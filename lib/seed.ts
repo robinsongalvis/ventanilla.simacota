@@ -23,7 +23,7 @@
  */
 
 import { doc, setDoc } from 'firebase/firestore';
-import { db }                      from './firebase';
+import { getDb }               from './firebase';
 import type { Radicado }           from '../src/types/radicado';
 
 /* ─────────────────────────────────────────────────────────────
@@ -242,7 +242,7 @@ export async function seedRadicadosPrueba(): Promise<void> {
   const radicados = buildRadicados();
 
   for (const r of radicados) {
-    await setDoc(doc(db, 'radicados', r.radicadoId), r);
+    await setDoc(doc(getDb(), 'radicados', r.radicadoId), r);
     console.log(`[seed] ✓ Radicado: ${r.radicadoId}`);
   }
 
@@ -255,7 +255,7 @@ export async function seedRadicadosPrueba(): Promise<void> {
  * and replace ADMIN_UID / GOB_UID at the top of this file.
  */
 export async function seedUsuariosPrueba(): Promise<void> {
-  await setDoc(doc(db, 'users', ADMIN_UID), {
+  await setDoc(doc(getDb(), 'users', ADMIN_UID), {
     nombre:   'Administrador',
     email:    'admin@simacota.gov.co',
     rol:      'ADMIN',
@@ -263,7 +263,7 @@ export async function seedUsuariosPrueba(): Promise<void> {
   });
   console.log('[seed] ✓ Usuario admin escritos en Firestore.');
 
-  await setDoc(doc(db, 'users', GOB_UID), {
+  await setDoc(doc(getDb(), 'users', GOB_UID), {
     nombre:   'Secretaría de Gobierno',
     email:    'gobierno@simacota.gov.co',
     rol:      'FUNCIONARIO',

@@ -9,7 +9,7 @@ import {
   where,
   type QueryConstraint,
 } from 'firebase/firestore';
-import { db }                    from '@/lib/firebase';
+import { getDb }                 from '@/lib/firebase';
 import type { Radicado, TenantId } from '@/src/types/radicado';
 import type { UsuarioAutenticado } from './useAuth';
 
@@ -78,6 +78,7 @@ export function useRadicados(
 
     constraints.push(orderBy('fechaCreacion', 'desc'));
 
+    const db = getDb();
     const q = query(collection(db, 'radicados'), ...constraints);
 
     const unsub = onSnapshot(

@@ -1,8 +1,10 @@
 'use client';
 
+export const dynamic = 'force-dynamic';
+
 import { useEffect, useMemo, useState } from 'react';
 import { signInWithEmailAndPassword }    from 'firebase/auth';
-import { auth }                          from '@/lib/firebase';
+import { getFirebaseAuth }              from '@/lib/firebase';
 import { useAuth }                       from '@/lib/hooks/useAuth';
 import { useRadicados }                  from '@/lib/hooks/useRadicados';
 import { ModalRadicado }                 from './components/ModalRadicado';
@@ -496,7 +498,7 @@ function FormLogin() {
     setError(null);
     setLoading(true);
     try {
-      await signInWithEmailAndPassword(auth, email.trim(), password);
+      await signInWithEmailAndPassword(getFirebaseAuth(), email.trim(), password);
     } catch {
       setError('Credenciales incorrectas. Verifica tu email y contraseña.');
     } finally {

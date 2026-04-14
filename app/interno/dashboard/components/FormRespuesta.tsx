@@ -2,7 +2,7 @@
 
 import { useState } from 'react';
 import { doc, updateDoc, arrayUnion } from 'firebase/firestore';
-import { db }                          from '@/lib/firebase';
+import { getDb }                        from '@/lib/firebase';
 import { generateWhatsAppReport }      from '@/lib/whatsapp';
 import type { EstadoRadicado, Radicado } from '@/src/types/radicado';
 import type { UsuarioAutenticado }       from '@/lib/hooks/useAuth';
@@ -133,7 +133,7 @@ export function FormRespuesta({ radicado, usuario, onExito }: Props) {
     };
 
     try {
-      await updateDoc(doc(db, 'radicados', radicado.radicadoId), {
+      await updateDoc(doc(getDb(), 'radicados', radicado.radicadoId), {
         estadoActual: nuevoEstado,
         auditoria:    arrayUnion(nuevaEntrada),
       });
@@ -159,7 +159,7 @@ export function FormRespuesta({ radicado, usuario, onExito }: Props) {
         console.groupEnd();
 
         // Audit entry for the WhatsApp notification
-        await updateDoc(doc(db, 'radicados', radicado.radicadoId), {
+        await updateDoc(doc(getDb(), 'radicados', radicado.radicadoId), {
           auditoria: arrayUnion({
             fecha:  new Date().toISOString(),
             accion: 'NOTIFICACION_WHATSAPP',

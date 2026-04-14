@@ -1,6 +1,6 @@
-import { initializeApp, getApps, getApp } from 'firebase/app';
-import { getFirestore }                    from 'firebase/firestore';
-import { getAuth }                         from 'firebase/auth';
+import { initializeApp, getApps, getApp, type FirebaseApp } from 'firebase/app';
+import { getFirestore, type Firestore }                       from 'firebase/firestore';
+import { getAuth, type Auth }                                 from 'firebase/auth';
 
 const firebaseConfig = {
   apiKey:            process.env.NEXT_PUBLIC_FIREBASE_API_KEY,
@@ -11,8 +11,34 @@ const firebaseConfig = {
   appId:             process.env.NEXT_PUBLIC_FIREBASE_APP_ID,
 };
 
-// Singleton: do not re-initialize if app already exists (hot-reload safe)
-const app = getApps().length ? getApp() : initializeApp(firebaseConfig);
+// ── Lazy singletons — safe for SSR/build-time ──────────────────────────────
+// Module-level init fires at bundle evaluation time (during Next.js build),
+// before env vars are available in the render context → Firebase crash.
+// Using getters defers init to the first call-site inside a useEffect.
 
-export const db   = getFirestore(app);
-export const auth = getAuth(app);
+let _app:  FirebaseApp | undefined;
+let _db:   Firestore   | undefined;
+let _auth: Auth        | undefined;
+
+function getFirebaseApp(): FirebaseApp {
+  if (!_app) {
+    if (!firebaseConfig.apiKey) {
+      throw new Error(
+        'Firebase API key no configurada. ' +
+        'Verifica las variables NEXT_PUBLIC_FIREBASE_* en .env.local y en Vercel.'
+      );
+    }
+    _app = getApps().length > 0 ? getApp() : initializeApp(firebaseConfig);
+  }
+  return _app;
+}
+
+export function getDb(): Firestore {
+  if (!_db) _db = getFirestore(getFirebaseApp());
+  return _db;
+}
+
+export function getFirebaseAuth(): Auth {
+  if (!_auth) _auth = getAuth(getFirebaseApp());
+  return _auth;
+}

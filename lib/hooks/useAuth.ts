@@ -3,7 +3,7 @@
 import { useEffect, useState } from 'react';
 import { onAuthStateChanged, signOut } from 'firebase/auth';
 import { doc, getDoc }                 from 'firebase/firestore';
-import { auth, db }                    from '@/lib/firebase';
+import { getFirebaseAuth, getDb }      from '@/lib/firebase';
 import type { TenantId }               from '@/src/types/radicado';
 
 export interface UsuarioAutenticado {
@@ -27,6 +27,8 @@ export function useAuth(): UseAuthReturn {
   const [error,    setError]    = useState<string | null>(null);
 
   useEffect(() => {
+    const auth = getFirebaseAuth();
+    const db   = getDb();
     const unsub = onAuthStateChanged(auth, async (firebaseUser) => {
       if (!firebaseUser) {
         setUsuario(null);
@@ -64,7 +66,7 @@ export function useAuth(): UseAuthReturn {
   }, []);
 
   const cerrarSesion = async () => {
-    await signOut(auth);
+    await signOut(getFirebaseAuth());
     setUsuario(null);
   };
 
