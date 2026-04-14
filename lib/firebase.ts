@@ -1,6 +1,7 @@
 import { initializeApp, getApps, getApp, type FirebaseApp } from 'firebase/app';
 import { getFirestore, type Firestore }                       from 'firebase/firestore';
 import { getAuth, type Auth }                                 from 'firebase/auth';
+import { getStorage as fbGetStorage, type FirebaseStorage }   from 'firebase/storage';
 
 const firebaseConfig = {
   apiKey:            process.env.NEXT_PUBLIC_FIREBASE_API_KEY,
@@ -16,9 +17,10 @@ const firebaseConfig = {
 // before env vars are available in the render context → Firebase crash.
 // Using getters defers init to the first call-site inside a useEffect.
 
-let _app:  FirebaseApp | undefined;
-let _db:   Firestore   | undefined;
-let _auth: Auth        | undefined;
+let _app:     FirebaseApp     | undefined;
+let _db:      Firestore       | undefined;
+let _auth:    Auth            | undefined;
+let _storage: FirebaseStorage | undefined;
 
 function getFirebaseApp(): FirebaseApp {
   if (!_app) {
@@ -41,4 +43,9 @@ export function getDb(): Firestore {
 export function getFirebaseAuth(): Auth {
   if (!_auth) _auth = getAuth(getFirebaseApp());
   return _auth;
+}
+
+export function getStorage(): FirebaseStorage {
+  if (!_storage) _storage = fbGetStorage(getFirebaseApp());
+  return _storage;
 }

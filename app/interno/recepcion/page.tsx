@@ -2,6 +2,8 @@
 
 import { useCallback, useEffect, useRef, useState } from 'react';
 import Link from 'next/link';
+import { radicarSolicitud } from '@/lib/radicacion';
+import type { UploadProgress } from '@/lib/storage';
 
 /* ══════════════════════════════════════════════════════════════
    TIPOS TYPESCRIPT
@@ -29,22 +31,6 @@ interface ErrorArchivo {
   razon:  string;
 }
 
-interface PayloadRecepcionFisica {
-  radicadoId:      string;
-  origen:          'FISICO_ESCANER';
-  fechaCreacion:   string;
-  ciudadano:       DatosCiudadanoFisico;
-  descripcion:     string;
-  notasInternas:   string;
-  archivos: {
-    nombre:    string;
-    tamanioKB: number;
-    tipo:      string;
-    orden:     number;
-  }[];
-  totalArchivos:   number;
-  totalTamanioMB:  number;
-}
 
 // Campos del formulario que tienen validación con touched
 type CampoForm = 'nombre' | 'cedula' | 'email' | 'telefono' | 'descripcion';
@@ -57,7 +43,6 @@ const MAX_ARCHIVOS           = 10;
 const MAX_BYTES_POR_ARCHIVO  = 10 * 1024 * 1024; // 10 MB
 const MAX_BYTES_TOTAL        = 50 * 1024 * 1024; // 50 MB
 const TIPOS_VALIDOS          = new Set(['application/pdf', 'image/jpeg', 'image/png', 'image/webp']);
-const CHARSET                = 'ABCDEFGHJKMNPQRSTUVWXYZ23456789'; // Sin O/0/I/1/L
 const CEDULA_RE              = /^[0-9]{6,10}$/;
 const EMAIL_RE               = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 const TEL_DIGITS_RE          = /^3[0-9]{9}$/; // 10 dígitos colombianos
@@ -65,17 +50,6 @@ const TEL_DIGITS_RE          = /^3[0-9]{9}$/; // 10 dígitos colombianos
 /* ══════════════════════════════════════════════════════════════
    UTILIDADES
 ══════════════════════════════════════════════════════════════ */
-
-/** Genera ID único: EXT-YYYY-MM-DD-HHmmss-XXXX */
-function generarRadicadoId(): string {
-  const now    = new Date();
-  const date   = now.toISOString().split('T')[0];
-  const time   = now.toTimeString().slice(0, 8).replace(/:/g, '');
-  const sufijo = Array.from({ length: 4 }, () =>
-    CHARSET[Math.floor(Math.random() * CHARSET.length)]
-  ).join('');
-  return `EXT-${date}-${time}-${sufijo}`;
-}
 
 /** ID único para keys de React (no criptográfico) */
 function uid(): string {
@@ -329,66 +303,145 @@ function IconoCheck() {
    SUB-COMPONENTE: PantallaConfirmacion (adaptada para FÍSICO)
 ══════════════════════════════════════════════════════════════ */
 
+interface DatosComprobante {
+  nombre:       string;
+  cedula:       string;
+  telefono:     string;
+  descripcion:  string;
+  archivos:     string[];  // nombres de los archivos
+  fechaStr:     string;    // Fecha ya formateada
+}
+
 function PantallaConfirmacion({
   radicadoId,
   totalArchivos,
+  errores,
+  datosComprobante,
   onNuevo,
 }: {
-  radicadoId:    string;
-  totalArchivos: number;
-  onNuevo:       () => void;
+  radicadoId:       string;
+  totalArchivos:    number;
+  errores:          string[];
+  datosComprobante: DatosComprobante;
+  onNuevo:          () => void;
 }) {
+  function imprimirComprobante() {
+    window.print();
+  }
+
   return (
-    <div className="flex flex-col items-center justify-center py-16 px-6 text-center animate-fade-in-up">
-      <div className="mb-8"><IconoCheck /></div>
-
-      <p className="text-[10px] font-bold uppercase tracking-widest text-emerald-400 mb-3">
-        Registro físico completado
-      </p>
-      <h2
-        className="text-2xl font-black tracking-tighter text-slate-50 mb-3"
-        style={{ fontFamily: 'var(--font-manrope)' }}
-      >
-        Radicado registrado como recepción física
-      </h2>
-      <p className="text-slate-400 text-sm leading-relaxed max-w-sm mb-2">
-        La solicitud fue radicada y será procesada por el sistema de IA (OCR + clasificación).
-      </p>
-      <p className="text-slate-500 text-xs mb-8">
-        Origen:{' '}
-        <span className="text-indigo-400 font-bold">FÍSICO (ESCÁNER)</span>
-        {' '}—{' '}
-        <span className="text-slate-400">{totalArchivos} documento{totalArchivos !== 1 ? 's' : ''} adjunto{totalArchivos !== 1 ? 's' : ''}</span>
-      </p>
-
-      {/* Radicado ID */}
-      <div
-        className="w-full max-w-sm rounded-2xl border border-white/10 p-6 mb-8"
-        style={{ background: 'rgba(15,23,42,0.40)', backdropFilter: 'blur(25px)' }}
-      >
-        <p className="text-[10px] font-bold uppercase tracking-widest text-slate-500 mb-3">
-          Número de radicado
-        </p>
-        <p
-          className="text-2xl font-black tracking-widest text-indigo-400 break-all"
-          style={{ fontFamily: 'var(--font-manrope)' }}
-        >
-          {radicadoId}
-        </p>
-        <p className="text-slate-500 text-xs mt-3">
-          Informe este número al ciudadano para seguimiento de su caso.
-        </p>
+    <>
+      {/* ── Comprobante imprimible — oculto en pantalla, visible al imprimir ── */}
+      <div id="comprobante-imprimir" className="hidden print:block text-black text-sm font-mono p-8">
+        <div className="border-b border-black pb-3 mb-4">
+          <p className="font-bold text-base">ALCALDÍA DE SIMACOTA</p>
+          <p className="font-bold">VENTANILLA ÚNICA DIGITAL</p>
+          <p className="font-bold">COMPROBANTE DE RADICACIÓN</p>
+        </div>
+        <p><strong>Número de radicado:</strong> {radicadoId}</p>
+        <p><strong>Fecha:</strong> {datosComprobante.fechaStr}</p>
+        <p><strong>Origen:</strong> Recepción Física</p>
+        <div className="border-t border-black pt-3 mt-3">
+          <p><strong>Ciudadano:</strong> {datosComprobante.nombre}</p>
+          <p><strong>Cédula:</strong> {datosComprobante.cedula}</p>
+          <p><strong>Teléfono:</strong> {datosComprobante.telefono}</p>
+        </div>
+        <div className="border-t border-black pt-3 mt-3">
+          <p><strong>Documentos recibidos:</strong> {datosComprobante.archivos.length}</p>
+          {datosComprobante.archivos.map((a, i) => (
+            <p key={i} className="ml-4">{i + 1}. {a}</p>
+          ))}
+        </div>
+        <div className="border-t border-black pt-3 mt-3">
+          <p><strong>Descripción:</strong></p>
+          <p className="mt-1 leading-relaxed">{datosComprobante.descripcion}</p>
+        </div>
+        <div className="border-t border-black pt-3 mt-3">
+          <p>Conserve este comprobante.</p>
+          <p>Consulte el estado en: /consulta</p>
+        </div>
       </div>
 
-      <button
-        onClick={onNuevo}
-        className="w-full max-w-sm py-4 px-6 rounded-xl font-bold text-sm uppercase tracking-wider text-white
-          bg-gradient-to-r from-indigo-600 to-indigo-500 hover:from-indigo-500 hover:to-indigo-400
-          hover:shadow-lg hover:shadow-indigo-500/25 transition-all duration-300"
-      >
-        Registrar siguiente solicitud
-      </button>
-    </div>
+      {/* ── Pantalla de éxito — oculta al imprimir ── */}
+      <div className="flex flex-col items-center justify-center py-16 px-6 text-center animate-fade-in-up print:hidden">
+        <div className="mb-8"><IconoCheck /></div>
+
+        <p className="text-[10px] font-bold uppercase tracking-widest text-emerald-400 mb-3">
+          Registro físico completado
+        </p>
+        <h2
+          className="text-2xl font-black tracking-tighter text-slate-50 mb-3"
+          style={{ fontFamily: 'var(--font-manrope)' }}
+        >
+          Radicado registrado como recepción física
+        </h2>
+        <p className="text-slate-400 text-sm leading-relaxed max-w-sm mb-2">
+          La solicitud fue radicada y será procesada por el sistema de IA (OCR + clasificación).
+        </p>
+        <p className="text-slate-500 text-xs mb-6">
+          Origen:{' '}
+          <span className="text-indigo-400 font-bold">FÍSICO (ESCÁNER)</span>
+          {' '}—{' '}
+          <span className="text-slate-400">{totalArchivos} documento{totalArchivos !== 1 ? 's' : ''} adjunto{totalArchivos !== 1 ? 's' : ''}</span>
+        </p>
+
+        {/* Advertencias parciales */}
+        {errores.length > 0 && (
+          <div className="w-full max-w-sm rounded-xl border border-amber-500/30 bg-amber-500/10 p-4 mb-6 text-left">
+            <p className="text-xs font-bold uppercase tracking-widest text-amber-400 mb-2">Advertencias</p>
+            <ul className="space-y-1">
+              {errores.map((e, i) => (
+                <li key={i} className="text-xs text-amber-300/80 leading-relaxed">• {e}</li>
+              ))}
+            </ul>
+          </div>
+        )}
+
+        {/* Radicado ID */}
+        <div
+          className="w-full max-w-sm rounded-2xl border border-white/10 p-6 mb-6"
+          style={{ background: 'rgba(15,23,42,0.40)', backdropFilter: 'blur(25px)' }}
+        >
+          <p className="text-[10px] font-bold uppercase tracking-widest text-slate-500 mb-3">
+            Número de radicado
+          </p>
+          <p
+            className="text-2xl font-black tracking-widest text-indigo-400 break-all"
+            style={{ fontFamily: 'var(--font-manrope)' }}
+          >
+            {radicadoId}
+          </p>
+          <p className="text-slate-500 text-xs mt-3">
+            Informe este número al ciudadano para seguimiento de su caso.
+          </p>
+        </div>
+
+        <div className="flex flex-col gap-3 w-full max-w-sm">
+          {/* Imprimir comprobante */}
+          <button
+            onClick={imprimirComprobante}
+            className="w-full py-3 px-6 rounded-xl font-bold text-sm uppercase tracking-wider
+              border border-emerald-500/40 text-emerald-400 hover:border-emerald-500 hover:bg-emerald-500/10
+              transition-all duration-300 flex items-center justify-center gap-2"
+          >
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} className="w-4 h-4">
+              <path strokeLinecap="round" strokeLinejoin="round" d="M6.72 13.829c-.24.03-.48.062-.72.096m.72-.096a42.415 42.415 0 0110.56 0m-10.56 0L6.34 18m10.94-4.171c.24.03.48.062.72.096m-.72-.096L17.66 18m0 0l.229 2.523a1.125 1.125 0 01-1.12 1.227H7.231c-.662 0-1.18-.568-1.12-1.227L6.34 18m11.318 0h1.091A2.25 2.25 0 0021 15.75V9.456c0-1.081-.768-2.015-1.837-2.175a48.055 48.055 0 00-1.913-.247M6.34 18H5.25A2.25 2.25 0 013 15.75V9.456c0-1.081.768-2.015 1.837-2.175a48.041 48.041 0 011.913-.247m10.5 0a48.536 48.536 0 00-10.5 0m10.5 0V3.375c0-.621-.504-1.125-1.125-1.125h-8.25c-.621 0-1.125.504-1.125 1.125v3.659M18 10.5h.008v.008H18V10.5zm-3 0h.008v.008H15V10.5z" />
+            </svg>
+            Imprimir comprobante
+          </button>
+
+          {/* Registrar siguiente */}
+          <button
+            onClick={onNuevo}
+            className="w-full py-4 px-6 rounded-xl font-bold text-sm uppercase tracking-wider text-white
+              bg-gradient-to-r from-indigo-600 to-indigo-500 hover:from-indigo-500 hover:to-indigo-400
+              hover:shadow-lg hover:shadow-indigo-500/25 transition-all duration-300"
+          >
+            Registrar siguiente solicitud
+          </button>
+        </div>
+      </div>
+    </>
   );
 }
 
@@ -425,6 +478,12 @@ export default function RecepcionFisica() {
   /* ── UI ── */
   const [estado,      setEstado]      = useState<'formulario' | 'enviando' | 'confirmacion'>('formulario');
   const [radicadoId,  setRadicadoId]  = useState('');
+
+  /* ── Progreso de envío ── */
+  const [progresoMensaje,   setProgresoMensaje]   = useState('');
+  const [progresoPct,       setProgresoPct]       = useState(0);
+  const [progresosArchivos, setProgresosArchivos] = useState<UploadProgress[]>([]);
+  const [erroresSubmit,     setErroresSubmit]     = useState<string[]>([]);
 
   /* ── Ref para cleanup de object URLs en unmount ── */
   const archivosRef = useRef(archivos);
@@ -585,41 +644,32 @@ export default function RecepcionFisica() {
     }
 
     setEstado('enviando');
+    setProgresoMensaje('Iniciando radicación...');
+    setProgresoPct(0);
+    setProgresosArchivos([]);
 
-    const id              = generarRadicadoId();
-    const totalKB         = archivos.reduce((s, a) => s + a.tamanioKB, 0);
-    const totalTamanioMB  = parseFloat((totalKB / 1024).toFixed(2));
-
-    const payload: PayloadRecepcionFisica = {
-      radicadoId:     id,
-      origen:         'FISICO_ESCANER',
-      fechaCreacion:  new Date().toISOString(),
-      ciudadano: {
-        nombre:   form.nombre.trim(),
-        cedula:   form.cedula.trim(),
-        email:    form.email.trim().toLowerCase(),
-        telefono: form.telefono.replace(/\s/g, ''),
+    const res = await radicarSolicitud(
+      {
+        origen: 'FISICO_ESCANER',
+        ciudadano: {
+          nombre:   form.nombre.trim(),
+          email:    form.email.trim().toLowerCase(),
+          telefono: form.telefono.replace(/\s/g, ''),
+          cedula:   form.cedula.trim(),
+        },
+        descripcion:    form.descripcion.trim(),
+        notasInternas:  form.notasInternas.trim() || undefined,
+        archivos:       archivos.map((a) => a.archivo),
       },
-      descripcion:    form.descripcion.trim(),
-      notasInternas:  form.notasInternas.trim(),
-      archivos: archivos.map((a) => ({
-        nombre:    a.nombre,
-        tamanioKB: a.tamanioKB,
-        tipo:      a.tipo,
-        orden:     a.orden,
-      })),
-      totalArchivos:  archivos.length,
-      totalTamanioMB,
-    };
+      (mensaje, pct, progresos) => {
+        setProgresoMensaje(mensaje);
+        setProgresoPct(pct);
+        if (progresos) setProgresosArchivos(progresos);
+      },
+    );
 
-    // [DEV] Simular envío al webhook de n8n (OCR processing)
-    console.group('%c[VENTANILLA ÚNICA] Recepción Física → n8n/OCR', 'color:#6366F1;font-weight:bold');
-    console.log('Payload:', JSON.stringify(payload, null, 2));
-    console.groupEnd();
-
-    await new Promise<void>((resolve) => setTimeout(resolve, 1800));
-
-    setRadicadoId(id);
+    setErroresSubmit(res.errores);
+    setRadicadoId(res.radicadoId);
     setEstado('confirmacion');
   }
 
@@ -638,6 +688,10 @@ export default function RecepcionFisica() {
     setEliminando(new Set());
     setEstado('formulario');
     setRadicadoId('');
+    setProgresoMensaje('');
+    setProgresoPct(0);
+    setProgresosArchivos([]);
+    setErroresSubmit([]);
     if (fileInputRef.current) fileInputRef.current.value = '';
   }
 
@@ -733,6 +787,18 @@ export default function RecepcionFisica() {
             <PantallaConfirmacion
               radicadoId={radicadoId}
               totalArchivos={archivos.length}
+              errores={erroresSubmit}
+              datosComprobante={{
+                nombre:      form.nombre.trim(),
+                cedula:      form.cedula.trim(),
+                telefono:    form.telefono.replace(/\s/g, ''),
+                descripcion: form.descripcion.trim(),
+                archivos:    archivos.map((a) => a.nombre),
+                fechaStr:    new Date().toLocaleString('es-CO', {
+                  year: 'numeric', month: 'long', day: 'numeric',
+                  hour: '2-digit', minute: '2-digit',
+                }),
+              }}
               onNuevo={resetFormulario}
             />
           </div>
@@ -1102,7 +1168,46 @@ export default function RecepcionFisica() {
               </div>
 
               {/* ── Botón submit (barra inferior de la tarjeta) ── */}
-              <div className="px-6 sm:px-8 pb-6 sm:pb-8 pt-4 border-t border-white/[0.06]">
+              <div className="px-6 sm:px-8 pb-6 sm:pb-8 pt-4 border-t border-white/[0.06] space-y-3">
+                {/* Barra de progreso — visible solo mientras se envía */}
+                {isEnviando && (
+                  <div className="rounded-xl border border-white/10 p-4 bg-slate-800/40">
+                    <div className="flex items-center justify-between mb-1.5">
+                      <span className="text-xs text-slate-400">{progresoMensaje}</span>
+                      <span className="text-xs font-bold tabular-nums text-indigo-400">{progresoPct}%</span>
+                    </div>
+                    <div className="h-2 bg-slate-800/50 rounded-full overflow-hidden mb-3">
+                      <div
+                        className="h-full bg-indigo-500 rounded-full transition-all duration-500"
+                        style={{ width: `${progresoPct}%` }}
+                      />
+                    </div>
+                    {progresosArchivos.length > 0 && (
+                      <ul className="space-y-1.5">
+                        {progresosArchivos.map((p, i) => (
+                          <li key={i} className="flex items-center gap-2 text-xs text-slate-500">
+                            {p.estado === 'completado' ? (
+                              <svg viewBox="0 0 24 24" fill="none" stroke="#10B981" strokeWidth={2.5} className="w-3.5 h-3.5 shrink-0">
+                                <path strokeLinecap="round" strokeLinejoin="round" d="M4.5 12.75l6 6 9-13.5" />
+                              </svg>
+                            ) : p.estado === 'error' ? (
+                              <svg viewBox="0 0 24 24" fill="none" stroke="#F43F5E" strokeWidth={2} className="w-3.5 h-3.5 shrink-0">
+                                <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
+                              </svg>
+                            ) : (
+                              <svg viewBox="0 0 24 24" fill="none" stroke="#6366F1" strokeWidth={2} className="w-3.5 h-3.5 shrink-0 animate-spin-smooth">
+                                <path strokeLinecap="round" strokeLinejoin="round" d="M16.023 9.348h4.992v-.001M2.985 19.644v-4.992m0 0h4.992m-4.993 0l3.181 3.183a8.25 8.25 0 0013.803-3.7M4.031 9.865a8.25 8.25 0 0113.803-3.7l3.181 3.182m0-4.991v4.99" />
+                              </svg>
+                            )}
+                            <span className="truncate max-w-[200px]">{p.archivo}</span>
+                            <span className="ml-auto tabular-nums text-slate-600">{p.porcentaje}%</span>
+                          </li>
+                        ))}
+                      </ul>
+                    )}
+                  </div>
+                )}
+
                 <button
                   type="submit"
                   disabled={isEnviando}

@@ -2,18 +2,12 @@
 
 import { useCallback, useRef, useState } from 'react';
 import Link from 'next/link';
+import { radicarSolicitud, type ResultadoRadicacion } from '@/lib/radicacion';
+import type { UploadProgress } from '@/lib/storage';
 
 /* ══════════════════════════════════════════════════════════════
    TIPOS TYPESCRIPT
 ══════════════════════════════════════════════════════════════ */
-
-type OrigenRadicado = 'WEB' | 'FISICO_ESCANER';
-
-interface DatosCiudadano {
-  nombre: string;
-  email: string;
-  telefono: string;
-}
 
 interface FormData {
   nombre: string;
@@ -24,14 +18,6 @@ interface FormData {
 
 type CampoForm = keyof FormData;
 
-interface FormularioRadicacionPayload {
-  radicadoId: string;
-  origen: OrigenRadicado;
-  fechaCreacion: string;
-  ciudadano: DatosCiudadano;
-  descripcion: string;
-  archivos: { nombre: string; tamanioKB: number }[];
-}
 
 /* ══════════════════════════════════════════════════════════════
    CONSTANTES DE VALIDACIÓN
@@ -43,24 +29,9 @@ const MAX_ARCHIVOS  = 3;
 const MAX_BYTES     = 5 * 1024 * 1024; // 5 MB
 const TIPOS_VALIDOS = new Set(['application/pdf', 'image/jpeg', 'image/png']);
 
-/* Charset para el sufijo del radicadoId — sin caracteres ambiguos O/0/I/1/L */
-const CHARSET = 'ABCDEFGHJKMNPQRSTUVWXYZ23456789';
-
 /* ══════════════════════════════════════════════════════════════
    UTILIDADES
 ══════════════════════════════════════════════════════════════ */
-
-/** Genera un ID único: EXT-YYYY-MM-DD-HHmmss-XXXX */
-function generarRadicadoId(): string {
-  const now  = new Date();
-  const date = now.toISOString().split('T')[0];                      // YYYY-MM-DD
-  const time = now.toTimeString().slice(0, 8).replace(/:/g, '');    // HHmmss
-  const sufijo = Array.from(
-    { length: 4 },
-    () => CHARSET[Math.floor(Math.random() * CHARSET.length)]
-  ).join('');
-  return `EXT-${date}-${time}-${sufijo}`;
-}
 
 /** Formatea bytes a texto legible */
 function formatBytes(bytes: number): string {
@@ -146,11 +117,22 @@ function IconoCheck() {
 /** Pantalla de confirmación post-submit */
 function PantallaConfirmacion({
   radicadoId,
+  errores,
   onNueva,
 }: {
   radicadoId: string;
-  onNueva: () => void;
+  errores:    string[];
+  onNueva:    () => void;
 }) {
+  const [copiado, setCopiado] = useState(false);
+
+  function copiarRadicado() {
+    navigator.clipboard.writeText(radicadoId).then(() => {
+      setCopiado(true);
+      setTimeout(() => setCopiado(false), 2000);
+    });
+  }
+
   return (
     <div className="flex flex-col items-center justify-center py-12 px-4 text-center animate-fade-in-up">
       {/* Ícono */}
@@ -170,15 +152,32 @@ function PantallaConfirmacion({
         Recibirá respuesta por WhatsApp en los próximos días hábiles.
       </p>
 
+      {/* Advertencias parciales (archivos fallidos, webhook caído, etc.) */}
+      {errores.length > 0 && (
+        <div className="w-full max-w-sm rounded-xl border border-amber-500/30 bg-amber-500/10 p-4 mb-6 text-left">
+          <p className="text-xs font-bold uppercase tracking-widest text-amber-400 mb-2">
+            Advertencias
+          </p>
+          <ul className="space-y-1">
+            {errores.map((e, i) => (
+              <li key={i} className="text-xs text-amber-300/80 leading-relaxed">
+                • {e}
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
+
       {/* Número de radicado */}
       <div
-        className="w-full max-w-sm rounded-2xl border border-white/10 p-6 mb-8"
+        className="w-full max-w-sm rounded-2xl border border-white/10 p-6 mb-6"
         style={{ background: 'rgba(15,23,42,0.40)', backdropFilter: 'blur(25px)' }}
       >
         <p className="text-xs font-bold uppercase tracking-widest text-slate-500 mb-3">
           Número de radicado
         </p>
-        <p className="text-2xl font-black tracking-widest text-indigo-400 break-all"
+        <p
+          className="text-2xl font-black tracking-widest text-indigo-400 break-all"
           style={{ fontFamily: 'var(--font-manrope)' }}
         >
           {radicadoId}
@@ -189,22 +188,48 @@ function PantallaConfirmacion({
       </div>
 
       {/* Acciones */}
-      <div className="flex flex-col sm:flex-row gap-3 w-full max-w-sm">
+      <div className="flex flex-col gap-3 w-full max-w-sm">
+        {/* Copiar número */}
+        <button
+          onClick={copiarRadicado}
+          className="w-full py-3 px-6 rounded-xl font-bold text-sm uppercase tracking-wider transition-all duration-300
+            border border-indigo-500/40 text-indigo-400 hover:border-indigo-500 hover:bg-indigo-500/10 flex items-center justify-center gap-2"
+        >
+          {copiado ? (
+            <>
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2.5} className="w-4 h-4">
+                <path strokeLinecap="round" strokeLinejoin="round" d="M4.5 12.75l6 6 9-13.5" />
+              </svg>
+              ¡Copiado!
+            </>
+          ) : (
+            <>
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} className="w-4 h-4">
+                <path strokeLinecap="round" strokeLinejoin="round" d="M15.75 17.25v3.375c0 .621-.504 1.125-1.125 1.125h-9.75a1.125 1.125 0 01-1.125-1.125V7.875c0-.621.504-1.125 1.125-1.125H6.75a9.06 9.06 0 011.5.124m7.5 10.376h3.375c.621 0 1.125-.504 1.125-1.125V11.25c0-4.46-3.243-8.161-7.5-8.876a9.06 9.06 0 00-1.5-.124H9.375c-.621 0-1.125.504-1.125 1.125v3.5m7.5 10.375H9.375a1.125 1.125 0 01-1.125-1.125v-9.25m12 6.625v-1.875a3.375 3.375 0 00-3.375-3.375h-1.5a1.125 1.125 0 01-1.125-1.125v-1.5a3.375 3.375 0 00-3.375-3.375H9.75" />
+              </svg>
+              Copiar número de radicado
+            </>
+          )}
+        </button>
+
+        {/* Consultar estado */}
+        <Link
+          href={`/consulta?id=${radicadoId}`}
+          className="w-full py-3 px-6 rounded-xl font-bold text-sm uppercase tracking-wider text-white text-center
+            bg-gradient-to-r from-indigo-600 to-indigo-500 hover:from-indigo-500 hover:to-indigo-400
+            hover:shadow-lg hover:shadow-indigo-500/25 transition-all duration-300"
+        >
+          Consultar estado de mi solicitud
+        </Link>
+
+        {/* Radicar otra */}
         <button
           onClick={onNueva}
-          className="flex-1 py-3 px-6 rounded-xl font-bold text-sm uppercase tracking-wider text-white transition-all duration-300
-            bg-gradient-to-r from-indigo-600 to-indigo-500 hover:from-indigo-500 hover:to-indigo-400
-            hover:shadow-lg hover:shadow-indigo-500/25"
+          className="w-full py-3 px-6 rounded-xl font-bold text-sm uppercase tracking-wider text-slate-400
+            border border-white/10 hover:border-white/20 hover:text-slate-200 transition-all duration-300"
         >
           Radicar otra solicitud
         </button>
-        <Link
-          href="/"
-          className="flex-1 py-3 px-6 rounded-xl font-bold text-sm uppercase tracking-wider text-slate-400
-            border border-white/10 hover:border-white/20 hover:text-slate-200 transition-all duration-300 text-center"
-        >
-          Ir al inicio
-        </Link>
       </div>
     </div>
   );
@@ -242,6 +267,13 @@ export default function PortalCiudadano() {
   /* Estado de UI */
   const [estado, setEstado] = useState<'formulario' | 'enviando' | 'confirmacion'>('formulario');
   const [radicadoId, setRadicadoId] = useState('');
+
+  /* Progreso de envío */
+  const [progresoMensaje,    setProgresoMensaje]    = useState('');
+  const [progresoPct,        setProgresoPct]        = useState(0);
+  const [progresosArchivos,  setProgresosArchivos]  = useState<UploadProgress[]>([]);
+  const [erroresSubmit,      setErroresSubmit]      = useState<string[]>([]);
+  const [resultado,          setResultado]          = useState<ResultadoRadicacion | null>(null);
 
   /* ── Handlers de campos ── */
 
@@ -319,33 +351,31 @@ export default function PortalCiudadano() {
     }
 
     setEstado('enviando');
+    setProgresoMensaje('Iniciando radicación...');
+    setProgresoPct(0);
+    setProgresosArchivos([]);
 
-    const id = generarRadicadoId();
-    const payload: FormularioRadicacionPayload = {
-      radicadoId:    id,
-      origen:        'WEB',
-      fechaCreacion: new Date().toISOString(),
-      ciudadano: {
-        nombre:   form.nombre.trim(),
-        email:    form.email.trim().toLowerCase(),
-        telefono: form.telefono.replace(/\s/g, ''),
+    const res = await radicarSolicitud(
+      {
+        origen: 'WEB',
+        ciudadano: {
+          nombre:   form.nombre.trim(),
+          email:    form.email.trim().toLowerCase(),
+          telefono: form.telefono.replace(/\s/g, ''),
+        },
+        descripcion: form.descripcion.trim(),
+        archivos,
       },
-      descripcion: form.descripcion.trim(),
-      archivos: archivos.map((a) => ({
-        nombre:    a.name,
-        tamanioKB: Math.round(a.size / 1024),
-      })),
-    };
+      (mensaje, pct, progresos) => {
+        setProgresoMensaje(mensaje);
+        setProgresoPct(pct);
+        if (progresos) setProgresosArchivos(progresos);
+      },
+    );
 
-    // [DEV] Simular envío al webhook de n8n
-    console.group(`%c[VENTANILLA ÚNICA] Radicación → n8n`, 'color:#6366F1;font-weight:bold');
-    console.log('Payload:', JSON.stringify(payload, null, 2));
-    console.groupEnd();
-
-    // Simular latencia de red
-    await new Promise<void>((resolve) => setTimeout(resolve, 1800));
-
-    setRadicadoId(id);
+    setResultado(res);
+    setErroresSubmit(res.errores);
+    setRadicadoId(res.radicadoId);
     setEstado('confirmacion');
   }
 
@@ -359,6 +389,11 @@ export default function PortalCiudadano() {
     setErrorArchivo('');
     setEstado('formulario');
     setRadicadoId('');
+    setProgresoMensaje('');
+    setProgresoPct(0);
+    setProgresosArchivos([]);
+    setErroresSubmit([]);
+    setResultado(null);
     if (fileInputRef.current) fileInputRef.current.value = '';
   }
 
@@ -449,7 +484,11 @@ export default function PortalCiudadano() {
             className="rounded-2xl border border-white/10"
             style={{ background: 'rgba(15,23,42,0.40)', backdropFilter: 'blur(25px)' }}
           >
-            <PantallaConfirmacion radicadoId={radicadoId} onNueva={resetFormulario} />
+            <PantallaConfirmacion
+              radicadoId={radicadoId}
+              errores={erroresSubmit}
+              onNueva={resetFormulario}
+            />
           </div>
         ) : (
           <>
@@ -731,6 +770,48 @@ export default function PortalCiudadano() {
                 className="pt-2 field-animate"
                 style={{ animationDelay: `${STAGGER[5]}ms` }}
               >
+                {/* Barra de progreso — visible solo mientras se envía */}
+                {estado === 'enviando' && (
+                  <div className="mb-4 rounded-xl border border-white/10 p-4 bg-slate-800/40">
+                    {/* Barra global */}
+                    <div className="flex items-center justify-between mb-1.5">
+                      <span className="text-xs text-slate-400">{progresoMensaje}</span>
+                      <span className="text-xs font-bold tabular-nums text-indigo-400">{progresoPct}%</span>
+                    </div>
+                    <div className="h-2 bg-slate-800/50 rounded-full overflow-hidden mb-3">
+                      <div
+                        className="h-full bg-indigo-500 rounded-full transition-all duration-500"
+                        style={{ width: `${progresoPct}%` }}
+                      />
+                    </div>
+
+                    {/* Progreso por archivo */}
+                    {progresosArchivos.length > 0 && (
+                      <ul className="space-y-1.5">
+                        {progresosArchivos.map((p, i) => (
+                          <li key={i} className="flex items-center gap-2 text-xs text-slate-500">
+                            {p.estado === 'completado' ? (
+                              <svg viewBox="0 0 24 24" fill="none" stroke="#10B981" strokeWidth={2.5} className="w-3.5 h-3.5 shrink-0">
+                                <path strokeLinecap="round" strokeLinejoin="round" d="M4.5 12.75l6 6 9-13.5" />
+                              </svg>
+                            ) : p.estado === 'error' ? (
+                              <svg viewBox="0 0 24 24" fill="none" stroke="#F43F5E" strokeWidth={2} className="w-3.5 h-3.5 shrink-0">
+                                <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
+                              </svg>
+                            ) : (
+                              <svg viewBox="0 0 24 24" fill="none" stroke="#6366F1" strokeWidth={2} className="w-3.5 h-3.5 shrink-0 animate-spin-smooth">
+                                <path strokeLinecap="round" strokeLinejoin="round" d="M16.023 9.348h4.992v-.001M2.985 19.644v-4.992m0 0h4.992m-4.993 0l3.181 3.183a8.25 8.25 0 0013.803-3.7M4.031 9.865a8.25 8.25 0 0113.803-3.7l3.181 3.182m0-4.991v4.99" />
+                              </svg>
+                            )}
+                            <span className="truncate max-w-[160px]">{p.archivo}</span>
+                            <span className="ml-auto tabular-nums text-slate-600">{p.porcentaje}%</span>
+                          </li>
+                        ))}
+                      </ul>
+                    )}
+                  </div>
+                )}
+
                 <button
                   type="submit"
                   disabled={estado === 'enviando'}
