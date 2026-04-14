@@ -23,8 +23,8 @@
  */
 
 import { doc, setDoc, Timestamp } from 'firebase/firestore';
-import { db }                      from '@/lib/firebase';
-import type { Radicado }           from '@/src/types/radicado';
+import { db }                      from './firebase';
+import type { Radicado }           from '../src/types/radicado';
 
 /* ─────────────────────────────────────────────────────────────
    Replace with the actual UIDs after creating Auth accounts

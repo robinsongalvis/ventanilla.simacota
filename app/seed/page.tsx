@@ -1,7 +1,6 @@
 'use client';
 
 import React, { useState } from 'react';
-// Usamos ruta relativa para evitar errores de configuración de alias en Vercel
 import { seedTodo } from '../../lib/seed';
 
 export default function SeedPage() {
