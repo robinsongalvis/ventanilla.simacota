@@ -22,7 +22,7 @@
  *      await seedRadicadosPrueba();
  */
 
-import { doc, setDoc, Timestamp } from 'firebase/firestore';
+import { doc, setDoc } from 'firebase/firestore';
 import { db }                      from './firebase';
 import type { Radicado }           from '../src/types/radicado';
 
