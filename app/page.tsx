@@ -57,7 +57,7 @@ export default function HomePage() {
             </div>
           </div>
           <Link
-            href="/ventanilla"
+            href="/interno/dashboard"
             className="font-label text-slate-400 hover:text-slate-200 transition-colors text-[11px]"
           >
             Acceso funcionarios →

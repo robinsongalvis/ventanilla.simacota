@@ -430,7 +430,7 @@ function ConsultaInterna() {
             el número que apareció en la pantalla de confirmación.
           </p>
           <Link
-            href="/ciudadano/radicar"
+            href="/radicacion"
             className="inline-flex items-center gap-2 text-xs font-bold uppercase tracking-wider
               text-indigo-400 hover:text-indigo-300 transition-colors"
           >
