@@ -184,7 +184,7 @@ function ConsultaInterna() {
     >
       {/* ── Header ── */}
       <header className="border-b border-white/[0.06] backdrop-blur-[20px] bg-[#0A0A0B]/70">
-        <div className="max-w-2xl mx-auto px-4 sm:px-6 py-5 flex items-center gap-3">
+        <div className="max-w-4xl mx-auto px-4 sm:px-6 py-5 flex items-center gap-3">
           <div className="w-9 h-9 rounded-xl border border-indigo-500/30 bg-indigo-500/15 flex items-center justify-center shrink-0">
             <svg viewBox="0 0 24 24" fill="none" stroke="#6366F1" strokeWidth={2} className="w-5 h-5">
               <path strokeLinecap="round" strokeLinejoin="round" d="M12 3l8 4v5c0 5.25-3.5 10.15-8 11.5C7.5 22.15 4 17.25 4 12V7l8-4z" />
@@ -207,7 +207,7 @@ function ConsultaInterna() {
         </div>
       </header>
 
-      <div className="max-w-2xl mx-auto px-4 sm:px-6 py-10 sm:py-16 space-y-6">
+      <div className="max-w-4xl mx-auto px-4 sm:px-6 py-10 sm:py-16 space-y-6">
 
         {/* ── Título ── */}
         <div className="text-center mb-8">

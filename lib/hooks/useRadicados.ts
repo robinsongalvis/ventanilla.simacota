@@ -106,6 +106,7 @@ export function useRadicados(
       unsub();
       unsubRef.current = null;
     };
+  // eslint-disable-next-line react-hooks/exhaustive-deps -- intentionally using granular fields to avoid re-subscribing when unrelated user fields change
   }, [usuario?.uid, usuario?.rol, usuario?.tenantId, tenantFiltro]);
 
   return { radicados, cargando, error };

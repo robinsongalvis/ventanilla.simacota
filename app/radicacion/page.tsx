@@ -348,7 +348,7 @@ export default function PortalCiudadano() {
     >
       {/* ── Header ── */}
       <header className="sticky top-0 z-50 border-b border-white/[0.06] backdrop-blur-[20px] bg-[#0A0A0B]/70">
-        <div className="max-w-2xl mx-auto px-4 sm:px-6 py-4 flex items-center gap-3">
+        <div className="max-w-4xl mx-auto px-4 sm:px-6 py-4 flex items-center gap-3">
           <Link
             href="/"
             aria-label="Volver al inicio"
@@ -383,7 +383,7 @@ export default function PortalCiudadano() {
       </header>
 
       {/* ── Contenido principal ── */}
-      <div className="max-w-2xl mx-auto px-4 sm:px-6 py-10 sm:py-16">
+      <div className="max-w-4xl mx-auto px-4 sm:px-6 py-10 sm:py-16">
 
         {estado === 'confirmacion' ? (
           <div

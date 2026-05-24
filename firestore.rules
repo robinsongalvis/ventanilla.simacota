@@ -1,0 +1,149 @@
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+    function signedIn() {
+      return request.auth != null;
+    }
+
+    function userPath() {
+      return /databases/$(database)/documents/users/$(request.auth.uid);
+    }
+
+    function hasUserProfile() {
+      return signedIn() && exists(userPath());
+    }
+
+    function userProfile() {
+      return get(userPath()).data;
+    }
+
+    function userRole() {
+      return hasUserProfile() ? userProfile().rol : null;
+    }
+
+    function userTenant() {
+      return hasUserProfile() ? userProfile().tenantId : null;
+    }
+
+    function isAdmin() {
+      return userRole() == 'ADMIN';
+    }
+
+    function isFuncionario() {
+      return userRole() == 'FUNCIONARIO';
+    }
+
+    function isRecepcionista() {
+      return userRole() == 'RECEPCIONISTA';
+    }
+
+    function isInternalUser() {
+      return isAdmin() || isFuncionario() || isRecepcionista();
+    }
+
+    function assignedTenant(data) {
+      return data.clasificacionIA != null
+        && data.clasificacionIA.oficinaDestino == userTenant();
+    }
+
+    function validRole(role) {
+      return role in ['ADMIN', 'FUNCIONARIO', 'RECEPCIONISTA'];
+    }
+
+    function validRadicadoCreate() {
+      return request.resource.data.keys().hasAll([
+        'radicadoId',
+        'origen',
+        'fechaCreacion',
+        'estadoActual',
+        'prioridad',
+        'ciudadano',
+        'clasificacionIA',
+        'archivos',
+        'auditoria'
+      ])
+      && request.resource.data.keys().hasOnly([
+        'radicadoId',
+        'origen',
+        'fechaCreacion',
+        'estadoActual',
+        'prioridad',
+        'ciudadano',
+        'clasificacionIA',
+        'archivos',
+        'auditoria',
+        'notasInternas'
+      ])
+      && request.resource.data.radicadoId is string
+      && request.resource.data.origen in ['WEB', 'FISICO_ESCANER']
+      && (
+        request.resource.data.origen == 'WEB'
+        || (request.resource.data.origen == 'FISICO_ESCANER' && (isAdmin() || isRecepcionista()))
+      )
+      && (
+        !request.resource.data.keys().hasAny(['notasInternas'])
+        || isAdmin()
+        || isRecepcionista()
+      )
+      && request.resource.data.estadoActual == 'PENDIENTE'
+      && request.resource.data.prioridad in ['ROJO', 'NARANJA', 'AMARILLO']
+      && request.resource.data.ciudadano.nombre is string
+      && request.resource.data.ciudadano.email is string
+      && request.resource.data.ciudadano.telefono is string
+      && request.resource.data.archivos is list
+      && request.resource.data.auditoria is list;
+    }
+
+    function canReadRadicado(data) {
+      return isAdmin()
+        || (isFuncionario() && assignedTenant(data))
+        || (isRecepcionista() && assignedTenant(data));
+    }
+
+    function canUpdateRadicado(data) {
+      return isAdmin()
+        || (isFuncionario() && assignedTenant(data))
+        || (isRecepcionista() && assignedTenant(data));
+    }
+
+    match /users/{uid} {
+      allow get: if signedIn() && (request.auth.uid == uid || isAdmin());
+      allow list: if isAdmin();
+
+      allow create: if isAdmin()
+        && request.resource.data.rol is string
+        && validRole(request.resource.data.rol)
+        && request.resource.data.tenantId is string;
+
+      allow update: if isAdmin()
+        && request.resource.data.rol is string
+        && validRole(request.resource.data.rol)
+        && request.resource.data.tenantId is string;
+
+      allow delete: if false;
+    }
+
+    match /radicados/{radicadoId} {
+      // Consulta ciudadana por numero de radicado. Quien conozca el ID puede leer el documento.
+      allow get: if true;
+
+      // El dashboard debe consultar con filtro de tenant para FUNCIONARIO/RECEPCIONISTA.
+      allow list: if isAdmin()
+        || ((isFuncionario() || isRecepcionista()) && canReadRadicado(resource.data));
+
+      // Radicacion web publica y radicacion fisica desde recepcion.
+      allow create: if validRadicadoCreate()
+        && request.resource.data.radicadoId == radicadoId;
+
+      // Cambios de estado/respuesta. n8n con Firebase Admin omite estas reglas.
+      allow update: if canUpdateRadicado(resource.data);
+
+      allow delete: if false;
+    }
+
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}

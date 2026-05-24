@@ -1,0 +1,33 @@
+rules_version = '2';
+
+service firebase.storage {
+  match /b/{bucket}/o {
+    function signedIn() {
+      return request.auth != null;
+    }
+
+    function isAllowedRadicadoFile() {
+      return request.resource != null
+        && request.resource.size > 0
+        && request.resource.size <= 10 * 1024 * 1024
+        && (
+          request.resource.contentType.matches('image/.*')
+          || request.resource.contentType == 'application/pdf'
+        );
+    }
+
+    match /radicados/{radicadoId}/{archivo} {
+      // Permite radicacion ciudadana sin cuenta, con limites estrictos de tipo y tamano.
+      allow create: if isAllowedRadicadoFile();
+
+      // Solo funcionarios autenticados pueden abrir adjuntos desde el panel interno.
+      allow read: if signedIn();
+
+      allow update, delete: if false;
+    }
+
+    match /{path=**} {
+      allow read, write: if false;
+    }
+  }
+}

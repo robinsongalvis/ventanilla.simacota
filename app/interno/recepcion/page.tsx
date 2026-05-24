@@ -9,13 +9,6 @@ import type { UploadProgress } from '@/lib/storage';
    TIPOS TYPESCRIPT
 ══════════════════════════════════════════════════════════════ */
 
-interface DatosCiudadanoFisico {
-  nombre:   string;
-  cedula:   string;
-  email:    string;   // Puede ser vacío
-  telefono: string;
-}
-
 interface ArchivoEscaneado {
   archivo:    File;
   id:         string;         // Key de React
@@ -176,6 +169,7 @@ function ArchivoPreview({
       {/* Thumbnail / Ícono — 64×80 px */}
       <div className="w-16 h-20 rounded-lg overflow-hidden shrink-0 bg-slate-700/40 flex items-center justify-center">
         {esImagen && archivo.previewUrl ? (
+          // eslint-disable-next-line @next/next/no-img-element -- blob: URL preview not supported by next/image
           <img
             src={archivo.previewUrl}
             alt={`Vista previa de ${archivo.nombre}`}

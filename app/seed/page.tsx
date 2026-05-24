@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, useCallback } from "react";
 import { getDb, getFirebaseAuth } from "@/lib/firebase";
 import {
   collection,
@@ -8,7 +8,6 @@ import {
   setDoc,
   getDocs,
   deleteDoc,
-  query
 } from "firebase/firestore";
 import {
   signInWithEmailAndPassword,
@@ -17,7 +16,15 @@ import {
 } from "firebase/auth";
 
 // --- 1. DIRECTORIO OFICIAL — DATOS REALES DE SIMACOTA ---
-const DIRECTORIO_OFICIAL: Record<string, any> = {
+interface DependenciaOficial {
+  tenantId: string;
+  nombre: string;
+  email: string;
+  celular: string;
+  zonaExclusiva?: string;
+}
+
+const DIRECTORIO_OFICIAL: Record<string, DependenciaOficial> = {
   VENTANILLA_UNICA: { tenantId: "VENTANILLA_UNICA", nombre: "Ventanilla Única", email: "contactenos@simacota-santander.gov.co", celular: "3502956401" },
   DESPACHO_ALCALDE: { tenantId: "DESPACHO_ALCALDE", nombre: "Despacho del Alcalde", email: "alcaldia@simacota-santander.gov.co", celular: "3502956389" },
   SEC_GOBIERNO: { tenantId: "SEC_GOBIERNO", nombre: "Secretaría de Gobierno", email: "gobierno@simacota-santander.gov.co", celular: "3502956394" },
@@ -90,30 +97,30 @@ export default function SeedPage() {
     tenant: "DESPACHO_ALCALDE"
   });
 
-  const agregarLog = (msg: string, type: LogType = 'normal') => {
+  const agregarLog = useCallback((msg: string, type: LogType = 'normal') => {
     setLogs(prev => [...prev, { msg: `[${new Date().toLocaleTimeString()}] ${msg}`, type }]);
-  };
+  }, []);
 
   // Scroll automático en consola
   useEffect(() => {
     logEndRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [logs]);
 
-  // Cargar estadísticas
-  useEffect(() => {
-    if (autorizado) fetchStats();
-  }, [autorizado]);
-
-  const fetchStats = async () => {
+  const fetchStats = useCallback(async () => {
     try {
       const db = getDb();
       const uSnap = await getDocs(collection(db, "users"));
       const rSnap = await getDocs(collection(db, "radicados"));
       setStats({ users: uSnap.size, docs: rSnap.size });
-    } catch (e) {
+    } catch {
       agregarLog("Error cargando diagnóstico de BD.", "error");
     }
-  };
+  }, [agregarLog]);
+
+  // Cargar estadísticas
+  useEffect(() => {
+    if (autorizado) fetchStats();
+  }, [autorizado, fetchStats]);
 
   // Lógica de Autenticación y vinculación
   const handleAuth = async (mode: 'crear' | 'vincular') => {
@@ -152,15 +159,16 @@ export default function SeedPage() {
       agregarLog("Sesión cerrada. El usuario ya puede ingresar por /interno/dashboard", "normal");
       fetchStats();
 
-    } catch (error: any) {
-      if (error.code === "auth/user-not-found" || error.code === "auth/invalid-credential") {
+    } catch (error: unknown) {
+      const firebaseError = error as { code?: string; message?: string };
+      if (firebaseError.code === "auth/user-not-found" || firebaseError.code === "auth/invalid-credential") {
         agregarLog("❌ Este usuario no existe en Firebase Auth. Créalo o usa 'Crear usuario nuevo'.", "error");
-      } else if (error.code === "auth/wrong-password") {
+      } else if (firebaseError.code === "auth/wrong-password") {
         agregarLog("❌ Contraseña incorrecta.", "error");
-      } else if (error.code === "auth/email-already-in-use") {
+      } else if (firebaseError.code === "auth/email-already-in-use") {
         agregarLog("❌ Este email ya existe en Auth. Usa 'Vincular usuario existente'.", "error");
       } else {
-        agregarLog(`❌ Error crítico: ${error.message}`, "error");
+        agregarLog(`❌ Error crítico: ${firebaseError.message ?? String(error)}`, "error");
       }
     } finally {
       setLoading(false);
@@ -197,8 +205,8 @@ export default function SeedPage() {
       }
       agregarLog("✅ 8 radicados creados exitosamente.", "success");
       fetchStats();
-    } catch (error: any) {
-      agregarLog(`❌ Error creando radicados: ${error.message}`, "error");
+    } catch (error: unknown) {
+      agregarLog(`❌ Error creando radicados: ${error instanceof Error ? error.message : String(error)}`, "error");
     } finally {
       setLoading(false);
     }
@@ -214,8 +222,8 @@ export default function SeedPage() {
       await Promise.all(batchPromises);
       agregarLog(`🗑️ ${snapshot.size} radicados eliminados de Firestore.`, "success");
       fetchStats();
-    } catch (error: any) {
-      agregarLog(`❌ Error eliminando radicados: ${error.message}`, "error");
+    } catch (error: unknown) {
+      agregarLog(`❌ Error eliminando radicados: ${error instanceof Error ? error.message : String(error)}`, "error");
     } finally {
       setLoading(false);
     }
