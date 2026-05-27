@@ -61,7 +61,6 @@ Las APIs server-side requieren estas variables:
 FIREBASE_PROJECT_ID=
 FIREBASE_CLIENT_EMAIL=
 FIREBASE_PRIVATE_KEY=
-N8N_WEBHOOK_URL=
 ```
 
 `FIREBASE_PRIVATE_KEY` puede guardarse con saltos escapados `\n`, como suele ocurrir en Vercel.

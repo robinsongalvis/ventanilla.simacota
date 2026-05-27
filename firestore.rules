@@ -157,7 +157,7 @@ service cloud.firestore {
       allow create: if validRadicadoCreate()
         && request.resource.data.radicadoId == radicadoId;
 
-      // Cambios de estado/respuesta. n8n con cuenta de servicio omite estas reglas.
+      // Cambios de estado/respuesta desde el panel interno.
       allow update: if canUpdateRadicado(resource.data)
         && validRadicadoUpdate();
 

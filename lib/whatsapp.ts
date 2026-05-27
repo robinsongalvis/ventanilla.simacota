@@ -78,7 +78,7 @@ function formatearFecha(isoString: string): string {
  *
  * IMPORTANTE: Esta función solo genera el mensaje y el link wa.me.
  * NO realiza fetch ni abre el link automáticamente.
- * La integración con la API de WhatsApp Business / n8n es una fase futura.
+ * La integración con la API de WhatsApp Business es una fase futura.
  */
 export function generateWhatsAppReport(params: WhatsAppReportParams): WhatsAppReport {
   const {

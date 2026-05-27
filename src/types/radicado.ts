@@ -84,9 +84,3 @@ export interface FormRadicacionData {
   descripcion: string;
   archivo: File | null;
 }
-
-/** Respuesta del webhook al radicado satisfactoriamente */
-export interface WebhookResponse {
-  success: boolean;
-  radicadoId: string;
-}

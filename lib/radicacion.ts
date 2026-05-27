@@ -8,7 +8,6 @@
 import { doc, setDoc }    from 'firebase/firestore';
 import { getDb }          from './firebase';
 import { subirArchivos, type UploadResult, type UploadProgress } from './storage';
-import { enviarWebhookN8N }  from './webhook';
 
 /* ──────────────────────────────────────────────
    ID de radicado
@@ -62,13 +61,10 @@ export interface ResultadoRadicacion {
  * Orquesta el proceso completo:
  *   1. Sube archivos a Firebase Storage (con progreso por archivo)
  *   2. Crea el documento en Firestore
- *   3. Envía el webhook a n8n para clasificación IA
  *
  * DECISIÓN ARQUITECTÓNICA:
- * - El webhook es fire-and-forget: si falla, el radicado ya está en Firestore
- *   y se clasifica manualmente. El ciudadano NUNCA pierde su radicado.
  * - Defaults: oficinaDestino = "VENTANILLA_UNICA", prioridad = "AMARILLO".
- *   La IA los sobreescribirá vía n8n → Firebase Admin.
+ *   Un funcionario puede reclasificar/asignar el radicado manualmente.
  *
  * FIRESTORE SECURITY RULES (agregar en Firebase Console → Firestore → Rules):
  * ──────────────────────────────────────────────────────────────────────────
@@ -126,7 +122,6 @@ export async function radicarSolicitud(
       origen:        datos.origen,
       fechaCreacion: new Date().toISOString(),
       estadoActual:  'PENDIENTE',
-      // Default AMARILLO; la IA lo reclasificará vía n8n
       prioridad:     'AMARILLO',
       ciudadano: {
         nombre:   datos.ciudadano.nombre,
@@ -135,10 +130,9 @@ export async function radicarSolicitud(
         ...(datos.ciudadano.cedula ? { cedula: datos.ciudadano.cedula } : {}),
       },
       clasificacionIA: {
-        // Defaults que la IA sobreescribirá
         oficinaDestino: 'VENTANILLA_UNICA',
         zonaGeografica: 'CASCO_URBANO',
-        resumenCaso:    '',
+        resumenCaso:    'Pendiente de clasificación manual.',
         mensajeOriginal: datos.descripcion,
       },
       archivos: archivosResultado.map((a, i) => ({
@@ -165,19 +159,6 @@ export async function radicarSolicitud(
 
     const db = getDb();
     await setDoc(doc(db, 'radicados', radicadoId), radicado);
-
-    // ── Paso 3: Webhook a n8n ────────────────────────────────────────────
-    onProgreso?.('Enviando a clasificación IA...', 80);
-
-    try {
-      await enviarWebhookN8N(radicado);
-    } catch (webhookErr: unknown) {
-      // El webhook NO bloquea la radicación — el radicado ya está en Firestore
-      const msg = webhookErr instanceof Error ? webhookErr.message : String(webhookErr);
-      errores.push(
-        `Clasificación IA no disponible (${msg}). Se clasificará manualmente.`,
-      );
-    }
 
     onProgreso?.('¡Radicado exitosamente!', 100);
 
