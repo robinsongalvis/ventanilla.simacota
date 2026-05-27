@@ -1,0 +1,141 @@
+'use client';
+
+import {
+  createContext,
+  useContext,
+  useReducer,
+  useMemo,
+  type ReactNode,
+  type Dispatch,
+} from 'react';
+import type { VentanillaRadicado } from '@/src/types/ventanilla';
+import type { TenantId } from '@/src/types/radicado';
+
+/* ══════════════════════════════════════════════════════════════
+   TIPOS
+══════════════════════════════════════════════════════════════ */
+
+export type FiltroMIPG =
+  | 'TODOS'
+  | 'RADICADAS'
+  | 'PRIORIDAD_MIPG'
+  | 'ASIGNADAS'
+  | 'POR_VENCER'
+  | 'VENCIDAS'
+  | 'DEVUELTAS_PRORROGA';
+
+export type VistaActual =
+  | 'TABLERO'
+  | 'RADICACION'
+  | 'VENTANILLA'
+  | 'DEPENDENCIAS'
+  | 'REPORTES';
+
+interface VentanillaState {
+  radicadoSeleccionado: VentanillaRadicado | null;
+  panelDerechoAbierto: boolean;
+  drawerNuevoAbierto: boolean;
+  filtroMIPG: FiltroMIPG;
+  busqueda: string;
+  tenantFiltro: TenantId | 'TODOS';
+  vistaActual: VistaActual;
+}
+
+export type VentanillaAction =
+  | { type: 'SELECCIONAR_RADICADO'; radicado: VentanillaRadicado }
+  | { type: 'CERRAR_PANEL_DERECHO' }
+  | { type: 'TOGGLE_DRAWER_NUEVO' }
+  | { type: 'CERRAR_DRAWER_NUEVO' }
+  | { type: 'SET_FILTRO_MIPG'; filtro: FiltroMIPG }
+  | { type: 'SET_BUSQUEDA'; busqueda: string }
+  | { type: 'SET_TENANT_FILTRO'; tenant: TenantId | 'TODOS' }
+  | { type: 'SET_VISTA'; vista: VistaActual }
+  | { type: 'SYNC_RADICADO_SELECCIONADO'; radicados: VentanillaRadicado[] };
+
+/* ══════════════════════════════════════════════════════════════
+   ESTADO INICIAL
+══════════════════════════════════════════════════════════════ */
+
+const ESTADO_INICIAL: VentanillaState = {
+  radicadoSeleccionado: null,
+  panelDerechoAbierto: false,
+  drawerNuevoAbierto: false,
+  filtroMIPG: 'TODOS',
+  busqueda: '',
+  tenantFiltro: 'TODOS',
+  vistaActual: 'TABLERO',
+};
+
+/* ══════════════════════════════════════════════════════════════
+   REDUCER
+══════════════════════════════════════════════════════════════ */
+
+function reducer(state: VentanillaState, action: VentanillaAction): VentanillaState {
+  switch (action.type) {
+    case 'SELECCIONAR_RADICADO':
+      return {
+        ...state,
+        radicadoSeleccionado: action.radicado,
+        panelDerechoAbierto: true,
+        drawerNuevoAbierto: false,
+      };
+    case 'CERRAR_PANEL_DERECHO':
+      return { ...state, radicadoSeleccionado: null, panelDerechoAbierto: false };
+    case 'TOGGLE_DRAWER_NUEVO':
+      return {
+        ...state,
+        drawerNuevoAbierto: !state.drawerNuevoAbierto,
+        panelDerechoAbierto: state.drawerNuevoAbierto
+          ? state.panelDerechoAbierto
+          : false,
+      };
+    case 'CERRAR_DRAWER_NUEVO':
+      return { ...state, drawerNuevoAbierto: false };
+    case 'SET_FILTRO_MIPG':
+      return { ...state, filtroMIPG: action.filtro };
+    case 'SET_BUSQUEDA':
+      return { ...state, busqueda: action.busqueda };
+    case 'SET_TENANT_FILTRO':
+      return { ...state, tenantFiltro: action.tenant };
+    case 'SET_VISTA':
+      return {
+        ...state,
+        vistaActual: action.vista,
+        panelDerechoAbierto: false,
+        drawerNuevoAbierto: false,
+      };
+    case 'SYNC_RADICADO_SELECCIONADO': {
+      if (!state.radicadoSeleccionado) return state;
+      const actualizado = action.radicados.find(
+        (r) => r.radicadoId === state.radicadoSeleccionado!.radicadoId,
+      );
+      if (!actualizado) return state;
+      return { ...state, radicadoSeleccionado: actualizado };
+    }
+    default:
+      return state;
+  }
+}
+
+/* ══════════════════════════════════════════════════════════════
+   CONTEXT
+══════════════════════════════════════════════════════════════ */
+
+interface ContextValue {
+  state: VentanillaState;
+  dispatch: Dispatch<VentanillaAction>;
+}
+
+const VentanillaContext = createContext<ContextValue | null>(null);
+
+export function VentanillaProvider({ children }: { children: ReactNode }) {
+  const [state, dispatch] = useReducer(reducer, ESTADO_INICIAL);
+  const value = useMemo(() => ({ state, dispatch }), [state]);
+  return <VentanillaContext.Provider value={value}>{children}</VentanillaContext.Provider>;
+}
+
+export function useVentanilla(): ContextValue {
+  const ctx = useContext(VentanillaContext);
+  if (!ctx) throw new Error('useVentanilla debe usarse dentro de <VentanillaProvider>');
+  return ctx;
+}
