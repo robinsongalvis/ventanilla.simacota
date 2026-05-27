@@ -10,9 +10,11 @@ import { useAuth }                        from '@/lib/hooks/useAuth';
 import { useVentanillaRadicados }         from '@/lib/hooks/useVentanillaRadicados';
 import { VentanillaProvider, useVentanilla } from '@/lib/store/ventanillaStore';
 import { NOMBRES_TENANT, DIRECTORIO_TENANTS } from '@/src/types/reglas-negocio';
-import { diasRestantesHabiles }           from '@/lib/tiempos-radicado';
+import { diasRestantesHabiles, TIPOS_SOLICITUD } from '@/lib/tiempos-radicado';
 import { RadicacionFuncionarioForm }       from '@/app/interno/recepcion/components/RadicacionFuncionarioForm';
 import { radicarInstitucionalmente }       from '@/lib/actions/radicarVentanilla';
+import { asignarRadicado, asignarMasivo }  from '@/lib/actions/asignarRadicado';
+import { ComprobanteRadicado }             from '@/app/interno/dashboard/components/ComprobanteRadicado';
 import type {
   FiltroMIPG,
   VistaActual,
@@ -225,6 +227,15 @@ const NAV_ITEMS: { vista: VistaActual; label: string; icono: React.ReactNode }[]
     ),
   },
   {
+    vista: 'BANDEJA',
+    label: 'Bandeja',
+    icono: (
+      <svg className="w-[18px] h-[18px]" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.8}>
+        <path strokeLinecap="round" strokeLinejoin="round" d="M2.25 13.5h3.86a2.25 2.25 0 012.012 1.244l.256.512a2.25 2.25 0 002.013 1.244h3.218a2.25 2.25 0 002.013-1.244l.256-.512a2.25 2.25 0 012.013-1.244h3.859m-19.5.338V18a2.25 2.25 0 002.25 2.25h15A2.25 2.25 0 0021.75 18v-4.162c0-.224-.034-.447-.1-.661L19.24 5.338a2.25 2.25 0 00-2.15-1.588H6.911a2.25 2.25 0 00-2.15 1.588L2.1 13.177a2.25 2.25 0 00-.1.661z" />
+      </svg>
+    ),
+  },
+  {
     vista: 'VENTANILLA',
     label: 'Ventanilla',
     icono: (
@@ -259,12 +270,14 @@ function SidebarNav({
   onNuevoRadicado,
   usuario,
   onCerrarSesion,
+  pendientesBandeja,
 }: {
   vistaActual: VistaActual;
   onVistaChange: (v: VistaActual) => void;
   onNuevoRadicado: () => void;
   usuario: UsuarioAutenticado;
   onCerrarSesion: () => void;
+  pendientesBandeja: number;
 }) {
   const nombreRol = usuario.rol === 'ADMIN'
     ? 'Admin'
@@ -322,7 +335,12 @@ function SidebarNav({
               <span className={activo ? 'text-indigo-400' : 'text-slate-600 group-hover:text-slate-400'}>
                 {icono}
               </span>
-              <span className="text-xs font-medium">{label}</span>
+              <span className="text-xs font-medium flex-1">{label}</span>
+              {vista === 'BANDEJA' && pendientesBandeja > 0 && (
+                <span className="shrink-0 min-w-[18px] h-[18px] rounded-full bg-indigo-600 text-white text-[9px] font-black flex items-center justify-center px-1">
+                  {pendientesBandeja > 99 ? '99+' : pendientesBandeja}
+                </span>
+              )}
             </button>
           );
         })}
@@ -1123,6 +1141,21 @@ function PanelDerecho({
    SUB-COMPONENTE: DrawerNuevoRadicado
 ══════════════════════════════════════════════════════════════ */
 
+interface DatosComprobante {
+  solicitanteNombre: string;
+  numeroDocumento:   string;
+  tipoDocumento:     string;
+  fechaRadicado:     string;
+  horaRadicado:      string;
+  medioRecepcion:    string;
+  tipoTramite:       string;
+  diasRespuesta:     number;
+  unidad:            'HABILES' | 'CALENDARIO';
+  asunto:            string;
+  fechaVencimiento:  string;
+  numeroFolios:      number;
+}
+
 function DrawerNuevoRadicado({
   usuario,
   onCerrar,
@@ -1131,6 +1164,7 @@ function DrawerNuevoRadicado({
   onCerrar: () => void;
 }) {
   const [radicadoGenerado,  setRadicadoGenerado]  = useState<string | null>(null);
+  const [datosComprobante,  setDatosComprobante]  = useState<DatosComprobante | null>(null);
   const [progreso,          setProgreso]          = useState('');
   const [progresoPct,       setProgresoPct]       = useState(0);
   const [errorGuardado,     setErrorGuardado]     = useState<string | null>(null);
@@ -1143,11 +1177,27 @@ function DrawerNuevoRadicado({
     setProgresoPct(5);
 
     try {
+      const ahora = new Date();
       const { radicadoId } = await radicarInstitucionalmente(
         payload,
         { uid: usuario.uid, nombre: usuario.nombre, tenantId: usuario.tenantId },
         (msg, pct) => { setProgreso(msg); setProgresoPct(pct); },
       );
+      const tipoConf = TIPOS_SOLICITUD[payload.tipoSolicitudId];
+      setDatosComprobante({
+        solicitanteNombre: payload.nombreCompleto,
+        numeroDocumento:   payload.numeroDocumento,
+        tipoDocumento:     payload.tipoDocumento,
+        fechaRadicado:     ahora.toISOString(),
+        horaRadicado:      ahora.toLocaleTimeString('es-CO', { hour: '2-digit', minute: '2-digit' }),
+        medioRecepcion:    payload.medioRecepcion,
+        tipoTramite:       tipoConf.nombre,
+        diasRespuesta:     tipoConf.diasRespuesta,
+        unidad:            tipoConf.unidad,
+        asunto:            payload.asunto,
+        fechaVencimiento:  payload.fechaVencimiento,
+        numeroFolios:      payload.numeroFolios,
+      });
       setRadicadoGenerado(radicadoId);
     } catch (err) {
       setErrorGuardado(err instanceof Error ? err.message : 'Error al guardar el radicado.');
@@ -1182,21 +1232,48 @@ function DrawerNuevoRadicado({
         <div className="flex-1 overflow-y-auto px-5 py-5">
 
           {/* ── Estado de éxito ── */}
-          {radicadoGenerado && (
-            <div className="flex flex-col items-center justify-center py-16 text-center gap-5">
-              <div className="w-16 h-16 rounded-full bg-emerald-500/15 border border-emerald-500/30 flex items-center justify-center">
-                <svg className="w-8 h-8 text-emerald-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
-                  <path strokeLinecap="round" strokeLinejoin="round" d="M4.5 12.75l6 6 9-13.5" />
-                </svg>
-              </div>
-              <div>
-                <p className="text-xs font-bold uppercase tracking-widest text-emerald-400 mb-2">Radicado registrado</p>
+          {radicadoGenerado && datosComprobante && (
+            <div className="flex flex-col items-center gap-6 py-8">
+              {/* Confirmación visual */}
+              <div className="text-center">
+                <div className="inline-flex w-14 h-14 rounded-full bg-emerald-500/15 border border-emerald-500/30 items-center justify-center mb-3">
+                  <svg className="w-7 h-7 text-emerald-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M4.5 12.75l6 6 9-13.5" />
+                  </svg>
+                </div>
+                <p className="text-xs font-bold uppercase tracking-widest text-emerald-400 mb-1">Radicado registrado</p>
                 <p className="text-2xl font-black font-mono text-indigo-300">{radicadoGenerado}</p>
-                <p className="text-xs text-slate-500 mt-2">Informe este número al ciudadano para seguimiento.</p>
+                <p className="text-xs text-slate-500 mt-1">Informe este número al ciudadano para seguimiento.</p>
               </div>
-              <div className="flex gap-3 mt-2">
+
+              {/* Comprobante imprimible */}
+              <ComprobanteRadicado
+                radicadoId={radicadoGenerado}
+                solicitanteNombre={datosComprobante.solicitanteNombre}
+                numeroDocumento={datosComprobante.numeroDocumento}
+                tipoDocumento={datosComprobante.tipoDocumento}
+                fechaRadicado={datosComprobante.fechaRadicado}
+                horaRadicado={datosComprobante.horaRadicado}
+                medioRecepcion={datosComprobante.medioRecepcion}
+                tipoTramite={datosComprobante.tipoTramite}
+                diasRespuesta={datosComprobante.diasRespuesta}
+                unidad={datosComprobante.unidad}
+                asunto={datosComprobante.asunto}
+                fechaVencimiento={datosComprobante.fechaVencimiento}
+                funcionarioNombre={usuario.nombre}
+                dependencia={usuario.tenantId}
+                numeroFolios={datosComprobante.numeroFolios}
+              />
+
+              {/* Acciones */}
+              <div className="flex gap-3">
                 <button
-                  onClick={() => { setRadicadoGenerado(null); setProgreso(''); setProgresoPct(0); }}
+                  onClick={() => {
+                    setRadicadoGenerado(null);
+                    setDatosComprobante(null);
+                    setProgreso('');
+                    setProgresoPct(0);
+                  }}
                   className="px-5 py-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white text-sm font-bold transition-colors"
                 >
                   Radicar otro
@@ -1282,6 +1359,284 @@ function VistaReportes({ metricas, total }: { metricas: MetricasMIPGData; total:
 }
 
 /* ══════════════════════════════════════════════════════════════
+   SUB-COMPONENTE: BandejaAsignacion
+══════════════════════════════════════════════════════════════ */
+
+function BandejaAsignacion({
+  radicados,
+  cargando,
+  error,
+  usuario,
+}: {
+  radicados: VentanillaRadicado[];
+  cargando: boolean;
+  error: string | null;
+  usuario: UsuarioAutenticado;
+}) {
+  const { state, dispatch } = useVentanilla();
+  const { seleccionMasiva, tenantMasivo } = state;
+
+  const [tenantPorFila,   setTenantPorFila]   = useState<Record<string, TenantId>>({});
+  const [asignandoFila,   setAsignandoFila]   = useState<Record<string, boolean>>({});
+  const [exitoFila,       setExitoFila]       = useState<Record<string, boolean>>({});
+  const [asignandoMasivo, setAsignandoMasivo] = useState(false);
+  const [resultadoMasivo, setResultadoMasivo] = useState<string | null>(null);
+
+  const todosIds = radicados.map((r) => r.radicadoId);
+  const todosSeleccionados =
+    todosIds.length > 0 && todosIds.every((id) => seleccionMasiva.has(id));
+
+  function getTenantFila(id: string): TenantId {
+    return tenantPorFila[id] ?? 'DESPACHO_ALCALDE';
+  }
+
+  async function asignarUno(r: VentanillaRadicado) {
+    const tenant = getTenantFila(r.radicadoId);
+    setAsignandoFila((p) => ({ ...p, [r.radicadoId]: true }));
+    try {
+      await asignarRadicado(r.radicadoId, tenant, { uid: usuario.uid, nombre: usuario.nombre });
+      setExitoFila((p) => ({ ...p, [r.radicadoId]: true }));
+      setTimeout(() => setExitoFila((p) => ({ ...p, [r.radicadoId]: false })), 3000);
+    } finally {
+      setAsignandoFila((p) => ({ ...p, [r.radicadoId]: false }));
+    }
+  }
+
+  async function asignarSeleccionados() {
+    if (!tenantMasivo || seleccionMasiva.size === 0) return;
+    setAsignandoMasivo(true);
+    setResultadoMasivo(null);
+    try {
+      const { asignados, fallidos } = await asignarMasivo(
+        Array.from(seleccionMasiva),
+        tenantMasivo as TenantId,
+        { uid: usuario.uid, nombre: usuario.nombre },
+      );
+      dispatch({ type: 'LIMPIAR_SELECCION' });
+      setResultadoMasivo(
+        `${asignados} asignado${asignados !== 1 ? 's' : ''}` +
+          (fallidos > 0 ? ` · ${fallidos} fallido${fallidos !== 1 ? 's' : ''}` : ''),
+      );
+    } finally {
+      setAsignandoMasivo(false);
+    }
+  }
+
+  return (
+    <div className="flex-1 flex flex-col overflow-hidden min-h-0">
+
+      {/* Encabezado */}
+      <div className="flex items-center justify-between gap-3 px-4 py-2.5 border-b border-white/[0.07] shrink-0">
+        <div className="flex items-center gap-2">
+          <h2 className="text-sm font-bold text-slate-200">Bandeja de Asignación</h2>
+          <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-indigo-500/15 text-indigo-300 border border-indigo-500/20">
+            {radicados.length} pendiente{radicados.length !== 1 ? 's' : ''}
+          </span>
+        </div>
+        {seleccionMasiva.size > 0 && (
+          <button
+            onClick={() => dispatch({ type: 'LIMPIAR_SELECCION' })}
+            className="text-xs text-slate-500 hover:text-slate-300 transition-colors"
+          >
+            Limpiar selección ({seleccionMasiva.size})
+          </button>
+        )}
+      </div>
+
+      {/* Barra de asignación masiva */}
+      {seleccionMasiva.size > 0 && (
+        <div className="flex items-center gap-3 px-4 py-2.5 bg-indigo-500/5 border-b border-indigo-500/20 shrink-0">
+          <span className="text-xs font-bold text-indigo-300 shrink-0">
+            {seleccionMasiva.size} seleccionado{seleccionMasiva.size !== 1 ? 's' : ''}
+          </span>
+          <select
+            value={tenantMasivo}
+            onChange={(e) =>
+              dispatch({ type: 'SET_TENANT_MASIVO', tenant: e.target.value as TenantId | '' })
+            }
+            className="flex-1 bg-slate-800/60 border border-white/10 rounded-lg px-3 py-1.5 text-xs text-slate-200 focus:outline-none focus:border-indigo-500"
+          >
+            <option value="">— Selecciona dependencia destino —</option>
+            {(Object.keys(DIRECTORIO_TENANTS) as TenantId[]).map((id) => (
+              <option key={id} value={id}>{NOMBRES_TENANT[id]}</option>
+            ))}
+          </select>
+          <button
+            onClick={asignarSeleccionados}
+            disabled={!tenantMasivo || asignandoMasivo}
+            className="shrink-0 flex items-center gap-1.5 px-4 py-1.5 rounded-lg bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-bold transition-colors disabled:opacity-50"
+          >
+            {asignandoMasivo && (
+              <span className="w-3 h-3 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+            )}
+            Asignar {seleccionMasiva.size}
+          </button>
+        </div>
+      )}
+
+      {/* Feedback masivo */}
+      {resultadoMasivo && (
+        <div className="mx-4 mt-2 px-3 py-2 bg-emerald-500/10 border border-emerald-500/30 rounded-lg text-xs text-emerald-300 shrink-0">
+          {resultadoMasivo}
+        </div>
+      )}
+
+      {error && (
+        <div className="mx-4 mt-3 p-3 rounded-xl bg-rose-500/10 border border-rose-500/30 text-xs text-rose-400 shrink-0">
+          Error de conexión: {error}
+        </div>
+      )}
+
+      {/* Tabla */}
+      <div className="flex-1 overflow-y-auto overflow-x-auto">
+        <table className="w-full text-sm">
+          <thead className="sticky top-0 z-10 bg-slate-900/90 backdrop-blur-sm">
+            <tr className="border-b border-white/[0.07]">
+              <th className="px-4 py-2.5 w-10">
+                <input
+                  type="checkbox"
+                  checked={todosSeleccionados}
+                  onChange={() =>
+                    dispatch({ type: 'SELECCIONAR_TODOS', radicadoIds: todosIds })
+                  }
+                  className="w-3.5 h-3.5 rounded border-slate-600 bg-slate-800 text-indigo-500 focus:ring-0 cursor-pointer"
+                />
+              </th>
+              {['Radicado', 'Solicitante', 'Tipo', 'Días', 'Dependencia destino', 'Acción'].map((h) => (
+                <th key={h} className="px-4 py-2.5 text-left text-[10px] font-bold uppercase tracking-widest text-slate-500 whitespace-nowrap">
+                  {h}
+                </th>
+              ))}
+            </tr>
+          </thead>
+          <tbody>
+            {cargando &&
+              Array.from({ length: 5 }).map((_, i) => (
+                <tr key={i} className="animate-pulse border-b border-white/[0.05]">
+                  {Array.from({ length: 7 }).map((_, j) => (
+                    <td key={j} className="px-4 py-3">
+                      <div className="h-3 rounded bg-slate-800/80" style={{ width: `${40 + (j % 3) * 20}%` }} />
+                    </td>
+                  ))}
+                </tr>
+              ))}
+
+            {!cargando && radicados.length === 0 && (
+              <tr>
+                <td colSpan={7} className="px-4 py-16 text-center">
+                  <p className="text-slate-400 font-medium mb-1">Sin pendientes</p>
+                  <p className="text-xs text-slate-600">No hay radicados esperando asignación.</p>
+                </td>
+              </tr>
+            )}
+
+            {!cargando &&
+              radicados.map((r) => {
+                const dias       = calcDiasRestantes(r);
+                const seleccionado = seleccionMasiva.has(r.radicadoId);
+                const esRojo     = r.prioridad === 'ROJO';
+                const ok         = exitoFila[r.radicadoId];
+
+                return (
+                  <tr
+                    key={r.radicadoId}
+                    className={`border-b border-white/[0.04] transition-colors ${
+                      seleccionado ? 'bg-indigo-500/5' : 'hover:bg-white/[0.025]'
+                    }`}
+                  >
+                    {/* Checkbox */}
+                    <td className="px-4 py-3">
+                      <input
+                        type="checkbox"
+                        checked={seleccionado}
+                        onChange={() =>
+                          dispatch({ type: 'TOGGLE_SELECCION', radicadoId: r.radicadoId })
+                        }
+                        className="w-3.5 h-3.5 rounded border-slate-600 bg-slate-800 text-indigo-500 focus:ring-0 cursor-pointer"
+                      />
+                    </td>
+
+                    {/* Radicado */}
+                    <td className="px-4 py-3 whitespace-nowrap">
+                      <div className="flex items-center gap-1.5">
+                        {esRojo && (
+                          <span className="w-1.5 h-1.5 rounded-full bg-red-500 animate-pulse shrink-0" />
+                        )}
+                        <span className="font-mono text-xs text-indigo-300">{r.radicadoId}</span>
+                      </div>
+                      <p className="text-[10px] text-slate-600 mt-0.5">{fmtFecha(r.control.fechaRadicado)}</p>
+                    </td>
+
+                    {/* Solicitante */}
+                    <td className="px-4 py-3 max-w-[160px]">
+                      <p className="text-xs font-medium text-slate-200 truncate">{r.solicitante.nombreCompleto}</p>
+                      <p className="text-[10px] text-slate-600 font-mono">
+                        {r.solicitante.tipoDocumento} {r.solicitante.numeroDocumento}
+                      </p>
+                    </td>
+
+                    {/* Tipo */}
+                    <td className="px-4 py-3 whitespace-nowrap">
+                      <p className="text-xs text-slate-400">{r.termino.tipoSolicitudNombre}</p>
+                      <p className="text-[10px] text-slate-600">{r.termino.diasRespuesta}d</p>
+                    </td>
+
+                    {/* Días restantes */}
+                    <td className="px-4 py-3 whitespace-nowrap">
+                      <span className={`text-sm font-bold tabular-nums ${
+                        dias < 0 ? 'text-rose-400' : dias <= 2 ? 'text-orange-400' : 'text-slate-400'
+                      }`}>
+                        {dias < 0 ? `${Math.abs(dias)}d venc.` : `${dias}d`}
+                      </span>
+                    </td>
+
+                    {/* Select destino */}
+                    <td className="px-4 py-3">
+                      <select
+                        value={getTenantFila(r.radicadoId)}
+                        onChange={(e) =>
+                          setTenantPorFila((p) => ({
+                            ...p,
+                            [r.radicadoId]: e.target.value as TenantId,
+                          }))
+                        }
+                        className="bg-slate-800/60 border border-white/10 rounded-lg px-2 py-1.5 text-[11px] text-slate-200 focus:outline-none focus:border-indigo-500 min-w-[150px]"
+                      >
+                        {(Object.keys(DIRECTORIO_TENANTS) as TenantId[]).map((id) => (
+                          <option key={id} value={id}>{NOMBRES_TENANT[id]}</option>
+                        ))}
+                      </select>
+                    </td>
+
+                    {/* Botón */}
+                    <td className="px-4 py-3 whitespace-nowrap">
+                      {ok ? (
+                        <span className="text-xs text-emerald-400 font-bold">✓ Asignado</span>
+                      ) : (
+                        <button
+                          onClick={() => asignarUno(r)}
+                          disabled={!!asignandoFila[r.radicadoId]}
+                          className="flex items-center gap-1 px-3 py-1.5 rounded-lg bg-slate-700 hover:bg-slate-600 text-white text-xs font-bold transition-colors disabled:opacity-50"
+                        >
+                          {asignandoFila[r.radicadoId] ? (
+                            <span className="w-3 h-3 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                          ) : (
+                            'Asignar →'
+                          )}
+                        </button>
+                      )}
+                    </td>
+                  </tr>
+                );
+              })}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  );
+}
+
+/* ══════════════════════════════════════════════════════════════
    COMPONENTE INTERNO PRINCIPAL (dentro del Provider)
 ══════════════════════════════════════════════════════════════ */
 
@@ -1316,6 +1671,11 @@ function DashboardInterior({ usuario, cerrarSesion }: { usuario: UsuarioAutentic
     [todosLosRadicados, filtroMIPG, busqueda],
   );
 
+  const radicadosPendientes = useMemo(
+    () => todosLosRadicados.filter((r) => r.estadoActual === 'PENDIENTE'),
+    [todosLosRadicados],
+  );
+
   return (
     <div className="flex h-screen overflow-hidden bg-[#0A0A0B]">
       {/* ── COLUMNA 1: Sidebar de navegación ── */}
@@ -1325,6 +1685,7 @@ function DashboardInterior({ usuario, cerrarSesion }: { usuario: UsuarioAutentic
         onNuevoRadicado={() => dispatch({ type: 'TOGGLE_DRAWER_NUEVO' })}
         usuario={usuario}
         onCerrarSesion={cerrarSesion}
+        pendientesBandeja={radicadosPendientes.length}
       />
 
       {/* ── COLUMNA 2: Cuerpo central ── */}
@@ -1332,6 +1693,13 @@ function DashboardInterior({ usuario, cerrarSesion }: { usuario: UsuarioAutentic
 
         {vistaActual === 'REPORTES' ? (
           <VistaReportes metricas={metricas} total={todosLosRadicados.length} />
+        ) : vistaActual === 'BANDEJA' ? (
+          <BandejaAsignacion
+            radicados={radicadosPendientes}
+            cargando={cargando}
+            error={error}
+            usuario={usuario}
+          />
         ) : (
           <>
             {/* Fila de métricas MIPG */}
@@ -1359,20 +1727,22 @@ function DashboardInterior({ usuario, cerrarSesion }: { usuario: UsuarioAutentic
         )}
       </div>
 
-      {/* ── COLUMNA 3: Panel derecho (collapsible) ── */}
-      <div
-        className={`shrink-0 transition-all duration-300 ease-in-out overflow-hidden ${
-          panelDerechoAbierto ? 'w-[420px]' : 'w-0'
-        }`}
-      >
-        {radicadoSeleccionado && (
-          <PanelDerecho
-            radicado={radicadoSeleccionado}
-            usuario={usuario}
-            onCerrar={() => dispatch({ type: 'CERRAR_PANEL_DERECHO' })}
-          />
-        )}
-      </div>
+      {/* ── COLUMNA 3: Panel derecho — oculto en BANDEJA ── */}
+      {vistaActual !== 'BANDEJA' && (
+        <div
+          className={`shrink-0 transition-all duration-300 ease-in-out overflow-hidden ${
+            panelDerechoAbierto ? 'w-[420px]' : 'w-0'
+          }`}
+        >
+          {radicadoSeleccionado && (
+            <PanelDerecho
+              radicado={radicadoSeleccionado}
+              usuario={usuario}
+              onCerrar={() => dispatch({ type: 'CERRAR_PANEL_DERECHO' })}
+            />
+          )}
+        </div>
+      )}
 
       {/* ── Drawer de radicación rápida ── */}
       {drawerNuevoAbierto && (

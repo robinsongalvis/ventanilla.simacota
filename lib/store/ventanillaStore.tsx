@@ -28,6 +28,7 @@ export type VistaActual =
   | 'TABLERO'
   | 'RADICACION'
   | 'VENTANILLA'
+  | 'BANDEJA'
   | 'DEPENDENCIAS'
   | 'REPORTES';
 
@@ -39,6 +40,8 @@ interface VentanillaState {
   busqueda: string;
   tenantFiltro: TenantId | 'TODOS';
   vistaActual: VistaActual;
+  seleccionMasiva: Set<string>;
+  tenantMasivo: TenantId | '';
 }
 
 export type VentanillaAction =
@@ -50,7 +53,11 @@ export type VentanillaAction =
   | { type: 'SET_BUSQUEDA'; busqueda: string }
   | { type: 'SET_TENANT_FILTRO'; tenant: TenantId | 'TODOS' }
   | { type: 'SET_VISTA'; vista: VistaActual }
-  | { type: 'SYNC_RADICADO_SELECCIONADO'; radicados: VentanillaRadicado[] };
+  | { type: 'SYNC_RADICADO_SELECCIONADO'; radicados: VentanillaRadicado[] }
+  | { type: 'TOGGLE_SELECCION'; radicadoId: string }
+  | { type: 'SELECCIONAR_TODOS'; radicadoIds: string[] }
+  | { type: 'LIMPIAR_SELECCION' }
+  | { type: 'SET_TENANT_MASIVO'; tenant: TenantId | '' };
 
 /* ══════════════════════════════════════════════════════════════
    ESTADO INICIAL
@@ -64,6 +71,8 @@ const ESTADO_INICIAL: VentanillaState = {
   busqueda: '',
   tenantFiltro: 'TODOS',
   vistaActual: 'TABLERO',
+  seleccionMasiva: new Set(),
+  tenantMasivo: '',
 };
 
 /* ══════════════════════════════════════════════════════════════
@@ -103,6 +112,8 @@ function reducer(state: VentanillaState, action: VentanillaAction): VentanillaSt
         vistaActual: action.vista,
         panelDerechoAbierto: false,
         drawerNuevoAbierto: false,
+        seleccionMasiva: new Set(),
+        tenantMasivo: '',
       };
     case 'SYNC_RADICADO_SELECCIONADO': {
       if (!state.radicadoSeleccionado) return state;
@@ -112,6 +123,32 @@ function reducer(state: VentanillaState, action: VentanillaAction): VentanillaSt
       if (!actualizado) return state;
       return { ...state, radicadoSeleccionado: actualizado };
     }
+    case 'TOGGLE_SELECCION': {
+      const siguiente = new Set(state.seleccionMasiva);
+      if (siguiente.has(action.radicadoId)) {
+        siguiente.delete(action.radicadoId);
+      } else {
+        siguiente.add(action.radicadoId);
+      }
+      return { ...state, seleccionMasiva: siguiente };
+    }
+    case 'SELECCIONAR_TODOS': {
+      const todosYaSeleccionados = action.radicadoIds.every((id) =>
+        state.seleccionMasiva.has(id),
+      );
+      if (todosYaSeleccionados) {
+        const sin = new Set(state.seleccionMasiva);
+        action.radicadoIds.forEach((id) => sin.delete(id));
+        return { ...state, seleccionMasiva: sin };
+      }
+      const con = new Set(state.seleccionMasiva);
+      action.radicadoIds.forEach((id) => con.add(id));
+      return { ...state, seleccionMasiva: con };
+    }
+    case 'LIMPIAR_SELECCION':
+      return { ...state, seleccionMasiva: new Set(), tenantMasivo: '' };
+    case 'SET_TENANT_MASIVO':
+      return { ...state, tenantMasivo: action.tenant };
     default:
       return state;
   }
