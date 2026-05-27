@@ -152,12 +152,6 @@ export function FormRespuesta({ radicado, usuario, onExito }: Props) {
           fechaRadicacion:      radicado.fechaCreacion,
         });
 
-        console.group(`[WhatsApp] Notificación para ${radicado.ciudadano.nombre}`);
-        console.log('Teléfono:', report.telefono);
-        console.log('Mensaje:\n', report.mensaje);
-        console.log('Link wa.me:', report.linkWaMe);
-        console.groupEnd();
-
         // Audit entry for the WhatsApp notification
         await updateDoc(doc(getDb(), 'radicados', radicado.radicadoId), {
           auditoria: arrayUnion({

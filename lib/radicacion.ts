@@ -73,8 +73,9 @@ export interface ResultadoRadicacion {
  * FIRESTORE SECURITY RULES (agregar en Firebase Console → Firestore → Rules):
  * ──────────────────────────────────────────────────────────────────────────
  * match /radicados/{radicadoId} {
- *   // Lectura pública de documento individual (consulta ciudadana por ID)
- *   allow get: if true;
+ *   // Lectura publica: pasar por /api/consulta/{radicadoId};
+ *   // Firestore directo queda reservado a usuarios internos.
+ *   allow get: if canReadRadicado(resource.data);
  *   // Listado: solo autenticados con rol correcto
  *   allow list: if isAdmin()
  *     || (isFuncionario() && resource.data.clasificacionIA.oficinaDestino == getUserTenant())

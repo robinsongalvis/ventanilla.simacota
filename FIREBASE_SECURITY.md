@@ -27,7 +27,8 @@ Roles soportados:
 
 ## Comportamiento
 
-- `radicados/{id}` permite `get` publico para que `/consulta` funcione con el numero de radicado.
+- `radicados/{id}` ya no permite `get` publico directo desde el SDK cliente.
+- `/consulta` debe pasar por `/api/consulta/{radicadoId}`, que usa cuenta de servicio y devuelve solo campos publicos.
 - `list` de radicados queda limitado a `ADMIN` o al `tenantId` del funcionario/recepcionista.
 - `create` de radicados queda publico solo para origen `WEB`; origen `FISICO_ESCANER` requiere `ADMIN` o `RECEPCIONISTA`.
 - `notasInternas` solo puede enviarse al crear un radicado desde `ADMIN` o `RECEPCIONISTA`.
@@ -52,8 +53,19 @@ firebase use <project-id>
 firebase deploy --only firestore:rules,storage
 ```
 
+## Variables server-side
+
+Las APIs server-side requieren estas variables:
+
+```bash
+FIREBASE_PROJECT_ID=
+FIREBASE_CLIENT_EMAIL=
+FIREBASE_PRIVATE_KEY=
+N8N_WEBHOOK_URL=
+```
+
+`FIREBASE_PRIVATE_KEY` puede guardarse con saltos escapados `\n`, como suele ocurrir en Vercel.
+
 ## Nota de seguridad
 
-La consulta publica por ID expone el documento completo a quien conozca el numero de radicado. Es aceptable para el flujo actual, pero el siguiente endurecimiento recomendado es mover `/consulta` a una API server-side que devuelva solo campos publicos.
-
-Tambien hay un paso de bootstrap: crea al menos un usuario `ADMIN` en Firebase Auth y su documento `users/{uid}` antes de publicar estas reglas, o hazlo con Firebase Admin SDK. Una vez publicadas, crear/editar usuarios desde cliente queda reservado a administradores.
+Tambien hay un paso de bootstrap: crea al menos un usuario `ADMIN` en Firebase Auth y su documento `users/{uid}` antes de publicar estas reglas, o hazlo con una cuenta de servicio. Una vez publicadas, crear/editar usuarios desde cliente queda reservado a administradores.

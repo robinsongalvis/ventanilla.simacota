@@ -1,36 +1,46 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# Ventanilla Unica Digital - Alcaldia de Simacota
 
-## Getting Started
+Aplicacion Next.js para radicacion ciudadana, consulta publica de estado y gestion interna de radicados con Firebase.
 
-First, run the development server:
+## Variables de entorno
+
+Copia `.env.example` a `.env.local` y completa los valores de Firebase.
+
+- `NEXT_PUBLIC_FIREBASE_*`: configuracion publica del SDK web.
+- `FIREBASE_PROJECT_ID`, `FIREBASE_CLIENT_EMAIL`, `FIREBASE_PRIVATE_KEY`: cuenta de servicio usada solo por APIs server-side.
+- `N8N_WEBHOOK_URL`: webhook privado de clasificacion IA.
+
+No uses `NEXT_PUBLIC_` para secretos.
+
+## Desarrollo
 
 ```bash
+npm install
 npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+Abre [http://localhost:3000](http://localhost:3000).
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+## Produccion
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+Antes de publicar:
 
-## Learn More
+```bash
+npm run lint
+npm run build
+firebase deploy --only firestore:rules,storage
+```
 
-To learn more about Next.js, take a look at the following resources:
+La consulta ciudadana `/consulta` no lee Firestore directamente desde el navegador: pasa por `/api/consulta/{radicadoId}` y devuelve solo campos publicos.
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+La clasificacion IA se dispara mediante `/api/radicacion/webhook`, que usa `N8N_WEBHOOK_URL` privado del servidor.
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+## Firebase
 
-## Deploy on Vercel
+Reglas incluidas:
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+- `firestore.rules`
+- `storage.rules`
+- `firebase.json`
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+Consulta tambien `FIREBASE_SECURITY.md`.

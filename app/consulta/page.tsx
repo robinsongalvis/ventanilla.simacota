@@ -3,8 +3,6 @@
 import { Suspense, useCallback, useEffect, useRef, useState } from 'react';
 import { useSearchParams } from 'next/navigation';
 import Link from 'next/link';
-import { doc, getDoc } from 'firebase/firestore';
-import { getDb } from '@/lib/firebase';
 import { DIRECTORIO_TENANTS } from '@/src/types/reglas-negocio';
 import type { EstadoRadicado, AccionAuditoria, TenantId } from '@/src/types/radicado';
 
@@ -77,6 +75,19 @@ const ACCION_CIUDADANO: Partial<Record<AccionAuditoria, string>> = {
   NOTIFICACION_WHATSAPP:  'Notificación enviada',
 };
 
+interface RadicadoPublico {
+  radicadoId: string;
+  fechaCreacion?: string;
+  estadoActual?: EstadoRadicado;
+  clasificacionIA?: {
+    oficinaDestino?: TenantId;
+  } | null;
+  auditoria?: {
+    fecha: string;
+    accion: AccionAuditoria;
+  }[];
+}
+
 /* ══════════════════════════════════════════════════════════════
    UTILIDADES
 ══════════════════════════════════════════════════════════════ */
@@ -107,7 +118,7 @@ function ConsultaInterna() {
 
   const [inputId,      setInputId]      = useState(idParam);
   const [buscando,     setBuscando]     = useState(false);
-  const [radicado,     setRadicado]     = useState<Record<string, unknown> | null>(null);
+  const [radicado,     setRadicado]     = useState<RadicadoPublico | null>(null);
   const [noEncontrado, setNoEncontrado] = useState(false);
   const [error,        setError]        = useState('');
   const [copiado,      setCopiado]      = useState(false);
@@ -134,14 +145,24 @@ function ConsultaInterna() {
     setError('');
 
     try {
-      const db       = getDb();
-      const snap     = await getDoc(doc(db, 'radicados', idLimpio));
+      const res = await fetch(`/api/consulta/${encodeURIComponent(idLimpio)}`);
 
-      if (!snap.exists()) {
+      if (res.status === 404) {
         setNoEncontrado(true);
-      } else {
-        setRadicado(snap.data() as Record<string, unknown>);
+        return;
       }
+
+      const payload = await res.json().catch(() => null);
+
+      if (!res.ok) {
+        throw new Error(
+          payload && typeof payload.error === 'string'
+            ? payload.error
+            : 'Error al consultar. Intente nuevamente.'
+        );
+      }
+
+      setRadicado(payload as RadicadoPublico);
     } catch (err: unknown) {
       setError(err instanceof Error ? err.message : 'Error al consultar. Intente nuevamente.');
     } finally {
@@ -165,12 +186,12 @@ function ConsultaInterna() {
   }
 
   /* ── Extracción tipada de datos del radicado ── */
-  const estado       = radicado?.estadoActual as EstadoRadicado | undefined;
+  const estado       = radicado?.estadoActual;
   const estadoInfo   = estado ? DESCRIPCION_ESTADO[estado] : null;
-  const auditoria    = (radicado?.auditoria as { fecha: string; accion: string }[] | undefined) ?? [];
-  const oficinaId    = (radicado?.clasificacionIA as { oficinaDestino?: TenantId } | null)?.oficinaDestino;
+  const auditoria    = radicado?.auditoria ?? [];
+  const oficinaId    = radicado?.clasificacionIA?.oficinaDestino;
   const oficina      = oficinaId ? DIRECTORIO_TENANTS[oficinaId] : null;
-  const fechaCreacion = radicado?.fechaCreacion as string | undefined;
+  const fechaCreacion = radicado?.fechaCreacion;
 
   return (
     <main
@@ -305,7 +326,7 @@ function ConsultaInterna() {
                     className="text-xl font-black tracking-widest text-indigo-400 font-mono break-all"
                     style={{ fontFamily: 'var(--font-manrope)' }}
                   >
-                    {radicado.radicadoId as string}
+                    {radicado.radicadoId}
                   </p>
                 </div>
                 {fechaCreacion && (

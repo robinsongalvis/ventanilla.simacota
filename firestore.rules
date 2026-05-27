@@ -51,6 +51,17 @@ service cloud.firestore {
       return role in ['ADMIN', 'FUNCIONARIO', 'RECEPCIONISTA'];
     }
 
+    function validEstado(estado) {
+      return estado in [
+        'PENDIENTE',
+        'EN_REVISION',
+        'EN_PROCESO',
+        'RESUELTO',
+        'DEVUELTO',
+        'RECHAZADO'
+      ];
+    }
+
     function validRadicadoCreate() {
       return request.resource.data.keys().hasAll([
         'radicadoId',
@@ -95,6 +106,15 @@ service cloud.firestore {
       && request.resource.data.auditoria is list;
     }
 
+    function validRadicadoUpdate() {
+      return request.resource.data.diff(resource.data).affectedKeys().hasOnly([
+        'estadoActual',
+        'auditoria'
+      ])
+      && validEstado(request.resource.data.estadoActual)
+      && request.resource.data.auditoria is list;
+    }
+
     function canReadRadicado(data) {
       return isAdmin()
         || (isFuncionario() && assignedTenant(data))
@@ -125,8 +145,9 @@ service cloud.firestore {
     }
 
     match /radicados/{radicadoId} {
-      // Consulta ciudadana por numero de radicado. Quien conozca el ID puede leer el documento.
-      allow get: if true;
+      // La consulta ciudadana publica debe pasar por /api/consulta/{radicadoId},
+      // que devuelve solo campos publicos usando cuenta de servicio.
+      allow get: if canReadRadicado(resource.data);
 
       // El dashboard debe consultar con filtro de tenant para FUNCIONARIO/RECEPCIONISTA.
       allow list: if isAdmin()
@@ -136,8 +157,9 @@ service cloud.firestore {
       allow create: if validRadicadoCreate()
         && request.resource.data.radicadoId == radicadoId;
 
-      // Cambios de estado/respuesta. n8n con Firebase Admin omite estas reglas.
-      allow update: if canUpdateRadicado(resource.data);
+      // Cambios de estado/respuesta. n8n con cuenta de servicio omite estas reglas.
+      allow update: if canUpdateRadicado(resource.data)
+        && validRadicadoUpdate();
 
       allow delete: if false;
     }
