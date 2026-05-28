@@ -19,6 +19,7 @@ import { PanelCargaDependencias }          from '@/app/interno/dashboard/compone
 import { VistaAnalytics }                  from '@/app/interno/dashboard/components/analytics/VistaAnalytics';
 import { VistaAlertas, contarAlertasActivas } from '@/app/interno/dashboard/components/analytics/VistaAlertas';
 import { VistaSupervisionIA }              from '@/app/interno/dashboard/components/analytics/VistaSupervisionIA';
+import { VistaAnticipacionOperativa }      from '@/app/interno/dashboard/components/analytics/VistaAnticipacionOperativa';
 import type {
   FiltroMIPG,
   VistaActual,
@@ -329,6 +330,15 @@ function SidebarNav({
 
   const items = [...NAV_ITEMS];
   if (usuario.rol === 'ADMIN') {
+    items.push({
+      vista: 'ANTICIPACION_OPERATIVA' as const,
+      label: 'Anticipación Operativa',
+      icono: (
+        <svg className="w-[18px] h-[18px]" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.8}>
+          <path strokeLinecap="round" strokeLinejoin="round" d="M2.25 18L9 11.25l4.306 4.307a11.95 11.95 0 015.814-5.519l2.74-1.22m0 0l-5.94-2.28m5.94 2.28l-2.28 5.941" />
+        </svg>
+      ),
+    });
     items.push({
       vista: 'SUPERVISION_IA' as const,
       label: 'Supervisión IA',
@@ -1919,6 +1929,10 @@ function DashboardInterior({ usuario, cerrarSesion }: { usuario: UsuarioAutentic
           <div className="flex-1 overflow-y-auto p-6 bg-[#0E0E10]/40">
             <VistaSupervisionIA />
           </div>
+        ) : vistaActual === 'ANTICIPACION_OPERATIVA' ? (
+          <div className="flex-1 overflow-y-auto p-6 bg-[#0E0E10]/40">
+            <VistaAnticipacionOperativa radicados={todosLosRadicados} />
+          </div>
         ) : (
           <>
             {/* Fila de métricas MIPG */}
@@ -1949,7 +1963,7 @@ function DashboardInterior({ usuario, cerrarSesion }: { usuario: UsuarioAutentic
       {/* ── COLUMNA 3: Panel derecho — oculto en vistas de pantalla completa ── */}
       {vistaActual !== 'BANDEJA' && vistaActual !== 'DEPENDENCIAS'
        && vistaActual !== 'ANALYTICS' && vistaActual !== 'ALERTAS'
-       && vistaActual !== 'SUPERVISION_IA' && (
+       && vistaActual !== 'SUPERVISION_IA' && vistaActual !== 'ANTICIPACION_OPERATIVA' && (
         <div
           className={`shrink-0 transition-all duration-300 ease-in-out overflow-hidden ${
             panelDerechoAbierto ? 'w-[420px]' : 'w-0'
