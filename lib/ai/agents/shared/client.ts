@@ -1,6 +1,14 @@
 import { PROMPT_SHARED_AGENT_INSTRUCTIONS } from './prompts';
 import { ejecutarConResiliencia } from '../../resilience';
 
+export interface RespuestaGeminiAgente {
+  priorizacionSugerida: 'CRITICA' | 'PREVENTIVA' | 'ESTANDAR';
+  motivoPrioridad: string;
+  sugerenciasOperativas: string[];
+  borradorRespuestaInterna: string;
+  cuellosBotellaDetectados?: string | null;
+}
+
 /**
  * Helper compartido para realizar la llamada HTTP a Gemini con formato JSON estricto
  * con Circuit Breaker y políticas de reintentos con Jitter.
@@ -9,7 +17,7 @@ export async function llamarGeminiAgente(
   promptEspecializado: string,
   contextoJSON: string,
   apiKey: string
-): Promise<any> {
+): Promise<RespuestaGeminiAgente> {
   const geminiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${apiKey}`;
 
   const requestBody = {

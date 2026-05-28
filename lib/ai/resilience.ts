@@ -67,7 +67,7 @@ class CircuitBreaker {
     }
   }
 
-  public registrarFallo(error: any) {
+  public registrarFallo(error: unknown) {
     this.failureCount++;
     this.lastFailureTime = Date.now();
     
@@ -75,14 +75,16 @@ class CircuitBreaker {
       if (this.failureCount >= this.config.maxFailures) {
         this.state = 'OPEN';
         console.error(
-          `[CircuitBreaker - ${this.name}] Se alcanzaron ${this.failureCount} fallas consecutivas. ¡CIRCUITO ABIERTO!`
+          `[CircuitBreaker - ${this.name}] Se alcanzaron ${this.failureCount} fallas consecutivas. ¡CIRCUITO ABIERTO! Detalle:`,
+          error instanceof Error ? error.message : String(error)
         );
       }
     } else if (this.state === 'HALF_OPEN') {
       this.state = 'OPEN';
       this.successCount = 0;
       console.error(
-        `[CircuitBreaker - ${this.name}] Falló petición en estado HALF_OPEN. CIRCUITO ABIERTO de nuevo.`
+        `[CircuitBreaker - ${this.name}] Falló petición en estado HALF_OPEN. CIRCUITO ABIERTO de nuevo. Detalle:`,
+        error instanceof Error ? error.message : String(error)
       );
     }
   }

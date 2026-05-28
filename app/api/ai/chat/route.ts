@@ -3,7 +3,12 @@ import { SIMI_SYSTEM_PROMPT } from '@/lib/ai/prompts/simi';
 import { registrarLogIA } from '@/lib/ai/telemetry';
 import { ejecutarConResiliencia } from '@/lib/ai/resilience';
 
-function obtenerChatMockResponse(messages: any[], isFallbackError = false) {
+interface ChatMessage {
+  role: 'user' | 'assistant' | 'model';
+  content: string;
+}
+
+function obtenerChatMockResponse(messages: ChatMessage[], isFallbackError = false) {
   const lastUserMsg = messages[messages.length - 1]?.content?.toLowerCase() || '';
   let mockReply = '¡Hola, mano! Qué gusto saludarlo por acá en la Ventanilla Única de Simacota. Cuénteme, ¿en qué le puedo colaborar sumercé?';
 
@@ -32,7 +37,7 @@ function obtenerChatMockResponse(messages: any[], isFallbackError = false) {
 export async function POST(request: Request) {
   const start = Date.now();
   const apiKey = process.env.GEMINI_API_KEY;
-  let messages: any[] = [];
+  let messages: ChatMessage[] = [];
 
   try {
     const body = await request.json();
@@ -60,7 +65,7 @@ export async function POST(request: Request) {
     }
 
     // Convert OpenAI/standard chat format to Gemini API format
-    const geminiContents = messages.map((m: { role: string; content: string }) => ({
+    const geminiContents = messages.map((m: ChatMessage) => ({
       role: m.role === 'assistant' ? 'model' : 'user',
       parts: [
         {

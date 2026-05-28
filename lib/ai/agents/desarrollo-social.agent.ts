@@ -45,8 +45,9 @@ export async function ejecutarAgenteDesarrolloSocial(
       promptVersion,
       fechaGeneracion: new Date().toISOString(),
     };
-  } catch (error: any) {
-    console.error(`[Resilience - DesarrolloSocial] Copiloto falló (usando fallback local):`, error?.message || error);
+  } catch (error: unknown) {
+    const errorMsg = error instanceof Error ? error.message : String(error);
+    console.error(`[Resilience - DesarrolloSocial] Copiloto falló (usando fallback local):`, errorMsg);
     
     // Degradación progresiva: Retornar mock local pero con anotación de fallback
     const esCritico = contexto.diasHabilesRestantes <= 2 || contexto.nivelSaturacionOficina === 'CRITICO';

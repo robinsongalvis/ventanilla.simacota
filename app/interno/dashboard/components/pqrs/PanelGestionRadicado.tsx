@@ -74,7 +74,7 @@ export function PanelGestionRadicado({ radicado, onAsignar, onDevolver, onProrro
                   <div>
                     <span className="text-[9px] font-bold uppercase tracking-widest text-slate-500 block mb-1">Resumen Ejecutivo IA</span>
                     <p className="text-xs text-slate-300 italic bg-slate-950/30 p-3 rounded-lg border border-white/5 leading-relaxed">
-                      "{radicado.analisisIa.resumenEjecutivo}"
+                      &quot;{radicado.analisisIa.resumenEjecutivo}&quot;
                     </p>
                   </div>
 

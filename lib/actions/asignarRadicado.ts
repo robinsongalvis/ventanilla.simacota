@@ -1,4 +1,4 @@
-import { doc, updateDoc, writeBatch, arrayUnion, Timestamp } from 'firebase/firestore';
+import { doc, updateDoc, writeBatch, arrayUnion } from 'firebase/firestore';
 import { getDb } from '@/lib/firebase';
 import type { TenantId } from '@/src/types/radicado';
 

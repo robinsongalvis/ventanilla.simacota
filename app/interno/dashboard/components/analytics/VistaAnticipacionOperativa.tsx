@@ -3,8 +3,7 @@
 import { useEffect, useState, useMemo } from 'react';
 import { collection, onSnapshot, query, limit } from 'firebase/firestore';
 import { getDb } from '@/lib/firebase';
-import type { VentanillaRadicado } from '@/src/types/ventanilla';
-import type { ZonaGeografica } from '@/src/types/radicado';
+import type { VentanillaRadicado, AuditoriaOverride } from '@/src/types/ventanilla';
 import {
   orquestarReportePredictivo,
   explicarRiesgoRadicado,
@@ -17,8 +16,7 @@ interface VistaAnticipacionOperativaProps {
 }
 
 export function VistaAnticipacionOperativa({ radicados }: VistaAnticipacionOperativaProps) {
-  const [audits, setAudits] = useState<any[]>([]);
-  const [cargandoAudits, setCargandoAudits] = useState(true);
+  const [audits, setAudits] = useState<AuditoriaOverride[]>([]);
   const [radicadoSeleccionado, setRadicadoSeleccionado] = useState<AnalisisRiesgoRadicado | null>(null);
 
   // Escuchar ai_auditoria para acumular overrides históricos en caliente
@@ -26,9 +24,8 @@ export function VistaAnticipacionOperativa({ radicados }: VistaAnticipacionOpera
     const db = getDb();
     const q = query(collection(db, 'ai_auditoria'), limit(150));
     const unsub = onSnapshot(q, (snap) => {
-      setAudits(snap.docs.map(d => d.data()));
-      setCargandoAudits(false);
-    }, () => setCargandoAudits(false));
+      setAudits(snap.docs.map(d => d.data() as AuditoriaOverride));
+    }, (err) => console.error('Error al escuchar ai_auditoria:', err));
 
     return () => unsub();
   }, []);

@@ -1,4 +1,4 @@
-import type { VentanillaRadicado } from '@/src/types/ventanilla';
+import type { VentanillaRadicado, AuditoriaOverride } from '@/src/types/ventanilla';
 import { NOMBRES_TENANT } from '@/src/types/reglas-negocio';
 import { PREDICTIVE_THRESHOLDS, CAPACIDAD_DIARIA_DEPENDENCIAS } from './thresholds';
 
@@ -24,7 +24,7 @@ function estaActivo(r: VentanillaRadicado): boolean {
  */
 export function calcularSaturacionDependencias(
   todosLosRadicados: VentanillaRadicado[],
-  overridesAuditoria: Array<{ clasificacionOriginal?: string }> = []
+  overridesAuditoria: Array<{ clasificacionOriginal?: string | null }> = []
 ): AnalisisSaturacionDependencia[] {
   
   const dependenciasIds = Object.keys(CAPACIDAD_DIARIA_DEPENDENCIAS);

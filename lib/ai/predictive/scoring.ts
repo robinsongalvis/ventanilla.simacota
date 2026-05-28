@@ -1,4 +1,4 @@
-import type { VentanillaRadicado } from '@/src/types/ventanilla';
+import type { VentanillaRadicado, AuditoriaOverride } from '@/src/types/ventanilla';
 import { calcularRiesgoVencimiento, type AnalisisRiesgoRadicado } from './riesgo-vencimiento';
 import { calcularSaturacionDependencias, type AnalisisSaturacionDependencia } from './saturacion';
 import { calcularTendenciasSemanticas, type AnalisisTendenciaTag } from './tendencias';
@@ -29,7 +29,7 @@ function estaActivo(r: VentanillaRadicado): boolean {
  */
 export function orquestarReportePredictivo(
   todosLosRadicados: VentanillaRadicado[],
-  overridesAuditoria: Array<{ clasificacionOriginal?: string }> = []
+  overridesAuditoria: Array<{ clasificacionOriginal?: string | null }> = []
 ): ReporteInteligenciaMunicipal {
   const activos = todosLosRadicados.filter(estaActivo);
   const totalActivos = activos.length;

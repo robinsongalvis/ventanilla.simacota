@@ -26,7 +26,7 @@ export interface ContextoIARadicado {
 export function construirContextoAgente(
   radicado: VentanillaRadicado,
   todosLosRadicados: VentanillaRadicado[],
-  overridesAuditoria: any[] = []
+  overridesAuditoria: Array<{ clasificacionOriginal?: string | null }> = []
 ): ContextoIARadicado {
   // 1. Calcular riesgo matemático
   const riesgo = calcularRiesgoVencimiento(radicado, todosLosRadicados);

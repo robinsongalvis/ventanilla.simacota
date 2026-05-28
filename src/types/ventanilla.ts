@@ -120,3 +120,19 @@ export interface UsuarioInterno {
   activo: boolean;
 }
 
+export interface AuditoriaOverride {
+  auditoriaId: string;
+  radicadoId: string;
+  timestamp: string;
+  promptVersion: string;
+  clasificacionOriginal?: string | null;
+  clasificacionFinal?: string | null;
+  confianzaIA?: number | null;
+  resumenIA?: string | null;
+  resumenEditado?: string | null;
+  etiquetasIA: string[];
+  etiquetasFinales: string[];
+  accionFuncionario: 'MODIFICADO' | 'ACEPTADO';
+  motivoCorreccion: string;
+}
+
