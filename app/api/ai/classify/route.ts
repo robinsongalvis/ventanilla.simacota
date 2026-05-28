@@ -1,13 +1,63 @@
 import { NextResponse } from 'next/server';
 import { CLASSIFIER_PROMPT, CLASSIFIER_SCHEMA } from '@/lib/ai/prompts/classifier';
 import { registrarLogIA } from '@/lib/ai/telemetry';
+import { ejecutarConResiliencia } from '@/lib/ai/resilience';
+
+function ejecutarClasificacionLocal(asunto: string, descripcion: string, isFallbackError = false) {
+  const text = `${asunto || ''} ${descripcion}`.toLowerCase();
+  let sugerencia = 'VENTANILLA_UNICA';
+  const tags: string[] = [];
+
+  if (text.includes('agua') || text.includes('tubo') || text.includes('fuga') || text.includes('acueducto')) {
+    sugerencia = 'SEC_PLANEACION';
+    tags.push('acueducto');
+  } else if (text.includes('luminaria') || text.includes('postes') || text.includes('luz') || text.includes('alumbrado')) {
+    sugerencia = 'SEC_PLANEACION';
+    tags.push('alumbrado');
+  } else if (text.includes('via') || text.includes('carretera') || text.includes('zanja') || text.includes('hueco')) {
+    sugerencia = 'SEC_PLANEACION';
+    tags.push('vias-rurales');
+  } else if (text.includes('sisben') || text.includes('encuesta')) {
+    sugerencia = 'SUB_SISBEN';
+    tags.push('sisben');
+  } else if (text.includes('subsidio') || text.includes('adulto mayor') || text.includes('familias en accion')) {
+    sugerencia = 'SUB_PROGRAMAS';
+    tags.push('programas-sociales');
+  } else if (text.includes('violencia') || text.includes('familiar') || text.includes('menor') || text.includes('abuso')) {
+    sugerencia = 'SUB_COMISARIA';
+    tags.push('comisaria-familia');
+  } else if (text.includes('animal') || text.includes('cultivo') || text.includes('plaga') || text.includes('finca')) {
+    sugerencia = 'SEC_AGRICULTURA_UMATA';
+    tags.push('agricultura');
+  } else if (text.includes('desastre') || text.includes('derrumbe') || text.includes('inundacion') || text.includes('riesgo')) {
+    sugerencia = 'SUB_RIESGOS_GRD';
+    tags.push('gestion-del-riesgo');
+  }
+
+  if (text.includes('vereda') || text.includes('veredas') || text.includes('campo')) {
+    tags.push('zona-rural');
+  }
+
+  return {
+    dependenciaSugerida: sugerencia,
+    confianzaClasificacion: 0.85,
+    etiquetasSemanticas: tags.length > 0 ? tags : ['ciudadania'],
+    resumenEjecutivo: `[FALLBACK] Ciudadano solicita asistencia/reporte sobre ${asunto || 'tema general'}.`,
+    promptVersion: isFallbackError ? 'simi-classifier-v1.0-fallback-error' : 'simi-classifier-v1.0-mock',
+    fechaAnalisis: new Date().toISOString(),
+  };
+}
 
 export async function POST(request: Request) {
   const start = Date.now();
   const apiKey = process.env.GEMINI_API_KEY;
+  let asunto = '';
+  let descripcion = '';
 
   try {
-    const { asunto, descripcion } = await request.json();
+    const body = await request.json();
+    asunto = body.asunto || '';
+    descripcion = body.descripcion || '';
 
     if (!descripcion || descripcion.trim().length < 10) {
       return NextResponse.json(
@@ -17,53 +67,10 @@ export async function POST(request: Request) {
     }
 
     if (!apiKey) {
-      console.warn('GEMINI_API_KEY is not defined in environment variables. Falling back to local mock classifier.');
-      
-      // Local semantic mock matcher based on common keywords
-      const text = `${asunto || ''} ${descripcion}`.toLowerCase();
-      let sugerencia = 'VENTANILLA_UNICA';
-      const tags: string[] = [];
-
-      if (text.includes('agua') || text.includes('tubo') || text.includes('fuga') || text.includes('acueducto')) {
-        sugerencia = 'SEC_PLANEACION';
-        tags.push('acueducto');
-      } else if (text.includes('luminaria') || text.includes('postes') || text.includes('luz') || text.includes('alumbrado')) {
-        sugerencia = 'SEC_PLANEACION';
-        tags.push('alumbrado');
-      } else if (text.includes('via') || text.includes('carretera') || text.includes('zanja') || text.includes('hueco')) {
-        sugerencia = 'SEC_PLANEACION';
-        tags.push('vias-rurales');
-      } else if (text.includes('sisben') || text.includes('encuesta')) {
-        sugerencia = 'SUB_SISBEN';
-        tags.push('sisben');
-      } else if (text.includes('subsidio') || text.includes('adulto mayor') || text.includes('familias en accion')) {
-        sugerencia = 'SUB_PROGRAMAS';
-        tags.push('programas-sociales');
-      } else if (text.includes('violencia') || text.includes('familiar') || text.includes('menor') || text.includes('abuso')) {
-        sugerencia = 'SUB_COMISARIA';
-        tags.push('comisaria-familia');
-      } else if (text.includes('animal') || text.includes('cultivo') || text.includes('plaga') || text.includes('finca')) {
-        sugerencia = 'SEC_AGRICULTURA_UMATA';
-        tags.push('agricultura');
-      } else if (text.includes('desastre') || text.includes('derrumbe') || text.includes('inundacion') || text.includes('riesgo')) {
-        sugerencia = 'SUB_RIESGOS_GRD';
-        tags.push('gestion-del-riesgo');
-      }
-
-      if (text.includes('vereda') || text.includes('veredas') || text.includes('campo')) {
-        tags.push('zona-rural');
-      }
-
-      const mockResponse = {
-        dependenciaSugerida: sugerencia,
-        confianzaClasificacion: 0.85,
-        etiquetasSemanticas: tags.length > 0 ? tags : ['ciudadania'],
-        resumenEjecutivo: `Ciudadano solicita asistencia/reporte sobre ${asunto || 'tema general'}.`,
-        promptVersion: 'simi-classifier-v1.0-mock',
-        fechaAnalisis: new Date().toISOString(),
-      };
-
+      console.warn('GEMINI_API_KEY is not defined. Falling back to local mock classifier.');
+      const mockResponse = ejecutarClasificacionLocal(asunto, descripcion, false);
       const latenciaMs = Date.now() - start;
+
       await registrarLogIA({
         endpoint: 'classify',
         latenciaMs,
@@ -100,18 +107,34 @@ export async function POST(request: Request) {
       },
     };
 
-    const response = await fetch(geminiUrl, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify(geminiRequestBody),
-    });
+    // Consumir Gemini a través de la malla de resiliencia (Circuit Breaker + Retries)
+    const response = await ejecutarConResiliencia(
+      'GeminiClasificador',
+      async () => {
+        const res = await fetch(geminiUrl, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify(geminiRequestBody),
+        });
 
-    if (!response.ok) {
-      const errText = await response.text();
-      throw new Error(`Gemini API error: ${response.status} - ${errText}`);
-    }
+        if (!res.ok) {
+          const errText = await res.text();
+          throw new Error(`Gemini API error: ${res.status} - ${errText}`);
+        }
+
+        return res;
+      },
+      {
+        retries: 2,
+        baseDelayMs: 1000,
+        configBreaker: {
+          maxFailures: 5,
+          cooldownMs: 60000,
+        },
+      }
+    );
 
     const resData = await response.json();
     const responseText = resData.candidates?.[0]?.content?.parts?.[0]?.text;
@@ -135,22 +158,23 @@ export async function POST(request: Request) {
       promptVersion: 'simi-classifier-v1.0',
       fechaAnalisis: new Date().toISOString(),
     });
+
   } catch (error: unknown) {
     const latenciaMs = Date.now() - start;
     const msg = error instanceof Error ? error.message : String(error);
-    console.error('Error en /api/ai/classify:', msg);
+    console.error('Error en /api/ai/classify (activando degradación progresiva):', msg);
+
+    // DEGRADACIÓN PROGRESIVA: En lugar de retornar 500 a producción, devolvemos inferencia local.
+    const fallbackResponse = ejecutarClasificacionLocal(asunto, descripcion, true);
 
     await registrarLogIA({
       endpoint: 'classify',
       latenciaMs,
       error: msg,
-      fallbackActivo: !apiKey,
-      promptVersion: apiKey ? 'simi-classifier-v1.0' : 'simi-classifier-v1.0-mock',
+      fallbackActivo: true,
+      promptVersion: 'simi-classifier-v1.0-fallback-error',
     });
 
-    return NextResponse.json(
-      { error: 'Error interno en el clasificador de IA.', detalles: msg },
-      { status: 500 }
-    );
+    return NextResponse.json(fallbackResponse);
   }
 }

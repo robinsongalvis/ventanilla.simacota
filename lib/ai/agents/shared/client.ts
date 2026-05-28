@@ -1,7 +1,9 @@
 import { PROMPT_SHARED_AGENT_INSTRUCTIONS } from './prompts';
+import { ejecutarConResiliencia } from '../../resilience';
 
 /**
  * Helper compartido para realizar la llamada HTTP a Gemini con formato JSON estricto
+ * con Circuit Breaker y políticas de reintentos con Jitter.
  */
 export async function llamarGeminiAgente(
   promptEspecializado: string,
@@ -62,25 +64,40 @@ export async function llamarGeminiAgente(
     },
   };
 
-  const response = await fetch(geminiUrl, {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
+  // Envolvemos el procesamiento completo en ejecutarConResiliencia
+  return ejecutarConResiliencia(
+    'GeminiCopilotoAgente',
+    async () => {
+      const response = await fetch(geminiUrl, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(requestBody),
+      });
+
+      if (!response.ok) {
+        const errText = await response.text();
+        throw new Error(`Gemini API Agente falló: ${response.status} - ${errText}`);
+      }
+
+      const resData = await response.json();
+      const responseText = resData.candidates?.[0]?.content?.parts?.[0]?.text;
+
+      if (!responseText) {
+        throw new Error('No se recibió texto de respuesta del agente de Gemini.');
+      }
+
+      return JSON.parse(responseText);
     },
-    body: JSON.stringify(requestBody),
-  });
-
-  if (!response.ok) {
-    const errText = await response.text();
-    throw new Error(`Gemini API Agente falló: ${response.status} - ${errText}`);
-  }
-
-  const resData = await response.json();
-  const responseText = resData.candidates?.[0]?.content?.parts?.[0]?.text;
-
-  if (!responseText) {
-    throw new Error('No se recibió texto de respuesta del agente de Gemini.');
-  }
-
-  return JSON.parse(responseText);
+    {
+      retries: 2, // 2 reintentos (3 intentos en total)
+      baseDelayMs: 1000,
+      configBreaker: {
+        maxFailures: 5,
+        cooldownMs: 60000, // Cooldown de 60 segundos
+      },
+    }
+  );
 }
+
