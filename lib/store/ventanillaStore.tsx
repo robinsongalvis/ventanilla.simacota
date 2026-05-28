@@ -30,7 +30,10 @@ export type VistaActual =
   | 'VENTANILLA'
   | 'BANDEJA'
   | 'DEPENDENCIAS'
-  | 'REPORTES';
+  | 'REPORTES'
+  | 'ANALYTICS'    // Centro de Inteligencia Operativa — Fase 2
+  | 'ALERTAS';     // Panel de Alertas Predictivas — Fase 2
+
 
 interface VentanillaState {
   radicadoSeleccionado: VentanillaRadicado | null;

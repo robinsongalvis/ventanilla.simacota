@@ -16,6 +16,8 @@ import { radicarInstitucionalmente }       from '@/lib/actions/radicarVentanilla
 import { asignarRadicado, asignarMasivo }  from '@/lib/actions/asignarRadicado';
 import { ComprobanteRadicado }             from '@/app/interno/dashboard/components/ComprobanteRadicado';
 import { PanelCargaDependencias }          from '@/app/interno/dashboard/components/dependencias/PanelCargaDependencias';
+import { VistaAnalytics }                  from '@/app/interno/dashboard/components/analytics/VistaAnalytics';
+import { VistaAlertas, contarAlertasActivas } from '@/app/interno/dashboard/components/analytics/VistaAlertas';
 import type {
   FiltroMIPG,
   VistaActual,
@@ -280,6 +282,25 @@ const NAV_ITEMS: { vista: VistaActual; label: string; icono: React.ReactNode }[]
       </svg>
     ),
   },
+  // ── Fase 2: Inteligencia Operativa ─────────────────────────
+  {
+    vista: 'ANALYTICS' as const,
+    label: 'Analítica',
+    icono: (
+      <svg className="w-[18px] h-[18px]" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.8}>
+        <path strokeLinecap="round" strokeLinejoin="round" d="M7.5 14.25v2.25m3-4.5v4.5m3-6.75v6.75m3-9v9M6 20.25h12A2.25 2.25 0 0020.25 18V6A2.25 2.25 0 0018 3.75H6A2.25 2.25 0 003.75 6v12A2.25 2.25 0 006 20.25z" />
+      </svg>
+    ),
+  },
+  {
+    vista: 'ALERTAS' as const,
+    label: 'Alertas',
+    icono: (
+      <svg className="w-[18px] h-[18px]" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.8}>
+        <path strokeLinecap="round" strokeLinejoin="round" d="M14.857 17.082a23.848 23.848 0 005.454-1.31A8.967 8.967 0 0118 9.75v-.7V9A6 6 0 006 9v.75a8.967 8.967 0 01-2.312 6.022c1.733.64 3.56 1.085 5.455 1.31m5.714 0a24.255 24.255 0 01-5.714 0m5.714 0a3 3 0 11-5.714 0" />
+      </svg>
+    ),
+  },
 ];
 
 function SidebarNav({
@@ -289,6 +310,7 @@ function SidebarNav({
   usuario,
   onCerrarSesion,
   pendientesBandeja,
+  pendientesAlertas,
 }: {
   vistaActual: VistaActual;
   onVistaChange: (v: VistaActual) => void;
@@ -296,6 +318,7 @@ function SidebarNav({
   usuario: UsuarioAutenticado;
   onCerrarSesion: () => void;
   pendientesBandeja: number;
+  pendientesAlertas: number;
 }) {
   const nombreRol = usuario.rol === 'ADMIN'
     ? 'Admin'
@@ -357,6 +380,11 @@ function SidebarNav({
               {vista === 'BANDEJA' && pendientesBandeja > 0 && (
                 <span className="shrink-0 min-w-[18px] h-[18px] rounded-full bg-indigo-600 text-white text-[9px] font-black flex items-center justify-center px-1">
                   {pendientesBandeja > 99 ? '99+' : pendientesBandeja}
+                </span>
+              )}
+              {vista === 'ALERTAS' && pendientesAlertas > 0 && (
+                <span className="shrink-0 min-w-[18px] h-[18px] rounded-full bg-red-600 text-white text-[9px] font-black flex items-center justify-center px-1 animate-pulse">
+                  {pendientesAlertas > 99 ? '99+' : pendientesAlertas}
                 </span>
               )}
             </button>
@@ -1694,6 +1722,12 @@ function DashboardInterior({ usuario, cerrarSesion }: { usuario: UsuarioAutentic
     [todosLosRadicados],
   );
 
+  // Fase 2 — badge de alertas por rol
+  const pendientesAlertas = useMemo(
+    () => contarAlertasActivas(todosLosRadicados, esAdmin, usuario.tenantId),
+    [todosLosRadicados, esAdmin, usuario.tenantId],
+  );
+
   return (
     <div className="flex h-screen overflow-hidden bg-[#0A0A0B]">
       {/* ── COLUMNA 1: Sidebar de navegación ── */}
@@ -1704,12 +1738,26 @@ function DashboardInterior({ usuario, cerrarSesion }: { usuario: UsuarioAutentic
         usuario={usuario}
         onCerrarSesion={cerrarSesion}
         pendientesBandeja={radicadosPendientes.length}
+        pendientesAlertas={pendientesAlertas}
       />
 
       {/* ── COLUMNA 2: Cuerpo central ── */}
       <div className="flex-1 flex flex-col overflow-hidden min-w-0">
 
-        {vistaActual === 'REPORTES' ? (
+        {vistaActual === 'ANALYTICS' ? (
+          <VistaAnalytics
+            radicados={todosLosRadicados}
+            esAdmin={esAdmin}
+            tenantIdUsuario={usuario.tenantId}
+          />
+        ) : vistaActual === 'ALERTAS' ? (
+          <VistaAlertas
+            radicados={todosLosRadicados}
+            esAdmin={esAdmin}
+            tenantIdUsuario={usuario.tenantId}
+            onVerRadicado={(r) => dispatch({ type: 'SELECCIONAR_RADICADO', radicado: r })}
+          />
+        ) : vistaActual === 'REPORTES' ? (
           <VistaReportes metricas={metricas} total={todosLosRadicados.length} />
         ) : vistaActual === 'BANDEJA' ? (
           <BandejaAsignacion
@@ -1747,8 +1795,9 @@ function DashboardInterior({ usuario, cerrarSesion }: { usuario: UsuarioAutentic
         )}
       </div>
 
-      {/* ── COLUMNA 3: Panel derecho — oculto en BANDEJA y DEPENDENCIAS ── */}
-      {vistaActual !== 'BANDEJA' && vistaActual !== 'DEPENDENCIAS' && (
+      {/* ── COLUMNA 3: Panel derecho — oculto en vistas de pantalla completa ── */}
+      {vistaActual !== 'BANDEJA' && vistaActual !== 'DEPENDENCIAS'
+       && vistaActual !== 'ANALYTICS' && vistaActual !== 'ALERTAS' && (
         <div
           className={`shrink-0 transition-all duration-300 ease-in-out overflow-hidden ${
             panelDerechoAbierto ? 'w-[420px]' : 'w-0'
