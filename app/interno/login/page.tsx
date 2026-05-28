@@ -21,10 +21,10 @@ export default function LoginInternoPage() {
               <path strokeLinecap="round" strokeLinejoin="round" d="M3.75 21h16.5M4.5 3h15M5.25 3v18m13.5-18v18M9 6.75h1.5m-1.5 3h1.5m-1.5 3h1.5m3-6H15m-1.5 3H15m-1.5 3H15M9 21v-3.375c0-.621.504-1.125 1.125-1.125h3.75c.621 0 1.125.504 1.125 1.125V21" />
             </svg>
           </div>
-          <h1 className="text-2xl font-black tracking-tighter text-slate-50" style={{ fontFamily: 'var(--font-manrope)' }}>
-            Panel de Gestion
+          <h1 className="font-headline text-2xl text-slate-50">
+            Panel de Gestión
           </h1>
-          <p className="text-sm text-slate-500 mt-1">Alcaldia de Simacota - Ventanilla Unica</p>
+          <p className="text-sm text-slate-400 mt-1">Alcaldía de Simacota · Ventanilla Única</p>
         </div>
 
         <Suspense fallback={<LoginFormFallback />}>

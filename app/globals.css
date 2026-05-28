@@ -275,3 +275,120 @@ body {
 .animate-overlay-out { animation: overlayOut 0.2s  ease-in  both; }
 .animate-modal-in    { animation: modalIn    0.3s  ease-out both; }
 .animate-modal-out   { animation: modalOut   0.2s  ease-in  both; }
+
+/* ============================================================
+   PANEL INTERNO — Tokens y utilidades adicionales
+   ============================================================ */
+
+:root {
+  --focus-ring: 0 0 0 2px rgba(99, 102, 241, 0.40);
+}
+
+/* ——— focus-visible para .input-obsidian ——— */
+.input-obsidian:focus-visible {
+  border-color: #6366F1;
+  box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.15);
+  background: rgba(99, 102, 241, 0.05);
+}
+
+/* ——— focus-visible para .btn-primary ——— */
+.btn-primary:focus-visible {
+  outline: none;
+  box-shadow:
+    0 4px 24px rgba(99, 102, 241, 0.30),
+    0 0 0 2px #0A0A0B,
+    0 0 0 4px rgba(99, 102, 241, 0.70);
+}
+
+/* ——— Input compacto para formularios densos del panel interno ——— */
+.input-internal {
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid rgba(255, 255, 255, 0.10);
+  border-radius: 0.5rem;
+  color: #F8FAFC;
+  width: 100%;
+  padding: 0.5rem 0.75rem;
+  font-size: 0.875rem;
+  line-height: 1.5;
+  transition: border-color 0.2s ease, box-shadow 0.2s ease, background 0.2s ease;
+  outline: none;
+}
+
+.input-internal::placeholder {
+  color: #475569;
+}
+
+.input-internal:hover {
+  border-color: rgba(99, 102, 241, 0.30);
+  background: rgba(255, 255, 255, 0.06);
+}
+
+.input-internal:focus,
+.input-internal:focus-visible {
+  border-color: rgba(99, 102, 241, 0.70);
+  box-shadow: var(--focus-ring);
+  background: rgba(99, 102, 241, 0.05);
+}
+
+/* ——— Select estilo Obsidian ——— */
+.select-internal {
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid rgba(255, 255, 255, 0.10);
+  border-radius: 0.5rem;
+  color: #F8FAFC;
+  padding: 0.5rem 0.75rem;
+  font-size: 0.875rem;
+  line-height: 1.5;
+  transition: border-color 0.2s ease, box-shadow 0.2s ease, background 0.2s ease;
+  outline: none;
+  cursor: pointer;
+}
+
+.select-internal:hover {
+  border-color: rgba(99, 102, 241, 0.30);
+  background: rgba(255, 255, 255, 0.06);
+}
+
+.select-internal:focus,
+.select-internal:focus-visible {
+  border-color: rgba(99, 102, 241, 0.70);
+  box-shadow: var(--focus-ring);
+  background: rgba(99, 102, 241, 0.04);
+}
+
+/* ——— Botón ghost (acciones secundarias del panel) ——— */
+.btn-ghost {
+  background: transparent;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 0.5rem;
+  color: #94A3B8;
+  padding: 0.5rem 1rem;
+  font-size: 0.875rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.15s ease, border-color 0.15s ease, color 0.15s ease, transform 0.1s ease;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.375rem;
+}
+
+.btn-ghost:hover:not(:disabled) {
+  background: rgba(255, 255, 255, 0.05);
+  border-color: rgba(255, 255, 255, 0.20);
+  color: #F8FAFC;
+}
+
+.btn-ghost:active:not(:disabled) {
+  transform: scale(0.97);
+}
+
+.btn-ghost:focus-visible {
+  outline: none;
+  box-shadow: var(--focus-ring);
+}
+
+.btn-ghost:disabled {
+  opacity: 0.40;
+  cursor: not-allowed;
+}

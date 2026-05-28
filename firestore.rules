@@ -164,6 +164,33 @@ service cloud.firestore {
       allow delete: if false;
     }
 
+    // ── Sistema MIPG: radicados institucionales ─────────────────────────────
+    match /ventanilla_radicados/{radicadoId} {
+      // Admin y recepcionista ven todo; funcionario solo los de su dependencia.
+      allow get: if isAdmin() || isRecepcionista()
+        || (isFuncionario() && resource.data.clasificacion.oficinaDestino == userTenant());
+
+      // Las queries del hook están filtradas por tenant en servidor para FUNCIONARIO.
+      allow list: if isAdmin() || isRecepcionista()
+        || (isFuncionario() && resource.data.clasificacion.oficinaDestino == userTenant());
+
+      // Solo admin y recepcionista pueden radicar institucionalmente.
+      allow create: if (isAdmin() || isRecepcionista())
+        && request.resource.data.radicadoId == radicadoId;
+
+      // Traslados, trazabilidad, prórroga y respuesta desde el panel interno.
+      allow update: if isAdmin() || isRecepcionista()
+        || (isFuncionario() && resource.data.clasificacion.oficinaDestino == userTenant());
+
+      allow delete: if false;
+    }
+
+    // ── Contadores de consecutivo anual ────────────────────────────────────
+    match /counters/{document} {
+      // Lectura y escritura transaccional para generar el número de radicado.
+      allow read, write: if isAdmin() || isRecepcionista();
+    }
+
     match /{document=**} {
       allow read, write: if false;
     }

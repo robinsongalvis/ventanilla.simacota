@@ -177,7 +177,7 @@ function FormLogin() {
   };
 
   return (
-    <div className="h-screen bg-[#0A0A0B] flex items-center justify-center p-4">
+    <main className="min-h-screen bg-obsidian-gradient flex items-center justify-center p-4">
       <div className="w-full max-w-md">
         <div className="text-center mb-8">
           <div className="inline-flex items-center justify-center w-14 h-14 rounded-2xl bg-indigo-500/20 border border-indigo-500/30 mb-4">
@@ -185,30 +185,47 @@ function FormLogin() {
               <path strokeLinecap="round" strokeLinejoin="round" d="M3.75 21h16.5M4.5 3h15M5.25 3v18m13.5-18v18M9 6.75h1.5m-1.5 3h1.5m-1.5 3h1.5m3-6H15m-1.5 3H15m-1.5 3H15M9 21v-3.375c0-.621.504-1.125 1.125-1.125h3.75c.621 0 1.125.504 1.125 1.125V21" />
             </svg>
           </div>
-          <h1 className="text-2xl font-black tracking-tighter text-slate-50">Panel de Gestión</h1>
-          <p className="text-sm text-slate-500 mt-1">Alcaldía de Simacota · Ventanilla Única</p>
+          <h1 className="font-headline text-2xl text-slate-50">Panel de Gestión</h1>
+          <p className="text-sm text-slate-400 mt-1">Alcaldía de Simacota · Ventanilla Única</p>
         </div>
-        <form onSubmit={handleSubmit} className="bg-slate-900/60 border border-white/10 rounded-2xl p-8 flex flex-col gap-5 backdrop-blur-xl">
+        <form onSubmit={handleSubmit} className="glass-card p-8 flex flex-col gap-5">
           <div className="flex flex-col gap-1.5">
-            <label className="text-xs font-bold uppercase tracking-widest text-slate-400">Correo institucional</label>
-            <input type="email" value={email} onChange={(e) => setEmail(e.target.value)} required placeholder="funcionario@simacota.gov.co"
-              className="bg-slate-800/50 border border-white/10 rounded-xl px-4 py-3 text-slate-50 text-sm placeholder-slate-600 focus:outline-none focus:border-indigo-500 transition-colors" />
+            <label className="font-label text-slate-400">Correo institucional</label>
+            <input
+              type="email"
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+              required
+              placeholder="funcionario@simacota.gov.co"
+              className="input-obsidian"
+              autoComplete="email"
+            />
           </div>
           <div className="flex flex-col gap-1.5">
-            <label className="text-xs font-bold uppercase tracking-widest text-slate-400">Contraseña</label>
-            <input type="password" value={password} onChange={(e) => setPassword(e.target.value)} required placeholder="••••••••"
-              className="bg-slate-800/50 border border-white/10 rounded-xl px-4 py-3 text-slate-50 text-sm placeholder-slate-600 focus:outline-none focus:border-indigo-500 transition-colors" />
+            <label className="font-label text-slate-400">Contraseña</label>
+            <input
+              type="password"
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+              required
+              placeholder="••••••••"
+              className="input-obsidian"
+              autoComplete="current-password"
+            />
           </div>
-          {error && <p className="text-sm text-rose-400 bg-rose-500/10 border border-rose-500/20 rounded-lg px-4 py-2.5">{error}</p>}
-          <button type="submit" disabled={loading}
-            className="w-full py-3 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white font-bold text-sm transition-colors disabled:opacity-60 flex items-center justify-center gap-2 mt-1">
+          {error && (
+            <p className="text-sm text-rose-400 bg-rose-500/10 border border-rose-500/20 rounded-lg px-4 py-2.5">
+              {error}
+            </p>
+          )}
+          <button type="submit" disabled={loading} className="btn-primary w-full mt-1">
             {loading
-              ? <><span className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />Ingresando…</>
+              ? <><span className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin-smooth" />Ingresando…</>
               : 'Ingresar al Panel'}
           </button>
         </form>
       </div>
-    </div>
+    </main>
   );
 }
 
@@ -286,7 +303,7 @@ function SidebarNav({
       : 'Funcionario';
 
   return (
-    <aside className="h-full flex flex-col bg-slate-950 border-r border-white/[0.07] shrink-0 w-[210px]">
+    <aside className="h-full flex flex-col bg-[#0A0A0B] border-r border-white/[0.07] shrink-0 w-[210px]">
       {/* Logo */}
       <div className="px-4 py-4 border-b border-white/[0.07]">
         <div className="flex items-center gap-2.5">
@@ -306,7 +323,7 @@ function SidebarNav({
       <div className="px-3 pt-3 pb-2">
         <button
           onClick={onNuevoRadicado}
-          className="w-full flex items-center gap-2 px-3 py-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-bold transition-colors"
+          className="w-full flex items-center gap-2 px-3 py-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-500 active:scale-95 text-white text-xs font-bold transition-all duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-400 focus-visible:ring-offset-1 focus-visible:ring-offset-black"
         >
           <svg className="w-3.5 h-3.5 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
             <path strokeLinecap="round" strokeLinejoin="round" d="M12 4v16m8-8H4" />
@@ -326,10 +343,10 @@ function SidebarNav({
             <button
               key={vista}
               onClick={() => onVistaChange(vista)}
-              className={`w-full flex items-center gap-2.5 px-3 py-2.5 rounded-xl text-left transition-colors duration-150 group ${
+              className={`w-full flex items-center gap-2.5 px-3 py-2.5 rounded-xl text-left transition-colors duration-150 group focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-indigo-500/50 ${
                 activo
                   ? 'bg-indigo-500/15 text-indigo-300'
-                  : 'text-slate-400 hover:text-slate-100 hover:bg-white/5'
+                  : 'text-slate-400 hover:text-slate-100 hover:bg-white/[0.05]'
               }`}
             >
               <span className={activo ? 'text-indigo-400' : 'text-slate-600 group-hover:text-slate-400'}>
@@ -360,7 +377,7 @@ function SidebarNav({
             <button
               onClick={onCerrarSesion}
               title="Cerrar sesión"
-              className="p-1 rounded-lg text-slate-500 hover:text-rose-400 hover:bg-rose-500/10 transition-colors"
+              className="p-1 rounded-lg text-slate-500 hover:text-rose-400 hover:bg-rose-500/10 active:scale-90 transition-all duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-rose-500/50"
             >
               <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
                 <path strokeLinecap="round" strokeLinejoin="round" d="M15.75 9V5.25A2.25 2.25 0 0013.5 3h-6a2.25 2.25 0 00-2.25 2.25v13.5A2.25 2.25 0 007.5 21h6a2.25 2.25 0 002.25-2.25V15m3 0l3-3m0 0l-3-3m3 3H9" />
@@ -457,10 +474,10 @@ function TarjetasMIPG({
         {/* Tarjeta TODOS */}
         <button
           onClick={() => onFiltroChange('TODOS')}
-          className={`shrink-0 flex flex-col items-start px-4 py-3 rounded-xl border border-l-4 transition-all duration-200 cursor-pointer ${
+          className={`shrink-0 flex flex-col items-start px-4 py-3 rounded-xl border border-l-4 transition-all duration-200 cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-white/30 ${
             filtroActivo === 'TODOS'
               ? 'bg-slate-800/80 border-slate-400 border-t-white/15 border-r-white/15 border-b-white/15'
-              : 'bg-slate-900/40 border-slate-600 border-t-white/8 border-r-white/8 border-b-white/8 hover:bg-slate-900/60 hover:border-slate-500'
+              : 'bg-slate-900/40 border-slate-600 border-t-white/8 border-r-white/8 border-b-white/8 hover:bg-slate-800/60 hover:border-slate-500 hover:-translate-y-px'
           }`}
         >
           <span className="text-2xl font-black leading-none text-slate-50 tabular-nums">
@@ -475,10 +492,10 @@ function TarjetasMIPG({
             <button
               key={t.filtro}
               onClick={() => onFiltroChange(t.filtro)}
-              className={`shrink-0 flex flex-col items-start px-4 py-3 rounded-xl border border-l-4 transition-all duration-200 cursor-pointer ${t.borde} ${
+              className={`shrink-0 flex flex-col items-start px-4 py-3 rounded-xl border border-l-4 transition-all duration-200 cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-white/30 ${t.borde} ${
                 activo
                   ? 'bg-slate-800/80 border-t-white/15 border-r-white/15 border-b-white/15'
-                  : 'bg-slate-900/40 border-t-white/8 border-r-white/8 border-b-white/8 hover:bg-slate-900/60'
+                  : 'bg-slate-900/40 border-t-white/8 border-r-white/8 border-b-white/8 hover:bg-slate-800/60 hover:-translate-y-px'
               }`}
             >
               <span className={`text-2xl font-black leading-none tabular-nums flex items-center gap-1 ${t.texto}`}>
@@ -498,7 +515,7 @@ function TarjetasMIPG({
             <select
               value={tenantFiltro}
               onChange={(e) => onTenantChange(e.target.value as TenantId | 'TODOS')}
-              className="bg-slate-800/60 border border-white/10 rounded-xl px-3 py-2 text-xs text-slate-300 focus:outline-none focus:border-indigo-500 cursor-pointer"
+              className="select-internal text-xs"
             >
               <option value="TODOS">Todas las dependencias</option>
               {(Object.keys(DIRECTORIO_TENANTS) as TenantId[]).map((id) => (
@@ -560,13 +577,13 @@ function TablaRadicados({
             value={busqueda}
             onChange={(e) => onBusquedaChange(e.target.value)}
             placeholder="Buscar por radicado, nombre o documento…"
-            className="w-full bg-slate-800/50 border border-white/10 rounded-lg pl-9 pr-3 py-2 text-sm text-slate-200 placeholder-slate-600 focus:outline-none focus:border-indigo-500/60 transition-colors"
+            className="w-full bg-white/[0.04] border border-white/10 rounded-lg pl-9 pr-3 py-2 text-sm text-slate-200 placeholder-slate-600 outline-none transition-all duration-200 hover:border-indigo-500/25 hover:bg-white/[0.06] focus:border-indigo-500/70 focus:bg-indigo-500/[0.04] focus:shadow-[0_0_0_2px_rgba(99,102,241,0.35)] focus-visible:border-indigo-500/70 focus-visible:shadow-[0_0_0_2px_rgba(99,102,241,0.35)]"
           />
         </div>
         <span className="text-xs text-slate-600 shrink-0">{radicados.length} resultado{radicados.length !== 1 ? 's' : ''}</span>
         <button
           onClick={onNuevoRadicado}
-          className="shrink-0 flex items-center gap-1.5 px-3 py-2 rounded-lg bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-bold transition-colors"
+          className="shrink-0 flex items-center gap-1.5 px-3 py-2 rounded-lg bg-indigo-600 hover:bg-indigo-500 active:scale-95 text-white text-xs font-bold transition-all duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-400/60"
         >
           <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
             <path strokeLinecap="round" strokeLinejoin="round" d="M12 4v16m8-8H4" />
@@ -589,7 +606,7 @@ function TablaRadicados({
           <thead className="sticky top-0 z-10 bg-slate-900/90 backdrop-blur-sm">
             <tr className="border-b border-white/[0.07]">
               {['Radicado', 'Solicitante', 'Tipo Trámite', 'Dependencia', 'Estado', 'Vencimiento', 'Días'].map((h) => (
-                <th key={h} className="px-4 py-2.5 text-left text-[10px] font-bold uppercase tracking-widest text-slate-500 whitespace-nowrap">
+                <th key={h} className="px-4 py-2.5 text-left text-[10px] font-bold uppercase tracking-widest text-slate-400 whitespace-nowrap">
                   {h}
                 </th>
               ))}
@@ -850,7 +867,7 @@ function PanelDerecho({
           </div>
           <button
             onClick={onCerrar}
-            className="shrink-0 p-1.5 rounded-lg text-slate-500 hover:text-slate-200 hover:bg-white/5 transition-colors"
+            className="shrink-0 p-1.5 rounded-lg text-slate-500 hover:text-slate-200 hover:bg-white/[0.06] active:scale-90 transition-all duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/25"
           >
             <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
               <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
@@ -865,10 +882,10 @@ function PanelDerecho({
           <button
             key={t.id}
             onClick={() => { setTab(t.id); setMensajeOk(null); setErrorLocal(null); }}
-            className={`shrink-0 px-3 py-2.5 text-[11px] font-bold uppercase tracking-wider transition-colors whitespace-nowrap ${
+            className={`shrink-0 px-3 py-2.5 text-[11px] font-bold uppercase tracking-wider transition-colors whitespace-nowrap focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-indigo-500/50 ${
               tab === t.id
                 ? 'text-indigo-300 border-b-2 border-indigo-500'
-                : 'text-slate-500 hover:text-slate-300 hover:bg-white/5'
+                : 'text-slate-400 hover:text-slate-200 hover:bg-white/[0.04]'
             }`}
           >
             {t.label}
@@ -964,7 +981,7 @@ function PanelDerecho({
               <select
                 value={tenantDestino}
                 onChange={(e) => setTenantDestino(e.target.value as TenantId)}
-                className="w-full bg-slate-800/60 border border-white/10 rounded-lg px-3 py-2.5 text-sm text-slate-200 focus:outline-none focus:border-indigo-500"
+                className="select-internal w-full"
               >
                 {(Object.keys(DIRECTORIO_TENANTS) as TenantId[]).map((id) => (
                   <option key={id} value={id}>{NOMBRES_TENANT[id]}</option>
@@ -978,7 +995,7 @@ function PanelDerecho({
                 value={funcionarioUid}
                 onChange={(e) => setFuncionarioUid(e.target.value)}
                 placeholder="uid-del-funcionario"
-                className="w-full bg-slate-800/60 border border-white/10 rounded-lg px-3 py-2.5 text-sm text-slate-200 placeholder-slate-600 focus:outline-none focus:border-indigo-500"
+                className="input-internal"
               />
             </div>
 
@@ -986,7 +1003,7 @@ function PanelDerecho({
               type="button"
               onClick={asignar}
               disabled={guardando}
-              className="w-full py-2.5 rounded-lg bg-indigo-600 hover:bg-indigo-500 text-white text-sm font-bold transition-colors disabled:opacity-60 flex items-center justify-center gap-2"
+              className="w-full py-2.5 rounded-lg bg-indigo-600 hover:bg-indigo-500 active:scale-[0.98] text-white text-sm font-bold transition-all duration-150 disabled:opacity-60 flex items-center justify-center gap-2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-400"
             >
               {guardando && <span className="w-3.5 h-3.5 border-2 border-white/30 border-t-white rounded-full animate-spin" />}
               Confirmar traslado
@@ -1053,14 +1070,14 @@ function PanelDerecho({
                   onChange={(e) => setMotivo(e.target.value)}
                   rows={3}
                   placeholder="Indica la razón de la devolución…"
-                  className="w-full bg-slate-800/60 border border-white/10 rounded-lg px-3 py-2 text-sm text-slate-200 placeholder-slate-600 focus:outline-none focus:border-rose-500 resize-none"
+                  className="input-internal resize-none"
                 />
               </div>
               <button
                 type="button"
                 onClick={devolver}
                 disabled={guardando}
-                className="w-full py-2 rounded-lg border border-rose-500/40 text-rose-300 text-sm font-bold hover:bg-rose-500/10 transition-colors disabled:opacity-60"
+                className="w-full py-2 rounded-lg border border-rose-500/40 text-rose-300 text-sm font-bold hover:bg-rose-500/10 active:scale-[0.98] transition-all duration-150 disabled:opacity-60 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-rose-500/40"
               >
                 Devolver
               </button>
@@ -1076,7 +1093,7 @@ function PanelDerecho({
                     value={motivo}
                     onChange={(e) => setMotivo(e.target.value)}
                     placeholder="Fundamento legal de la prórroga"
-                    className="w-full bg-slate-800/60 border border-white/10 rounded-lg px-3 py-2 text-sm text-slate-200 placeholder-slate-600 focus:outline-none focus:border-amber-500"
+                    className="input-internal"
                   />
                 </div>
                 <div className="w-24">
@@ -1087,7 +1104,7 @@ function PanelDerecho({
                     max={30}
                     value={diasProrroga}
                     onChange={(e) => setDiasProrroga(Math.max(1, Number(e.target.value)))}
-                    className="w-full bg-slate-800/60 border border-white/10 rounded-lg px-3 py-2 text-sm text-slate-200 focus:outline-none focus:border-amber-500 text-center"
+                    className="input-internal text-center"
                   />
                 </div>
               </div>
@@ -1095,7 +1112,7 @@ function PanelDerecho({
                 type="button"
                 onClick={aplicarProrroga}
                 disabled={guardando}
-                className="w-full py-2 rounded-lg border border-amber-500/40 text-amber-300 text-sm font-bold hover:bg-amber-500/10 transition-colors disabled:opacity-60"
+                className="w-full py-2 rounded-lg border border-amber-500/40 text-amber-300 text-sm font-bold hover:bg-amber-500/10 active:scale-[0.98] transition-all duration-150 disabled:opacity-60 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-500/40"
               >
                 Aplicar prórroga (+{diasProrroga} días)
               </button>
@@ -1111,14 +1128,14 @@ function PanelDerecho({
                   onChange={(e) => setRespuesta(e.target.value)}
                   rows={4}
                   placeholder="Describe la respuesta dada al ciudadano y adjunta el oficio firmado si aplica…"
-                  className="w-full bg-slate-800/60 border border-white/10 rounded-lg px-3 py-2 text-sm text-slate-200 placeholder-slate-600 focus:outline-none focus:border-emerald-500 resize-none"
+                  className="input-internal resize-none"
                 />
               </div>
               <button
                 type="button"
                 onClick={responderCaso}
                 disabled={guardando || radicado.estadoActual === 'RESUELTO'}
-                className="w-full py-2 rounded-lg bg-emerald-700 hover:bg-emerald-600 text-white text-sm font-bold transition-colors disabled:opacity-60"
+                className="w-full py-2 rounded-lg bg-emerald-700 hover:bg-emerald-600 active:scale-[0.98] text-white text-sm font-bold transition-all duration-150 disabled:opacity-60 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500/50"
               >
                 {radicado.estadoActual === 'RESUELTO' ? 'Ya está resuelto' : 'Marcar como resuelto'}
               </button>
@@ -1221,7 +1238,7 @@ function DrawerNuevoRadicado({
             <p className="text-xs text-slate-500">Nuevo radicado institucional · Ventanilla Única</p>
           </div>
           <button onClick={onCerrar}
-            className="p-2 rounded-xl text-slate-400 hover:text-slate-100 hover:bg-white/5 transition-colors">
+            className="p-2 rounded-xl text-slate-400 hover:text-slate-100 hover:bg-white/[0.06] active:scale-90 transition-all duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/25">
             <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
               <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
             </svg>
@@ -1274,13 +1291,13 @@ function DrawerNuevoRadicado({
                     setProgreso('');
                     setProgresoPct(0);
                   }}
-                  className="px-5 py-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white text-sm font-bold transition-colors"
+                  className="px-5 py-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-500 active:scale-95 text-white text-sm font-bold transition-all duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-400"
                 >
                   Radicar otro
                 </button>
                 <button
                   onClick={onCerrar}
-                  className="px-5 py-2.5 rounded-xl border border-white/10 text-slate-300 hover:bg-white/5 text-sm transition-colors"
+                  className="px-5 py-2.5 rounded-xl border border-white/10 text-slate-300 hover:bg-white/[0.06] hover:border-white/20 active:scale-95 text-sm transition-all duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/25"
                 >
                   Cerrar
                 </button>
@@ -1454,7 +1471,7 @@ function BandejaAsignacion({
             onChange={(e) =>
               dispatch({ type: 'SET_TENANT_MASIVO', tenant: e.target.value as TenantId | '' })
             }
-            className="flex-1 bg-slate-800/60 border border-white/10 rounded-lg px-3 py-1.5 text-xs text-slate-200 focus:outline-none focus:border-indigo-500"
+            className="select-internal flex-1 text-xs"
           >
             <option value="">— Selecciona dependencia destino —</option>
             {(Object.keys(DIRECTORIO_TENANTS) as TenantId[]).map((id) => (
@@ -1464,7 +1481,7 @@ function BandejaAsignacion({
           <button
             onClick={asignarSeleccionados}
             disabled={!tenantMasivo || asignandoMasivo}
-            className="shrink-0 flex items-center gap-1.5 px-4 py-1.5 rounded-lg bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-bold transition-colors disabled:opacity-50"
+            className="shrink-0 flex items-center gap-1.5 px-4 py-1.5 rounded-lg bg-indigo-600 hover:bg-indigo-500 active:scale-95 text-white text-xs font-bold transition-all duration-150 disabled:opacity-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-400/60"
           >
             {asignandoMasivo && (
               <span className="w-3 h-3 border-2 border-white/30 border-t-white rounded-full animate-spin" />
@@ -1503,7 +1520,7 @@ function BandejaAsignacion({
                 />
               </th>
               {['Radicado', 'Solicitante', 'Tipo', 'Días', 'Dependencia destino', 'Acción'].map((h) => (
-                <th key={h} className="px-4 py-2.5 text-left text-[10px] font-bold uppercase tracking-widest text-slate-500 whitespace-nowrap">
+                <th key={h} className="px-4 py-2.5 text-left text-[10px] font-bold uppercase tracking-widest text-slate-400 whitespace-nowrap">
                   {h}
                 </th>
               ))}
@@ -1600,7 +1617,7 @@ function BandejaAsignacion({
                             [r.radicadoId]: e.target.value as TenantId,
                           }))
                         }
-                        className="bg-slate-800/60 border border-white/10 rounded-lg px-2 py-1.5 text-[11px] text-slate-200 focus:outline-none focus:border-indigo-500 min-w-[150px]"
+                        className="select-internal text-[11px] min-w-[150px]"
                       >
                         {(Object.keys(DIRECTORIO_TENANTS) as TenantId[]).map((id) => (
                           <option key={id} value={id}>{NOMBRES_TENANT[id]}</option>
@@ -1616,7 +1633,7 @@ function BandejaAsignacion({
                         <button
                           onClick={() => asignarUno(r)}
                           disabled={!!asignandoFila[r.radicadoId]}
-                          className="flex items-center gap-1 px-3 py-1.5 rounded-lg bg-slate-700 hover:bg-slate-600 text-white text-xs font-bold transition-colors disabled:opacity-50"
+                          className="flex items-center gap-1 px-3 py-1.5 rounded-lg bg-slate-700 hover:bg-slate-600 active:scale-95 text-white text-xs font-bold transition-all duration-150 disabled:opacity-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/30"
                         >
                           {asignandoFila[r.radicadoId] ? (
                             <span className="w-3 h-3 border-2 border-white/30 border-t-white rounded-full animate-spin" />
