@@ -69,6 +69,23 @@ export interface TrazabilidadRadicado {
   metadata?: Record<string, unknown>;
 }
 
+export interface AnalisisIA {
+  resumenEjecutivo:       string;
+  etiquetasSemanticas:    string[];
+  dependenciaSugerida:    TenantId;
+  confianzaClasificacion: number; // 0.0 a 1.0
+  fechaAnalisis:          string;
+  promptVersion?:         string;
+}
+
+export interface FeedbackIA {
+  usuarioId:        string;
+  actorNombre:      string;
+  puntuacion:       'POSITIVO' | 'CORREGIDO' | 'NEGATIVO'; // 👍, ✏️, ❌
+  motivoCorreccion?: string | null;
+  fecha:            string;
+}
+
 export interface VentanillaRadicado {
   radicadoId: string;
   estadoActual: EstadoRadicado | 'ASIGNADO' | 'POR_VENCER' | 'VENCIDO' | 'PRORROGA';
@@ -89,7 +106,10 @@ export interface VentanillaRadicado {
   };
   archivos: ArchivoRadicado[];
   trazabilidad: TrazabilidadRadicado[];
+  analisisIa?: AnalisisIA;
+  feedbackIa?: FeedbackIA;
 }
+
 
 export interface UsuarioInterno {
   uid: string;

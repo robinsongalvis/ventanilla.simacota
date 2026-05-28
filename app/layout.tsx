@@ -1,6 +1,7 @@
 import type { Metadata } from 'next';
 import { DM_Sans, Manrope } from 'next/font/google';
 import './globals.css';
+import { SimiChat } from '@/app/components/ai/SimiChat';
 
 // Body + UI text — DM Sans per Obsidian Kinetic spec
 const dmSans = DM_Sans({
@@ -110,7 +111,9 @@ export default function RootLayout({
     >
       <body className="min-h-full bg-[#0A0A0B] text-slate-100 antialiased">
         {children}
+        <SimiChat />
       </body>
     </html>
   );
 }
+

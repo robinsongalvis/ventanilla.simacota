@@ -4,6 +4,8 @@ import { useCallback, useRef, useState } from 'react';
 import Link from 'next/link';
 import { radicarSolicitud } from '@/lib/radicacion';
 import type { UploadProgress } from '@/lib/storage';
+import type { AnalisisIA } from '@/src/types/ventanilla';
+import { NOMBRES_TENANT } from '@/src/types/reglas-negocio';
 
 /* ══════════════════════════════════════════════════════════════
    TIPOS TYPESCRIPT
@@ -204,6 +206,10 @@ export default function PortalCiudadano() {
     nombre: '', email: '', telefono: '', descripcion: '',
   });
 
+  const [analisisIa, setAnalisisIa] = useState<AnalisisIA | null>(null);
+  const [estaClasificando, setEstaClasificando] = useState(false);
+  const debounceRef = useRef<NodeJS.Timeout | null>(null);
+
   const [archivos, setArchivos] = useState<File[]>([]);
   const [errorArchivo, setErrorArchivo] = useState('');
   const [isDragging, setIsDragging] = useState(false);
@@ -220,6 +226,34 @@ export default function PortalCiudadano() {
     setForm((prev) => ({ ...prev, [campo]: valor }));
     if (touched[campo]) {
       setErrors((prev) => ({ ...prev, [campo]: validarCampo(campo, valor) }));
+    }
+
+    if (campo === 'descripcion') {
+      if (debounceRef.current) clearTimeout(debounceRef.current);
+
+      if (valor.trim().length >= 25) {
+        setEstaClasificando(true);
+        debounceRef.current = setTimeout(async () => {
+          try {
+            const response = await fetch('/api/ai/classify', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ asunto: 'Solicitud Web', descripcion: valor }),
+            });
+            if (response.ok) {
+              const data = await response.json();
+              setAnalisisIa(data);
+            }
+          } catch (err) {
+            console.error('Error classifying in real-time:', err);
+          } finally {
+            setEstaClasificando(false);
+          }
+        }, 800);
+      } else {
+        setAnalisisIa(null);
+        setEstaClasificando(false);
+      }
     }
   }
 
@@ -295,6 +329,7 @@ export default function PortalCiudadano() {
         },
         descripcion: form.descripcion.trim(),
         archivos,
+        analisisIa: analisisIa || undefined,
       },
       (mensaje, pct, progresos) => {
         setProgresoMensaje(mensaje);
@@ -320,6 +355,8 @@ export default function PortalCiudadano() {
     setProgresoPct(0);
     setProgresosArchivos([]);
     setErroresSubmit([]);
+    setAnalisisIa(null);
+    setEstaClasificando(false);
     if (fileInputRef.current) fileInputRef.current.value = '';
   }
 
@@ -503,6 +540,53 @@ export default function PortalCiudadano() {
                   aria-invalid={!!errors.descripcion}
                 />
                 <FeedbackCampo id="error-descripcion" error={errors.descripcion} touched={!!touched.descripcion} valorOk={form.descripcion.trim().length >= 20} />
+                
+                {/* Sugerencias de IA en tiempo real */}
+                {(estaClasificando || analisisIa) && (
+                  <div className="mt-3 rounded-xl border border-white/10 bg-slate-900/60 p-4 animate-fade-in-up">
+                    <div className="flex items-center justify-between mb-2">
+                      <div className="flex items-center gap-1.5">
+                        <span className="relative flex h-2 w-2">
+                          <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-indigo-400 opacity-75"></span>
+                          <span className="relative inline-flex rounded-full h-2 w-2 bg-indigo-500"></span>
+                        </span>
+                        <span className="text-[10px] font-bold uppercase tracking-widest text-indigo-400">Análisis Asistido IA</span>
+                      </div>
+                      {estaClasificando && (
+                        <span className="text-[10px] text-slate-500 animate-pulse">Clasificando en caliente...</span>
+                      )}
+                      {!estaClasificando && analisisIa && (
+                        <span className="text-[10px] text-emerald-400 font-medium">
+                          Confianza: {(analisisIa.confianzaClasificacion * 100).toFixed(0)}%
+                        </span>
+                      )}
+                    </div>
+
+                    {!estaClasificando && analisisIa && (
+                      <div className="space-y-3">
+                        <p className="text-xs text-slate-300">
+                          Sugerencia de dependencia:{' '}
+                          <span className="text-slate-100 font-bold">
+                            {NOMBRES_TENANT[analisisIa.dependenciaSugerida] || analisisIa.dependenciaSugerida}
+                          </span>
+                        </p>
+                        
+                        {analisisIa.etiquetasSemanticas.length > 0 && (
+                          <div className="flex flex-wrap gap-1.5">
+                            {analisisIa.etiquetasSemanticas.map((tag) => (
+                              <span
+                                key={tag}
+                                className="inline-flex items-center rounded-md bg-indigo-500/10 px-2 py-0.5 text-[10px] font-medium text-indigo-400 border border-indigo-500/20"
+                              >
+                                #{tag}
+                              </span>
+                            ))}
+                          </div>
+                        )}
+                      </div>
+                    )}
+                  </div>
+                )}
               </div>
 
               {/* ─ Archivos adjuntos ─ */}

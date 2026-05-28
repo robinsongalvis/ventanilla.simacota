@@ -18,6 +18,7 @@ import { ComprobanteRadicado }             from '@/app/interno/dashboard/compone
 import { PanelCargaDependencias }          from '@/app/interno/dashboard/components/dependencias/PanelCargaDependencias';
 import { VistaAnalytics }                  from '@/app/interno/dashboard/components/analytics/VistaAnalytics';
 import { VistaAlertas, contarAlertasActivas } from '@/app/interno/dashboard/components/analytics/VistaAlertas';
+import { VistaSupervisionIA }              from '@/app/interno/dashboard/components/analytics/VistaSupervisionIA';
 import type {
   FiltroMIPG,
   VistaActual,
@@ -326,6 +327,20 @@ function SidebarNav({
       ? 'Recepción'
       : 'Funcionario';
 
+  const items = [...NAV_ITEMS];
+  if (usuario.rol === 'ADMIN') {
+    items.push({
+      vista: 'SUPERVISION_IA' as const,
+      label: 'Supervisión IA',
+      icono: (
+        <svg className="w-[18px] h-[18px]" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.8}>
+          <path strokeLinecap="round" strokeLinejoin="round" d="M9.594 3.94c.09-.542.56-.94 1.11-.94h2.593c.55 0 1.02.398 1.11.94l.213 1.281c.063.374.313.686.645.87.074.04.147.083.22.127.324.196.72.257 1.075.124l1.217-.456a1.125 1.125 0 011.37.49l1.296 2.247a1.125 1.125 0 01-.26 1.43l-1.003.828c-.293.241-.438.613-.43.992a7.723 7.723 0 010 .255c-.008.378.137.75.43.991l1.004.827c.424.35.534.954.26 1.43l-1.298 2.247a1.125 1.125 0 01-1.369.491l-1.217-.456c-.355-.133-.75-.072-1.076.124a6.47 6.47 0 01-.22.128c-.331.183-.581.495-.644.869l-.213 1.281c-.09.543-.56.94-1.11.94h-2.594c-.55 0-1.019-.398-1.11-.94l-.213-1.281c-.062-.374-.312-.686-.644-.87a6.52 6.52 0 01-.22-.127c-.325-.196-.72-.257-1.076-.124l-1.217.456a1.125 1.125 0 01-1.369-.49l-1.297-2.247a1.125 1.125 0 01.26-1.43l1.004-.827c.292-.24.437-.613.43-.991a6.932 6.932 0 010-.255c.007-.38-.138-.751-.43-.992l-1.004-.827a1.125 1.125 0 01-.26-1.43l1.297-2.247a1.125 1.125 0 011.37-.491l1.216.456c.356.133.751.072 1.076-.124.072-.044.146-.086.22-.128.332-.183.582-.495.644-.869l.214-1.28Z" />
+          <path strokeLinecap="round" strokeLinejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0Z" />
+        </svg>
+      ),
+    });
+  }
+
   return (
     <aside className="h-full flex flex-col bg-[#0A0A0B] border-r border-white/[0.07] shrink-0 w-[210px]">
       {/* Logo */}
@@ -361,7 +376,7 @@ function SidebarNav({
         <p className="text-[10px] font-bold uppercase tracking-widest text-slate-600 px-2 py-1.5">
           Módulos
         </p>
-        {NAV_ITEMS.map(({ vista, label, icono }) => {
+        {items.map(({ vista, label, icono }) => {
           const activo = vistaActual === vista;
           return (
             <button
@@ -813,6 +828,28 @@ function PanelDerecho({
 
   async function asignar() {
     if (!tenantDestino) return;
+
+    // Si la sugerencia difiere, enviamos feedback de corrección a la IA
+    if (radicado.analisisIa && radicado.analisisIa.dependenciaSugerida !== tenantDestino) {
+      fetch('/api/ai/feedback', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          radicadoId: radicado.radicadoId,
+          usuarioId: usuario.uid,
+          actorNombre: usuario.nombre,
+          puntuacion: 'CORREGIDO',
+          motivoCorreccion: `Trasladado manualmente a ${NOMBRES_TENANT[tenantDestino]}. Sugerido originalmente: ${NOMBRES_TENANT[radicado.analisisIa.dependenciaSugerida]}`,
+          clasificacionOriginal: radicado.analisisIa?.dependenciaSugerida || 'VENTANILLA_UNICA',
+          clasificacionFinal: tenantDestino,
+          etiquetasIA: radicado.analisisIa?.etiquetasSemanticas || [],
+          etiquetasFinales: radicado.analisisIa?.etiquetasSemanticas || [],
+          resumenIA: radicado.analisisIa?.resumenEjecutivo,
+          confianzaIA: radicado.analisisIa?.confianzaClasificacion,
+        }),
+      }).catch(err => console.error('Error logging override telemetry:', err));
+    }
+
     await ejecutarAccion(() =>
       updateDoc(doc(getDb(), 'ventanilla_radicados', radicado.radicadoId), {
         'clasificacion.oficinaDestino':         tenantDestino,
@@ -822,8 +859,47 @@ function PanelDerecho({
           `Trasladado a ${NOMBRES_TENANT[tenantDestino]}`,
           { oficinaOrigen: radicado.clasificacion.oficinaDestino, oficinaDestino: tenantDestino },
         )),
+        ...(radicado.analisisIa && radicado.analisisIa.dependenciaSugerida !== tenantDestino ? {
+          'feedbackIa': {
+            usuarioId: usuario.uid,
+            actorNombre: usuario.nombre,
+            puntuacion: 'CORREGIDO',
+            motivoCorreccion: `Trasladado manualmente a ${NOMBRES_TENANT[tenantDestino]}.`,
+            fecha: new Date().toISOString()
+          }
+        } : {})
       }),
     );
+  }
+
+  async function enviarFeedbackIA(puntuacion: 'POSITIVO' | 'NEGATIVO' | 'CORREGIDO', motivoCorreccion?: string) {
+    if (!radicado.analisisIa) return;
+    
+    await ejecutarAccion(async () => {
+      const response = await fetch('/api/ai/feedback', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          radicadoId: radicado.radicadoId,
+          usuarioId: usuario.uid,
+          actorNombre: usuario.nombre,
+          puntuacion,
+          motivoCorreccion: motivoCorreccion || null,
+          clasificacionOriginal: radicado.analisisIa?.dependenciaSugerida || 'VENTANILLA_UNICA',
+          clasificacionFinal: radicado.clasificacion.oficinaDestino,
+          etiquetasIA: radicado.analisisIa?.etiquetasSemanticas || [],
+          etiquetasFinales: radicado.analisisIa?.etiquetasSemanticas || [],
+          resumenIA: radicado.analisisIa?.resumenEjecutivo,
+          confianzaIA: radicado.analisisIa?.confianzaClasificacion,
+        }),
+      });
+
+      if (!response.ok) {
+        throw new Error('Error al registrar la calificación de la IA.');
+      }
+      
+      setMensajeOk('Calificación de la IA registrada exitosamente.');
+    });
   }
 
   async function devolver() {
@@ -997,6 +1073,77 @@ function PanelDerecho({
                     </li>
                   ))}
                 </ul>
+              </div>
+            )}
+
+            {radicado.analisisIa && (
+              <div className="border-t border-white/[0.07] pt-4">
+                <div className="flex items-center justify-between mb-3">
+                  <div className="flex items-center gap-1.5">
+                    <span className="relative flex h-2 w-2">
+                      <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-indigo-400 opacity-75"></span>
+                      <span className="relative inline-flex rounded-full h-2 w-2 bg-indigo-500"></span>
+                    </span>
+                    <span className="text-[10px] font-bold uppercase tracking-widest text-indigo-400">Análisis Asistido IA</span>
+                  </div>
+                  <span className="text-[10px] text-indigo-300 font-semibold bg-indigo-500/10 px-2 py-0.5 rounded-md border border-indigo-500/20">
+                    Confianza: {(radicado.analisisIa.confianzaClasificacion * 100).toFixed(0)}%
+                  </span>
+                </div>
+
+                <div className="space-y-3 bg-slate-950/40 p-4 rounded-xl border border-white/10">
+                  <div>
+                    <span className="text-[9px] font-bold uppercase tracking-widest text-slate-500 block mb-1">Resumen Ejecutivo IA</span>
+                    <p className="text-xs text-slate-300 italic leading-relaxed">
+                      "{radicado.analisisIa.resumenEjecutivo}"
+                    </p>
+                  </div>
+
+                  {radicado.analisisIa.etiquetasSemanticas && radicado.analisisIa.etiquetasSemanticas.length > 0 && (
+                    <div className="flex flex-wrap gap-1">
+                      {radicado.analisisIa.etiquetasSemanticas.map((tag) => (
+                        <span
+                          key={tag}
+                          className="inline-flex items-center rounded-md bg-indigo-500/10 px-2 py-0.5 text-[9px] font-medium text-indigo-400 border border-indigo-500/20"
+                        >
+                          #{tag}
+                        </span>
+                      ))}
+                    </div>
+                  )}
+
+                  {/* Feedback de IA */}
+                  <div className="border-t border-white/[0.05] pt-3 flex items-center justify-between gap-3">
+                    <span className="text-[9px] font-bold uppercase tracking-widest text-slate-500">¿La IA acertó?</span>
+                    
+                    {radicado.feedbackIa ? (
+                      <span className={`text-[10px] font-bold uppercase px-2 py-0.5 rounded-md ${
+                        radicado.feedbackIa.puntuacion === 'POSITIVO'
+                          ? 'bg-emerald-500/10 border border-emerald-500/30 text-emerald-400'
+                          : radicado.feedbackIa.puntuacion === 'CORREGIDO'
+                            ? 'bg-amber-500/10 border border-amber-500/30 text-amber-400'
+                            : 'bg-rose-500/10 border border-rose-500/30 text-rose-400'
+                      }`}>
+                        Calificado: {radicado.feedbackIa.puntuacion}
+                      </span>
+                    ) : (
+                      <div className="flex items-center gap-2">
+                        <button
+                          onClick={() => enviarFeedbackIA('POSITIVO')}
+                          className="px-2.5 py-1 rounded-md bg-slate-800 hover:bg-slate-700 hover:text-emerald-400 border border-white/10 text-xs font-medium transition-colors cursor-pointer"
+                        >
+                          👍 Sí
+                        </button>
+                        <button
+                          onClick={() => enviarFeedbackIA('NEGATIVO')}
+                          className="px-2.5 py-1 rounded-md bg-slate-800 hover:bg-slate-700 hover:text-rose-400 border border-white/10 text-xs font-medium transition-colors cursor-pointer"
+                        >
+                          ❌ No
+                        </button>
+                      </div>
+                    )}
+                  </div>
+                </div>
               </div>
             )}
           </>
@@ -1768,6 +1915,10 @@ function DashboardInterior({ usuario, cerrarSesion }: { usuario: UsuarioAutentic
           />
         ) : vistaActual === 'DEPENDENCIAS' ? (
           <PanelCargaDependencias radicados={todosLosRadicados} />
+        ) : vistaActual === 'SUPERVISION_IA' ? (
+          <div className="flex-1 overflow-y-auto p-6 bg-[#0E0E10]/40">
+            <VistaSupervisionIA />
+          </div>
         ) : (
           <>
             {/* Fila de métricas MIPG */}
@@ -1797,7 +1948,8 @@ function DashboardInterior({ usuario, cerrarSesion }: { usuario: UsuarioAutentic
 
       {/* ── COLUMNA 3: Panel derecho — oculto en vistas de pantalla completa ── */}
       {vistaActual !== 'BANDEJA' && vistaActual !== 'DEPENDENCIAS'
-       && vistaActual !== 'ANALYTICS' && vistaActual !== 'ALERTAS' && (
+       && vistaActual !== 'ANALYTICS' && vistaActual !== 'ALERTAS'
+       && vistaActual !== 'SUPERVISION_IA' && (
         <div
           className={`shrink-0 transition-all duration-300 ease-in-out overflow-hidden ${
             panelDerechoAbierto ? 'w-[420px]' : 'w-0'

@@ -32,7 +32,8 @@ export type VistaActual =
   | 'DEPENDENCIAS'
   | 'REPORTES'
   | 'ANALYTICS'    // Centro de Inteligencia Operativa — Fase 2
-  | 'ALERTAS';     // Panel de Alertas Predictivas — Fase 2
+  | 'ALERTAS'      // Panel de Alertas Predictivas — Fase 2
+  | 'SUPERVISION_IA'; // Panel de Supervisión y Gobernanza de IA — Fase 3.5
 
 
 interface VentanillaState {

@@ -8,6 +8,7 @@
 import { doc, setDoc }    from 'firebase/firestore';
 import { getDb }          from './firebase';
 import { subirArchivos, type UploadResult, type UploadProgress } from './storage';
+import type { AnalisisIA } from '@/src/types/ventanilla';
 
 /* ──────────────────────────────────────────────
    ID de radicado
@@ -43,6 +44,7 @@ export interface DatosRadicacion {
   descripcion:     string;
   notasInternas?:  string;   // Solo ventanilla física
   archivos:        File[];
+  analisisIa?:     AnalisisIA;
 }
 
 export interface ResultadoRadicacion {
@@ -130,10 +132,13 @@ export async function radicarSolicitud(
         ...(datos.ciudadano.cedula ? { cedula: datos.ciudadano.cedula } : {}),
       },
       clasificacionIA: {
-        oficinaDestino: 'VENTANILLA_UNICA',
+        oficinaDestino: datos.analisisIa?.dependenciaSugerida ?? 'VENTANILLA_UNICA',
         zonaGeografica: 'CASCO_URBANO',
-        resumenCaso:    'Pendiente de clasificación manual.',
+        resumenCaso:    datos.analisisIa?.resumenEjecutivo ?? 'Pendiente de clasificación manual.',
         mensajeOriginal: datos.descripcion,
+        confianza:      datos.analisisIa?.confianzaClasificacion ?? 1.0,
+        etiquetasSemanticas: datos.analisisIa?.etiquetasSemanticas ?? [],
+        fechaAnalisis:  datos.analisisIa?.fechaAnalisis ?? new Date().toISOString(),
       },
       archivos: archivosResultado.map((a, i) => ({
         nombre:    a.nombre,
