@@ -2,9 +2,9 @@ name: CI/CD Pipeline - Ventanilla Única Simacota
 
 on:
   push:
-    branches: [ main, develop ]
+    branches: [ main, develop, release/fase5-hardening ]
   pull_request:
-    branches: [ main, develop ]
+    branches: [ main, develop, release/fase5-hardening ]
 
 jobs:
   validate:
