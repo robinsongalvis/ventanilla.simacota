@@ -15,6 +15,7 @@ import { RadicacionFuncionarioForm }       from '@/app/interno/recepcion/compone
 import { radicarInstitucionalmente }       from '@/lib/actions/radicarVentanilla';
 import { asignarRadicado, asignarMasivo }  from '@/lib/actions/asignarRadicado';
 import { ComprobanteRadicado }             from '@/app/interno/dashboard/components/ComprobanteRadicado';
+import { PanelCargaDependencias }          from '@/app/interno/dashboard/components/dependencias/PanelCargaDependencias';
 import type {
   FiltroMIPG,
   VistaActual,
@@ -1717,6 +1718,8 @@ function DashboardInterior({ usuario, cerrarSesion }: { usuario: UsuarioAutentic
             error={error}
             usuario={usuario}
           />
+        ) : vistaActual === 'DEPENDENCIAS' ? (
+          <PanelCargaDependencias radicados={todosLosRadicados} />
         ) : (
           <>
             {/* Fila de métricas MIPG */}
@@ -1744,8 +1747,8 @@ function DashboardInterior({ usuario, cerrarSesion }: { usuario: UsuarioAutentic
         )}
       </div>
 
-      {/* ── COLUMNA 3: Panel derecho — oculto en BANDEJA ── */}
-      {vistaActual !== 'BANDEJA' && (
+      {/* ── COLUMNA 3: Panel derecho — oculto en BANDEJA y DEPENDENCIAS ── */}
+      {vistaActual !== 'BANDEJA' && vistaActual !== 'DEPENDENCIAS' && (
         <div
           className={`shrink-0 transition-all duration-300 ease-in-out overflow-hidden ${
             panelDerechoAbierto ? 'w-[420px]' : 'w-0'

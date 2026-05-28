@@ -1,7 +1,15 @@
 import { Suspense } from 'react';
 import { LoginForm } from './LoginForm';
+import type { Metadata } from 'next';
 
 export const dynamic = 'force-dynamic';
+
+// Bloquea la indexación de esta ruta privada (doble capa junto a robots.ts)
+export const metadata: Metadata = {
+  title: 'Acceso Funcionarios',
+  robots: { index: false, follow: false, googleBot: { index: false, follow: false } },
+};
+
 
 function LoginFormFallback() {
   return (
