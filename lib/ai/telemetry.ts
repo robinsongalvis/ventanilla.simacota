@@ -3,7 +3,7 @@ import { getDb } from '@/lib/firebase';
 
 interface LogAiParams {
   radicadoId?: string;
-  endpoint: 'classify' | 'chat';
+  endpoint: 'classify' | 'chat' | 'scan-doc';
   latenciaMs: number;
   error?: string | null;
   fallbackActivo?: boolean;

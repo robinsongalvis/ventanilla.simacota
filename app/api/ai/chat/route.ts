@@ -2,110 +2,170 @@ import { NextResponse } from 'next/server';
 import { SIMI_SYSTEM_PROMPT } from '@/lib/ai/prompts/simi';
 import { registrarLogIA } from '@/lib/ai/telemetry';
 import { ejecutarConResiliencia } from '@/lib/ai/resilience';
+import type { DatosExtraidos } from '@/src/types/simi';
 
-interface ChatMessage {
-  role: 'user' | 'assistant' | 'model';
+/* ══════════════════════════════════════════════════════════════
+   TIPOS
+══════════════════════════════════════════════════════════════ */
+
+interface MensajeGemini {
+  role: 'user' | 'model';
+  parts: Array<{ text: string }>;
+}
+
+interface ChatRequestBody {
+  /** Historial de mensajes del chat */
+  messages: Array<{
+    role: 'user' | 'assistant' | 'model';
+    content: string;
+  }>;
+  /**
+   * Contexto del formulario actual — qué campos ya están llenos.
+   * Permite a SIMI saber qué falta y personalizar su guía.
+   * Opcional: si no se envía, SIMI no sabe el estado del formulario.
+   */
+  contextoFormulario?: Partial<DatosExtraidos>;
+}
+
+interface RespuestaChat {
+  role: 'assistant';
   content: string;
 }
 
-function obtenerChatMockResponse(messages: ChatMessage[], isFallbackError = false) {
-  const lastUserMsg = messages[messages.length - 1]?.content?.toLowerCase() || '';
-  let mockReply = '¡Hola, mano! Qué gusto saludarlo por acá en la Ventanilla Única de Simacota. Cuénteme, ¿en qué le puedo colaborar sumercé?';
+/* ══════════════════════════════════════════════════════════════
+   FALLBACK LOCAL (sin Gemini o circuito abierto)
+══════════════════════════════════════════════════════════════ */
 
-  if (lastUserMsg.includes('agua') || lastUserMsg.includes('acueducto') || lastUserMsg.includes('tubo')) {
-    mockReply = 'Entiendo perfectamente, mano. Eso del agua es prioridad para la vereda. Le sugiero radicar una solicitud dirigida a la *Secretaría de Planeación e Infraestructura*. Describa bien dónde es el daño (cuál vereda y sector) y si puede, tómele una fotico para anexarla en el formulario. ¡Así le resuelven más rápido!';
-  } else if (lastUserMsg.includes('sisben') || lastUserMsg.includes('encuesta')) {
-    mockReply = '¡Hola! Para temas de encuestas, puntajes o actualizaciones de datos, debe radicar una PQRS dirigida a la *Oficina del SISBEN*. Sumercé debe anexar una fotocopia legible de su cédula y, si es por cambio de vivienda, un recibo de servicios. ¿Desea que le ayude a redactar la solicitud?';
-  } else if (lastUserMsg.includes('luz') || lastUserMsg.includes('luminaria') || lastUserMsg.includes('alumbrado')) {
-    mockReply = 'Ole, mano, el alumbrado público es clave para la seguridad en la vereda. Esta solicitud va directamente para la *Secretaría de Planeación*. Al momento de radicar en nuestro portal público, recuerde indicar el número del poste (si lo tiene escrito en la placa amarilla) o la referencia exacta de la casa vecina para que los técnicos vayan a la fija. ¡Es muy fácil!';
-  } else if (lastUserMsg.includes('gracias') || lastUserMsg.includes('bueno')) {
-    mockReply = '¡Con muchísimo gusto, sumercé! Para eso estamos aquí los simacotenses, para darnos una mano. Si tiene otra duda o ya está listo para radicar, me avisa. ¡Dios lo guarde, mano!';
+function generarRespuestaFallback(
+  messages: ChatRequestBody['messages'],
+  esFallbackError = false,
+): RespuestaChat {
+  const ultimoMensaje = messages[messages.length - 1]?.content?.toLowerCase() ?? '';
+
+  let respuesta =
+    '¡Hola, mano! Bienvenido a la Ventanilla Única de Simacota. ' +
+    '¿En qué le puedo colaborar? Si quiere radicar rápido, use el botón 📎 para escanear su documento.';
+
+  if (ultimoMensaje.includes('agua') || ultimoMensaje.includes('acueducto')) {
+    respuesta =
+      'Eso va para **Planeación e Infraestructura**, sumercé. ' +
+      'Adjunte una foto del daño si puede y use el botón 📎 para escanear su cédula — así llena el formulario más rápido.';
+  } else if (ultimoMensaje.includes('sisben') || ultimoMensaje.includes('encuesta')) {
+    respuesta =
+      'Para SISBEN, radique directo a la **Oficina SISBEN**. ' +
+      'Tenga lista su cédula y use el botón 📎 para escanearla.';
+  } else if (ultimoMensaje.includes('escanear') || ultimoMensaje.includes('foto') || ultimoMensaje.includes('cedula') || ultimoMensaje.includes('cédula')) {
+    respuesta =
+      'Use el botón **📎** junto al campo de texto para adjuntar la foto de su cédula o carta. ' +
+      'SIMI llenará el formulario por usted en segundos.';
   } else if (messages.length > 1) {
-    mockReply = 'Excelente explicación, mano. Para radicar este caso, le recomiendo elegir la opción del formulario según lo que conversamos y redactar el asunto de forma corta. ¿Desea que lo guíe sobre qué documentos anexar, o prefiere que le resuma los requisitos?';
+    respuesta =
+      'Entendido, mano. ¿Quiere que le ayude a redactar el asunto, ' +
+      'o prefiere usar el botón 📎 para escanear su documento?';
   }
 
-  if (isFallbackError) {
-    mockReply = `[Mantenimiento de IA] Sumercé, disculpe la molestia, en este momento el motor principal de IA está en mantenimiento preventivo. De forma local, le puedo sugerir lo siguiente: ${mockReply}`;
+  if (esFallbackError) {
+    respuesta =
+      '[Mantenimiento momentáneo] ' + respuesta +
+      ' Estamos restableciendo el servicio, sumercé. Intente en unos segundos.';
   }
 
-  return {
-    role: 'assistant',
-    content: mockReply,
-  };
+  return { role: 'assistant', content: respuesta };
 }
 
-export async function POST(request: Request) {
-  const start = Date.now();
+/* ══════════════════════════════════════════════════════════════
+   ROUTE HANDLER — POST /api/ai/chat
+══════════════════════════════════════════════════════════════ */
+
+export async function POST(request: Request): Promise<NextResponse<RespuestaChat>> {
+  const inicio = Date.now();
   const apiKey = process.env.GEMINI_API_KEY;
-  let messages: ChatMessage[] = [];
+  let body: ChatRequestBody = { messages: [] };
 
   try {
-    const body = await request.json();
-    messages = body.messages;
+    body = (await request.json()) as ChatRequestBody;
+    const { messages, contextoFormulario } = body;
 
     if (!messages || !Array.isArray(messages) || messages.length === 0) {
       return NextResponse.json(
-        { error: 'Se requiere el historial de mensajes.' },
-        { status: 400 }
+        generarRespuestaFallback([]),
+        { status: 400 },
       );
     }
 
+    /* ── Fallback sin API key ── */
     if (!apiKey) {
-      console.warn('GEMINI_API_KEY is not defined. SimiChat will run in fallback mock mode.');
-      const mockResult = obtenerChatMockResponse(messages, false);
-      const latenciaMs = Date.now() - start;
+      console.warn('[chat] GEMINI_API_KEY no definida — modo mock.');
+      const fallback = generarRespuestaFallback(messages);
       await registrarLogIA({
         endpoint: 'chat',
-        latenciaMs,
+        latenciaMs: Date.now() - inicio,
         fallbackActivo: true,
-        promptVersion: 'simi-chat-v1.0-mock',
+        promptVersion: 'simi-chat-v2.0-mock',
       });
-
-      return NextResponse.json(mockResult);
+      return NextResponse.json(fallback);
     }
 
-    // Convert OpenAI/standard chat format to Gemini API format
-    const geminiContents = messages.map((m: ChatMessage) => ({
+    /* ── Construcción del system prompt enriquecido con contexto del formulario ── */
+    let systemPromptFinal = SIMI_SYSTEM_PROMPT;
+
+    if (contextoFormulario) {
+      const camposLlenos = (
+        Object.entries(contextoFormulario) as Array<[keyof DatosExtraidos, string | null]>
+      )
+        .filter(([, valor]) => valor !== null && valor !== '')
+        .map(([campo]) => campo);
+
+      const camposVacios = (
+        ['nombre', 'email', 'telefono', 'descripcion'] as Array<keyof DatosExtraidos>
+      ).filter((c) => !camposLlenos.includes(c));
+
+      if (camposLlenos.length > 0 || camposVacios.length > 0) {
+        systemPromptFinal +=
+          `\n\nCONTEXTO ACTUAL DEL FORMULARIO:` +
+          (camposLlenos.length > 0
+            ? `\n- Campos ya llenos: ${camposLlenos.join(', ')}.`
+            : '') +
+          (camposVacios.length > 0
+            ? `\n- Campos pendientes: ${camposVacios.join(', ')}. Guía al ciudadano a completarlos.`
+            : '\n- ¡El formulario está completo! Anima al ciudadano a enviarlo.');
+      }
+    }
+
+    /* ── Conversión al formato de Gemini (role: 'model' en vez de 'assistant') ── */
+    const contenidosGemini: MensajeGemini[] = messages.map((m) => ({
       role: m.role === 'assistant' ? 'model' : 'user',
-      parts: [
-        {
-          text: m.content,
-        },
-      ],
+      parts: [{ text: m.content }],
     }));
 
-    const geminiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${apiKey}`;
+    const geminiUrl =
+      `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash` +
+      `:generateContent?key=${apiKey}`;
 
-    const geminiRequestBody = {
-      contents: geminiContents,
+    const geminiBody = {
+      contents: contenidosGemini,
       systemInstruction: {
-        parts: [
-          {
-            text: SIMI_SYSTEM_PROMPT,
-          },
-        ],
+        parts: [{ text: systemPromptFinal }],
       },
       generationConfig: {
-        maxOutputTokens: 800,
-        temperature: 0.7,
+        maxOutputTokens: 400, // Respuestas cortas (modo ejecución rápida)
+        temperature: 0.6,    // Balance entre creatividad y precisión
       },
     };
 
-    // Consumir Gemini a través de la malla de resiliencia (Circuit Breaker + Retries)
+    /* ── Llamada con resiliencia ── */
     const response = await ejecutarConResiliencia(
       'GeminiChat',
       async () => {
         const res = await fetch(geminiUrl, {
           method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify(geminiRequestBody),
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(geminiBody),
         });
 
         if (!res.ok) {
           const errText = await res.text();
-          throw new Error(`Gemini API error: ${res.status} - ${errText}`);
+          throw new Error(`Gemini Chat error ${res.status}: ${errText}`);
         }
 
         return res;
@@ -115,47 +175,50 @@ export async function POST(request: Request) {
         baseDelayMs: 1000,
         configBreaker: {
           maxFailures: 5,
-          cooldownMs: 60000,
+          cooldownMs: 60_000,
         },
-      }
+      },
     );
 
-    const resData = await response.json();
-    const replyText = resData.candidates?.[0]?.content?.parts?.[0]?.text;
+    const resData = await response.json() as {
+      candidates?: Array<{
+        content?: { parts?: Array<{ text?: string }> };
+      }>;
+    };
 
-    if (!replyText) {
-      throw new Error('No se recibió texto de respuesta del asistente de Gemini.');
+    const textRespuesta = resData.candidates?.[0]?.content?.parts?.[0]?.text;
+
+    if (!textRespuesta) {
+      throw new Error('Gemini Chat no devolvió texto en la respuesta.');
     }
 
-    const latenciaMs = Date.now() - start;
     await registrarLogIA({
       endpoint: 'chat',
-      latenciaMs,
+      latenciaMs: Date.now() - inicio,
       fallbackActivo: false,
-      promptVersion: 'simi-chat-v1.0',
+      promptVersion: 'simi-chat-v2.0',
     });
 
-    return NextResponse.json({
+    return NextResponse.json<RespuestaChat>({
       role: 'assistant',
-      content: replyText,
+      content: textRespuesta,
     });
 
   } catch (error: unknown) {
-    const latenciaMs = Date.now() - start;
+    const latenciaMs = Date.now() - inicio;
     const msg = error instanceof Error ? error.message : String(error);
-    console.error('Error en /api/ai/chat (activando degradación progresiva):', msg);
+    console.error('[chat] Error — activando degradación progresiva:', msg);
 
-    // DEGRADACIÓN PROGRESIVA: Si Gemini o el circuito de chat fallan, devolvemos un mensaje de contingencia local
-    const fallbackResult = obtenerChatMockResponse(messages, true);
+    const fallback = generarRespuestaFallback(body.messages, true);
 
     await registrarLogIA({
       endpoint: 'chat',
       latenciaMs,
       error: msg,
       fallbackActivo: true,
-      promptVersion: 'simi-chat-v1.0-fallback-error',
+      promptVersion: 'simi-chat-v2.0-fallback-error',
     });
 
-    return NextResponse.json(fallbackResult);
+    return NextResponse.json(fallback);
   }
 }
