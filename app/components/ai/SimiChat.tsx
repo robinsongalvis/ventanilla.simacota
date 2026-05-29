@@ -79,10 +79,13 @@ function leerArchivoComoBase64(archivo: File): Promise<string> {
 ══════════════════════════════════════════════════════════════ */
 
 const ETIQUETAS_CAMPO: Record<keyof DatosExtraidos, string> = {
-  nombre: 'Nombre',
-  email: 'Correo electrónico',
-  telefono: 'Teléfono',
-  descripcion: 'Descripción / asunto',
+  nombre:               'Nombre',
+  email:                'Correo electrónico',
+  telefono:             'Teléfono',
+  descripcion:          'Descripción / asunto',
+  tipo_documento:       'Tipo de documento',
+  documento_identidad:  'Número de documento',
+  dependencia_sugerida: 'Dependencia sugerida',
 };
 
 function construirMensajeExtraccion(
@@ -635,7 +638,7 @@ export function SimiChat() {
 
             {/* Hint contextual */}
             <p className="text-[9px] text-slate-600 text-center leading-relaxed">
-              📎 Adjunta tu cédula o carta para llenar el formulario automáticamente
+              📎 Adjunte su cédula o carta para llenar el formulario automáticamente
             </p>
           </form>
         </div>

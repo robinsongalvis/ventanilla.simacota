@@ -40,32 +40,58 @@ const GEMINI_VISION_MODEL = 'gemini-2.5-flash';
 const RESPONSE_SCHEMA = {
   type: 'OBJECT',
   properties: {
-    nombre: {
+    tipo_documento_adjunto: {
       type: 'STRING',
       nullable: true,
       description:
-        'Nombre completo de la persona o razón social. null si no se detecta con certeza.',
+        'Clasifica el documento en una o dos palabras (ej. "Carta formal", "Cédula de Ciudadanía", "Factura"). null si no es determinable.',
     },
-    email: {
+    nombre_completo: {
       type: 'STRING',
       nullable: true,
       description:
-        'Correo electrónico en minúsculas. null si no aparece en el documento.',
+        'Nombre completo de la persona natural o razón social de la empresa. null si no se detecta con certeza.',
     },
-    telefono: {
+    documento_identidad: {
+      type: 'STRING',
+      nullable: true,
+      description:
+        'Número de cédula, NIT o pasaporte. Solo dígitos, sin puntos ni comas. null si no aparece.',
+    },
+    telefono_contacto: {
       type: 'STRING',
       nullable: true,
       description:
         'Número de teléfono, solo dígitos, sin espacios ni guiones. null si no aparece.',
     },
-    descripcion: {
+    correo_electronico: {
       type: 'STRING',
       nullable: true,
       description:
-        'Asunto o motivo de la solicitud inferido del documento. Máximo 120 caracteres. null si el documento es ilegible.',
+        'Dirección de correo electrónico en minúsculas. null si no aparece en el documento.',
+    },
+    asunto_resumido: {
+      type: 'STRING',
+      nullable: true,
+      description:
+        'Motivo principal de la solicitud en máximo 120 caracteres. null si el documento es ilegible.',
+    },
+    dependencia_sugerida: {
+      type: 'STRING',
+      nullable: true,
+      description:
+        'Dependencia que debe atender el trámite. Solo una de: "Planeación e Infraestructura", "Desarrollo Social", "Inspección de Policía", "UMATA", "Secretaría de Hacienda". null si no está seguro.',
     },
   },
-  required: ['nombre', 'email', 'telefono', 'descripcion'],
+  required: [
+    'tipo_documento_adjunto',
+    'nombre_completo',
+    'documento_identidad',
+    'telefono_contacto',
+    'correo_electronico',
+    'asunto_resumido',
+    'dependencia_sugerida',
+  ],
 } as const;
 
 /* ══════════════════════════════════════════════════════════════
@@ -106,10 +132,13 @@ function normalizarExtraccion(raw: unknown): DatosExtraidos {
       : (raw as GeminiExtraccionSchema);
 
   return {
-    nombre:      parsed.nombre      ?? null,
-    email:       parsed.email       ?? null,
-    telefono:    parsed.telefono    ?? null,
-    descripcion: parsed.descripcion ?? null,
+    nombre:               parsed.nombre_completo        ?? null,
+    email:                parsed.correo_electronico     ?? null,
+    telefono:             parsed.telefono_contacto      ?? null,
+    descripcion:          parsed.asunto_resumido        ?? null,
+    tipo_documento:       parsed.tipo_documento_adjunto ?? null,
+    documento_identidad:  parsed.documento_identidad   ?? null,
+    dependencia_sugerida: parsed.dependencia_sugerida  ?? null,
   };
 }
 
@@ -162,7 +191,7 @@ export async function POST(request: Request): Promise<NextResponse<ResultadoExtr
     return NextResponse.json(
       crearFallbackExtraccion(
         'El escáner de documentos no está disponible en este momento. ' +
-        'Por favor, ingresa tus datos manualmente en el formulario, mano.',
+        'Por favor, ingrese sus datos manualmente en el formulario.',
       ),
     );
   }
@@ -325,9 +354,9 @@ export async function POST(request: Request): Promise<NextResponse<ResultadoExtr
         datos: null,
         camposEncontrados: [],
         mensajeError:
-          'No pude leer ningún dato del documento, sumercé. ' +
-          'Asegúrate de que la imagen esté bien iluminada, sin borrosos, ' +
-          'y que el texto sea visible. Intenta con otra foto o ingresa los datos manualmente.',
+          'No fue posible leer ningún dato del documento. ' +
+          'Asegúrese de que la imagen esté bien iluminada y que el texto sea visible. ' +
+          'Intente con otra foto o ingrese los datos manualmente.',
       });
     }
 
@@ -361,7 +390,7 @@ export async function POST(request: Request): Promise<NextResponse<ResultadoExtr
     const estaCircuitoAbierto = msg.includes('OPEN');
     const mensajeError = estaCircuitoAbierto
       ? 'El escáner está en mantenimiento momentáneo (máx. 90 segundos). ' +
-        'Ingresa tus datos manualmente por ahora, mano.'
+        'Por favor, ingrese sus datos manualmente por ahora.'
       : 'Ocurrió un error al analizar el documento. ' +
         'Intenta con otra imagen o ingresa los datos manualmente en el formulario.';
 

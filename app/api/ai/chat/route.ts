@@ -43,12 +43,12 @@ function generarRespuestaFallback(
   const ultimoMensaje = messages[messages.length - 1]?.content?.toLowerCase() ?? '';
 
   let respuesta =
-    '¡Hola, mano! Bienvenido a la Ventanilla Única de Simacota. ' +
-    '¿En qué le puedo colaborar? Si quiere radicar rápido, use el botón 📎 para escanear su documento.';
+    '¡Hola! Bienvenido a la Ventanilla Única de Simacota. ' +
+    '¿En qué le puedo ayudar? Si quiere radicar rápido, use el botón 📎 para escanear su documento.';
 
   if (ultimoMensaje.includes('agua') || ultimoMensaje.includes('acueducto')) {
     respuesta =
-      'Eso va para **Planeación e Infraestructura**, sumercé. ' +
+      'Eso va para **Planeación e Infraestructura**. ' +
       'Adjunte una foto del daño si puede y use el botón 📎 para escanear su cédula — así llena el formulario más rápido.';
   } else if (ultimoMensaje.includes('sisben') || ultimoMensaje.includes('encuesta')) {
     respuesta =
@@ -60,14 +60,14 @@ function generarRespuestaFallback(
       'SIMI llenará el formulario por usted en segundos.';
   } else if (messages.length > 1) {
     respuesta =
-      'Entendido, mano. ¿Quiere que le ayude a redactar el asunto, ' +
+      'Entendido. ¿Quiere que le ayude a redactar el asunto, ' +
       'o prefiere usar el botón 📎 para escanear su documento?';
   }
 
   if (esFallbackError) {
     respuesta =
       '[Mantenimiento momentáneo] ' + respuesta +
-      ' Estamos restableciendo el servicio, sumercé. Intente en unos segundos.';
+      ' Estamos restableciendo el servicio. Intente en unos segundos.';
   }
 
   return { role: 'assistant', content: respuesta };
