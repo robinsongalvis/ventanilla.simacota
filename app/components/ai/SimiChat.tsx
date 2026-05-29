@@ -30,9 +30,9 @@ const MENSAJE_BIENVENIDA: MensajeChat = {
   id: 'bienvenida',
   rol: 'assistant',
   contenido:
-    '¡Hola, mano! Soy **SIMI**, su asistente de la Ventanilla Única de Simacota.\n\n' +
-    'Puedo ayudarle a orientarse o, si quiere radicar rápido, use el botón **📎** ' +
-    'para escanear su cédula o carta y lleno el formulario por usted automáticamente.',
+    '¡Hola! Soy **SIMI**, su asistente de la Ventanilla Única. ¿En qué le puedo ayudar hoy?\n\n' +
+    'Recuerde que si tiene un documento físico, puede usar el botón **📎** para escanearlo ' +
+    'y yo le ayudo a llenar el formulario rápidamente.',
   timestamp: Date.now(),
 };
 
@@ -268,7 +268,7 @@ export function SimiChat() {
       agregarMensaje({
         rol: 'assistant',
         contenido:
-          `El archivo **"${archivo.name}"** no es compatible, sumercé. ` +
+          `El archivo **"${archivo.name}"** no es compatible. ` +
           `Solo acepto ${SCAN_MIME_LABEL}. Intente con otra imagen o PDF.`,
       });
       setArchivoScan(null);
@@ -281,7 +281,7 @@ export function SimiChat() {
         rol: 'assistant',
         contenido:
           `El archivo pesa **${mb} MB** y supera el límite de 4 MB del escáner. ` +
-          `Comprima la imagen o recorte el área del documento, mano.`,
+          `Por favor, comprima la imagen o recorte el área del documento e intente de nuevo.`,
       });
       setArchivoScan(null);
       return;
@@ -341,8 +341,8 @@ export function SimiChat() {
       agregarMensaje({
         rol: 'assistant',
         contenido:
-          'Qué pena, sumercé, pero no pude leer el documento en este momento. ' +
-          'Verifique su conexión e intente de nuevo, o ingrese los datos manualmente.',
+          'El escáner de documentos no está disponible en este momento. ' +
+          'Por favor, ingrese sus datos manualmente en el formulario o intente adjuntar el archivo nuevamente.',
       });
     } finally {
       setEstadoSimi('IDLE');
@@ -424,8 +424,8 @@ export function SimiChat() {
         agregarMensaje({
           rol: 'assistant',
           contenido:
-            'Mano, qué pena, se me cayó la señal un momentico. ' +
-            'Intente de nuevo o use el botón 📎 para escanear su documento.',
+            'No fue posible procesar su mensaje en este momento. ' +
+            'Por favor, intente de nuevo o use el botón 📎 para escanear su documento.',
         });
       } finally {
         setEstadoSimi('IDLE');
