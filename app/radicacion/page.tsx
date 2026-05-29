@@ -6,6 +6,8 @@ import { radicarSolicitud } from '@/lib/radicacion';
 import type { UploadProgress } from '@/lib/storage';
 import type { AnalisisIA } from '@/src/types/ventanilla';
 import { NOMBRES_TENANT } from '@/src/types/reglas-negocio';
+import { useSimiDataReceiver } from '@/lib/store/simiContext';
+import type { DatosExtraidos } from '@/src/types/simi';
 
 /* ══════════════════════════════════════════════════════════════
    TIPOS TYPESCRIPT
@@ -205,6 +207,68 @@ export default function PortalCiudadano() {
   const [errors, setErrors] = useState<Record<CampoForm, string>>({
     nombre: '', email: '', telefono: '', descripcion: '',
   });
+
+  /* ══════════════════════════════════════════════════════════════
+     INTEGRACIÓN SIMI — Receptor de datos extraídos por Vision AI
+     Cuando SIMI escanea un documento, este handler recibe los datos
+     extraídos y los inyecta en el estado del formulario.
+  ══════════════════════════════════════════════════════════════ */
+  const handleSimiDataExtracted = useCallback(
+    (datos: Partial<DatosExtraidos>) => {
+      // Mapeamos los campos extraídos → FormData del formulario público
+      // Solo actualizamos los campos que vienen con valor real (no null/vacío)
+      const actualizados: Partial<FormData> = {};
+      const camposTocados: Partial<Record<CampoForm, true>> = {};
+
+      if (datos.nombre) {
+        actualizados.nombre = datos.nombre;
+        camposTocados.nombre = true;
+      }
+      if (datos.email) {
+        actualizados.email = datos.email;
+        camposTocados.email = true;
+      }
+      if (datos.telefono) {
+        // Nos aseguramos de que solo sean los primeros 10 dígitos
+        actualizados.telefono = datos.telefono.replace(/\D/g, '').slice(0, 10);
+        camposTocados.telefono = true;
+      }
+      if (datos.descripcion) {
+        actualizados.descripcion = datos.descripcion.slice(0, 1000);
+        camposTocados.descripcion = true;
+      }
+
+      if (Object.keys(actualizados).length === 0) return;
+
+      // Actualizar el estado del formulario
+      setForm((prev) => ({ ...prev, ...actualizados }));
+
+      // Marcar los campos como tocados para activar validación visual (checkmarks verdes)
+      setTouched((prev) => ({ ...prev, ...camposTocados }));
+
+      // Recalcular errores para los campos rellenados
+      setErrors((prev) => ({
+        ...prev,
+        ...(actualizados.nombre !== undefined
+          ? { nombre: validarCampo('nombre', actualizados.nombre) }
+          : {}),
+        ...(actualizados.email !== undefined
+          ? { email: validarCampo('email', actualizados.email) }
+          : {}),
+        ...(actualizados.telefono !== undefined
+          ? { telefono: validarCampo('telefono', actualizados.telefono) }
+          : {}),
+        ...(actualizados.descripcion !== undefined
+          ? { descripcion: validarCampo('descripcion', actualizados.descripcion) }
+          : {}),
+      }));
+    },
+    [], // validarCampo es una función pura definida fuera del componente
+  );
+
+  // Registra el handler con el Context de SIMI.
+  // Se desregistra automáticamente cuando el componente se desmonta.
+  useSimiDataReceiver(handleSimiDataExtracted);
 
   const [analisisIa, setAnalisisIa] = useState<AnalisisIA | null>(null);
   const [estaClasificando, setEstaClasificando] = useState(false);
