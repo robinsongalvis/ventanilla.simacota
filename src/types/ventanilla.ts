@@ -23,10 +23,13 @@ export interface SolicitanteRadicado {
   tipoDocumento: TipoDocumento;
   numeroDocumento: string;
   nombreCompleto: string;
-  razonSocial?: string;
-  email?: string;
-  telefono?: string;
-  direccion?: string;
+  razonSocial?: string | null;
+  /** Null cuando el solicitante no proveyó el dato (Firestore no acepta undefined) */
+  email?: string | null;
+  /** Null cuando el solicitante no proveyó el dato (Firestore no acepta undefined) */
+  telefono?: string | null;
+  /** Null cuando el solicitante no proveyó el dato (Firestore no acepta undefined) */
+  direccion?: string | null;
   ubicacion: UbicacionSolicitante;
 }
 
@@ -102,7 +105,8 @@ export interface VentanillaRadicado {
     asunto: string;
     descripcion: string;
     numeroFolios: number;
-    anexosDescripcion?: string;
+    /** Null cuando no se especificaron anexos (Firestore no acepta undefined) */
+    anexosDescripcion?: string | null;
   };
   archivos: ArchivoRadicado[];
   trazabilidad: TrazabilidadRadicado[];

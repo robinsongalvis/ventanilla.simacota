@@ -43,13 +43,55 @@ export interface ResultadoRadicacion {
 }
 
 /* ══════════════════════════════════════════════════════════════
+   SANITIZACIÓN DE DATOS (Firestore no admite `undefined`)
+══════════════════════════════════════════════════════════════ */
+
+/**
+ * Elimina recursivamente todos los valores `undefined` de un objeto
+ * antes de enviarlo a Firestore. Convierte los `undefined` a `null`
+ * para preservar la estructura del documento y respetar el tipado.
+ *
+ * Firestore: acepta `null` ✅ — rechaza `undefined` ❌
+ */
+export function sanitizeFirestoreData(
+  data: Record<string, unknown>,
+): Record<string, unknown> {
+  const sanitized: Record<string, unknown> = {};
+
+  for (const [key, value] of Object.entries(data)) {
+    if (value === undefined) {
+      // Convertimos undefined a null para cumplir con Firestore
+      sanitized[key] = null;
+    } else if (
+      value !== null &&
+      typeof value === 'object' &&
+      !Array.isArray(value)
+    ) {
+      // Recursión sobre objetos anidados (ej. solicitante, detalle, termino)
+      sanitized[key] = sanitizeFirestoreData(value as Record<string, unknown>);
+    } else if (Array.isArray(value)) {
+      // Los arrays se sanitizan elemento a elemento
+      sanitized[key] = value.map((item) =>
+        item !== null && typeof item === 'object'
+          ? sanitizeFirestoreData(item as Record<string, unknown>)
+          : item ?? null,
+      );
+    } else {
+      sanitized[key] = value;
+    }
+  }
+
+  return sanitized;
+}
+
+/* ══════════════════════════════════════════════════════════════
    MAPEO DE CANAL
 ══════════════════════════════════════════════════════════════ */
 
 function mapCanal(medio: MedioRecepcion): CanalRadicadoInstitucional {
-  if (medio === 'WEB')          return 'WEB';
-  if (medio === 'EMAIL')        return 'EMAIL';
-  if (medio === 'PRESENCIAL')   return 'PRESENCIAL';
+  if (medio === 'WEB')        return 'WEB';
+  if (medio === 'EMAIL')      return 'EMAIL';
+  if (medio === 'PRESENCIAL') return 'PRESENCIAL';
   return 'OFICIO';
 }
 
@@ -60,6 +102,11 @@ function mapCanal(medio: MedioRecepcion): CanalRadicadoInstitucional {
 /**
  * Crea un VentanillaRadicado completo en la colección `ventanilla_radicados`.
  * Pasos: genera ID → sube archivos → escribe documento Firestore.
+ *
+ * IMPORTANTE: Todos los campos opcionales usan `|| null` (no `|| undefined`)
+ * para garantizar compatibilidad estricta con Firestore. La función
+ * `sanitizeFirestoreData` aplica una capa de defensa adicional en el objeto
+ * completo antes de la escritura transaccional.
  */
 export async function radicarInstitucionalmente(
   datos:      DatosRadicacionInstitucional,
@@ -81,6 +128,9 @@ export async function radicarInstitucionalmente(
   const tipo = TIPOS_SOLICITUD[datos.tipoSolicitudId];
   const ahora = new Date();
 
+  // Construimos el documento con `null` explícito en campos opcionales vacíos.
+  // Nunca usamos `|| undefined` — Firestore rechaza undefined con una excepción:
+  // "Function setDoc() called with invalid data. Unsupported field value: undefined"
   const radicado: VentanillaRadicado = {
     radicadoId,
     estadoActual: 'PENDIENTE',
@@ -91,9 +141,10 @@ export async function radicarInstitucionalmente(
       tipoDocumento:   datos.tipoDocumento,
       numeroDocumento: datos.numeroDocumento.trim(),
       nombreCompleto:  datos.nombreCompleto.trim(),
-      email:           datos.email.trim()    || undefined,
-      telefono:        datos.telefono.trim() || undefined,
-      direccion:       datos.direccion.trim()|| undefined,
+      // Campos opcionales: cadena vacía → null (NUNCA undefined)
+      email:    datos.email.trim()     || null,
+      telefono: datos.telefono.trim()  || null,
+      direccion: datos.direccion.trim() || null,
       ubicacion: {
         pais:         datos.pais,
         departamento: datos.departamento,
@@ -111,25 +162,28 @@ export async function radicarInstitucionalmente(
     },
 
     termino: {
-      tipoSolicitudId:   datos.tipoSolicitudId,
+      tipoSolicitudId:     datos.tipoSolicitudId,
       tipoSolicitudNombre: tipo.nombre,
-      diasRespuesta:     tipo.diasRespuesta,
-      unidad:            tipo.unidad,
-      fechaVencimiento:  datos.fechaVencimiento,
-      prorrogasAplicadas: 0,
+      diasRespuesta:       tipo.diasRespuesta,
+      unidad:              tipo.unidad,
+      fechaVencimiento:    datos.fechaVencimiento,
+      prorrogasAplicadas:  0,
     },
 
     clasificacion: {
-      oficinaDestino:              'VENTANILLA_UNICA',
-      funcionarioResponsableUid:   actor.uid,
-      zonaGeografica:              'CASCO_URBANO',
+      oficinaDestino:            'VENTANILLA_UNICA',
+      funcionarioResponsableUid: actor.uid,
+      zonaGeografica:            'CASCO_URBANO',
     },
 
     detalle: {
-      asunto:            datos.asunto.trim(),
-      descripcion:       datos.descripcion.trim(),
-      numeroFolios:      datos.numeroFolios,
-      anexosDescripcion: datos.anexosDescripcion.trim() || undefined,
+      asunto:       datos.asunto.trim(),
+      descripcion:  datos.descripcion.trim(),
+      numeroFolios: datos.numeroFolios,
+      // Si el campo viene vacío o con solo espacios → null.
+      // NUNCA undefined → genera: "Unsupported field value: undefined"
+      // en detalle.anexosDescripcion al llamar a setDoc().
+      anexosDescripcion: datos.anexosDescripcion.trim() || null,
     },
 
     archivos: exitosos.map((a, i) => ({
@@ -152,7 +206,13 @@ export async function radicarInstitucionalmente(
     ],
   };
 
-  await setDoc(doc(getDb(), 'ventanilla_radicados', radicadoId), radicado);
+  // Capa de defensa final: sanitizeFirestoreData garantiza que ningún campo
+  // llegue como `undefined` aunque se añadan atributos nuevos en el futuro.
+  const radicadoSeguro = sanitizeFirestoreData(
+    radicado as unknown as Record<string, unknown>,
+  );
+
+  await setDoc(doc(getDb(), 'ventanilla_radicados', radicadoId), radicadoSeguro);
 
   onProgress('Radicado registrado exitosamente.', 100);
   return { radicadoId, consecutivo };
