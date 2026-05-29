@@ -1,4 +1,4 @@
-import type { VentanillaRadicado, AuditoriaOverride } from '@/src/types/ventanilla';
+import type { VentanillaRadicado } from '@/src/types/ventanilla';
 import { calcularRiesgoVencimiento, type AnalisisRiesgoRadicado } from './riesgo-vencimiento';
 import { calcularSaturacionDependencias, type AnalisisSaturacionDependencia } from './saturacion';
 import { calcularTendenciasSemanticas, type AnalisisTendenciaTag } from './tendencias';

@@ -1,4 +1,4 @@
-import type { VentanillaRadicado, AuditoriaOverride } from '@/src/types/ventanilla';
+import type { VentanillaRadicado } from '@/src/types/ventanilla';
 import { NOMBRES_TENANT } from '@/src/types/reglas-negocio';
 import { PREDICTIVE_THRESHOLDS, CAPACIDAD_DIARIA_DEPENDENCIAS } from './thresholds';
 
