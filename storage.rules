@@ -20,8 +20,21 @@ service firebase.storage {
       // Permite radicacion ciudadana sin cuenta, con limites estrictos de tipo y tamano.
       allow create: if isAllowedRadicadoFile();
 
-      // Solo funcionarios autenticados pueden abrir adjuntos desde el panel interno.
-      allow read: if signedIn();
+      allow read: if false;
+
+      allow update, delete: if false;
+    }
+
+    match /respuestas/{radicadoId}/{archivo} {
+      // Solo funcionarios autenticados pueden subir el PDF firmado de respuesta.
+      allow create: if signedIn()
+        && request.resource != null
+        && request.resource.size > 0
+        && request.resource.size <= 10 * 1024 * 1024
+        && request.resource.contentType == 'application/pdf';
+
+      // Lectura solo via Admin SDK en /api/interno/archivo — nunca directa.
+      allow read: if false;
 
       allow update, delete: if false;
     }

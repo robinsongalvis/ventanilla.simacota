@@ -3,7 +3,7 @@
 import { useEffect, useState } from 'react';
 import { onAuthStateChanged, signOut } from 'firebase/auth';
 import { doc, getDoc }                 from 'firebase/firestore';
-import { clearInternalSession, markInternalSessionActive } from '@/lib/auth-session';
+import { clearInternalSession, createInternalSession } from '@/lib/auth-session';
 import { getFirebaseAuth, getDb }      from '@/lib/firebase';
 import type { TenantId }               from '@/src/types/radicado';
 
@@ -32,17 +32,20 @@ export function useAuth(): UseAuthReturn {
     const db   = getDb();
     const unsub = onAuthStateChanged(auth, async (firebaseUser) => {
       if (!firebaseUser) {
-        clearInternalSession();
+        void clearInternalSession();
         setUsuario(null);
         setCargando(false);
         return;
       }
 
       try {
+        const idToken = await firebaseUser.getIdToken();
+        await createInternalSession(idToken, () => firebaseUser.getIdToken(true));
+
         const snap = await getDoc(doc(db, 'users', firebaseUser.uid));
 
         if (!snap.exists()) {
-          clearInternalSession();
+          void clearInternalSession();
           setError(
             'Tu cuenta no está registrada en el sistema. Contacta al administrador.'
           );
@@ -56,11 +59,10 @@ export function useAuth(): UseAuthReturn {
             rol:      data.rol      ?? 'FUNCIONARIO',
             tenantId: data.tenantId as TenantId,
           });
-          markInternalSessionActive();
           setError(null);
         }
       } catch {
-        clearInternalSession();
+        void clearInternalSession();
         setError('Error al cargar datos del usuario. Intenta de nuevo.');
       } finally {
         setCargando(false);
@@ -71,8 +73,8 @@ export function useAuth(): UseAuthReturn {
   }, []);
 
   const cerrarSesion = async () => {
+    await clearInternalSession();
     await signOut(getFirebaseAuth());
-    clearInternalSession();
     setUsuario(null);
   };
 

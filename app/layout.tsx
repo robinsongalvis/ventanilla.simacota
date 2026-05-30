@@ -1,24 +1,7 @@
 import type { Metadata } from 'next';
-import { DM_Sans, Manrope } from 'next/font/google';
 import './globals.css';
 import { SimiChat } from '@/app/components/ai/SimiChat';
 import { SimiProvider } from '@/lib/store/simiContext';
-
-// Body + UI text — DM Sans per Obsidian Kinetic spec
-const dmSans = DM_Sans({
-  variable: '--font-dm-sans',
-  subsets: ['latin'],
-  weight: ['400', '700'],
-  display: 'swap',
-});
-
-// Headlines — Manrope 700/800
-const manrope = Manrope({
-  variable: '--font-manrope',
-  subsets: ['latin'],
-  weight: ['700', '800'],
-  display: 'swap',
-});
 
 export const metadata: Metadata = {
   // ── Base URL — obligatorio para que los OG relativos funcionen ──
@@ -108,7 +91,7 @@ export default function RootLayout({
   return (
     <html
       lang="es"
-      className={`${dmSans.variable} ${manrope.variable} h-full`}
+      className="h-full"
     >
       <body className="min-h-full bg-[#0A0A0B] text-slate-100 antialiased">
         <SimiProvider>
@@ -119,4 +102,3 @@ export default function RootLayout({
     </html>
   );
 }
-

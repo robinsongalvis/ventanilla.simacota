@@ -143,6 +143,7 @@ export async function radicarSolicitud(
       archivos: archivosResultado.map((a, i) => ({
         nombre:    a.nombre,
         url:       a.url,
+        path:      a.path,
         tipo:      a.tipo,
         tamanioKB: a.tamanioKB,
         orden:     i + 1,

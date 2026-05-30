@@ -1,8 +1,22 @@
 import { NextResponse } from 'next/server';
-import { doc, updateDoc, setDoc } from 'firebase/firestore';
-import { getDb } from '@/lib/firebase';
+import { getFirebaseAdminDb } from '@/lib/firebase-admin';
+import { checkRateLimit, getClientIp, rateLimitHeaders } from '@/lib/ai/rate-limit';
 
 export async function POST(request: Request) {
+  const limite = { maxRequests: 30, windowMs: 60_000 };
+  const ip = getClientIp(request);
+  const bloqueado = checkRateLimit(`ai:feedback:${ip}`, limite);
+
+  if (bloqueado) {
+    return NextResponse.json(
+      { error: 'Se recibieron muchas evaluaciones seguidas. Espere un momento e intente nuevamente.' },
+      {
+        status: 429,
+        headers: rateLimitHeaders(limite.maxRequests, bloqueado.retryAfterSeconds),
+      },
+    );
+  }
+
   try {
     const payload = await request.json();
     const {
@@ -27,11 +41,10 @@ export async function POST(request: Request) {
       );
     }
 
-    const db = getDb();
+    const db = getFirebaseAdminDb();
     const ahora = new Date().toISOString();
     const feedbackId = `fb_${radicadoId}_${Date.now()}`;
 
-    // 1. Registrar evaluación en la colección 'ai_feedback'
     const feedbackDoc = {
       feedbackId,
       radicadoId,
@@ -41,11 +54,9 @@ export async function POST(request: Request) {
       motivoCorreccion: motivoCorreccion || null,
       fecha: ahora,
     };
-    await setDoc(doc(db, 'ai_feedback', feedbackId), feedbackDoc);
+    await db.doc(`ai_feedback/${feedbackId}`).set(feedbackDoc);
 
-    // 2. Actualizar el radicado en 'ventanilla_radicados' con la evaluación
-    const radRef = doc(db, 'ventanilla_radicados', radicadoId);
-    await updateDoc(radRef, {
+    await db.doc(`ventanilla_radicados/${radicadoId}`).update({
       feedbackIa: {
         usuarioId,
         actorNombre: actorNombre || 'Funcionario',
@@ -55,7 +66,6 @@ export async function POST(request: Request) {
       },
     });
 
-    // 3. Si hubo corrección, registrar auditoría en la colección 'ai_auditoria'
     if (puntuacion === 'CORREGIDO' || clasificacionOriginal !== clasificacionFinal) {
       const auditoriaId = `aud_${radicadoId}_${Date.now()}`;
       const auditoriaDoc = {
@@ -73,7 +83,7 @@ export async function POST(request: Request) {
         accionFuncionario: puntuacion === 'CORREGIDO' ? 'MODIFICADO' : 'ACEPTADO',
         motivoCorreccion: motivoCorreccion || 'Traslado o re-enrutamiento manual.',
       };
-      await setDoc(doc(db, 'ai_auditoria', auditoriaId), auditoriaDoc);
+      await db.doc(`ai_auditoria/${auditoriaId}`).set(auditoriaDoc);
     }
 
     return NextResponse.json({ exito: true, feedbackId });

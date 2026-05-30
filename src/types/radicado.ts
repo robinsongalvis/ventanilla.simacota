@@ -49,7 +49,8 @@ export interface AuditoriaEntry {
 
 export interface Archivo {
   nombre: string;
-  url: string;
+  url?: string | null;
+  path?: string | null;
 }
 
 export interface ClasificacionIA {

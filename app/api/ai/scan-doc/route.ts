@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import { SIMI_DATA_EXTRACTION_PROMPT } from '@/lib/ai/prompts/simi';
 import { ejecutarConResiliencia } from '@/lib/ai/resilience';
 import { registrarLogIA } from '@/lib/ai/telemetry';
+import { checkRateLimit, getClientIp, rateLimitHeaders } from '@/lib/ai/rate-limit';
 import type {
   ResultadoExtraccion,
   DatosExtraidos,
@@ -178,6 +179,22 @@ function crearFallbackExtraccion(motivo: string): ResultadoExtraccion {
 export async function POST(request: Request): Promise<NextResponse<ResultadoExtraccion>> {
   const inicio = Date.now();
   const apiKey = process.env.GEMINI_API_KEY;
+  const limite = { maxRequests: 5, windowMs: 60_000 };
+  const ip = getClientIp(request);
+  const bloqueado = checkRateLimit(`ai:scan-doc:${ip}`, limite);
+
+  if (bloqueado) {
+    return NextResponse.json<ResultadoExtraccion>(
+      crearFallbackExtraccion(
+        'El escáner recibió muchas solicitudes seguidas desde esta conexión. ' +
+        'Espere un momento e intente nuevamente.',
+      ),
+      {
+        status: 429,
+        headers: rateLimitHeaders(limite.maxRequests, bloqueado.retryAfterSeconds),
+      },
+    );
+  }
 
   /* ── 1. Validación de API Key ── */
   if (!apiKey) {

@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import { SIMI_SYSTEM_PROMPT } from '@/lib/ai/prompts/simi';
 import { registrarLogIA } from '@/lib/ai/telemetry';
 import { ejecutarConResiliencia } from '@/lib/ai/resilience';
+import { checkRateLimit, getClientIp, rateLimitHeaders } from '@/lib/ai/rate-limit';
 import type { DatosExtraidos } from '@/src/types/simi';
 
 /* ══════════════════════════════════════════════════════════════
@@ -81,6 +82,24 @@ export async function POST(request: Request): Promise<NextResponse<RespuestaChat
   const inicio = Date.now();
   const apiKey = process.env.GEMINI_API_KEY;
   let body: ChatRequestBody = { messages: [] };
+  const limite = { maxRequests: 10, windowMs: 60_000 };
+  const ip = getClientIp(request);
+  const bloqueado = checkRateLimit(`ai:chat:${ip}`, limite);
+
+  if (bloqueado) {
+    return NextResponse.json(
+      {
+        role: 'assistant',
+        content:
+          'SIMI recibió muchas solicitudes seguidas desde esta conexión. ' +
+          'Espere un momento e intente nuevamente para continuar con la atención.',
+      },
+      {
+        status: 429,
+        headers: rateLimitHeaders(limite.maxRequests, bloqueado.retryAfterSeconds),
+      },
+    );
+  }
 
   try {
     body = (await request.json()) as ChatRequestBody;

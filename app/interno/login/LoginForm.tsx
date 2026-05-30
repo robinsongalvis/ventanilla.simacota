@@ -4,7 +4,7 @@ import { useMemo, useState } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { signInWithEmailAndPassword } from 'firebase/auth';
 import { getFirebaseAuth } from '@/lib/firebase';
-import { markInternalSessionActive } from '@/lib/auth-session';
+import { createInternalSession } from '@/lib/auth-session';
 
 export function LoginForm() {
   const router = useRouter();
@@ -27,8 +27,9 @@ export function LoginForm() {
     setLoading(true);
 
     try {
-      await signInWithEmailAndPassword(getFirebaseAuth(), email.trim(), password);
-      markInternalSessionActive();
+      const credential = await signInWithEmailAndPassword(getFirebaseAuth(), email.trim(), password);
+      const idToken = await credential.user.getIdToken();
+      await createInternalSession(idToken, () => credential.user.getIdToken(true));
       router.replace(nextUrl);
     } catch {
       setError('Credenciales incorrectas. Verifica tu correo y contrasena.');

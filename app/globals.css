@@ -1,5 +1,16 @@
 @import "tailwindcss";
 
+/* ── Fuentes locales — sin dependencia de red en build ── */
+@import '@fontsource/dm-sans/400.css';
+@import '@fontsource/dm-sans/700.css';
+@import '@fontsource/manrope/700.css';
+@import '@fontsource/manrope/800.css';
+
+:root {
+  --font-dm-sans: 'DM Sans', system-ui, sans-serif;
+  --font-manrope: 'Manrope', system-ui, sans-serif;
+}
+
 /* ============================================================
    OBSIDIAN KINETIC — Sistema de Diseño
    Alcaldía Municipal de Simacota, Santander

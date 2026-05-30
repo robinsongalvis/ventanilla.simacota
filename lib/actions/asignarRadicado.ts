@@ -1,6 +1,7 @@
-import { doc, updateDoc, writeBatch, arrayUnion } from 'firebase/firestore';
+import { addDoc, collection, doc, updateDoc, writeBatch } from 'firebase/firestore';
 import { getDb } from '@/lib/firebase';
 import type { TenantId } from '@/src/types/radicado';
+import type { TrazabilidadRadicado } from '@/src/types/ventanilla';
 
 export interface ActorAsignacion {
   uid: string;
@@ -32,7 +33,13 @@ export async function asignarRadicado(
       ? { 'clasificacion.funcionarioResponsableUid': funcionarioDestinoUid }
       : {}),
     estadoActual: 'ASIGNADO',
-    trazabilidad: arrayUnion({
+    ultimaActualizacion: ahora,
+  });
+
+  await addDoc(
+    collection(db, 'ventanilla_radicados', radicadoId, 'trazabilidad'),
+    {
+      eventoId: `ev_${radicadoId}_${Date.now()}`,
       fecha: ahora,
       accion: 'TRASLADO',
       actorUid: actor.uid,
@@ -40,8 +47,8 @@ export async function asignarRadicado(
       oficinaDestino: tenantDestino,
       ...(funcionarioDestinoUid ? { funcionarioDestinoUid } : {}),
       nota: `Asignado a ${tenantDestino} por ${actor.nombre}`,
-    }),
-  });
+    } satisfies TrazabilidadRadicado,
+  );
 }
 
 /* ══════════════════════════════════════════════════════════════
@@ -60,7 +67,7 @@ export async function asignarMasivo(
   let asignados = 0;
   let fallidos = 0;
 
-  const entrada = {
+  const entrada: Omit<TrazabilidadRadicado, 'eventoId'> = {
     fecha: ahora,
     accion: 'TRASLADO',
     actorUid: actor.uid,
@@ -78,12 +85,23 @@ export async function asignarMasivo(
       batch.update(ref, {
         'clasificacion.oficinaDestino': tenantDestino,
         estadoActual: 'ASIGNADO',
-        trazabilidad: arrayUnion(entrada),
+        ultimaActualizacion: ahora,
       });
     }
 
     try {
       await batch.commit();
+      await Promise.allSettled(
+        lote.map((id, idx) =>
+          addDoc(
+            collection(db, 'ventanilla_radicados', id, 'trazabilidad'),
+            {
+              ...entrada,
+              eventoId: `ev_${id}_${Date.now()}_${idx}`,
+            } satisfies TrazabilidadRadicado,
+          ),
+        ),
+      );
       asignados += lote.length;
     } catch {
       fallidos += lote.length;

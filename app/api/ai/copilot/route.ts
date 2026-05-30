@@ -1,14 +1,52 @@
 import { NextResponse } from 'next/server';
+import type { DecodedIdToken } from 'firebase-admin/auth';
 import { doc, getDoc, collection, getDocs } from 'firebase/firestore';
 import { getDb } from '@/lib/firebase';
+import { SESSION_COOKIE_NAME } from '@/lib/auth-cookie';
+import { getFirebaseAdminAuth } from '@/lib/firebase-admin';
+import { checkRateLimit, rateLimitHeaders } from '@/lib/ai/rate-limit';
 import { construirContextoAgente } from '@/lib/ai/context-engine';
 import { invocarCopilotoEspecializado } from '@/lib/ai/agents';
 import { registrarLogIA } from '@/lib/ai/telemetry';
-import type { VentanillaRadicado } from '@/src/types/ventanilla';
+import type { TrazabilidadRadicado, VentanillaRadicado } from '@/src/types/ventanilla';
+
+async function verificarSesionInterna(request: Request): Promise<DecodedIdToken | null> {
+  const cookieHeader = request.headers.get('cookie') ?? '';
+  const cookies = cookieHeader.split(';').map((item) => item.trim());
+  const sessionCookie = cookies
+    .find((item) => item.startsWith(`${SESSION_COOKIE_NAME}=`))
+    ?.slice(SESSION_COOKIE_NAME.length + 1);
+
+  if (!sessionCookie) return null;
+
+  try {
+    return await getFirebaseAdminAuth().verifySessionCookie(sessionCookie, true);
+  } catch {
+    return null;
+  }
+}
 
 export async function POST(request: Request) {
   const start = Date.now();
   const apiKey = process.env.GEMINI_API_KEY;
+  const sesion = await verificarSesionInterna(request);
+
+  if (!sesion) {
+    return NextResponse.json({ error: 'No autorizado.' }, { status: 401 });
+  }
+
+  const limite = { maxRequests: 20, windowMs: 60_000 };
+  const bloqueado = checkRateLimit(`ai:copilot:${sesion.uid}`, limite);
+
+  if (bloqueado) {
+    return NextResponse.json(
+      { error: 'Ha realizado muchas consultas al Copiloto IA. Espere un momento e intente nuevamente.' },
+      {
+        status: 429,
+        headers: rateLimitHeaders(limite.maxRequests, bloqueado.retryAfterSeconds),
+      },
+    );
+  }
 
   try {
     const { radicadoId } = await request.json();
@@ -34,6 +72,10 @@ export async function POST(request: Request) {
     }
 
     const radicadoData = radDocSnap.data() as VentanillaRadicado;
+    const trazSnap = await getDocs(collection(db, 'ventanilla_radicados', radicadoId, 'trazabilidad'));
+    const trazabilidad = trazSnap.docs
+      .map((d) => d.data() as TrazabilidadRadicado)
+      .sort((a, b) => a.fecha.localeCompare(b.fecha));
 
     // 2. Consultar el resto de radicados para promedios históricos de dependencias
     const querySnapshot = await getDocs(collection(db, 'ventanilla_radicados'));
@@ -44,7 +86,7 @@ export async function POST(request: Request) {
     const todosLosAudits = auditSnapshot.docs.map((d) => d.data());
 
     // 4. Construir el payload de contexto unificado del Radicado (AI Context Engine)
-    const contexto = construirContextoAgente(radicadoData, todosLosRadicados, todosLosAudits);
+    const contexto = construirContextoAgente(radicadoData, todosLosRadicados, todosLosAudits, trazabilidad);
 
     // 5. Invocar al copiloto especializado correspondiente según la secretaría
     const recomendacion = await invocarCopilotoEspecializado(contexto, apiKey);

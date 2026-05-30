@@ -1,9 +1,15 @@
-import { doc, setDoc } from 'firebase/firestore';
+import { addDoc, collection, doc, setDoc } from 'firebase/firestore';
 import { getDb } from '@/lib/firebase';
 import { generarRadicadoInstitucional, type CanalRadicadoInstitucional } from '@/lib/radicado-institucional';
 import { TIPOS_SOLICITUD, type TipoSolicitudId } from '@/lib/tiempos-radicado';
 import { subirArchivos } from '@/lib/storage';
-import type { VentanillaRadicado, TipoPersona, TipoDocumento, MedioRecepcion } from '@/src/types/ventanilla';
+import type {
+  MedioRecepcion,
+  TipoDocumento,
+  TipoPersona,
+  TrazabilidadRadicado,
+  VentanillaRadicado,
+} from '@/src/types/ventanilla';
 import type { TenantId } from '@/src/types/radicado';
 
 /* ══════════════════════════════════════════════════════════════
@@ -134,6 +140,7 @@ export async function radicarInstitucionalmente(
   const radicado: VentanillaRadicado = {
     radicadoId,
     estadoActual: 'PENDIENTE',
+    ultimaActualizacion: ahora.toISOString(),
     prioridad:    tipo.prioridadSugerida,
 
     solicitante: {
@@ -195,15 +202,6 @@ export async function radicarInstitucionalmente(
       orden:     i + 1,
     })),
 
-    trazabilidad: [
-      {
-        fecha:       ahora.toISOString(),
-        accion:      'RADICACION',
-        actorUid:    actor.uid,
-        actorNombre: actor.nombre,
-        nota:        `Radicado por ${actor.nombre} · Canal: ${datos.medioRecepcion}`,
-      },
-    ],
   };
 
   // Capa de defensa final: sanitizeFirestoreData garantiza que ningún campo
@@ -213,6 +211,17 @@ export async function radicarInstitucionalmente(
   );
 
   await setDoc(doc(getDb(), 'ventanilla_radicados', radicadoId), radicadoSeguro);
+  await addDoc(
+    collection(getDb(), 'ventanilla_radicados', radicadoId, 'trazabilidad'),
+    {
+      eventoId: `ev_${radicadoId}_RADICACION`,
+      fecha: ahora.toISOString(),
+      accion: 'RADICACION',
+      actorUid: actor.uid,
+      actorNombre: actor.nombre,
+      nota: `Radicado por ${actor.nombre} · Canal: ${datos.medioRecepcion}`,
+    } satisfies TrazabilidadRadicado,
+  );
 
   onProgress('Radicado registrado exitosamente.', 100);
   return { radicadoId, consecutivo };

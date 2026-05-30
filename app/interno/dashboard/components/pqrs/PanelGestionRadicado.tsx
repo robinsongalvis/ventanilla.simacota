@@ -3,12 +3,13 @@
 import { useState } from 'react';
 import { DIRECTORIO_TENANTS, NOMBRES_TENANT } from '@/src/types/reglas-negocio';
 import type { TenantId } from '@/src/types/radicado';
-import type { VentanillaRadicado } from '@/src/types/ventanilla';
+import type { TrazabilidadRadicado, VentanillaRadicado } from '@/src/types/ventanilla';
 
 type TabId = 'info' | 'trazabilidad' | 'asignar' | 'devolver';
 
 interface Props {
   radicado: VentanillaRadicado;
+  trazabilidad: TrazabilidadRadicado[];
   onAsignar?: (tenantId: TenantId, funcionarioUid: string) => void;
   onDevolver?: (motivo: string) => void;
   onProrroga?: (motivo: string, dias: number) => void;
@@ -21,7 +22,7 @@ const TABS: { id: TabId; label: string }[] = [
   { id: 'devolver', label: 'Devolver / prorroga' },
 ];
 
-export function PanelGestionRadicado({ radicado, onAsignar, onDevolver, onProrroga }: Props) {
+export function PanelGestionRadicado({ radicado, trazabilidad, onAsignar, onDevolver, onProrroga }: Props) {
   const [tab, setTab] = useState<TabId>('info');
   const [tenant, setTenant] = useState<TenantId>(radicado.clasificacion.oficinaDestino);
   const [funcionarioUid, setFuncionarioUid] = useState('');
@@ -117,8 +118,8 @@ export function PanelGestionRadicado({ radicado, onAsignar, onDevolver, onProrro
 
         {tab === 'trazabilidad' && (
           <ol className="space-y-3">
-            {radicado.trazabilidad.map((evento, index) => (
-              <li key={`${evento.fecha}-${index}`} className="flex gap-3">
+            {trazabilidad.map((evento, index) => (
+              <li key={evento.eventoId ?? `${evento.fecha}-${index}`} className="flex gap-3">
                 <span className="mt-1 h-2 w-2 rounded-full bg-indigo-400" />
                 <div>
                   <p className="text-sm font-semibold text-slate-200">{evento.accion}</p>
@@ -205,4 +206,3 @@ function Info({ label, value, className = '' }: { label: string; value: string; 
     </div>
   );
 }
-

@@ -1,25 +1,28 @@
 'use client';
 
-import { INTERNAL_AUTH_COOKIE } from './auth-cookie';
-
-const COOKIE_MAX_AGE_SECONDS = 60 * 60 * 24 * 7;
-
-export function markInternalSessionActive() {
-  const parts = [
-    `${INTERNAL_AUTH_COOKIE}=1`,
-    `Max-Age=${COOKIE_MAX_AGE_SECONDS}`,
-    'Path=/',
-    'SameSite=Lax',
-  ];
-
-  if (window.location.protocol === 'https:') {
-    parts.push('Secure');
-  }
-
-  document.cookie = parts.join('; ');
+interface SessionResponse {
+  refreshRequired?: boolean;
+  error?: string;
 }
 
-export function clearInternalSession() {
-  const secure = window.location.protocol === 'https:' ? '; Secure' : '';
-  document.cookie = `${INTERNAL_AUTH_COOKIE}=; Max-Age=0; Path=/; SameSite=Lax${secure}`;
+export async function createInternalSession(idToken: string, retryWithFreshToken?: () => Promise<string>) {
+  const response = await fetch('/api/auth/session', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ idToken }),
+  });
+
+  if (response.status === 409 && retryWithFreshToken) {
+    const freshToken = await retryWithFreshToken();
+    return createInternalSession(freshToken);
+  }
+
+  if (!response.ok) {
+    const data = await response.json().catch(() => null) as SessionResponse | null;
+    throw new Error(data?.error ?? 'No fue posible crear la sesion interna.');
+  }
+}
+
+export async function clearInternalSession() {
+  await fetch('/api/auth/logout', { method: 'POST' }).catch(() => null);
 }

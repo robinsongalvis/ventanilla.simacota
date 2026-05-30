@@ -1,19 +1,40 @@
 import { NextResponse, type NextRequest } from 'next/server';
-import { INTERNAL_AUTH_COOKIE } from '@/lib/auth-cookie';
+import { SESSION_COOKIE_NAME } from '@/lib/auth-cookie';
+import { getFirebaseAdminAuth } from '@/lib/firebase-admin';
 
-export function proxy(request: NextRequest) {
+async function hasValidInternalSession(request: NextRequest): Promise<boolean> {
+  const sessionCookie = request.cookies.get(SESSION_COOKIE_NAME)?.value;
+  if (!sessionCookie) return false;
+
+  try {
+    const decoded = await getFirebaseAdminAuth().verifySessionCookie(sessionCookie, true);
+    return typeof decoded.tenantId === 'string' && typeof decoded.rol === 'string';
+  } catch {
+    return false;
+  }
+}
+
+function unauthorizedApi() {
+  return NextResponse.json({ error: 'No autorizado.' }, { status: 401 });
+}
+
+export async function proxy(request: NextRequest) {
   const { pathname } = request.nextUrl;
-  const hasInternalSession = request.cookies.get(INTERNAL_AUTH_COOKIE)?.value === '1';
+  const isLogin = pathname === '/interno/login';
+  const isInternalApi = pathname.startsWith('/api/interno/');
+  const validSession = await hasValidInternalSession(request);
 
-  if (pathname === '/interno/login') {
-    if (hasInternalSession) {
-      return NextResponse.redirect(new URL('/interno/dashboard', request.url));
-    }
-
-    return NextResponse.next();
+  if (isInternalApi) {
+    return validSession ? NextResponse.next() : unauthorizedApi();
   }
 
-  if (!hasInternalSession) {
+  if (isLogin) {
+    return validSession
+      ? NextResponse.redirect(new URL('/interno/dashboard', request.url))
+      : NextResponse.next();
+  }
+
+  if (!validSession) {
     const loginUrl = new URL('/interno/login', request.url);
     loginUrl.searchParams.set('next', pathname);
     return NextResponse.redirect(loginUrl);
@@ -23,5 +44,5 @@ export function proxy(request: NextRequest) {
 }
 
 export const config = {
-  matcher: ['/interno/:path*'],
+  matcher: ['/interno/:path*', '/api/interno/:path*'],
 };

@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import { CLASSIFIER_PROMPT, CLASSIFIER_SCHEMA } from '@/lib/ai/prompts/classifier';
 import { registrarLogIA } from '@/lib/ai/telemetry';
 import { ejecutarConResiliencia } from '@/lib/ai/resilience';
+import { checkRateLimit, getClientIp, rateLimitHeaders } from '@/lib/ai/rate-limit';
 
 function ejecutarClasificacionLocal(asunto: string, descripcion: string, isFallbackError = false) {
   const text = `${asunto || ''} ${descripcion}`.toLowerCase();
@@ -53,6 +54,24 @@ export async function POST(request: Request) {
   const apiKey = process.env.GEMINI_API_KEY;
   let asunto = '';
   let descripcion = '';
+  const limite = { maxRequests: 15, windowMs: 60_000 };
+  const ip = getClientIp(request);
+  const bloqueado = checkRateLimit(`ai:classify:${ip}`, limite);
+
+  if (bloqueado) {
+    return NextResponse.json(
+      {
+        ...ejecutarClasificacionLocal('', '', true),
+        resumenEjecutivo:
+          'SIMI recibió muchas solicitudes de clasificación seguidas. ' +
+          'Espere un momento e intente nuevamente.',
+      },
+      {
+        status: 429,
+        headers: rateLimitHeaders(limite.maxRequests, bloqueado.retryAfterSeconds),
+      },
+    );
+  }
 
   try {
     const body = await request.json();

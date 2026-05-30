@@ -1,6 +1,5 @@
 import { NextResponse } from 'next/server';
-import { doc, setDoc } from 'firebase/firestore';
-import { getDb } from '@/lib/firebase';
+import { getFirebaseAdminDb } from '@/lib/firebase-admin';
 
 export async function POST(request: Request) {
   try {
@@ -21,7 +20,7 @@ export async function POST(request: Request) {
       );
     }
 
-    const db = getDb();
+    const db = getFirebaseAdminDb();
     const ahora = new Date().toISOString();
     const logId = `log_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`;
 
@@ -36,7 +35,7 @@ export async function POST(request: Request) {
       timestamp: ahora,
     };
 
-    await setDoc(doc(db, 'ai_logs', logId), logDoc);
+    await db.doc(`ai_logs/${logId}`).set(logDoc);
 
     return NextResponse.json({ exito: true, logId });
   } catch (error: unknown) {

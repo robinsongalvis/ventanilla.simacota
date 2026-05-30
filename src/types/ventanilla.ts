@@ -53,7 +53,7 @@ export interface TerminoLegal {
 
 export interface ArchivoRadicado {
   nombre: string;
-  url: string;
+  url?: string | null;
   path: string;
   tipo: string;
   tamanioKB: number;
@@ -61,6 +61,7 @@ export interface ArchivoRadicado {
 }
 
 export interface TrazabilidadRadicado {
+  eventoId?: string;
   fecha: string;
   accion: AccionAuditoria | 'TRASLADO' | 'PRORROGA';
   actorUid: string;
@@ -89,9 +90,20 @@ export interface FeedbackIA {
   fecha:            string;
 }
 
+export interface RespuestaOficial {
+  /** Ruta en Storage: respuestas/{radicadoId}/{timestamp_filename} */
+  archivoPath:   string;
+  archivoNombre: string;
+  nota:          string;
+  fecha:         string;        // ISO
+  actorUid:      string;
+  actorNombre:   string;
+}
+
 export interface VentanillaRadicado {
   radicadoId: string;
   estadoActual: EstadoRadicado | 'ASIGNADO' | 'POR_VENCER' | 'VENCIDO' | 'PRORROGA';
+  ultimaActualizacion: string;
   prioridad: Prioridad;
   solicitante: SolicitanteRadicado;
   control: ControlRadicacion;
@@ -109,9 +121,9 @@ export interface VentanillaRadicado {
     anexosDescripcion?: string | null;
   };
   archivos: ArchivoRadicado[];
-  trazabilidad: TrazabilidadRadicado[];
-  analisisIa?: AnalisisIA;
-  feedbackIa?: FeedbackIA;
+  analisisIa?:       AnalisisIA;
+  feedbackIa?:       FeedbackIA;
+  respuestaOficial?: RespuestaOficial | null;
 }
 
 
@@ -139,4 +151,3 @@ export interface AuditoriaOverride {
   accionFuncionario: 'MODIFICADO' | 'ACEPTADO';
   motivoCorreccion: string;
 }
-

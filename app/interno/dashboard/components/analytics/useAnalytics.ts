@@ -119,14 +119,14 @@ function estaResuelto(r: VentanillaRadicado): boolean {
 function diasHabilesTranscurridos(r: VentanillaRadicado): number {
   const inicio = r.control.fechaRadicado;
   const fin    = estaResuelto(r)
-    ? (r.trazabilidad.at(-1)?.fecha ?? new Date().toISOString())
+    ? (r.ultimaActualizacion ?? new Date().toISOString())
     : new Date().toISOString();
   return Math.abs(diasRestantesHabiles(fin, inicio));
 }
 
 /** Días desde la última entrada en trazabilidad */
 function diasSinMovimiento(r: VentanillaRadicado): number {
-  const ultimaFecha = r.trazabilidad.at(-1)?.fecha ?? r.control.fechaRadicado;
+  const ultimaFecha = r.ultimaActualizacion ?? r.control.fechaRadicado;
   return Math.abs(diasRestantesHabiles(new Date().toISOString(), ultimaFecha));
 }
 

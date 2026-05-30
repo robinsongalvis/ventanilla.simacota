@@ -1,4 +1,4 @@
-import { ref, uploadBytesResumable, getDownloadURL } from 'firebase/storage';
+import { ref, uploadBytesResumable } from 'firebase/storage';
 import { getStorage } from './firebase';
 
 /* ══════════════════════════════════════════════════════════════
@@ -48,15 +48,18 @@ export interface UploadProgress {
  *   }
  * }
  */
+export type StoragePrefijo = 'radicados' | 'respuestas';
+
 export function subirArchivo(
   archivo:     File,
   radicadoId:  string,
   onProgress?: (progreso: UploadProgress) => void,
+  prefijo:     StoragePrefijo = 'radicados',
 ): Promise<UploadResult> {
   return new Promise((resolve, reject) => {
     const storage  = getStorage();
     const filename = `${Date.now()}_${archivo.name}`;
-    const path     = `radicados/${radicadoId}/${filename}`;
+    const path     = `${prefijo}/${radicadoId}/${filename}`;
     const storageRef = ref(storage, path);
 
     const task = uploadBytesResumable(storageRef, archivo, {
@@ -81,11 +84,10 @@ export function subirArchivo(
         reject(error);
       },
       async () => {
-        const url = await getDownloadURL(task.snapshot.ref);
         onProgress?.({ archivo: archivo.name, porcentaje: 100, estado: 'completado' });
         resolve({
           nombre:    archivo.name,
-          url,
+          url:       '',
           tipo:      archivo.type,
           tamanioKB: Math.round(archivo.size / 1024),
           path,
@@ -107,6 +109,7 @@ export async function subirArchivos(
   archivos:    File[],
   radicadoId:  string,
   onProgress?: (progresos: UploadProgress[]) => void,
+  prefijo:     StoragePrefijo = 'radicados',
 ): Promise<{
   exitosos:  UploadResult[];
   fallidos:  { nombre: string; error: string }[];
@@ -125,7 +128,7 @@ export async function subirArchivos(
 
   const resultados = await Promise.allSettled(
     archivos.map((archivo, idx) =>
-      subirArchivo(archivo, radicadoId, (p) => notificar(idx, p)),
+      subirArchivo(archivo, radicadoId, (p) => notificar(idx, p), prefijo),
     ),
   );
 
