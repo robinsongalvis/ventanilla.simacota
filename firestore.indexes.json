@@ -1,0 +1,13 @@
+{
+  "indexes": [
+    {
+      "collectionGroup": "ventanilla_radicados",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "clasificacion.oficinaDestino", "order": "ASCENDING"  },
+        { "fieldPath": "control.fechaRadicado",        "order": "DESCENDING" }
+      ]
+    }
+  ],
+  "fieldOverrides": []
+}

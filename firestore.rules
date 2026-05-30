@@ -127,6 +127,35 @@ service cloud.firestore {
         || (isRecepcionista() && assignedTenant(data));
     }
 
+    // Estados válidos que el cliente puede escribir en ventanilla_radicados.
+    // POR_VENCER y VENCIDO solo los escribe Admin SDK (Cloud Functions / backend);
+    // quedan fuera de esta lista deliberadamente.
+    function validVentanillaEstado(estado) {
+      return estado in [
+        'PENDIENTE',
+        'EN_REVISION',
+        'EN_PROCESO',
+        'ASIGNADO',
+        'RESUELTO',
+        'DEVUELTO',
+        'RECHAZADO',
+        'PRORROGA'
+      ];
+    }
+
+    function validVentanillaUpdate() {
+      return request.resource.data.diff(resource.data).affectedKeys().hasOnly([
+        'estadoActual',
+        'clasificacion',
+        'feedbackIa',
+        'termino',
+        'ultimaActualizacion',
+        'respuestaOficial'
+      ])
+      && request.resource.data.ultimaActualizacion is string
+      && validVentanillaEstado(request.resource.data.estadoActual);
+    }
+
     match /users/{uid} {
       allow get: if signedIn() && (request.auth.uid == uid || isAdmin());
       allow list: if isAdmin();
@@ -178,11 +207,42 @@ service cloud.firestore {
       allow create: if (isAdmin() || isRecepcionista())
         && request.resource.data.radicadoId == radicadoId;
 
-      // Traslados, trazabilidad, prórroga y respuesta desde el panel interno.
-      allow update: if isAdmin() || isRecepcionista()
-        || (isFuncionario() && resource.data.clasificacion.oficinaDestino == userTenant());
+      allow update: if (
+          isAdmin()
+          || isRecepcionista()
+          || (
+          isFuncionario()
+          && resource.data.clasificacion.oficinaDestino == userTenant()
+          && request.resource.data.clasificacion.oficinaDestino == userTenant()
+        )
+        )
+        && validVentanillaUpdate();
 
       allow delete: if false;
+    }
+
+    match /ai_logs/{logId} {
+      allow read: if isAdmin();
+      allow write: if false;
+    }
+
+    match /ai_feedback/{feedbackId} {
+      allow read: if isInternalUser();
+      allow write: if false;
+    }
+
+    match /ai_auditoria/{auditoriaId} {
+      allow read: if isInternalUser();
+      allow write: if false;
+    }
+
+    match /ventanilla_radicados/{radicadoId}/trazabilidad/{eventoId} {
+      allow read: if isAdmin() || isRecepcionista()
+        || (isFuncionario()
+            && get(/databases/$(database)/documents/ventanilla_radicados/$(radicadoId))
+                  .data.clasificacion.oficinaDestino == userTenant());
+      allow create: if isInternalUser();
+      allow update, delete: if false;
     }
 
     // ── Contadores de consecutivo anual ────────────────────────────────────

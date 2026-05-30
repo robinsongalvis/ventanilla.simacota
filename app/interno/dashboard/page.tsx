@@ -3,7 +3,7 @@
 export const dynamic = 'force-dynamic';
 
 import { useEffect, useMemo, useState } from 'react';
-import { doc, updateDoc, arrayUnion }    from 'firebase/firestore';
+import { addDoc, collection, doc, getDocs, updateDoc } from 'firebase/firestore';
 import { signInWithEmailAndPassword }     from 'firebase/auth';
 import { getFirebaseAuth, getDb }         from '@/lib/firebase';
 import { useAuth }                        from '@/lib/hooks/useAuth';
@@ -25,7 +25,11 @@ import type {
   VistaActual,
 }                                         from '@/lib/store/ventanillaStore';
 import type { TenantId }                  from '@/src/types/radicado';
-import type { VentanillaRadicado }        from '@/src/types/ventanilla';
+import {
+  ejecutarResolucion,
+  despacharNotificaciones,
+} from '@/lib/acciones/resolver-radicado';
+import type { TrazabilidadRadicado, VentanillaRadicado } from '@/src/types/ventanilla';
 import type { UsuarioAutenticado }        from '@/lib/hooks/useAuth';
 
 /* ══════════════════════════════════════════════════════════════
@@ -978,24 +982,51 @@ function PanelDerecho({
   const [guardando,        setGuardando]        = useState(false);
   const [mensajeOk,        setMensajeOk]        = useState<string | null>(null);
   const [errorLocal,       setErrorLocal]       = useState<string | null>(null);
+  const [trazabilidad,         setTrazabilidad]         = useState<TrazabilidadRadicado[]>([]);
+  const [cargandoTrazabilidad, setCargandoTrazabilidad] = useState(false);
+  const [archivoPdf,           setArchivoPdf]           = useState<File | null>(null);
 
   const dias = calcDiasRestantes(radicado);
 
-  async function ejecutarAccion(accionFn: () => Promise<void>) {
+  useEffect(() => {
+    if (tab !== 'trazabilidad') return;
+
+    setCargandoTrazabilidad(true);
+    setTrazabilidad([]);
+    getDocs(collection(getDb(), 'ventanilla_radicados', radicado.radicadoId, 'trazabilidad'))
+      .then((snap) => {
+        const eventos = snap.docs
+          .map((d) => d.data() as TrazabilidadRadicado)
+          .sort((a, b) => a.fecha.localeCompare(b.fecha));
+        setTrazabilidad(eventos);
+      })
+      .catch((err) => {
+        setErrorLocal(`Error al cargar trazabilidad: ${err instanceof Error ? err.message : String(err)}`);
+      })
+      .finally(() => setCargandoTrazabilidad(false));
+  }, [tab, radicado.radicadoId]);
+
+  async function ejecutarAccion(accionFn: () => Promise<void>): Promise<boolean> {
     setGuardando(true);
     setErrorLocal(null);
     setMensajeOk(null);
     try {
       await accionFn();
       setMensajeOk('Operación guardada correctamente.');
+      return true;
     } catch (err) {
       setErrorLocal(`Error: ${err instanceof Error ? err.message : String(err)}`);
+      return false;
     } finally {
       setGuardando(false);
     }
   }
 
-  function trazabilidadEntry(accion: string, nota: string, extra?: Record<string, unknown>) {
+  function trazabilidadEntry(
+    accion: TrazabilidadRadicado['accion'],
+    nota: string,
+    extra?: Record<string, unknown>,
+  ): Omit<TrazabilidadRadicado, 'eventoId'> {
     return {
       fecha:       new Date().toISOString(),
       accion,
@@ -1004,6 +1035,16 @@ function PanelDerecho({
       nota,
       ...(extra ?? {}),
     };
+  }
+
+  async function appendTrazabilidad(
+    radicadoId: string,
+    entrada: Omit<TrazabilidadRadicado, 'eventoId'>,
+  ): Promise<void> {
+    await addDoc(
+      collection(getDb(), 'ventanilla_radicados', radicadoId, 'trazabilidad'),
+      { ...entrada, eventoId: `ev_${radicadoId}_${Date.now()}` },
+    );
   }
 
   async function asignar() {
@@ -1030,15 +1071,16 @@ function PanelDerecho({
       }).catch(err => console.error('Error logging override telemetry:', err));
     }
 
-    await ejecutarAccion(() =>
-      updateDoc(doc(getDb(), 'ventanilla_radicados', radicado.radicadoId), {
+    await ejecutarAccion(async () => {
+      const entrada = trazabilidadEntry('ASIGNACION',
+        `Trasladado a ${NOMBRES_TENANT[tenantDestino]}`,
+        { oficinaOrigen: radicado.clasificacion.oficinaDestino, oficinaDestino: tenantDestino },
+      );
+      await updateDoc(doc(getDb(), 'ventanilla_radicados', radicado.radicadoId), {
         'clasificacion.oficinaDestino':         tenantDestino,
         'clasificacion.funcionarioResponsableUid': funcionarioUid || null,
         estadoActual: 'ASIGNADO',
-        trazabilidad: arrayUnion(trazabilidadEntry('ASIGNACION',
-          `Trasladado a ${NOMBRES_TENANT[tenantDestino]}`,
-          { oficinaOrigen: radicado.clasificacion.oficinaDestino, oficinaDestino: tenantDestino },
-        )),
+        ultimaActualizacion: entrada.fecha,
         ...(radicado.analisisIa && radicado.analisisIa.dependenciaSugerida !== tenantDestino ? {
           'feedbackIa': {
             usuarioId: usuario.uid,
@@ -1048,8 +1090,9 @@ function PanelDerecho({
             fecha: new Date().toISOString()
           }
         } : {})
-      }),
-    );
+      });
+      await appendTrazabilidad(radicado.radicadoId, entrada);
+    });
   }
 
   async function enviarFeedbackIA(puntuacion: 'POSITIVO' | 'NEGATIVO' | 'CORREGIDO', motivoCorreccion?: string) {
@@ -1084,12 +1127,14 @@ function PanelDerecho({
 
   async function devolver() {
     if (motivo.trim().length < 10) { setErrorLocal('El motivo debe tener al menos 10 caracteres.'); return; }
-    await ejecutarAccion(() =>
-      updateDoc(doc(getDb(), 'ventanilla_radicados', radicado.radicadoId), {
+    await ejecutarAccion(async () => {
+      const entrada = trazabilidadEntry('DEVOLUCION', motivo.trim());
+      await updateDoc(doc(getDb(), 'ventanilla_radicados', radicado.radicadoId), {
         estadoActual: 'DEVUELTO',
-        trazabilidad: arrayUnion(trazabilidadEntry('DEVOLUCION', motivo.trim())),
-      }),
-    );
+        ultimaActualizacion: entrada.fecha,
+      });
+      await appendTrazabilidad(radicado.radicadoId, entrada);
+    });
     setMotivo('');
   }
 
@@ -1099,29 +1144,73 @@ function PanelDerecho({
     const nuevaFecha   = new Date(fechaActual);
     nuevaFecha.setDate(nuevaFecha.getDate() + diasProrroga);
 
-    await ejecutarAccion(() =>
-      updateDoc(doc(getDb(), 'ventanilla_radicados', radicado.radicadoId), {
+    await ejecutarAccion(async () => {
+      const entrada = trazabilidadEntry('PRORROGA', motivo.trim(), {
+        diasProrroga,
+        fechaVencimientoAnterior: radicado.termino.fechaVencimiento,
+      });
+      await updateDoc(doc(getDb(), 'ventanilla_radicados', radicado.radicadoId), {
         'termino.fechaVencimiento':    nuevaFecha.toISOString(),
         'termino.prorrogasAplicadas':  (radicado.termino.prorrogasAplicadas ?? 0) + 1,
         estadoActual: 'PRORROGA',
-        trazabilidad: arrayUnion(trazabilidadEntry('PRORROGA', motivo.trim(), {
-          diasProrroga,
-          fechaVencimientoAnterior: radicado.termino.fechaVencimiento,
-        })),
-      }),
-    );
+        ultimaActualizacion: entrada.fecha,
+      });
+      await appendTrazabilidad(radicado.radicadoId, entrada);
+    });
     setMotivo('');
   }
 
   async function responderCaso() {
-    if (respuesta.trim().length < 10) { setErrorLocal('La respuesta debe tener al menos 10 caracteres.'); return; }
-    await ejecutarAccion(() =>
-      updateDoc(doc(getDb(), 'ventanilla_radicados', radicado.radicadoId), {
-        estadoActual: 'RESUELTO',
-        trazabilidad: arrayUnion(trazabilidadEntry('RESPUESTA_FUNCIONARIO', respuesta.trim())),
-      }),
-    );
+    if (respuesta.trim().length < 10) {
+      setErrorLocal('La respuesta debe tener al menos 10 caracteres.');
+      return;
+    }
+
+    // Capturamos ANTES del ciclo async — el estado se limpia en éxito.
+    const nota          = respuesta.trim();
+    const tieneArchivo  = !!archivoPdf;
+
+    // ── OPERACIONES CRÍTICAS ───────────────────────────────────
+    // Storage (si hay PDF) + updateDoc en Firestore.
+    // Si cualquiera falla → ok:false → NO limpiamos formulario,
+    // NO enviamos email, mostramos error al funcionario.
+    setGuardando(true);
+    setErrorLocal(null);
+    setMensajeOk(null);
+
+    const resultado = await ejecutarResolucion({
+      radicado, usuario, nota, archivoPdf,
+    });
+
+    setGuardando(false);
+
+    if (!resultado.ok) {
+      // logError ya fue llamado dentro de ejecutarResolucion
+      setErrorLocal(`Error al guardar: ${resultado.mensaje}`);
+      return;
+    }
+
+    // ── ÉXITO CRÍTICO ──────────────────────────────────────────
+    setMensajeOk('Operación guardada correctamente.');
     setRespuesta('');
+    setArchivoPdf(null);
+
+    // ── OPERACIONES SECUNDARIAS (fire-and-forget) ──────────────
+    // Trazabilidad + email. Su fallo se loguea pero nunca
+    // revierte ni bloquea la resolución ya confirmada.
+    despacharNotificaciones({
+      radicadoId:      radicado.radicadoId,
+      actorUid:        usuario.uid,
+      actorNombre:     usuario.nombre,
+      nota,
+      archivoNombre:   resultado.archivoNombre,
+      ahora:           resultado.ahora,
+      emailCiudadano:  radicado.solicitante.email,
+      nombreCiudadano: radicado.solicitante.nombreCompleto,
+      asunto:          radicado.detalle.asunto,
+      tenantId:        radicado.clasificacion.oficinaDestino,
+      tieneArchivo,
+    });
   }
 
   const esRojo = radicado.prioridad === 'ROJO';
@@ -1244,8 +1333,8 @@ function PanelDerecho({
                   {radicado.archivos.map((arch, i) => (
                     <li key={i} className="flex items-center justify-between gap-3 py-2 border-b border-white/[0.05] last:border-0">
                       <span className="text-xs text-slate-300 truncate min-w-0">{arch.nombre}</span>
-                      {arch.url && (
-                        <a href={arch.url} target="_blank" rel="noopener noreferrer"
+                      {arch.path && (
+                        <a href={`/api/interno/archivo?path=${encodeURIComponent(arch.path)}`} target="_blank" rel="noopener noreferrer"
                           className="shrink-0 text-xs text-indigo-400 hover:text-indigo-300 underline underline-offset-2">
                           Ver
                         </a>
@@ -1375,11 +1464,18 @@ function PanelDerecho({
         {/* ── TAB 3: Trazabilidad MIPG ── */}
         {tab === 'trazabilidad' && (
           <div>
-            {radicado.trazabilidad.length === 0
+            {cargandoTrazabilidad
+              ? (
+                <div className="flex items-center gap-2 text-sm text-slate-500">
+                  <span className="w-4 h-4 border-2 border-indigo-500/30 border-t-indigo-500 rounded-full animate-spin" />
+                  Cargando trazabilidad...
+                </div>
+              )
+              : trazabilidad.length === 0
               ? <p className="text-sm text-slate-600 italic">Sin eventos de trazabilidad.</p>
               : (
                 <ol className="relative flex flex-col gap-0">
-                  {[...radicado.trazabilidad]
+                  {[...trazabilidad]
                     .sort((a, b) => new Date(b.fecha).getTime() - new Date(a.fecha).getTime())
                     .map((evento, idx, arr) => (
                       <li key={`${evento.fecha}-${idx}`} className="relative flex gap-3 pb-5 last:pb-0">
@@ -1477,16 +1573,81 @@ function PanelDerecho({
             {/* Respuesta final */}
             <div className="bg-emerald-500/5 border border-emerald-500/20 rounded-xl p-4 space-y-3">
               <p className="text-xs font-bold uppercase tracking-widest text-emerald-400">Cargar respuesta / resolver</p>
+
+              {/* Oficio archivado — visible si el radicado ya fue resuelto con PDF */}
+              {radicado.respuestaOficial && (
+                <div className="rounded-lg bg-slate-800/60 border border-white/[0.07] p-3 space-y-1">
+                  <p className="text-[10px] font-bold uppercase tracking-widest text-slate-500">Oficio de respuesta archivado</p>
+                  <p className="text-xs text-slate-300 leading-relaxed">{radicado.respuestaOficial.nota}</p>
+                  <div className="flex items-center justify-between pt-1">
+                    <span className="text-[10px] text-slate-600 font-mono truncate">{radicado.respuestaOficial.archivoNombre}</span>
+                    <a
+                      href={`/api/interno/archivo?path=${encodeURIComponent(radicado.respuestaOficial.archivoPath)}`}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="shrink-0 text-xs text-indigo-400 hover:text-indigo-300 underline underline-offset-2 ml-3"
+                    >
+                      Descargar oficio
+                    </a>
+                  </div>
+                </div>
+              )}
+
               <div>
                 <p className="text-[10px] font-bold uppercase tracking-widest text-slate-600 mb-1.5">Nota de resolución</p>
                 <textarea
                   value={respuesta}
                   onChange={(e) => setRespuesta(e.target.value)}
                   rows={4}
-                  placeholder="Describe la respuesta dada al ciudadano y adjunta el oficio firmado si aplica…"
+                  placeholder="Describe la respuesta dada al ciudadano…"
                   className="input-internal resize-none"
+                  disabled={radicado.estadoActual === 'RESUELTO'}
                 />
               </div>
+
+              {/* Upload PDF firmado */}
+              {radicado.estadoActual !== 'RESUELTO' && (
+                <div>
+                  <p className="text-[10px] font-bold uppercase tracking-widest text-slate-600 mb-1.5">
+                    PDF firmado <span className="text-slate-700 normal-case font-normal">(opcional)</span>
+                  </p>
+                  {archivoPdf ? (
+                    <div className="flex items-center justify-between gap-2 px-3 py-2 rounded-lg bg-emerald-500/10 border border-emerald-500/30">
+                      <span className="text-xs text-emerald-300 truncate min-w-0">{archivoPdf.name}</span>
+                      <button
+                        type="button"
+                        onClick={() => setArchivoPdf(null)}
+                        className="shrink-0 text-[10px] text-slate-500 hover:text-rose-400 transition-colors"
+                      >
+                        Quitar
+                      </button>
+                    </div>
+                  ) : (
+                    <label className="flex items-center gap-2 px-3 py-2.5 rounded-lg border border-dashed border-white/[0.12] hover:border-indigo-500/40 cursor-pointer transition-colors group">
+                      <svg className="w-4 h-4 text-slate-600 group-hover:text-indigo-400 transition-colors shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
+                        <path strokeLinecap="round" strokeLinejoin="round" d="M18.375 12.739l-7.693 7.693a4.5 4.5 0 01-6.364-6.364l10.94-10.94A3 3 0 1119.5 7.372L8.552 18.32m.009-.01l-.01.01m5.699-9.941l-7.81 7.81a1.5 1.5 0 002.112 2.13" />
+                      </svg>
+                      <span className="text-xs text-slate-600 group-hover:text-slate-400 transition-colors">Adjuntar oficio firmado (PDF, máx. 10 MB)</span>
+                      <input
+                        type="file"
+                        accept="application/pdf"
+                        className="sr-only"
+                        onChange={(e) => {
+                          const f = e.target.files?.[0];
+                          if (!f) return;
+                          if (f.size > 10 * 1024 * 1024) {
+                            setErrorLocal('El archivo supera los 10 MB.');
+                          } else {
+                            setArchivoPdf(f);
+                          }
+                          e.target.value = '';
+                        }}
+                      />
+                    </label>
+                  )}
+                </div>
+              )}
+
               <button
                 type="button"
                 onClick={responderCaso}
