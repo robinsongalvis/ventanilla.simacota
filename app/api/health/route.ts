@@ -1,8 +1,8 @@
 import { NextResponse } from 'next/server';
-import { doc, getDoc } from 'firebase/firestore';
-import { getDb } from '@/lib/firebase';
+import { getFirebaseAdminDb } from '@/lib/firebase-admin';
 
 export const dynamic = 'force-dynamic';
+export const runtime  = 'nodejs';
 
 export async function GET() {
   const start = Date.now();
@@ -15,15 +15,14 @@ export async function GET() {
   let firestoreLatenciaMs = 0;
   let firestoreDetalles = '';
 
-  // 1. Validar Conectividad con Firestore (Lectura rápida no destructiva)
+  // 1. Validar Conectividad con Firestore via Admin SDK (bypasea security rules)
   try {
-    const db = getDb();
+    const adminDb = getFirebaseAdminDb();
     const currentYear = new Date().getFullYear();
-    const counterRef = doc(db, 'counters', `radicados-${currentYear}`);
-    
+
     const dbStart = Date.now();
-    await getDoc(counterRef);
-    
+    await adminDb.collection('counters').doc(`radicados-${currentYear}`).get();
+
     firestoreLatenciaMs = Date.now() - dbStart;
     firestoreStatus = 'connected';
   } catch (error: unknown) {
