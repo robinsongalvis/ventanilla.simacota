@@ -182,7 +182,7 @@ describe('asignarRadicado — snapshot MIPG-2', () => {
 
     await asignarRadicado('SIM-2026-001', 'SEC_GOBIERNO', actor, nuevoResponsable);
 
-    const [, payload] = vi.mocked(updateDoc).mock.calls[0];
+    const payload = vi.mocked(updateDoc).mock.calls[0][1] as unknown as Record<string, unknown>;
     expect(payload['clasificacion.funcionarioResponsableNombre']).toBe('Ana Martínez');
     expect(payload['clasificacion.funcionarioResponsableEmail']).toBe('amartinez@simacota-santander.gov.co');
   });

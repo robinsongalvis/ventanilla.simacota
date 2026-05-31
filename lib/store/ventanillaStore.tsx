@@ -20,9 +20,11 @@ export type FiltroMIPG =
   | 'RADICADAS'
   | 'PRIORIDAD_MIPG'
   | 'ASIGNADAS'
+  | 'EN_TERMINO'
   | 'POR_VENCER'
   | 'VENCIDAS'
-  | 'DEVUELTAS_PRORROGA';
+  | 'DEVUELTAS_PRORROGA'
+  | 'RESUELTOS_FUERA_TERMINO';
 
 export type VistaActual =
   | 'TABLERO'

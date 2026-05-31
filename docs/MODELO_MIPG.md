@@ -1,7 +1,7 @@
 # Modelo MIPG — Ventanilla Única Digital
 ## Alcaldía Municipal de Simacota, Santander
 
-**Versión:** 1.2 (MIPG-2)  
+**Versión:** 1.3 (MIPG-3)  
 **Fecha:** 2026-05-31  
 **Sistema:** `ventanilla_radicados` — Firebase Firestore
 
@@ -233,12 +233,56 @@ El botón **"Exportar CSV MIPG"** (Vista Reportes en el dashboard) genera un arc
 | 17 | Fecha Respuesta | Req 5 |
 | 18 | Oficio Adjunto | Req 6 |
 | 19 | Fecha Vencimiento | Req 8 |
-| 20 | Prórrogas Aplicadas | Req 8 |
-| 21 | **Cumplió Término MIPG** | **Req 8 — MIPG-1** |
-| 22 | Trazabilidad | Req 7 |
+| 20 | **Días Restantes** | **MIPG-3 — calculado al exportar** |
+| 21 | **Estado Término** | **MIPG-3 — EN_TERMINO / POR_VENCER / VENCIDO / RESUELTO** |
+| 22 | **Días Vencido** | **MIPG-3 — 0 si en término** |
+| 23 | Prórrogas Aplicadas | Req 8 |
+| 24 | **Cumplió Término MIPG** | **Req 8 — MIPG-1** |
+| 25 | Trazabilidad | Req 7 |
 
 **Formato:** CSV UTF-8 con BOM (compatible con Excel colombiano — acentos y ñ correctos).  
 **Nombre:** `MIPG_Radicados_YYYY-MM-DD.csv`
+
+---
+
+## Semáforo de cumplimiento MIPG-3
+
+### Componente `SemaforoTermino`
+
+Componente reutilizable (`app/interno/dashboard/components/mipg/SemaforoTermino.tsx`) que calcula y muestra:
+
+| Color | Estado | Condición |
+|---|---|---|
+| 🟢 Verde | `EN_TERMINO` | > 2 días hábiles restantes |
+| 🟡 Amarillo | `POR_VENCER` | 0-2 días hábiles restantes |
+| 🔴 Rojo | `VENCIDO` | Días negativos (ya venció) |
+| ⚪ Gris | `RESUELTO` | Cerrado — muestra si cumplió o no |
+| 🩷 Rosa | `RESUELTO` (fuera de término) | `cumplioTermino === false` |
+
+### Variantes de presentación
+
+- `badge` — pill con dot e indicador de días (default)
+- `compact` — dot + texto (para espacios reducidos como el panel derecho)
+- `inline` — solo texto con color (para tablas)
+
+### Filtros de dashboard
+
+| Filtro | Descripción |
+|---|---|
+| `EN_TERMINO` | Activos con > 2 días hábiles (semáforo verde) |
+| `POR_VENCER` | Activos con 0-2 días hábiles (semáforo amarillo) |
+| `VENCIDAS` | Activos con días negativos (semáforo rojo) |
+| `RESUELTOS_FUERA_TERMINO` | Cerrados que no cumplieron el plazo legal |
+
+### Visibilidad por rol
+
+| Rol | Semáforos visibles |
+|---|---|
+| `ADMIN` | Todos los tenants — todos los filtros |
+| `CONTROL_INTERNO` | Todos los tenants — todos los filtros (solo lectura) |
+| `JEFE_DEPENDENCIA` | Solo su tenant — todos los filtros (solo lectura) |
+| `FUNCIONARIO` | Solo su tenant — todos los filtros |
+| `RECEPCIONISTA` | Su tenant — todos los filtros |
 
 ---
 
@@ -246,10 +290,9 @@ El botón **"Exportar CSV MIPG"** (Vista Reportes en el dashboard) genera un arc
 
 | Sprint | Descripción | Prioridad |
 |---|---|---|
-| MIPG-3 | Reportes en PDF institucionales con firma digital | MEDIA |
 | MIPG-4 | Notificaciones automáticas de vencimiento próximo (email/SMS) | ALTA |
 | MIPG-5 | Dashboard público de indicadores de gestión (transparencia ciudadana) | MEDIA |
-| ALTO-3 | Sentry DSN configurado — activar observabilidad en producción | ALTA |
+| MIPG-6 | Reportes en PDF institucionales con firma digital | MEDIA |
 
 ---
 

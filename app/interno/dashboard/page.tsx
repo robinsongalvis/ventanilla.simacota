@@ -29,6 +29,7 @@ import {
   ejecutarResolucion,
   despacharNotificaciones,
 } from '@/lib/acciones/resolver-radicado';
+import { SemaforoTermino, calcularSemaforo } from '@/app/interno/dashboard/components/mipg/SemaforoTermino';
 import { useFuncionariosTenant }              from '@/lib/hooks/useFuncionariosTenant';
 import type { FuncionarioTenant }             from '@/lib/hooks/useFuncionariosTenant';
 import type { ResponsableFuncionario }        from '@/lib/actions/asignarRadicado';
@@ -80,12 +81,14 @@ function estaActivo(r: VentanillaRadicado): boolean {
 }
 
 interface MetricasMIPGData {
-  radicadas:         number;
-  prioridadMIPG:     number;
-  asignadas:         number;
-  porVencer:         number;
-  vencidas:          number;
-  devueltasProrroga: number;
+  radicadas:              number;
+  prioridadMIPG:          number;
+  asignadas:              number;
+  enTermino:              number;   // MIPG-3: activos con días > 2
+  porVencer:              number;
+  vencidas:               number;
+  devueltasProrroga:      number;
+  resueltosFueraTermino:  number;   // MIPG-3: cumplioTermino === false
 }
 
 function calcularMetricas(radicados: VentanillaRadicado[]): MetricasMIPGData {
@@ -94,16 +97,18 @@ function calcularMetricas(radicados: VentanillaRadicado[]): MetricasMIPGData {
       const dias   = calcDiasRestantes(r);
       const activo = estaActivo(r);
 
-      if (r.estadoActual === 'PENDIENTE')                                         acc.radicadas         += 1;
-      if (r.prioridad === 'ROJO' && activo)                                       acc.prioridadMIPG     += 1;
-      if (['ASIGNADO', 'EN_REVISION', 'EN_PROCESO'].includes(r.estadoActual))     acc.asignadas         += 1;
-      if (activo && dias >= 0 && dias <= 2)                                       acc.porVencer         += 1;
-      if (activo && dias < 0)                                                     acc.vencidas          += 1;
-      if (['DEVUELTO', 'PRORROGA'].includes(r.estadoActual))                      acc.devueltasProrroga += 1;
+      if (r.estadoActual === 'PENDIENTE')                                         acc.radicadas              += 1;
+      if (r.prioridad === 'ROJO' && activo)                                       acc.prioridadMIPG          += 1;
+      if (['ASIGNADO', 'EN_REVISION', 'EN_PROCESO'].includes(r.estadoActual))     acc.asignadas              += 1;
+      if (activo && dias > 2)                                                     acc.enTermino              += 1;
+      if (activo && dias >= 0 && dias <= 2)                                       acc.porVencer              += 1;
+      if (activo && dias < 0)                                                     acc.vencidas               += 1;
+      if (['DEVUELTO', 'PRORROGA'].includes(r.estadoActual))                      acc.devueltasProrroga      += 1;
+      if (r.cumplioTermino === false)                                             acc.resueltosFueraTermino  += 1;
 
       return acc;
     },
-    { radicadas: 0, prioridadMIPG: 0, asignadas: 0, porVencer: 0, vencidas: 0, devueltasProrroga: 0 },
+    { radicadas: 0, prioridadMIPG: 0, asignadas: 0, enTermino: 0, porVencer: 0, vencidas: 0, devueltasProrroga: 0, resueltosFueraTermino: 0 },
   );
 }
 
@@ -114,12 +119,14 @@ function aplicarFiltroMIPG(
 ): VentanillaRadicado[] {
   let lista = radicados;
 
-  if (filtro === 'RADICADAS')           lista = lista.filter((r) => r.estadoActual === 'PENDIENTE');
-  else if (filtro === 'PRIORIDAD_MIPG') lista = lista.filter((r) => r.prioridad === 'ROJO' && estaActivo(r));
-  else if (filtro === 'ASIGNADAS')      lista = lista.filter((r) => ['ASIGNADO', 'EN_REVISION', 'EN_PROCESO'].includes(r.estadoActual));
-  else if (filtro === 'POR_VENCER')     lista = lista.filter((r) => { const d = calcDiasRestantes(r); return estaActivo(r) && d >= 0 && d <= 2; });
-  else if (filtro === 'VENCIDAS')       lista = lista.filter((r) => estaActivo(r) && calcDiasRestantes(r) < 0);
-  else if (filtro === 'DEVUELTAS_PRORROGA') lista = lista.filter((r) => ['DEVUELTO', 'PRORROGA'].includes(r.estadoActual));
+  if (filtro === 'RADICADAS')                    lista = lista.filter((r) => r.estadoActual === 'PENDIENTE');
+  else if (filtro === 'PRIORIDAD_MIPG')          lista = lista.filter((r) => r.prioridad === 'ROJO' && estaActivo(r));
+  else if (filtro === 'ASIGNADAS')               lista = lista.filter((r) => ['ASIGNADO', 'EN_REVISION', 'EN_PROCESO'].includes(r.estadoActual));
+  else if (filtro === 'EN_TERMINO')              lista = lista.filter((r) => estaActivo(r) && calcDiasRestantes(r) > 2);
+  else if (filtro === 'POR_VENCER')              lista = lista.filter((r) => { const d = calcDiasRestantes(r); return estaActivo(r) && d >= 0 && d <= 2; });
+  else if (filtro === 'VENCIDAS')                lista = lista.filter((r) => estaActivo(r) && calcDiasRestantes(r) < 0);
+  else if (filtro === 'DEVUELTAS_PRORROGA')      lista = lista.filter((r) => ['DEVUELTO', 'PRORROGA'].includes(r.estadoActual));
+  else if (filtro === 'RESUELTOS_FUERA_TERMINO') lista = lista.filter((r) => r.cumplioTermino === false);
 
   if (busqueda.trim()) {
     const q = busqueda.toLowerCase().trim();
@@ -511,6 +518,13 @@ function TarjetasMIPG({
       texto:  'text-sky-300',
     },
     {
+      filtro: 'EN_TERMINO',
+      label:  'En término',
+      valor:  metricas.enTermino,
+      borde:  'border-emerald-600',
+      texto:  'text-emerald-300',
+    },
+    {
       filtro: 'POR_VENCER',
       label:  'Por Vencer',
       valor:  metricas.porVencer,
@@ -530,6 +544,13 @@ function TarjetasMIPG({
       valor:  metricas.devueltasProrroga,
       borde:  'border-amber-600',
       texto:  'text-amber-300',
+    },
+    {
+      filtro: 'RESUELTOS_FUERA_TERMINO',
+      label:  'Resueltos fuera de término',
+      valor:  metricas.resueltosFueraTermino,
+      borde:  'border-pink-600',
+      texto:  'text-pink-300',
     },
   ];
 
@@ -697,13 +718,8 @@ function TablaRadicados({
               const esRojo   = r.prioridad === 'ROJO';
               const seleccionado = radicadoSeleccionadoId === r.radicadoId;
 
-              const diasColor = !activo
-                ? 'text-slate-600'
-                : dias < 0
-                  ? 'text-rose-400 font-bold'
-                  : dias <= 2
-                    ? 'text-orange-400 font-bold'
-                    : 'text-slate-400';
+              const semaforoData = calcularSemaforo(r);
+              const diasColor = semaforoData.textoClass;
 
               return (
                 <tr
@@ -759,14 +775,10 @@ function TablaRadicados({
                     <p className="text-xs text-slate-400">{fmtFecha(r.termino.fechaVencimiento)}</p>
                   </td>
 
-                  {/* Días restantes */}
+                  {/* Semáforo MIPG */}
                   <td className="px-4 py-3 whitespace-nowrap">
                     <span className={`text-sm tabular-nums ${diasColor}`}>
-                      {!activo
-                        ? '—'
-                        : dias < 0
-                          ? `${Math.abs(dias)}d venc.`
-                          : `${dias}d`}
+                      {semaforoData.label}
                     </span>
                   </td>
                 </tr>
@@ -1296,11 +1308,7 @@ function PanelDerecho({
               }`}>
                 {LABELS_ESTADO[radicado.estadoActual] ?? radicado.estadoActual}
               </span>
-              <span className={`text-[10px] font-bold tabular-nums ${
-                dias < 0 ? 'text-rose-400' : dias <= 2 ? 'text-orange-400' : 'text-slate-500'
-              }`}>
-                {estaActivo(radicado) ? (dias < 0 ? `${Math.abs(dias)}d VENCIDO` : `${dias}d restantes`) : 'Cerrado'}
-              </span>
+              <SemaforoTermino radicado={radicado} variante="compact" />
             </div>
           </div>
           <button
@@ -2076,6 +2084,9 @@ function exportarCSVMIPG(radicados: VentanillaRadicado[]): void {
     'Fecha Respuesta',                // Req 5
     'Oficio Adjunto',                 // Req 6
     'Fecha Vencimiento',              // Req 8 (término legal)
+    'Días Restantes',                 // MIPG-3: calculado en tiempo de exportación
+    'Estado Término',                 // MIPG-3: EN_TERMINO | POR_VENCER | VENCIDO | RESUELTO
+    'Días Vencido',                   // MIPG-3: solo cuando < 0
     'Prórrogas Aplicadas',            // Req 8
     'Cumplió Término MIPG',          // Req 8 — dato auditoriable
     'Trazabilidad',                   // Req 7 — confirmación de subcollección
@@ -2083,7 +2094,7 @@ function exportarCSVMIPG(radicados: VentanillaRadicado[]): void {
 
   const esc = (v: string) => `"${v.replace(/"/g, '""')}"`;
 
-  const rows = radicados.map((r) => [
+  const rows = radicados.map((r) => { const sem = calcularSemaforo(r); return [
     r.radicadoId,
     r.control.fechaRadicado,
     r.control.horaRadicado,
@@ -2104,11 +2115,14 @@ function exportarCSVMIPG(radicados: VentanillaRadicado[]): void {
     r.respuestaOficial?.fecha ?? '—',
     r.respuestaOficial?.archivoNombre ? `Sí — ${r.respuestaOficial.archivoNombre}` : 'No',
     r.termino.fechaVencimiento,
+    String(sem.diasRestantes),
+    sem.estado,
+    sem.diasRestantes < 0 ? String(Math.abs(sem.diasRestantes)) : '0',
     String(r.termino.prorrogasAplicadas ?? 0),
     r.cumplioTermino === true  ? 'Sí — dentro del término' :
     r.cumplioTermino === false ? 'No — fuera del término'  : 'Pendiente',
     'Ver subcollección trazabilidad en Firebase',
-  ].map(esc).join(','));
+  ].map(esc).join(','); });
 
   const csv = [headers.map(esc).join(','), ...rows].join('\r\n');
   const blob = new Blob(['﻿' + csv], { type: 'text/csv;charset=utf-8;' });
