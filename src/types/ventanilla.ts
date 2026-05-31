@@ -131,7 +131,7 @@ export interface UsuarioInterno {
   uid: string;
   email: string;
   nombre: string;
-  rol: 'ADMIN' | 'FUNCIONARIO' | 'RECEPCIONISTA';
+  rol: 'ADMIN' | 'FUNCIONARIO' | 'RECEPCIONISTA' | 'JEFE_DEPENDENCIA' | 'CONTROL_INTERNO';
   tenantId: TenantId;
   activo: boolean;
 }

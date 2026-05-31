@@ -326,14 +326,18 @@ function SidebarNav({
   pendientesBandeja: number;
   pendientesAlertas: number;
 }) {
-  const nombreRol = usuario.rol === 'ADMIN'
-    ? 'Admin'
-    : usuario.rol === 'RECEPCIONISTA'
-      ? 'Recepción'
-      : 'Funcionario';
+  const LABEL_ROL: Record<string, string> = {
+    ADMIN:             'Admin',
+    RECEPCIONISTA:     'Recepción',
+    FUNCIONARIO:       'Funcionario',
+    JEFE_DEPENDENCIA:  'Jefe de Dependencia',
+    CONTROL_INTERNO:   'Control Interno',
+  };
+  const nombreRol = LABEL_ROL[usuario.rol] ?? 'Funcionario';
 
   const items = [...NAV_ITEMS];
-  if (usuario.rol === 'ADMIN') {
+  // Control Interno tiene visibilidad total equivalente a Admin.
+  if (usuario.rol === 'ADMIN' || usuario.rol === 'CONTROL_INTERNO') {
     items.push({
       vista: 'ANTICIPACION_OPERATIVA' as const,
       label: 'Anticipación Operativa',
@@ -968,10 +972,13 @@ function PanelDerecho({
   radicado,
   usuario,
   onCerrar,
+  soloLectura = false,
 }: {
-  radicado: VentanillaRadicado;
-  usuario:  UsuarioAutenticado;
-  onCerrar: () => void;
+  radicado:    VentanillaRadicado;
+  usuario:     UsuarioAutenticado;
+  onCerrar:    () => void;
+  /** Roles JEFE_DEPENDENCIA y CONTROL_INTERNO: ven el panel pero no ejecutan acciones. */
+  soloLectura?: boolean;
 }) {
   const [tab,              setTab]              = useState<TabPanelId>('info');
   const [tenantDestino,    setTenantDestino]    = useState<TenantId>(radicado.clasificacion.oficinaDestino);
@@ -1447,7 +1454,8 @@ function PanelDerecho({
             <button
               type="button"
               onClick={asignar}
-              disabled={guardando}
+              disabled={guardando || soloLectura}
+              title={soloLectura ? 'Tu rol no permite realizar acciones sobre radicados.' : undefined}
               className="w-full py-2.5 rounded-lg bg-indigo-600 hover:bg-indigo-500 active:scale-[0.98] text-white text-sm font-bold transition-all duration-150 disabled:opacity-60 flex items-center justify-center gap-2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-400"
             >
               {guardando && <span className="w-3.5 h-3.5 border-2 border-white/30 border-t-white rounded-full animate-spin" />}
@@ -1528,7 +1536,8 @@ function PanelDerecho({
               <button
                 type="button"
                 onClick={devolver}
-                disabled={guardando}
+                disabled={guardando || soloLectura}
+                title={soloLectura ? 'Tu rol no permite realizar acciones sobre radicados.' : undefined}
                 className="w-full py-2 rounded-lg border border-rose-500/40 text-rose-300 text-sm font-bold hover:bg-rose-500/10 active:scale-[0.98] transition-all duration-150 disabled:opacity-60 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-rose-500/40"
               >
                 Devolver
@@ -1563,7 +1572,8 @@ function PanelDerecho({
               <button
                 type="button"
                 onClick={aplicarProrroga}
-                disabled={guardando}
+                disabled={guardando || soloLectura}
+                title={soloLectura ? 'Tu rol no permite realizar acciones sobre radicados.' : undefined}
                 className="w-full py-2 rounded-lg border border-amber-500/40 text-amber-300 text-sm font-bold hover:bg-amber-500/10 active:scale-[0.98] transition-all duration-150 disabled:opacity-60 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-500/40"
               >
                 Aplicar prórroga (+{diasProrroga} días)
@@ -1651,10 +1661,15 @@ function PanelDerecho({
               <button
                 type="button"
                 onClick={responderCaso}
-                disabled={guardando || radicado.estadoActual === 'RESUELTO'}
+                disabled={guardando || radicado.estadoActual === 'RESUELTO' || soloLectura}
+                title={soloLectura ? 'Tu rol no permite realizar acciones sobre radicados.' : undefined}
                 className="w-full py-2 rounded-lg bg-emerald-700 hover:bg-emerald-600 active:scale-[0.98] text-white text-sm font-bold transition-all duration-150 disabled:opacity-60 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500/50"
               >
-                {radicado.estadoActual === 'RESUELTO' ? 'Ya está resuelto' : 'Marcar como resuelto'}
+                {soloLectura
+                  ? 'Vista de solo lectura'
+                  : radicado.estadoActual === 'RESUELTO'
+                    ? 'Ya está resuelto'
+                    : 'Marcar como resuelto'}
               </button>
             </div>
 
@@ -2191,7 +2206,9 @@ function DashboardInterior({ usuario, cerrarSesion }: { usuario: UsuarioAutentic
     vistaActual,
   } = state;
 
-  const esAdmin = usuario.rol === 'ADMIN';
+  const esAdmin = usuario.rol === 'ADMIN' || usuario.rol === 'CONTROL_INTERNO';
+  /** Roles de solo lectura: pueden ver pero no ejecutar acciones sobre radicados. */
+  const esVistaReadOnly = usuario.rol === 'JEFE_DEPENDENCIA' || usuario.rol === 'CONTROL_INTERNO';
 
   const { radicados: todosLosRadicados, cargando, error } =
     useVentanillaRadicados(usuario, tenantFiltro);
@@ -2310,6 +2327,7 @@ function DashboardInterior({ usuario, cerrarSesion }: { usuario: UsuarioAutentic
               radicado={radicadoSeleccionado}
               usuario={usuario}
               onCerrar={() => dispatch({ type: 'CERRAR_PANEL_DERECHO' })}
+              soloLectura={esVistaReadOnly}
             />
           )}
         </div>

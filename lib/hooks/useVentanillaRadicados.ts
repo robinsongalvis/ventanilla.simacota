@@ -52,12 +52,12 @@ export function useVentanillaRadicados(
 
     const constraints: QueryConstraint[] = [];
 
-    const effectiveTenant: TenantId | null =
-      usuario.rol !== 'ADMIN'
-        ? usuario.tenantId
-        : tenantFiltro !== 'TODOS'
-          ? tenantFiltro
-          : null;
+    // ADMIN y CONTROL_INTERNO ven todos los tenants (o filtran por tenantFiltro).
+    // RECEPCIONISTA, FUNCIONARIO y JEFE_DEPENDENCIA ven solo su dependencia.
+    const puedeVerTodo = usuario.rol === 'ADMIN' || usuario.rol === 'CONTROL_INTERNO';
+    const effectiveTenant: TenantId | null = puedeVerTodo
+      ? tenantFiltro !== 'TODOS' ? tenantFiltro : null
+      : usuario.tenantId;
 
     if (effectiveTenant) {
       constraints.push(where('clasificacion.oficinaDestino', '==', effectiveTenant));

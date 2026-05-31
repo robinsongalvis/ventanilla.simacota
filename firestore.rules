@@ -38,7 +38,24 @@ service cloud.firestore {
       return userRole() == 'RECEPCIONISTA';
     }
 
+    /** Jefe de Dependencia: lectura de su tenant, sin acciones de resolución. */
+    function isJefeDependencia() {
+      return userRole() == 'JEFE_DEPENDENCIA';
+    }
+
+    /** Control Interno: lectura de todos los tenants, sin escritura. */
+    function isControlInterno() {
+      return userRole() == 'CONTROL_INTERNO';
+    }
+
+    /** Cualquier rol que puede acceder al panel interno. */
     function isInternalUser() {
+      return isAdmin() || isFuncionario() || isRecepcionista()
+          || isJefeDependencia() || isControlInterno();
+    }
+
+    /** Solo los roles que pueden escribir entradas de trazabilidad. */
+    function canWriteTrazabilidad() {
       return isAdmin() || isFuncionario() || isRecepcionista();
     }
 
@@ -48,7 +65,7 @@ service cloud.firestore {
     }
 
     function validRole(role) {
-      return role in ['ADMIN', 'FUNCIONARIO', 'RECEPCIONISTA'];
+      return role in ['ADMIN', 'FUNCIONARIO', 'RECEPCIONISTA', 'JEFE_DEPENDENCIA', 'CONTROL_INTERNO'];
     }
 
     function validEstado(estado) {
@@ -195,26 +212,29 @@ service cloud.firestore {
 
     // ── Sistema MIPG: radicados institucionales ─────────────────────────────
     match /ventanilla_radicados/{radicadoId} {
-      // Admin y recepcionista ven todo; funcionario solo los de su dependencia.
-      allow get: if isAdmin() || isRecepcionista()
-        || (isFuncionario() && resource.data.clasificacion.oficinaDestino == userTenant());
+      // Admin, Recepcionista y Control Interno ven todos los tenants.
+      // Funcionario y Jefe de Dependencia solo ven su propia dependencia.
+      allow get: if isAdmin() || isRecepcionista() || isControlInterno()
+        || ((isFuncionario() || isJefeDependencia())
+            && resource.data.clasificacion.oficinaDestino == userTenant());
 
-      // Las queries del hook están filtradas por tenant en servidor para FUNCIONARIO.
-      allow list: if isAdmin() || isRecepcionista()
-        || (isFuncionario() && resource.data.clasificacion.oficinaDestino == userTenant());
+      allow list: if isAdmin() || isRecepcionista() || isControlInterno()
+        || ((isFuncionario() || isJefeDependencia())
+            && resource.data.clasificacion.oficinaDestino == userTenant());
 
       // Solo admin y recepcionista pueden radicar institucionalmente.
       allow create: if (isAdmin() || isRecepcionista())
         && request.resource.data.radicadoId == radicadoId;
 
+      // Jefe de Dependencia y Control Interno son roles de solo lectura — no pueden actualizar.
       allow update: if (
           isAdmin()
           || isRecepcionista()
           || (
-          isFuncionario()
-          && resource.data.clasificacion.oficinaDestino == userTenant()
-          && request.resource.data.clasificacion.oficinaDestino == userTenant()
-        )
+            isFuncionario()
+            && resource.data.clasificacion.oficinaDestino == userTenant()
+            && request.resource.data.clasificacion.oficinaDestino == userTenant()
+          )
         )
         && validVentanillaUpdate();
 
@@ -237,11 +257,13 @@ service cloud.firestore {
     }
 
     match /ventanilla_radicados/{radicadoId}/trazabilidad/{eventoId} {
-      allow read: if isAdmin() || isRecepcionista()
-        || (isFuncionario()
+      // Lectura: todos los roles internos (incluye Jefe y Control Interno para auditoría).
+      allow read: if isAdmin() || isRecepcionista() || isControlInterno()
+        || ((isFuncionario() || isJefeDependencia())
             && get(/databases/$(database)/documents/ventanilla_radicados/$(radicadoId))
                   .data.clasificacion.oficinaDestino == userTenant());
-      allow create: if isInternalUser();
+      // Escritura: solo roles operativos (Jefe y Control Interno son solo lectura).
+      allow create: if canWriteTrazabilidad();
       allow update, delete: if false;
     }
 

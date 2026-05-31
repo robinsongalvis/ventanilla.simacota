@@ -9,15 +9,19 @@ import { getFirebaseAdminAuth, getFirebaseAdminDb } from '@/lib/firebase-admin';
 
 export const runtime = 'nodejs';
 
-type RolInterno = 'ADMIN' | 'FUNCIONARIO' | 'RECEPCIONISTA';
+type RolInterno = 'ADMIN' | 'FUNCIONARIO' | 'RECEPCIONISTA' | 'JEFE_DEPENDENCIA' | 'CONTROL_INTERNO';
 
 interface UsuarioInternoClaims {
   rol: RolInterno;
   tenantId: string;
 }
 
+const ROLES_INTERNOS = new Set<string>([
+  'ADMIN', 'FUNCIONARIO', 'RECEPCIONISTA', 'JEFE_DEPENDENCIA', 'CONTROL_INTERNO',
+]);
+
 function isRolInterno(value: unknown): value is RolInterno {
-  return value === 'ADMIN' || value === 'FUNCIONARIO' || value === 'RECEPCIONISTA';
+  return typeof value === 'string' && ROLES_INTERNOS.has(value);
 }
 
 async function resolveClaims(uid: string, tokenClaims: Record<string, unknown>): Promise<UsuarioInternoClaims | null> {

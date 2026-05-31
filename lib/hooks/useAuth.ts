@@ -7,11 +7,19 @@ import { clearInternalSession, createInternalSession } from '@/lib/auth-session'
 import { getFirebaseAuth, getDb }      from '@/lib/firebase';
 import type { TenantId }               from '@/src/types/radicado';
 
+/** Todos los roles válidos del sistema de Ventanilla Única. */
+export type RolInterno =
+  | 'ADMIN'
+  | 'RECEPCIONISTA'
+  | 'FUNCIONARIO'
+  | 'JEFE_DEPENDENCIA'
+  | 'CONTROL_INTERNO';
+
 export interface UsuarioAutenticado {
   uid:      string;
   email:    string;
   nombre:   string;
-  rol:      'ADMIN' | 'FUNCIONARIO' | 'RECEPCIONISTA';
+  rol:      RolInterno;
   tenantId: TenantId;
 }
 
