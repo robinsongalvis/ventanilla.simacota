@@ -32,6 +32,18 @@ yarn-error.log*
 
 # env files (can opt-in for committing if needed)
 .env*
+!.env.example
+
+# Firebase / Google credentials — NUNCA subir
+*firebase-adminsdk*.json
+service-account*.json
+google-credentials*.json
+credentials*.json
+private-key*.json
+*.key
+
+# Temporary secrets
+apppass.txt
 
 # vercel
 .vercel
