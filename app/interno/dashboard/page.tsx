@@ -1880,33 +1880,140 @@ function DrawerNuevoRadicado({
    VISTA: Reportes MIPG (placeholder)
 ══════════════════════════════════════════════════════════════ */
 
-function VistaReportes({ metricas, total }: { metricas: MetricasMIPGData; total: number }) {
+/* ── Helper: exportación CSV MIPG ──────────────────────────────
+   14 columnas que cubren los 8 requisitos MIPG de trazabilidad.
+   BOM UTF-8 (﻿) para que Excel colombiano abra tildes y ñ sin problemas.
+─────────────────────────────────────────────────────────────── */
+function exportarCSVMIPG(radicados: VentanillaRadicado[]): void {
+  const headers = [
+    'N° Radicado',          // Req 1 (identificación)
+    'Fecha Radicación',     // Req 1
+    'Hora Radicación',      // Req 1
+    'Medio Recepción',      // Req 1
+    'Solicitante',          // contexto ciudadano
+    'Documento',            // identificación
+    'Tipo Solicitud',       // clasificación MIPG
+    'Dependencia Asignada', // Req 2
+    'Funcionario (UID)',    // Req 3
+    'Estado Actual',        // ciclo de vida
+    'Respuesta',            // Req 4 (primeros 300 chars)
+    'Fecha Respuesta',      // Req 5
+    'Oficio Adjunto',       // Req 6
+    'Fecha Vencimiento',    // Req 8 (término legal)
+    'Prórrogas Aplicadas',  // Req 8
+    'Cumplió Término MIPG', // Req 8 — dato auditoriable
+    'Trazabilidad',         // Req 7 — confirmación de subcollección
+  ];
+
+  const esc = (v: string) => `"${v.replace(/"/g, '""')}"`;
+
+  const rows = radicados.map((r) => [
+    r.radicadoId,
+    r.control.fechaRadicado,
+    r.control.horaRadicado,
+    r.control.medioRecepcion,
+    r.solicitante.nombreCompleto,
+    r.solicitante.numeroDocumento,
+    r.termino.tipoSolicitudNombre,
+    NOMBRES_TENANT[r.clasificacion.oficinaDestino] ?? r.clasificacion.oficinaDestino,
+    r.clasificacion.funcionarioResponsableUid ?? '—',
+    r.estadoActual,
+    (r.respuestaOficial?.nota ?? '—').substring(0, 300),
+    r.respuestaOficial?.fecha ?? '—',
+    r.respuestaOficial?.archivoNombre ? `Sí — ${r.respuestaOficial.archivoNombre}` : 'No',
+    r.termino.fechaVencimiento,
+    String(r.termino.prorrogasAplicadas ?? 0),
+    r.cumplioTermino === true  ? 'Sí — dentro del término' :
+    r.cumplioTermino === false ? 'No — fuera del término'  : 'Pendiente',
+    'Ver subcollección trazabilidad en Firebase',
+  ].map(esc).join(','));
+
+  const csv = [headers.map(esc).join(','), ...rows].join('\r\n');
+  const blob = new Blob(['﻿' + csv], { type: 'text/csv;charset=utf-8;' });
+  const url  = URL.createObjectURL(blob);
+  const a    = document.createElement('a');
+  a.href     = url;
+  a.download = `MIPG_Radicados_${new Date().toISOString().slice(0, 10)}.csv`;
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  URL.revokeObjectURL(url);
+}
+
+function VistaReportes({
+  metricas,
+  total,
+  radicados,
+}: {
+  metricas:  MetricasMIPGData;
+  total:     number;
+  radicados: VentanillaRadicado[];
+}) {
+  // KPI de cumplimiento de términos — calculado sobre datos reales de Firestore
+  const resueltosConDato = radicados.filter(
+    (r) => r.cumplioTermino !== undefined && r.cumplioTermino !== null,
+  );
+  const aTiempo = radicados.filter((r) => r.cumplioTermino === true).length;
+  const pctCumplimiento = resueltosConDato.length > 0
+    ? Math.round((aTiempo / resueltosConDato.length) * 100)
+    : null;  // null = sin datos suficientes (antes de MIPG-1)
+
   const items = [
-    { label: 'Total radicados',        valor: total,                    color: 'text-slate-200' },
-    { label: 'Tasa resolución (%)',    valor: total > 0 ? Math.round(((total - metricas.radicadas - metricas.asignadas) / total) * 100) : 0, color: 'text-emerald-300' },
-    { label: 'Radicadas (pendientes)', valor: metricas.radicadas,        color: 'text-indigo-300' },
-    { label: 'Prioridad MIPG activos', valor: metricas.prioridadMIPG,   color: 'text-red-300'   },
-    { label: 'En trámite (asignadas)', valor: metricas.asignadas,        color: 'text-sky-300'   },
-    { label: 'Por vencer (≤ 2 días)',  valor: metricas.porVencer,        color: 'text-orange-300'},
-    { label: 'Vencidas sin respuesta', valor: metricas.vencidas,         color: 'text-rose-300'  },
-    { label: 'Devueltas / Prórroga',   valor: metricas.devueltasProrroga,color: 'text-amber-300' },
+    { label: 'Total radicados',           valor: total,                    color: 'text-slate-200',  desc: '' },
+    { label: 'Tasa resolución (%)',        valor: total > 0 ? Math.round(((total - metricas.radicadas - metricas.asignadas) / total) * 100) : 0, color: 'text-emerald-300', desc: 'Resueltos / Total' },
+    { label: 'Cumplimiento términos (%)',  valor: pctCumplimiento !== null ? pctCumplimiento : '—', color: pctCumplimiento !== null ? (pctCumplimiento >= 80 ? 'text-emerald-300' : pctCumplimiento >= 60 ? 'text-amber-300' : 'text-rose-400') : 'text-slate-600', desc: 'MIPG Req. 8 — Respondidos a tiempo' },
+    { label: 'Respondidos a tiempo',       valor: aTiempo,                  color: 'text-teal-300',   desc: 'Con dato de cumplimiento' },
+    { label: 'Radicadas (pendientes)',     valor: metricas.radicadas,        color: 'text-indigo-300', desc: '' },
+    { label: 'Prioridad MIPG activos',    valor: metricas.prioridadMIPG,   color: 'text-red-300',    desc: 'Prioridad ROJO activa' },
+    { label: 'En trámite (asignadas)',     valor: metricas.asignadas,        color: 'text-sky-300',    desc: '' },
+    { label: 'Por vencer (≤ 2 días)',      valor: metricas.porVencer,        color: 'text-orange-300', desc: '' },
+    { label: 'Vencidas sin respuesta',     valor: metricas.vencidas,         color: 'text-rose-300',   desc: '' },
+    { label: 'Devueltas / Prórroga',       valor: metricas.devueltasProrroga,color: 'text-amber-300',  desc: '' },
   ];
 
   return (
     <div className="flex-1 overflow-y-auto px-6 py-8">
-      <p className="text-[10px] font-bold uppercase tracking-widest text-slate-600 mb-1">MIPG · Rendición de Cuentas</p>
-      <h2 className="text-xl font-black text-slate-50 mb-6">Indicadores de Eficiencia</h2>
-      <div className="grid grid-cols-2 xl:grid-cols-4 gap-4">
+      <div className="flex items-start justify-between gap-4 mb-6">
+        <div>
+          <p className="text-[10px] font-bold uppercase tracking-widest text-slate-600 mb-1">MIPG · Rendición de Cuentas</p>
+          <h2 className="text-xl font-black text-slate-50">Indicadores de Eficiencia</h2>
+        </div>
+        <button
+          type="button"
+          onClick={() => exportarCSVMIPG(radicados)}
+          className="shrink-0 flex items-center gap-2 px-4 py-2 rounded-lg bg-indigo-600/20 border border-indigo-500/30 text-indigo-300 text-xs font-bold hover:bg-indigo-600/30 transition-colors"
+          title="Exportar reporte MIPG en formato CSV (compatible con Excel)"
+        >
+          <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+            <path strokeLinecap="round" strokeLinejoin="round" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
+          </svg>
+          Exportar CSV MIPG
+        </button>
+      </div>
+
+      <div className="grid grid-cols-2 xl:grid-cols-5 gap-4 mb-6">
         {items.map((item) => (
           <div key={item.label} className="bg-slate-900/40 border border-white/[0.07] rounded-xl p-5">
             <p className={`text-3xl font-black tabular-nums ${item.color}`}>{item.valor}</p>
-            <p className="text-xs text-slate-500 mt-2 leading-tight">{item.label}</p>
+            <p className="text-xs text-slate-400 mt-2 leading-tight font-medium">{item.label}</p>
+            {item.desc && <p className="text-[10px] text-slate-600 mt-0.5 leading-tight">{item.desc}</p>}
           </div>
         ))}
       </div>
-      <p className="text-xs text-slate-700 mt-6">
-        Los datos se calculan en tiempo real sobre la colección <span className="font-mono">ventanilla_radicados</span>.
-        Exportación a Excel y PDF disponible próximamente.
+
+      {pctCumplimiento === null && (
+        <div className="bg-amber-500/5 border border-amber-500/20 rounded-lg px-4 py-3 mb-4">
+          <p className="text-xs text-amber-300/80 leading-relaxed">
+            <span className="font-bold">MIPG Req. 8 — Sin datos de cumplimiento aún.</span>{' '}
+            El campo <span className="font-mono text-amber-200">cumplioTermino</span> se registra automáticamente
+            la próxima vez que se resuelva un radicado. Los radicados históricos no tienen este dato.
+          </p>
+        </div>
+      )}
+
+      <p className="text-xs text-slate-700">
+        Datos en tiempo real · colección <span className="font-mono">ventanilla_radicados</span> ·
+        {' '}{total} documento{total !== 1 ? 's' : ''} visibles para tu rol.
       </p>
     </div>
   );
@@ -2268,7 +2375,7 @@ function DashboardInterior({ usuario, cerrarSesion }: { usuario: UsuarioAutentic
             onVerRadicado={(r) => dispatch({ type: 'SELECCIONAR_RADICADO', radicado: r })}
           />
         ) : vistaActual === 'REPORTES' ? (
-          <VistaReportes metricas={metricas} total={todosLosRadicados.length} />
+          <VistaReportes metricas={metricas} total={todosLosRadicados.length} radicados={todosLosRadicados} />
         ) : vistaActual === 'BANDEJA' ? (
           <BandejaAsignacion
             radicados={radicadosPendientes}

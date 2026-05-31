@@ -105,6 +105,18 @@ export interface VentanillaRadicado {
   estadoActual: EstadoRadicado | 'ASIGNADO' | 'POR_VENCER' | 'VENCIDO' | 'PRORROGA';
   ultimaActualizacion: string;
   prioridad: Prioridad;
+  /**
+   * MIPG — Requisito 8: evidencia de cumplimiento de término legal.
+   *
+   * Se persiste en Firestore al momento de resolver el radicado:
+   *   true  → respondido dentro del plazo legal (incluyendo prórrogas)
+   *   false → respondido fuera del plazo legal
+   *   null/undefined → radicado aún activo, no resuelto
+   *
+   * Este valor es inmutable una vez escrito; el auditor de Control Interno
+   * puede consultarlo en cualquier momento, incluso años después.
+   */
+  cumplioTermino?: boolean | null;
   solicitante: SolicitanteRadicado;
   control: ControlRadicacion;
   termino: TerminoLegal;

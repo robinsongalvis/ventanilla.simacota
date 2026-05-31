@@ -167,7 +167,8 @@ service cloud.firestore {
         'feedbackIa',
         'termino',
         'ultimaActualizacion',
-        'respuestaOficial'
+        'respuestaOficial',
+        'cumplioTermino'     // MIPG Req 8: evidencia de cumplimiento de término legal
       ])
       && request.resource.data.ultimaActualizacion is string
       && validVentanillaEstado(request.resource.data.estadoActual);

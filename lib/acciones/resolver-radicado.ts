@@ -38,7 +38,7 @@ export interface EjecutarResolucionInput {
 }
 
 export type EjecutarResolucionResult =
-  | { ok: true;  ahora: string; archivoNombre: string | null }
+  | { ok: true;  ahora: string; archivoNombre: string | null; cumplioTermino: boolean }
   | { ok: false; mensaje: string };
 
 export interface DespacharNotificacionesParams {
@@ -83,19 +83,26 @@ export async function ejecutarResolucion(
     }
 
     // 2. Marcar radicado como RESUELTO en Firestore (crítico)
+    //    cumplioTermino — MIPG Requisito 8: evidencia auditoria de cumplimiento legal.
+    //    Se calcula en el momento exacto de resolución y queda inmutable en Firestore.
+    const cumplioTermino: boolean =
+      new Date(ahora) <= new Date(radicado.termino.fechaVencimiento);
+
     await updateDoc(
       doc(getDb(), 'ventanilla_radicados', radicado.radicadoId),
       {
         estadoActual:        'RESUELTO',
         ultimaActualizacion: ahora,
+        cumplioTermino,
         ...(respuestaOficial ? { respuestaOficial } : {}),
       },
     );
 
     return {
-      ok:            true,
+      ok:             true,
       ahora,
-      archivoNombre: respuestaOficial?.archivoNombre ?? null,
+      archivoNombre:  respuestaOficial?.archivoNombre ?? null,
+      cumplioTermino,
     };
 
   } catch (err) {

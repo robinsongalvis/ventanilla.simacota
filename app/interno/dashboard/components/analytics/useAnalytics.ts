@@ -23,25 +23,32 @@ export type PeriodoAnalytics = 30 | 60 | 90 | 'TODO';
 
 /** KPIs globales del municipio en el período seleccionado */
 export interface MetricasGlobales {
-  totalPeriodo:          number;
-  resueltos:             number;
-  tasaResolucion:        number;   // % (0–100)
-  promedioRespuestaDias: number;   // días hábiles promedio solo resueltos
-  vencidosActivos:       number;
-  porVencerHoy:          number;   // vence en ≤ 2 días hábiles
+  totalPeriodo:               number;
+  resueltos:                  number;
+  tasaResolucion:             number;   // % (0–100) — resueltos / total
+  /** MIPG Req 8: % de radicados RESUELTOS que cumplieron el término legal */
+  tasaCumplimientoTerminos:   number;   // % (0–100) — respondidos a tiempo / resueltos
+  respondidosATiempo:         number;   // cantidad absoluta
+  promedioRespuestaDias:      number;   // días hábiles promedio solo resueltos
+  vencidosActivos:            number;
+  porVencerHoy:               number;   // vence en ≤ 2 días hábiles
   dependenciaMayorCarga: { id: TenantId; nombre: string; total: number } | null;
   zonaMayorVolumen:      { zona: ZonaGeografica; total: number } | null;
 }
 
 /** Métricas por dependencia para el ranking */
 export interface MetricaPorDependencia {
-  tenantId:   TenantId;
-  nombre:     string;
-  recibidos:  number;
-  resueltos:  number;
-  vencidos:   number;
-  promDias:   number;    // promedio de días hábiles en radicados resueltos
-  pctCarga:   number;    // % del total global
+  tenantId:            TenantId;
+  nombre:              string;
+  recibidos:           number;
+  resueltos:           number;
+  vencidos:            number;
+  /** MIPG Req 8: radicados resueltos dentro del término legal */
+  respondidosATiempo:  number;
+  /** MIPG Req 8: % de resueltos que cumplieron el término (0–100) */
+  tasaCumplimiento:    number;
+  promDias:            number;    // promedio de días hábiles en radicados resueltos
+  pctCarga:            number;    // % del total global
 }
 
 /** Alerta predictiva con severidad calculada */
@@ -197,6 +204,15 @@ export function useAnalytics(
       ? Math.round((resueltos.length / radicados.length) * 100)
       : 0;
 
+    // MIPG Req 8 — cumplimiento de términos legales
+    // cumplioTermino es persistente en Firestore desde la versión MIPG-1.
+    // Radicados anteriores (null/undefined) se excluyen del denominador.
+    const resueltosConDato = resueltos.filter((r) => r.cumplioTermino !== undefined && r.cumplioTermino !== null);
+    const respondidosATiempo = resueltos.filter((r) => r.cumplioTermino === true).length;
+    const tasaCumplimientoTerminos = resueltosConDato.length > 0
+      ? Math.round((respondidosATiempo / resueltosConDato.length) * 100)
+      : 0;
+
     const diasResueltos = resueltos.map(diasHabilesTranscurridos);
     const promedioRespuestaDias = promedio(diasResueltos);
 
@@ -219,12 +235,14 @@ export function useAnalytics(
       .sort(([, a], [, b]) => (b as number) - (a as number))[0] ?? [null, 0];
 
     const globales: MetricasGlobales = {
-      totalPeriodo:          radicados.length,
-      resueltos:             resueltos.length,
+      totalPeriodo:             radicados.length,
+      resueltos:                resueltos.length,
       tasaResolucion,
+      tasaCumplimientoTerminos,
+      respondidosATiempo,
       promedioRespuestaDias,
-      vencidosActivos:       vencidos.length,
-      porVencerHoy:          porVencer.length,
+      vencidosActivos:          vencidos.length,
+      porVencerHoy:             porVencer.length,
       dependenciaMayorCarga: topTenantId
         ? { id: topTenantId as TenantId, nombre: NOMBRES_TENANT[topTenantId as TenantId], total: topTenantTotal as number }
         : null,
@@ -234,18 +252,22 @@ export function useAnalytics(
     };
 
     /* ── Ranking por dependencia ───────────────────────────── */
-    const mapaDep: Map<TenantId, { recibidos: number; resueltos: number; vencidos: number; dias: number[] }> = new Map();
+    const mapaDep: Map<TenantId, { recibidos: number; resueltos: number; vencidos: number; aTiempo: number; conDato: number; dias: number[] }> = new Map();
 
     for (const r of radicados) {
       const id = r.clasificacion.oficinaDestino;
       if (!mapaDep.has(id)) {
-        mapaDep.set(id, { recibidos: 0, resueltos: 0, vencidos: 0, dias: [] });
+        mapaDep.set(id, { recibidos: 0, resueltos: 0, vencidos: 0, aTiempo: 0, conDato: 0, dias: [] });
       }
       const m = mapaDep.get(id)!;
       m.recibidos += 1;
       if (estaResuelto(r)) {
         m.resueltos += 1;
         m.dias.push(diasHabilesTranscurridos(r));
+        if (r.cumplioTermino !== undefined && r.cumplioTermino !== null) {
+          m.conDato += 1;
+          if (r.cumplioTermino === true) m.aTiempo += 1;
+        }
       }
       if (estaActivo(r) && diasRestantesHabiles(r.termino.fechaVencimiento) < 0) {
         m.vencidos += 1;
@@ -255,12 +277,14 @@ export function useAnalytics(
     const porDependencia: MetricaPorDependencia[] = Array.from(mapaDep.entries())
       .map(([tenantId, m]) => ({
         tenantId,
-        nombre:    NOMBRES_TENANT[tenantId],
-        recibidos: m.recibidos,
-        resueltos: m.resueltos,
-        vencidos:  m.vencidos,
-        promDias:  promedio(m.dias),
-        pctCarga:  radicados.length > 0 ? Math.round((m.recibidos / radicados.length) * 100) : 0,
+        nombre:             NOMBRES_TENANT[tenantId],
+        recibidos:          m.recibidos,
+        resueltos:          m.resueltos,
+        vencidos:           m.vencidos,
+        respondidosATiempo: m.aTiempo,
+        tasaCumplimiento:   m.conDato > 0 ? Math.round((m.aTiempo / m.conDato) * 100) : 0,
+        promDias:           promedio(m.dias),
+        pctCarga:           radicados.length > 0 ? Math.round((m.recibidos / radicados.length) * 100) : 0,
       }))
       .sort((a, b) => b.recibidos - a.recibidos);
 
