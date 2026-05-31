@@ -7,6 +7,8 @@ import type {
   ZonaGeografica,
 } from './radicado';
 import type { TipoSolicitudId, UnidadTermino } from '@/lib/tiempos-radicado';
+// type-only import — erased en runtime, seguro desde shared types
+import type { RolInterno } from '@/lib/hooks/useAuth';
 
 export type TipoPersona = 'NATURAL' | 'JURIDICA';
 export type TipoDocumento = 'CC' | 'CE' | 'NIT' | 'PASAPORTE' | 'OTRO';
@@ -100,6 +102,34 @@ export interface RespuestaOficial {
   actorNombre:   string;
 }
 
+/**
+ * MIPG-2 — Snapshot inmutable del responsable funcional asignado.
+ *
+ * Los campos `funcionarioResponsable*` se capturan en el momento exacto de
+ * la asignación y NO se actualizan si el usuario cambia de nombre, cargo o rol.
+ * Esto garantiza la evidencia histórica requerida por MIPG.
+ *
+ * Compatibilidad hacia atrás: radicados anteriores solo tienen `funcionarioResponsableUid`.
+ * El sistema los muestra como "No registrado (ver trazabilidad)".
+ */
+export interface ClasificacionRadicado {
+  oficinaDestino:   TenantId;
+  zonaGeografica:   ZonaGeografica;
+
+  /** UID técnico de Firebase Auth — referencia permanente */
+  funcionarioResponsableUid?:     string;
+  /** Nombre completo al momento de la asignación */
+  funcionarioResponsableNombre?:  string;
+  /** Email institucional al momento de la asignación */
+  funcionarioResponsableEmail?:   string;
+  /** Rol bajo el que actuó */
+  funcionarioResponsableRol?:     RolInterno;
+  /** Cargo adicional si aplica (campo opcional en el perfil) */
+  funcionarioResponsableCargo?:   string;
+  /** ISO timestamp del momento exacto de la asignación del responsable */
+  fechaAsignacionResponsable?:    string;
+}
+
 export interface VentanillaRadicado {
   radicadoId: string;
   estadoActual: EstadoRadicado | 'ASIGNADO' | 'POR_VENCER' | 'VENCIDO' | 'PRORROGA';
@@ -120,11 +150,7 @@ export interface VentanillaRadicado {
   solicitante: SolicitanteRadicado;
   control: ControlRadicacion;
   termino: TerminoLegal;
-  clasificacion: {
-    oficinaDestino: TenantId;
-    funcionarioResponsableUid?: string;
-    zonaGeografica: ZonaGeografica;
-  };
+  clasificacion: ClasificacionRadicado;
   detalle: {
     asunto: string;
     descripcion: string;

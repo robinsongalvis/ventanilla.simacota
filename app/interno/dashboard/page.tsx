@@ -29,6 +29,9 @@ import {
   ejecutarResolucion,
   despacharNotificaciones,
 } from '@/lib/acciones/resolver-radicado';
+import { useFuncionariosTenant }              from '@/lib/hooks/useFuncionariosTenant';
+import type { FuncionarioTenant }             from '@/lib/hooks/useFuncionariosTenant';
+import type { ResponsableFuncionario }        from '@/lib/actions/asignarRadicado';
 import type { TrazabilidadRadicado, VentanillaRadicado } from '@/src/types/ventanilla';
 import type { UsuarioAutenticado }        from '@/lib/hooks/useAuth';
 
@@ -982,6 +985,9 @@ function PanelDerecho({
 }) {
   const [tab,              setTab]              = useState<TabPanelId>('info');
   const [tenantDestino,    setTenantDestino]    = useState<TenantId>(radicado.clasificacion.oficinaDestino);
+  // MIPG-2: reemplaza el free-text de UID por un selector con snapshot completo
+  const [responsableSelec, setResponsableSelec] = useState<FuncionarioTenant | null>(null);
+  // Backward compat: si el radicado ya tenía un UID libre, lo inicializamos
   const [funcionarioUid,   setFuncionarioUid]   = useState(radicado.clasificacion.funcionarioResponsableUid ?? '');
   const [motivo,           setMotivo]           = useState('');
   const [diasProrroga,     setDiasProrroga]     = useState(5);
@@ -992,6 +998,10 @@ function PanelDerecho({
   const [trazabilidad,         setTrazabilidad]         = useState<TrazabilidadRadicado[]>([]);
   const [cargandoTrazabilidad, setCargandoTrazabilidad] = useState(false);
   const [archivoPdf,           setArchivoPdf]           = useState<File | null>(null);
+
+  // MIPG-2: carga funcionarios del tenant destino para el selector de responsable
+  const { funcionarios: funcionariosTenant, cargando: cargandoFuncionarios } =
+    useFuncionariosTenant(tab === 'traslado' ? tenantDestino : '');
 
   const dias = calcDiasRestantes(radicado);
 
@@ -1079,26 +1089,73 @@ function PanelDerecho({
     }
 
     await ejecutarAccion(async () => {
-      const entrada = trazabilidadEntry('ASIGNACION',
-        `Trasladado a ${NOMBRES_TENANT[tenantDestino]}`,
-        { oficinaOrigen: radicado.clasificacion.oficinaDestino, oficinaDestino: tenantDestino },
-      );
-      await updateDoc(doc(getDb(), 'ventanilla_radicados', radicado.radicadoId), {
-        'clasificacion.oficinaDestino':         tenantDestino,
-        'clasificacion.funcionarioResponsableUid': funcionarioUid || null,
-        estadoActual: 'ASIGNADO',
-        ultimaActualizacion: entrada.fecha,
-        ...(radicado.analisisIa && radicado.analisisIa.dependenciaSugerida !== tenantDestino ? {
-          'feedbackIa': {
-            usuarioId: usuario.uid,
-            actorNombre: usuario.nombre,
-            puntuacion: 'CORREGIDO',
-            motivoCorreccion: `Trasladado manualmente a ${NOMBRES_TENANT[tenantDestino]}.`,
-            fecha: new Date().toISOString()
+      const ahora = new Date().toISOString();
+
+      // MIPG-2: snapshot del responsable — prioridad al selector; fallback al UID libre (legacy)
+      const responsable: ResponsableFuncionario | null = responsableSelec
+        ? {
+            uid:    responsableSelec.uid,
+            nombre: responsableSelec.nombre,
+            email:  responsableSelec.email,
+            rol:    responsableSelec.rol,
+            cargo:  responsableSelec.cargo,
           }
-        } : {})
+        : funcionarioUid
+          ? { uid: funcionarioUid, nombre: 'No registrado', email: '', rol: 'FUNCIONARIO' }
+          : null;
+
+      const snapshotResponsable = responsable
+        ? {
+            'clasificacion.funcionarioResponsableUid':    responsable.uid,
+            'clasificacion.funcionarioResponsableNombre': responsable.nombre,
+            'clasificacion.funcionarioResponsableEmail':  responsable.email,
+            'clasificacion.funcionarioResponsableRol':    responsable.rol,
+            ...(responsable.cargo
+              ? { 'clasificacion.funcionarioResponsableCargo': responsable.cargo }
+              : {}),
+            'clasificacion.fechaAsignacionResponsable':   ahora,
+          }
+        : {};
+
+      await updateDoc(doc(getDb(), 'ventanilla_radicados', radicado.radicadoId), {
+        'clasificacion.oficinaDestino': tenantDestino,
+        ...snapshotResponsable,
+        estadoActual:        'ASIGNADO',
+        ultimaActualizacion: ahora,
+        ...(radicado.analisisIa && radicado.analisisIa.dependenciaSugerida !== tenantDestino ? {
+          feedbackIa: {
+            usuarioId:        usuario.uid,
+            actorNombre:      usuario.nombre,
+            puntuacion:       'CORREGIDO',
+            motivoCorreccion: `Trasladado manualmente a ${NOMBRES_TENANT[tenantDestino]}.`,
+            fecha:             ahora,
+          },
+        } : {}),
       });
-      await appendTrazabilidad(radicado.radicadoId, entrada);
+
+      // Trazabilidad enriquecida con datos auditoriables
+      const metadataResponsable = responsable && responsable.nombre !== 'No registrado'
+        ? {
+            funcionarioResponsableUid:    responsable.uid,
+            funcionarioResponsableNombre: responsable.nombre,
+            funcionarioResponsableEmail:  responsable.email,
+            funcionarioResponsableRol:    responsable.rol,
+          }
+        : {};
+
+      await appendTrazabilidad(radicado.radicadoId, {
+        fecha:       ahora,
+        accion:      'ASIGNACION',
+        actorUid:    usuario.uid,
+        actorNombre: usuario.nombre,
+        nota:        `Trasladado a ${NOMBRES_TENANT[tenantDestino]}`,
+        metadata: {
+          dependenciaOrigen:  radicado.clasificacion.oficinaDestino,
+          dependenciaDestino: tenantDestino,
+          actorRol:           usuario.rol,
+          ...metadataResponsable,
+        },
+      });
     });
   }
 
@@ -1331,6 +1388,56 @@ function PanelDerecho({
               </div>
             </div>
 
+            {/* ── MIPG-2: Responsable funcional ── */}
+            <div className="border-t border-white/[0.07] pt-4">
+              <p className="text-[10px] font-bold uppercase tracking-widest text-indigo-500/70 mb-3">
+                MIPG · Responsable funcional asignado
+              </p>
+              {radicado.clasificacion.funcionarioResponsableNombre ? (
+                <div className="bg-indigo-950/20 border border-indigo-500/20 rounded-lg p-3 space-y-2">
+                  <div className="flex items-center gap-2">
+                    <span className="w-6 h-6 rounded-full bg-indigo-600/30 flex items-center justify-center text-xs font-bold text-indigo-300">
+                      {radicado.clasificacion.funcionarioResponsableNombre.charAt(0).toUpperCase()}
+                    </span>
+                    <p className="text-sm font-semibold text-slate-100">
+                      {radicado.clasificacion.funcionarioResponsableNombre}
+                    </p>
+                  </div>
+                  <div className="grid grid-cols-2 gap-x-4 gap-y-1.5 text-xs mt-1">
+                    {radicado.clasificacion.funcionarioResponsableCargo && (
+                      <FilaInfo label="Cargo" value={radicado.clasificacion.funcionarioResponsableCargo} />
+                    )}
+                    <FilaInfo
+                      label="Dependencia"
+                      value={NOMBRES_TENANT[radicado.clasificacion.oficinaDestino]}
+                    />
+                    {radicado.clasificacion.funcionarioResponsableEmail && (
+                      <FilaInfo label="Email" value={radicado.clasificacion.funcionarioResponsableEmail} />
+                    )}
+                    {radicado.clasificacion.funcionarioResponsableRol && (
+                      <FilaInfo label="Rol" value={radicado.clasificacion.funcionarioResponsableRol} />
+                    )}
+                    {radicado.clasificacion.fechaAsignacionResponsable && (
+                      <FilaInfo
+                        label="Fecha asignación"
+                        value={fmtFechaLarga(radicado.clasificacion.fechaAsignacionResponsable)}
+                      />
+                    )}
+                  </div>
+                </div>
+              ) : radicado.clasificacion.funcionarioResponsableUid ? (
+                <div className="bg-slate-900/30 border border-white/[0.06] rounded-lg p-3">
+                  <p className="text-xs text-slate-500">
+                    <span className="font-mono text-slate-400">{radicado.clasificacion.funcionarioResponsableUid}</span>
+                    <br />
+                    <span className="text-slate-600">Radicado anterior — nombre no registrado. Ver trazabilidad para detalle.</span>
+                  </p>
+                </div>
+              ) : (
+                <p className="text-xs text-slate-700 italic">Sin responsable asignado</p>
+              )}
+            </div>
+
             {radicado.archivos.length > 0 && (
               <div className="border-t border-white/[0.07] pt-4">
                 <p className="text-[10px] font-bold uppercase tracking-widest text-slate-600 mb-3">
@@ -1441,14 +1548,77 @@ function PanelDerecho({
               </select>
             </div>
 
+            {/* Selector MIPG-2 — responsable funcional */}
             <div>
-              <p className="text-[10px] font-bold uppercase tracking-widest text-slate-600 mb-1.5">UID funcionario responsable <span className="normal-case font-normal text-slate-600">(opcional)</span></p>
-              <input
-                value={funcionarioUid}
-                onChange={(e) => setFuncionarioUid(e.target.value)}
-                placeholder="uid-del-funcionario"
-                className="input-internal"
-              />
+              <p className="text-[10px] font-bold uppercase tracking-widest text-slate-600 mb-1.5">
+                Responsable funcional <span className="normal-case font-normal text-slate-600">(opcional)</span>
+              </p>
+              {cargandoFuncionarios ? (
+                <div className="flex items-center gap-2 text-xs text-slate-500 py-2">
+                  <span className="w-3 h-3 border-2 border-slate-500/30 border-t-slate-400 rounded-full animate-spin" />
+                  Cargando funcionarios…
+                </div>
+              ) : funcionariosTenant.length > 0 ? (
+                <select
+                  value={responsableSelec?.uid ?? ''}
+                  onChange={(e) => {
+                    const f = funcionariosTenant.find((x) => x.uid === e.target.value) ?? null;
+                    setResponsableSelec(f);
+                    if (f) setFuncionarioUid(f.uid);
+                  }}
+                  className="select-internal w-full"
+                >
+                  <option value="">— Sin responsable asignado —</option>
+                  {funcionariosTenant.map((f) => (
+                    <option key={f.uid} value={f.uid}>
+                      {f.nombre}{f.cargo ? ` · ${f.cargo}` : ''} ({f.rol})
+                    </option>
+                  ))}
+                </select>
+              ) : (
+                // Fallback para tenants sin usuarios registrados
+                <input
+                  value={funcionarioUid}
+                  onChange={(e) => { setFuncionarioUid(e.target.value); setResponsableSelec(null); }}
+                  placeholder="UID del funcionario (no hay usuarios registrados en esta dependencia)"
+                  className="input-internal text-slate-500"
+                />
+              )}
+              {responsableSelec && (
+                <p className="text-[10px] text-slate-500 mt-1.5">
+                  📧 {responsableSelec.email}
+                </p>
+              )}
+            </div>
+
+            {/* Responsable actual del radicado */}
+            <div className="border-t border-white/[0.07] pt-3">
+              <p className="text-[10px] font-bold uppercase tracking-widest text-slate-600 mb-2">
+                Responsable registrado actualmente
+              </p>
+              {radicado.clasificacion.funcionarioResponsableNombre ? (
+                <div className="bg-slate-900/40 border border-white/[0.07] rounded-lg p-3 space-y-1">
+                  <p className="text-sm font-semibold text-slate-200">{radicado.clasificacion.funcionarioResponsableNombre}</p>
+                  {radicado.clasificacion.funcionarioResponsableCargo && (
+                    <p className="text-xs text-slate-500">{radicado.clasificacion.funcionarioResponsableCargo}</p>
+                  )}
+                  {radicado.clasificacion.funcionarioResponsableEmail && (
+                    <p className="text-xs text-slate-500">📧 {radicado.clasificacion.funcionarioResponsableEmail}</p>
+                  )}
+                  {radicado.clasificacion.fechaAsignacionResponsable && (
+                    <p className="text-[10px] text-slate-600 mt-1">
+                      Asignado: {new Date(radicado.clasificacion.fechaAsignacionResponsable).toLocaleDateString('es-CO')}
+                    </p>
+                  )}
+                </div>
+              ) : radicado.clasificacion.funcionarioResponsableUid ? (
+                <p className="text-xs text-slate-600">
+                  UID: {radicado.clasificacion.funcionarioResponsableUid}
+                  <span className="ml-2 text-slate-700">(radicado anterior — nombre no registrado)</span>
+                </p>
+              ) : (
+                <p className="text-xs text-slate-700">Sin responsable asignado</p>
+              )}
             </div>
 
             <button
@@ -1886,23 +2056,29 @@ function DrawerNuevoRadicado({
 ─────────────────────────────────────────────────────────────── */
 function exportarCSVMIPG(radicados: VentanillaRadicado[]): void {
   const headers = [
-    'N° Radicado',          // Req 1 (identificación)
-    'Fecha Radicación',     // Req 1
-    'Hora Radicación',      // Req 1
-    'Medio Recepción',      // Req 1
-    'Solicitante',          // contexto ciudadano
-    'Documento',            // identificación
-    'Tipo Solicitud',       // clasificación MIPG
-    'Dependencia Asignada', // Req 2
-    'Funcionario (UID)',    // Req 3
-    'Estado Actual',        // ciclo de vida
-    'Respuesta',            // Req 4 (primeros 300 chars)
-    'Fecha Respuesta',      // Req 5
-    'Oficio Adjunto',       // Req 6
-    'Fecha Vencimiento',    // Req 8 (término legal)
-    'Prórrogas Aplicadas',  // Req 8
-    'Cumplió Término MIPG', // Req 8 — dato auditoriable
-    'Trazabilidad',         // Req 7 — confirmación de subcollección
+    'N° Radicado',                    // Req 1 (identificación)
+    'Fecha Radicación',               // Req 1
+    'Hora Radicación',                // Req 1
+    'Medio Recepción',                // Req 1
+    'Solicitante',                    // contexto ciudadano
+    'Documento',                      // identificación
+    'Tipo Solicitud',                 // clasificación MIPG
+    'Dependencia Asignada',           // Req 2
+    // Req 3 — Responsable funcional (MIPG-2)
+    'Responsable UID',
+    'Responsable Nombre',
+    'Responsable Email',
+    'Responsable Rol',
+    'Responsable Cargo',
+    'Fecha Asignación Responsable',
+    'Estado Actual',                  // ciclo de vida
+    'Respuesta',                      // Req 4 (primeros 300 chars)
+    'Fecha Respuesta',                // Req 5
+    'Oficio Adjunto',                 // Req 6
+    'Fecha Vencimiento',              // Req 8 (término legal)
+    'Prórrogas Aplicadas',            // Req 8
+    'Cumplió Término MIPG',          // Req 8 — dato auditoriable
+    'Trazabilidad',                   // Req 7 — confirmación de subcollección
   ];
 
   const esc = (v: string) => `"${v.replace(/"/g, '""')}"`;
@@ -1916,7 +2092,13 @@ function exportarCSVMIPG(radicados: VentanillaRadicado[]): void {
     r.solicitante.numeroDocumento,
     r.termino.tipoSolicitudNombre,
     NOMBRES_TENANT[r.clasificacion.oficinaDestino] ?? r.clasificacion.oficinaDestino,
-    r.clasificacion.funcionarioResponsableUid ?? '—',
+    // Req 3 — MIPG-2: responsable funcional con backward compat
+    r.clasificacion.funcionarioResponsableUid    ?? '—',
+    r.clasificacion.funcionarioResponsableNombre ?? 'No registrado (ver trazabilidad)',
+    r.clasificacion.funcionarioResponsableEmail  ?? '—',
+    r.clasificacion.funcionarioResponsableRol    ?? '—',
+    r.clasificacion.funcionarioResponsableCargo  ?? '—',
+    r.clasificacion.fechaAsignacionResponsable   ?? '—',
     r.estadoActual,
     (r.respuestaOficial?.nota ?? '—').substring(0, 300),
     r.respuestaOficial?.fecha ?? '—',

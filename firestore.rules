@@ -176,7 +176,9 @@ service cloud.firestore {
 
     match /users/{uid} {
       allow get: if signedIn() && (request.auth.uid == uid || isAdmin());
-      allow list: if isAdmin();
+      // Recepcionista y Admin necesitan listar usuarios para el selector
+      // de responsable funcional (MIPG-2 — asignación).
+      allow list: if isAdmin() || isRecepcionista();
 
       allow create: if isAdmin()
         && request.resource.data.rol is string
