@@ -410,6 +410,7 @@ function SidebarNav({
   onCerrarSesion,
   pendientesBandeja,
   pendientesAlertas,
+  className = '',
 }: {
   vistaActual: VistaActual;
   onVistaChange: (v: VistaActual) => void;
@@ -418,6 +419,7 @@ function SidebarNav({
   onCerrarSesion: () => void;
   pendientesBandeja: number;
   pendientesAlertas: number;
+  className?: string;
 }) {
   const LABEL_ROL: Record<string, string> = {
     ADMIN:             'Admin',
@@ -453,7 +455,7 @@ function SidebarNav({
   }
 
   return (
-    <aside className="h-full flex flex-col bg-[#0A0A0B] border-r border-white/[0.07] shrink-0 w-[210px]">
+    <aside className={`h-full flex flex-col bg-[#0A0A0B] border-r border-white/[0.07] shrink-0 w-[210px] ${className}`}>
       {/* Logo */}
       <div className="px-4 py-4 border-b border-white/[0.07]">
         <div className="flex items-center gap-2.5">
@@ -544,6 +546,58 @@ function SidebarNav({
         </div>
       </div>
     </aside>
+  );
+}
+
+function MobileTopBar({
+  usuario,
+  vistaActual,
+  onAbrirMenu,
+}: {
+  usuario: UsuarioAutenticado;
+  vistaActual: VistaActual;
+  onAbrirMenu: () => void;
+}) {
+  const vista = NAV_ITEMS.find((item) => item.vista === vistaActual)?.label
+    ?? (vistaActual === 'SUPERVISION_IA'
+      ? 'Supervisión IA'
+      : vistaActual === 'ANTICIPACION_OPERATIVA'
+        ? 'Anticipación'
+        : 'Panel interno');
+  const rolCompacto: Record<string, string> = {
+    ADMIN: 'Admin',
+    RECEPCIONISTA: 'Recepción',
+    FUNCIONARIO: 'Func.',
+    JEFE_DEPENDENCIA: 'Jefe',
+    CONTROL_INTERNO: 'Control',
+  };
+
+  return (
+    <header className="md:hidden shrink-0 border-b border-white/[0.07] bg-[#0A0A0B]/95 px-3 py-3">
+      <div className="flex items-center gap-3">
+        <button
+          type="button"
+          onClick={onAbrirMenu}
+          className="flex h-10 w-10 items-center justify-center rounded-xl border border-white/[0.08] bg-white/[0.04] text-slate-200 active:scale-95 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500/60"
+          aria-label="Abrir menú"
+        >
+          <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+            <path strokeLinecap="round" strokeLinejoin="round" d="M3.75 6.75h16.5M3.75 12h16.5m-16.5 5.25h16.5" />
+          </svg>
+        </button>
+        <div className="min-w-0 flex-1">
+          <p className="text-[10px] font-bold uppercase tracking-widest text-slate-600">
+            {NOMBRES_TENANT[usuario.tenantId]}
+          </p>
+          <p className="truncate text-sm font-black text-slate-100">
+            {vista}
+          </p>
+        </div>
+        <span className="shrink-0 rounded-full border border-indigo-500/25 bg-indigo-500/10 px-2 py-1 text-[10px] font-bold uppercase tracking-wider text-indigo-300">
+          {rolCompacto[usuario.rol] ?? 'Func.'}
+        </span>
+      </div>
+    </header>
   );
 }
 
@@ -736,7 +790,7 @@ function PanelOperacionDependencia({
             </span>
           </div>
 
-          <div className="mt-4 grid grid-cols-5 gap-2">
+          <div className="mt-4 grid grid-cols-2 sm:grid-cols-5 gap-2">
             {[
               { label: 'Activos', value: resumen.totalActivos, tone: 'text-slate-100', filtro: 'TODOS' as FiltroMIPG },
               { label: 'Sin resp.', value: resumen.sinResponsable, tone: 'text-amber-300', filtro: 'ASIGNADAS' as FiltroMIPG },
@@ -787,7 +841,7 @@ function PanelOperacionDependencia({
           </div>
 
           {siguiente ? (
-            <div className="mt-3 grid grid-cols-[minmax(150px,0.8fr)_minmax(0,1.2fr)_minmax(130px,0.7fr)] gap-3 text-xs">
+            <div className="mt-3 grid grid-cols-1 sm:grid-cols-[minmax(150px,0.8fr)_minmax(0,1.2fr)_minmax(130px,0.7fr)] gap-3 text-xs">
               <div className="min-w-0">
                 <p className="text-[9px] font-bold uppercase tracking-widest text-slate-600">Radicado</p>
                 <p className="mt-1 truncate font-mono text-indigo-300">{siguiente.radicadoId}</p>
@@ -854,8 +908,8 @@ function TablaRadicados({
   return (
     <div className="flex-1 flex flex-col overflow-hidden min-h-0">
       {/* Toolbar */}
-      <div className="flex items-center gap-3 px-4 py-2.5 border-b border-white/[0.07] shrink-0">
-        <div className="relative flex-1 max-w-sm">
+      <div className="flex flex-wrap items-center gap-3 px-4 py-2.5 border-b border-white/[0.07] shrink-0">
+        <div className="relative min-w-[220px] flex-1 max-w-sm">
           <svg className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-slate-500" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
             <path strokeLinecap="round" strokeLinejoin="round" d="M21 21l-5.197-5.197m0 0A7.5 7.5 0 105.196 5.196a7.5 7.5 0 0010.607 10.607z" />
           </svg>
@@ -2697,6 +2751,7 @@ function BandejaAsignacion({
 ══════════════════════════════════════════════════════════════ */
 
 function DashboardInterior({ usuario, cerrarSesion }: { usuario: UsuarioAutenticado; cerrarSesion: () => Promise<void> }) {
+  const [menuMovilAbierto, setMenuMovilAbierto] = useState(false);
   const { state, dispatch } = useVentanilla();
   const {
     radicadoSeleccionado,
@@ -2748,12 +2803,18 @@ function DashboardInterior({ usuario, cerrarSesion }: { usuario: UsuarioAutentic
     [todosLosRadicados, esAdmin, usuario.tenantId],
   );
 
+  function cambiarVista(vista: VistaActual) {
+    dispatch({ type: 'SET_VISTA', vista });
+    setMenuMovilAbierto(false);
+  }
+
   return (
-    <div className="flex h-screen overflow-hidden bg-[#0A0A0B]">
+    <div className="flex h-[100dvh] overflow-hidden bg-[#0A0A0B]">
       {/* ── COLUMNA 1: Sidebar de navegación ── */}
       <SidebarNav
+        className="hidden md:flex"
         vistaActual={vistaActual}
-        onVistaChange={(v) => dispatch({ type: 'SET_VISTA', vista: v })}
+        onVistaChange={cambiarVista}
         onNuevoRadicado={() => {
           if (tienePermisoRadicar) dispatch({ type: 'TOGGLE_DRAWER_NUEVO' });
         }}
@@ -2765,6 +2826,11 @@ function DashboardInterior({ usuario, cerrarSesion }: { usuario: UsuarioAutentic
 
       {/* ── COLUMNA 2: Cuerpo central ── */}
       <div className="flex-1 flex flex-col overflow-hidden min-w-0">
+        <MobileTopBar
+          usuario={usuario}
+          vistaActual={vistaActual}
+          onAbrirMenu={() => setMenuMovilAbierto(true)}
+        />
 
         {vistaActual === 'ANALYTICS' ? (
           <VistaAnalytics
@@ -2791,11 +2857,11 @@ function DashboardInterior({ usuario, cerrarSesion }: { usuario: UsuarioAutentic
         ) : vistaActual === 'DEPENDENCIAS' ? (
           <PanelCargaDependencias radicados={todosLosRadicados} />
         ) : vistaActual === 'SUPERVISION_IA' ? (
-          <div className="flex-1 overflow-y-auto p-6 bg-[#0E0E10]/40">
+          <div className="flex-1 overflow-y-auto p-4 md:p-6 bg-[#0E0E10]/40">
             <VistaSupervisionIA />
           </div>
         ) : vistaActual === 'ANTICIPACION_OPERATIVA' ? (
-          <div className="flex-1 overflow-y-auto p-6 bg-[#0E0E10]/40">
+          <div className="flex-1 overflow-y-auto p-4 md:p-6 bg-[#0E0E10]/40">
             <VistaAnticipacionOperativa radicados={todosLosRadicados} />
           </div>
         ) : (
@@ -2840,8 +2906,10 @@ function DashboardInterior({ usuario, cerrarSesion }: { usuario: UsuarioAutentic
        && vistaActual !== 'ANALYTICS' && vistaActual !== 'ALERTAS'
        && vistaActual !== 'SUPERVISION_IA' && vistaActual !== 'ANTICIPACION_OPERATIVA' && (
         <div
-          className={`shrink-0 transition-all duration-300 ease-in-out overflow-hidden ${
-            panelDerechoAbierto ? 'w-[420px]' : 'w-0'
+          className={`fixed inset-y-0 right-0 z-40 max-w-full transition-transform duration-300 ease-in-out md:relative md:z-auto md:shrink-0 md:overflow-hidden md:transition-all ${
+            panelDerechoAbierto
+              ? 'w-full translate-x-0 md:w-[420px]'
+              : 'w-full translate-x-full md:w-0 md:translate-x-0'
           }`}
         >
           {radicadoSeleccionado && (
@@ -2861,6 +2929,32 @@ function DashboardInterior({ usuario, cerrarSesion }: { usuario: UsuarioAutentic
           usuario={usuario}
           onCerrar={() => dispatch({ type: 'CERRAR_DRAWER_NUEVO' })}
         />
+      )}
+
+      {menuMovilAbierto && (
+        <div className="fixed inset-0 z-50 md:hidden">
+          <button
+            type="button"
+            className="absolute inset-0 bg-black/70"
+            aria-label="Cerrar menú"
+            onClick={() => setMenuMovilAbierto(false)}
+          />
+          <SidebarNav
+            className="relative z-10 w-[min(82vw,320px)] shadow-2xl"
+            vistaActual={vistaActual}
+            onVistaChange={cambiarVista}
+            onNuevoRadicado={() => {
+              if (tienePermisoRadicar) {
+                dispatch({ type: 'TOGGLE_DRAWER_NUEVO' });
+                setMenuMovilAbierto(false);
+              }
+            }}
+            usuario={usuario}
+            onCerrarSesion={cerrarSesion}
+            pendientesBandeja={radicadosPendientes.length}
+            pendientesAlertas={pendientesAlertas}
+          />
+        </div>
       )}
     </div>
   );

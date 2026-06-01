@@ -182,7 +182,7 @@ export function VistaSupervisionIA() {
   }
 
   return (
-    <div className="space-y-6 animate-fade-in-up">
+    <div className="space-y-5 md:space-y-6 animate-fade-in-up">
       {/* Cabecera del Panel */}
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div>
@@ -219,7 +219,7 @@ export function VistaSupervisionIA() {
       )}
 
       {/* Fila de KPIs */}
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+      <div className="grid grid-cols-1 min-[420px]:grid-cols-2 md:grid-cols-4 gap-3 md:gap-4">
         <KpiCard
           label="Precisión Global IA"
           value={`${kpis.precisionGlobal}%`}
@@ -246,9 +246,9 @@ export function VistaSupervisionIA() {
         />
       </div>
 
-      <div className="grid md:grid-cols-3 gap-6">
+      <div className="grid md:grid-cols-3 gap-4 md:gap-6">
         {/* Feature Flags Panel */}
-        <div className="md:col-span-1 rounded-2xl border border-white/10 bg-slate-900/40 p-5 space-y-4">
+        <div className="md:col-span-1 rounded-2xl border border-white/10 bg-slate-900/40 p-4 md:p-5 space-y-4">
           <div>
             <h3 className="text-sm font-bold uppercase tracking-wider text-slate-300">Feature Flags (Caliente)</h3>
             <p className="text-[10px] text-slate-500">Activa o desactiva módulos de IA sin re-desplegar.</p>
@@ -283,7 +283,7 @@ export function VistaSupervisionIA() {
         </div>
 
         {/* Telemetría y Logs */}
-        <div className="md:col-span-2 rounded-2xl border border-white/10 bg-slate-900/40 p-5 space-y-4">
+        <div className="md:col-span-2 rounded-2xl border border-white/10 bg-slate-900/40 p-4 md:p-5 space-y-4">
           <div>
             <h3 className="text-sm font-bold uppercase tracking-wider text-slate-300">Telemetría de Ejecución</h3>
             <p className="text-[10px] text-slate-500">Últimos logs operacionales capturados del servidor.</p>
@@ -339,9 +339,9 @@ export function VistaSupervisionIA() {
 
 function KpiCard({ label, value, desc, color }: { label: string; value: string; desc: string; color: string }) {
   return (
-    <div className="rounded-2xl border border-white/10 bg-slate-900/40 p-4">
+    <div className="rounded-2xl border border-white/10 bg-slate-900/40 p-4 min-w-0">
       <p className="text-[10px] font-bold uppercase tracking-widest text-slate-500">{label}</p>
-      <p className={`text-2xl font-black mt-2 tracking-tight ${color}`} style={{ fontFamily: 'var(--font-manrope)' }}>
+      <p className={`text-2xl font-black mt-2 tracking-tight break-words ${color}`} style={{ fontFamily: 'var(--font-manrope)' }}>
         {value}
       </p>
       <p className="text-[9px] text-slate-600 mt-1 leading-relaxed">{desc}</p>
