@@ -32,6 +32,8 @@ import {
 import { SemaforoTermino, calcularSemaforo } from '@/app/interno/dashboard/components/mipg/SemaforoTermino';
 import { VistaAdministracion }                from '@/app/interno/dashboard/components/admin/VistaAdministracion';
 import { PanelSimi }                         from '@/app/interno/dashboard/components/simi/PanelSimi';
+import { InstitucionalHeader }               from '@/app/components/institucional/InstitucionalHeader';
+import { SelloRadicado }                     from '@/app/components/institucional/SelloRadicado';
 import { useFuncionariosTenant }              from '@/lib/hooks/useFuncionariosTenant';
 import type { FuncionarioTenant }             from '@/lib/hooks/useFuncionariosTenant';
 import type { ResponsableFuncionario }        from '@/lib/actions/asignarRadicado';
@@ -474,17 +476,7 @@ function SidebarNav({
     <aside className={`h-full flex flex-col bg-[#0A0A0B] border-r border-white/[0.07] shrink-0 w-[210px] ${className}`}>
       {/* Logo */}
       <div className="px-4 py-4 border-b border-white/[0.07]">
-        <div className="flex items-center gap-2.5">
-          <div className="w-8 h-8 rounded-lg bg-indigo-500/20 border border-indigo-500/30 flex items-center justify-center shrink-0">
-            <svg className="w-4 h-4 text-indigo-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-              <path strokeLinecap="round" strokeLinejoin="round" d="M12 21v-8.25M15.75 21v-8.25M8.25 21v-8.25M3 9l9-6 9 6m-1.5 12V10.332A48.36 48.36 0 0012 9.75c-2.551 0-5.056.2-7.5.582V21M3 21h18M12 6.75h.008v.008H12V6.75z" />
-            </svg>
-          </div>
-          <div className="min-w-0">
-            <p className="text-[10px] text-slate-600 leading-none">Alcaldía</p>
-            <p className="text-xs font-bold text-slate-100 leading-tight">Simacota</p>
-          </div>
-        </div>
+        <InstitucionalHeader compact subtitle="Panel Institucional" />
       </div>
 
       {/* Radicación Rápida */}
@@ -1456,6 +1448,25 @@ function PanelDerecho({
         {/* ── TAB 1: Información ── */}
         {tab === 'info' && (
           <>
+            <SelloRadicado
+              variant="compact"
+              data={{
+                radicadoId: radicado.radicadoId,
+                fechaRadicado: radicado.control.fechaRadicado,
+                horaRadicado: radicado.control.horaRadicado,
+                medioRecepcion: radicado.control.medioRecepcion,
+                tipoSolicitud: radicado.termino.tipoSolicitudNombre,
+                canalRespuesta: radicado.canalRespuesta ?? null,
+                dependencia: NOMBRES_TENANT[radicado.clasificacion.oficinaDestino] ?? radicado.clasificacion.oficinaDestino,
+                estado: radicado.estadoActual,
+                solicitante: radicado.solicitante.nombreCompleto,
+                documento: `${radicado.solicitante.tipoDocumento} ${radicado.solicitante.numeroDocumento}`,
+                correo: radicado.solicitante.email ?? null,
+                esAnonimo: radicado.esAnonimo,
+                identidadReservada: radicado.identidadReservada,
+              }}
+            />
+
             <div>
               <p className="text-[10px] font-bold uppercase tracking-widest text-slate-600 mb-3">Solicitante</p>
               <div className="grid grid-cols-2 gap-x-4 gap-y-3">

@@ -403,3 +403,29 @@ body {
   opacity: 0.40;
   cursor: not-allowed;
 }
+
+@media print {
+  html,
+  body {
+    background: #ffffff !important;
+    color: #0f172a !important;
+  }
+
+  header,
+  nav,
+  .print\:hidden {
+    display: none !important;
+  }
+
+  .constancia-radicacion {
+    width: 100% !important;
+    max-width: 190mm !important;
+    margin: 0 auto !important;
+    padding: 0 !important;
+  }
+
+  .sello-radicado {
+    break-inside: avoid;
+    page-break-inside: avoid;
+  }
+}

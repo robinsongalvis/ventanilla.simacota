@@ -1,4 +1,6 @@
 import Link from 'next/link';
+import { InstitucionalHeader } from '@/app/components/institucional/InstitucionalHeader';
+import { INSTITUCION } from '@/lib/institucion';
 
 const STATS = [
   { value: '16', label: 'Dependencias conectadas' },
@@ -43,28 +45,15 @@ export default function HomePage() {
       {/* ── Navbar ── */}
       <header className="border-b border-white/[0.06] sticky top-0 z-50 backdrop-blur-[20px] bg-[#0A0A0B]/70" role="banner">
         <div className="max-w-6xl mx-auto px-6 py-4 flex items-center justify-between">
-          {/* Logo + identidad institucional */}
-          <div
-            className="flex items-center gap-3"
-            aria-label="Alcaldía Municipal de Simacota — Ventanilla Única Digital"
-          >
-            <div
-              className="w-9 h-9 rounded-lg bg-indigo-500/20 border border-indigo-500/30 flex items-center justify-center"
-              aria-hidden="true"
-            >
-              <svg viewBox="0 0 24 24" fill="none" stroke="#6366F1" strokeWidth={2} className="w-5 h-5" aria-hidden="true">
-                <path strokeLinecap="round" strokeLinejoin="round" d="M12 3l8 4v5c0 5.25-3.5 10.15-8 11.5C7.5 22.15 4 17.25 4 12V7l8-4z" />
-              </svg>
-            </div>
-            <div>
-              <p className="font-label text-indigo-400 text-[10px]">Alcaldía Municipal</p>
-              <p className="text-slate-100 font-semibold text-sm leading-tight" style={{ fontFamily: 'var(--font-manrope)' }}>
-                Simacota, Santander
-              </p>
-            </div>
-          </div>
+          <InstitucionalHeader compact />
           {/* Navegación principal */}
-          <nav aria-label="Navegación principal">
+          <nav aria-label="Navegación principal" className="flex items-center gap-4">
+            <Link
+              href="/directorio"
+              className="font-label text-slate-500 hover:text-slate-300 transition-colors text-[11px]"
+            >
+              Directorio
+            </Link>
             <Link
               href="/interno/dashboard"
               className="font-label text-slate-400 hover:text-slate-200 transition-colors text-[11px]"
@@ -86,7 +75,7 @@ export default function HomePage() {
           aria-label="Estado del sistema: activo"
         >
           <span className="w-2 h-2 rounded-full bg-indigo-400 animate-pulse-glow" aria-hidden="true" />
-          <span className="font-label text-indigo-400 text-[11px]">Sistema activo — Cuentas Claras</span>
+          <span className="font-label text-indigo-400 text-[11px]">{INSTITUCION.contexto} — Sistema activo</span>
         </div>
 
         {/* Headline */}
@@ -197,7 +186,7 @@ export default function HomePage() {
       {/* ── Footer ── */}
       <footer className="border-t border-white/[0.06] py-8 text-center" role="contentinfo">
         <p className="font-label text-slate-600 text-[10px]">
-          Alcaldía Municipal de Simacota · Santander, Colombia · Sistema de Ventanilla Única Digital
+          {INSTITUCION.nombre} · {INSTITUCION.departamento}, {INSTITUCION.pais} · {INSTITUCION.sistema}
         </p>
       </footer>
     </div>

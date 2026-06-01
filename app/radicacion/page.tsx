@@ -10,6 +10,9 @@ import { useSimiDataReceiver }  from '@/lib/store/simiContext';
 import type { DatosExtraidos }  from '@/src/types/simi';
 import { TIPOS_SOLICITUD, TIPOS_PQRSD_CIUDADANO } from '@/lib/tiempos-radicado';
 import type { TipoSolicitudId } from '@/lib/tiempos-radicado';
+import { InstitucionalHeader } from '@/app/components/institucional/InstitucionalHeader';
+import { ConstanciaRadicacion } from '@/app/components/institucional/ConstanciaRadicacion';
+import type { SelloRadicadoData } from '@/app/components/institucional/SelloRadicado';
 
 /* ══════════════════════════════════════════════════════════════
    TIPOS TYPESCRIPT
@@ -101,125 +104,6 @@ function validarTodo(form: FormData): Record<CampoForm, string> {
     canalRespuesta:   '',
     descripcion:      validarCampo('descripcion',      form.descripcion, form),
   };
-}
-
-/* ══════════════════════════════════════════════════════════════
-   SUBCOMPONENTES PUROS
-══════════════════════════════════════════════════════════════ */
-
-function IconoCheck() {
-  return (
-    <div className="animate-success-bounce">
-      <svg viewBox="0 0 52 52" className="w-20 h-20" fill="none" aria-hidden="true">
-        <circle cx="26" cy="26" r="25" stroke="#10B981" strokeWidth="2" className="svg-circle-draw" strokeLinecap="round" />
-        <circle cx="26" cy="26" r="24" fill="rgba(16,185,129,0.12)" />
-        <path d="M14 27 L22 35 L38 17" stroke="#10B981" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" className="svg-check-draw" />
-      </svg>
-    </div>
-  );
-}
-
-function PantallaConfirmacion({
-  radicadoId,
-  errores,
-  onNueva,
-}: {
-  radicadoId: string;
-  errores:    string[];
-  onNueva:    () => void;
-}) {
-  const [copiado, setCopiado] = useState(false);
-
-  function copiarRadicado() {
-    navigator.clipboard.writeText(radicadoId).then(() => {
-      setCopiado(true);
-      setTimeout(() => setCopiado(false), 2000);
-    });
-  }
-
-  return (
-    <div className="flex flex-col items-center justify-center py-12 px-4 text-center animate-fade-in-up">
-      <div className="mb-8">
-        <IconoCheck />
-      </div>
-
-      <h2
-        className="text-2xl font-black tracking-tighter text-slate-50 mb-3"
-        style={{ fontFamily: 'var(--font-manrope)' }}
-      >
-        Solicitud radicada exitosamente
-      </h2>
-      <p className="text-slate-400 text-sm leading-relaxed max-w-sm mb-8">
-        Su solicitud fue recibida y será clasificada por el sistema de IA.
-        Recibirá respuesta por WhatsApp en los próximos días hábiles.
-      </p>
-
-      {errores.length > 0 && (
-        <div className="w-full max-w-sm rounded-xl border border-amber-500/30 bg-amber-500/10 p-4 mb-6 text-left">
-          <p className="text-xs font-bold uppercase tracking-widest text-amber-400 mb-2">Advertencias</p>
-          <ul className="space-y-1">
-            {errores.map((e, i) => (
-              <li key={i} className="text-xs text-amber-300/80 leading-relaxed">• {e}</li>
-            ))}
-          </ul>
-        </div>
-      )}
-
-      <div
-        className="w-full max-w-sm rounded-2xl border border-white/10 p-6 mb-6"
-        style={{ background: 'rgba(15,23,42,0.40)', backdropFilter: 'blur(25px)' }}
-      >
-        <p className="text-xs font-bold uppercase tracking-widest text-slate-500 mb-3">Número de radicado</p>
-        <p className="text-2xl font-black tracking-widest text-indigo-400 break-all" style={{ fontFamily: 'var(--font-manrope)' }}>
-          {radicadoId}
-        </p>
-        <p className="text-slate-500 text-xs mt-3 leading-relaxed">
-          Conserve este número para hacer seguimiento de su caso.
-        </p>
-      </div>
-
-      <div className="flex flex-col gap-3 w-full max-w-sm">
-        <button
-          onClick={copiarRadicado}
-          className="w-full py-3 px-6 rounded-xl font-bold text-sm uppercase tracking-wider transition-all duration-300
-            border border-indigo-500/40 text-indigo-400 hover:border-indigo-500 hover:bg-indigo-500/10 flex items-center justify-center gap-2"
-        >
-          {copiado ? (
-            <>
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2.5} className="w-4 h-4">
-                <path strokeLinecap="round" strokeLinejoin="round" d="M4.5 12.75l6 6 9-13.5" />
-              </svg>
-              ¡Copiado!
-            </>
-          ) : (
-            <>
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} className="w-4 h-4">
-                <path strokeLinecap="round" strokeLinejoin="round" d="M15.75 17.25v3.375c0 .621-.504 1.125-1.125 1.125h-9.75a1.125 1.125 0 01-1.125-1.125V7.875c0-.621.504-1.125 1.125-1.125H6.75a9.06 9.06 0 011.5.124m7.5 10.376h3.375c.621 0 1.125-.504 1.125-1.125V11.25c0-4.46-3.243-8.161-7.5-8.876a9.06 9.06 0 00-1.5-.124H9.375c-.621 0-1.125.504-1.125 1.125v3.5m7.5 10.375H9.375a1.125 1.125 0 01-1.125-1.125v-9.25m12 6.625v-1.875a3.375 3.375 0 00-3.375-3.375h-1.5a1.125 1.125 0 01-1.125-1.125v-1.5a3.375 3.375 0 00-3.375-3.375H9.75" />
-              </svg>
-              Copiar número de radicado
-            </>
-          )}
-        </button>
-
-        <Link
-          href={`/consulta?id=${radicadoId}`}
-          className="w-full py-3 px-6 rounded-xl font-bold text-sm uppercase tracking-wider text-white text-center
-            bg-gradient-to-r from-indigo-600 to-indigo-500 hover:from-indigo-500 hover:to-indigo-400
-            hover:shadow-lg hover:shadow-indigo-500/25 transition-all duration-300"
-        >
-          Consultar estado de mi solicitud
-        </Link>
-
-        <button
-          onClick={onNueva}
-          className="w-full py-3 px-6 rounded-xl font-bold text-sm uppercase tracking-wider text-slate-400
-            border border-white/10 hover:border-white/20 hover:text-slate-200 transition-all duration-300"
-        >
-          Radicar otra solicitud
-        </button>
-      </div>
-    </div>
-  );
 }
 
 /* ══════════════════════════════════════════════════════════════
@@ -322,7 +206,7 @@ export default function PortalCiudadano() {
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const [estado, setEstado] = useState<'formulario' | 'enviando' | 'confirmacion'>('formulario');
-  const [radicadoId, setRadicadoId] = useState('');
+  const [selloRadicado, setSelloRadicado] = useState<SelloRadicadoData | null>(null);
   const [progresoMensaje, setProgresoMensaje] = useState('');
   const [progresoPct, setProgresoPct] = useState(0);
   const [progresosArchivos, setProgresosArchivos] = useState<UploadProgress[]>([]);
@@ -425,6 +309,7 @@ export default function PortalCiudadano() {
     setProgresoMensaje('Iniciando radicación...');
     setProgresoPct(0);
     setProgresosArchivos([]);
+    const fechaSolicitud = new Date();
 
     const res = await radicarSolicitud(
       {
@@ -452,7 +337,21 @@ export default function PortalCiudadano() {
     );
 
     setErroresSubmit(res.errores);
-    setRadicadoId(res.radicadoId);
+    setSelloRadicado({
+      radicadoId: res.radicadoId,
+      fechaRadicado: fechaSolicitud,
+      horaRadicado: fechaSolicitud,
+      medioRecepcion: 'WEB',
+      tipoSolicitud: TIPOS_SOLICITUD[form.tipoSolicitudId].nombre,
+      canalRespuesta: form.canalRespuesta,
+      dependencia: NOMBRES_TENANT[analisisIa?.dependenciaSugerida ?? 'VENTANILLA_UNICA'] ?? 'Ventanilla Única',
+      estado: 'Radicado',
+      solicitante: form.tipoPresentacion === 'ANONIMA' ? null : form.nombre.trim(),
+      documento: null,
+      correo: form.email.trim().toLowerCase() || null,
+      esAnonimo: form.tipoPresentacion === 'ANONIMA',
+      identidadReservada: form.tipoPresentacion === 'RESERVADA',
+    });
     setEstado('confirmacion');
   }
 
@@ -481,7 +380,7 @@ export default function PortalCiudadano() {
     setArchivos([]);
     setErrorArchivo('');
     setEstado('formulario');
-    setRadicadoId('');
+    setSelloRadicado(null);
     setProgresoMensaje('');
     setProgresoPct(0);
     setProgresosArchivos([]);
@@ -528,19 +427,7 @@ export default function PortalCiudadano() {
             </svg>
           </Link>
 
-          <div className="w-8 h-8 rounded-lg border border-indigo-500/30 bg-indigo-500/15 flex items-center justify-center shrink-0">
-            <svg viewBox="0 0 24 24" fill="none" stroke="#6366F1" strokeWidth={2} className="w-4 h-4">
-              <path strokeLinecap="round" strokeLinejoin="round" d="M12 3l8 4v5c0 5.25-3.5 10.15-8 11.5C7.5 22.15 4 17.25 4 12V7l8-4z" />
-            </svg>
-          </div>
-          <div className="min-w-0">
-            <p className="text-[10px] font-bold uppercase tracking-widest text-indigo-400 leading-none mb-0.5">
-              Alcaldía de Simacota
-            </p>
-            <p className="text-slate-200 text-sm font-black tracking-tight leading-none truncate" style={{ fontFamily: 'var(--font-manrope)' }}>
-              Ventanilla Única Digital
-            </p>
-          </div>
+          <InstitucionalHeader compact />
 
           <nav className="ml-auto hidden sm:flex items-center gap-2 text-[10px] font-bold uppercase tracking-widest text-slate-600">
             <Link href="/" className="hover:text-slate-400 transition-colors">Inicio</Link>
@@ -554,12 +441,9 @@ export default function PortalCiudadano() {
       <div className="max-w-4xl mx-auto px-4 sm:px-6 py-10 sm:py-16">
 
         {estado === 'confirmacion' ? (
-          <div
-            className="rounded-2xl border border-white/10"
-            style={{ background: 'rgba(15,23,42,0.40)', backdropFilter: 'blur(25px)' }}
-          >
-            <PantallaConfirmacion radicadoId={radicadoId} errores={erroresSubmit} onNueva={resetFormulario} />
-          </div>
+          selloRadicado ? (
+            <ConstanciaRadicacion sello={selloRadicado} errores={erroresSubmit} onNueva={resetFormulario} />
+          ) : null
         ) : (
           <>
             <div className="text-center mb-10 field-animate" style={{ animationDelay: '0ms' }}>

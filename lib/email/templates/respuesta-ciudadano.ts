@@ -1,3 +1,5 @@
+import { INSTITUCION } from '@/lib/institucion';
+
 /* ══════════════════════════════════════════════════════════════
    TEMPLATE: Notificación de respuesta al ciudadano
    Activado cuando el funcionario marca un radicado como RESUELTO.
@@ -34,7 +36,7 @@ export function buildRespuestaCiudadanoHtml(
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Su solicitud ha sido respondida – Alcaldía de Simacota</title>
+  <title>Su solicitud ha sido respondida – ${INSTITUCION.nombre}</title>
 </head>
 <body style="margin:0;padding:0;background:#f4f5f7;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;">
 
@@ -47,7 +49,10 @@ export function buildRespuestaCiudadanoHtml(
           <tr>
             <td style="background:#1a237e;padding:28px 32px;">
               <p style="margin:0;color:#ffffff;font-size:11px;font-weight:700;letter-spacing:2px;text-transform:uppercase;opacity:0.7;">
-                Alcaldía Municipal de Simacota · Santander
+                ${INSTITUCION.nombre} · ${INSTITUCION.departamento}
+              </p>
+              <p style="margin:6px 0 0;color:#c7d2fe;font-size:12px;font-weight:700;letter-spacing:1.6px;text-transform:uppercase;">
+                ${INSTITUCION.sistema}
               </p>
               <p style="margin:8px 0 0;color:#ffffff;font-size:22px;font-weight:800;line-height:1.3;">
                 Su solicitud ha sido respondida
@@ -81,7 +86,7 @@ export function buildRespuestaCiudadanoHtml(
 
               <p style="margin:0 0 24px;color:#37474f;font-size:15px;line-height:1.6;">
                 Le informamos que su solicitud radicada en la <strong>${escapeHtml(p.dependenciaNombre)}</strong>
-                de la Alcaldía de Simacota ha sido atendida y marcada como resuelta.
+                de la ${INSTITUCION.nombre} ha sido atendida y marcada como resuelta.
               </p>
 
               <!-- Tarjeta del radicado -->
@@ -158,7 +163,7 @@ export function buildRespuestaCiudadanoHtml(
                 Este mensaje fue generado automáticamente por el sistema de
               </p>
               <p style="margin:0;color:#546e7a;font-size:12px;font-weight:600;">
-                Ventanilla Única Digital · Alcaldía Municipal de Simacota, Santander, Colombia
+                ${INSTITUCION.sistema} · ${INSTITUCION.nombre}, ${INSTITUCION.departamento}, ${INSTITUCION.pais}
               </p>
             </td>
           </tr>
@@ -183,5 +188,5 @@ function escapeHtml(str: string): string {
 }
 
 export function buildRespuestaCiudadanoSubject(radicadoId: string): string {
-  return `Su solicitud ${radicadoId} ha sido respondida – Alcaldía de Simacota`;
+  return `Su solicitud ${radicadoId} ha sido respondida – ${INSTITUCION.nombre}`;
 }

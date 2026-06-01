@@ -54,6 +54,7 @@ async function getVentanillaRadicadoPublico(id: string) {
     estadoActual: data.estadoActual,
     tipoSolicitudNombre: data.termino?.tipoSolicitudNombre,
     canalRespuesta: data.canalRespuesta ?? null,
+    fechaVencimiento: data.termino?.fechaVencimiento,
     clasificacionIA: data.clasificacion?.oficinaDestino
       ? { oficinaDestino: data.clasificacion.oficinaDestino }
       : null,
@@ -98,6 +99,7 @@ export async function GET(_request: NextRequest, context: RouteContext) {
       estadoActual: data.estadoActual as EstadoRadicado | undefined,
       tipoSolicitudNombre: typeof data.tipoSolicitudNombre === 'string' ? data.tipoSolicitudNombre : undefined,
       canalRespuesta: typeof data.canalRespuesta === 'string' ? data.canalRespuesta : null,
+      fechaVencimiento: undefined,
       clasificacionIA: clasificacion?.oficinaDestino
         ? { oficinaDestino: clasificacion.oficinaDestino }
         : null,

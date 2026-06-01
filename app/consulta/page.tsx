@@ -5,6 +5,8 @@ import { useSearchParams } from 'next/navigation';
 import Link from 'next/link';
 import { DIRECTORIO_TENANTS } from '@/src/types/reglas-negocio';
 import type { AccionAuditoria, EstadoRadicado, TenantId } from '@/src/types/radicado';
+import { InstitucionalHeader } from '@/app/components/institucional/InstitucionalHeader';
+import { SelloRadicado } from '@/app/components/institucional/SelloRadicado';
 
 /* ══════════════════════════════════════════════════════════════
    DATOS: ESTADOS Y AUDITORÍA EN LENGUAJE CIUDADANO
@@ -115,6 +117,7 @@ interface RadicadoPublico {
   estadoActual?: EstadoPublico;
   tipoSolicitudNombre?: string;
   canalRespuesta?: string | null;
+  fechaVencimiento?: string;
   clasificacionIA?: {
     oficinaDestino?: TenantId;
   } | null;
@@ -252,19 +255,7 @@ function ConsultaInterna() {
       {/* ── Header ── */}
       <header className="border-b border-white/[0.06] backdrop-blur-[20px] bg-[#0A0A0B]/70">
         <div className="max-w-4xl mx-auto px-4 sm:px-6 py-5 flex items-center gap-3">
-          <div className="w-9 h-9 rounded-xl border border-indigo-500/30 bg-indigo-500/15 flex items-center justify-center shrink-0">
-            <svg viewBox="0 0 24 24" fill="none" stroke="#6366F1" strokeWidth={2} className="w-5 h-5">
-              <path strokeLinecap="round" strokeLinejoin="round" d="M12 3l8 4v5c0 5.25-3.5 10.15-8 11.5C7.5 22.15 4 17.25 4 12V7l8-4z" />
-            </svg>
-          </div>
-          <div>
-            <p className="text-[10px] font-bold uppercase tracking-widest text-indigo-400 leading-none mb-0.5">
-              Alcaldía de Simacota
-            </p>
-            <p className="text-slate-200 text-sm font-black tracking-tight leading-none" style={{ fontFamily: 'var(--font-manrope)' }}>
-              Consulta de Estado de Solicitud
-            </p>
-          </div>
+          <InstitucionalHeader compact subtitle="Consulta de Estado de Solicitud" />
           <Link
             href="/"
             className="ml-auto text-[10px] font-bold uppercase tracking-widest text-slate-600 hover:text-slate-400 transition-colors"
@@ -400,6 +391,27 @@ function ConsultaInterna() {
                 </div>
                 <p className="text-sm text-slate-300 leading-relaxed">{estadoInfo.descripcion}</p>
               </div>
+            </div>
+
+            <div className="px-6 py-5 border-b border-white/[0.06]">
+              <SelloRadicado
+                variant="compact"
+                data={{
+                  radicadoId: radicado.radicadoId,
+                  fechaRadicado: fechaCreacion,
+                  medioRecepcion: radicado.radicadoId.includes('-WEB-') ? 'WEB' : 'WEB',
+                  tipoSolicitud: radicado.tipoSolicitudNombre ?? 'No registrado',
+                  canalRespuesta: radicado.canalRespuesta ?? null,
+                  dependencia: oficina?.nombreOficial ?? 'Pendiente de asignación',
+                  estado: estadoInfo.titulo,
+                  esAnonimo: false,
+                }}
+              />
+              {radicado.fechaVencimiento && (
+                <p className="mt-3 text-xs text-slate-500">
+                  Fecha límite estimada: <span className="font-semibold text-slate-300">{formatearFecha(radicado.fechaVencimiento)}</span>
+                </p>
+              )}
             </div>
 
             {(radicado.tipoSolicitudNombre || radicado.canalRespuesta) && (
