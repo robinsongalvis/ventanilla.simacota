@@ -13,6 +13,8 @@ import type { RolInterno } from '@/lib/hooks/useAuth';
 export type TipoPersona = 'NATURAL' | 'JURIDICA';
 export type TipoDocumento = 'CC' | 'CE' | 'NIT' | 'PASAPORTE' | 'OTRO';
 export type MedioRecepcion = 'OFICIO_FISICO' | 'EMAIL' | 'WEB' | 'PRESENCIAL';
+/** Canal por el que el ciudadano prefiere recibir la respuesta */
+export type CanalRespuesta = 'CORREO' | 'PRESENCIAL' | 'TELEFONO';
 
 export interface UbicacionSolicitante {
   pais: string;
@@ -147,6 +149,10 @@ export interface VentanillaRadicado {
    * puede consultarlo en cualquier momento, incluso años después.
    */
   cumplioTermino?: boolean | null;
+  /** PQRSD: solicitud presentada de forma anónima (Ley 1755/2015 art. 14) */
+  esAnonimo?: boolean;
+  /** Canal de respuesta preferido por el ciudadano */
+  canalRespuesta?: CanalRespuesta | null;
   solicitante: SolicitanteRadicado;
   control: ControlRadicacion;
   termino: TerminoLegal;

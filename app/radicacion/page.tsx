@@ -4,10 +4,12 @@ import { useCallback, useRef, useState } from 'react';
 import Link from 'next/link';
 import { radicarSolicitud } from '@/lib/radicacion';
 import type { UploadProgress } from '@/lib/storage';
-import type { AnalisisIA } from '@/src/types/ventanilla';
-import { NOMBRES_TENANT } from '@/src/types/reglas-negocio';
-import { useSimiDataReceiver } from '@/lib/store/simiContext';
-import type { DatosExtraidos } from '@/src/types/simi';
+import type { AnalisisIA }    from '@/src/types/ventanilla';
+import { NOMBRES_TENANT }      from '@/src/types/reglas-negocio';
+import { useSimiDataReceiver }  from '@/lib/store/simiContext';
+import type { DatosExtraidos }  from '@/src/types/simi';
+import { TIPOS_SOLICITUD, TIPOS_PQRSD_CIUDADANO } from '@/lib/tiempos-radicado';
+import type { TipoSolicitudId } from '@/lib/tiempos-radicado';
 
 /* ══════════════════════════════════════════════════════════════
    TIPOS TYPESCRIPT
@@ -17,6 +19,9 @@ interface FormData {
   nombre: string;
   email: string;
   telefono: string;
+  tipoSolicitudId: TipoSolicitudId;
+  tipoPresentacion: 'IDENTIFICADA' | 'ANONIMA' | 'RESERVADA';
+  canalRespuesta: 'CORREO' | 'PRESENCIAL' | 'TELEFONO';
   descripcion: string;
 }
 
@@ -31,6 +36,7 @@ const EMAIL_RE      = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 const TEL_RE        = /^3[0-9]{9}$/;
 const MAX_ARCHIVOS  = 3;
 const MAX_BYTES     = 5 * 1024 * 1024; // 5 MB
+const MAX_DESCRIPCION = 5000;
 const TIPOS_VALIDOS = new Set(['application/pdf', 'image/jpeg', 'image/png']);
 
 /* ══════════════════════════════════════════════════════════════
@@ -43,19 +49,30 @@ function formatBytes(bytes: number): string {
   return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
 }
 
-function validarCampo(campo: CampoForm, valor: string): string {
+function validarCampo(campo: CampoForm, valor: string, form?: FormData): string {
+  const esAnonimo = form?.tipoPresentacion === 'ANONIMA';
+
   switch (campo) {
     case 'nombre':
+      if (esAnonimo) return '';
       if (!valor.trim() || valor.trim().length < 3)
         return 'Ingresa tu nombre completo (mínimo 3 caracteres).';
       return '';
     case 'email':
+      if (esAnonimo && !valor.trim()) return '';
+      if (!valor.trim() && form?.canalRespuesta !== 'CORREO') return '';
       if (!EMAIL_RE.test(valor.trim()))
         return 'Ingresa un correo electrónico válido.';
       return '';
     case 'telefono':
+      if (esAnonimo && !valor.trim()) return '';
+      if (!valor.trim() && form?.canalRespuesta !== 'TELEFONO') return '';
       if (!TEL_RE.test(valor.replace(/\s/g, '')))
         return 'Celular colombiano: 10 dígitos, debe comenzar por 3.';
+      return '';
+    case 'tipoSolicitudId':
+    case 'tipoPresentacion':
+    case 'canalRespuesta':
       return '';
     case 'descripcion':
       if (valor.trim().length < 20)
@@ -68,10 +85,13 @@ function validarCampo(campo: CampoForm, valor: string): string {
 
 function validarTodo(form: FormData): Record<CampoForm, string> {
   return {
-    nombre:      validarCampo('nombre',      form.nombre),
-    email:       validarCampo('email',       form.email),
-    telefono:    validarCampo('telefono',    form.telefono),
-    descripcion: validarCampo('descripcion', form.descripcion),
+    nombre:           validarCampo('nombre',           form.nombre, form),
+    email:            validarCampo('email',            form.email, form),
+    telefono:         validarCampo('telefono',         form.telefono, form),
+    tipoSolicitudId:  '',
+    tipoPresentacion: '',
+    canalRespuesta:   '',
+    descripcion:      validarCampo('descripcion',      form.descripcion, form),
   };
 }
 
@@ -200,12 +220,24 @@ function PantallaConfirmacion({
 
 export default function PortalCiudadano() {
   const [form, setForm] = useState<FormData>({
-    nombre: '', email: '', telefono: '', descripcion: '',
+    nombre: '',
+    email: '',
+    telefono: '',
+    tipoSolicitudId: 'PETICION',
+    tipoPresentacion: 'IDENTIFICADA',
+    canalRespuesta: 'CORREO',
+    descripcion: '',
   });
 
   const [touched, setTouched] = useState<Partial<Record<CampoForm, true>>>({});
   const [errors, setErrors] = useState<Record<CampoForm, string>>({
-    nombre: '', email: '', telefono: '', descripcion: '',
+    nombre: '',
+    email: '',
+    telefono: '',
+    tipoSolicitudId: '',
+    tipoPresentacion: '',
+    canalRespuesta: '',
+    descripcion: '',
   });
 
   /* ══════════════════════════════════════════════════════════════
@@ -250,20 +282,20 @@ export default function PortalCiudadano() {
       setErrors((prev) => ({
         ...prev,
         ...(actualizados.nombre !== undefined
-          ? { nombre: validarCampo('nombre', actualizados.nombre) }
+          ? { nombre: validarCampo('nombre', actualizados.nombre, { ...form, ...actualizados }) }
           : {}),
         ...(actualizados.email !== undefined
-          ? { email: validarCampo('email', actualizados.email) }
+          ? { email: validarCampo('email', actualizados.email, { ...form, ...actualizados }) }
           : {}),
         ...(actualizados.telefono !== undefined
-          ? { telefono: validarCampo('telefono', actualizados.telefono) }
+          ? { telefono: validarCampo('telefono', actualizados.telefono, { ...form, ...actualizados }) }
           : {}),
         ...(actualizados.descripcion !== undefined
-          ? { descripcion: validarCampo('descripcion', actualizados.descripcion) }
+          ? { descripcion: validarCampo('descripcion', actualizados.descripcion, { ...form, ...actualizados }) }
           : {}),
       }));
     },
-    [], // validarCampo es una función pura definida fuera del componente
+    [form],
   );
 
   // Registra el handler con el Context de SIMI.
@@ -287,9 +319,10 @@ export default function PortalCiudadano() {
   const [erroresSubmit, setErroresSubmit] = useState<string[]>([]);
 
   function handleChange(campo: CampoForm, valor: string) {
-    setForm((prev) => ({ ...prev, [campo]: valor }));
+    const siguiente = { ...form, [campo]: valor };
+    setForm(siguiente);
     if (touched[campo]) {
-      setErrors((prev) => ({ ...prev, [campo]: validarCampo(campo, valor) }));
+      setErrors((prev) => ({ ...prev, [campo]: validarCampo(campo, valor, siguiente) }));
     }
 
     if (campo === 'descripcion') {
@@ -323,7 +356,7 @@ export default function PortalCiudadano() {
 
   function handleBlur(campo: CampoForm) {
     setTouched((prev) => ({ ...prev, [campo]: true }));
-    setErrors((prev) => ({ ...prev, [campo]: validarCampo(campo, form[campo]) }));
+    setErrors((prev) => ({ ...prev, [campo]: validarCampo(campo, form[campo], form) }));
   }
 
   function procesarArchivos(nuevos: FileList | null) {
@@ -367,7 +400,7 @@ export default function PortalCiudadano() {
   async function handleSubmit(e: { preventDefault(): void }) {
     e.preventDefault();
 
-    setTouched({ nombre: true, email: true, telefono: true, descripcion: true });
+    setTouched({ nombre: true, email: true, telefono: true, tipoSolicitudId: true, tipoPresentacion: true, canalRespuesta: true, descripcion: true });
     const erroresFinal = validarTodo(form);
     setErrors(erroresFinal);
 
@@ -387,13 +420,18 @@ export default function PortalCiudadano() {
       {
         origen: 'WEB',
         ciudadano: {
-          nombre:   form.nombre.trim(),
+          nombre:   form.tipoPresentacion === 'ANONIMA' ? 'Ciudadano anonimo' : form.nombre.trim(),
           email:    form.email.trim().toLowerCase(),
           telefono: form.telefono.replace(/\s/g, ''),
         },
         descripcion: form.descripcion.trim(),
         archivos,
         analisisIa: analisisIa || undefined,
+        tipoSolicitudId: form.tipoSolicitudId,
+        tipoPresentacion: form.tipoPresentacion,
+        esAnonimo: form.tipoPresentacion === 'ANONIMA',
+        identidadReservada: form.tipoPresentacion === 'RESERVADA',
+        canalRespuesta: form.canalRespuesta,
       },
       (mensaje, pct, progresos) => {
         setProgresoMensaje(mensaje);
@@ -408,9 +446,25 @@ export default function PortalCiudadano() {
   }
 
   function resetFormulario() {
-    setForm({ nombre: '', email: '', telefono: '', descripcion: '' });
+    setForm({
+      nombre: '',
+      email: '',
+      telefono: '',
+      tipoSolicitudId: 'PETICION',
+      tipoPresentacion: 'IDENTIFICADA',
+      canalRespuesta: 'CORREO',
+      descripcion: '',
+    });
     setTouched({});
-    setErrors({ nombre: '', email: '', telefono: '', descripcion: '' });
+    setErrors({
+      nombre: '',
+      email: '',
+      telefono: '',
+      tipoSolicitudId: '',
+      tipoPresentacion: '',
+      canalRespuesta: '',
+      descripcion: '',
+    });
     setArchivos([]);
     setErrorArchivo('');
     setEstado('formulario');
@@ -515,10 +569,80 @@ export default function PortalCiudadano() {
               className="rounded-2xl border border-white/10 p-6 sm:p-8 space-y-6"
               style={{ background: 'rgba(15,23,42,0.40)', backdropFilter: 'blur(25px)' }}
             >
+              {/* ─ Tipo PQRSD ─ */}
+              <div className="field-animate" style={{ animationDelay: `${STAGGER[0]}ms` }}>
+                <label htmlFor="tipoSolicitudId" className="block text-xs font-bold uppercase tracking-widest text-slate-400 mb-2">
+                  Tipo de solicitud PQRSD *
+                </label>
+                <select
+                  id="tipoSolicitudId"
+                  className={inputClass('tipoSolicitudId')}
+                  value={form.tipoSolicitudId}
+                  onChange={(e) => handleChange('tipoSolicitudId', e.target.value as TipoSolicitudId)}
+                  disabled={estado === 'enviando'}
+                >
+                  {TIPOS_PQRSD_CIUDADANO.map((id) => {
+                    const tipo = TIPOS_SOLICITUD[id];
+                    return (
+                      <option key={id} value={id}>
+                        {tipo.nombre} - {tipo.diasRespuesta} dias {tipo.unidad.toLowerCase()}
+                      </option>
+                    );
+                  })}
+                </select>
+                <p className="mt-2 text-xs text-slate-500">
+                  El termino legal se calcula segun el tipo seleccionado.
+                </p>
+              </div>
+
+              {/* ─ Presentacion + canal ─ */}
+              <div className="grid sm:grid-cols-2 gap-6 field-animate" style={{ animationDelay: `${STAGGER[1]}ms` }}>
+                <div>
+                  <label htmlFor="tipoPresentacion" className="block text-xs font-bold uppercase tracking-widest text-slate-400 mb-2">
+                    Forma de presentacion *
+                  </label>
+                  <select
+                    id="tipoPresentacion"
+                    className={inputClass('tipoPresentacion')}
+                    value={form.tipoPresentacion}
+                    onChange={(e) => handleChange('tipoPresentacion', e.target.value)}
+                    disabled={estado === 'enviando'}
+                  >
+                    <option value="IDENTIFICADA">Identificada</option>
+                    <option value="ANONIMA">Anonima</option>
+                    <option value="RESERVADA">Identidad reservada</option>
+                  </select>
+                  <p className="mt-2 text-xs text-slate-500">
+                    La opcion anonima no exige datos personales. La reservada protege la identidad en el tramite interno.
+                  </p>
+                </div>
+
+                <div>
+                  <label htmlFor="canalRespuesta" className="block text-xs font-bold uppercase tracking-widest text-slate-400 mb-2">
+                    Canal de respuesta preferido *
+                  </label>
+                  <select
+                    id="canalRespuesta"
+                    className={inputClass('canalRespuesta')}
+                    value={form.canalRespuesta}
+                    onChange={(e) => handleChange('canalRespuesta', e.target.value)}
+                    disabled={estado === 'enviando'}
+                  >
+                    <option value="CORREO">Correo electronico</option>
+                    <option value="TELEFONO">Telefono</option>
+                    <option value="PRESENCIAL">Presencial</option>
+                  </select>
+                  <p className="mt-2 text-xs text-slate-500">
+                    Si elige correo o telefono, ese dato sera obligatorio salvo que la solicitud sea anonima.
+                  </p>
+                </div>
+              </div>
+
               {/* ─ Nombre ─ */}
-              <div className="field-animate" style={{ animationDelay: `${STAGGER[1]}ms` }}>
+              {form.tipoPresentacion !== 'ANONIMA' && (
+              <div className="field-animate" style={{ animationDelay: `${STAGGER[2]}ms` }}>
                 <label htmlFor="nombre" className="block text-xs font-bold uppercase tracking-widest text-slate-400 mb-2">
-                  Nombre completo *
+                  Nombre completo {form.tipoPresentacion === 'RESERVADA' ? '(identidad reservada)' : '*'}
                 </label>
                 <input
                   id="nombre"
@@ -535,12 +659,13 @@ export default function PortalCiudadano() {
                 />
                 <FeedbackCampo id="error-nombre" error={errors.nombre} touched={!!touched.nombre} valorOk={form.nombre.trim().length >= 3} />
               </div>
+              )}
 
               {/* ─ Email + Teléfono ─ */}
-              <div className="grid sm:grid-cols-2 gap-6 field-animate" style={{ animationDelay: `${STAGGER[2]}ms` }}>
+              <div className="grid sm:grid-cols-2 gap-6 field-animate" style={{ animationDelay: `${STAGGER[3]}ms` }}>
                 <div>
                   <label htmlFor="email" className="block text-xs font-bold uppercase tracking-widest text-slate-400 mb-2">
-                    Correo electrónico *
+                    Correo electrónico {form.canalRespuesta === 'CORREO' && form.tipoPresentacion !== 'ANONIMA' ? '*' : '(opcional)'}
                   </label>
                   <input
                     id="email"
@@ -560,7 +685,7 @@ export default function PortalCiudadano() {
 
                 <div>
                   <label htmlFor="telefono" className="block text-xs font-bold uppercase tracking-widest text-slate-400 mb-2">
-                    Celular WhatsApp *
+                    Celular WhatsApp {form.canalRespuesta === 'TELEFONO' && form.tipoPresentacion !== 'ANONIMA' ? '*' : '(opcional)'}
                   </label>
                   <input
                     id="telefono"
@@ -582,13 +707,13 @@ export default function PortalCiudadano() {
               </div>
 
               {/* ─ Descripción ─ */}
-              <div className="field-animate" style={{ animationDelay: `${STAGGER[3]}ms` }}>
+              <div className="field-animate" style={{ animationDelay: `${STAGGER[4]}ms` }}>
                 <div className="flex items-center justify-between mb-2">
                   <label htmlFor="descripcion" className="block text-xs font-bold uppercase tracking-widest text-slate-400">
                     Descripción de la solicitud *
                   </label>
                   <span className={`text-xs tabular-nums ${form.descripcion.length >= 20 ? 'text-emerald-500' : 'text-slate-600'}`}>
-                    {form.descripcion.length}/1 000
+                    {form.descripcion.length}/{MAX_DESCRIPCION.toLocaleString('es-CO')}
                   </span>
                 </div>
                 <textarea
@@ -597,7 +722,7 @@ export default function PortalCiudadano() {
                   className={`${inputClass('descripcion')} resize-none`}
                   placeholder="Describe con detalle tu solicitud. Si es de una vereda rural (ej. zona Yariguíes), indícalo para un mejor enrutamiento..."
                   value={form.descripcion}
-                  onChange={(e) => handleChange('descripcion', e.target.value.slice(0, 1000))}
+                  onChange={(e) => handleChange('descripcion', e.target.value.slice(0, MAX_DESCRIPCION))}
                   onBlur={() => handleBlur('descripcion')}
                   disabled={estado === 'enviando'}
                   aria-describedby={errors.descripcion ? 'error-descripcion' : undefined}
@@ -654,7 +779,7 @@ export default function PortalCiudadano() {
               </div>
 
               {/* ─ Archivos adjuntos ─ */}
-              <div className="field-animate" style={{ animationDelay: `${STAGGER[4]}ms` }}>
+              <div className="field-animate" style={{ animationDelay: `${STAGGER[5]}ms` }}>
                 <div className="flex items-center justify-between mb-2">
                   <p className="text-xs font-bold uppercase tracking-widest text-slate-400">
                     Archivos adjuntos <span className="text-slate-600 normal-case tracking-normal font-normal">(opcional — máx. {MAX_ARCHIVOS})</span>

@@ -12,6 +12,10 @@ export type Prioridad = 'ROJO' | 'NARANJA' | 'AMARILLO';
 
 export type ZonaGeografica = 'ZONA_YARIGUIES' | 'CASCO_URBANO' | 'ZONA_RURAL';
 
+export type TipoPresentacionPqrsd = 'IDENTIFICADA' | 'ANONIMA' | 'RESERVADA';
+
+export type CanalRespuesta = 'CORREO' | 'PRESENCIAL' | 'TELEFONO';
+
 export type TenantId =
   | 'DESPACHO_ALCALDE'
   | 'SEC_GOBIERNO'
@@ -75,6 +79,12 @@ export interface Radicado {
   clasificacionIA: ClasificacionIA | null;
   archivos: Archivo[];
   auditoria: AuditoriaEntry[];
+  tipoSolicitudId?: string;
+  tipoSolicitudNombre?: string;
+  tipoPresentacion?: TipoPresentacionPqrsd;
+  esAnonimo?: boolean;
+  identidadReservada?: boolean;
+  canalRespuesta?: CanalRespuesta;
 }
 
 /** Payload del formulario ciudadano antes de ser enriquecido por IA */

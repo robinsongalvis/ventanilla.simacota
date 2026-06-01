@@ -101,7 +101,13 @@ service cloud.firestore {
         'clasificacionIA',
         'archivos',
         'auditoria',
-        'notasInternas'
+        'notasInternas',
+        'tipoSolicitudId',
+        'tipoSolicitudNombre',
+        'tipoPresentacion',
+        'esAnonimo',
+        'identidadReservada',
+        'canalRespuesta'
       ])
       && request.resource.data.radicadoId is string
       && request.resource.data.origen in ['WEB', 'FISICO_ESCANER']
@@ -120,7 +126,40 @@ service cloud.firestore {
       && request.resource.data.ciudadano.email is string
       && request.resource.data.ciudadano.telefono is string
       && request.resource.data.archivos is list
-      && request.resource.data.auditoria is list;
+      && request.resource.data.auditoria is list
+      && (
+        !request.resource.data.keys().hasAny(['tipoSolicitudId'])
+        || request.resource.data.tipoSolicitudId in [
+          'PETICION',
+          'PETICION_INFORMACION',
+          'PETICION_AUTORIDADES',
+          'QUEJA',
+          'RECLAMO',
+          'SUGERENCIA',
+          'FELICITACION',
+          'DENUNCIA',
+          'HABEAS_DATA',
+          'INFORMATIVO',
+          'LICENCIA_CONSTRUCCION',
+          'ENTES_CONTROL_URGENTE'
+        ]
+      )
+      && (
+        !request.resource.data.keys().hasAny(['tipoPresentacion'])
+        || request.resource.data.tipoPresentacion in ['IDENTIFICADA', 'ANONIMA', 'RESERVADA']
+      )
+      && (
+        !request.resource.data.keys().hasAny(['canalRespuesta'])
+        || request.resource.data.canalRespuesta in ['CORREO', 'PRESENCIAL', 'TELEFONO']
+      )
+      && (
+        !request.resource.data.keys().hasAny(['esAnonimo'])
+        || request.resource.data.esAnonimo is bool
+      )
+      && (
+        !request.resource.data.keys().hasAny(['identidadReservada'])
+        || request.resource.data.identidadReservada is bool
+      );
     }
 
     function validRadicadoUpdate() {

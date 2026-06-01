@@ -5,7 +5,7 @@ import {
   getFirebaseAdminAuth,
   getFirebaseAdminDb,
 } from '@/lib/firebase-admin';
-import { DIRECTORIO_TENANTS, NOMBRES_TENANT } from '@/src/types/reglas-negocio';
+import { NOMBRES_TENANT } from '@/src/types/reglas-negocio';
 import { diasRestantesHabiles } from '@/lib/tiempos-radicado';
 import type { VentanillaRadicado, TrazabilidadRadicado } from '@/src/types/ventanilla';
 import type { TenantId } from '@/src/types/radicado';

@@ -9,6 +9,7 @@ import { doc, setDoc }    from 'firebase/firestore';
 import { getDb }          from './firebase';
 import { subirArchivos, type UploadResult, type UploadProgress } from './storage';
 import type { AnalisisIA } from '@/src/types/ventanilla';
+import { TIPOS_SOLICITUD, type TipoSolicitudId } from '@/lib/tiempos-radicado';
 
 /* ──────────────────────────────────────────────
    ID de radicado
@@ -45,6 +46,16 @@ export interface DatosRadicacion {
   notasInternas?:  string;   // Solo ventanilla física
   archivos:        File[];
   analisisIa?:     AnalisisIA;
+  /** PQRSD: tipo de solicitud seleccionado por el ciudadano */
+  tipoSolicitudId?: TipoSolicitudId;
+  /** PQRSD: presentación identificada, anónima o con identidad reservada */
+  tipoPresentacion?: 'IDENTIFICADA' | 'ANONIMA' | 'RESERVADA';
+  /** PQRSD: solicitud anónima (compatibilidad con registros previos) */
+  esAnonimo?: boolean;
+  /** PQRSD: oculta datos sensibles en interfaces no autorizadas */
+  identidadReservada?: boolean;
+  /** Canal de respuesta preferido */
+  canalRespuesta?: 'CORREO' | 'PRESENCIAL' | 'TELEFONO';
 }
 
 export interface ResultadoRadicacion {
@@ -119,14 +130,20 @@ export async function radicarSolicitud(
     // ── Paso 2: Crear documento en Firestore ─────────────────────────────
     onProgreso?.('Registrando radicado...', 60);
 
+    const tipoSolicitudId = datos.tipoSolicitudId ?? 'PETICION';
+    const tipoSolicitud = TIPOS_SOLICITUD[tipoSolicitudId];
+    const tipoPresentacion = datos.tipoPresentacion ?? (datos.esAnonimo ? 'ANONIMA' : 'IDENTIFICADA');
+    const esAnonimo = tipoPresentacion === 'ANONIMA';
+    const identidadReservada = tipoPresentacion === 'RESERVADA' || !!datos.identidadReservada;
+
     const radicado = {
       radicadoId,
       origen:        datos.origen,
       fechaCreacion: new Date().toISOString(),
       estadoActual:  'PENDIENTE',
-      prioridad:     'AMARILLO',
+      prioridad:     tipoSolicitud.prioridadSugerida,
       ciudadano: {
-        nombre:   datos.ciudadano.nombre,
+        nombre:   esAnonimo ? 'Ciudadano anonimo' : datos.ciudadano.nombre,
         email:    datos.ciudadano.email ?? '',
         telefono: datos.ciudadano.telefono,
         ...(datos.ciudadano.cedula ? { cedula: datos.ciudadano.cedula } : {}),
@@ -156,11 +173,17 @@ export async function radicarSolicitud(
             ? 'Portal Ciudadano'
             : 'Recepcionista VU',
           nota: datos.origen === 'WEB'
-            ? 'Radicado desde portal web por el ciudadano.'
+            ? `Radicado desde portal web por el ciudadano. Tipo: ${tipoSolicitud.nombre}. Presentacion: ${tipoPresentacion}.`
             : 'Radicado por ventanilla física.',
         },
       ],
       ...(datos.notasInternas ? { notasInternas: datos.notasInternas } : {}),
+      tipoSolicitudId,
+      tipoSolicitudNombre: tipoSolicitud.nombre,
+      tipoPresentacion,
+      esAnonimo,
+      identidadReservada,
+      ...(datos.canalRespuesta ? { canalRespuesta: datos.canalRespuesta } : {}),
     };
 
     const db = getDb();

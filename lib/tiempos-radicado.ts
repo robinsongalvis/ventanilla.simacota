@@ -1,9 +1,16 @@
 export type UnidadTermino = 'HABILES' | 'CALENDARIO';
 
 export type TipoSolicitudId =
-  | 'INFORMATIVO'
+  | 'PETICION'
   | 'PETICION_INFORMACION'
   | 'PETICION_AUTORIDADES'
+  | 'QUEJA'
+  | 'RECLAMO'
+  | 'SUGERENCIA'
+  | 'FELICITACION'
+  | 'DENUNCIA'
+  | 'HABEAS_DATA'
+  | 'INFORMATIVO'
   | 'LICENCIA_CONSTRUCCION'
   | 'ENTES_CONTROL_URGENTE';
 
@@ -24,6 +31,71 @@ export interface CalculoVencimiento {
 }
 
 export const TIPOS_SOLICITUD: Record<TipoSolicitudId, TipoSolicitudConfig> = {
+  /* ── PQRSD — Catálogo completo Ley 1755 de 2015 ─────────── */
+  PETICION: {
+    id: 'PETICION',
+    nombre: 'Petición (Derecho de petición)',
+    diasRespuesta: 15,
+    unidad: 'HABILES',
+    prioridadSugerida: 'NARANJA',
+  },
+  PETICION_INFORMACION: {
+    id: 'PETICION_INFORMACION',
+    nombre: 'Solicitud de información',
+    diasRespuesta: 10,
+    unidad: 'HABILES',
+    prioridadSugerida: 'AMARILLO',
+  },
+  PETICION_AUTORIDADES: {
+    id: 'PETICION_AUTORIDADES',
+    nombre: 'Petición entre autoridades',
+    diasRespuesta: 15,
+    unidad: 'HABILES',
+    prioridadSugerida: 'NARANJA',
+  },
+  QUEJA: {
+    id: 'QUEJA',
+    nombre: 'Queja',
+    diasRespuesta: 15,
+    unidad: 'HABILES',
+    prioridadSugerida: 'NARANJA',
+  },
+  RECLAMO: {
+    id: 'RECLAMO',
+    nombre: 'Reclamo',
+    diasRespuesta: 15,
+    unidad: 'HABILES',
+    prioridadSugerida: 'NARANJA',
+  },
+  SUGERENCIA: {
+    id: 'SUGERENCIA',
+    nombre: 'Sugerencia',
+    diasRespuesta: 15,
+    unidad: 'HABILES',
+    prioridadSugerida: 'AMARILLO',
+  },
+  FELICITACION: {
+    id: 'FELICITACION',
+    nombre: 'Felicitación',
+    diasRespuesta: 15,
+    unidad: 'CALENDARIO',
+    prioridadSugerida: 'AMARILLO',
+  },
+  DENUNCIA: {
+    id: 'DENUNCIA',
+    nombre: 'Denuncia',
+    diasRespuesta: 15,
+    unidad: 'HABILES',
+    prioridadSugerida: 'ROJO',
+  },
+  HABEAS_DATA: {
+    id: 'HABEAS_DATA',
+    nombre: 'Solicitud de datos personales (Habeas Data)',
+    diasRespuesta: 10,
+    unidad: 'HABILES',
+    prioridadSugerida: 'NARANJA',
+  },
+  /* ── Tipos especializados existentes ─────────────────────── */
   INFORMATIVO: {
     id: 'INFORMATIVO',
     nombre: 'Informativo',
@@ -31,35 +103,33 @@ export const TIPOS_SOLICITUD: Record<TipoSolicitudId, TipoSolicitudConfig> = {
     unidad: 'CALENDARIO',
     prioridadSugerida: 'AMARILLO',
   },
-  PETICION_INFORMACION: {
-    id: 'PETICION_INFORMACION',
-    nombre: 'Peticion de informacion',
-    diasRespuesta: 10,
-    unidad: 'HABILES',
-    prioridadSugerida: 'AMARILLO',
-  },
-  PETICION_AUTORIDADES: {
-    id: 'PETICION_AUTORIDADES',
-    nombre: 'Peticion entre autoridades',
-    diasRespuesta: 15,
-    unidad: 'HABILES',
-    prioridadSugerida: 'NARANJA',
-  },
   LICENCIA_CONSTRUCCION: {
     id: 'LICENCIA_CONSTRUCCION',
-    nombre: 'Licencia de construccion',
+    nombre: 'Licencia de construcción',
     diasRespuesta: 45,
     unidad: 'HABILES',
     prioridadSugerida: 'AMARILLO',
   },
   ENTES_CONTROL_URGENTE: {
     id: 'ENTES_CONTROL_URGENTE',
-    nombre: 'Peticion entes de control - urgente',
+    nombre: 'Petición entes de control (urgente)',
     diasRespuesta: 2,
     unidad: 'HABILES',
     prioridadSugerida: 'ROJO',
   },
 };
+
+/** Tipos visibles para el ciudadano en el formulario público de radicación */
+export const TIPOS_PQRSD_CIUDADANO: TipoSolicitudId[] = [
+  'PETICION',
+  'QUEJA',
+  'RECLAMO',
+  'SUGERENCIA',
+  'FELICITACION',
+  'DENUNCIA',
+  'PETICION_INFORMACION',
+  'HABEAS_DATA',
+];
 
 export const LISTA_TIPOS_SOLICITUD = Object.values(TIPOS_SOLICITUD);
 
