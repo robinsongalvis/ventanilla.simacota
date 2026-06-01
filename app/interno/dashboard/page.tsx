@@ -1462,6 +1462,9 @@ function PanelDerecho({
                 <FilaInfo label="Tipo persona"    value={radicado.solicitante.tipoPersona} />
                 <FilaInfo label="Documento"       value={`${radicado.solicitante.tipoDocumento} ${radicado.solicitante.numeroDocumento}`} />
                 <FilaInfo label="Nombre completo" value={radicado.solicitante.nombreCompleto} />
+                <FilaInfo label="Presentación" value={radicado.tipoPresentacion ?? (radicado.esAnonimo ? 'ANONIMA' : 'IDENTIFICADA')} />
+                <FilaInfo label="Anónima" value={radicado.esAnonimo ? 'Sí' : 'No'} />
+                {radicado.identidadReservada && <FilaInfo label="Identidad reservada" value="Sí" />}
                 {radicado.solicitante.email    && <FilaInfo label="Correo"    value={radicado.solicitante.email} />}
                 {radicado.solicitante.telefono && <FilaInfo label="Teléfono"  value={radicado.solicitante.telefono} />}
                 {radicado.solicitante.direccion && <FilaInfo label="Dirección" value={radicado.solicitante.direccion} />}
@@ -1491,6 +1494,7 @@ function PanelDerecho({
               <div className="grid grid-cols-2 gap-x-4 gap-y-3">
                 <FilaInfo label="Fecha"   value={fmtFechaLarga(radicado.control.fechaRadicado)} />
                 <FilaInfo label="Canal"   value={radicado.control.medioRecepcion} />
+                <FilaInfo label="Canal respuesta" value={radicado.canalRespuesta ?? 'No registrado'} />
                 <FilaInfo label="Vence"   value={fmtFecha(radicado.termino.fechaVencimiento)} />
                 <FilaInfo label="Tipo"    value={`${radicado.termino.tipoSolicitudNombre} · ${radicado.termino.diasRespuesta}d`} />
               </div>
@@ -2175,6 +2179,10 @@ function exportarCSVMIPG(radicados: VentanillaRadicado[]): void {
     'Solicitante',                    // contexto ciudadano
     'Documento',                      // identificación
     'Tipo Solicitud',                 // clasificación MIPG
+    'Forma Presentación PQRSD',
+    'Solicitud Anónima',
+    'Identidad Reservada',
+    'Canal Respuesta',
     'Dependencia Asignada',           // Req 2
     // Req 3 — Responsable funcional (MIPG-2)
     'Responsable UID',
@@ -2206,6 +2214,10 @@ function exportarCSVMIPG(radicados: VentanillaRadicado[]): void {
     r.solicitante.nombreCompleto,
     r.solicitante.numeroDocumento,
     r.termino.tipoSolicitudNombre,
+    r.tipoPresentacion ?? (r.esAnonimo ? 'ANONIMA' : 'IDENTIFICADA'),
+    r.esAnonimo ? 'Sí' : 'No',
+    r.identidadReservada ? 'Sí' : 'No',
+    r.canalRespuesta ?? 'No registrado',
     NOMBRES_TENANT[r.clasificacion.oficinaDestino] ?? r.clasificacion.oficinaDestino,
     // Req 3 — MIPG-2: responsable funcional con backward compat
     r.clasificacion.funcionarioResponsableUid    ?? '—',

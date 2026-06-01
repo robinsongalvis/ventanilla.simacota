@@ -40,6 +40,7 @@ export interface DatosRadicacion {
     nombre:   string;
     email:    string;
     telefono: string;
+    direccion?: string;
     cedula?:  string;   // Solo ventanilla física
   };
   descripcion:     string;
@@ -55,7 +56,7 @@ export interface DatosRadicacion {
   /** PQRSD: oculta datos sensibles en interfaces no autorizadas */
   identidadReservada?: boolean;
   /** Canal de respuesta preferido */
-  canalRespuesta?: 'CORREO' | 'PRESENCIAL' | 'TELEFONO';
+  canalRespuesta?: 'CORREO' | 'PRESENCIAL' | 'TELEFONO' | 'DIRECCION_FISICA';
 }
 
 export interface ResultadoRadicacion {
@@ -146,6 +147,7 @@ export async function radicarSolicitud(
         nombre:   esAnonimo ? 'Ciudadano anonimo' : datos.ciudadano.nombre,
         email:    datos.ciudadano.email ?? '',
         telefono: datos.ciudadano.telefono,
+        ...(datos.ciudadano.direccion ? { direccion: datos.ciudadano.direccion } : {}),
         ...(datos.ciudadano.cedula ? { cedula: datos.ciudadano.cedula } : {}),
       },
       clasificacionIA: {

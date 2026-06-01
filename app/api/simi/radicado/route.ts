@@ -92,8 +92,12 @@ function buildPrompt(params: {
   const contexto = `
 CONTEXTO DEL RADICADO:
 - Número: ${r.radicadoId}
-- Solicitante: ${r.solicitante.nombreCompleto} (${r.solicitante.tipoDocumento} ${r.solicitante.numeroDocumento})
+- Forma de presentación: ${r.tipoPresentacion ?? (r.esAnonimo ? 'ANONIMA' : 'IDENTIFICADA')}
+- Solicitud anónima: ${r.esAnonimo ? 'Sí' : 'No'}
+- Identidad reservada: ${r.identidadReservada ? 'Sí' : 'No'}
+- Solicitante: ${r.esAnonimo ? 'Ciudadano anónimo; no inventes identidad ni datos de contacto.' : `${r.solicitante.nombreCompleto} (${r.solicitante.tipoDocumento} ${r.solicitante.numeroDocumento})`}
 - Email ciudadano: ${r.solicitante.email ?? 'No proporcionado'}
+- Canal de respuesta preferido: ${r.canalRespuesta ?? 'No registrado'}
 - Asunto: ${r.detalle.asunto}
 - Descripción: ${r.detalle.descripcion}
 - Tipo solicitud: ${r.termino.tipoSolicitudNombre} (${r.termino.diasRespuesta} días ${r.termino.unidad.toLowerCase()})

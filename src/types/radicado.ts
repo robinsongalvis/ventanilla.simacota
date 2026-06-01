@@ -14,7 +14,7 @@ export type ZonaGeografica = 'ZONA_YARIGUIES' | 'CASCO_URBANO' | 'ZONA_RURAL';
 
 export type TipoPresentacionPqrsd = 'IDENTIFICADA' | 'ANONIMA' | 'RESERVADA';
 
-export type CanalRespuesta = 'CORREO' | 'PRESENCIAL' | 'TELEFONO';
+export type CanalRespuesta = 'CORREO' | 'PRESENCIAL' | 'TELEFONO' | 'DIRECCION_FISICA';
 
 export type TenantId =
   | 'DESPACHO_ALCALDE'
@@ -75,6 +75,7 @@ export interface Radicado {
     nombre: string;
     email: string;
     telefono: string;
+    direccion?: string;
   };
   clasificacionIA: ClasificacionIA | null;
   archivos: Archivo[];

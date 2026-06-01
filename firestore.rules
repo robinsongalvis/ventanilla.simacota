@@ -150,7 +150,7 @@ service cloud.firestore {
       )
       && (
         !request.resource.data.keys().hasAny(['canalRespuesta'])
-        || request.resource.data.canalRespuesta in ['CORREO', 'PRESENCIAL', 'TELEFONO']
+        || request.resource.data.canalRespuesta in ['CORREO', 'PRESENCIAL', 'TELEFONO', 'DIRECCION_FISICA']
       )
       && (
         !request.resource.data.keys().hasAny(['esAnonimo'])

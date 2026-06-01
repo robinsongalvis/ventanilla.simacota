@@ -113,6 +113,8 @@ interface RadicadoPublico {
   radicadoId: string;
   fechaCreacion?: string;
   estadoActual?: EstadoPublico;
+  tipoSolicitudNombre?: string;
+  canalRespuesta?: string | null;
   clasificacionIA?: {
     oficinaDestino?: TenantId;
   } | null;
@@ -140,6 +142,16 @@ function formatearFecha(iso: string): string {
 function formatearFechaCorta(iso: string): string {
   const d = new Date(iso);
   return `${String(d.getDate()).padStart(2, '0')}/${String(d.getMonth() + 1).padStart(2, '0')} ${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`;
+}
+
+function labelCanalRespuesta(canal: string): string {
+  const labels: Record<string, string> = {
+    CORREO: 'Correo electrónico',
+    TELEFONO: 'Teléfono',
+    PRESENCIAL: 'Presencial',
+    DIRECCION_FISICA: 'Dirección física',
+  };
+  return labels[canal] ?? canal;
 }
 
 /* ══════════════════════════════════════════════════════════════
@@ -389,6 +401,27 @@ function ConsultaInterna() {
                 <p className="text-sm text-slate-300 leading-relaxed">{estadoInfo.descripcion}</p>
               </div>
             </div>
+
+            {(radicado.tipoSolicitudNombre || radicado.canalRespuesta) && (
+              <div className="px-6 py-5 border-b border-white/[0.06] grid sm:grid-cols-2 gap-4">
+                {radicado.tipoSolicitudNombre && (
+                  <div>
+                    <p className="text-[10px] font-bold uppercase tracking-widest text-slate-500 mb-2">
+                      Tipo de solicitud
+                    </p>
+                    <p className="text-sm font-semibold text-slate-200">{radicado.tipoSolicitudNombre}</p>
+                  </div>
+                )}
+                {radicado.canalRespuesta && (
+                  <div>
+                    <p className="text-[10px] font-bold uppercase tracking-widest text-slate-500 mb-2">
+                      Canal de respuesta
+                    </p>
+                    <p className="text-sm font-semibold text-slate-200">{labelCanalRespuesta(radicado.canalRespuesta)}</p>
+                  </div>
+                )}
+              </div>
+            )}
 
             {/* Dependencia asignada */}
             {oficina && (

@@ -19,9 +19,10 @@ interface FormData {
   nombre: string;
   email: string;
   telefono: string;
+  direccion: string;
   tipoSolicitudId: TipoSolicitudId;
   tipoPresentacion: 'IDENTIFICADA' | 'ANONIMA' | 'RESERVADA';
-  canalRespuesta: 'CORREO' | 'PRESENCIAL' | 'TELEFONO';
+  canalRespuesta: 'CORREO' | 'PRESENCIAL' | 'TELEFONO' | 'DIRECCION_FISICA';
   descripcion: string;
 }
 
@@ -70,6 +71,12 @@ function validarCampo(campo: CampoForm, valor: string, form?: FormData): string 
       if (!TEL_RE.test(valor.replace(/\s/g, '')))
         return 'Celular colombiano: 10 dígitos, debe comenzar por 3.';
       return '';
+    case 'direccion':
+      if (esAnonimo && !valor.trim()) return '';
+      if (!valor.trim() && form?.canalRespuesta !== 'DIRECCION_FISICA') return '';
+      if (valor.trim().length < 8)
+        return 'Ingresa una dirección física válida para recibir respuesta.';
+      return '';
     case 'tipoSolicitudId':
     case 'tipoPresentacion':
     case 'canalRespuesta':
@@ -88,6 +95,7 @@ function validarTodo(form: FormData): Record<CampoForm, string> {
     nombre:           validarCampo('nombre',           form.nombre, form),
     email:            validarCampo('email',            form.email, form),
     telefono:         validarCampo('telefono',         form.telefono, form),
+    direccion:        validarCampo('direccion',        form.direccion, form),
     tipoSolicitudId:  '',
     tipoPresentacion: '',
     canalRespuesta:   '',
@@ -223,6 +231,7 @@ export default function PortalCiudadano() {
     nombre: '',
     email: '',
     telefono: '',
+    direccion: '',
     tipoSolicitudId: 'PETICION',
     tipoPresentacion: 'IDENTIFICADA',
     canalRespuesta: 'CORREO',
@@ -234,6 +243,7 @@ export default function PortalCiudadano() {
     nombre: '',
     email: '',
     telefono: '',
+    direccion: '',
     tipoSolicitudId: '',
     tipoPresentacion: '',
     canalRespuesta: '',
@@ -400,7 +410,7 @@ export default function PortalCiudadano() {
   async function handleSubmit(e: { preventDefault(): void }) {
     e.preventDefault();
 
-    setTouched({ nombre: true, email: true, telefono: true, tipoSolicitudId: true, tipoPresentacion: true, canalRespuesta: true, descripcion: true });
+    setTouched({ nombre: true, email: true, telefono: true, direccion: true, tipoSolicitudId: true, tipoPresentacion: true, canalRespuesta: true, descripcion: true });
     const erroresFinal = validarTodo(form);
     setErrors(erroresFinal);
 
@@ -423,6 +433,7 @@ export default function PortalCiudadano() {
           nombre:   form.tipoPresentacion === 'ANONIMA' ? 'Ciudadano anonimo' : form.nombre.trim(),
           email:    form.email.trim().toLowerCase(),
           telefono: form.telefono.replace(/\s/g, ''),
+          direccion: form.direccion.trim(),
         },
         descripcion: form.descripcion.trim(),
         archivos,
@@ -450,6 +461,7 @@ export default function PortalCiudadano() {
       nombre: '',
       email: '',
       telefono: '',
+      direccion: '',
       tipoSolicitudId: 'PETICION',
       tipoPresentacion: 'IDENTIFICADA',
       canalRespuesta: 'CORREO',
@@ -460,6 +472,7 @@ export default function PortalCiudadano() {
       nombre: '',
       email: '',
       telefono: '',
+      direccion: '',
       tipoSolicitudId: '',
       tipoPresentacion: '',
       canalRespuesta: '',
@@ -631,9 +644,10 @@ export default function PortalCiudadano() {
                     <option value="CORREO">Correo electronico</option>
                     <option value="TELEFONO">Telefono</option>
                     <option value="PRESENCIAL">Presencial</option>
+                    <option value="DIRECCION_FISICA">Direccion fisica</option>
                   </select>
                   <p className="mt-2 text-xs text-slate-500">
-                    Si elige correo o telefono, ese dato sera obligatorio salvo que la solicitud sea anonima.
+                    Si elige correo, telefono o direccion fisica, ese dato sera obligatorio salvo que la solicitud sea anonima.
                   </p>
                 </div>
               </div>
@@ -706,8 +720,30 @@ export default function PortalCiudadano() {
                 </div>
               </div>
 
+              {form.tipoPresentacion !== 'ANONIMA' && (
+                <div className="field-animate" style={{ animationDelay: `${STAGGER[4]}ms` }}>
+                  <label htmlFor="direccion" className="block text-xs font-bold uppercase tracking-widest text-slate-400 mb-2">
+                    Direccion fisica {form.canalRespuesta === 'DIRECCION_FISICA' ? '*' : '(opcional)'}
+                  </label>
+                  <input
+                    id="direccion"
+                    type="text"
+                    className={inputClass('direccion')}
+                    placeholder="Ej. Calle 4 # 5-20, barrio Centro"
+                    value={form.direccion}
+                    onChange={(e) => handleChange('direccion', e.target.value)}
+                    onBlur={() => handleBlur('direccion')}
+                    disabled={estado === 'enviando'}
+                    autoComplete="street-address"
+                    aria-describedby={errors.direccion ? 'error-direccion' : undefined}
+                    aria-invalid={!!errors.direccion}
+                  />
+                  <FeedbackCampo id="error-direccion" error={errors.direccion} touched={!!touched.direccion} valorOk={form.direccion.trim().length >= 8} />
+                </div>
+              )}
+
               {/* ─ Descripción ─ */}
-              <div className="field-animate" style={{ animationDelay: `${STAGGER[4]}ms` }}>
+              <div className="field-animate" style={{ animationDelay: `${STAGGER[5]}ms` }}>
                 <div className="flex items-center justify-between mb-2">
                   <label htmlFor="descripcion" className="block text-xs font-bold uppercase tracking-widest text-slate-400">
                     Descripción de la solicitud *

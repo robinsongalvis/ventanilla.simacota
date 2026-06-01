@@ -14,7 +14,7 @@ export type TipoPersona = 'NATURAL' | 'JURIDICA';
 export type TipoDocumento = 'CC' | 'CE' | 'NIT' | 'PASAPORTE' | 'OTRO';
 export type MedioRecepcion = 'OFICIO_FISICO' | 'EMAIL' | 'WEB' | 'PRESENCIAL';
 /** Canal por el que el ciudadano prefiere recibir la respuesta */
-export type CanalRespuesta = 'CORREO' | 'PRESENCIAL' | 'TELEFONO';
+export type CanalRespuesta = 'CORREO' | 'PRESENCIAL' | 'TELEFONO' | 'DIRECCION_FISICA';
 
 export interface UbicacionSolicitante {
   pais: string;
@@ -151,6 +151,10 @@ export interface VentanillaRadicado {
   cumplioTermino?: boolean | null;
   /** PQRSD: solicitud presentada de forma anónima (Ley 1755/2015 art. 14) */
   esAnonimo?: boolean;
+  /** PQRSD: presentación identificada, anónima o con identidad reservada */
+  tipoPresentacion?: 'IDENTIFICADA' | 'ANONIMA' | 'RESERVADA';
+  /** PQRSD: datos personales protegidos en vistas no autorizadas */
+  identidadReservada?: boolean;
   /** Canal de respuesta preferido por el ciudadano */
   canalRespuesta?: CanalRespuesta | null;
   solicitante: SolicitanteRadicado;

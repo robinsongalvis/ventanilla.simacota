@@ -48,8 +48,8 @@ export const TIPOS_SOLICITUD: Record<TipoSolicitudId, TipoSolicitudConfig> = {
   },
   PETICION_AUTORIDADES: {
     id: 'PETICION_AUTORIDADES',
-    nombre: 'Petición entre autoridades',
-    diasRespuesta: 15,
+    nombre: 'Consulta a autoridades',
+    diasRespuesta: 30,
     unidad: 'HABILES',
     prioridadSugerida: 'NARANJA',
   },
@@ -128,6 +128,7 @@ export const TIPOS_PQRSD_CIUDADANO: TipoSolicitudId[] = [
   'FELICITACION',
   'DENUNCIA',
   'PETICION_INFORMACION',
+  'PETICION_AUTORIDADES',
   'HABEAS_DATA',
 ];
 
@@ -264,4 +265,3 @@ export function diasRestantesHabiles(fechaVencimiento: string | Date, desde: str
 
   return count;
 }
-

@@ -52,6 +52,8 @@ async function getVentanillaRadicadoPublico(id: string) {
     radicadoId: data.radicadoId ?? id,
     fechaCreacion: data.control?.fechaRadicado,
     estadoActual: data.estadoActual,
+    tipoSolicitudNombre: data.termino?.tipoSolicitudNombre,
+    canalRespuesta: data.canalRespuesta ?? null,
     clasificacionIA: data.clasificacion?.oficinaDestino
       ? { oficinaDestino: data.clasificacion.oficinaDestino }
       : null,
@@ -94,6 +96,8 @@ export async function GET(_request: NextRequest, context: RouteContext) {
       radicadoId: data.radicadoId ?? id,
       fechaCreacion: data.fechaCreacion,
       estadoActual: data.estadoActual as EstadoRadicado | undefined,
+      tipoSolicitudNombre: typeof data.tipoSolicitudNombre === 'string' ? data.tipoSolicitudNombre : undefined,
+      canalRespuesta: typeof data.canalRespuesta === 'string' ? data.canalRespuesta : null,
       clasificacionIA: clasificacion?.oficinaDestino
         ? { oficinaDestino: clasificacion.oficinaDestino }
         : null,
