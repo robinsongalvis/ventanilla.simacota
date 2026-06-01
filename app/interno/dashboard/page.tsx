@@ -134,7 +134,10 @@ function aplicarFiltroMIPG(
       (r) =>
         r.radicadoId.toLowerCase().includes(q) ||
         r.solicitante.nombreCompleto.toLowerCase().includes(q) ||
-        r.solicitante.numeroDocumento.includes(q),
+        r.solicitante.numeroDocumento.includes(q) ||
+        r.detalle.asunto.toLowerCase().includes(q) ||
+        NOMBRES_TENANT[r.clasificacion.oficinaDestino].toLowerCase().includes(q) ||
+        (r.clasificacion.funcionarioResponsableNombre ?? '').toLowerCase().includes(q),
     );
   }
 
@@ -144,6 +147,86 @@ function aplicarFiltroMIPG(
     if (urgA !== urgB) return urgA - urgB;
     return new Date(b.control.fechaRadicado).getTime() - new Date(a.control.fechaRadicado).getTime();
   });
+}
+
+interface ResumenBandejaOperativa {
+  totalActivos: number;
+  sinResponsable: number;
+  vencidos: number;
+  porVencer: number;
+  prioridadAlta: number;
+  siguiente: VentanillaRadicado | null;
+}
+
+function calcularResumenBandeja(radicados: VentanillaRadicado[]): ResumenBandejaOperativa {
+  const activos = radicados.filter(estaActivo);
+  const priorizados = [...activos].sort((a, b) => {
+    const diasA = calcDiasRestantes(a);
+    const diasB = calcDiasRestantes(b);
+    const scoreA =
+      (diasA < 0 ? -1000 : diasA) +
+      (a.prioridad === 'ROJO' ? -100 : 0) +
+      (!a.clasificacion.funcionarioResponsableUid ? -20 : 0);
+    const scoreB =
+      (diasB < 0 ? -1000 : diasB) +
+      (b.prioridad === 'ROJO' ? -100 : 0) +
+      (!b.clasificacion.funcionarioResponsableUid ? -20 : 0);
+
+    if (scoreA !== scoreB) return scoreA - scoreB;
+    return new Date(a.control.fechaRadicado).getTime() - new Date(b.control.fechaRadicado).getTime();
+  });
+
+  return {
+    totalActivos: activos.length,
+    sinResponsable: activos.filter((r) => !r.clasificacion.funcionarioResponsableUid).length,
+    vencidos: activos.filter((r) => calcDiasRestantes(r) < 0).length,
+    porVencer: activos.filter((r) => {
+      const dias = calcDiasRestantes(r);
+      return dias >= 0 && dias <= 2;
+    }).length,
+    prioridadAlta: activos.filter((r) => r.prioridad === 'ROJO').length,
+    siguiente: priorizados[0] ?? null,
+  };
+}
+
+function mensajeSiguienteAccion(radicado: VentanillaRadicado | null): string {
+  if (!radicado) return 'No hay casos activos en esta bandeja.';
+
+  const dias = calcDiasRestantes(radicado);
+  if (dias < 0) return `Atender de inmediato: vencido hace ${Math.abs(dias)} dia${Math.abs(dias) !== 1 ? 's' : ''}.`;
+  if (dias === 0) return 'Atender hoy: vence durante la jornada actual.';
+  if (dias <= 2) return `Atender pronto: vence en ${dias} dia${dias !== 1 ? 's' : ''}.`;
+  if (radicado.prioridad === 'ROJO') return 'Revisar primero: prioridad MIPG alta.';
+  if (!radicado.clasificacion.funcionarioResponsableUid) return 'Asignar responsable funcional antes de iniciar gestion.';
+  return 'Caso activo con termino vigente.';
+}
+
+function puedeRadicar(usuario: UsuarioAutenticado): boolean {
+  return usuario.rol === 'ADMIN' || usuario.rol === 'RECEPCIONISTA';
+}
+
+function puedeUsarBandejaAsignacion(usuario: UsuarioAutenticado): boolean {
+  return usuario.rol === 'ADMIN' || usuario.rol === 'RECEPCIONISTA';
+}
+
+function puedeVerDependencias(usuario: UsuarioAutenticado): boolean {
+  return usuario.rol === 'ADMIN' || usuario.rol === 'CONTROL_INTERNO';
+}
+
+function puedeVerAnaliticaAvanzada(usuario: UsuarioAutenticado): boolean {
+  return usuario.rol === 'ADMIN'
+    || usuario.rol === 'CONTROL_INTERNO'
+    || usuario.rol === 'JEFE_DEPENDENCIA';
+}
+
+function puedeAccederVista(usuario: UsuarioAutenticado, vista: VistaActual): boolean {
+  if (vista === 'BANDEJA' || vista === 'VENTANILLA') return puedeUsarBandejaAsignacion(usuario);
+  if (vista === 'DEPENDENCIAS') return puedeVerDependencias(usuario);
+  if (vista === 'SUPERVISION_IA' || vista === 'ANTICIPACION_OPERATIVA') {
+    return usuario.rol === 'ADMIN' || usuario.rol === 'CONTROL_INTERNO';
+  }
+  if (vista === 'ANALYTICS' || vista === 'REPORTES') return puedeVerAnaliticaAvanzada(usuario);
+  return true;
 }
 
 function fmtFecha(iso: string): string {
@@ -345,7 +428,7 @@ function SidebarNav({
   };
   const nombreRol = LABEL_ROL[usuario.rol] ?? 'Funcionario';
 
-  const items = [...NAV_ITEMS];
+  const items = NAV_ITEMS.filter((item) => puedeAccederVista(usuario, item.vista));
   // Control Interno tiene visibilidad total equivalente a Admin.
   if (usuario.rol === 'ADMIN' || usuario.rol === 'CONTROL_INTERNO') {
     items.push({
@@ -387,17 +470,19 @@ function SidebarNav({
       </div>
 
       {/* Radicación Rápida */}
-      <div className="px-3 pt-3 pb-2">
-        <button
-          onClick={onNuevoRadicado}
-          className="w-full flex items-center gap-2 px-3 py-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-500 active:scale-95 text-white text-xs font-bold transition-all duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-400 focus-visible:ring-offset-1 focus-visible:ring-offset-black"
-        >
-          <svg className="w-3.5 h-3.5 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
-            <path strokeLinecap="round" strokeLinejoin="round" d="M12 4v16m8-8H4" />
-          </svg>
-          Radicación Rápida
-        </button>
-      </div>
+      {puedeRadicar(usuario) && (
+        <div className="px-3 pt-3 pb-2">
+          <button
+            onClick={onNuevoRadicado}
+            className="w-full flex items-center gap-2 px-3 py-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-500 active:scale-95 text-white text-xs font-bold transition-all duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-400 focus-visible:ring-offset-1 focus-visible:ring-offset-black"
+          >
+            <svg className="w-3.5 h-3.5 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
+              <path strokeLinecap="round" strokeLinejoin="round" d="M12 4v16m8-8H4" />
+            </svg>
+            Radicación Rápida
+          </button>
+        </div>
+      )}
 
       {/* Navegación */}
       <nav className="flex-1 px-3 py-2 flex flex-col gap-0.5 overflow-y-auto">
@@ -615,6 +700,120 @@ function TarjetasMIPG({
   );
 }
 
+function PanelOperacionDependencia({
+  usuario,
+  radicados,
+  onSeleccionar,
+  onFiltroChange,
+}: {
+  usuario: UsuarioAutenticado;
+  radicados: VentanillaRadicado[];
+  onSeleccionar: (r: VentanillaRadicado) => void;
+  onFiltroChange: (f: FiltroMIPG) => void;
+}) {
+  const resumen = useMemo(() => calcularResumenBandeja(radicados), [radicados]);
+  const siguiente = resumen.siguiente;
+  const nombreAmbito = usuario.rol === 'ADMIN' || usuario.rol === 'CONTROL_INTERNO'
+    ? 'Vista institucional'
+    : NOMBRES_TENANT[usuario.tenantId];
+  const dias = siguiente ? calcDiasRestantes(siguiente) : null;
+
+  return (
+    <section className="px-4 py-3 border-b border-white/[0.07] bg-[#0D1117]/80 shrink-0">
+      <div className="grid grid-cols-1 xl:grid-cols-[minmax(0,1.2fr)_minmax(520px,1.8fr)] gap-3">
+        <div className="rounded-xl border border-white/[0.07] bg-slate-950/30 px-4 py-3">
+          <div className="flex items-start justify-between gap-3">
+            <div className="min-w-0">
+              <p className="text-[10px] font-black uppercase tracking-widest text-slate-500">
+                Bandeja operativa
+              </p>
+              <h2 className="mt-1 text-sm font-black text-slate-100 truncate">
+                {nombreAmbito}
+              </h2>
+            </div>
+            <span className="shrink-0 rounded-full border border-indigo-500/25 bg-indigo-500/10 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider text-indigo-300">
+              {usuario.rol}
+            </span>
+          </div>
+
+          <div className="mt-4 grid grid-cols-5 gap-2">
+            {[
+              { label: 'Activos', value: resumen.totalActivos, tone: 'text-slate-100', filtro: 'TODOS' as FiltroMIPG },
+              { label: 'Sin resp.', value: resumen.sinResponsable, tone: 'text-amber-300', filtro: 'ASIGNADAS' as FiltroMIPG },
+              { label: 'Prioridad', value: resumen.prioridadAlta, tone: 'text-red-300', filtro: 'PRIORIDAD_MIPG' as FiltroMIPG },
+              { label: 'Por vencer', value: resumen.porVencer, tone: 'text-orange-300', filtro: 'POR_VENCER' as FiltroMIPG },
+              { label: 'Vencidos', value: resumen.vencidos, tone: 'text-rose-300', filtro: 'VENCIDAS' as FiltroMIPG },
+            ].map((item) => (
+              <button
+                key={item.label}
+                type="button"
+                onClick={() => onFiltroChange(item.filtro)}
+                className="rounded-lg border border-white/[0.06] bg-white/[0.025] px-2 py-2 text-left transition-colors hover:bg-white/[0.05] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500/40"
+              >
+                <p className={`text-lg font-black tabular-nums leading-none ${item.tone}`}>{item.value}</p>
+                <p className="mt-1 text-[9px] font-bold uppercase tracking-wider text-slate-600 truncate">
+                  {item.label}
+                </p>
+              </button>
+            ))}
+          </div>
+        </div>
+
+        <div className="rounded-xl border border-white/[0.07] bg-slate-950/30 px-4 py-3">
+          <div className="flex items-start justify-between gap-3">
+            <div className="min-w-0">
+              <p className="text-[10px] font-black uppercase tracking-widest text-slate-500">
+                Siguiente atencion sugerida
+              </p>
+              <p className={`mt-1 text-sm font-bold ${
+                dias !== null && dias < 0
+                  ? 'text-rose-300'
+                  : dias !== null && dias <= 2
+                    ? 'text-orange-300'
+                    : 'text-slate-200'
+              }`}>
+                {mensajeSiguienteAccion(siguiente)}
+              </p>
+            </div>
+            {siguiente && (
+              <button
+                type="button"
+                onClick={() => onSeleccionar(siguiente)}
+                className="shrink-0 rounded-lg bg-indigo-600 px-3 py-2 text-xs font-bold text-white transition-colors hover:bg-indigo-500 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-400/60"
+              >
+                Abrir
+              </button>
+            )}
+          </div>
+
+          {siguiente ? (
+            <div className="mt-3 grid grid-cols-[minmax(150px,0.8fr)_minmax(0,1.2fr)_minmax(130px,0.7fr)] gap-3 text-xs">
+              <div className="min-w-0">
+                <p className="text-[9px] font-bold uppercase tracking-widest text-slate-600">Radicado</p>
+                <p className="mt-1 truncate font-mono text-indigo-300">{siguiente.radicadoId}</p>
+              </div>
+              <div className="min-w-0">
+                <p className="text-[9px] font-bold uppercase tracking-widest text-slate-600">Asunto</p>
+                <p className="mt-1 truncate text-slate-300">{siguiente.detalle.asunto}</p>
+              </div>
+              <div className="min-w-0">
+                <p className="text-[9px] font-bold uppercase tracking-widest text-slate-600">Responsable</p>
+                <p className="mt-1 truncate text-slate-300">
+                  {siguiente.clasificacion.funcionarioResponsableNombre ?? 'Sin asignar'}
+                </p>
+              </div>
+            </div>
+          ) : (
+            <p className="mt-3 text-xs text-slate-600">
+              Cuando entren solicitudes activas, aqui aparecera la prioridad operativa de la oficina.
+            </p>
+          )}
+        </div>
+      </div>
+    </section>
+  );
+}
+
 /* ══════════════════════════════════════════════════════════════
    SUB-COMPONENTE: TablaRadicados
 ══════════════════════════════════════════════════════════════ */
@@ -640,6 +839,7 @@ function TablaRadicados({
   radicadoSeleccionadoId,
   onSeleccionar,
   onNuevoRadicado,
+  puedeRadicar,
 }: {
   radicados:              VentanillaRadicado[];
   cargando:               boolean;
@@ -649,6 +849,7 @@ function TablaRadicados({
   radicadoSeleccionadoId: string | null;
   onSeleccionar:          (r: VentanillaRadicado) => void;
   onNuevoRadicado:        () => void;
+  puedeRadicar:           boolean;
 }) {
   return (
     <div className="flex-1 flex flex-col overflow-hidden min-h-0">
@@ -667,15 +868,17 @@ function TablaRadicados({
           />
         </div>
         <span className="text-xs text-slate-600 shrink-0">{radicados.length} resultado{radicados.length !== 1 ? 's' : ''}</span>
-        <button
-          onClick={onNuevoRadicado}
-          className="shrink-0 flex items-center gap-1.5 px-3 py-2 rounded-lg bg-indigo-600 hover:bg-indigo-500 active:scale-95 text-white text-xs font-bold transition-all duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-400/60"
-        >
-          <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
-            <path strokeLinecap="round" strokeLinejoin="round" d="M12 4v16m8-8H4" />
-          </svg>
-          Nuevo
-        </button>
+        {puedeRadicar && (
+          <button
+            onClick={onNuevoRadicado}
+            className="shrink-0 flex items-center gap-1.5 px-3 py-2 rounded-lg bg-indigo-600 hover:bg-indigo-500 active:scale-95 text-white text-xs font-bold transition-all duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-400/60"
+          >
+            <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
+              <path strokeLinecap="round" strokeLinejoin="round" d="M12 4v16m8-8H4" />
+            </svg>
+            Nuevo
+          </button>
+        )}
       </div>
 
       {/* Error Firestore */}
@@ -713,8 +916,6 @@ function TablaRadicados({
             )}
 
             {!cargando && radicados.map((r) => {
-              const dias     = calcDiasRestantes(r);
-              const activo   = estaActivo(r);
               const esRojo   = r.prioridad === 'ROJO';
               const seleccionado = radicadoSeleccionadoId === r.radicadoId;
 
@@ -1014,8 +1215,6 @@ function PanelDerecho({
   // MIPG-2: carga funcionarios del tenant destino para el selector de responsable
   const { funcionarios: funcionariosTenant, cargando: cargandoFuncionarios } =
     useFuncionariosTenant(tab === 'traslado' ? tenantDestino : '');
-
-  const dias = calcDiasRestantes(radicado);
 
   useEffect(() => {
     if (tab !== 'trazabilidad') return;
@@ -2510,6 +2709,8 @@ function DashboardInterior({ usuario, cerrarSesion }: { usuario: UsuarioAutentic
   } = state;
 
   const esAdmin = usuario.rol === 'ADMIN' || usuario.rol === 'CONTROL_INTERNO';
+  const tienePermisoRadicar = puedeRadicar(usuario);
+  const tienePermisoBandeja = puedeUsarBandejaAsignacion(usuario);
   /** Roles de solo lectura: pueden ver pero no ejecutar acciones sobre radicados. */
   const esVistaReadOnly = usuario.rol === 'JEFE_DEPENDENCIA' || usuario.rol === 'CONTROL_INTERNO';
 
@@ -2522,6 +2723,12 @@ function DashboardInterior({ usuario, cerrarSesion }: { usuario: UsuarioAutentic
       dispatch({ type: 'SYNC_RADICADO_SELECCIONADO', radicados: todosLosRadicados });
     }
   }, [todosLosRadicados, dispatch]);
+
+  useEffect(() => {
+    if (!puedeAccederVista(usuario, vistaActual)) {
+      dispatch({ type: 'SET_VISTA', vista: 'TABLERO' });
+    }
+  }, [dispatch, usuario, vistaActual]);
 
   const metricas = useMemo(() => calcularMetricas(todosLosRadicados), [todosLosRadicados]);
 
@@ -2547,7 +2754,9 @@ function DashboardInterior({ usuario, cerrarSesion }: { usuario: UsuarioAutentic
       <SidebarNav
         vistaActual={vistaActual}
         onVistaChange={(v) => dispatch({ type: 'SET_VISTA', vista: v })}
-        onNuevoRadicado={() => dispatch({ type: 'TOGGLE_DRAWER_NUEVO' })}
+        onNuevoRadicado={() => {
+          if (tienePermisoRadicar) dispatch({ type: 'TOGGLE_DRAWER_NUEVO' });
+        }}
         usuario={usuario}
         onCerrarSesion={cerrarSesion}
         pendientesBandeja={radicadosPendientes.length}
@@ -2572,7 +2781,7 @@ function DashboardInterior({ usuario, cerrarSesion }: { usuario: UsuarioAutentic
           />
         ) : vistaActual === 'REPORTES' ? (
           <VistaReportes metricas={metricas} total={todosLosRadicados.length} radicados={todosLosRadicados} />
-        ) : vistaActual === 'BANDEJA' ? (
+        ) : vistaActual === 'BANDEJA' && tienePermisoBandeja ? (
           <BandejaAsignacion
             radicados={radicadosPendientes}
             cargando={cargando}
@@ -2601,6 +2810,13 @@ function DashboardInterior({ usuario, cerrarSesion }: { usuario: UsuarioAutentic
               onTenantChange={(t) => dispatch({ type: 'SET_TENANT_FILTRO', tenant: t })}
             />
 
+            <PanelOperacionDependencia
+              usuario={usuario}
+              radicados={todosLosRadicados}
+              onFiltroChange={(f) => dispatch({ type: 'SET_FILTRO_MIPG', filtro: f })}
+              onSeleccionar={(r) => dispatch({ type: 'SELECCIONAR_RADICADO', radicado: r })}
+            />
+
             {/* Tabla maestra */}
             <TablaRadicados
               radicados={radicadosFiltrados}
@@ -2610,7 +2826,10 @@ function DashboardInterior({ usuario, cerrarSesion }: { usuario: UsuarioAutentic
               onBusquedaChange={(v) => dispatch({ type: 'SET_BUSQUEDA', busqueda: v })}
               radicadoSeleccionadoId={radicadoSeleccionado?.radicadoId ?? null}
               onSeleccionar={(r) => dispatch({ type: 'SELECCIONAR_RADICADO', radicado: r })}
-              onNuevoRadicado={() => dispatch({ type: 'TOGGLE_DRAWER_NUEVO' })}
+              onNuevoRadicado={() => {
+                if (tienePermisoRadicar) dispatch({ type: 'TOGGLE_DRAWER_NUEVO' });
+              }}
+              puedeRadicar={tienePermisoRadicar}
             />
           </>
         )}
@@ -2637,7 +2856,7 @@ function DashboardInterior({ usuario, cerrarSesion }: { usuario: UsuarioAutentic
       )}
 
       {/* ── Drawer de radicación rápida ── */}
-      {drawerNuevoAbierto && (
+      {drawerNuevoAbierto && tienePermisoRadicar && (
         <DrawerNuevoRadicado
           usuario={usuario}
           onCerrar={() => dispatch({ type: 'CERRAR_DRAWER_NUEVO' })}

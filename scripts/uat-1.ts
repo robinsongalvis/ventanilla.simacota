@@ -386,6 +386,8 @@ async function verificarEmail(radicadoId: string, uids: Record<string, string>) 
     body: JSON.stringify({ idToken: tokenData.idToken }),
   });
 
+  let sessionCookie: string | undefined;
+
   if (sessionRes.status === 409) {
     // Claims refresh needed — retry with fresh token
     console.log('  ℹ️  Claims refresh needed, retrying...');
@@ -403,12 +405,12 @@ async function verificarEmail(radicadoId: string, uids: Record<string, string>) 
     });
     if (!retryRes.ok) { fail(14, 'Email al ciudadano', `session retry ${retryRes.status}`); return; }
 
-    var sessionCookie = retryRes.headers.get('set-cookie')?.match(/__session=([^;]+)/)?.[1];
+    sessionCookie = retryRes.headers.get('set-cookie')?.match(/__session=([^;]+)/)?.[1];
   } else if (!sessionRes.ok) {
     fail(14, 'Email al ciudadano', `session ${sessionRes.status}`);
     return;
   } else {
-    var sessionCookie = sessionRes.headers.get('set-cookie')?.match(/__session=([^;]+)/)?.[1];
+    sessionCookie = sessionRes.headers.get('set-cookie')?.match(/__session=([^;]+)/)?.[1];
   }
 
   if (!sessionCookie) {

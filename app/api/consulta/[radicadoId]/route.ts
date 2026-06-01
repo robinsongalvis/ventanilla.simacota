@@ -1,10 +1,16 @@
 import { NextResponse, type NextRequest } from 'next/server';
 import { getRadicadoAdmin } from '@/lib/firestore-admin-rest';
+import { getFirebaseAdminDb } from '@/lib/firebase-admin';
 import type { AccionAuditoria, EstadoRadicado, TenantId } from '@/src/types/radicado';
+import type { TrazabilidadRadicado, VentanillaRadicado } from '@/src/types/ventanilla';
 
 export const runtime = 'nodejs';
 
-const RADICADO_RE = /^EXT-\d{4}-\d{2}-\d{2}-\d{6}-[A-Z2-9]{4}$/;
+const LEGACY_RADICADO_RE = /^EXT-\d{4}-\d{2}-\d{2}-\d{6}-[A-Z2-9]{4}$/;
+const INSTITUCIONAL_RADICADO_RE = /^1-(WEB|OFICIO|EMAIL|PRESENCIAL)-\d{4}-\d{8}$/;
+const RADICADO_RE = new RegExp(
+  `${LEGACY_RADICADO_RE.source}|${INSTITUCIONAL_RADICADO_RE.source}`,
+);
 
 const ACCIONES_PUBLICAS = new Set<AccionAuditoria>([
   'RADICACION',
@@ -21,6 +27,38 @@ interface RouteContext {
   params: Promise<{ radicadoId: string }>;
 }
 
+async function getVentanillaRadicadoPublico(id: string) {
+  const db = getFirebaseAdminDb();
+  const snap = await db.doc(`ventanilla_radicados/${id}`).get();
+
+  if (!snap.exists) return null;
+
+  const data = snap.data() as VentanillaRadicado;
+  const trazabilidadSnap = await db
+    .collection(`ventanilla_radicados/${id}/trazabilidad`)
+    .orderBy('fecha', 'asc')
+    .limit(25)
+    .get();
+
+  const auditoria = trazabilidadSnap.docs
+    .map((doc) => doc.data() as TrazabilidadRadicado)
+    .filter((entrada) => ACCIONES_PUBLICAS.has(entrada.accion as AccionAuditoria))
+    .map((entrada) => ({
+      fecha: entrada.fecha,
+      accion: entrada.accion as AccionAuditoria,
+    }));
+
+  return {
+    radicadoId: data.radicadoId ?? id,
+    fechaCreacion: data.control?.fechaRadicado,
+    estadoActual: data.estadoActual,
+    clasificacionIA: data.clasificacion?.oficinaDestino
+      ? { oficinaDestino: data.clasificacion.oficinaDestino }
+      : null,
+    auditoria,
+  };
+}
+
 export async function GET(_request: NextRequest, context: RouteContext) {
   const { radicadoId } = await context.params;
   const id = decodeURIComponent(radicadoId).trim().toUpperCase();
@@ -30,6 +68,16 @@ export async function GET(_request: NextRequest, context: RouteContext) {
   }
 
   try {
+    if (INSTITUCIONAL_RADICADO_RE.test(id)) {
+      const ventanilla = await getVentanillaRadicadoPublico(id);
+
+      if (!ventanilla) {
+        return NextResponse.json({ error: 'Radicado no encontrado.' }, { status: 404 });
+      }
+
+      return NextResponse.json(ventanilla);
+    }
+
     const data = await getRadicadoAdmin(id);
 
     if (!data) {

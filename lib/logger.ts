@@ -41,7 +41,6 @@ export function logError(params: {
   };
 
   // 1. Log estructurado (siempre)
-  // eslint-disable-next-line no-console
   console.error('[ventanilla:error]', JSON.stringify(entry));
 
   // 2. Sentry (solo si está disponible e inicializado — no-op silencioso si no)

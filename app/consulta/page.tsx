@@ -4,13 +4,15 @@ import { Suspense, useCallback, useEffect, useRef, useState } from 'react';
 import { useSearchParams } from 'next/navigation';
 import Link from 'next/link';
 import { DIRECTORIO_TENANTS } from '@/src/types/reglas-negocio';
-import type { EstadoRadicado, AccionAuditoria, TenantId } from '@/src/types/radicado';
+import type { AccionAuditoria, EstadoRadicado, TenantId } from '@/src/types/radicado';
 
 /* ══════════════════════════════════════════════════════════════
    DATOS: ESTADOS Y AUDITORÍA EN LENGUAJE CIUDADANO
 ══════════════════════════════════════════════════════════════ */
 
-const DESCRIPCION_ESTADO: Record<EstadoRadicado, { titulo: string; descripcion: string; color: string; bg: string; border: string }> = {
+type EstadoPublico = EstadoRadicado | 'ASIGNADO' | 'POR_VENCER' | 'VENCIDO' | 'PRORROGA';
+
+const DESCRIPCION_ESTADO: Record<EstadoPublico, { titulo: string; descripcion: string; color: string; bg: string; border: string }> = {
   PENDIENTE: {
     titulo:      'Pendiente',
     descripcion: 'Su solicitud fue recibida y está en espera de ser revisada por un funcionario.',
@@ -53,15 +55,47 @@ const DESCRIPCION_ESTADO: Record<EstadoRadicado, { titulo: string; descripcion: 
     bg:          'bg-slate-500/10',
     border:      'border-slate-500/30',
   },
+  ASIGNADO: {
+    titulo:      'Asignado a dependencia',
+    descripcion: 'Su solicitud ya fue direccionada a la dependencia competente para su atención.',
+    color:       'text-sky-400',
+    bg:          'bg-sky-500/10',
+    border:      'border-sky-500/30',
+  },
+  POR_VENCER: {
+    titulo:      'En atención prioritaria',
+    descripcion: 'Su solicitud está próxima a cumplir el término legal de respuesta y fue marcada para seguimiento.',
+    color:       'text-orange-400',
+    bg:          'bg-orange-500/10',
+    border:      'border-orange-500/30',
+  },
+  VENCIDO: {
+    titulo:      'En revisión por vencimiento',
+    descripcion: 'El término legal requiere revisión interna. La entidad debe priorizar la respuesta del caso.',
+    color:       'text-rose-400',
+    bg:          'bg-rose-500/10',
+    border:      'border-rose-500/30',
+  },
+  PRORROGA: {
+    titulo:      'Con prórroga registrada',
+    descripcion: 'La solicitud tiene una ampliación de término registrada por la entidad.',
+    color:       'text-amber-400',
+    bg:          'bg-amber-500/10',
+    border:      'border-amber-500/30',
+  },
 };
 
-const EMOJI_ESTADO: Record<EstadoRadicado, string> = {
+const EMOJI_ESTADO: Record<EstadoPublico, string> = {
   PENDIENTE:   '⏳',
   EN_REVISION: '🔍',
   EN_PROCESO:  '⚙️',
   RESUELTO:    '✅',
   DEVUELTO:    '↩️',
   RECHAZADO:   '⛔',
+  ASIGNADO:    '📨',
+  POR_VENCER:  '⚠️',
+  VENCIDO:     '🚨',
+  PRORROGA:    '🕒',
 };
 
 const ACCION_CIUDADANO: Partial<Record<AccionAuditoria, string>> = {
@@ -78,7 +112,7 @@ const ACCION_CIUDADANO: Partial<Record<AccionAuditoria, string>> = {
 interface RadicadoPublico {
   radicadoId: string;
   fechaCreacion?: string;
-  estadoActual?: EstadoRadicado;
+  estadoActual?: EstadoPublico;
   clasificacionIA?: {
     oficinaDestino?: TenantId;
   } | null;
@@ -259,7 +293,7 @@ function ConsultaInterna() {
               value={inputId}
               onChange={(e) => handleInputChange(e.target.value)}
               onKeyDown={(e) => e.key === 'Enter' && buscar(inputId)}
-              placeholder="EXT-2026-04-14-093022-A7K2"
+              placeholder="1-WEB-2026-00000047"
               className="flex-1 bg-slate-800/50 border border-white/10 rounded-xl px-4 py-3
                 text-slate-50 placeholder:text-slate-600 text-sm font-mono
                 focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/20 outline-none
