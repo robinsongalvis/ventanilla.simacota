@@ -30,6 +30,7 @@ import {
   despacharNotificaciones,
 } from '@/lib/acciones/resolver-radicado';
 import { SemaforoTermino, calcularSemaforo } from '@/app/interno/dashboard/components/mipg/SemaforoTermino';
+import { VistaAdministracion }                from '@/app/interno/dashboard/components/admin/VistaAdministracion';
 import { useFuncionariosTenant }              from '@/lib/hooks/useFuncionariosTenant';
 import type { FuncionarioTenant }             from '@/lib/hooks/useFuncionariosTenant';
 import type { ResponsableFuncionario }        from '@/lib/actions/asignarRadicado';
@@ -220,6 +221,7 @@ function puedeVerAnaliticaAvanzada(usuario: UsuarioAutenticado): boolean {
 }
 
 function puedeAccederVista(usuario: UsuarioAutenticado, vista: VistaActual): boolean {
+  if (vista === 'ADMINISTRACION') return usuario.rol === 'ADMIN';
   if (vista === 'BANDEJA' || vista === 'VENTANILLA') return puedeUsarBandejaAsignacion(usuario);
   if (vista === 'DEPENDENCIAS') return puedeVerDependencias(usuario);
   if (vista === 'SUPERVISION_IA' || vista === 'ANTICIPACION_OPERATIVA') {
@@ -449,6 +451,19 @@ function SidebarNav({
         <svg className="w-[18px] h-[18px]" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.8}>
           <path strokeLinecap="round" strokeLinejoin="round" d="M9.594 3.94c.09-.542.56-.94 1.11-.94h2.593c.55 0 1.02.398 1.11.94l.213 1.281c.063.374.313.686.645.87.074.04.147.083.22.127.324.196.72.257 1.075.124l1.217-.456a1.125 1.125 0 011.37.49l1.296 2.247a1.125 1.125 0 01-.26 1.43l-1.003.828c-.293.241-.438.613-.43.992a7.723 7.723 0 010 .255c-.008.378.137.75.43.991l1.004.827c.424.35.534.954.26 1.43l-1.298 2.247a1.125 1.125 0 01-1.369.491l-1.217-.456c-.355-.133-.75-.072-1.076.124a6.47 6.47 0 01-.22.128c-.331.183-.581.495-.644.869l-.213 1.281c-.09.543-.56.94-1.11.94h-2.594c-.55 0-1.019-.398-1.11-.94l-.213-1.281c-.062-.374-.312-.686-.644-.87a6.52 6.52 0 01-.22-.127c-.325-.196-.72-.257-1.076-.124l-1.217.456a1.125 1.125 0 01-1.369-.49l-1.297-2.247a1.125 1.125 0 01.26-1.43l1.004-.827c.292-.24.437-.613.43-.991a6.932 6.932 0 010-.255c.007-.38-.138-.751-.43-.992l-1.004-.827a1.125 1.125 0 01-.26-1.43l1.297-2.247a1.125 1.125 0 011.37-.491l1.216.456c.356.133.751.072 1.076-.124.072-.044.146-.086.22-.128.332-.183.582-.495.644-.869l.214-1.28Z" />
           <path strokeLinecap="round" strokeLinejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0Z" />
+        </svg>
+      ),
+    });
+  }
+
+  // Administración — solo ADMIN real (no CONTROL_INTERNO)
+  if (usuario.rol === 'ADMIN') {
+    items.push({
+      vista: 'ADMINISTRACION' as const,
+      label: 'Administración',
+      icono: (
+        <svg className="w-[18px] h-[18px]" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.8}>
+          <path strokeLinecap="round" strokeLinejoin="round" d="M15 19.128a9.38 9.38 0 002.625.372 9.337 9.337 0 004.121-.952 4.125 4.125 0 00-7.533-2.493M15 19.128v-.003c0-1.113-.285-2.16-.786-3.07M15 19.128v.106A12.318 12.318 0 018.624 21c-2.331 0-4.512-.645-6.374-1.766l-.001-.109a6.375 6.375 0 0111.964-3.07M12 6.375a3.375 3.375 0 11-6.75 0 3.375 3.375 0 016.75 0zm8.25 2.25a2.625 2.625 0 11-5.25 0 2.625 2.625 0 015.25 0z" />
         </svg>
       ),
     });
@@ -2864,6 +2879,8 @@ function DashboardInterior({ usuario, cerrarSesion }: { usuario: UsuarioAutentic
           <div className="flex-1 overflow-y-auto p-4 md:p-6 bg-[#0E0E10]/40">
             <VistaAnticipacionOperativa radicados={todosLosRadicados} />
           </div>
+        ) : vistaActual === 'ADMINISTRACION' ? (
+          <VistaAdministracion />
         ) : (
           <>
             {/* Fila de métricas MIPG */}

@@ -36,7 +36,8 @@ export type VistaActual =
   | 'ANALYTICS'    // Centro de Inteligencia Operativa — Fase 2
   | 'ALERTAS'      // Panel de Alertas Predictivas — Fase 2
   | 'SUPERVISION_IA' // Panel de Supervisión y Gobernanza de IA — Fase 3.5
-  | 'ANTICIPACION_OPERATIVA'; // Anticipación Operativa y Análisis Predictivo — Fase 4.1
+  | 'ANTICIPACION_OPERATIVA' // Anticipación Operativa y Análisis Predictivo — Fase 4.1
+  | 'ADMINISTRACION';        // Gestión de usuarios internos — Solo ADMIN
 
 
 interface VentanillaState {

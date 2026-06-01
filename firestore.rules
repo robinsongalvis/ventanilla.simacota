@@ -276,6 +276,13 @@ service cloud.firestore {
       allow read, write: if isAdmin() || isRecepcionista();
     }
 
+    // ── Auditoría administrativa — append-only, solo lectura Admin ────────
+    match /admin_auditoria/{eventoId} {
+      allow read: if isAdmin();
+      // Escritura solo desde Admin SDK (API routes) — no desde cliente
+      allow write: if false;
+    }
+
     match /{document=**} {
       allow read, write: if false;
     }
