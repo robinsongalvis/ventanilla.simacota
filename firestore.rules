@@ -279,7 +279,12 @@ service cloud.firestore {
     // ── Auditoría administrativa — append-only, solo lectura Admin ────────
     match /admin_auditoria/{eventoId} {
       allow read: if isAdmin();
-      // Escritura solo desde Admin SDK (API routes) — no desde cliente
+      allow write: if false;
+    }
+
+    // ── Auditoría SIMI — append-only, solo lectura Admin ─────────────────
+    match /simi_auditoria/{eventoId} {
+      allow read: if isAdmin();
       allow write: if false;
     }
 

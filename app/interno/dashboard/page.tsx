@@ -31,6 +31,7 @@ import {
 } from '@/lib/acciones/resolver-radicado';
 import { SemaforoTermino, calcularSemaforo } from '@/app/interno/dashboard/components/mipg/SemaforoTermino';
 import { VistaAdministracion }                from '@/app/interno/dashboard/components/admin/VistaAdministracion';
+import { PanelSimi }                         from '@/app/interno/dashboard/components/simi/PanelSimi';
 import { useFuncionariosTenant }              from '@/lib/hooks/useFuncionariosTenant';
 import type { FuncionarioTenant }             from '@/lib/hooks/useFuncionariosTenant';
 import type { ResponsableFuncionario }        from '@/lib/actions/asignarRadicado';
@@ -1072,7 +1073,7 @@ const TABS_PANEL: { id: TabPanelId; label: string }[] = [
   { id: 'traslado',     label: 'Traslado' },
   { id: 'trazabilidad', label: 'Trazabilidad' },
   { id: 'respuesta',    label: 'Prórroga / Resp.' },
-  { id: 'copiloto',     label: 'Copiloto IA ✦' },
+  { id: 'copiloto',     label: 'SIMI ✦' },
 ];
 
 function FilaInfo({ label, value }: { label: string; value: string }) {
@@ -2130,7 +2131,11 @@ function PanelDerecho({
 
         {/* ── TAB 5: Copiloto IA ── */}
         {tab === 'copiloto' && (
-          <CopilotoTab radicado={radicado} setRespuesta={setRespuesta} setTab={setTab} />
+          <PanelSimi
+            radicado={radicado}
+            usuario={usuario}
+            onAdoptarRespuesta={(texto) => { setRespuesta(texto); setTab('respuesta'); }}
+          />
         )}
       </div>
     </div>
