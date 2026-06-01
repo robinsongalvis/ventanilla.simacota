@@ -67,11 +67,13 @@ const LABEL_ROL: Record<RolInterno, string> = {
 ══════════════════════════════════════════════════════════════ */
 
 export function VistaAdministracion() {
-  const [usuarios,  setUsuarios]  = useState<UsuarioInterno[]>([]);
-  const [cargando,  setCargando]  = useState(true);
-  const [error,     setError]     = useState<string | null>(null);
-  const [showModal, setShowModal] = useState(false);
-  const [busqueda,  setBusqueda]  = useState('');
+  const [usuarios,    setUsuarios]    = useState<UsuarioInterno[]>([]);
+  const [cargando,    setCargando]    = useState(true);
+  const [error,       setError]       = useState<string | null>(null);
+  const [showModal,   setShowModal]   = useState(false);
+  const [editando,    setEditando]    = useState<UsuarioInterno | null>(null);
+  const [busqueda,    setBusqueda]    = useState('');
+  const [msgGlobal,   setMsgGlobal]   = useState<{ tipo: 'ok' | 'error'; texto: string } | null>(null);
 
   /* ── Cargar usuarios ────────────────────────────────────── */
   const cargarUsuarios = useCallback(async () => {
@@ -93,6 +95,44 @@ export function VistaAdministracion() {
   }, []);
 
   useEffect(() => { cargarUsuarios(); }, [cargarUsuarios]);
+
+  /* ── Acciones rápidas (toggle activo, reset password) ──── */
+  async function toggleActivo(u: UsuarioInterno) {
+    setMsgGlobal(null);
+    try {
+      const res = await fetch(`/api/admin/usuarios/${u.uid}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ activo: !u.activo }),
+      });
+      const data = await res.json() as { ok?: boolean; error?: string; mensaje?: string };
+      if (!res.ok) throw new Error(data.error ?? `HTTP ${res.status}`);
+      setMsgGlobal({ tipo: 'ok', texto: u.activo ? `${u.nombre} desactivado.` : `${u.nombre} activado.` });
+      cargarUsuarios();
+    } catch (err) {
+      setMsgGlobal({ tipo: 'error', texto: err instanceof Error ? err.message : 'Error' });
+    }
+  }
+
+  async function resetPassword(u: UsuarioInterno) {
+    setMsgGlobal(null);
+    try {
+      const res = await fetch(`/api/admin/usuarios/${u.uid}`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ accion: 'reset-password' }),
+      });
+      const data = await res.json() as { ok?: boolean; link?: string; error?: string };
+      if (!res.ok) throw new Error(data.error ?? `HTTP ${res.status}`);
+      // Copiar enlace al clipboard
+      if (data.link) {
+        await navigator.clipboard.writeText(data.link).catch(() => {});
+      }
+      setMsgGlobal({ tipo: 'ok', texto: `Enlace de restablecimiento generado para ${u.email}. ${data.link ? 'Copiado al portapapeles.' : ''}` });
+    } catch (err) {
+      setMsgGlobal({ tipo: 'error', texto: err instanceof Error ? err.message : 'Error' });
+    }
+  }
 
   /* ── Filtrado local ─────────────────────────────────────── */
   const filtrados = busqueda.trim()
@@ -150,10 +190,22 @@ export function VistaAdministracion() {
         </div>
       </div>
 
-      {/* Error */}
+      {/* Mensajes globales */}
       {error && (
         <div className="mx-6 mt-4 px-4 py-3 rounded-lg bg-rose-500/10 border border-rose-500/30 text-rose-400 text-sm">
           {error}
+        </div>
+      )}
+      {msgGlobal && (
+        <div className={`mx-6 mt-4 px-4 py-3 rounded-lg text-sm flex items-center justify-between ${
+          msgGlobal.tipo === 'ok'
+            ? 'bg-emerald-500/10 border border-emerald-500/30 text-emerald-300'
+            : 'bg-rose-500/10 border border-rose-500/30 text-rose-400'
+        }`}>
+          <span>{msgGlobal.texto}</span>
+          <button onClick={() => setMsgGlobal(null)} className="text-slate-500 hover:text-slate-300 ml-3 shrink-0">
+            <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" /></svg>
+          </button>
         </div>
       )}
 
@@ -181,7 +233,7 @@ export function VistaAdministracion() {
             <table className="w-full text-left">
               <thead>
                 <tr className="border-b border-white/[0.07]">
-                  {['Nombre', 'Email', 'Cargo', 'Rol', 'Dependencia', 'Estado'].map((h) => (
+                  {['Nombre', 'Email', 'Cargo', 'Rol', 'Dependencia', 'Estado', 'Acciones'].map((h) => (
                     <th key={h} className="px-4 py-3 text-[10px] font-bold uppercase tracking-widest text-slate-600">
                       {h}
                     </th>
@@ -214,6 +266,48 @@ export function VistaAdministracion() {
                         {u.activo ? 'Activo' : 'Inactivo'}
                       </span>
                     </td>
+                    {/* Acciones */}
+                    <td className="px-4 py-3">
+                      <div className="flex items-center gap-1">
+                        <button
+                          onClick={() => setEditando(u)}
+                          title="Editar usuario"
+                          className="p-1.5 rounded-lg text-slate-500 hover:text-indigo-400 hover:bg-indigo-500/10 transition-all"
+                        >
+                          <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                            <path strokeLinecap="round" strokeLinejoin="round" d="M16.862 4.487l1.687-1.688a1.875 1.875 0 112.652 2.652L10.582 16.07a4.5 4.5 0 01-1.897 1.13L6 18l.8-2.685a4.5 4.5 0 011.13-1.897l8.932-8.931zm0 0L19.5 7.125M18 14v4.75A2.25 2.25 0 0115.75 21H5.25A2.25 2.25 0 013 18.75V8.25A2.25 2.25 0 015.25 6H10" />
+                          </svg>
+                        </button>
+                        <button
+                          onClick={() => toggleActivo(u)}
+                          title={u.activo ? 'Desactivar' : 'Activar'}
+                          className={`p-1.5 rounded-lg transition-all ${
+                            u.activo
+                              ? 'text-slate-500 hover:text-rose-400 hover:bg-rose-500/10'
+                              : 'text-slate-500 hover:text-emerald-400 hover:bg-emerald-500/10'
+                          }`}
+                        >
+                          {u.activo ? (
+                            <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                              <path strokeLinecap="round" strokeLinejoin="round" d="M18.364 18.364A9 9 0 005.636 5.636m12.728 12.728A9 9 0 015.636 5.636m12.728 12.728L5.636 5.636" />
+                            </svg>
+                          ) : (
+                            <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                              <path strokeLinecap="round" strokeLinejoin="round" d="M9 12.75L11.25 15 15 9.75M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                            </svg>
+                          )}
+                        </button>
+                        <button
+                          onClick={() => resetPassword(u)}
+                          title="Restablecer contraseña"
+                          className="p-1.5 rounded-lg text-slate-500 hover:text-amber-400 hover:bg-amber-500/10 transition-all"
+                        >
+                          <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                            <path strokeLinecap="round" strokeLinejoin="round" d="M15.75 5.25a3 3 0 013 3m3 0a6 6 0 01-7.029 5.912c-.563-.097-1.159.026-1.563.43L10.5 17.25H8.25v2.25H6v2.25H2.25v-2.818c0-.597.237-1.17.659-1.591l6.499-6.499c.404-.404.527-1 .43-1.563A6 6 0 1121.75 8.25z" />
+                          </svg>
+                        </button>
+                      </div>
+                    </td>
                   </tr>
                 ))}
               </tbody>
@@ -228,6 +322,19 @@ export function VistaAdministracion() {
           onClose={() => setShowModal(false)}
           onCreado={() => {
             setShowModal(false);
+            cargarUsuarios();
+          }}
+        />
+      )}
+
+      {/* Modal Editar Usuario (Fase B) */}
+      {editando && (
+        <ModalEditarUsuario
+          usuario={editando}
+          onClose={() => setEditando(null)}
+          onGuardado={() => {
+            setEditando(null);
+            setMsgGlobal({ tipo: 'ok', texto: `${editando.nombre} actualizado.` });
             cargarUsuarios();
           }}
         />
@@ -448,6 +555,132 @@ function ModalCrearUsuario({
                 <span className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
               )}
               {guardando ? 'Creando...' : 'Crear usuario'}
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+  );
+}
+
+/* ══════════════════════════════════════════════════════════════
+   MODAL: Editar Usuario (Fase B)
+══════════════════════════════════════════════════════════════ */
+
+function ModalEditarUsuario({
+  usuario,
+  onClose,
+  onGuardado,
+}: {
+  usuario:    UsuarioInterno;
+  onClose:    () => void;
+  onGuardado: () => void;
+}) {
+  const [nombre,    setNombre]    = useState(usuario.nombre);
+  const [cargo,     setCargo]     = useState(usuario.cargo);
+  const [rol,       setRol]       = useState<RolInterno>(usuario.rol);
+  const [tenantId,  setTenantId]  = useState<TenantId>(usuario.tenantId);
+  const [guardando, setGuardando] = useState(false);
+  const [error,     setError]     = useState<string | null>(null);
+  const [exito,     setExito]     = useState<string | null>(null);
+
+  async function handleGuardar(e: React.FormEvent) {
+    e.preventDefault();
+    setError(null);
+    setExito(null);
+    setGuardando(true);
+
+    try {
+      const res = await fetch(`/api/admin/usuarios/${usuario.uid}`, {
+        method:  'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body:    JSON.stringify({
+          nombre: nombre.trim(),
+          cargo:  cargo.trim(),
+          rol,
+          tenantId,
+        }),
+      });
+
+      const data = await res.json() as { ok?: boolean; mensaje?: string; error?: string; cambios?: string[] };
+
+      if (!res.ok) throw new Error(data.error ?? `HTTP ${res.status}`);
+
+      const cambiosTexto = data.cambios?.length
+        ? ` (${data.cambios.join(', ')})`
+        : '';
+      setExito(`${data.mensaje ?? 'Actualizado.'}${cambiosTexto}`);
+
+      setTimeout(() => onGuardado(), 1200);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Error al guardar.');
+    } finally {
+      setGuardando(false);
+    }
+  }
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+      <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={onClose} />
+      <div
+        className="relative w-full max-w-lg rounded-2xl border border-white/10 p-6 shadow-2xl"
+        style={{ background: 'rgba(15,23,42,0.95)', backdropFilter: 'blur(25px)' }}
+      >
+        <div className="flex items-center justify-between mb-6">
+          <div>
+            <p className="text-[10px] font-bold uppercase tracking-widest text-amber-400 mb-0.5">
+              Editar usuario
+            </p>
+            <h2 className="text-lg font-black text-slate-50">{usuario.nombre}</h2>
+            <p className="text-xs text-slate-500 font-mono mt-0.5">{usuario.email}</p>
+          </div>
+          <button onClick={onClose} className="p-1.5 rounded-lg text-slate-500 hover:text-slate-200 hover:bg-white/[0.06] transition-all">
+            <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+              <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
+            </svg>
+          </button>
+        </div>
+
+        <form onSubmit={handleGuardar} className="space-y-4">
+          <div>
+            <label className="block text-[10px] font-bold uppercase tracking-widest text-slate-500 mb-1.5">Nombre completo</label>
+            <input type="text" value={nombre} onChange={(e) => setNombre(e.target.value)} required
+              className="w-full bg-slate-800/50 border border-white/10 rounded-xl px-4 py-2.5 text-sm text-slate-200 focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/20 outline-none transition-all" />
+          </div>
+          <div>
+            <label className="block text-[10px] font-bold uppercase tracking-widest text-slate-500 mb-1.5">Cargo</label>
+            <input type="text" value={cargo} onChange={(e) => setCargo(e.target.value)}
+              className="w-full bg-slate-800/50 border border-white/10 rounded-xl px-4 py-2.5 text-sm text-slate-200 focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/20 outline-none transition-all" />
+          </div>
+          <div className="grid grid-cols-2 gap-4">
+            <div>
+              <label className="block text-[10px] font-bold uppercase tracking-widest text-slate-500 mb-1.5">Rol</label>
+              <select value={rol} onChange={(e) => setRol(e.target.value as RolInterno)}
+                className="w-full bg-slate-800/50 border border-white/10 rounded-xl px-3 py-2.5 text-sm text-slate-200 focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/20 outline-none transition-all">
+                {ROLES.map((r) => <option key={r.value} value={r.value}>{r.label}</option>)}
+              </select>
+            </div>
+            <div>
+              <label className="block text-[10px] font-bold uppercase tracking-widest text-slate-500 mb-1.5">Dependencia</label>
+              <select value={tenantId} onChange={(e) => setTenantId(e.target.value as TenantId)}
+                className="w-full bg-slate-800/50 border border-white/10 rounded-xl px-3 py-2.5 text-sm text-slate-200 focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/20 outline-none transition-all">
+                {TENANTS.map((t) => <option key={t.value} value={t.value}>{t.label}</option>)}
+              </select>
+            </div>
+          </div>
+
+          {error && <div className="px-4 py-2.5 rounded-lg bg-rose-500/10 border border-rose-500/30 text-rose-400 text-xs">{error}</div>}
+          {exito && <div className="px-4 py-2.5 rounded-lg bg-emerald-500/10 border border-emerald-500/30 text-emerald-300 text-xs">{exito}</div>}
+
+          <div className="flex justify-end gap-3 pt-2">
+            <button type="button" onClick={onClose} disabled={guardando}
+              className="px-4 py-2.5 rounded-xl text-sm font-medium text-slate-400 hover:text-slate-200 hover:bg-white/[0.06] transition-all">
+              Cancelar
+            </button>
+            <button type="submit" disabled={guardando}
+              className="flex items-center gap-2 px-5 py-2.5 rounded-xl bg-amber-600 hover:bg-amber-500 text-white text-sm font-bold transition-all disabled:opacity-50 active:scale-[0.97]">
+              {guardando && <span className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />}
+              {guardando ? 'Guardando...' : 'Guardar cambios'}
             </button>
           </div>
         </form>
