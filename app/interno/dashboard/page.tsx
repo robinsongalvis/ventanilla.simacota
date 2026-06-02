@@ -32,6 +32,7 @@ import {
 import { SemaforoTermino, calcularSemaforo } from '@/app/interno/dashboard/components/mipg/SemaforoTermino';
 import { VistaAdministracion }                from '@/app/interno/dashboard/components/admin/VistaAdministracion';
 import { PanelSimi }                         from '@/app/interno/dashboard/components/simi/PanelSimi';
+import { PqrsdDeadlineDashboard }            from '@/app/interno/dashboard/components/simi/PqrsdDeadlineDashboard';
 import { InstitucionalHeader }               from '@/app/components/institucional/InstitucionalHeader';
 import { SelloRadicado }                     from '@/app/components/institucional/SelloRadicado';
 import { useFuncionariosTenant }              from '@/lib/hooks/useFuncionariosTenant';
@@ -2741,6 +2742,20 @@ function DashboardInterior({ usuario, cerrarSesion }: { usuario: UsuarioAutentic
           <VistaAdministracion />
         ) : (
           <>
+            {/* Dashboard PQRSD compacto — vencimientos y riesgo */}
+            {esAdmin && (
+              <div className="px-4 py-3 bg-white shrink-0" style={{ borderBottom: '1px solid #D9E2D9' }}>
+                <p className="text-[9px] font-bold uppercase tracking-widest mb-2" style={{ color: '#14532D' }}>
+                  Semáforo PQRSD
+                </p>
+                <PqrsdDeadlineDashboard
+                  radicados={todosLosRadicados}
+                  filtroTenant={tenantFiltro}
+                  compact={true}
+                />
+              </div>
+            )}
+
             {/* Fila de métricas MIPG */}
             <TarjetasMIPG
               metricas={metricas}

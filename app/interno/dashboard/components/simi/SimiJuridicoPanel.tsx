@@ -24,6 +24,11 @@ import type {
 import { LegalRiskBadge, RevisionJuridicaBanner, NormaEstadoBadge } from './LegalRiskBadge';
 import { MipgChecklistCard } from './MipgChecklistCard';
 import { NormativeSourcesCard } from './NormativeSourcesCard';
+import { RagSourcesPanel } from './RagSourcesPanel';
+import { ApprovalFlowCard } from './ApprovalFlowCard';
+import type { RagSource } from '@/src/types/simi-rag';
+import type { ApprovalFlowResult } from '@/src/types/simi-approval';
+import type { ApprovalFlow } from '@/src/types/simi-approval';
 
 /* ══════════════════════════════════════════════════════════════
    MODOS DISPONIBLES
@@ -314,11 +319,15 @@ export function SimiJuridicoPanel({
   usuario,
   onAdoptarRespuesta,
 }: SimiJuridicoPanelProps) {
-  const [modoActivo, setModoActivo]   = useState<SimiModoJuridico | null>(null);
-  const [cargando,   setCargando]     = useState(false);
-  const [respuesta,  setRespuesta]    = useState<SimiJuridicoResponse | null>(null);
-  const [error,      setError]        = useState<string | null>(null);
-  const [borrador,   setBorrador]     = useState('');
+  const [modoActivo, setModoActivo]       = useState<SimiModoJuridico | null>(null);
+  const [cargando,   setCargando]         = useState(false);
+  const [respuesta,  setRespuesta]        = useState<SimiJuridicoResponse | null>(null);
+  const [error,      setError]            = useState<string | null>(null);
+  const [borrador,   setBorrador]         = useState('');
+  const [useRag,     setUseRag]           = useState(false);
+  const [createApproval, setCreateApproval] = useState(false);
+  const [fuentesRag, setFuentesRag]       = useState<RagSource[]>([]);
+  const [approvalResult, setApprovalResult] = useState<ApprovalFlowResult | null>(null);
 
   const modoNecesitaBorrador = (m: SimiModoJuridico | null) =>
     m === 'revisar_borrador' || m === 'lenguaje_claro' || m === 'datos_personales';
@@ -334,17 +343,26 @@ export function SimiJuridicoPanel({
         method:  'POST',
         headers: { 'Content-Type': 'application/json' },
         body:    JSON.stringify({
-          radicadoId: radicado.radicadoId,
+          radicadoId:     radicado.radicadoId,
           modo,
           textoSolicitud: radicado.detalle.descripcion || radicado.detalle.asunto,
-          borrador:  borrador.trim() || undefined,
+          borrador:       borrador.trim() || undefined,
+          useRag,
+          createApproval,
         }),
       });
 
-      const data = await res.json() as SimiJuridicoResponse & { error?: string };
+      const data = await res.json() as SimiJuridicoResponse & {
+        error?: string;
+        fuentesRag?: RagSource[];
+        aprobacion?: ApprovalFlowResult;
+        usedRag?: boolean;
+      };
 
       if (!res.ok) throw new Error(data.error ?? `HTTP ${res.status}`);
       setRespuesta(data);
+      if (data.fuentesRag) setFuentesRag(data.fuentesRag);
+      if (data.aprobacion) setApprovalResult(data.aprobacion);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Error al consultar SIMI Jurídico.');
     } finally {
@@ -398,6 +416,38 @@ export function SimiJuridicoPanel({
           />
         </div>
       )}
+
+      {/* Opciones avanzadas RAG + Aprobación */}
+      <div className="rounded-lg p-3 space-y-2" style={{ background: '#F8FAF7', border: '1px solid #D9E2D9' }}>
+        <p className="text-[9px] font-bold uppercase tracking-widest" style={{ color: '#94A3B8' }}>Opciones avanzadas</p>
+        <label className="flex items-center gap-2 cursor-pointer">
+          <button
+            type="button"
+            onClick={() => setUseRag(!useRag)}
+            className="w-9 h-5 rounded-full p-0.5 transition-all duration-200 shrink-0"
+            style={{ background: useRag ? '#14532D' : '#D9E2D9' }}>
+            <div className="w-4 h-4 rounded-full bg-white shadow transition-all duration-200"
+                 style={{ transform: useRag ? 'translateX(16px)' : 'translateX(0)' }} />
+          </button>
+          <span className="text-[11px]" style={{ color: '#1F2933' }}>Usar base jurídica validada (RAG)</span>
+        </label>
+        <label className="flex items-center gap-2 cursor-pointer">
+          <button
+            type="button"
+            onClick={() => setCreateApproval(!createApproval)}
+            className="w-9 h-5 rounded-full p-0.5 transition-all duration-200 shrink-0"
+            style={{ background: createApproval ? '#14532D' : '#D9E2D9' }}>
+            <div className="w-4 h-4 rounded-full bg-white shadow transition-all duration-200"
+                 style={{ transform: createApproval ? 'translateX(16px)' : 'translateX(0)' }} />
+          </button>
+          <span className="text-[11px]" style={{ color: '#1F2933' }}>Crear flujo de aprobación humana</span>
+        </label>
+        {useRag && (
+          <p className="text-[9px] italic" style={{ color: '#94A3B8' }}>
+            Las fuentes normativas deben estar validadas para citarse como fundamento.
+          </p>
+        )}
+      </div>
 
       {/* Grid de modos */}
       {!modoActivo || !respuesta ? (
@@ -478,7 +528,7 @@ export function SimiJuridicoPanel({
               )}
             </div>
             <button
-              onClick={() => { setRespuesta(null); setModoActivo(null); }}
+              onClick={() => { setRespuesta(null); setModoActivo(null); setFuentesRag([]); setApprovalResult(null); }}
               className="text-[10px] font-semibold transition-colors"
               style={{ color: '#94A3B8' }}
               onMouseEnter={(e) => { (e.currentTarget as HTMLElement).style.color = '#667085'; }}
@@ -596,6 +646,25 @@ export function SimiJuridicoPanel({
               <pre className="text-xs leading-relaxed whitespace-pre-wrap" style={{ color: '#1F2933', fontFamily: 'inherit' }}>
                 {(respuesta.resultado as { instrucciones: string }).instrucciones}
               </pre>
+            </div>
+          )}
+
+          {/* Fuentes RAG usadas */}
+          {fuentesRag.length > 0 && (
+            <RagSourcesPanel
+              fuentesValidadas={fuentesRag}
+              fuentesPendientes={[]}
+            />
+          )}
+
+          {/* Flujo de aprobación creado */}
+          {approvalResult && (
+            <div className="rounded-xl p-3" style={{ background: '#F8FAF7', border: '1px solid #D9E2D9' }}>
+              <p className="text-[9px] font-bold uppercase tracking-widest mb-1.5" style={{ color: '#14532D' }}>
+                Flujo de aprobación creado
+              </p>
+              <p className="text-xs font-semibold" style={{ color: '#1F2933' }}>{approvalResult.mensaje}</p>
+              <p className="text-[10px] mt-1" style={{ color: '#94A3B8' }}>ID: {approvalResult.approvalId}</p>
             </div>
           )}
 
