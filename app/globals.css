@@ -78,6 +78,7 @@ html {
 }
 
 body {
+  /* Fondo institucional claro — portal público lo sobreescribe con .bg-obsidian-gradient */
   background-color: var(--bg-base);
   color: var(--text-primary);
   font-family: var(--font-dm-sans, 'DM Sans', system-ui, sans-serif);

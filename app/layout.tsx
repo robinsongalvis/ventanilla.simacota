@@ -93,7 +93,7 @@ export default function RootLayout({
       lang="es"
       className="h-full"
     >
-      <body className="min-h-full bg-[#0A0A0B] text-slate-100 antialiased">
+      <body className="min-h-full antialiased">
         <SimiProvider>
           {children}
           <SimiChat />
