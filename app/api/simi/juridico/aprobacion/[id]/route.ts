@@ -10,8 +10,14 @@ import { NextResponse }          from 'next/server';
 import { cookies }               from 'next/headers';
 import { SESSION_COOKIE_NAME }   from '@/lib/auth-cookie';
 import { getFirebaseAdminAuth, getFirebaseAdminDb } from '@/lib/firebase-admin';
-import { updateApprovalFlow }    from '@/lib/simi-juridico/createApprovalFlow';
-import { notificarCambioAprobacion } from '@/lib/simi-juridico/createNotification';
+import { updateApprovalFlow }         from '@/lib/simi-juridico/createApprovalFlow';
+import { notificarCambioAprobacion }  from '@/lib/simi-juridico/createNotification';
+import {
+  emailBorradorDevuelto,
+  emailBorradorAprobado,
+  emailEscaladoJuridica,
+} from '@/lib/simi-juridico/emailNotifications';
+import { validateReadyToSend }       from '@/lib/simi-juridico/validateReadyToSend';
 import type { ApprovalStatus }   from '@/src/types/simi-approval';
 import type { ApprovalFlow }     from '@/src/types/simi-approval';
 import type { RolInterno }       from '@/lib/hooks/useAuth';
@@ -87,6 +93,17 @@ export async function PATCH(
     nuevoEstado = 'aprobado_por_juridica';
   }
 
+  // Validar "listo_para_envio" antes de permitirlo
+  if (accion === 'marcar_listo_para_envio') {
+    const validacion = validateReadyToSend(flujo);
+    if (!validacion.ready) {
+      return NextResponse.json({
+        error: 'No se puede marcar como listo para envío.',
+        bloqueado: validacion.bloqueado,
+      }, { status: 422 });
+    }
+  }
+
   // Actualizar
   await updateApprovalFlow({
     approvalId:    id,
@@ -97,7 +114,67 @@ export async function PATCH(
     observacion,
   });
 
-  // Notificar si el estado genera nueva revisión
+  // Obtener email del funcionario original para notificaciones
+  const creadorId = flujo.historial?.[0]?.usuarioId;
+  let emailCreador: string | undefined;
+  let nombreCreador = 'Funcionario';
+  if (creadorId) {
+    try {
+      const userSnap = await getFirebaseAdminDb().doc(`users/${creadorId}`).get();
+      if (userSnap.exists) {
+        emailCreador = userSnap.data()?.email as string | undefined;
+        nombreCreador = userSnap.data()?.nombre as string ?? 'Funcionario';
+      }
+    } catch { /* silenciar */ }
+  }
+
+  // Enviar email según la acción
+  if (accion === 'devolver' && emailCreador) {
+    void emailBorradorDevuelto({
+      emailFuncionario:  emailCreador,
+      nombreFuncionario: nombreCreador,
+      radicadoId:        flujo.radicadoId,
+      asunto:            `Radicado ${flujo.radicadoId}`,
+      motivoDevolucion:  observacion ?? 'Ver observaciones en el sistema.',
+      devueltoPor:       usuario.nombre,
+    });
+  }
+
+  if ((accion === 'aprobar' || accion === 'marcar_listo_para_envio') && emailCreador) {
+    void emailBorradorAprobado({
+      emailFuncionario:  emailCreador,
+      nombreFuncionario: nombreCreador,
+      radicadoId:        flujo.radicadoId,
+      asunto:            `Radicado ${flujo.radicadoId}`,
+      aprobadoPor:       usuario.nombre,
+      estadoFinal:       nuevoEstado,
+    });
+  }
+
+  if (accion === 'escalar_juridica') {
+    // Buscar email de admin para notificar
+    try {
+      const adminsSnap = await getFirebaseAdminDb()
+        .collection('users')
+        .where('rol', '==', 'ADMIN')
+        .limit(3).get();
+      for (const doc of adminsSnap.docs) {
+        const adminEmail = doc.data().email as string | undefined;
+        if (adminEmail) {
+          void emailEscaladoJuridica({
+            emailJuridica: adminEmail,
+            radicadoId:    flujo.radicadoId,
+            asunto:        `Radicado ${flujo.radicadoId}`,
+            dependencia:   flujo.tenantId,
+            motivos:       flujo.motivoRevision ?? [],
+            escaladoPor:   usuario.nombre,
+          });
+        }
+      }
+    } catch { /* silenciar */ }
+  }
+
+  // Notificar si el estado genera nueva revisión interna
   if (nuevoEstado === 'pendiente_revision_juridica' || nuevoEstado === 'devuelto_para_ajustes') {
     void notificarCambioAprobacion({
       approvalId:   id,
