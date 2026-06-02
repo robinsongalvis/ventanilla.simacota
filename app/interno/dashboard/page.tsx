@@ -60,16 +60,16 @@ const LABELS_ESTADO: Record<string, string> = {
 };
 
 const BADGE_ESTADO: Record<string, string> = {
-  PENDIENTE:   'bg-indigo-500/20 text-indigo-300 border-indigo-500/30',
-  EN_REVISION: 'bg-amber-500/20  text-amber-300  border-amber-500/30',
-  EN_PROCESO:  'bg-blue-500/20   text-blue-300   border-blue-500/30',
-  ASIGNADO:    'bg-sky-500/20    text-sky-300    border-sky-500/30',
-  RESUELTO:    'bg-emerald-500/20 text-emerald-300 border-emerald-500/30',
-  DEVUELTO:    'bg-rose-500/20   text-rose-300   border-rose-500/30',
-  RECHAZADO:   'bg-slate-500/20  text-slate-300  border-slate-500/30',
-  POR_VENCER:  'bg-orange-500/20 text-orange-300 border-orange-500/30',
-  VENCIDO:     'bg-red-500/20    text-red-300    border-red-500/30',
-  PRORROGA:    'bg-yellow-500/20 text-yellow-300 border-yellow-500/30',
+  PENDIENTE:   'bg-yellow-50  text-yellow-800 border-yellow-200',
+  EN_REVISION: 'bg-blue-50    text-blue-800   border-blue-200',
+  EN_PROCESO:  'bg-sky-50     text-sky-800    border-sky-200',
+  ASIGNADO:    'bg-[#F5E8B7]  text-[#14532D]  border-[#D4A017]/40',
+  RESUELTO:    'bg-green-50   text-green-800  border-green-200',
+  DEVUELTO:    'bg-rose-50    text-rose-800   border-rose-200',
+  RECHAZADO:   'bg-gray-100   text-gray-600   border-gray-200',
+  POR_VENCER:  'bg-orange-50  text-orange-800 border-orange-200',
+  VENCIDO:     'bg-red-50     text-red-800    border-red-200',
+  PRORROGA:    'bg-amber-50   text-amber-800  border-amber-200',
 };
 
 /* ══════════════════════════════════════════════════════════════
@@ -473,9 +473,10 @@ function SidebarNav({
   }
 
   return (
-    <aside className={`h-full flex flex-col bg-[#0A0A0B] border-r border-white/[0.07] shrink-0 w-[210px] overflow-hidden ${className}`}>
-      {/* Bloque institucional — logo arriba, texto debajo, todo dentro del sidebar */}
-      <div className="px-4 py-3 border-b border-white/[0.07] w-full overflow-hidden">
+    <aside className={`h-full flex flex-col shrink-0 w-[210px] overflow-hidden ${className}`}
+           style={{ background: '#14532D' }}>
+      {/* Bloque institucional */}
+      <div className="px-4 py-3 w-full overflow-hidden" style={{ borderBottom: '1px solid rgba(255,255,255,0.10)' }}>
         <InstitucionalHeader variant="sidebar" subtitle="Ventanilla Única Digital" />
       </div>
 
@@ -484,7 +485,8 @@ function SidebarNav({
         <div className="px-3 pt-3 pb-2">
           <button
             onClick={onNuevoRadicado}
-            className="w-full flex items-center gap-2 px-3 py-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-500 active:scale-95 text-white text-xs font-bold transition-all duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-400 focus-visible:ring-offset-1 focus-visible:ring-offset-black"
+            className="w-full flex items-center gap-2 px-3 py-2.5 rounded-xl text-xs font-bold transition-all duration-150 active:scale-95 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-1"
+            style={{ background: '#D4A017', color: '#14532D' }}
           >
             <svg className="w-3.5 h-3.5 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
               <path strokeLinecap="round" strokeLinejoin="round" d="M12 4v16m8-8H4" />
@@ -496,7 +498,7 @@ function SidebarNav({
 
       {/* Navegación */}
       <nav className="flex-1 px-3 py-2 flex flex-col gap-0.5 overflow-y-auto">
-        <p className="text-[10px] font-bold uppercase tracking-widest text-slate-600 px-2 py-1.5">
+        <p className="text-[10px] font-bold uppercase tracking-widest px-2 py-1.5" style={{ color: 'rgba(255,255,255,0.40)' }}>
           Módulos
         </p>
         {items.map(({ vista, label, icono }) => {
@@ -505,18 +507,23 @@ function SidebarNav({
             <button
               key={vista}
               onClick={() => onVistaChange(vista)}
-              className={`w-full flex items-center gap-2.5 px-3 py-2.5 rounded-xl text-left transition-colors duration-150 group focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-indigo-500/50 ${
-                activo
-                  ? 'bg-indigo-500/15 text-indigo-300'
-                  : 'text-slate-400 hover:text-slate-100 hover:bg-white/[0.05]'
-              }`}
+              className="w-full flex items-center gap-2.5 px-3 py-2.5 rounded-xl text-left transition-all duration-150 group focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset"
+              style={activo ? {
+                background: '#D4A017',
+                color: '#14532D',
+              } : {
+                color: 'rgba(255,255,255,0.75)',
+              }}
+              onMouseEnter={(e) => { if (!activo) { (e.currentTarget as HTMLElement).style.background = 'rgba(255,255,255,0.10)'; (e.currentTarget as HTMLElement).style.color = '#ffffff'; } }}
+              onMouseLeave={(e) => { if (!activo) { (e.currentTarget as HTMLElement).style.background = 'transparent'; (e.currentTarget as HTMLElement).style.color = 'rgba(255,255,255,0.75)'; } }}
             >
-              <span className={activo ? 'text-indigo-400' : 'text-slate-600 group-hover:text-slate-400'}>
+              <span style={activo ? { color: '#14532D' } : { color: 'rgba(255,255,255,0.55)' }}>
                 {icono}
               </span>
               <span className="text-xs font-medium flex-1">{label}</span>
               {vista === 'BANDEJA' && pendientesBandeja > 0 && (
-                <span className="shrink-0 min-w-[18px] h-[18px] rounded-full bg-indigo-600 text-white text-[9px] font-black flex items-center justify-center px-1">
+                <span className="shrink-0 min-w-[18px] h-[18px] rounded-full text-white text-[9px] font-black flex items-center justify-center px-1"
+                      style={{ background: '#166534' }}>
                   {pendientesBandeja > 99 ? '99+' : pendientesBandeja}
                 </span>
               )}
@@ -531,20 +538,24 @@ function SidebarNav({
       </nav>
 
       {/* Usuario */}
-      <div className="px-3 pb-3 pt-2 border-t border-white/[0.07]">
-        <div className="bg-slate-900/60 rounded-xl px-3 py-2.5 flex flex-col gap-2">
+      <div className="px-3 pb-3 pt-2" style={{ borderTop: '1px solid rgba(255,255,255,0.10)' }}>
+        <div className="rounded-xl px-3 py-2.5 flex flex-col gap-2" style={{ background: 'rgba(0,0,0,0.20)' }}>
           <div className="min-w-0">
-            <p className="text-xs font-semibold text-slate-200 truncate">{usuario.nombre}</p>
-            <p className="text-[10px] text-slate-500 truncate">{NOMBRES_TENANT[usuario.tenantId]}</p>
+            <p className="text-xs font-semibold text-white truncate">{usuario.nombre}</p>
+            <p className="text-[10px] truncate" style={{ color: 'rgba(255,255,255,0.50)' }}>{NOMBRES_TENANT[usuario.tenantId]}</p>
           </div>
           <div className="flex items-center justify-between">
-            <span className="text-[10px] px-2 py-0.5 rounded-full bg-indigo-500/15 text-indigo-300 border border-indigo-500/20 font-bold uppercase tracking-wide">
+            <span className="text-[10px] px-2 py-0.5 rounded-full font-bold uppercase tracking-wide border"
+                  style={{ background: 'rgba(255,255,255,0.10)', color: '#F5E8B7', borderColor: 'rgba(255,255,255,0.20)' }}>
               {nombreRol}
             </span>
             <button
               onClick={onCerrarSesion}
               title="Cerrar sesión"
-              className="p-1 rounded-lg text-slate-500 hover:text-rose-400 hover:bg-rose-500/10 active:scale-90 transition-all duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-rose-500/50"
+              className="p-1 rounded-lg transition-all duration-150 active:scale-90 focus-visible:outline-none"
+              style={{ color: 'rgba(255,255,255,0.40)' }}
+              onMouseEnter={(e) => { (e.currentTarget as HTMLElement).style.color = '#fca5a5'; (e.currentTarget as HTMLElement).style.background = 'rgba(220,38,38,0.15)'; }}
+              onMouseLeave={(e) => { (e.currentTarget as HTMLElement).style.color = 'rgba(255,255,255,0.40)'; (e.currentTarget as HTMLElement).style.background = 'transparent'; }}
             >
               <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
                 <path strokeLinecap="round" strokeLinejoin="round" d="M15.75 9V5.25A2.25 2.25 0 0013.5 3h-6a2.25 2.25 0 00-2.25 2.25v13.5A2.25 2.25 0 007.5 21h6a2.25 2.25 0 002.25-2.25V15m3 0l3-3m0 0l-3-3m3 3H9" />
@@ -581,27 +592,29 @@ function MobileTopBar({
   };
 
   return (
-    <header className="md:hidden shrink-0 border-b border-white/[0.07] bg-[#0A0A0B]/95 px-3 py-2.5">
+    <header className="md:hidden shrink-0 bg-white px-3 py-2.5" style={{ borderBottom: '1px solid #D9E2D9' }}>
       <div className="flex items-center gap-2.5">
         <button
           type="button"
           onClick={onAbrirMenu}
-          className="shrink-0 flex h-9 w-9 items-center justify-center rounded-xl border border-white/[0.08] bg-white/[0.04] text-slate-200 active:scale-95 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500/60"
+          className="shrink-0 flex h-9 w-9 items-center justify-center rounded-xl active:scale-95 focus-visible:outline-none focus-visible:ring-2"
+          style={{ border: '1px solid #D9E2D9', color: '#14532D', background: '#EEF4EE' }}
           aria-label="Abrir menú"
         >
-          <svg className="h-4.5 w-4.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+          <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
             <path strokeLinecap="round" strokeLinejoin="round" d="M3.75 6.75h16.5M3.75 12h16.5m-16.5 5.25h16.5" />
           </svg>
         </button>
         <div className="min-w-0 flex-1">
-          <p className="text-[9px] font-bold uppercase tracking-widest text-slate-600 truncate">
+          <p className="text-[9px] font-bold uppercase tracking-widest truncate" style={{ color: '#667085' }}>
             Alcaldía de Simacota
           </p>
-          <p className="truncate text-sm font-black text-slate-100 leading-tight">
+          <p className="truncate text-sm font-black leading-tight" style={{ color: '#1F2933' }}>
             {vista}
           </p>
         </div>
-        <span className="shrink-0 rounded-full border border-indigo-500/25 bg-indigo-500/10 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider text-indigo-300">
+        <span className="shrink-0 rounded-full px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider border"
+              style={{ background: '#EEF4EE', color: '#14532D', borderColor: '#D9E2D9' }}>
           {rolCompacto[usuario.rol] ?? 'Func.'}
         </span>
       </div>
@@ -702,21 +715,23 @@ function TarjetasMIPG({
   ];
 
   return (
-    <div className="px-4 py-3 border-b border-white/[0.07] bg-slate-900/20 shrink-0">
+    <div className="px-3 sm:px-4 py-3 shrink-0 bg-white" style={{ borderBottom: '1px solid #D9E2D9' }}>
       <div className="flex gap-2 overflow-x-auto pb-0.5">
         {/* Tarjeta TODOS */}
         <button
           onClick={() => onFiltroChange('TODOS')}
-          className={`shrink-0 flex flex-col items-start px-4 py-3 rounded-xl border border-l-4 transition-all duration-200 cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-white/30 ${
-            filtroActivo === 'TODOS'
-              ? 'bg-slate-800/80 border-slate-400 border-t-white/15 border-r-white/15 border-b-white/15'
-              : 'bg-slate-900/40 border-slate-600 border-t-white/8 border-r-white/8 border-b-white/8 hover:bg-slate-800/60 hover:border-slate-500 hover:-translate-y-px'
-          }`}
+          className="shrink-0 flex flex-col items-start px-4 py-3 rounded-xl border-l-4 transition-all duration-200 cursor-pointer focus-visible:outline-none"
+          style={{
+            background: filtroActivo === 'TODOS' ? '#EEF4EE' : '#F8FAF7',
+            border: `1px solid ${filtroActivo === 'TODOS' ? '#14532D' : '#D9E2D9'}`,
+            borderLeftColor: '#14532D',
+            borderLeftWidth: 4,
+          }}
         >
-          <span className="text-2xl font-black leading-none text-slate-50 tabular-nums">
+          <span className="text-2xl font-black leading-none tabular-nums" style={{ color: '#14532D' }}>
             {tarjetas.reduce((s, t) => s + t.valor, 0)}
           </span>
-          <span className="text-[10px] font-bold uppercase tracking-widest text-slate-500 mt-0.5">Todos</span>
+          <span className="text-[10px] font-bold uppercase tracking-widest mt-0.5" style={{ color: '#667085' }}>Todos</span>
         </button>
 
         {tarjetas.map((t) => {
@@ -725,17 +740,18 @@ function TarjetasMIPG({
             <button
               key={t.filtro}
               onClick={() => onFiltroChange(t.filtro)}
-              className={`shrink-0 flex flex-col items-start px-4 py-3 rounded-xl border border-l-4 transition-all duration-200 cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-white/30 ${t.borde} ${
-                activo
-                  ? 'bg-slate-800/80 border-t-white/15 border-r-white/15 border-b-white/15'
-                  : 'bg-slate-900/40 border-t-white/8 border-r-white/8 border-b-white/8 hover:bg-slate-800/60 hover:-translate-y-px'
-              }`}
+              className="shrink-0 flex flex-col items-start px-4 py-3 rounded-xl transition-all duration-200 cursor-pointer focus-visible:outline-none hover:-translate-y-px"
+              style={{
+                background: activo ? '#EEF4EE' : '#F8FAF7',
+                border: `1px solid ${activo ? '#14532D' : '#D9E2D9'}`,
+                borderLeftWidth: 4,
+              }}
             >
               <span className={`text-2xl font-black leading-none tabular-nums flex items-center gap-1 ${t.texto}`}>
                 {t.icono && <span className="mt-0.5">{t.icono}</span>}
                 {t.valor}
               </span>
-              <span className={`text-[10px] font-bold uppercase tracking-widest mt-0.5 ${t.texto} opacity-70`}>
+              <span className={`text-[10px] font-bold uppercase tracking-widest mt-0.5 ${t.texto} opacity-80`}>
                 {t.label}
               </span>
             </button>
@@ -781,39 +797,44 @@ function PanelOperacionDependencia({
   const dias = siguiente ? calcDiasRestantes(siguiente) : null;
 
   return (
-    <section className="px-3 sm:px-4 py-3 border-b border-white/[0.07] bg-[#0D1117]/80 shrink-0">
+    <section className="px-3 sm:px-4 py-3 shrink-0 bg-[#F8FAF7]" style={{ borderBottom: '1px solid #D9E2D9' }}>
       <div className="grid grid-cols-1 lg:grid-cols-[minmax(0,1.2fr)_minmax(0,1.8fr)] gap-3">
-        <div className="rounded-xl border border-white/[0.07] bg-slate-950/30 px-4 py-3">
+        {/* Panel bandeja */}
+        <div className="rounded-xl px-4 py-3 bg-white" style={{ border: '1px solid #D9E2D9', boxShadow: '0 1px 3px rgba(20,83,45,0.06)' }}>
           <div className="flex items-start justify-between gap-3">
             <div className="min-w-0">
-              <p className="text-[10px] font-black uppercase tracking-widest text-slate-500">
+              <p className="text-[10px] font-black uppercase tracking-widest" style={{ color: '#667085' }}>
                 Bandeja operativa
               </p>
-              <h2 className="mt-1 text-sm font-black text-slate-100 truncate">
+              <h2 className="mt-1 text-sm font-black truncate" style={{ color: '#1F2933' }}>
                 {nombreAmbito}
               </h2>
             </div>
-            <span className="shrink-0 rounded-full border border-indigo-500/25 bg-indigo-500/10 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider text-indigo-300">
+            <span className="shrink-0 rounded-full px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider border"
+                  style={{ background: '#EEF4EE', color: '#14532D', borderColor: '#D9E2D9' }}>
               {usuario.rol}
             </span>
           </div>
 
           <div className="mt-3 grid grid-cols-3 sm:grid-cols-5 gap-2">
             {[
-              { label: 'Activos', value: resumen.totalActivos, tone: 'text-slate-100', filtro: 'TODOS' as FiltroMIPG },
-              { label: 'Sin resp.', value: resumen.sinResponsable, tone: 'text-amber-300', filtro: 'ASIGNADAS' as FiltroMIPG },
-              { label: 'Prioridad', value: resumen.prioridadAlta, tone: 'text-red-300', filtro: 'PRIORIDAD_MIPG' as FiltroMIPG },
-              { label: 'Por vencer', value: resumen.porVencer, tone: 'text-orange-300', filtro: 'POR_VENCER' as FiltroMIPG },
-              { label: 'Vencidos', value: resumen.vencidos, tone: 'text-rose-300', filtro: 'VENCIDAS' as FiltroMIPG },
+              { label: 'Activos',    value: resumen.totalActivos,    color: '#1F2933',  filtro: 'TODOS' as FiltroMIPG },
+              { label: 'Sin resp.',  value: resumen.sinResponsable,  color: '#B45309',  filtro: 'ASIGNADAS' as FiltroMIPG },
+              { label: 'Prioridad', value: resumen.prioridadAlta,   color: '#DC2626',  filtro: 'PRIORIDAD_MIPG' as FiltroMIPG },
+              { label: 'Por vencer', value: resumen.porVencer,      color: '#EA580C',  filtro: 'POR_VENCER' as FiltroMIPG },
+              { label: 'Vencidos',  value: resumen.vencidos,        color: '#DC2626',  filtro: 'VENCIDAS' as FiltroMIPG },
             ].map((item) => (
               <button
                 key={item.label}
                 type="button"
                 onClick={() => onFiltroChange(item.filtro)}
-                className="rounded-lg border border-white/[0.06] bg-white/[0.025] px-2 py-2 text-left transition-colors hover:bg-white/[0.05] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500/40"
+                className="rounded-lg px-2 py-2 text-left transition-colors focus-visible:outline-none"
+                style={{ border: '1px solid #D9E2D9', background: '#F8FAF7' }}
+                onMouseEnter={(e) => { (e.currentTarget as HTMLElement).style.background = '#EEF4EE'; }}
+                onMouseLeave={(e) => { (e.currentTarget as HTMLElement).style.background = '#F8FAF7'; }}
               >
-                <p className={`text-lg font-black tabular-nums leading-none ${item.tone}`}>{item.value}</p>
-                <p className="mt-1 text-[9px] font-bold uppercase tracking-wider text-slate-600 truncate">
+                <p className="text-lg font-black tabular-nums leading-none" style={{ color: item.color }}>{item.value}</p>
+                <p className="mt-1 text-[9px] font-bold uppercase tracking-wider truncate" style={{ color: '#94A3B8' }}>
                   {item.label}
                 </p>
               </button>
@@ -821,19 +842,20 @@ function PanelOperacionDependencia({
           </div>
         </div>
 
-        <div className="rounded-xl border border-white/[0.07] bg-slate-950/30 px-4 py-3">
+        {/* Panel siguiente acción */}
+        <div className="rounded-xl px-4 py-3 bg-white" style={{ border: '1px solid #D9E2D9', boxShadow: '0 1px 3px rgba(20,83,45,0.06)' }}>
           <div className="flex items-start justify-between gap-3">
             <div className="min-w-0">
-              <p className="text-[10px] font-black uppercase tracking-widest text-slate-500">
-                Siguiente atencion sugerida
+              <p className="text-[10px] font-black uppercase tracking-widest" style={{ color: '#667085' }}>
+                Siguiente atención sugerida
               </p>
               <p className={`mt-1 text-sm font-bold ${
                 dias !== null && dias < 0
-                  ? 'text-rose-300'
+                  ? 'text-rose-600'
                   : dias !== null && dias <= 2
-                    ? 'text-orange-300'
-                    : 'text-slate-200'
-              }`}>
+                    ? 'text-orange-600'
+                    : ''
+              }`} style={dias === null || dias > 2 ? { color: '#1F2933' } : {}}>
                 {mensajeSiguienteAccion(siguiente)}
               </p>
             </div>
@@ -841,7 +863,10 @@ function PanelOperacionDependencia({
               <button
                 type="button"
                 onClick={() => onSeleccionar(siguiente)}
-                className="shrink-0 rounded-lg bg-indigo-600 px-3 py-2 text-xs font-bold text-white transition-colors hover:bg-indigo-500 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-400/60"
+                className="shrink-0 rounded-lg px-3 py-2 text-xs font-bold text-white transition-colors focus-visible:outline-none"
+                style={{ background: '#14532D' }}
+                onMouseEnter={(e) => { (e.currentTarget as HTMLElement).style.background = '#166534'; }}
+                onMouseLeave={(e) => { (e.currentTarget as HTMLElement).style.background = '#14532D'; }}
               >
                 Abrir
               </button>
@@ -851,23 +876,23 @@ function PanelOperacionDependencia({
           {siguiente ? (
             <div className="mt-3 grid grid-cols-1 sm:grid-cols-[minmax(150px,0.8fr)_minmax(0,1.2fr)_minmax(130px,0.7fr)] gap-3 text-xs">
               <div className="min-w-0">
-                <p className="text-[9px] font-bold uppercase tracking-widest text-slate-600">Radicado</p>
-                <p className="mt-1 truncate font-mono text-indigo-300">{siguiente.radicadoId}</p>
+                <p className="text-[9px] font-bold uppercase tracking-widest" style={{ color: '#94A3B8' }}>Radicado</p>
+                <p className="mt-1 truncate font-mono font-bold" style={{ color: '#14532D' }}>{siguiente.radicadoId}</p>
               </div>
               <div className="min-w-0">
-                <p className="text-[9px] font-bold uppercase tracking-widest text-slate-600">Asunto</p>
-                <p className="mt-1 truncate text-slate-300">{siguiente.detalle.asunto}</p>
+                <p className="text-[9px] font-bold uppercase tracking-widest" style={{ color: '#94A3B8' }}>Asunto</p>
+                <p className="mt-1 truncate" style={{ color: '#1F2933' }}>{siguiente.detalle.asunto}</p>
               </div>
               <div className="min-w-0">
-                <p className="text-[9px] font-bold uppercase tracking-widest text-slate-600">Responsable</p>
-                <p className="mt-1 truncate text-slate-300">
+                <p className="text-[9px] font-bold uppercase tracking-widest" style={{ color: '#94A3B8' }}>Responsable</p>
+                <p className="mt-1 truncate" style={{ color: '#1F2933' }}>
                   {siguiente.clasificacion.funcionarioResponsableNombre ?? 'Sin asignar'}
                 </p>
               </div>
             </div>
           ) : (
-            <p className="mt-3 text-xs text-slate-600">
-              Cuando entren solicitudes activas, aqui aparecera la prioridad operativa de la oficina.
+            <p className="mt-3 text-xs" style={{ color: '#94A3B8' }}>
+              Cuando entren solicitudes activas, aquí aparecerá la prioridad operativa de la oficina.
             </p>
           )}
         </div>
@@ -916,9 +941,9 @@ function TablaRadicados({
   return (
     <div className="flex-1 flex flex-col overflow-hidden min-h-0">
       {/* Toolbar */}
-      <div className="flex flex-wrap items-center gap-2 sm:gap-3 px-3 sm:px-4 py-2 sm:py-2.5 border-b border-white/[0.07] shrink-0">
+      <div className="flex flex-wrap items-center gap-2 sm:gap-3 px-3 sm:px-4 py-2 sm:py-2.5 shrink-0 bg-white" style={{ borderBottom: '1px solid #D9E2D9' }}>
         <div className="relative min-w-0 flex-1 max-w-sm sm:min-w-[220px]">
-          <svg className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-slate-500" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+          <svg className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5" style={{ color: '#94A3B8' }} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
             <path strokeLinecap="round" strokeLinejoin="round" d="M21 21l-5.197-5.197m0 0A7.5 7.5 0 105.196 5.196a7.5 7.5 0 0010.607 10.607z" />
           </svg>
           <input
@@ -926,14 +951,24 @@ function TablaRadicados({
             value={busqueda}
             onChange={(e) => onBusquedaChange(e.target.value)}
             placeholder="Buscar por radicado, nombre o documento…"
-            className="w-full bg-white/[0.04] border border-white/10 rounded-lg pl-9 pr-3 py-2 text-sm text-slate-200 placeholder-slate-600 outline-none transition-all duration-200 hover:border-indigo-500/25 hover:bg-white/[0.06] focus:border-indigo-500/70 focus:bg-indigo-500/[0.04] focus:shadow-[0_0_0_2px_rgba(99,102,241,0.35)] focus-visible:border-indigo-500/70 focus-visible:shadow-[0_0_0_2px_rgba(99,102,241,0.35)]"
+            className="w-full rounded-lg pl-9 pr-3 py-2 text-sm outline-none transition-all duration-200"
+            style={{
+              background: '#F8FAF7',
+              border: '1px solid #D9E2D9',
+              color: '#1F2933',
+            }}
+            onFocus={(e) => { e.currentTarget.style.borderColor = '#14532D'; e.currentTarget.style.boxShadow = '0 0 0 3px rgba(20,83,45,0.15)'; }}
+            onBlur={(e)  => { e.currentTarget.style.borderColor = '#D9E2D9'; e.currentTarget.style.boxShadow = 'none'; }}
           />
         </div>
-        <span className="text-xs text-slate-600 shrink-0">{radicados.length} resultado{radicados.length !== 1 ? 's' : ''}</span>
+        <span className="text-xs shrink-0" style={{ color: '#94A3B8' }}>{radicados.length} resultado{radicados.length !== 1 ? 's' : ''}</span>
         {puedeRadicar && (
           <button
             onClick={onNuevoRadicado}
-            className="shrink-0 flex items-center gap-1.5 px-3 py-2 rounded-lg bg-indigo-600 hover:bg-indigo-500 active:scale-95 text-white text-xs font-bold transition-all duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-400/60"
+            className="shrink-0 flex items-center gap-1.5 px-3 py-2 rounded-lg text-white text-xs font-bold transition-all duration-150 active:scale-95 focus-visible:outline-none"
+            style={{ background: '#14532D' }}
+            onMouseEnter={(e) => { (e.currentTarget as HTMLElement).style.background = '#166534'; }}
+            onMouseLeave={(e) => { (e.currentTarget as HTMLElement).style.background = '#14532D'; }}
           >
             <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
               <path strokeLinecap="round" strokeLinejoin="round" d="M12 4v16m8-8H4" />
@@ -945,26 +980,26 @@ function TablaRadicados({
 
       {/* Error Firestore */}
       {error && (
-        <div className="mx-4 mt-3 p-3 rounded-xl bg-rose-500/10 border border-rose-500/30 text-xs text-rose-400 shrink-0">
+        <div className="mx-4 mt-3 p-3 rounded-xl text-xs shrink-0" style={{ background: '#FEF2F2', border: '1px solid #FECACA', color: '#DC2626' }}>
           <p className="font-semibold mb-1">Error de conexión</p>
           <p className="text-rose-500">{error}</p>
         </div>
       )}
 
       {/* Tarjetas — móvil (< sm) */}
-      <div className="sm:hidden flex-1 overflow-y-auto divide-y divide-white/[0.04]">
+      <div className="sm:hidden flex-1 overflow-y-auto bg-white" style={{ borderTop: '1px solid #EEF4EE' }}>
         {cargando && !error && (
           Array.from({ length: 5 }).map((_, i) => (
-            <div key={i} className="px-4 py-3 animate-pulse space-y-2">
-              <div className="h-3 rounded bg-slate-800/80 w-2/3" />
-              <div className="h-2.5 rounded bg-slate-800/60 w-1/2" />
+            <div key={i} className="px-4 py-3 animate-pulse space-y-2" style={{ borderBottom: '1px solid #EEF4EE' }}>
+              <div className="h-3 rounded w-2/3" style={{ background: '#EEF4EE' }} />
+              <div className="h-2.5 rounded w-1/2" style={{ background: '#F8FAF7' }} />
             </div>
           ))
         )}
         {!cargando && !error && radicados.length === 0 && (
           <div className="px-4 py-16 text-center">
-            <p className="text-slate-400 font-medium mb-1">Sin radicados</p>
-            <p className="text-xs text-slate-600">No hay resultados para los filtros aplicados.</p>
+            <p className="font-medium mb-1" style={{ color: '#667085' }}>Sin radicados</p>
+            <p className="text-xs" style={{ color: '#94A3B8' }}>No hay resultados para los filtros aplicados.</p>
           </div>
         )}
         {!cargando && radicados.map((r) => {
@@ -976,28 +1011,31 @@ function TablaRadicados({
               key={r.radicadoId}
               type="button"
               onClick={() => onSeleccionar(r)}
-              className={`w-full text-left px-4 py-3 transition-colors ${
-                seleccionado ? 'bg-indigo-500/10 border-l-2 border-l-indigo-500' : 'hover:bg-white/[0.025]'
-              }`}
+              className="w-full text-left px-4 py-3 transition-colors"
+              style={{
+                borderBottom: '1px solid #EEF4EE',
+                borderLeft: seleccionado ? '3px solid #14532D' : undefined,
+                background: seleccionado ? '#EEF4EE' : undefined,
+              }}
             >
               <div className="flex items-start justify-between gap-2 mb-1.5">
                 <div className="flex items-center gap-1.5 min-w-0">
                   {esRojo && <span className="shrink-0 w-1.5 h-1.5 rounded-full bg-red-500 animate-pulse mt-0.5" />}
-                  <span className="font-mono text-xs text-indigo-300 truncate">{r.radicadoId}</span>
+                  <span className="font-mono text-xs font-bold truncate" style={{ color: '#14532D' }}>{r.radicadoId}</span>
                 </div>
                 <span className={`shrink-0 inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wide border ${
-                  BADGE_ESTADO[r.estadoActual] ?? 'bg-slate-500/20 text-slate-300 border-slate-500/30'
+                  BADGE_ESTADO[r.estadoActual] ?? 'bg-gray-100 text-gray-600 border-gray-200'
                 }`}>
                   {LABELS_ESTADO[r.estadoActual] ?? r.estadoActual}
                 </span>
               </div>
-              <p className="text-sm text-slate-200 font-medium truncate">{r.solicitante.nombreCompleto}</p>
+              <p className="text-sm font-medium truncate" style={{ color: '#1F2933' }}>{r.solicitante.nombreCompleto}</p>
               <div className="mt-1 flex flex-wrap gap-x-3 gap-y-0.5">
-                <span className="text-[10px] text-slate-500">{r.termino.tipoSolicitudNombre}</span>
-                <span className="text-[10px] text-slate-600 truncate">{NOMBRES_TENANT[r.clasificacion.oficinaDestino]}</span>
+                <span className="text-[10px]" style={{ color: '#667085' }}>{r.termino.tipoSolicitudNombre}</span>
+                <span className="text-[10px] truncate" style={{ color: '#94A3B8' }}>{NOMBRES_TENANT[r.clasificacion.oficinaDestino]}</span>
               </div>
               <div className="mt-1 flex items-center gap-3">
-                <span className="text-[10px] text-slate-600">Vence {fmtFecha(r.termino.fechaVencimiento)}</span>
+                <span className="text-[10px]" style={{ color: '#94A3B8' }}>Vence {fmtFecha(r.termino.fechaVencimiento)}</span>
                 <span className={`text-[11px] font-semibold tabular-nums ${semaforoData.textoClass}`}>{semaforoData.label}</span>
               </div>
             </button>
@@ -1006,12 +1044,13 @@ function TablaRadicados({
       </div>
 
       {/* Tabla — sm+ */}
-      <div className="hidden sm:block flex-1 overflow-y-auto overflow-x-auto">
+      <div className="hidden sm:block flex-1 overflow-y-auto overflow-x-auto bg-white">
         <table className="w-full text-sm">
-          <thead className="sticky top-0 z-10 bg-slate-900/90 backdrop-blur-sm">
-            <tr className="border-b border-white/[0.07]">
+          <thead className="sticky top-0 z-10">
+            <tr style={{ background: '#EEF4EE', borderBottom: '1px solid #D9E2D9' }}>
               {['Radicado', 'Solicitante', 'Tipo Trámite', 'Dependencia', 'Estado', 'Vencimiento', 'Días'].map((h) => (
-                <th key={h} className="px-4 py-2.5 text-left text-[10px] font-bold uppercase tracking-widest text-slate-400 whitespace-nowrap">
+                <th key={h} className="px-4 py-2.5 text-left text-[10px] font-bold uppercase tracking-widest whitespace-nowrap"
+                    style={{ color: '#14532D' }}>
                   {h}
                 </th>
               ))}
@@ -1025,8 +1064,8 @@ function TablaRadicados({
             {!cargando && !error && radicados.length === 0 && (
               <tr>
                 <td colSpan={7} className="px-4 py-16 text-center">
-                  <p className="text-slate-400 font-medium mb-1">Sin radicados</p>
-                  <p className="text-xs text-slate-600">No hay resultados para los filtros aplicados.</p>
+                  <p className="font-medium mb-1" style={{ color: '#667085' }}>Sin radicados</p>
+                  <p className="text-xs" style={{ color: '#94A3B8' }}>No hay resultados para los filtros aplicados.</p>
                 </td>
               </tr>
             )}
@@ -1041,44 +1080,47 @@ function TablaRadicados({
                 <tr
                   key={r.radicadoId}
                   onClick={() => onSeleccionar(r)}
-                  className={`border-b border-white/[0.04] cursor-pointer transition-colors ${
-                    seleccionado
-                      ? 'bg-indigo-500/10 border-l-2 border-l-indigo-500'
-                      : 'hover:bg-white/[0.025]'
-                  }`}
+                  className="cursor-pointer transition-colors"
+                  style={{
+                    borderBottom: '1px solid #EEF4EE',
+                    background: seleccionado ? '#EEF4EE' : undefined,
+                    borderLeft: seleccionado ? '3px solid #14532D' : undefined,
+                  }}
+                  onMouseEnter={(e) => { if (!seleccionado) (e.currentTarget as HTMLElement).style.background = '#F8FAF7'; }}
+                  onMouseLeave={(e) => { if (!seleccionado) (e.currentTarget as HTMLElement).style.background = ''; }}
                 >
                   <td className="px-4 py-3 whitespace-nowrap">
                     <div className="flex items-center gap-2">
                       {esRojo && <span className="shrink-0 w-1.5 h-1.5 rounded-full bg-red-500 animate-pulse" />}
-                      <span className="font-mono text-xs text-indigo-300">{r.radicadoId}</span>
+                      <span className="font-mono text-xs font-bold" style={{ color: '#14532D' }}>{r.radicadoId}</span>
                     </div>
-                    <p className="text-[10px] text-slate-600 mt-0.5">{fmtFecha(r.control.fechaRadicado)}</p>
+                    <p className="text-[10px] mt-0.5" style={{ color: '#94A3B8' }}>{fmtFecha(r.control.fechaRadicado)}</p>
                   </td>
                   <td className="px-4 py-3 max-w-[180px]">
-                    <p className="text-slate-200 font-medium truncate">{r.solicitante.nombreCompleto}</p>
-                    <p className="text-[10px] text-slate-600 font-mono">
+                    <p className="font-medium truncate" style={{ color: '#1F2933' }}>{r.solicitante.nombreCompleto}</p>
+                    <p className="text-[10px] font-mono" style={{ color: '#94A3B8' }}>
                       {r.solicitante.tipoDocumento} {r.solicitante.numeroDocumento}
                     </p>
                   </td>
                   <td className="px-4 py-3 whitespace-nowrap">
-                    <p className="text-xs text-slate-400">{r.termino.tipoSolicitudNombre}</p>
-                    <p className="text-[10px] text-slate-600">{r.termino.diasRespuesta}d {r.termino.unidad.toLowerCase()}</p>
+                    <p className="text-xs" style={{ color: '#667085' }}>{r.termino.tipoSolicitudNombre}</p>
+                    <p className="text-[10px]" style={{ color: '#94A3B8' }}>{r.termino.diasRespuesta}d {r.termino.unidad.toLowerCase()}</p>
                   </td>
                   <td className="px-4 py-3 max-w-[150px]">
-                    <p className="text-xs text-slate-400 truncate">{NOMBRES_TENANT[r.clasificacion.oficinaDestino]}</p>
+                    <p className="text-xs truncate" style={{ color: '#667085' }}>{NOMBRES_TENANT[r.clasificacion.oficinaDestino]}</p>
                   </td>
                   <td className="px-4 py-3 whitespace-nowrap">
                     <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wide border ${
-                      BADGE_ESTADO[r.estadoActual] ?? 'bg-slate-500/20 text-slate-300 border-slate-500/30'
+                      BADGE_ESTADO[r.estadoActual] ?? 'bg-gray-100 text-gray-600 border-gray-200'
                     }`}>
                       {LABELS_ESTADO[r.estadoActual] ?? r.estadoActual}
                     </span>
                   </td>
                   <td className="px-4 py-3 whitespace-nowrap">
-                    <p className="text-xs text-slate-400">{fmtFecha(r.termino.fechaVencimiento)}</p>
+                    <p className="text-xs" style={{ color: '#667085' }}>{fmtFecha(r.termino.fechaVencimiento)}</p>
                   </td>
                   <td className="px-4 py-3 whitespace-nowrap">
-                    <span className={`text-sm tabular-nums ${diasColor}`}>{semaforoData.label}</span>
+                    <span className={`text-sm font-semibold tabular-nums ${diasColor}`}>{semaforoData.label}</span>
                   </td>
                 </tr>
               );
@@ -2331,16 +2373,19 @@ function VistaReportes({
   ];
 
   return (
-    <div className="flex-1 overflow-y-auto px-6 py-8">
+    <div className="flex-1 overflow-y-auto px-4 sm:px-6 py-6 sm:py-8" style={{ background: '#F8FAF7' }}>
       <div className="flex items-start justify-between gap-4 mb-6">
         <div>
-          <p className="text-[10px] font-bold uppercase tracking-widest text-slate-600 mb-1">MIPG · Rendición de Cuentas</p>
-          <h2 className="text-xl font-black text-slate-50">Indicadores de Eficiencia</h2>
+          <p className="text-[10px] font-bold uppercase tracking-widest mb-1" style={{ color: '#667085' }}>MIPG · Rendición de Cuentas</p>
+          <h2 className="text-xl font-black" style={{ color: '#1F2933' }}>Indicadores de Eficiencia</h2>
         </div>
         <button
           type="button"
           onClick={() => exportarCSVMIPG(radicados)}
-          className="shrink-0 flex items-center gap-2 px-4 py-2 rounded-lg bg-indigo-600/20 border border-indigo-500/30 text-indigo-300 text-xs font-bold hover:bg-indigo-600/30 transition-colors"
+          className="shrink-0 flex items-center gap-2 px-4 py-2 rounded-lg text-xs font-bold transition-colors"
+          style={{ background: '#EEF4EE', border: '1px solid #D9E2D9', color: '#14532D' }}
+          onMouseEnter={(e) => { (e.currentTarget as HTMLElement).style.background = '#D9E2D9'; }}
+          onMouseLeave={(e) => { (e.currentTarget as HTMLElement).style.background = '#EEF4EE'; }}
           title="Exportar reporte MIPG en formato CSV (compatible con Excel)"
         >
           <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
@@ -2352,25 +2397,25 @@ function VistaReportes({
 
       <div className="grid grid-cols-2 xl:grid-cols-5 gap-4 mb-6">
         {items.map((item) => (
-          <div key={item.label} className="bg-slate-900/40 border border-white/[0.07] rounded-xl p-5">
+          <div key={item.label} className="rounded-xl p-5 bg-white" style={{ border: '1px solid #D9E2D9', boxShadow: '0 1px 3px rgba(20,83,45,0.06)' }}>
             <p className={`text-3xl font-black tabular-nums ${item.color}`}>{item.valor}</p>
-            <p className="text-xs text-slate-400 mt-2 leading-tight font-medium">{item.label}</p>
-            {item.desc && <p className="text-[10px] text-slate-600 mt-0.5 leading-tight">{item.desc}</p>}
+            <p className="text-xs mt-2 leading-tight font-medium" style={{ color: '#667085' }}>{item.label}</p>
+            {item.desc && <p className="text-[10px] mt-0.5 leading-tight" style={{ color: '#94A3B8' }}>{item.desc}</p>}
           </div>
         ))}
       </div>
 
       {pctCumplimiento === null && (
-        <div className="bg-amber-500/5 border border-amber-500/20 rounded-lg px-4 py-3 mb-4">
-          <p className="text-xs text-amber-300/80 leading-relaxed">
+        <div className="rounded-lg px-4 py-3 mb-4" style={{ background: '#FFFBEB', border: '1px solid #FDE68A' }}>
+          <p className="text-xs leading-relaxed" style={{ color: '#92400E' }}>
             <span className="font-bold">MIPG Req. 8 — Sin datos de cumplimiento aún.</span>{' '}
-            El campo <span className="font-mono text-amber-200">cumplioTermino</span> se registra automáticamente
+            El campo <span className="font-mono">cumplioTermino</span> se registra automáticamente
             la próxima vez que se resuelva un radicado. Los radicados históricos no tienen este dato.
           </p>
         </div>
       )}
 
-      <p className="text-xs text-slate-700">
+      <p className="text-xs" style={{ color: '#94A3B8' }}>
         Datos en tiempo real · colección <span className="font-mono">ventanilla_radicados</span> ·
         {' '}{total} documento{total !== 1 ? 's' : ''} visibles para tu rol.
       </p>
@@ -2719,7 +2764,7 @@ function DashboardInterior({ usuario, cerrarSesion }: { usuario: UsuarioAutentic
   }
 
   return (
-    <div className="flex h-[100dvh] overflow-hidden bg-[#0A0A0B]">
+    <div className="flex h-[100dvh] overflow-hidden" style={{ background: '#F8FAF7' }}>
       {/* ── COLUMNA 1: Sidebar de navegación ── */}
       <SidebarNav
         className="hidden md:flex"

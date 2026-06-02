@@ -12,35 +12,61 @@
 }
 
 /* ============================================================
-   OBSIDIAN KINETIC — Sistema de Diseño
+   VENTANILLA ÚNICA INSTITUCIONAL — Sistema de Diseño
    Alcaldía Municipal de Simacota, Santander
    ============================================================ */
 
 @theme {
-  /* Paleta principal */
-  --color-obsidian:       #0A0A0B;
-  --color-primary:        #6366F1;
-  --color-primary-dark:   #4F46E5;
-  --color-alert:          #F43F5E;
-  --color-alert-dark:     #E11D48;
-  --color-success:        #10B981;
+  /* ── Paleta institucional ── */
+  --color-inst-green:        #14532D;
+  --color-inst-green-hover:  #166534;
+  --color-inst-green-dark:   #0F3D20;
+  --color-inst-gold:         #D4A017;
+  --color-inst-gold-hover:   #B8860B;
+  --color-inst-gold-soft:    #F5E8B7;
+  --color-inst-bg:           #F8FAF7;
+  --color-inst-surface:      #FFFFFF;
+  --color-inst-muted:        #EEF4EE;
+  --color-inst-border:       #D9E2D9;
+  --color-inst-text:         #1F2933;
+  --color-inst-text-sec:     #667085;
 
-  /* Tipografía */
+  /* ── Estados semánticos ── */
+  --color-success:    #16A34A;
+  --color-warning:    #F59E0B;
+  --color-danger:     #DC2626;
+  --color-info:       #2563EB;
+
+  /* ── Sidebar oscuro (verde institucional) ── */
+  --color-sidebar-bg:        #14532D;
+  --color-sidebar-border:    rgba(255,255,255,0.10);
+  --color-sidebar-text:      rgba(255,255,255,0.80);
+  --color-sidebar-muted:     rgba(255,255,255,0.45);
+  --color-sidebar-active-bg: #D4A017;
+  --color-sidebar-active-tx: #14532D;
+
+  /* ── Tipografía ── */
   --font-manrope:  var(--font-manrope),  'Manrope',  system-ui, sans-serif;
   --font-dm-sans:  var(--font-dm-sans),  'DM Sans',  system-ui, sans-serif;
 }
 
-/* Variables de diseño globales */
+/* ── Variables globales ── */
 :root {
-  --bg-base:        #0A0A0B;
-  --bg-glass:       rgba(15, 15, 20, 0.40);
-  --border-glass:   rgba(255, 255, 255, 0.08);
-  --text-primary:   #F8FAFC;
-  --text-secondary: #94A3B8;
-  --text-muted:     #475569;
+  --bg-base:        #F8FAF7;
+  --bg-glass:       rgba(255, 255, 255, 0.80);
+  --border-glass:   rgba(20, 83, 45, 0.12);
+  --text-primary:   #1F2933;
+  --text-secondary: #667085;
+  --text-muted:     #94A3B8;
+  --focus-ring:     0 0 0 3px rgba(20, 83, 45, 0.20);
+
+  /* Portal público (oscuro) */
+  --bg-portal:      #0A0A0B;
+  --bg-portal-glass: rgba(15, 15, 20, 0.40);
+  --border-portal:  rgba(255, 255, 255, 0.08);
 }
 
-/* Reset base */
+/* ── Reset base ── */
 *,
 *::before,
 *::after {
@@ -61,24 +87,40 @@ body {
   overflow-x: hidden;
 }
 
-/* ——— Glassmorphism base ——— */
+/* ─────────────────────────────────────────────────────────────
+   GLASSMORPHISM — Portal público (oscuro)
+───────────────────────────────────────────────────────────── */
 .glass-card {
-  background: var(--bg-glass);
+  background: var(--bg-portal-glass);
   backdrop-filter: blur(25px);
   -webkit-backdrop-filter: blur(25px);
-  border: 1px solid var(--border-glass);
+  border: 1px solid var(--border-portal);
   border-radius: 1rem;
 }
 
-/* ——— Fondo dinámico con gradiente radial ——— */
+/* ─────────────────────────────────────────────────────────────
+   CARD INSTITUCIONAL — Superficie clara del sistema interno
+───────────────────────────────────────────────────────────── */
+.card-inst {
+  background: #ffffff;
+  border: 1px solid #D9E2D9;
+  border-radius: 1rem;
+  box-shadow: 0 1px 3px rgba(20, 83, 45, 0.06), 0 1px 2px rgba(20, 83, 45, 0.04);
+}
+
+/* ─────────────────────────────────────────────────────────────
+   FONDO DEL PORTAL PÚBLICO
+───────────────────────────────────────────────────────────── */
 .bg-obsidian-gradient {
   background:
-    radial-gradient(ellipse 80% 50% at 50% -10%, rgba(99, 102, 241, 0.15) 0%, transparent 60%),
-    radial-gradient(ellipse 60% 40% at 80% 80%, rgba(244, 63, 94, 0.06) 0%, transparent 50%),
+    radial-gradient(ellipse 80% 50% at 50% -10%, rgba(20, 83, 45, 0.25) 0%, transparent 60%),
+    radial-gradient(ellipse 60% 40% at 80% 80%, rgba(212, 160, 23, 0.08) 0%, transparent 50%),
     #0A0A0B;
 }
 
-/* ——— Tipografía Obsidian Kinetic ——— */
+/* ─────────────────────────────────────────────────────────────
+   TIPOGRAFÍA
+───────────────────────────────────────────────────────────── */
 .font-headline {
   font-family: var(--font-manrope);
   font-weight: 800;
@@ -94,52 +136,20 @@ body {
   font-size: 0.75rem;
 }
 
-/* ——— Inputs estilo Obsidian ——— */
-.input-obsidian {
-  background: rgba(255, 255, 255, 0.04);
-  border: 1px solid rgba(255, 255, 255, 0.10);
-  border-radius: 0.625rem;
-  color: #F8FAFC;
-  width: 100%;
-  padding: 0.75rem 1rem;
-  font-family: var(--font-inter);
-  font-size: 0.9375rem;
-  transition: border-color 0.2s ease, box-shadow 0.2s ease, background 0.2s ease;
-  outline: none;
-}
-
-.input-obsidian::placeholder {
-  color: #475569;
-}
-
-.input-obsidian:hover {
-  border-color: rgba(99, 102, 241, 0.30);
-  background: rgba(255, 255, 255, 0.06);
-}
-
-.input-obsidian:focus {
-  border-color: #6366F1;
-  box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.15);
-  background: rgba(99, 102, 241, 0.05);
-}
-
-.input-obsidian.error {
-  border-color: #F43F5E;
-  box-shadow: 0 0 0 3px rgba(244, 63, 94, 0.12);
-}
-
-/* ——— Botón primario ——— */
+/* ─────────────────────────────────────────────────────────────
+   BOTÓN PRIMARIO — Verde institucional
+───────────────────────────────────────────────────────────── */
 .btn-primary {
-  background: linear-gradient(135deg, #6366F1 0%, #4F46E5 100%);
+  background: #14532D;
   color: #ffffff;
-  font-family: var(--font-inter);
+  font-family: var(--font-dm-sans);
   font-weight: 700;
   border: none;
   border-radius: 0.625rem;
   padding: 0.875rem 2rem;
   cursor: pointer;
-  transition: transform 0.15s ease, box-shadow 0.15s ease, opacity 0.15s ease;
-  box-shadow: 0 4px 24px rgba(99, 102, 241, 0.30);
+  transition: background 0.15s ease, transform 0.15s ease, box-shadow 0.15s ease;
+  box-shadow: 0 4px 16px rgba(20, 83, 45, 0.25);
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -147,13 +157,14 @@ body {
 }
 
 .btn-primary:hover:not(:disabled) {
+  background: #166534;
   transform: translateY(-1px);
-  box-shadow: 0 8px 32px rgba(99, 102, 241, 0.45);
+  box-shadow: 0 8px 24px rgba(20, 83, 45, 0.35);
 }
 
 .btn-primary:active:not(:disabled) {
   transform: translateY(0);
-  box-shadow: 0 4px 16px rgba(99, 102, 241, 0.30);
+  box-shadow: 0 4px 12px rgba(20, 83, 45, 0.25);
 }
 
 .btn-primary:disabled {
@@ -162,7 +173,147 @@ body {
   transform: none;
 }
 
-/* ——— Animaciones ——— */
+.btn-primary:focus-visible {
+  outline: none;
+  box-shadow:
+    0 4px 16px rgba(20, 83, 45, 0.25),
+    0 0 0 2px #F8FAF7,
+    0 0 0 4px rgba(20, 83, 45, 0.60);
+}
+
+/* ─────────────────────────────────────────────────────────────
+   BOTÓN SECUNDARIO — Dorado institucional
+───────────────────────────────────────────────────────────── */
+.btn-secondary {
+  background: #D4A017;
+  color: #14532D;
+  font-family: var(--font-dm-sans);
+  font-weight: 700;
+  border: none;
+  border-radius: 0.625rem;
+  padding: 0.875rem 2rem;
+  cursor: pointer;
+  transition: background 0.15s ease, transform 0.15s ease;
+  box-shadow: 0 4px 16px rgba(212, 160, 23, 0.25);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+}
+
+.btn-secondary:hover:not(:disabled) {
+  background: #B8860B;
+  transform: translateY(-1px);
+}
+
+.btn-secondary:disabled { opacity: 0.5; cursor: not-allowed; }
+
+/* ─────────────────────────────────────────────────────────────
+   BOTÓN GHOST — Sólo contorno verde
+───────────────────────────────────────────────────────────── */
+.btn-ghost {
+  background: transparent;
+  border: 1px solid #D9E2D9;
+  border-radius: 0.5rem;
+  color: #667085;
+  padding: 0.5rem 1rem;
+  font-size: 0.875rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.15s ease, border-color 0.15s ease, color 0.15s ease;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.375rem;
+}
+
+.btn-ghost:hover:not(:disabled) {
+  background: #EEF4EE;
+  border-color: #14532D;
+  color: #14532D;
+}
+
+.btn-ghost:active:not(:disabled) { transform: scale(0.97); }
+
+.btn-ghost:focus-visible {
+  outline: none;
+  box-shadow: var(--focus-ring);
+}
+
+.btn-ghost:disabled { opacity: 0.40; cursor: not-allowed; }
+
+/* ─────────────────────────────────────────────────────────────
+   INPUTS — Sistema interno (fondo claro)
+───────────────────────────────────────────────────────────── */
+.input-obsidian,
+.input-internal {
+  background: #ffffff;
+  border: 1px solid #D9E2D9;
+  border-radius: 0.625rem;
+  color: #1F2933;
+  width: 100%;
+  padding: 0.75rem 1rem;
+  font-family: var(--font-dm-sans);
+  font-size: 0.9375rem;
+  transition: border-color 0.2s ease, box-shadow 0.2s ease;
+  outline: none;
+}
+
+.input-internal {
+  padding: 0.5rem 0.75rem;
+  font-size: 0.875rem;
+}
+
+.input-obsidian::placeholder,
+.input-internal::placeholder {
+  color: #94A3B8;
+}
+
+.input-obsidian:hover,
+.input-internal:hover {
+  border-color: #14532D;
+}
+
+.input-obsidian:focus,
+.input-obsidian:focus-visible,
+.input-internal:focus,
+.input-internal:focus-visible {
+  border-color: #14532D;
+  box-shadow: var(--focus-ring);
+}
+
+.input-obsidian.error,
+.input-internal.error {
+  border-color: #DC2626;
+  box-shadow: 0 0 0 3px rgba(220, 38, 38, 0.12);
+}
+
+/* ─────────────────────────────────────────────────────────────
+   SELECT — Sistema interno
+───────────────────────────────────────────────────────────── */
+.select-internal {
+  background: #ffffff;
+  border: 1px solid #D9E2D9;
+  border-radius: 0.5rem;
+  color: #1F2933;
+  padding: 0.5rem 0.75rem;
+  font-size: 0.875rem;
+  transition: border-color 0.2s ease, box-shadow 0.2s ease;
+  outline: none;
+  cursor: pointer;
+}
+
+.select-internal:hover { border-color: #14532D; }
+
+.select-internal:focus,
+.select-internal:focus-visible {
+  border-color: #14532D;
+  box-shadow: var(--focus-ring);
+}
+
+/* ─────────────────────────────────────────────────────────────
+   ANIMACIONES
+───────────────────────────────────────────────────────────── */
 @keyframes fadeInUp {
   from { opacity: 0; transform: translateY(20px); }
   to   { opacity: 1; transform: translateY(0); }
@@ -173,25 +324,15 @@ body {
 }
 
 @keyframes pulse-glow {
-  0%, 100% { box-shadow: 0 0 0 0 rgba(99, 102, 241, 0.4); }
-  50%       { box-shadow: 0 0 0 8px rgba(99, 102, 241, 0); }
+  0%, 100% { box-shadow: 0 0 0 0 rgba(20, 83, 45, 0.4); }
+  50%       { box-shadow: 0 0 0 8px rgba(20, 83, 45, 0); }
 }
 
-.animate-fade-in-up {
-  animation: fadeInUp 0.5s ease forwards;
-}
+.animate-fade-in-up   { animation: fadeInUp 0.5s ease forwards; }
+.animate-spin-smooth  { animation: spin 0.8s linear infinite; }
+.animate-pulse-glow   { animation: pulse-glow 2s infinite; }
 
-.animate-spin-smooth {
-  animation: spin 0.8s linear infinite;
-}
-
-.animate-pulse-glow {
-  animation: pulse-glow 2s infinite;
-}
-
-/* ——— Animación: icono de éxito (SVG check animado) ——— */
-
-/* Contenedor: rebote de entrada */
+/* Animación éxito */
 @keyframes successBounce {
   0%   { transform: scale(0.4); opacity: 0; }
   55%  { transform: scale(1.08); opacity: 1; }
@@ -199,212 +340,50 @@ body {
   100% { transform: scale(1); }
 }
 
-/* Círculo SVG: se "dibuja" con stroke-dashoffset */
 @keyframes drawCircle {
   from { stroke-dashoffset: 157; }
   to   { stroke-dashoffset: 0; }
 }
 
-/* Checkmark SVG: aparece con ligero retraso */
 @keyframes drawCheck {
   from { stroke-dashoffset: 36; opacity: 0; }
   10%  { opacity: 1; }
   to   { stroke-dashoffset: 0; opacity: 1; }
 }
 
-.animate-success-bounce {
-  animation: successBounce 0.65s cubic-bezier(0.34, 1.56, 0.64, 1) both;
-}
+.animate-success-bounce { animation: successBounce 0.65s cubic-bezier(0.34, 1.56, 0.64, 1) both; }
+.svg-circle-draw { stroke-dasharray: 157; stroke-dashoffset: 157; animation: drawCircle 0.55s ease-out 0.15s both; }
+.svg-check-draw  { stroke-dasharray: 36;  stroke-dashoffset: 36;  animation: drawCheck  0.4s  ease-out 0.6s  both; }
 
-.svg-circle-draw {
-  stroke-dasharray: 157;
-  stroke-dashoffset: 157;
-  animation: drawCircle 0.55s ease-out 0.15s both;
-}
-
-.svg-check-draw {
-  stroke-dasharray: 36;
-  stroke-dashoffset: 36;
-  animation: drawCheck 0.4s ease-out 0.6s both;
-}
-
-/* ——— Animación: entrada escalonada de campos ——— */
+/* Entrada escalonada de campos */
 @keyframes fieldIn {
   from { opacity: 0; transform: translateY(14px); }
   to   { opacity: 1; transform: translateY(0); }
 }
 
-/* Se aplica con animation-delay inline desde el componente */
-.field-animate {
-  animation: fieldIn 0.4s ease both;
-  opacity: 0;
-}
+.field-animate { animation: fieldIn 0.4s ease both; opacity: 0; }
 
-/* ——— Animación: thumbnails de archivos (escala + opacidad) ——— */
-@keyframes fileIn {
-  from { opacity: 0; transform: scale(0.88); }
-  to   { opacity: 1; transform: scale(1); }
-}
+/* Thumbnails de archivos */
+@keyframes fileIn  { from { opacity: 0; transform: scale(0.88); } to { opacity: 1; transform: scale(1); } }
+@keyframes fileOut { from { opacity: 1; transform: scale(1); } to { opacity: 0; transform: scale(0.88); } }
 
-@keyframes fileOut {
-  from { opacity: 1; transform: scale(1); }
-  to   { opacity: 0; transform: scale(0.88); }
-}
+.file-animate-in  { animation: fileIn  0.22s cubic-bezier(0.34, 1.4, 0.64, 1) both; }
+.file-animate-out { animation: fileOut 0.18s ease forwards; }
 
-.file-animate-in {
-  animation: fileIn 0.22s cubic-bezier(0.34, 1.4, 0.64, 1) both;
-}
-
-.file-animate-out {
-  animation: fileOut 0.18s ease forwards;
-}
-
-/* ——— Animación: Modal glassmorphism ——— */
-
-/* Overlay: fade in/out */
-@keyframes overlayIn {
-  from { opacity: 0; }
-  to   { opacity: 1; }
-}
-
-@keyframes overlayOut {
-  from { opacity: 1; }
-  to   { opacity: 0; }
-}
-
-/* Panel del modal: scale + translateY */
-@keyframes modalIn {
-  from { opacity: 0; transform: scale(0.96) translateY(10px); }
-  to   { opacity: 1; transform: scale(1)    translateY(0); }
-}
-
-@keyframes modalOut {
-  from { opacity: 1; transform: scale(1)    translateY(0); }
-  to   { opacity: 0; transform: scale(0.96) translateY(10px); }
-}
+/* Modal */
+@keyframes overlayIn  { from { opacity: 0; } to { opacity: 1; } }
+@keyframes overlayOut { from { opacity: 1; } to { opacity: 0; } }
+@keyframes modalIn    { from { opacity: 0; transform: scale(0.96) translateY(10px); } to { opacity: 1; transform: scale(1) translateY(0); } }
+@keyframes modalOut   { from { opacity: 1; transform: scale(1)    translateY(0); }    to { opacity: 0; transform: scale(0.96) translateY(10px); } }
 
 .animate-overlay-in  { animation: overlayIn  0.25s ease-out both; }
 .animate-overlay-out { animation: overlayOut 0.2s  ease-in  both; }
 .animate-modal-in    { animation: modalIn    0.3s  ease-out both; }
 .animate-modal-out   { animation: modalOut   0.2s  ease-in  both; }
 
-/* ============================================================
-   PANEL INTERNO — Tokens y utilidades adicionales
-   ============================================================ */
-
-:root {
-  --focus-ring: 0 0 0 2px rgba(99, 102, 241, 0.40);
-}
-
-/* ——— focus-visible para .input-obsidian ——— */
-.input-obsidian:focus-visible {
-  border-color: #6366F1;
-  box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.15);
-  background: rgba(99, 102, 241, 0.05);
-}
-
-/* ——— focus-visible para .btn-primary ——— */
-.btn-primary:focus-visible {
-  outline: none;
-  box-shadow:
-    0 4px 24px rgba(99, 102, 241, 0.30),
-    0 0 0 2px #0A0A0B,
-    0 0 0 4px rgba(99, 102, 241, 0.70);
-}
-
-/* ——— Input compacto para formularios densos del panel interno ——— */
-.input-internal {
-  background: rgba(255, 255, 255, 0.04);
-  border: 1px solid rgba(255, 255, 255, 0.10);
-  border-radius: 0.5rem;
-  color: #F8FAFC;
-  width: 100%;
-  padding: 0.5rem 0.75rem;
-  font-size: 0.875rem;
-  line-height: 1.5;
-  transition: border-color 0.2s ease, box-shadow 0.2s ease, background 0.2s ease;
-  outline: none;
-}
-
-.input-internal::placeholder {
-  color: #475569;
-}
-
-.input-internal:hover {
-  border-color: rgba(99, 102, 241, 0.30);
-  background: rgba(255, 255, 255, 0.06);
-}
-
-.input-internal:focus,
-.input-internal:focus-visible {
-  border-color: rgba(99, 102, 241, 0.70);
-  box-shadow: var(--focus-ring);
-  background: rgba(99, 102, 241, 0.05);
-}
-
-/* ——— Select estilo Obsidian ——— */
-.select-internal {
-  background: rgba(255, 255, 255, 0.04);
-  border: 1px solid rgba(255, 255, 255, 0.10);
-  border-radius: 0.5rem;
-  color: #F8FAFC;
-  padding: 0.5rem 0.75rem;
-  font-size: 0.875rem;
-  line-height: 1.5;
-  transition: border-color 0.2s ease, box-shadow 0.2s ease, background 0.2s ease;
-  outline: none;
-  cursor: pointer;
-}
-
-.select-internal:hover {
-  border-color: rgba(99, 102, 241, 0.30);
-  background: rgba(255, 255, 255, 0.06);
-}
-
-.select-internal:focus,
-.select-internal:focus-visible {
-  border-color: rgba(99, 102, 241, 0.70);
-  box-shadow: var(--focus-ring);
-  background: rgba(99, 102, 241, 0.04);
-}
-
-/* ——— Botón ghost (acciones secundarias del panel) ——— */
-.btn-ghost {
-  background: transparent;
-  border: 1px solid rgba(255, 255, 255, 0.12);
-  border-radius: 0.5rem;
-  color: #94A3B8;
-  padding: 0.5rem 1rem;
-  font-size: 0.875rem;
-  font-weight: 600;
-  cursor: pointer;
-  transition: background 0.15s ease, border-color 0.15s ease, color 0.15s ease, transform 0.1s ease;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  gap: 0.375rem;
-}
-
-.btn-ghost:hover:not(:disabled) {
-  background: rgba(255, 255, 255, 0.05);
-  border-color: rgba(255, 255, 255, 0.20);
-  color: #F8FAFC;
-}
-
-.btn-ghost:active:not(:disabled) {
-  transform: scale(0.97);
-}
-
-.btn-ghost:focus-visible {
-  outline: none;
-  box-shadow: var(--focus-ring);
-}
-
-.btn-ghost:disabled {
-  opacity: 0.40;
-  cursor: not-allowed;
-}
-
+/* ─────────────────────────────────────────────────────────────
+   IMPRESIÓN
+───────────────────────────────────────────────────────────── */
 @media print {
   html,
   body {
