@@ -3,6 +3,10 @@
 /**
  * PanelSimi — Asistente SIMI contextual por radicado.
  * SIMI sugiere. El funcionario revisa. El funcionario aprueba.
+ *
+ * Incluye dos modos:
+ *   - Asistente general (chat + acciones rápidas)
+ *   - Jurídico-Administrativo (análisis PQRSD, proyección, revisión, MIPG)
  */
 
 import { useState } from 'react';
@@ -11,6 +15,9 @@ import type { UsuarioAutenticado }  from '@/lib/hooks/useAuth';
 import type { RolInterno }          from '@/lib/hooks/useAuth';
 import { NOMBRES_TENANT }           from '@/src/types/reglas-negocio';
 import { diasRestantesHabiles }     from '@/lib/tiempos-radicado';
+import { SimiJuridicoPanel }        from './SimiJuridicoPanel';
+
+type PanelTab = 'general' | 'juridico';
 
 type AccionSimi =
   | 'RESUMIR_RADICADO'
@@ -55,6 +62,7 @@ interface PanelSimiProps {
 }
 
 export function PanelSimi({ radicado, usuario, onAdoptarRespuesta }: PanelSimiProps) {
+  const [tabActivo, setTabActivo] = useState<PanelTab>('general');
   const [cargando,         setCargando]         = useState(false);
   const [respuesta,        setRespuesta]        = useState<SimiResponse | null>(null);
   const [error,            setError]            = useState<string | null>(null);
@@ -103,6 +111,37 @@ export function PanelSimi({ radicado, usuario, onAdoptarRespuesta }: PanelSimiPr
 
   return (
     <div className="space-y-4">
+
+      {/* Selector de modo: General / Jurídico */}
+      <div className="flex rounded-xl overflow-hidden" style={{ border: '1px solid #D9E2D9' }}>
+        {([
+          { id: 'general',   label: '💬 Asistente' },
+          { id: 'juridico',  label: '⚖️ Jurídico' },
+        ] as { id: PanelTab; label: string }[]).map((tab) => (
+          <button
+            key={tab.id}
+            onClick={() => setTabActivo(tab.id)}
+            className="flex-1 py-2 text-[11px] font-bold transition-all duration-150"
+            style={tabActivo === tab.id
+              ? { background: '#14532D', color: '#ffffff' }
+              : { background: '#F8FAF7', color: '#667085' }}
+          >
+            {tab.label}
+          </button>
+        ))}
+      </div>
+
+      {/* Modo Jurídico */}
+      {tabActivo === 'juridico' && (
+        <SimiJuridicoPanel
+          radicado={radicado}
+          usuario={usuario}
+          onAdoptarRespuesta={onAdoptarRespuesta}
+        />
+      )}
+
+      {/* Modo General (oculto si tab jurídico activo) */}
+      {tabActivo !== 'juridico' && <>
 
       {/* Header contextual */}
       <div className="rounded-xl p-4" style={{ background: '#EEF4EE', border: '1px solid #D9E2D9' }}>
@@ -316,6 +355,8 @@ export function PanelSimi({ radicado, usuario, onAdoptarRespuesta }: PanelSimiPr
           </p>
         </div>
       )}
+
+      </> /* fin tabActivo === 'general' */}
     </div>
   );
 }
