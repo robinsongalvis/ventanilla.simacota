@@ -475,8 +475,8 @@ function SidebarNav({
   return (
     <aside className={`h-full flex flex-col bg-[#0A0A0B] border-r border-white/[0.07] shrink-0 w-[210px] ${className}`}>
       {/* Logo */}
-      <div className="px-4 py-4 border-b border-white/[0.07]">
-        <InstitucionalHeader compact subtitle="Panel Institucional" />
+      <div className="px-4 py-3 border-b border-white/[0.07]">
+        <InstitucionalHeader variant="sidebar" subtitle="Panel Institucional" />
       </div>
 
       {/* Radicación Rápida */}
@@ -581,27 +581,27 @@ function MobileTopBar({
   };
 
   return (
-    <header className="md:hidden shrink-0 border-b border-white/[0.07] bg-[#0A0A0B]/95 px-3 py-3">
-      <div className="flex items-center gap-3">
+    <header className="md:hidden shrink-0 border-b border-white/[0.07] bg-[#0A0A0B]/95 px-3 py-2.5">
+      <div className="flex items-center gap-2.5">
         <button
           type="button"
           onClick={onAbrirMenu}
-          className="flex h-10 w-10 items-center justify-center rounded-xl border border-white/[0.08] bg-white/[0.04] text-slate-200 active:scale-95 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500/60"
+          className="shrink-0 flex h-9 w-9 items-center justify-center rounded-xl border border-white/[0.08] bg-white/[0.04] text-slate-200 active:scale-95 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500/60"
           aria-label="Abrir menú"
         >
-          <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+          <svg className="h-4.5 w-4.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
             <path strokeLinecap="round" strokeLinejoin="round" d="M3.75 6.75h16.5M3.75 12h16.5m-16.5 5.25h16.5" />
           </svg>
         </button>
         <div className="min-w-0 flex-1">
-          <p className="text-[10px] font-bold uppercase tracking-widest text-slate-600">
-            {NOMBRES_TENANT[usuario.tenantId]}
+          <p className="text-[9px] font-bold uppercase tracking-widest text-slate-600 truncate">
+            Alcaldía de Simacota
           </p>
-          <p className="truncate text-sm font-black text-slate-100">
+          <p className="truncate text-sm font-black text-slate-100 leading-tight">
             {vista}
           </p>
         </div>
-        <span className="shrink-0 rounded-full border border-indigo-500/25 bg-indigo-500/10 px-2 py-1 text-[10px] font-bold uppercase tracking-wider text-indigo-300">
+        <span className="shrink-0 rounded-full border border-indigo-500/25 bg-indigo-500/10 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider text-indigo-300">
           {rolCompacto[usuario.rol] ?? 'Func.'}
         </span>
       </div>
@@ -781,8 +781,8 @@ function PanelOperacionDependencia({
   const dias = siguiente ? calcDiasRestantes(siguiente) : null;
 
   return (
-    <section className="px-4 py-3 border-b border-white/[0.07] bg-[#0D1117]/80 shrink-0">
-      <div className="grid grid-cols-1 xl:grid-cols-[minmax(0,1.2fr)_minmax(520px,1.8fr)] gap-3">
+    <section className="px-3 sm:px-4 py-3 border-b border-white/[0.07] bg-[#0D1117]/80 shrink-0">
+      <div className="grid grid-cols-1 lg:grid-cols-[minmax(0,1.2fr)_minmax(0,1.8fr)] gap-3">
         <div className="rounded-xl border border-white/[0.07] bg-slate-950/30 px-4 py-3">
           <div className="flex items-start justify-between gap-3">
             <div className="min-w-0">
@@ -798,7 +798,7 @@ function PanelOperacionDependencia({
             </span>
           </div>
 
-          <div className="mt-4 grid grid-cols-2 sm:grid-cols-5 gap-2">
+          <div className="mt-3 grid grid-cols-3 sm:grid-cols-5 gap-2">
             {[
               { label: 'Activos', value: resumen.totalActivos, tone: 'text-slate-100', filtro: 'TODOS' as FiltroMIPG },
               { label: 'Sin resp.', value: resumen.sinResponsable, tone: 'text-amber-300', filtro: 'ASIGNADAS' as FiltroMIPG },
@@ -916,8 +916,8 @@ function TablaRadicados({
   return (
     <div className="flex-1 flex flex-col overflow-hidden min-h-0">
       {/* Toolbar */}
-      <div className="flex flex-wrap items-center gap-3 px-4 py-2.5 border-b border-white/[0.07] shrink-0">
-        <div className="relative min-w-[220px] flex-1 max-w-sm">
+      <div className="flex flex-wrap items-center gap-2 sm:gap-3 px-3 sm:px-4 py-2 sm:py-2.5 border-b border-white/[0.07] shrink-0">
+        <div className="relative min-w-0 flex-1 max-w-sm sm:min-w-[220px]">
           <svg className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-slate-500" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
             <path strokeLinecap="round" strokeLinejoin="round" d="M21 21l-5.197-5.197m0 0A7.5 7.5 0 105.196 5.196a7.5 7.5 0 0010.607 10.607z" />
           </svg>
@@ -951,8 +951,62 @@ function TablaRadicados({
         </div>
       )}
 
-      {/* Tabla */}
-      <div className="flex-1 overflow-y-auto overflow-x-auto">
+      {/* Tarjetas — móvil (< sm) */}
+      <div className="sm:hidden flex-1 overflow-y-auto divide-y divide-white/[0.04]">
+        {cargando && !error && (
+          Array.from({ length: 5 }).map((_, i) => (
+            <div key={i} className="px-4 py-3 animate-pulse space-y-2">
+              <div className="h-3 rounded bg-slate-800/80 w-2/3" />
+              <div className="h-2.5 rounded bg-slate-800/60 w-1/2" />
+            </div>
+          ))
+        )}
+        {!cargando && !error && radicados.length === 0 && (
+          <div className="px-4 py-16 text-center">
+            <p className="text-slate-400 font-medium mb-1">Sin radicados</p>
+            <p className="text-xs text-slate-600">No hay resultados para los filtros aplicados.</p>
+          </div>
+        )}
+        {!cargando && radicados.map((r) => {
+          const esRojo = r.prioridad === 'ROJO';
+          const seleccionado = radicadoSeleccionadoId === r.radicadoId;
+          const semaforoData = calcularSemaforo(r);
+          return (
+            <button
+              key={r.radicadoId}
+              type="button"
+              onClick={() => onSeleccionar(r)}
+              className={`w-full text-left px-4 py-3 transition-colors ${
+                seleccionado ? 'bg-indigo-500/10 border-l-2 border-l-indigo-500' : 'hover:bg-white/[0.025]'
+              }`}
+            >
+              <div className="flex items-start justify-between gap-2 mb-1.5">
+                <div className="flex items-center gap-1.5 min-w-0">
+                  {esRojo && <span className="shrink-0 w-1.5 h-1.5 rounded-full bg-red-500 animate-pulse mt-0.5" />}
+                  <span className="font-mono text-xs text-indigo-300 truncate">{r.radicadoId}</span>
+                </div>
+                <span className={`shrink-0 inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wide border ${
+                  BADGE_ESTADO[r.estadoActual] ?? 'bg-slate-500/20 text-slate-300 border-slate-500/30'
+                }`}>
+                  {LABELS_ESTADO[r.estadoActual] ?? r.estadoActual}
+                </span>
+              </div>
+              <p className="text-sm text-slate-200 font-medium truncate">{r.solicitante.nombreCompleto}</p>
+              <div className="mt-1 flex flex-wrap gap-x-3 gap-y-0.5">
+                <span className="text-[10px] text-slate-500">{r.termino.tipoSolicitudNombre}</span>
+                <span className="text-[10px] text-slate-600 truncate">{NOMBRES_TENANT[r.clasificacion.oficinaDestino]}</span>
+              </div>
+              <div className="mt-1 flex items-center gap-3">
+                <span className="text-[10px] text-slate-600">Vence {fmtFecha(r.termino.fechaVencimiento)}</span>
+                <span className={`text-[11px] font-semibold tabular-nums ${semaforoData.textoClass}`}>{semaforoData.label}</span>
+              </div>
+            </button>
+          );
+        })}
+      </div>
+
+      {/* Tabla — sm+ */}
+      <div className="hidden sm:block flex-1 overflow-y-auto overflow-x-auto">
         <table className="w-full text-sm">
           <thead className="sticky top-0 z-10 bg-slate-900/90 backdrop-blur-sm">
             <tr className="border-b border-white/[0.07]">
@@ -980,7 +1034,6 @@ function TablaRadicados({
             {!cargando && radicados.map((r) => {
               const esRojo   = r.prioridad === 'ROJO';
               const seleccionado = radicadoSeleccionadoId === r.radicadoId;
-
               const semaforoData = calcularSemaforo(r);
               const diasColor = semaforoData.textoClass;
 
@@ -994,37 +1047,26 @@ function TablaRadicados({
                       : 'hover:bg-white/[0.025]'
                   }`}
                 >
-                  {/* Radicado */}
                   <td className="px-4 py-3 whitespace-nowrap">
                     <div className="flex items-center gap-2">
-                      {esRojo && (
-                        <span className="shrink-0 w-1.5 h-1.5 rounded-full bg-red-500 animate-pulse" />
-                      )}
+                      {esRojo && <span className="shrink-0 w-1.5 h-1.5 rounded-full bg-red-500 animate-pulse" />}
                       <span className="font-mono text-xs text-indigo-300">{r.radicadoId}</span>
                     </div>
                     <p className="text-[10px] text-slate-600 mt-0.5">{fmtFecha(r.control.fechaRadicado)}</p>
                   </td>
-
-                  {/* Solicitante */}
                   <td className="px-4 py-3 max-w-[180px]">
                     <p className="text-slate-200 font-medium truncate">{r.solicitante.nombreCompleto}</p>
                     <p className="text-[10px] text-slate-600 font-mono">
                       {r.solicitante.tipoDocumento} {r.solicitante.numeroDocumento}
                     </p>
                   </td>
-
-                  {/* Tipo trámite */}
                   <td className="px-4 py-3 whitespace-nowrap">
                     <p className="text-xs text-slate-400">{r.termino.tipoSolicitudNombre}</p>
                     <p className="text-[10px] text-slate-600">{r.termino.diasRespuesta}d {r.termino.unidad.toLowerCase()}</p>
                   </td>
-
-                  {/* Dependencia */}
                   <td className="px-4 py-3 max-w-[150px]">
                     <p className="text-xs text-slate-400 truncate">{NOMBRES_TENANT[r.clasificacion.oficinaDestino]}</p>
                   </td>
-
-                  {/* Estado */}
                   <td className="px-4 py-3 whitespace-nowrap">
                     <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wide border ${
                       BADGE_ESTADO[r.estadoActual] ?? 'bg-slate-500/20 text-slate-300 border-slate-500/30'
@@ -1032,17 +1074,11 @@ function TablaRadicados({
                       {LABELS_ESTADO[r.estadoActual] ?? r.estadoActual}
                     </span>
                   </td>
-
-                  {/* Vencimiento */}
                   <td className="px-4 py-3 whitespace-nowrap">
                     <p className="text-xs text-slate-400">{fmtFecha(r.termino.fechaVencimiento)}</p>
                   </td>
-
-                  {/* Semáforo MIPG */}
                   <td className="px-4 py-3 whitespace-nowrap">
-                    <span className={`text-sm tabular-nums ${diasColor}`}>
-                      {semaforoData.label}
-                    </span>
+                    <span className={`text-sm tabular-nums ${diasColor}`}>{semaforoData.label}</span>
                   </td>
                 </tr>
               );

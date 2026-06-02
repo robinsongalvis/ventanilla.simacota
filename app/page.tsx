@@ -44,7 +44,7 @@ export default function HomePage() {
 
       {/* ── Navbar ── */}
       <header className="border-b border-white/[0.06] sticky top-0 z-50 backdrop-blur-[20px] bg-[#0A0A0B]/70" role="banner">
-        <div className="max-w-6xl mx-auto px-6 py-4 flex items-center justify-between">
+        <div className="max-w-6xl mx-auto px-4 sm:px-6 py-3 sm:py-4 flex items-center justify-between gap-2">
           <InstitucionalHeader compact />
           {/* Navegación principal */}
           <nav aria-label="Navegación principal" className="flex items-center gap-4">
@@ -120,7 +120,7 @@ export default function HomePage() {
 
         {/* Stats — datos clave de la plataforma */}
         <dl
-          className="grid grid-cols-3 gap-8 mt-20 animate-fade-in-up"
+          className="grid grid-cols-3 gap-4 sm:gap-8 mt-16 sm:mt-20 animate-fade-in-up"
           style={{ animationDelay: '0.4s', opacity: 0 }}
           aria-label="Estadísticas de la plataforma"
         >
@@ -136,7 +136,7 @@ export default function HomePage() {
       {/* ── Cómo funciona ── */}
       <section
         id="como-funciona"
-        className="max-w-6xl mx-auto px-6 pb-24 w-full"
+        className="max-w-6xl mx-auto px-4 sm:px-6 pb-16 sm:pb-24 w-full"
         aria-labelledby="como-funciona-titulo"
       >
         <div className="text-center mb-12">
