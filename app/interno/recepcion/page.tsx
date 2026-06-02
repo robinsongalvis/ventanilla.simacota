@@ -121,7 +121,7 @@ function FeedbackCampo({
   if (!touched) return null;
   if (error) {
     return (
-      <p id={id} role="alert" className="mt-1.5 text-xs text-rose-400 flex items-center gap-1.5">
+      <p id={id} role="alert" className="mt-1.5 text-xs flex items-center gap-1.5" style={{ color: '#DC2626' }}>
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} className="w-3.5 h-3.5 shrink-0">
           <path strokeLinecap="round" strokeLinejoin="round" d="M12 9v3.75m9-.75a9 9 0 11-18 0 9 9 0 0118 0zm-9 3.75h.008v.008H12v-.008z" />
         </svg>
@@ -131,7 +131,7 @@ function FeedbackCampo({
   }
   if (valorOk) {
     return (
-      <p id={id} className="mt-1.5 text-xs text-emerald-500 flex items-center gap-1.5">
+      <p id={id} className="mt-1.5 text-xs flex items-center gap-1.5 text-green-700">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2.5} className="w-3.5 h-3.5 shrink-0">
           <path strokeLinecap="round" strokeLinejoin="round" d="M4.5 12.75l6 6 9-13.5" />
         </svg>
@@ -160,14 +160,12 @@ function ArchivoPreview({
 
   return (
     <div
-      className={`
-        flex items-center gap-3 rounded-xl border border-white/[0.07] p-3
-        bg-slate-800/30 transition-all duration-200
-        ${isRemoving ? 'file-animate-out pointer-events-none' : 'file-animate-in'}
-      `}
+      className={`flex items-center gap-3 rounded-xl p-3 transition-all duration-200 bg-white
+        ${isRemoving ? 'file-animate-out pointer-events-none' : 'file-animate-in'}`}
+      style={{ border: '1px solid #D9E2D9' }}
     >
       {/* Thumbnail / Ícono — 64×80 px */}
-      <div className="w-16 h-20 rounded-lg overflow-hidden shrink-0 bg-slate-700/40 flex items-center justify-center">
+      <div className="w-16 h-20 rounded-lg overflow-hidden shrink-0 flex items-center justify-center" style={{ background: '#F8FAF7' }}>
         {esImagen && archivo.previewUrl ? (
           // eslint-disable-next-line @next/next/no-img-element -- blob: URL preview not supported by next/image
           <img
@@ -190,23 +188,19 @@ function ArchivoPreview({
       <div className="flex-1 min-w-0">
         {/* Badges: número de orden + tipo */}
         <div className="flex items-center gap-1.5 mb-1">
-          <span className="text-[9px] font-bold text-slate-500 bg-white/[0.04] border border-white/[0.06] rounded px-1.5 py-0.5">
+          <span className="text-[9px] font-bold rounded px-1.5 py-0.5" style={{ background: '#EEF4EE', border: '1px solid #D9E2D9', color: '#667085' }}>
             #{archivo.orden}
           </span>
-          <span
-            className={`text-[9px] font-bold uppercase tracking-widest rounded px-1.5 py-0.5 ${
-              esPDF
-                ? 'text-rose-400 bg-rose-500/10'
-                : 'text-indigo-400 bg-indigo-500/10'
-            }`}
-          >
+          <span className={`text-[9px] font-bold uppercase tracking-widest rounded px-1.5 py-0.5 ${
+              esPDF ? 'bg-red-50 text-red-700' : 'bg-[#EEF4EE] text-[#14532D]'
+            }`}>
             {esPDF ? 'PDF' : 'IMG'}
           </span>
         </div>
-        <p className="text-sm text-slate-200 font-medium truncate" title={archivo.nombre}>
+        <p className="text-sm font-medium truncate" style={{ color: '#1F2933' }} title={archivo.nombre}>
           {archivo.nombre}
         </p>
-        <p className="text-xs text-slate-500 mt-0.5">{formatTamanio(archivo.tamanioKB)}</p>
+        <p className="text-xs mt-0.5" style={{ color: '#94A3B8' }}>{formatTamanio(archivo.tamanioKB)}</p>
       </div>
 
       {/* Botón eliminar */}
@@ -214,7 +208,10 @@ function ArchivoPreview({
         type="button"
         onClick={() => onEliminar(archivo.id)}
         aria-label={`Eliminar ${archivo.nombre}`}
-        className="text-slate-600 hover:text-rose-400 transition-colors p-2 -mr-1 shrink-0"
+        className="p-2 -mr-1 shrink-0 transition-colors"
+        style={{ color: '#94A3B8' }}
+        onMouseEnter={(e) => { (e.currentTarget as HTMLElement).style.color = '#DC2626'; }}
+        onMouseLeave={(e) => { (e.currentTarget as HTMLElement).style.color = '#94A3B8'; }}
       >
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} className="w-4 h-4">
           <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
@@ -236,41 +233,37 @@ function BarraProgresoCarga({ archivos }: { archivos: ArchivoEscaneado[] }) {
   const maxPct         = Math.max(pctArchivos, pctTamano);
 
   const colorBarra =
-    maxPct >= 90 ? 'bg-rose-500'
+    maxPct >= 90 ? 'bg-red-500'
     : maxPct >= 70 ? 'bg-amber-500'
-    : 'bg-indigo-500';
+    : 'bg-[#14532D]';
 
   return (
     <div className="space-y-3 pt-1">
       {/* Pista: cantidad de archivos */}
       <div>
         <div className="flex justify-between items-center mb-1.5">
-          <span className="text-[10px] font-bold uppercase tracking-widest text-slate-600">Archivos</span>
-          <span className={`text-[10px] font-bold tabular-nums ${maxPct >= 90 ? 'text-rose-400' : maxPct >= 70 ? 'text-amber-400' : 'text-slate-500'}`}>
+          <span className="text-[10px] font-bold uppercase tracking-widest" style={{ color: '#667085' }}>Archivos</span>
+          <span className={`text-[10px] font-bold tabular-nums ${maxPct >= 90 ? 'text-red-600' : maxPct >= 70 ? 'text-amber-600' : ''}`} style={maxPct < 70 ? { color: '#94A3B8' } : {}}>
             {archivos.length} / {MAX_ARCHIVOS}
           </span>
         </div>
-        <div className="h-1 bg-white/[0.06] rounded-full overflow-hidden">
-          <div
-            className={`h-full rounded-full transition-all duration-400 ${colorBarra}`}
-            style={{ width: `${pctArchivos}%` }}
-          />
+        <div className="h-1 rounded-full overflow-hidden" style={{ background: '#EEF4EE' }}>
+          <div className={`h-full rounded-full transition-all duration-400 ${colorBarra}`}
+               style={{ width: `${pctArchivos}%` }} />
         </div>
       </div>
 
       {/* Pista: tamaño total */}
       <div>
         <div className="flex justify-between items-center mb-1.5">
-          <span className="text-[10px] font-bold uppercase tracking-widest text-slate-600">Tamaño total</span>
-          <span className={`text-[10px] font-bold tabular-nums ${maxPct >= 90 ? 'text-rose-400' : maxPct >= 70 ? 'text-amber-400' : 'text-slate-500'}`}>
+          <span className="text-[10px] font-bold uppercase tracking-widest" style={{ color: '#667085' }}>Tamaño total</span>
+          <span className={`text-[10px] font-bold tabular-nums ${maxPct >= 90 ? 'text-red-600' : maxPct >= 70 ? 'text-amber-600' : ''}`} style={maxPct < 70 ? { color: '#94A3B8' } : {}}>
             {totalMB.toFixed(1)} / 50 MB
           </span>
         </div>
-        <div className="h-1 bg-white/[0.06] rounded-full overflow-hidden">
-          <div
-            className={`h-full rounded-full transition-all duration-400 ${colorBarra}`}
-            style={{ width: `${pctTamano}%` }}
-          />
+        <div className="h-1 rounded-full overflow-hidden" style={{ background: '#EEF4EE' }}>
+          <div className={`h-full rounded-full transition-all duration-400 ${colorBarra}`}
+               style={{ width: `${pctTamano}%` }} />
         </div>
       </div>
     </div>
@@ -360,52 +353,46 @@ function PantallaConfirmacion({
       <div className="flex flex-col items-center justify-center py-16 px-6 text-center animate-fade-in-up print:hidden">
         <div className="mb-8"><IconoCheck /></div>
 
-        <p className="text-[10px] font-bold uppercase tracking-widest text-emerald-400 mb-3">
+        <p className="text-[10px] font-bold uppercase tracking-widest mb-3" style={{ color: '#14532D' }}>
           Registro físico completado
         </p>
-        <h2
-          className="text-2xl font-black tracking-tighter text-slate-50 mb-3"
-          style={{ fontFamily: 'var(--font-manrope)' }}
-        >
+        <h2 className="text-2xl font-black tracking-tighter mb-3"
+            style={{ fontFamily: 'var(--font-manrope)', color: '#1F2933' }}>
           Radicado registrado como recepción física
         </h2>
-        <p className="text-slate-400 text-sm leading-relaxed max-w-sm mb-2">
+        <p className="text-sm leading-relaxed max-w-sm mb-2" style={{ color: '#667085' }}>
           La solicitud fue radicada y será procesada por el sistema de IA (OCR + clasificación).
         </p>
-        <p className="text-slate-500 text-xs mb-6">
+        <p className="text-xs mb-6" style={{ color: '#94A3B8' }}>
           Origen:{' '}
-          <span className="text-indigo-400 font-bold">FÍSICO (ESCÁNER)</span>
+          <span className="font-bold" style={{ color: '#14532D' }}>FÍSICO (ESCÁNER)</span>
           {' '}—{' '}
           <span className="text-slate-400">{totalArchivos} documento{totalArchivos !== 1 ? 's' : ''} adjunto{totalArchivos !== 1 ? 's' : ''}</span>
         </p>
 
         {/* Advertencias parciales */}
         {errores.length > 0 && (
-          <div className="w-full max-w-sm rounded-xl border border-amber-500/30 bg-amber-500/10 p-4 mb-6 text-left">
-            <p className="text-xs font-bold uppercase tracking-widest text-amber-400 mb-2">Advertencias</p>
+          <div className="w-full max-w-sm rounded-xl p-4 mb-6 text-left"
+               style={{ background: '#FFFBEB', border: '1px solid #FDE68A' }}>
+            <p className="text-xs font-bold uppercase tracking-widest mb-2 text-amber-700">Advertencias</p>
             <ul className="space-y-1">
               {errores.map((e, i) => (
-                <li key={i} className="text-xs text-amber-300/80 leading-relaxed">• {e}</li>
+                <li key={i} className="text-xs text-amber-700 leading-relaxed">• {e}</li>
               ))}
             </ul>
           </div>
         )}
 
         {/* Radicado ID */}
-        <div
-          className="w-full max-w-sm rounded-2xl border border-white/10 p-6 mb-6"
-          style={{ background: 'rgba(15,23,42,0.40)', backdropFilter: 'blur(25px)' }}
-        >
-          <p className="text-[10px] font-bold uppercase tracking-widest text-slate-500 mb-3">
+        <div className="w-full max-w-sm rounded-2xl p-6 mb-6 bg-white"
+             style={{ border: '1px solid #D9E2D9', borderLeft: '4px solid #14532D', boxShadow: '0 1px 3px rgba(20,83,45,0.06)' }}>
+          <p className="text-[10px] font-bold uppercase tracking-widest mb-3" style={{ color: '#667085' }}>
             Número de radicado
           </p>
-          <p
-            className="text-2xl font-black tracking-widest text-indigo-400 break-all"
-            style={{ fontFamily: 'var(--font-manrope)' }}
-          >
+          <p className="text-2xl font-black tracking-widest break-all" style={{ fontFamily: 'var(--font-manrope)', color: '#14532D' }}>
             {radicadoId}
           </p>
-          <p className="text-slate-500 text-xs mt-3">
+          <p className="text-xs mt-3" style={{ color: '#94A3B8' }}>
             Informe este número al ciudadano para seguimiento de su caso.
           </p>
         </div>
@@ -414,9 +401,10 @@ function PantallaConfirmacion({
           {/* Imprimir comprobante */}
           <button
             onClick={imprimirComprobante}
-            className="w-full py-3 px-6 rounded-xl font-bold text-sm uppercase tracking-wider
-              border border-emerald-500/40 text-emerald-400 hover:border-emerald-500 hover:bg-emerald-500/10
-              transition-all duration-300 flex items-center justify-center gap-2"
+            className="w-full py-3 px-6 rounded-xl font-bold text-sm uppercase tracking-wider transition-all duration-200 flex items-center justify-center gap-2"
+            style={{ border: '1px solid #D9E2D9', background: '#EEF4EE', color: '#14532D' }}
+            onMouseEnter={(e) => { (e.currentTarget as HTMLElement).style.background = '#D9E2D9'; }}
+            onMouseLeave={(e) => { (e.currentTarget as HTMLElement).style.background = '#EEF4EE'; }}
           >
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} className="w-4 h-4">
               <path strokeLinecap="round" strokeLinejoin="round" d="M6.72 13.829c-.24.03-.48.062-.72.096m.72-.096a42.415 42.415 0 0110.56 0m-10.56 0L6.34 18m10.94-4.171c.24.03.48.062.72.096m-.72-.096L17.66 18m0 0l.229 2.523a1.125 1.125 0 01-1.12 1.227H7.231c-.662 0-1.18-.568-1.12-1.227L6.34 18m11.318 0h1.091A2.25 2.25 0 0021 15.75V9.456c0-1.081-.768-2.015-1.837-2.175a48.055 48.055 0 00-1.913-.247M6.34 18H5.25A2.25 2.25 0 013 15.75V9.456c0-1.081.768-2.015 1.837-2.175a48.041 48.041 0 011.913-.247m10.5 0a48.536 48.536 0 00-10.5 0m10.5 0V3.375c0-.621-.504-1.125-1.125-1.125h-8.25c-.621 0-1.125.504-1.125 1.125v3.659M18 10.5h.008v.008H18V10.5zm-3 0h.008v.008H15V10.5z" />
@@ -427,9 +415,10 @@ function PantallaConfirmacion({
           {/* Registrar siguiente */}
           <button
             onClick={onNuevo}
-            className="w-full py-4 px-6 rounded-xl font-bold text-sm uppercase tracking-wider text-white
-              bg-gradient-to-r from-indigo-600 to-indigo-500 hover:from-indigo-500 hover:to-indigo-400
-              hover:shadow-lg hover:shadow-indigo-500/25 transition-all duration-300"
+            className="w-full py-4 px-6 rounded-xl font-bold text-sm uppercase tracking-wider text-white transition-all duration-200 active:scale-[0.98]"
+            style={{ background: '#14532D' }}
+            onMouseEnter={(e) => { (e.currentTarget as HTMLElement).style.background = '#166534'; }}
+            onMouseLeave={(e) => { (e.currentTarget as HTMLElement).style.background = '#14532D'; }}
           >
             Registrar siguiente solicitud
           </button>
@@ -694,11 +683,11 @@ export default function RecepcionFisica() {
   ══════════════════════════════════════════════ */
 
   function inputCls(campo: CampoForm) {
-    const base = 'w-full bg-slate-800/50 border rounded-xl px-4 py-3 text-slate-50 text-sm ' +
-      'placeholder:text-slate-500 transition-all duration-300 outline-none';
+    const base = 'w-full border rounded-xl px-4 py-3 text-sm ' +
+      'placeholder:text-[#94A3B8] transition-all duration-200 outline-none bg-white';
     const variantCls = touched[campo] && errors[campo]
-      ? 'border-rose-500 focus:border-rose-500 focus:ring-1 focus:ring-rose-500/50'
-      : 'border-white/10 focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500/50';
+      ? 'border-red-400 focus:border-red-500 focus:ring-2 focus:ring-red-500/20'
+      : 'border-[#D9E2D9] focus:border-[#14532D] focus:ring-2 focus:ring-[#14532D]/15';
     return `${base} ${variantCls}`;
   }
 
@@ -710,59 +699,44 @@ export default function RecepcionFisica() {
   ══════════════════════════════════════════════ */
 
   return (
-    <main
-      className="min-h-screen"
-      style={{
-        background: `
-          radial-gradient(ellipse 70% 40% at 30% -5%, rgba(99,102,241,0.12) 0%, transparent 55%),
-          #0A0A0B
-        `,
-        backgroundImage: `
-          linear-gradient(rgba(255,255,255,0.025) 1px, transparent 1px),
-          linear-gradient(90deg, rgba(255,255,255,0.025) 1px, transparent 1px),
-          radial-gradient(ellipse 70% 40% at 30% -5%, rgba(99,102,241,0.12) 0%, transparent 55%)
-        `,
-        backgroundSize: '8px 8px, 8px 8px, 100% 100%',
-      }}
-    >
+    <main className="min-h-screen" style={{ background: '#F8FAF7' }}>
       {/* ── Header interno ── */}
-      <header className="sticky top-0 z-50 border-b border-white/[0.06] backdrop-blur-[20px] bg-[#0A0A0B]/75">
-        <div className="max-w-6xl mx-auto px-4 sm:px-6 py-4 flex items-center gap-3">
+      <header className="sticky top-0 z-50 bg-white" style={{ borderBottom: '1px solid #D9E2D9' }}>
+        <div className="max-w-6xl mx-auto px-4 sm:px-6 py-3.5 flex items-center gap-3">
           {/* Volver */}
           <Link
             href="/"
             aria-label="Volver al inicio"
-            className="w-8 h-8 rounded-lg border border-white/10 flex items-center justify-center
-              text-slate-400 hover:text-slate-200 hover:border-white/20 transition-all duration-200 shrink-0"
+            className="w-8 h-8 rounded-lg flex items-center justify-center transition-all duration-200 shrink-0"
+            style={{ border: '1px solid #D9E2D9', color: '#667085' }}
           >
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} className="w-4 h-4">
               <path strokeLinecap="round" strokeLinejoin="round" d="M15.75 19.5L8.25 12l7.5-7.5" />
             </svg>
           </Link>
 
-          {/* Escudo */}
-          <div className="w-8 h-8 rounded-lg border border-indigo-500/30 bg-indigo-500/15 flex items-center justify-center shrink-0">
-            <svg viewBox="0 0 24 24" fill="none" stroke="#6366F1" strokeWidth={2} className="w-4 h-4">
+          {/* Escudo institucional */}
+          <div className="w-8 h-8 rounded-lg flex items-center justify-center shrink-0"
+               style={{ border: '1px solid #D9E2D9', background: '#EEF4EE' }}>
+            <svg viewBox="0 0 24 24" fill="none" stroke="#14532D" strokeWidth={2} className="w-4 h-4">
               <path strokeLinecap="round" strokeLinejoin="round" d="M12 3l8 4v5c0 5.25-3.5 10.15-8 11.5C7.5 22.15 4 17.25 4 12V7l8-4z" />
             </svg>
           </div>
 
           <div className="min-w-0">
-            <p className="text-[10px] font-bold uppercase tracking-widest text-slate-500 leading-none mb-0.5">
+            <p className="text-[10px] font-bold uppercase tracking-widest leading-none mb-0.5" style={{ color: '#94A3B8' }}>
               Alcaldía de Simacota — Módulo Interno
             </p>
-            <p
-              className="text-slate-100 text-sm font-black tracking-tight leading-none truncate"
-              style={{ fontFamily: 'var(--font-manrope)' }}
-            >
+            <p className="text-sm font-black tracking-tight leading-none truncate" style={{ fontFamily: 'var(--font-manrope)', color: '#1F2933' }}>
               Ventanilla de Recepción Física
             </p>
           </div>
 
-          {/* Badge "USO INTERNO" */}
-          <div className="ml-auto flex items-center gap-2 px-3 py-1.5 rounded-full border border-indigo-500/25 bg-indigo-500/10 shrink-0">
-            <span className="w-1.5 h-1.5 rounded-full bg-indigo-400" />
-            <span className="text-[10px] font-bold uppercase tracking-widest text-indigo-300 hidden sm:block">
+          {/* Badge */}
+          <div className="ml-auto flex items-center gap-2 px-3 py-1.5 rounded-full shrink-0"
+               style={{ border: '1px solid #D9E2D9', background: '#EEF4EE' }}>
+            <span className="w-1.5 h-1.5 rounded-full bg-green-500" />
+            <span className="text-[10px] font-bold uppercase tracking-widest hidden sm:block" style={{ color: '#14532D' }}>
               Uso Interno
             </span>
           </div>
@@ -774,10 +748,7 @@ export default function RecepcionFisica() {
 
         {/* ── Pantalla de confirmación ── */}
         {estado === 'confirmacion' ? (
-          <div
-            className="rounded-2xl border border-l-4 border-white/10 border-l-indigo-500"
-            style={{ background: 'rgba(15,23,42,0.40)', backdropFilter: 'blur(25px)' }}
-          >
+          <div className="rounded-2xl bg-white" style={{ border: '1px solid #D9E2D9', borderLeft: '4px solid #14532D', boxShadow: '0 1px 3px rgba(20,83,45,0.06)' }}>
             <PantallaConfirmacion
               radicadoId={radicadoId}
               totalArchivos={archivos.length}
@@ -803,43 +774,42 @@ export default function RecepcionFisica() {
               className="mb-8 field-animate"
               style={{ animationDelay: '0ms' }}
             >
-              <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full border border-indigo-500/20 bg-indigo-500/08 mb-4">
-                <svg viewBox="0 0 24 24" fill="none" stroke="#6366F1" strokeWidth={1.5} className="w-3.5 h-3.5">
+              <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full mb-4"
+                   style={{ border: '1px solid #D9E2D9', background: '#EEF4EE' }}>
+                <svg viewBox="0 0 24 24" fill="none" stroke="#14532D" strokeWidth={1.5} className="w-3.5 h-3.5">
                   <path strokeLinecap="round" strokeLinejoin="round" d="M7.5 7.5h-.75A2.25 2.25 0 004.5 9.75v7.5a2.25 2.25 0 002.25 2.25h7.5a2.25 2.25 0 002.25-2.25v-7.5a2.25 2.25 0 00-2.25-2.25h-.75m0-3l-3-3m0 0l-3 3m3-3v11.25m6-2.25h.75a2.25 2.25 0 012.25 2.25v7.5a2.25 2.25 0 01-2.25 2.25h-7.5a2.25 2.25 0 01-2.25-2.25v-.75" />
                 </svg>
-                <span className="text-[10px] font-bold uppercase tracking-widest text-indigo-400">
+                <span className="text-[10px] font-bold uppercase tracking-widest" style={{ color: '#14532D' }}>
                   Digitalización de documento físico
                 </span>
               </div>
-              <h1
-                className="text-2xl sm:text-3xl font-black tracking-tighter text-slate-50 mb-2"
-                style={{ fontFamily: 'var(--font-manrope)' }}
-              >
+              <h1 className="text-2xl sm:text-3xl font-black tracking-tighter mb-2"
+                  style={{ fontFamily: 'var(--font-manrope)', color: '#1F2933' }}>
                 Nueva Radicación Física
               </h1>
-              <p className="text-slate-500 text-sm">
+              <p className="text-sm" style={{ color: '#667085' }}>
                 Transcribe los datos del ciudadano y adjunta los documentos escaneados o fotografiados.
               </p>
             </div>
 
             {/* ── Grid dos columnas ── */}
-            <div
-              className="rounded-2xl border-l-4 border-indigo-500"
-              style={{ background: 'rgba(15,23,42,0.40)', backdropFilter: 'blur(25px)', border: '1px solid rgba(255,255,255,0.08)', borderLeftWidth: '4px', borderLeftColor: '#6366F1' }}
-            >
-              <div className="grid lg:grid-cols-[3fr_2fr] divide-y lg:divide-y-0 lg:divide-x divide-white/[0.06]">
+            <div className="rounded-2xl bg-white"
+                 style={{ border: '1px solid #D9E2D9', borderLeft: '4px solid #14532D', boxShadow: '0 1px 3px rgba(20,83,45,0.06)' }}>
+              <div className="grid lg:grid-cols-[3fr_2fr] divide-y lg:divide-y-0 lg:divide-x"
+                   style={{ '--tw-divide-opacity': '1', borderColor: '#D9E2D9' } as React.CSSProperties}>
 
                 {/* ════════════════════════════════════
                     COLUMNA IZQUIERDA — Datos ciudadano
                 ════════════════════════════════════ */}
                 <div className="p-6 sm:p-8 space-y-6">
-                  <p className="text-[10px] font-bold uppercase tracking-widest text-indigo-400 pb-2 border-b border-white/[0.06]">
+                  <p className="text-[10px] font-bold uppercase tracking-widest pb-2"
+                     style={{ color: '#14532D', borderBottom: '1px solid #D9E2D9' }}>
                     Datos del ciudadano
                   </p>
 
                   {/* Nombre */}
                   <div className="field-animate" style={{ animationDelay: `${STAGGER[1]}ms` }}>
-                    <label htmlFor="nombre" className="block text-xs font-bold uppercase tracking-widest text-slate-400 mb-2">
+                    <label htmlFor="nombre" className="block text-xs font-bold uppercase tracking-widest mb-2" style={{ color: '#667085' }}>
                       Nombre completo *
                     </label>
                     <input
@@ -866,7 +836,7 @@ export default function RecepcionFisica() {
                   <div className="grid sm:grid-cols-2 gap-6 field-animate" style={{ animationDelay: `${STAGGER[2]}ms` }}>
                     {/* Cédula */}
                     <div>
-                      <label htmlFor="cedula" className="block text-xs font-bold uppercase tracking-widest text-slate-400 mb-2">
+                      <label htmlFor="cedula" className="block text-xs font-bold uppercase tracking-widest mb-2" style={{ color: '#667085' }} >
                         Cédula / Documento *
                       </label>
                       <input
@@ -892,7 +862,7 @@ export default function RecepcionFisica() {
 
                     {/* Email (opcional) */}
                     <div>
-                      <label htmlFor="email" className="block text-xs font-bold uppercase tracking-widest text-slate-400 mb-2">
+                      <label htmlFor="email" className="block text-xs font-bold uppercase tracking-widest mb-2" style={{ color: '#667085' }}>
                         Correo electrónico{' '}
                         <span className="text-slate-600 normal-case font-normal tracking-normal">(opcional)</span>
                       </label>
@@ -919,26 +889,26 @@ export default function RecepcionFisica() {
 
                   {/* Teléfono con prefijo +57 */}
                   <div className="field-animate" style={{ animationDelay: `${STAGGER[3]}ms` }}>
-                    <label htmlFor="telefono" className="block text-xs font-bold uppercase tracking-widest text-slate-400 mb-2">
+                    <label htmlFor="telefono" className="block text-xs font-bold uppercase tracking-widest mb-2" style={{ color: '#667085' }}>
                       Teléfono WhatsApp *
                     </label>
                     <div
-                      className={`flex rounded-xl overflow-hidden transition-all duration-300
-                        ${touched.telefono && errors.telefono
-                          ? 'ring-1 ring-rose-500/60 border border-rose-500'
-                          : 'border border-white/10 focus-within:border-indigo-500 focus-within:ring-1 focus-within:ring-indigo-500/50'
-                        }`}
-                      style={{ background: 'rgba(30,41,59,0.50)' }}
+                      className="flex rounded-xl overflow-hidden transition-all duration-200"
+                      style={touched.telefono && errors.telefono
+                        ? { border: '1px solid #F87171', background: '#ffffff' }
+                        : { border: '1px solid #D9E2D9', background: '#ffffff' }}
                     >
                       {/* Prefijo +57 */}
-                      <span className="px-3 flex items-center text-slate-400 text-sm bg-white/[0.03] border-r border-white/[0.08] select-none font-mono shrink-0">
+                      <span className="px-3 flex items-center text-sm select-none font-mono shrink-0"
+                            style={{ color: '#94A3B8', background: '#F8FAF7', borderRight: '1px solid #D9E2D9' }}>
                         +57
                       </span>
                       <input
                         id="telefono"
                         type="tel"
                         inputMode="numeric"
-                        className="flex-1 bg-transparent px-4 py-3 text-slate-50 text-sm placeholder:text-slate-500 outline-none"
+                        className="flex-1 bg-transparent px-4 py-3 text-sm placeholder:text-[#94A3B8] outline-none"
+                        style={{ color: '#1F2933' }}
                         placeholder="310 000 0000"
                         value={form.telefono}
                         onChange={(e) => {
@@ -1001,9 +971,10 @@ export default function RecepcionFisica() {
                     <textarea
                       id="notasInternas"
                       rows={3}
-                      className="w-full bg-amber-500/[0.04] border border-amber-500/20 rounded-xl px-4 py-3 text-slate-300 text-sm
-                        placeholder:text-slate-600 focus:border-amber-500/50 focus:ring-1 focus:ring-amber-500/30
-                        transition-all duration-300 outline-none resize-none"
+                      className="w-full rounded-xl px-4 py-3 text-sm placeholder:text-[#94A3B8] outline-none resize-none transition-all duration-200"
+                      style={{ border: '1px solid #FDE68A', background: '#FFFBEB', color: '#1F2933' }}
+                      onFocus={(e) => { e.currentTarget.style.borderColor = '#D97706'; e.currentTarget.style.boxShadow = '0 0 0 2px rgba(217,119,6,0.15)'; }}
+                      onBlur={(e)  => { e.currentTarget.style.borderColor = '#FDE68A'; e.currentTarget.style.boxShadow = 'none'; }}
                       placeholder="Observaciones que solo verá el equipo interno. No se comparte con el ciudadano."
                       value={form.notasInternas}
                       onChange={(e) => handleChange('notasInternas', e.target.value.slice(0, 500))}
@@ -1022,9 +993,10 @@ export default function RecepcionFisica() {
                     COLUMNA DERECHA — Zona de archivos
                 ════════════════════════════════════ */}
                 <div className="p-6 sm:p-8 space-y-5">
-                  <p className="text-[10px] font-bold uppercase tracking-widest text-indigo-400 pb-2 border-b border-white/[0.06] flex items-center justify-between">
+                  <p className="text-[10px] font-bold uppercase tracking-widest pb-2 flex items-center justify-between"
+                     style={{ color: '#14532D', borderBottom: '1px solid #D9E2D9' }}>
                     <span>Documentos escaneados *</span>
-                    <span className="text-slate-600 normal-case font-normal tracking-normal text-[10px]">Mín. 1 requerido</span>
+                    <span className="normal-case font-normal tracking-normal" style={{ color: '#94A3B8' }}>Mín. 1 requerido</span>
                   </p>
 
                   {/* ── Zona Drag & Drop ── */}
@@ -1043,13 +1015,13 @@ export default function RecepcionFisica() {
                       className={[
                         'relative border-2 border-dashed rounded-xl p-8 text-center cursor-pointer',
                         'transition-all duration-300 min-h-[180px] flex flex-col items-center justify-center gap-4',
-                        isDragging
-                          ? 'border-indigo-500 bg-indigo-500/10 scale-[1.01]'
-                          : errorSinArch
-                          ? 'border-rose-500/60 bg-rose-500/05 hover:border-rose-500/80'
-                          : 'border-white/20 hover:border-indigo-500/50 hover:bg-white/[0.01]',
                         isEnviando ? 'pointer-events-none opacity-50' : '',
                       ].join(' ')}
+                      style={isDragging
+                        ? { borderColor: '#14532D', background: '#EEF4EE', transform: 'scale(1.01)' }
+                        : errorSinArch
+                          ? { borderColor: '#F87171', background: '#FEF2F2' }
+                          : { borderColor: '#D9E2D9', background: '#F8FAF7' }}
                     >
                       <input
                         ref={fileInputRef}
@@ -1064,13 +1036,12 @@ export default function RecepcionFisica() {
 
                       {/* Ícono central */}
                       <div
-                        className={`w-14 h-14 rounded-2xl flex items-center justify-center transition-colors duration-300 ${
-                          isDragging
-                            ? 'bg-indigo-500/25 text-indigo-400'
-                            : errorSinArch
-                            ? 'bg-rose-500/15 text-rose-400'
-                            : 'bg-white/[0.05] text-slate-500'
-                        }`}
+                        className="w-14 h-14 rounded-2xl flex items-center justify-center transition-colors duration-300"
+                        style={isDragging
+                          ? { background: '#EEF4EE', color: '#14532D' }
+                          : errorSinArch
+                            ? { background: '#FEE2E2', color: '#DC2626' }
+                            : { background: '#EEF4EE', color: '#94A3B8' }}
                       >
                         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.5} className="w-7 h-7">
                           <path strokeLinecap="round" strokeLinejoin="round" d="M7.5 7.5h-.75A2.25 2.25 0 004.5 9.75v7.5a2.25 2.25 0 002.25 2.25h7.5a2.25 2.25 0 002.25-2.25v-7.5a2.25 2.25 0 00-2.25-2.25h-.75m-6 3.75l3 3m0 0l3-3m-3 3V1.5m6 9h.75a2.25 2.25 0 012.25 2.25v7.5a2.25 2.25 0 01-2.25 2.25h-7.5a2.25 2.25 0 01-2.25-2.25v-.75" />
@@ -1078,15 +1049,15 @@ export default function RecepcionFisica() {
                       </div>
 
                       <div className="pointer-events-none">
-                        <p className="text-sm font-medium text-slate-300">
+                        <p className="text-sm font-medium" style={{ color: '#1F2933' }}>
                           {isDragging ? 'Suelta aquí los documentos' : (
                             <>
                               Arrastre los documentos escaneados aquí o{' '}
-                              <span className="text-indigo-400 underline underline-offset-2">haga clic para seleccionar</span>
+                              <span className="underline underline-offset-2" style={{ color: '#14532D' }}>haga clic para seleccionar</span>
                             </>
                           )}
                         </p>
-                        <p className="text-xs text-slate-600 mt-1.5">
+                        <p className="text-xs mt-1.5" style={{ color: '#94A3B8' }}>
                           PDF, JPG, PNG, WEBP — Máx. 10 MB por archivo · 50 MB total
                         </p>
                       </div>
@@ -1162,39 +1133,37 @@ export default function RecepcionFisica() {
               </div>
 
               {/* ── Botón submit (barra inferior de la tarjeta) ── */}
-              <div className="px-6 sm:px-8 pb-6 sm:pb-8 pt-4 border-t border-white/[0.06] space-y-3">
+              <div className="px-6 sm:px-8 pb-6 sm:pb-8 pt-4 space-y-3" style={{ borderTop: '1px solid #D9E2D9' }}>
                 {/* Barra de progreso — visible solo mientras se envía */}
                 {isEnviando && (
-                  <div className="rounded-xl border border-white/10 p-4 bg-slate-800/40">
+                  <div className="rounded-xl p-4 bg-white" style={{ border: '1px solid #D9E2D9' }}>
                     <div className="flex items-center justify-between mb-1.5">
-                      <span className="text-xs text-slate-400">{progresoMensaje}</span>
-                      <span className="text-xs font-bold tabular-nums text-indigo-400">{progresoPct}%</span>
+                      <span className="text-xs" style={{ color: '#667085' }}>{progresoMensaje}</span>
+                      <span className="text-xs font-bold tabular-nums" style={{ color: '#14532D' }}>{progresoPct}%</span>
                     </div>
-                    <div className="h-2 bg-slate-800/50 rounded-full overflow-hidden mb-3">
-                      <div
-                        className="h-full bg-indigo-500 rounded-full transition-all duration-500"
-                        style={{ width: `${progresoPct}%` }}
-                      />
+                    <div className="h-2 rounded-full overflow-hidden mb-3" style={{ background: '#EEF4EE' }}>
+                      <div className="h-full rounded-full transition-all duration-500"
+                           style={{ width: `${progresoPct}%`, background: '#14532D' }} />
                     </div>
                     {progresosArchivos.length > 0 && (
                       <ul className="space-y-1.5">
                         {progresosArchivos.map((p, i) => (
-                          <li key={i} className="flex items-center gap-2 text-xs text-slate-500">
+                          <li key={i} className="flex items-center gap-2 text-xs" style={{ color: '#667085' }}>
                             {p.estado === 'completado' ? (
-                              <svg viewBox="0 0 24 24" fill="none" stroke="#10B981" strokeWidth={2.5} className="w-3.5 h-3.5 shrink-0">
+                              <svg viewBox="0 0 24 24" fill="none" stroke="#16A34A" strokeWidth={2.5} className="w-3.5 h-3.5 shrink-0">
                                 <path strokeLinecap="round" strokeLinejoin="round" d="M4.5 12.75l6 6 9-13.5" />
                               </svg>
                             ) : p.estado === 'error' ? (
-                              <svg viewBox="0 0 24 24" fill="none" stroke="#F43F5E" strokeWidth={2} className="w-3.5 h-3.5 shrink-0">
+                              <svg viewBox="0 0 24 24" fill="none" stroke="#DC2626" strokeWidth={2} className="w-3.5 h-3.5 shrink-0">
                                 <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
                               </svg>
                             ) : (
-                              <svg viewBox="0 0 24 24" fill="none" stroke="#6366F1" strokeWidth={2} className="w-3.5 h-3.5 shrink-0 animate-spin-smooth">
+                              <svg viewBox="0 0 24 24" fill="none" stroke="#14532D" strokeWidth={2} className="w-3.5 h-3.5 shrink-0 animate-spin-smooth">
                                 <path strokeLinecap="round" strokeLinejoin="round" d="M16.023 9.348h4.992v-.001M2.985 19.644v-4.992m0 0h4.992m-4.993 0l3.181 3.183a8.25 8.25 0 0013.803-3.7M4.031 9.865a8.25 8.25 0 0113.803-3.7l3.181 3.182m0-4.991v4.99" />
                               </svg>
                             )}
                             <span className="truncate max-w-[200px]">{p.archivo}</span>
-                            <span className="ml-auto tabular-nums text-slate-600">{p.porcentaje}%</span>
+                            <span className="ml-auto tabular-nums" style={{ color: '#94A3B8' }}>{p.porcentaje}%</span>
                           </li>
                         ))}
                       </ul>
@@ -1206,11 +1175,11 @@ export default function RecepcionFisica() {
                   type="submit"
                   disabled={isEnviando}
                   className="w-full py-4 px-6 rounded-xl font-bold text-sm uppercase tracking-wider text-white
-                    bg-gradient-to-r from-indigo-600 to-indigo-500
-                    hover:from-indigo-500 hover:to-indigo-400
-                    hover:shadow-lg hover:shadow-indigo-500/25
-                    disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:shadow-none
-                    transition-all duration-300 flex items-center justify-center gap-2.5"
+                    disabled:opacity-50 disabled:cursor-not-allowed
+                    transition-all duration-200 flex items-center justify-center gap-2.5 active:scale-[0.98]"
+                  style={{ background: '#14532D' }}
+                  onMouseEnter={(e) => { if (!isEnviando) (e.currentTarget as HTMLElement).style.background = '#166534'; }}
+                  onMouseLeave={(e) => { (e.currentTarget as HTMLElement).style.background = '#14532D'; }}
                 >
                   {isEnviando ? (
                     <>
@@ -1235,8 +1204,8 @@ export default function RecepcionFisica() {
       </div>
 
       {/* ── Footer ── */}
-      <footer className="border-t border-white/[0.04] py-5 mt-8 text-center">
-        <p className="text-[10px] font-bold uppercase tracking-widest text-slate-700">
+      <footer className="py-5 mt-8 text-center" style={{ borderTop: '1px solid #D9E2D9' }}>
+        <p className="text-[10px] font-bold uppercase tracking-widest" style={{ color: '#94A3B8' }}>
           Módulo Interno · Alcaldía de Simacota · Uso exclusivo funcionarios
         </p>
       </footer>

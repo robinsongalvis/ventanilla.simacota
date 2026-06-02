@@ -131,7 +131,10 @@ export function ComprobanteRadicado({
       {/* Botón visible solo en pantalla */}
       <button
         onClick={handleImprimir}
-        className="flex items-center gap-2 rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700 print:hidden"
+        className="flex items-center gap-2 rounded-lg px-4 py-2 text-sm font-bold text-white transition-all active:scale-95 print:hidden"
+        style={{ background: '#14532D' }}
+        onMouseEnter={(e) => { (e.currentTarget as HTMLElement).style.background = '#166534'; }}
+        onMouseLeave={(e) => { (e.currentTarget as HTMLElement).style.background = '#14532D'; }}
       >
         <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
@@ -146,20 +149,20 @@ export function ComprobanteRadicado({
         className="w-full max-w-md rounded-lg border border-gray-300 bg-white p-5 font-mono text-xs text-gray-800"
       >
         {/* Encabezado */}
-        <div className="mb-4 border-b border-dashed border-gray-400 pb-3 text-center">
-          <p className="text-[10px] font-semibold uppercase tracking-widest text-gray-500">
+        <div className="mb-4 border-b border-dashed border-gray-300 pb-3 text-center">
+          <p className="text-[10px] font-bold uppercase tracking-widest" style={{ color: '#14532D' }}>
             Alcaldía Municipal de Simacota
           </p>
-          <p className="text-[10px] text-gray-400">Ventanilla Única de Atención al Ciudadano</p>
+          <p className="text-[10px] text-gray-500">Ventanilla Única de Atención al Ciudadano</p>
           <p className="mt-2 text-[11px] font-bold uppercase tracking-wider text-gray-700">
             Comprobante de Radicación
           </p>
         </div>
 
         {/* Número de radicado destacado */}
-        <div className="mb-4 rounded border border-gray-800 bg-gray-50 px-3 py-2 text-center">
-          <p className="text-[9px] uppercase tracking-widest text-gray-500">N.° de Radicado</p>
-          <p className="text-lg font-bold tracking-widest text-gray-900">{radicadoId}</p>
+        <div className="mb-4 rounded-lg px-3 py-2 text-center" style={{ background: '#EEF4EE', border: '1px solid #D9E2D9' }}>
+          <p className="text-[9px] uppercase tracking-widest" style={{ color: '#667085' }}>N.° de Radicado</p>
+          <p className="text-lg font-bold tracking-widest" style={{ color: '#14532D' }}>{radicadoId}</p>
         </div>
 
         {/* Datos del radicado */}
