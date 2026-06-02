@@ -37,7 +37,7 @@ export async function GET(request: Request): Promise<NextResponse> {
 
   try {
     const db = getFirebaseAdminDb();
-    let q = db.collection('plantillas_respuesta')
+    const q = db.collection('plantillas_respuesta')
       .where('tenantId', '==', usuario.tenantId)
       .where('estado', '==', 'activa')
       .limit(50);
@@ -72,7 +72,9 @@ export async function POST(request: Request): Promise<NextResponse> {
   }
 
   // Crear plantilla nueva
-  const { accion: _, ...docData } = body;
+  const docData = Object.fromEntries(
+    Object.entries(body).filter(([key]) => key !== 'accion'),
+  ) as Partial<ResponseTemplate>;
   if (!docData.nombre || !docData.contenido) {
     return NextResponse.json({ error: 'Campos requeridos: nombre, contenido.' }, { status: 400 });
   }

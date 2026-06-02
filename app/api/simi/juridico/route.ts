@@ -15,7 +15,7 @@ import { checkRateLimit, getClientIp, rateLimitHeaders } from '@/lib/ai/rate-lim
 import { callGeminiJuridico }        from '@/lib/simi-juridico/callGemini';
 import { createAuditLog }            from '@/lib/simi-juridico/createAuditLog';
 import { generateWithRagContext }    from '@/lib/simi-juridico/generateWithRagContext';
-import { createApprovalFlow, determinarEstadoInicial } from '@/lib/simi-juridico/createApprovalFlow';
+import { createApprovalFlow }            from '@/lib/simi-juridico/createApprovalFlow';
 import type { ApprovalFlowResult }   from '@/src/types/simi-approval';
 import type { RagSource }            from '@/src/types/simi-rag';
 import {

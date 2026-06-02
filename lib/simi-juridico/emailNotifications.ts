@@ -10,7 +10,6 @@ import { enviarEmail } from '@/lib/email/mailer';
 import type { ApprovalStatus } from '@/src/types/simi-approval';
 
 const BASE_URL = process.env.NEXT_PUBLIC_APP_URL ?? 'https://ventanilla.simacota.gov.co';
-const FROM_NAME = 'Ventanilla Única — Alcaldía de Simacota';
 
 /* ── Templates HTML minimalistas ──────────────────────────── */
 
@@ -47,10 +46,6 @@ function row(label: string, value: string): string {
     <td style="padding:4px 0;font-size:12px;color:#667085;white-space:nowrap;padding-right:16px;">${label}:</td>
     <td style="padding:4px 0;font-size:12px;color:#1F2933;font-weight:600;">${value}</td>
   </tr>`;
-}
-
-function pill(texto: string, color: string, bg: string): string {
-  return `<span style="display:inline-block;padding:3px 10px;border-radius:999px;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:0.05em;color:${color};background:${bg};">${texto}</span>`;
 }
 
 function btnVerde(href: string, texto: string): string {

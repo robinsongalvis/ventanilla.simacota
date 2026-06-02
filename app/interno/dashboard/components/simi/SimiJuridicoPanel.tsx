@@ -17,18 +17,15 @@ import type {
   SimiAnalisisJuridico,
   SimiRevisionBorrador,
   SimiLenguajeClaro,
-  NivelRiesgoJuridico,
   ChecklistMipg,
   NormativaSugerida,
 } from '@/src/types/simi-juridico';
-import { LegalRiskBadge, RevisionJuridicaBanner, NormaEstadoBadge } from './LegalRiskBadge';
+import { LegalRiskBadge, RevisionJuridicaBanner } from './LegalRiskBadge';
 import { MipgChecklistCard } from './MipgChecklistCard';
 import { NormativeSourcesCard } from './NormativeSourcesCard';
 import { RagSourcesPanel } from './RagSourcesPanel';
-import { ApprovalFlowCard } from './ApprovalFlowCard';
 import type { RagSource } from '@/src/types/simi-rag';
 import type { ApprovalFlowResult } from '@/src/types/simi-approval';
-import type { ApprovalFlow } from '@/src/types/simi-approval';
 
 /* ══════════════════════════════════════════════════════════════
    MODOS DISPONIBLES
@@ -316,7 +313,6 @@ function LenguajeClaroView({ resultado, onAdoptar }: { resultado: SimiLenguajeCl
 
 export function SimiJuridicoPanel({
   radicado,
-  usuario,
   onAdoptarRespuesta,
 }: SimiJuridicoPanelProps) {
   const [modoActivo, setModoActivo]       = useState<SimiModoJuridico | null>(null);

@@ -3,10 +3,30 @@
 interface SessionResponse {
   refreshRequired?: boolean;
   error?: string;
+  uid?: string;
+  email?: string | null;
+  rol?: string;
+  tenantId?: string;
 }
 
-export async function createInternalSession(idToken: string, retryWithFreshToken?: () => Promise<string>) {
-  const response = await fetch('/api/auth/session', {
+const SESSION_TIMEOUT_MS = 15_000;
+
+async function fetchWithTimeout(input: RequestInfo | URL, init: RequestInit): Promise<Response> {
+  const controller = new AbortController();
+  const timer = window.setTimeout(() => controller.abort(), SESSION_TIMEOUT_MS);
+
+  try {
+    return await fetch(input, { ...init, signal: controller.signal });
+  } finally {
+    window.clearTimeout(timer);
+  }
+}
+
+export async function createInternalSession(
+  idToken: string,
+  retryWithFreshToken?: () => Promise<string>,
+): Promise<SessionResponse> {
+  const response = await fetchWithTimeout('/api/auth/session', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ idToken }),
@@ -17,10 +37,13 @@ export async function createInternalSession(idToken: string, retryWithFreshToken
     return createInternalSession(freshToken);
   }
 
+  const data = await response.json().catch(() => null) as SessionResponse | null;
+
   if (!response.ok) {
-    const data = await response.json().catch(() => null) as SessionResponse | null;
     throw new Error(data?.error ?? 'No fue posible crear la sesion interna.');
   }
+
+  return data ?? {};
 }
 
 export async function clearInternalSession() {

@@ -22,7 +22,7 @@ function LoginFormFallback() {
 
 export default function LoginInternoPage() {
   return (
-    <main className="min-h-screen bg-obsidian-gradient flex items-center justify-center p-4">
+    <main className="min-h-dvh bg-obsidian-gradient flex items-center justify-center overflow-y-auto px-4 py-6 sm:p-4">
       <div className="w-full max-w-md">
         <div className="text-center mb-8">
           <InstitucionalHeader align="center" subtitle="Acceso Funcionarios · Ventanilla Única Digital" />

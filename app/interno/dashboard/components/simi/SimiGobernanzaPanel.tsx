@@ -108,7 +108,7 @@ export function SimiGobernanzaPanel({ usuario }: SimiGobernanzaPanelProps) {
                 información pública, reserva legal, visita técnica, queja, reclamo y trámite en curso.
               </p>
               <p className="text-[10px] mt-3 font-semibold" style={{ color: '#D4A017' }}>
-                Haga clic en "Cargar plantillas base" para inicializar el normograma de plantillas de su dependencia.
+                Haga clic en Cargar plantillas base para inicializar el normograma de plantillas de su dependencia.
               </p>
             </div>
           </div>

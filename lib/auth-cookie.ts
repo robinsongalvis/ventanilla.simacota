@@ -7,7 +7,7 @@ export const SESSION_EXPIRES_IN_MS = 60 * 60 * 24 * 5 * 1000;
 export function sessionCookieOptions(maxAgeSeconds: number): Partial<ResponseCookie> {
   return {
     httpOnly: true,
-    secure: true,
+    secure: process.env.NODE_ENV === 'production',
     sameSite: 'strict',
     path: '/',
     maxAge: maxAgeSeconds,
@@ -17,7 +17,7 @@ export function sessionCookieOptions(maxAgeSeconds: number): Partial<ResponseCoo
 export function clearSessionCookieOptions(): Partial<ResponseCookie> {
   return {
     httpOnly: true,
-    secure: true,
+    secure: process.env.NODE_ENV === 'production',
     sameSite: 'strict',
     path: '/',
     maxAge: 0,

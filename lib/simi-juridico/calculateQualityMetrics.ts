@@ -24,10 +24,6 @@ export async function calculateQualityMetrics(tenantId: string): Promise<Quality
   const db = getFirebaseAdminDb();
 
   // Obtener auditorías del tenant (últimos 90 días)
-  const hace90 = new Date();
-  hace90.setDate(hace90.getDate() - 90);
-  const desde = hace90.toISOString();
-
   const [auditSnap, approvalSnap] = await Promise.all([
     db.collection('simi_juridico_auditoria')
       .where('rol', '!=', 'system')
