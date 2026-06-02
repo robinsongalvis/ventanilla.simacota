@@ -33,6 +33,7 @@ import { SemaforoTermino, calcularSemaforo } from '@/app/interno/dashboard/compo
 import { VistaAdministracion }                from '@/app/interno/dashboard/components/admin/VistaAdministracion';
 import { PanelSimi }                         from '@/app/interno/dashboard/components/simi/PanelSimi';
 import { PqrsdDeadlineDashboard }            from '@/app/interno/dashboard/components/simi/PqrsdDeadlineDashboard';
+import { SimiGobernanzaPanel }              from '@/app/interno/dashboard/components/simi/SimiGobernanzaPanel';
 import { InstitucionalHeader }               from '@/app/components/institucional/InstitucionalHeader';
 import { SelloRadicado }                     from '@/app/components/institucional/SelloRadicado';
 import { useFuncionariosTenant }              from '@/lib/hooks/useFuncionariosTenant';
@@ -2739,7 +2740,14 @@ function DashboardInterior({ usuario, cerrarSesion }: { usuario: UsuarioAutentic
             <VistaAnticipacionOperativa radicados={todosLosRadicados} />
           </div>
         ) : vistaActual === 'ADMINISTRACION' ? (
-          <VistaAdministracion />
+          <div className="flex-1 flex overflow-hidden min-h-0">
+            <div className="flex-1 overflow-hidden min-h-0"><VistaAdministracion /></div>
+            {esAdmin && (
+              <div className="hidden xl:flex flex-col w-[420px] shrink-0 border-l" style={{ borderColor: '#D9E2D9' }}>
+                <SimiGobernanzaPanel usuario={usuario} />
+              </div>
+            )}
+          </div>
         ) : (
           <>
             {/* Dashboard PQRSD compacto — vencimientos y riesgo */}

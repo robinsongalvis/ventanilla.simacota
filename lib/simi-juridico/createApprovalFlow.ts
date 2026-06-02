@@ -7,6 +7,7 @@
 
 import { getFirebaseAdminDb } from '@/lib/firebase-admin';
 import type { ApprovalFlow, ApprovalRules, ApprovalStatus, ApprovalFlowResult } from '@/src/types/simi-approval';
+import { notificarCambioAprobacion } from './createNotification';
 
 /**
  * Determinar el estado inicial según reglas de riesgo.
@@ -126,6 +127,18 @@ export async function createApprovalFlow(params: {
     listo_para_envio:              'Listo para envío.',
     enviado:                       'Enviado.',
   };
+
+  // Notificar si el estado inicial requiere revisión
+  if (estado === 'pendiente_revision_jefe' || estado === 'pendiente_revision_juridica') {
+    void notificarCambioAprobacion({
+      approvalId:   ref.id,
+      radicadoId:   params.radicadoId,
+      tenantId:     params.tenantId,
+      estado,
+      creadoPor:    params.usuarioId,
+      radicadoDesc: `Radicado ${params.radicadoId}`,
+    });
+  }
 
   return {
     approvalId:               ref.id,
