@@ -473,10 +473,10 @@ function SidebarNav({
   }
 
   return (
-    <aside className={`h-full flex flex-col bg-[#0A0A0B] border-r border-white/[0.07] shrink-0 w-[210px] ${className}`}>
-      {/* Logo */}
-      <div className="px-4 py-3 border-b border-white/[0.07]">
-        <InstitucionalHeader variant="sidebar" subtitle="Panel Institucional" />
+    <aside className={`h-full flex flex-col bg-[#0A0A0B] border-r border-white/[0.07] shrink-0 w-[210px] overflow-hidden ${className}`}>
+      {/* Bloque institucional — logo arriba, texto debajo, todo dentro del sidebar */}
+      <div className="px-4 py-3 border-b border-white/[0.07] w-full overflow-hidden">
+        <InstitucionalHeader variant="sidebar" subtitle="Ventanilla Única Digital" />
       </div>
 
       {/* Radicación Rápida */}

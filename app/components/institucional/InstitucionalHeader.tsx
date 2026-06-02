@@ -36,23 +36,34 @@ export function InstitucionalHeader({
   const resolved: Variant = variant ?? (compact ? 'compact' : 'default');
   const centered = align === 'center';
 
-  /* ── SIDEBAR variant: logo fills the full width, no side text ── */
+  /* ── SIDEBAR variant: logo arriba, texto institucional debajo ── */
   if (resolved === 'sidebar') {
     return (
-      <div className={`flex flex-col gap-1.5 min-w-0 ${className}`}>
-        <div className="relative w-full h-9">
+      <div className={`flex flex-col gap-2 w-full min-w-0 overflow-hidden ${className}`}>
+        {/* Logo — ancho completo, altura fija para no empujar el layout */}
+        <div className="relative w-full h-8 shrink-0">
           <Image
             src={INSTITUCION.logo}
             alt={INSTITUCION.nombre}
             fill
             priority
-            sizes="170px"
+            sizes="178px"
             className="object-contain object-left"
           />
         </div>
-        <p className="text-[9px] font-bold uppercase tracking-[0.2em] text-slate-600 truncate">
-          {subtitle}
-        </p>
+        {/* Texto institucional apilado, todo dentro del sidebar */}
+        <div className="flex flex-col gap-0.5 min-w-0 w-full">
+          <p className="text-[9px] font-bold uppercase tracking-[0.18em] text-emerald-400/70 truncate">
+            {eyebrow}
+          </p>
+          <p className="text-[11px] font-black tracking-tight text-slate-200 leading-tight truncate"
+             style={{ fontFamily: 'var(--font-manrope)' }}>
+            {INSTITUCION.municipio}
+          </p>
+          <p className="text-[9px] text-slate-600 truncate">
+            {subtitle}
+          </p>
+        </div>
       </div>
     );
   }
