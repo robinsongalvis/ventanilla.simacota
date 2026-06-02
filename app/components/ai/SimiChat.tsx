@@ -463,22 +463,45 @@ export function SimiChat() {
   return (
     <div className="fixed bottom-6 right-6 z-50 font-sans">
 
-      {/* ── BOTÓN FLOTANTE ── */}
+      {/* ── BOTÓN FLOTANTE — institucional verde + badge dorado ── */}
       <button
         onClick={() => setIsOpen((p) => !p)}
         aria-label={isOpen ? 'Cerrar asistente SIMI' : 'Abrir asistente SIMI'}
         aria-expanded={isOpen}
         aria-controls="simi-chat-panel"
-        className={[
-          'w-14 h-14 rounded-full flex items-center justify-center cursor-pointer',
-          'transition-all duration-300 shadow-xl border focus:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500',
-          isOpen
-            ? 'bg-slate-900 border-white/10 hover:bg-slate-800 scale-95'
-            : 'bg-gradient-to-tr from-indigo-600 to-violet-500 hover:from-indigo-500 hover:to-violet-400 border-indigo-400/35 hover:shadow-indigo-500/30 scale-100 hover:scale-[1.05]',
-        ].join(' ')}
+        className="w-14 h-14 rounded-full flex items-center justify-center cursor-pointer focus:outline-none focus-visible:ring-2 focus-visible:ring-[#14532D] focus-visible:ring-offset-2"
+        style={{
+          background: isOpen ? '#1F2933' : '#14532D',
+          border: isOpen ? '1px solid rgba(255,255,255,0.10)' : '1px solid rgba(20,83,45,0.30)',
+          boxShadow: isOpen
+            ? '0 4px 14px rgba(0,0,0,0.35)'
+            : '0 6px 20px rgba(20,83,45,0.35)',
+          transform: isOpen ? 'scale(0.95)' : 'scale(1)',
+          transition: 'background 0.2s ease-out, transform 0.2s ease-out, box-shadow 0.2s ease-out',
+        }}
+        onMouseEnter={(e) => {
+          if (!isOpen) {
+            (e.currentTarget as HTMLElement).style.background = '#166534';
+            (e.currentTarget as HTMLElement).style.transform = 'scale(1.06) translateY(-2px)';
+            (e.currentTarget as HTMLElement).style.boxShadow = '0 10px 28px rgba(20,83,45,0.45)';
+          }
+        }}
+        onMouseLeave={(e) => {
+          (e.currentTarget as HTMLElement).style.background = isOpen ? '#1F2933' : '#14532D';
+          (e.currentTarget as HTMLElement).style.transform = isOpen ? 'scale(0.95)' : 'scale(1)';
+          (e.currentTarget as HTMLElement).style.boxShadow = isOpen
+            ? '0 4px 14px rgba(0,0,0,0.35)'
+            : '0 6px 20px rgba(20,83,45,0.35)';
+        }}
+        onMouseDown={(e) => {
+          (e.currentTarget as HTMLElement).style.transform = 'scale(0.93)';
+        }}
+        onMouseUp={(e) => {
+          (e.currentTarget as HTMLElement).style.transform = isOpen ? 'scale(0.95)' : 'scale(1)';
+        }}
       >
         {isOpen ? (
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} className="w-6 h-6 text-slate-100">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} className="w-6 h-6 text-white">
             <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
           </svg>
         ) : (
@@ -486,7 +509,9 @@ export function SimiChat() {
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} className="w-6 h-6 text-white">
               <path strokeLinecap="round" strokeLinejoin="round" d="M8.625 9.75a.375.375 0 11-.75 0 .375.375 0 01.75 0zm0 0H8.25m4.125 0a.375.375 0 11-.75 0 .375.375 0 01.75 0zm0 0H12m4.125 0a.375.375 0 11-.75 0 .375.375 0 01.75 0zm0 0h-.375M21 12c0 4.556-4.03 8.25-9 8.25a9.764 9.764 0 01-2.555-.337A5.972 5.972 0 015.41 20.97a5.969 5.969 0 01-.474-.065 4.48 4.48 0 00.978-2.025c.09-.457-.133-.901-.467-1.226C3.93 16.178 3 14.189 3 12c0-4.556 4.03-8.25 9-8.25s9 3.694 9 8.25z" />
             </svg>
-            <span className="absolute -top-1 -right-1 w-3.5 h-3.5 bg-emerald-500 rounded-full border-2 border-slate-900 animate-pulse" />
+            {/* Badge dorado — solo el punto pulsa, no el botón */}
+            <span className="absolute -top-1 -right-1 w-3.5 h-3.5 rounded-full border-2 border-white animate-pulse"
+                  style={{ background: '#D4A017' }} />
           </div>
         )}
       </button>

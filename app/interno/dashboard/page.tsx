@@ -485,8 +485,12 @@ function SidebarNav({
         <div className="px-3 pt-3 pb-2">
           <button
             onClick={onNuevoRadicado}
-            className="w-full flex items-center gap-2 px-3 py-2.5 rounded-xl text-xs font-bold transition-all duration-150 active:scale-95 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-1"
-            style={{ background: '#D4A017', color: '#14532D' }}
+            className="w-full flex items-center gap-2 px-3 py-2.5 rounded-xl text-xs font-bold focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-1"
+            style={{ background: '#D4A017', color: '#14532D', transition: 'filter 0.15s ease-out, transform 0.15s ease-out, box-shadow 0.15s ease-out', boxShadow: '0 2px 8px rgba(212,160,23,0.30)' }}
+            onMouseEnter={(e) => { (e.currentTarget as HTMLElement).style.filter = 'brightness(0.93)'; (e.currentTarget as HTMLElement).style.transform = 'translateY(-1px)'; (e.currentTarget as HTMLElement).style.boxShadow = '0 5px 14px rgba(212,160,23,0.40)'; }}
+            onMouseLeave={(e) => { (e.currentTarget as HTMLElement).style.filter = ''; (e.currentTarget as HTMLElement).style.transform = ''; (e.currentTarget as HTMLElement).style.boxShadow = '0 2px 8px rgba(212,160,23,0.30)'; }}
+            onMouseDown={(e) => { (e.currentTarget as HTMLElement).style.transform = 'scale(0.97)'; }}
+            onMouseUp={(e) => { (e.currentTarget as HTMLElement).style.transform = ''; }}
           >
             <svg className="w-3.5 h-3.5 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
               <path strokeLinecap="round" strokeLinejoin="round" d="M12 4v16m8-8H4" />
@@ -507,10 +511,11 @@ function SidebarNav({
             <button
               key={vista}
               onClick={() => onVistaChange(vista)}
-              className="w-full flex items-center gap-2.5 px-3 py-2.5 rounded-xl text-left transition-all duration-150 group focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset"
+              className="micro-sidebar-item w-full flex items-center gap-2.5 px-3 py-2.5 rounded-xl text-left group focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset"
               style={activo ? {
                 background: '#D4A017',
                 color: '#14532D',
+                boxShadow: '0 2px 8px rgba(212,160,23,0.30)',
               } : {
                 color: 'rgba(255,255,255,0.75)',
               }}
@@ -720,7 +725,7 @@ function TarjetasMIPG({
         {/* Tarjeta TODOS */}
         <button
           onClick={() => onFiltroChange('TODOS')}
-          className="shrink-0 flex flex-col items-start px-4 py-3 rounded-xl border-l-4 transition-all duration-200 cursor-pointer focus-visible:outline-none"
+          className="micro-card shrink-0 flex flex-col items-start px-4 py-3 rounded-xl border-l-4 cursor-pointer focus-visible:outline-none"
           style={{
             background: filtroActivo === 'TODOS' ? '#EEF4EE' : '#F8FAF7',
             border: `1px solid ${filtroActivo === 'TODOS' ? '#14532D' : '#D9E2D9'}`,
@@ -740,7 +745,7 @@ function TarjetasMIPG({
             <button
               key={t.filtro}
               onClick={() => onFiltroChange(t.filtro)}
-              className="shrink-0 flex flex-col items-start px-4 py-3 rounded-xl transition-all duration-200 cursor-pointer focus-visible:outline-none hover:-translate-y-px"
+              className="micro-card shrink-0 flex flex-col items-start px-4 py-3 rounded-xl cursor-pointer focus-visible:outline-none"
               style={{
                 background: activo ? '#EEF4EE' : '#F8FAF7',
                 border: `1px solid ${activo ? '#14532D' : '#D9E2D9'}`,
@@ -800,7 +805,7 @@ function PanelOperacionDependencia({
     <section className="px-3 sm:px-4 py-3 shrink-0 bg-[#F8FAF7]" style={{ borderBottom: '1px solid #D9E2D9' }}>
       <div className="grid grid-cols-1 lg:grid-cols-[minmax(0,1.2fr)_minmax(0,1.8fr)] gap-3">
         {/* Panel bandeja */}
-        <div className="rounded-xl px-4 py-3 bg-white" style={{ border: '1px solid #D9E2D9', boxShadow: '0 1px 3px rgba(20,83,45,0.06)' }}>
+        <div className="micro-card-read rounded-xl px-4 py-3 bg-white" style={{ border: '1px solid #D9E2D9', boxShadow: '0 1px 3px rgba(20,83,45,0.06)' }}>
           <div className="flex items-start justify-between gap-3">
             <div className="min-w-0">
               <p className="text-[10px] font-black uppercase tracking-widest" style={{ color: '#667085' }}>
@@ -828,7 +833,7 @@ function PanelOperacionDependencia({
                 key={item.label}
                 type="button"
                 onClick={() => onFiltroChange(item.filtro)}
-                className="rounded-lg px-2 py-2 text-left transition-colors focus-visible:outline-none"
+                className="micro-card rounded-lg px-2 py-2 text-left focus-visible:outline-none"
                 style={{ border: '1px solid #D9E2D9', background: '#F8FAF7' }}
                 onMouseEnter={(e) => { (e.currentTarget as HTMLElement).style.background = '#EEF4EE'; }}
                 onMouseLeave={(e) => { (e.currentTarget as HTMLElement).style.background = '#F8FAF7'; }}
@@ -843,7 +848,7 @@ function PanelOperacionDependencia({
         </div>
 
         {/* Panel siguiente acción */}
-        <div className="rounded-xl px-4 py-3 bg-white" style={{ border: '1px solid #D9E2D9', boxShadow: '0 1px 3px rgba(20,83,45,0.06)' }}>
+        <div className="micro-card-read rounded-xl px-4 py-3 bg-white" style={{ border: '1px solid #D9E2D9', boxShadow: '0 1px 3px rgba(20,83,45,0.06)' }}>
           <div className="flex items-start justify-between gap-3">
             <div className="min-w-0">
               <p className="text-[10px] font-black uppercase tracking-widest" style={{ color: '#667085' }}>
@@ -863,10 +868,8 @@ function PanelOperacionDependencia({
               <button
                 type="button"
                 onClick={() => onSeleccionar(siguiente)}
-                className="shrink-0 rounded-lg px-3 py-2 text-xs font-bold text-white transition-colors focus-visible:outline-none"
+                className="micro-btn-primary shrink-0 rounded-lg px-3 py-2 text-xs font-bold text-white focus-visible:outline-none"
                 style={{ background: '#14532D' }}
-                onMouseEnter={(e) => { (e.currentTarget as HTMLElement).style.background = '#166534'; }}
-                onMouseLeave={(e) => { (e.currentTarget as HTMLElement).style.background = '#14532D'; }}
               >
                 Abrir
               </button>
@@ -951,24 +954,20 @@ function TablaRadicados({
             value={busqueda}
             onChange={(e) => onBusquedaChange(e.target.value)}
             placeholder="Buscar por radicado, nombre o documento…"
-            className="w-full rounded-lg pl-9 pr-3 py-2 text-sm outline-none transition-all duration-200"
+            className="micro-input w-full rounded-lg pl-9 pr-3 py-2 text-sm outline-none"
             style={{
               background: '#F8FAF7',
               border: '1px solid #D9E2D9',
               color: '#1F2933',
             }}
-            onFocus={(e) => { e.currentTarget.style.borderColor = '#14532D'; e.currentTarget.style.boxShadow = '0 0 0 3px rgba(20,83,45,0.15)'; }}
-            onBlur={(e)  => { e.currentTarget.style.borderColor = '#D9E2D9'; e.currentTarget.style.boxShadow = 'none'; }}
           />
         </div>
         <span className="text-xs shrink-0" style={{ color: '#94A3B8' }}>{radicados.length} resultado{radicados.length !== 1 ? 's' : ''}</span>
         {puedeRadicar && (
           <button
             onClick={onNuevoRadicado}
-            className="shrink-0 flex items-center gap-1.5 px-3 py-2 rounded-lg text-white text-xs font-bold transition-all duration-150 active:scale-95 focus-visible:outline-none"
+            className="micro-btn-primary shrink-0 flex items-center gap-1.5 px-3 py-2 rounded-lg text-white text-xs font-bold focus-visible:outline-none"
             style={{ background: '#14532D' }}
-            onMouseEnter={(e) => { (e.currentTarget as HTMLElement).style.background = '#166534'; }}
-            onMouseLeave={(e) => { (e.currentTarget as HTMLElement).style.background = '#14532D'; }}
           >
             <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
               <path strokeLinecap="round" strokeLinejoin="round" d="M12 4v16m8-8H4" />
@@ -1011,7 +1010,7 @@ function TablaRadicados({
               key={r.radicadoId}
               type="button"
               onClick={() => onSeleccionar(r)}
-              className="w-full text-left px-4 py-3 transition-colors"
+              className="micro-row w-full text-left px-4 py-3"
               style={{
                 borderBottom: '1px solid #EEF4EE',
                 borderLeft: seleccionado ? '3px solid #14532D' : undefined,
@@ -1080,14 +1079,12 @@ function TablaRadicados({
                 <tr
                   key={r.radicadoId}
                   onClick={() => onSeleccionar(r)}
-                  className="cursor-pointer transition-colors"
+                  className="micro-row cursor-pointer"
                   style={{
                     borderBottom: '1px solid #EEF4EE',
                     background: seleccionado ? '#EEF4EE' : undefined,
                     borderLeft: seleccionado ? '3px solid #14532D' : undefined,
                   }}
-                  onMouseEnter={(e) => { if (!seleccionado) (e.currentTarget as HTMLElement).style.background = '#F8FAF7'; }}
-                  onMouseLeave={(e) => { if (!seleccionado) (e.currentTarget as HTMLElement).style.background = ''; }}
                 >
                   <td className="px-4 py-3 whitespace-nowrap">
                     <div className="flex items-center gap-2">
@@ -1499,10 +1496,10 @@ function PanelDerecho({
         {TABS_PANEL.map((t) => (
           <button key={t.id}
             onClick={() => { setTab(t.id); setMensajeOk(null); setErrorLocal(null); }}
-            className="shrink-0 px-3 py-2.5 text-[11px] font-bold uppercase tracking-wider transition-colors whitespace-nowrap focus-visible:outline-none"
+            className="shrink-0 px-3 py-2.5 text-[11px] font-bold uppercase tracking-wider whitespace-nowrap focus-visible:outline-none"
             style={tab === t.id
-              ? { color: '#14532D', borderBottom: '2px solid #14532D' }
-              : { color: '#94A3B8' }}
+              ? { color: '#14532D', borderBottom: '2px solid #14532D', transition: 'color 0.15s ease-out, background 0.15s ease-out' }
+              : { color: '#94A3B8', transition: 'color 0.15s ease-out, background 0.15s ease-out' }}
             onMouseEnter={(e) => { if (tab !== t.id) { (e.currentTarget as HTMLElement).style.color = '#667085'; (e.currentTarget as HTMLElement).style.background = '#F8FAF7'; } }}
             onMouseLeave={(e) => { if (tab !== t.id) { (e.currentTarget as HTMLElement).style.color = '#94A3B8'; (e.currentTarget as HTMLElement).style.background = ''; } }}>
             {t.label}
@@ -2550,10 +2547,8 @@ function BandejaAsignacion({
               const ok         = exitoFila[r.radicadoId];
 
               return (
-                <tr key={r.radicadoId} className="transition-colors"
-                    style={{ borderBottom: '1px solid #EEF4EE', background: seleccionado ? '#EEF4EE' : undefined }}
-                    onMouseEnter={(e) => { if (!seleccionado) (e.currentTarget as HTMLElement).style.background = '#F8FAF7'; }}
-                    onMouseLeave={(e) => { if (!seleccionado) (e.currentTarget as HTMLElement).style.background = ''; }}>
+                <tr key={r.radicadoId} className="micro-row"
+                    style={{ borderBottom: '1px solid #EEF4EE', background: seleccionado ? '#EEF4EE' : undefined }}>
                   <td className="px-4 py-3">
                     <input type="checkbox" checked={seleccionado}
                       onChange={() => dispatch({ type: 'TOGGLE_SELECCION', radicadoId: r.radicadoId })}
