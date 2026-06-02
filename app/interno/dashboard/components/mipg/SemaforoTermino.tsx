@@ -1,25 +1,18 @@
 'use client';
 
 /**
- * SemaforoTermino — Componente reutilizable de semáforo MIPG
+ * SemaforoTermino — Semáforo MIPG de término legal
  *
- * Muestra el estado de cumplimiento de término legal de un radicado
- * con colores semafóricos y días restantes/vencidos.
+ * Variantes:
+ *   badge   → pill con dot + texto (por defecto)
+ *   compact → dot + texto sin pill
+ *   inline  → solo texto
  *
- * Colores:
- *   Verde   → En término (> 2 días hábiles restantes)
- *   Amarillo → Próximo a vencer (0-2 días hábiles)
- *   Rojo    → Vencido (días negativos)
- *   Gris    → Resuelto / cerrado
- *
- * Usado en: tabla de radicados, panel derecho, y cualquier futuro
- * componente que necesite mostrar estado de término.
+ * Badges claros para buena lectura sobre bg-white y bg-[#F8FAF7].
  */
 
 import type { VentanillaRadicado } from '@/src/types/ventanilla';
 import { diasRestantesHabiles }    from '@/lib/tiempos-radicado';
-
-/* ── Tipos ──────────────────────────────────────────────────── */
 
 export type EstadoTermino = 'EN_TERMINO' | 'POR_VENCER' | 'VENCIDO' | 'RESUELTO';
 
@@ -27,15 +20,10 @@ export interface SemaforoData {
   estado:        EstadoTermino;
   diasRestantes: number;
   label:         string;
-  /** Color de fondo/borde para badges */
   badgeClass:    string;
-  /** Color del dot/indicador */
   dotClass:      string;
-  /** Color del texto */
   textoClass:    string;
 }
-
-/* ── Cálculo puro ───────────────────────────────────────────── */
 
 const ESTADOS_RESUELTOS = new Set(['RESUELTO', 'RECHAZADO']);
 
@@ -50,11 +38,12 @@ export function calcularSemaforo(radicado: VentanillaRadicado): SemaforoData {
         : fueATiempo === true
           ? 'Resuelto en término'
           : 'Resuelto',
-      badgeClass:    fueATiempo === false
-        ? 'bg-pink-500/15 text-pink-300 border-pink-500/30'
-        : 'bg-slate-500/15 text-slate-400 border-slate-500/30',
-      dotClass:      fueATiempo === false ? 'bg-pink-400' : 'bg-slate-500',
-      textoClass:    fueATiempo === false ? 'text-pink-300' : 'text-slate-500',
+      // claro: rosa pálido si falló término, gris suave si ok
+      badgeClass:  fueATiempo === false
+        ? 'bg-pink-50 text-pink-700 border-pink-200'
+        : 'bg-gray-100 text-gray-600 border-gray-200',
+      dotClass:    fueATiempo === false ? 'bg-pink-500' : 'bg-gray-400',
+      textoClass:  fueATiempo === false ? 'text-pink-600 font-semibold' : 'text-gray-500',
     };
   }
 
@@ -65,9 +54,9 @@ export function calcularSemaforo(radicado: VentanillaRadicado): SemaforoData {
       estado:        'VENCIDO',
       diasRestantes: dias,
       label:         `${Math.abs(dias)}d vencido`,
-      badgeClass:    'bg-red-500/15 text-red-300 border-red-500/30',
+      badgeClass:    'bg-red-50 text-red-700 border-red-200',
       dotClass:      'bg-red-500 animate-pulse',
-      textoClass:    'text-red-400 font-bold',
+      textoClass:    'text-red-600 font-bold',
     };
   }
 
@@ -76,9 +65,9 @@ export function calcularSemaforo(radicado: VentanillaRadicado): SemaforoData {
       estado:        'POR_VENCER',
       diasRestantes: dias,
       label:         dias === 0 ? 'Vence hoy' : `${dias}d restante${dias > 1 ? 's' : ''}`,
-      badgeClass:    'bg-amber-500/15 text-amber-300 border-amber-500/30',
-      dotClass:      'bg-amber-500 animate-pulse',
-      textoClass:    'text-amber-400 font-semibold',
+      badgeClass:    'bg-yellow-50 text-yellow-700 border-yellow-200',
+      dotClass:      'bg-yellow-500 animate-pulse',
+      textoClass:    'text-yellow-700 font-semibold',
     };
   }
 
@@ -86,17 +75,14 @@ export function calcularSemaforo(radicado: VentanillaRadicado): SemaforoData {
     estado:        'EN_TERMINO',
     diasRestantes: dias,
     label:         `${dias}d restantes`,
-    badgeClass:    'bg-emerald-500/15 text-emerald-300 border-emerald-500/30',
-    dotClass:      'bg-emerald-500',
-    textoClass:    'text-emerald-400',
+    badgeClass:    'bg-green-50 text-green-700 border-green-200',
+    dotClass:      'bg-green-500',
+    textoClass:    'text-green-700',
   };
 }
 
-/* ── Componente visual ──────────────────────────────────────── */
-
 interface SemaforoTerminoProps {
   radicado: VentanillaRadicado;
-  /** 'badge' muestra pill con icono; 'compact' muestra solo dot + días; 'inline' solo texto */
   variante?: 'badge' | 'compact' | 'inline';
 }
 
@@ -116,11 +102,8 @@ export function SemaforoTermino({ radicado, variante = 'badge' }: SemaforoTermin
     );
   }
 
-  // variante 'badge' (default)
   return (
-    <span
-      className={`inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wide border ${semaforo.badgeClass}`}
-    >
+    <span className={`inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wide border ${semaforo.badgeClass}`}>
       <span className={`w-1.5 h-1.5 rounded-full shrink-0 ${semaforo.dotClass}`} />
       {semaforo.label}
     </span>

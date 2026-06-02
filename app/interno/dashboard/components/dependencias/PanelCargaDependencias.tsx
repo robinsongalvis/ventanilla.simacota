@@ -5,79 +5,86 @@ import type { TenantId } from '@/src/types/radicado';
 import { useCargaDependencias, type AlertaTono, type CargaDependencia } from './useCargaDependencias';
 import { useVentanilla } from '@/lib/store/ventanillaStore';
 
-/* ─── Tailwind class maps — full strings required for JIT detection ─── */
+/* ── Paleta institucional clara por tono ──────────────────────── */
 
+/** Borde izquierdo de la fila (accent) */
 const SPINE_CLS: Record<AlertaTono, string> = {
-  rose:   'border-l-rose-500',
-  amber:  'border-l-amber-500',
-  indigo: 'border-l-indigo-500',
-  slate:  'border-l-slate-700',
+  rose:   'border-l-red-400',
+  amber:  'border-l-amber-400',
+  indigo: 'border-l-[#14532D]',
+  slate:  'border-l-gray-300',
 };
 
-const VALOR_CLS: Record<AlertaTono, string> = {
-  rose:   'text-rose-300',
-  amber:  'text-amber-300',
-  indigo: 'text-slate-100',
-  slate:  'text-slate-600',
+/** Color del número total */
+const VALOR_STYLE: Record<AlertaTono, React.CSSProperties> = {
+  rose:   { color: '#DC2626' },
+  amber:  { color: '#D97706' },
+  indigo: { color: '#14532D' },
+  slate:  { color: '#94A3B8' },
 };
 
+/** Color de la barra de carga */
 const BARRA_CLS: Record<AlertaTono, string> = {
-  rose:   'bg-rose-500',
+  rose:   'bg-red-500',
   amber:  'bg-amber-500',
-  indigo: 'bg-indigo-500',
-  slate:  'bg-slate-700',
+  indigo: 'bg-[#14532D]',
+  slate:  'bg-gray-300',
 };
 
-const CARD_BORDE: Record<AlertaTono, string> = {
-  rose:   'border-rose-500',
-  amber:  'border-amber-500',
-  indigo: 'border-indigo-500',
-  slate:  'border-slate-600',
+/** Borde-left de la tarjeta KPI */
+const CARD_BORDER_COLOR: Record<AlertaTono, string> = {
+  rose:   '#F87171',
+  amber:  '#FBBF24',
+  indigo: '#14532D',
+  slate:  '#D9E2D9',
 };
 
-const CARD_TEXTO: Record<AlertaTono, string> = {
-  rose:   'text-rose-300',
-  amber:  'text-amber-300',
-  indigo: 'text-indigo-300',
-  slate:  'text-slate-500',
+/** Color del número en la tarjeta KPI */
+const CARD_VALOR_STYLE: Record<AlertaTono, React.CSSProperties> = {
+  rose:   { color: '#DC2626' },
+  amber:  { color: '#D97706' },
+  indigo: { color: '#14532D' },
+  slate:  { color: '#94A3B8' },
 };
 
-/* ─── ChipEstado ─── */
+/** Chips de estado — badge claro */
+const CHIP_CLS_PEND  = 'bg-yellow-50  text-yellow-700 border-yellow-200';
+const CHIP_CLS_PROC  = 'bg-sky-50     text-sky-700    border-sky-200';
+const CHIP_CLS_PV    = 'bg-amber-50   text-amber-700  border-amber-200';
+const CHIP_CLS_VENC  = 'bg-red-50     text-red-700    border-red-200';
+
+/* ── ChipEstado ─────────────────────────────────────────────── */
 
 function ChipEstado({ valor, label, cls }: { valor: number; label: string; cls: string }) {
   if (valor === 0) return null;
   return (
-    <span
-      className={`inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-bold tabular-nums border leading-none ${cls}`}
-    >
+    <span className={`inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-bold tabular-nums border leading-none ${cls}`}>
       {label}&nbsp;{valor}
     </span>
   );
 }
 
-/* ─── FilaDependencia ─── */
+/* ── FilaDependencia ────────────────────────────────────────── */
 
-function FilaDependencia({
-  dep,
-  onVer,
-}: {
-  dep: CargaDependencia;
-  onVer: (id: TenantId) => void;
-}) {
+function FilaDependencia({ dep, onVer }: { dep: CargaDependencia; onVer: (id: TenantId) => void }) {
   return (
     <tr
-      className={`border-b border-white/[0.04] border-l-4 ${SPINE_CLS[dep.alertaTono]} transition-colors group ${
-        dep.total === 0 ? 'opacity-40' : 'hover:bg-white/[0.025]'
-      }`}
+      className={`border-l-4 ${SPINE_CLS[dep.alertaTono]} transition-colors group`}
+      style={{
+        borderBottom: '1px solid #EEF4EE',
+        opacity: dep.total === 0 ? 0.45 : 1,
+      }}
+      onMouseEnter={(e) => { if (dep.total > 0) (e.currentTarget as HTMLElement).style.background = '#F8FAF7'; }}
+      onMouseLeave={(e) => { (e.currentTarget as HTMLElement).style.background = ''; }}
     >
       {/* Nombre */}
       <td className="px-4 py-3 max-w-[220px]">
-        <p className="text-sm font-medium text-slate-200 leading-snug truncate">{dep.nombre}</p>
+        <p className="text-sm font-medium leading-snug truncate" style={{ color: '#1F2933' }}>{dep.nombre}</p>
       </td>
 
       {/* Total */}
       <td className="px-4 py-3 whitespace-nowrap w-16">
-        <span className={`text-xl font-black tabular-nums leading-none ${VALOR_CLS[dep.alertaTono]}`}>
+        <span className="text-xl font-black tabular-nums leading-none" style={VALOR_STYLE[dep.alertaTono]}>
           {dep.total}
         </span>
       </td>
@@ -85,41 +92,25 @@ function FilaDependencia({
       {/* Chips de estado */}
       <td className="px-4 py-3">
         <div className="flex items-center gap-1 flex-wrap min-w-[160px]">
-          <ChipEstado
-            valor={dep.pendientes}
-            label="PEND"
-            cls="bg-indigo-500/20 text-indigo-300 border-indigo-500/30"
-          />
-          <ChipEstado
-            valor={dep.enProceso}
-            label="PROC"
-            cls="bg-sky-500/20 text-sky-300 border-sky-500/30"
-          />
-          <ChipEstado
-            valor={dep.porVencer}
-            label="PV"
-            cls="bg-amber-500/20 text-amber-300 border-amber-500/30"
-          />
-          <ChipEstado
-            valor={dep.vencidos}
-            label="VENC"
-            cls="bg-rose-500/20 text-rose-300 border-rose-500/30"
-          />
+          <ChipEstado valor={dep.pendientes} label="PEND" cls={CHIP_CLS_PEND} />
+          <ChipEstado valor={dep.enProceso}  label="PROC" cls={CHIP_CLS_PROC} />
+          <ChipEstado valor={dep.porVencer}  label="PV"   cls={CHIP_CLS_PV}   />
+          <ChipEstado valor={dep.vencidos}   label="VENC" cls={CHIP_CLS_VENC} />
           {dep.total === 0 && (
-            <span className="text-[10px] text-slate-700 italic">sin carga</span>
+            <span className="text-[10px] italic" style={{ color: '#94A3B8' }}>sin carga</span>
           )}
         </div>
       </td>
 
       {/* Barra de carga */}
       <td className="px-4 py-3 w-36">
-        <div className="h-1 bg-slate-800 rounded-full overflow-hidden">
+        <div className="h-1.5 rounded-full overflow-hidden" style={{ background: '#EEF4EE' }}>
           <div
             className={`h-full rounded-full transition-all duration-500 ${BARRA_CLS[dep.alertaTono]}`}
             style={{ width: `${dep.cargaRelativa}%` }}
           />
         </div>
-        <p className="text-[10px] text-slate-700 mt-1 tabular-nums">{dep.cargaRelativa}%</p>
+        <p className="text-[10px] mt-1 tabular-nums" style={{ color: '#94A3B8' }}>{dep.cargaRelativa}%</p>
       </td>
 
       {/* Acción */}
@@ -127,7 +118,10 @@ function FilaDependencia({
         {dep.total > 0 && (
           <button
             onClick={() => onVer(dep.tenantId)}
-            className="px-3 py-1.5 rounded-lg text-xs font-bold text-slate-500 hover:text-indigo-300 hover:bg-indigo-500/10 active:scale-95 transition-all duration-150 opacity-0 group-hover:opacity-100 focus-visible:opacity-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500/40"
+            className="px-3 py-1.5 rounded-lg text-xs font-bold transition-all duration-150 active:scale-95 opacity-0 group-hover:opacity-100 focus-visible:opacity-100"
+            style={{ color: '#14532D', background: '#EEF4EE', border: '1px solid #D9E2D9' }}
+            onMouseEnter={(e) => { (e.currentTarget as HTMLElement).style.background = '#D9E2D9'; }}
+            onMouseLeave={(e) => { (e.currentTarget as HTMLElement).style.background = '#EEF4EE'; }}
           >
             Ver →
           </button>
@@ -137,7 +131,7 @@ function FilaDependencia({
   );
 }
 
-/* ─── PanelCargaDependencias ─── */
+/* ── PanelCargaDependencias ─────────────────────────────────── */
 
 export function PanelCargaDependencias({ radicados }: { radicados: VentanillaRadicado[] }) {
   const { dispatch } = useVentanilla();
@@ -162,32 +156,40 @@ export function PanelCargaDependencias({ radicados }: { radicados: VentanillaRad
   }
 
   return (
-    <div className="flex-1 flex flex-col overflow-hidden min-h-0">
+    <div className="flex-1 flex flex-col overflow-hidden min-h-0 bg-[#F8FAF7]">
 
       {/* Header */}
-      <div className="flex items-center justify-between gap-4 px-5 py-4 border-b border-white/[0.07] shrink-0">
+      <div className="flex items-center justify-between gap-4 px-5 py-4 bg-white shrink-0"
+           style={{ borderBottom: '1px solid #D9E2D9' }}>
         <div>
-          <p className="text-[10px] font-bold uppercase tracking-widest text-slate-600">Panel Operacional</p>
-          <h2 className="text-base font-black text-slate-50 mt-0.5">Carga por Dependencia</h2>
+          <p className="text-[10px] font-bold uppercase tracking-widest" style={{ color: '#14532D' }}>
+            Panel Operacional
+          </p>
+          <h2 className="text-base font-black mt-0.5" style={{ color: '#1F2933' }}>Carga por Dependencia</h2>
         </div>
-        <span className="flex items-center gap-1.5 text-[10px] text-slate-600">
-          <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
+        <span className="flex items-center gap-1.5 text-[10px]" style={{ color: '#667085' }}>
+          <span className="w-1.5 h-1.5 rounded-full bg-green-500 animate-pulse" />
           Tiempo real
         </span>
       </div>
 
-      {/* Summary cards */}
-      <div className="px-5 py-3 border-b border-white/[0.07] bg-slate-900/20 shrink-0">
+      {/* KPI cards */}
+      <div className="px-5 py-3 shrink-0 bg-white" style={{ borderBottom: '1px solid #D9E2D9' }}>
         <div className="flex gap-3 overflow-x-auto pb-0.5">
           {tarjetas.map((t) => (
             <div
               key={t.label}
-              className={`shrink-0 flex flex-col items-start px-4 py-3 rounded-xl border border-l-4 bg-slate-900/40 border-t-white/[0.08] border-r-white/[0.08] border-b-white/[0.08] ${CARD_BORDE[t.tono]}`}
+              className="shrink-0 flex flex-col items-start px-4 py-3 rounded-xl border-l-4 bg-white"
+              style={{
+                border: '1px solid #D9E2D9',
+                borderLeftColor: CARD_BORDER_COLOR[t.tono],
+                borderLeftWidth: 4,
+              }}
             >
-              <span className={`text-2xl font-black leading-none tabular-nums ${CARD_TEXTO[t.tono]}`}>
+              <span className="text-2xl font-black leading-none tabular-nums" style={CARD_VALOR_STYLE[t.tono]}>
                 {t.valor}
               </span>
-              <span className={`text-[10px] font-bold uppercase tracking-widest mt-0.5 opacity-70 ${CARD_TEXTO[t.tono]}`}>
+              <span className="text-[10px] font-bold uppercase tracking-widest mt-0.5" style={{ color: '#94A3B8' }}>
                 {t.label}
               </span>
             </div>
@@ -195,15 +197,16 @@ export function PanelCargaDependencias({ radicados }: { radicados: VentanillaRad
         </div>
       </div>
 
-      {/* Tabla densa */}
-      <div className="flex-1 overflow-y-auto overflow-x-auto">
+      {/* Tabla */}
+      <div className="flex-1 overflow-y-auto overflow-x-auto bg-white">
         <table className="w-full text-sm">
-          <thead className="sticky top-0 z-10 bg-slate-900/90 backdrop-blur-sm">
-            <tr className="border-b border-white/[0.07]">
+          <thead className="sticky top-0 z-10" style={{ background: '#EEF4EE' }}>
+            <tr style={{ borderBottom: '1px solid #D9E2D9' }}>
               {['Dependencia', 'Total', 'Estado de carga', 'Carga relativa', ''].map((h) => (
                 <th
                   key={h}
-                  className="px-4 py-2.5 text-left text-[10px] font-bold uppercase tracking-widest text-slate-400 whitespace-nowrap"
+                  className="px-4 py-2.5 text-left text-[10px] font-bold uppercase tracking-widest whitespace-nowrap"
+                  style={{ color: '#14532D' }}
                 >
                   {h}
                 </th>

@@ -71,6 +71,12 @@ function formatDateTime(date: Date): string {
   }).format(date);
 }
 
+/* ── Estilos compartidos ─────────────────────────────────────── */
+const sectionCls = 'rounded-xl bg-white p-4 space-y-1';
+const sectionStyle = { border: '1px solid #D9E2D9', boxShadow: '0 1px 2px rgba(20,83,45,0.05)' };
+const labelCls = 'mb-1 block text-[10px] font-bold uppercase tracking-widest';
+const labelStyle = { color: '#667085' };
+
 export function RadicacionFuncionarioForm({ radicadoPreview, onSubmit }: Props) {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [form, setForm] = useState<FormState>(INITIAL_FORM);
@@ -115,30 +121,34 @@ export function RadicacionFuncionarioForm({ radicadoPreview, onSubmit }: Props) 
   }
 
   return (
-    <form onSubmit={handleSubmit} className="space-y-5">
-      <section className="grid gap-3 rounded-lg border border-white/10 bg-slate-900/40 p-4">
+    <form onSubmit={handleSubmit} className="space-y-4">
+
+      {/* ── Bloque radicado ── */}
+      <section className={sectionCls} style={sectionStyle}>
+        <SectionTitle eyebrow="Radicado" title="Datos de recepción" />
         <div className="grid gap-3 md:grid-cols-4">
-          <ReadOnlyField label="Numero radicado" value={radicadoPreview} />
-          <ReadOnlyField label="Fecha y hora" value={formatDateTime(fechaRadicado)} />
+          <ReadOnlyField label="Número radicado" value={radicadoPreview} />
+          <ReadOnlyField label="Fecha y hora"    value={formatDateTime(fechaRadicado)} />
           <SelectField
-            label="Medio"
+            label="Medio de recepción"
             value={form.medioRecepcion}
             onChange={(v) => update('medioRecepcion', v as MedioRecepcion)}
             options={[
-              ['OFICIO_FISICO', 'Oficio fisico'],
+              ['OFICIO_FISICO', 'Oficio físico'],
               ['EMAIL', 'Email'],
               ['WEB', 'Web'],
               ['PRESENCIAL', 'Presencial'],
             ]}
           />
           <ReadOnlyField
-            label="Vencimiento"
+            label="Fecha vencimiento"
             value={new Date(vencimiento.fechaVencimiento).toLocaleDateString('es-CO')}
           />
         </div>
       </section>
 
-      <section className="rounded-lg border border-white/10 bg-slate-900/40 p-4">
+      {/* ── Datos solicitante ── */}
+      <section className={sectionCls} style={sectionStyle}>
         <SectionTitle eyebrow="Solicitante" title="Datos del solicitante" />
         <div className="grid gap-3 md:grid-cols-4">
           <SelectField
@@ -146,8 +156,8 @@ export function RadicacionFuncionarioForm({ radicadoPreview, onSubmit }: Props) 
             value={form.tipoPersona}
             onChange={(v) => update('tipoPersona', v as TipoPersona)}
             options={[
-              ['NATURAL', 'Natural'],
-              ['JURIDICA', 'Juridica'],
+              ['NATURAL',  'Natural'],
+              ['JURIDICA', 'Jurídica'],
             ]}
           />
           <SelectField
@@ -155,30 +165,45 @@ export function RadicacionFuncionarioForm({ radicadoPreview, onSubmit }: Props) 
             value={form.tipoDocumento}
             onChange={(v) => update('tipoDocumento', v as TipoDocumento)}
             options={[
-              ['CC', 'Cedula'],
-              ['CE', 'Cedula extranjeria'],
-              ['NIT', 'NIT'],
-              ['PASAPORTE', 'Pasaporte'],
-              ['OTRO', 'Otro'],
+              ['CC',         'Cédula'],
+              ['CE',         'Cédula extranjeríca'],
+              ['NIT',        'NIT'],
+              ['PASAPORTE',  'Pasaporte'],
+              ['OTRO',       'Otro'],
             ]}
           />
-          <TextField label="Identificacion" value={form.numeroDocumento} onChange={(v) => update('numeroDocumento', v)} required />
-          <TextField label="Nombre / razon social" value={form.nombreCompleto} onChange={(v) => update('nombreCompleto', v)} required className="md:col-span-1" />
-          <TextField label="Correo electronico" value={form.email} onChange={(v) => update('email', v)} type="email" />
-          <TextField label="Telefono" value={form.telefono} onChange={(v) => update('telefono', v)} />
-          <TextField label="Direccion" value={form.direccion} onChange={(v) => update('direccion', v)} className="md:col-span-2" />
-          <TextField label="Pais" value={form.pais} onChange={(v) => update('pais', v.toUpperCase())} />
-          <TextField label="Departamento" value={form.departamento} onChange={(v) => update('departamento', v.toUpperCase())} />
+          <TextField
+            label="Identificación"
+            value={form.numeroDocumento}
+            onChange={(v) => update('numeroDocumento', v)}
+            required
+          />
+          <TextField
+            label="Nombre / razón social"
+            value={form.nombreCompleto}
+            onChange={(v) => update('nombreCompleto', v)}
+            required
+            className="md:col-span-1"
+          />
+          <TextField label="Correo electrónico" value={form.email}    onChange={(v) => update('email', v)}    type="email" />
+          <TextField label="Teléfono"            value={form.telefono} onChange={(v) => update('telefono', v)} />
+          <TextField label="Dirección"           value={form.direccion} onChange={(v) => update('direccion', v)} className="md:col-span-2" />
+          <TextField label="País"          value={form.pais}         onChange={(v) => update('pais', v.toUpperCase())} />
+          <TextField label="Departamento"  value={form.departamento} onChange={(v) => update('departamento', v.toUpperCase())} />
           <div className="relative md:col-span-2">
             <TextField label="Municipio" value={form.municipio} onChange={(v) => update('municipio', v)} />
             {form.municipio && municipiosFiltrados.length > 0 && (
-              <div className="absolute z-20 mt-1 w-full rounded-lg border border-white/10 bg-slate-950 shadow-xl">
+              <div className="absolute z-20 mt-1 w-full rounded-xl shadow-lg bg-white"
+                   style={{ border: '1px solid #D9E2D9' }}>
                 {municipiosFiltrados.slice(0, 5).map((m) => (
                   <button
                     key={m}
                     type="button"
                     onClick={() => update('municipio', m)}
-                    className="block w-full px-3 py-2 text-left text-xs text-slate-300 hover:bg-white/5"
+                    className="block w-full px-3 py-2 text-left text-xs transition-colors"
+                    style={{ color: '#1F2933' }}
+                    onMouseEnter={(e) => { (e.currentTarget as HTMLElement).style.background = '#EEF4EE'; }}
+                    onMouseLeave={(e) => { (e.currentTarget as HTMLElement).style.background = ''; }}
                   >
                     {m}
                   </button>
@@ -189,8 +214,9 @@ export function RadicacionFuncionarioForm({ radicadoPreview, onSubmit }: Props) 
         </div>
       </section>
 
-      <section className="rounded-lg border border-white/10 bg-slate-900/40 p-4">
-        <SectionTitle eyebrow="Clasificacion" title="Terminos y detalle de la solicitud" />
+      {/* ── Clasificación ── */}
+      <section className={sectionCls} style={sectionStyle}>
+        <SectionTitle eyebrow="Clasificación" title="Términos y detalle de la solicitud" />
         <div className="grid gap-3 md:grid-cols-4">
           <SelectField
             label="Tipo solicitud / doc"
@@ -198,61 +224,85 @@ export function RadicacionFuncionarioForm({ radicadoPreview, onSubmit }: Props) 
             onChange={(v) => update('tipoSolicitudId', v as TipoSolicitudId)}
             options={LISTA_TIPOS_SOLICITUD.map((t) => [
               t.id,
-              `${t.nombre} - ${t.diasRespuesta} dias ${t.unidad.toLowerCase()}`,
+              `${t.nombre} — ${t.diasRespuesta} días ${t.unidad.toLowerCase()}`,
             ])}
             className="md:col-span-2"
           />
-          <ReadOnlyField label="Dias respuesta" value={`${vencimiento.diasRespuesta} ${vencimiento.unidad.toLowerCase()}`} />
+          <ReadOnlyField
+            label="Días de respuesta"
+            value={`${vencimiento.diasRespuesta} ${vencimiento.unidad.toLowerCase()}`}
+          />
           <TextField
-            label="Numero folios"
+            label="Número de folios"
             value={String(form.numeroFolios)}
             onChange={(v) => update('numeroFolios', Number(v.replace(/\D/g, '') || 0))}
           />
-          <TextField label="Asunto" value={form.asunto} onChange={(v) => update('asunto', v)} required className="md:col-span-4" />
+          <TextField
+            label="Asunto"
+            value={form.asunto}
+            onChange={(v) => update('asunto', v)}
+            required
+            className="md:col-span-4"
+          />
           <div className="md:col-span-4">
-            <label className="mb-1 block text-xs font-bold uppercase tracking-widest text-slate-400">Descripcion</label>
-            <textarea
-              value={form.descripcion}
-              onChange={(e) => update('descripcion', e.target.value)}
-              rows={4}
-              className="input-internal"
-              required
-            />
+            <label>
+              <span className={labelCls} style={labelStyle}>Descripción</span>
+              <textarea
+                value={form.descripcion}
+                onChange={(e) => update('descripcion', e.target.value)}
+                rows={4}
+                className="input-internal"
+                required
+              />
+            </label>
           </div>
         </div>
       </section>
 
-      <section className="rounded-lg border border-white/10 bg-slate-900/40 p-4">
+      {/* ── Anexos ── */}
+      <section className={sectionCls} style={sectionStyle}>
         <SectionTitle eyebrow="Anexos" title="Archivos y soportes" />
         <div
           role="button"
           tabIndex={0}
           onClick={() => fileInputRef.current?.click()}
           onKeyDown={(e) => e.key === 'Enter' && fileInputRef.current?.click()}
-          onDragOver={(e) => {
-            e.preventDefault();
-            setDragging(true);
-          }}
+          onDragOver={(e) => { e.preventDefault(); setDragging(true); }}
           onDragLeave={() => setDragging(false)}
-          onDrop={(e) => {
-            e.preventDefault();
-            setDragging(false);
-            addFiles(e.dataTransfer.files);
-          }}
-          className={`rounded-lg border border-dashed p-5 text-center transition-colors ${
-            dragging ? 'border-indigo-400 bg-indigo-500/10' : 'border-white/20 bg-slate-950/40'
-          }`}
+          onDrop={(e) => { e.preventDefault(); setDragging(false); addFiles(e.dataTransfer.files); }}
+          className="rounded-lg border border-dashed p-5 text-center transition-colors cursor-pointer"
+          style={dragging
+            ? { borderColor: '#14532D', background: '#EEF4EE' }
+            : { borderColor: '#D9E2D9', background: '#F8FAF7' }}
         >
-          <input ref={fileInputRef} type="file" multiple accept=".pdf,.jpg,.jpeg,.png,.webp" className="hidden" onChange={(e) => addFiles(e.target.files)} />
-          <p className="text-sm font-semibold text-slate-200">Arrastra PDFs o imagenes aqui</p>
-          <p className="mt-1 text-xs text-slate-500">Maximo 10 archivos para esta primera version</p>
+          <input
+            ref={fileInputRef}
+            type="file"
+            multiple
+            accept=".pdf,.jpg,.jpeg,.png,.webp"
+            className="hidden"
+            onChange={(e) => addFiles(e.target.files)}
+          />
+          <svg className="w-6 h-6 mx-auto mb-2" style={{ color: '#94A3B8' }} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
+            <path strokeLinecap="round" strokeLinejoin="round" d="M19.5 14.25v-2.625a3.375 3.375 0 00-3.375-3.375h-1.5A1.125 1.125 0 0113.5 7.125v-1.5a3.375 3.375 0 00-3.375-3.375H8.25m6.75 12l-3-3m0 0l-3 3m3-3v6m-1.5-15H5.625c-.621 0-1.125.504-1.125 1.125v17.25c0 .621.504 1.125 1.125 1.125h12.75c.621 0 1.125-.504 1.125-1.125V11.25a9 9 0 00-9-9z" />
+          </svg>
+          <p className="text-sm font-semibold" style={{ color: '#1F2933' }}>Arrastra PDFs o imágenes aquí</p>
+          <p className="mt-1 text-xs" style={{ color: '#94A3B8' }}>Máximo 10 archivos · PDF, JPG, PNG, WebP</p>
         </div>
         {archivos.length > 0 && (
           <ul className="mt-3 grid gap-2 md:grid-cols-2">
             {archivos.map((file, index) => (
-              <li key={`${file.name}-${index}`} className="flex items-center justify-between rounded-lg border border-white/10 bg-slate-800/40 px-3 py-2 text-xs text-slate-300">
-                <span className="truncate">{file.name}</span>
-                <button type="button" onClick={() => setArchivos((prev) => prev.filter((_, i) => i !== index))} className="text-rose-300 hover:text-rose-200">
+              <li
+                key={`${file.name}-${index}`}
+                className="flex items-center justify-between rounded-lg px-3 py-2 text-xs"
+                style={{ border: '1px solid #D9E2D9', background: '#F8FAF7' }}
+              >
+                <span className="truncate" style={{ color: '#1F2933' }}>{file.name}</span>
+                <button
+                  type="button"
+                  onClick={() => setArchivos((prev) => prev.filter((_, i) => i !== index))}
+                  className="ml-2 shrink-0 text-red-500 hover:text-red-700 transition-colors text-[11px] font-semibold"
+                >
                   Quitar
                 </button>
               </li>
@@ -261,12 +311,19 @@ export function RadicacionFuncionarioForm({ radicadoPreview, onSubmit }: Props) 
         )}
       </section>
 
-      <div className="flex justify-end">
+      {/* ── Submit ── */}
+      <div className="flex justify-end pt-1">
         <button
           type="submit"
           disabled={guardando}
-          className="rounded-lg bg-indigo-600 px-5 py-3 text-sm font-bold text-white transition-colors hover:bg-indigo-500 disabled:opacity-60"
+          className="flex items-center gap-2 rounded-xl px-6 py-3 text-sm font-bold text-white transition-all disabled:opacity-60 active:scale-[0.98]"
+          style={{ background: '#14532D' }}
+          onMouseEnter={(e) => { if (!guardando) (e.currentTarget as HTMLElement).style.background = '#166534'; }}
+          onMouseLeave={(e) => { (e.currentTarget as HTMLElement).style.background = '#14532D'; }}
         >
+          {guardando && (
+            <span className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+          )}
           {guardando ? 'Radicando...' : 'Registrar radicado'}
         </button>
       </div>
@@ -274,33 +331,26 @@ export function RadicacionFuncionarioForm({ radicadoPreview, onSubmit }: Props) 
   );
 }
 
+/* ── Sub-componentes de UI ──────────────────────────────────── */
+
 function SectionTitle({ eyebrow, title }: { eyebrow: string; title: string }) {
   return (
     <div className="mb-4">
-      <p className="text-[10px] font-bold uppercase tracking-widest text-indigo-400">{eyebrow}</p>
-      <h2 className="text-base font-black text-slate-100">{title}</h2>
+      <p className="text-[10px] font-bold uppercase tracking-widest" style={{ color: '#14532D' }}>{eyebrow}</p>
+      <h2 className="text-base font-black" style={{ color: '#1F2933' }}>{title}</h2>
     </div>
   );
 }
 
 function TextField({
-  label,
-  value,
-  onChange,
-  type = 'text',
-  required,
-  className = '',
+  label, value, onChange, type = 'text', required, className = '',
 }: {
-  label: string;
-  value: string;
-  onChange: (value: string) => void;
-  type?: string;
-  required?: boolean;
-  className?: string;
+  label: string; value: string; onChange: (value: string) => void;
+  type?: string; required?: boolean; className?: string;
 }) {
   return (
     <label className={className}>
-      <span className="mb-1 block text-xs font-bold uppercase tracking-widest text-slate-400">{label}</span>
+      <span className={labelCls} style={labelStyle}>{label}</span>
       <input
         type={type}
         value={value}
@@ -313,21 +363,14 @@ function TextField({
 }
 
 function SelectField({
-  label,
-  value,
-  onChange,
-  options,
-  className = '',
+  label, value, onChange, options, className = '',
 }: {
-  label: string;
-  value: string;
-  onChange: (value: string) => void;
-  options: [string, string][];
-  className?: string;
+  label: string; value: string; onChange: (value: string) => void;
+  options: [string, string][]; className?: string;
 }) {
   return (
     <label className={className}>
-      <span className="mb-1 block text-xs font-bold uppercase tracking-widest text-slate-400">{label}</span>
+      <span className={labelCls} style={labelStyle}>{label}</span>
       <select
         value={value}
         onChange={(e) => onChange(e.target.value)}
@@ -344,9 +387,13 @@ function SelectField({
 function ReadOnlyField({ label, value }: { label: string; value: string }) {
   return (
     <div>
-      <p className="mb-1 text-xs font-bold uppercase tracking-widest text-slate-500">{label}</p>
-      <p className="rounded-lg border border-white/10 bg-slate-950/50 px-3 py-2 text-sm font-semibold text-slate-200">{value}</p>
+      <p className={labelCls} style={labelStyle}>{label}</p>
+      <p
+        className="rounded-lg px-3 py-2 text-sm font-semibold"
+        style={{ border: '1px solid #D9E2D9', background: '#EEF4EE', color: '#1F2933' }}
+      >
+        {value}
+      </p>
     </div>
   );
 }
-
