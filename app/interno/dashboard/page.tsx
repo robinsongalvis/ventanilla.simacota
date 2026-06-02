@@ -1149,8 +1149,8 @@ const TABS_PANEL: { id: TabPanelId; label: string }[] = [
 function FilaInfo({ label, value }: { label: string; value: string }) {
   return (
     <div>
-      <p className="text-[10px] font-bold uppercase tracking-widest text-slate-600">{label}</p>
-      <p className="text-sm text-slate-200 mt-0.5 break-words">{value}</p>
+      <p className="text-[10px] font-bold uppercase tracking-widest" style={{ color: '#94A3B8' }}>{label}</p>
+      <p className="text-sm mt-0.5 break-words" style={{ color: '#1F2933' }}>{value}</p>
     </div>
   );
 }
@@ -1462,29 +1462,31 @@ function PanelDerecho({
   const esRojo = radicado.prioridad === 'ROJO';
 
   return (
-    <div className="h-full flex flex-col bg-[#0D1117] border-l border-white/[0.07]">
+    <div className="h-full flex flex-col bg-white" style={{ borderLeft: '1px solid #D9E2D9' }}>
       {/* Header */}
-      <div className={`px-4 py-3 border-b border-white/[0.07] shrink-0 ${esRojo ? 'bg-red-950/20' : ''}`}>
+      <div className={`px-4 py-3 shrink-0 bg-white ${esRojo ? 'border-l-4 border-l-red-500' : ''}`}
+           style={{ borderBottom: '1px solid #D9E2D9' }}>
         <div className="flex items-start justify-between gap-3">
           <div className="min-w-0">
             <div className="flex items-center gap-2 mb-0.5">
               {esRojo && <span className="w-2 h-2 rounded-full bg-red-500 animate-pulse shrink-0" />}
-              <p className="font-mono text-xs text-indigo-300 truncate">{radicado.radicadoId}</p>
+              <p className="font-mono text-xs font-bold truncate" style={{ color: '#14532D' }}>{radicado.radicadoId}</p>
             </div>
-            <p className="text-sm font-semibold text-slate-100 truncate">{radicado.solicitante.nombreCompleto}</p>
+            <p className="text-sm font-semibold truncate" style={{ color: '#1F2933' }}>{radicado.solicitante.nombreCompleto}</p>
             <div className="flex items-center gap-2 mt-1 flex-wrap">
               <span className={`text-[10px] font-bold uppercase px-2 py-0.5 rounded-full border ${
-                BADGE_ESTADO[radicado.estadoActual] ?? 'bg-slate-500/20 text-slate-300 border-slate-500/30'
+                BADGE_ESTADO[radicado.estadoActual] ?? 'bg-gray-100 text-gray-600 border-gray-200'
               }`}>
                 {LABELS_ESTADO[radicado.estadoActual] ?? radicado.estadoActual}
               </span>
               <SemaforoTermino radicado={radicado} variante="compact" />
             </div>
           </div>
-          <button
-            onClick={onCerrar}
-            className="shrink-0 p-1.5 rounded-lg text-slate-500 hover:text-slate-200 hover:bg-white/[0.06] active:scale-90 transition-all duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/25"
-          >
+          <button onClick={onCerrar}
+            className="shrink-0 p-1.5 rounded-lg active:scale-90 transition-all duration-150"
+            style={{ color: '#94A3B8' }}
+            onMouseEnter={(e) => { (e.currentTarget as HTMLElement).style.color = '#1F2933'; (e.currentTarget as HTMLElement).style.background = '#EEF4EE'; }}
+            onMouseLeave={(e) => { (e.currentTarget as HTMLElement).style.color = '#94A3B8'; (e.currentTarget as HTMLElement).style.background = ''; }}>
             <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
               <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
             </svg>
@@ -1493,17 +1495,16 @@ function PanelDerecho({
       </div>
 
       {/* Tabs */}
-      <div className="flex border-b border-white/[0.07] shrink-0 overflow-x-auto">
+      <div className="flex shrink-0 overflow-x-auto bg-white" style={{ borderBottom: '1px solid #D9E2D9' }}>
         {TABS_PANEL.map((t) => (
-          <button
-            key={t.id}
+          <button key={t.id}
             onClick={() => { setTab(t.id); setMensajeOk(null); setErrorLocal(null); }}
-            className={`shrink-0 px-3 py-2.5 text-[11px] font-bold uppercase tracking-wider transition-colors whitespace-nowrap focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-indigo-500/50 ${
-              tab === t.id
-                ? 'text-indigo-300 border-b-2 border-indigo-500'
-                : 'text-slate-400 hover:text-slate-200 hover:bg-white/[0.04]'
-            }`}
-          >
+            className="shrink-0 px-3 py-2.5 text-[11px] font-bold uppercase tracking-wider transition-colors whitespace-nowrap focus-visible:outline-none"
+            style={tab === t.id
+              ? { color: '#14532D', borderBottom: '2px solid #14532D' }
+              : { color: '#94A3B8' }}
+            onMouseEnter={(e) => { if (tab !== t.id) { (e.currentTarget as HTMLElement).style.color = '#667085'; (e.currentTarget as HTMLElement).style.background = '#F8FAF7'; } }}
+            onMouseLeave={(e) => { if (tab !== t.id) { (e.currentTarget as HTMLElement).style.color = '#94A3B8'; (e.currentTarget as HTMLElement).style.background = ''; } }}>
             {t.label}
           </button>
         ))}
@@ -1511,17 +1512,16 @@ function PanelDerecho({
 
       {/* Feedback global */}
       {(mensajeOk || errorLocal) && (
-        <div className={`mx-4 mt-3 px-3 py-2 rounded-lg text-xs shrink-0 ${
-          mensajeOk
-            ? 'bg-emerald-500/10 border border-emerald-500/30 text-emerald-300'
-            : 'bg-rose-500/10 border border-rose-500/30 text-rose-400'
-        }`}>
+        <div className="mx-4 mt-3 px-3 py-2 rounded-lg text-xs shrink-0"
+             style={mensajeOk
+               ? { background: '#F0FDF4', border: '1px solid #BBF7D0', color: '#166534' }
+               : { background: '#FEF2F2', border: '1px solid #FECACA', color: '#DC2626' }}>
           {mensajeOk ?? errorLocal}
         </div>
       )}
 
       {/* Contenido con scroll */}
-      <div className="flex-1 overflow-y-auto px-4 py-4 space-y-4">
+      <div className="flex-1 overflow-y-auto px-4 py-4 space-y-4" style={{ background: '#F8FAF7' }}>
 
         {/* ── TAB 1: Información ── */}
         {tab === 'info' && (
@@ -1545,8 +1545,8 @@ function PanelDerecho({
               }}
             />
 
-            <div>
-              <p className="text-[10px] font-bold uppercase tracking-widest text-slate-600 mb-3">Solicitante</p>
+            <div className="rounded-xl bg-white p-4" style={{ border: '1px solid #D9E2D9' }}>
+              <p className="text-[10px] font-bold uppercase tracking-widest mb-3" style={{ color: '#14532D' }}>Solicitante</p>
               <div className="grid grid-cols-2 gap-x-4 gap-y-3">
                 <FilaInfo label="Tipo persona"    value={radicado.solicitante.tipoPersona} />
                 <FilaInfo label="Documento"       value={`${radicado.solicitante.tipoDocumento} ${radicado.solicitante.numeroDocumento}`} />
@@ -1561,13 +1561,13 @@ function PanelDerecho({
               </div>
             </div>
 
-            <div className="border-t border-white/[0.07] pt-4">
-              <p className="text-[10px] font-bold uppercase tracking-widest text-slate-600 mb-3">Detalle del caso</p>
+            <div className="rounded-xl bg-white p-4" style={{ border: '1px solid #D9E2D9' }}>
+              <p className="text-[10px] font-bold uppercase tracking-widest mb-3" style={{ color: '#14532D' }}>Detalle del caso</p>
               <div className="space-y-3">
                 <FilaInfo label="Asunto"      value={radicado.detalle.asunto} />
                 <div>
-                  <p className="text-[10px] font-bold uppercase tracking-widest text-slate-600">Descripción</p>
-                  <p className="text-sm text-slate-300 mt-0.5 leading-relaxed whitespace-pre-wrap">{radicado.detalle.descripcion}</p>
+                  <p className="text-[10px] font-bold uppercase tracking-widest" style={{ color: '#94A3B8' }}>Descripción</p>
+                  <p className="text-sm mt-0.5 leading-relaxed whitespace-pre-wrap" style={{ color: '#1F2933' }}>{radicado.detalle.descripcion}</p>
                 </div>
                 <FilaInfo label="Número de folios" value={String(radicado.detalle.numeroFolios)} />
                 {radicado.detalle.anexosDescripcion && (
@@ -1576,8 +1576,8 @@ function PanelDerecho({
               </div>
             </div>
 
-            <div className="border-t border-white/[0.07] pt-4">
-              <p className="text-[10px] font-bold uppercase tracking-widest text-slate-600 mb-3">
+            <div className="rounded-xl bg-white p-4" style={{ border: '1px solid #D9E2D9' }}>
+              <p className="text-[10px] font-bold uppercase tracking-widest mb-3" style={{ color: '#14532D' }}>
                 Control de radicación
               </p>
               <div className="grid grid-cols-2 gap-x-4 gap-y-3">
@@ -1590,17 +1590,18 @@ function PanelDerecho({
             </div>
 
             {/* ── MIPG-2: Responsable funcional ── */}
-            <div className="border-t border-white/[0.07] pt-4">
-              <p className="text-[10px] font-bold uppercase tracking-widest text-indigo-500/70 mb-3">
+            <div className="rounded-xl bg-white p-4" style={{ border: '1px solid #D9E2D9' }}>
+              <p className="text-[10px] font-bold uppercase tracking-widest mb-3" style={{ color: '#14532D' }}>
                 MIPG · Responsable funcional asignado
               </p>
               {radicado.clasificacion.funcionarioResponsableNombre ? (
-                <div className="bg-indigo-950/20 border border-indigo-500/20 rounded-lg p-3 space-y-2">
+                <div className="rounded-lg p-3 space-y-2" style={{ background: '#EEF4EE', border: '1px solid #D9E2D9' }}>
                   <div className="flex items-center gap-2">
-                    <span className="w-6 h-6 rounded-full bg-indigo-600/30 flex items-center justify-center text-xs font-bold text-indigo-300">
+                    <span className="w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold text-white"
+                          style={{ background: '#14532D' }}>
                       {radicado.clasificacion.funcionarioResponsableNombre.charAt(0).toUpperCase()}
                     </span>
-                    <p className="text-sm font-semibold text-slate-100">
+                    <p className="text-sm font-semibold" style={{ color: '#1F2933' }}>
                       {radicado.clasificacion.funcionarioResponsableNombre}
                     </p>
                   </div>
@@ -1608,10 +1609,7 @@ function PanelDerecho({
                     {radicado.clasificacion.funcionarioResponsableCargo && (
                       <FilaInfo label="Cargo" value={radicado.clasificacion.funcionarioResponsableCargo} />
                     )}
-                    <FilaInfo
-                      label="Dependencia"
-                      value={NOMBRES_TENANT[radicado.clasificacion.oficinaDestino]}
-                    />
+                    <FilaInfo label="Dependencia" value={NOMBRES_TENANT[radicado.clasificacion.oficinaDestino]} />
                     {radicado.clasificacion.funcionarioResponsableEmail && (
                       <FilaInfo label="Email" value={radicado.clasificacion.funcionarioResponsableEmail} />
                     )}
@@ -1619,38 +1617,36 @@ function PanelDerecho({
                       <FilaInfo label="Rol" value={radicado.clasificacion.funcionarioResponsableRol} />
                     )}
                     {radicado.clasificacion.fechaAsignacionResponsable && (
-                      <FilaInfo
-                        label="Fecha asignación"
-                        value={fmtFechaLarga(radicado.clasificacion.fechaAsignacionResponsable)}
-                      />
+                      <FilaInfo label="Fecha asignación" value={fmtFechaLarga(radicado.clasificacion.fechaAsignacionResponsable)} />
                     )}
                   </div>
                 </div>
               ) : radicado.clasificacion.funcionarioResponsableUid ? (
-                <div className="bg-slate-900/30 border border-white/[0.06] rounded-lg p-3">
-                  <p className="text-xs text-slate-500">
-                    <span className="font-mono text-slate-400">{radicado.clasificacion.funcionarioResponsableUid}</span>
+                <div className="rounded-lg p-3" style={{ background: '#F8FAF7', border: '1px solid #D9E2D9' }}>
+                  <p className="text-xs" style={{ color: '#667085' }}>
+                    <span className="font-mono" style={{ color: '#94A3B8' }}>{radicado.clasificacion.funcionarioResponsableUid}</span>
                     <br />
-                    <span className="text-slate-600">Radicado anterior — nombre no registrado. Ver trazabilidad para detalle.</span>
+                    <span style={{ color: '#94A3B8' }}>Radicado anterior — nombre no registrado. Ver trazabilidad para detalle.</span>
                   </p>
                 </div>
               ) : (
-                <p className="text-xs text-slate-700 italic">Sin responsable asignado</p>
+                <p className="text-xs italic" style={{ color: '#94A3B8' }}>Sin responsable asignado</p>
               )}
             </div>
 
             {radicado.archivos.length > 0 && (
-              <div className="border-t border-white/[0.07] pt-4">
-                <p className="text-[10px] font-bold uppercase tracking-widest text-slate-600 mb-3">
+              <div className="rounded-xl bg-white p-4" style={{ border: '1px solid #D9E2D9' }}>
+                <p className="text-[10px] font-bold uppercase tracking-widest mb-3" style={{ color: '#14532D' }}>
                   Archivos adjuntos ({radicado.archivos.length})
                 </p>
                 <ul className="space-y-2">
                   {radicado.archivos.map((arch, i) => (
-                    <li key={i} className="flex items-center justify-between gap-3 py-2 border-b border-white/[0.05] last:border-0">
-                      <span className="text-xs text-slate-300 truncate min-w-0">{arch.nombre}</span>
+                    <li key={i} className="flex items-center justify-between gap-3 py-2 last:border-0"
+                        style={{ borderBottom: '1px solid #EEF4EE' }}>
+                      <span className="text-xs truncate min-w-0" style={{ color: '#1F2933' }}>{arch.nombre}</span>
                       {arch.path && (
                         <a href={`/api/interno/archivo?path=${encodeURIComponent(arch.path)}`} target="_blank" rel="noopener noreferrer"
-                          className="shrink-0 text-xs text-indigo-400 hover:text-indigo-300 underline underline-offset-2">
+                          className="shrink-0 text-xs underline underline-offset-2 font-semibold" style={{ color: '#14532D' }}>
                           Ver
                         </a>
                       )}
@@ -1737,7 +1733,7 @@ function PanelDerecho({
         {tab === 'traslado' && (
           <div className="space-y-4">
             <div>
-              <p className="text-[10px] font-bold uppercase tracking-widest text-slate-600 mb-1.5">Dependencia destino</p>
+              <p className="text-[10px] font-bold uppercase tracking-widest mb-1.5" style={{ color: '#667085' }}>Dependencia destino</p>
               <select
                 value={tenantDestino}
                 onChange={(e) => setTenantDestino(e.target.value as TenantId)}
@@ -1751,12 +1747,12 @@ function PanelDerecho({
 
             {/* Selector MIPG-2 — responsable funcional */}
             <div>
-              <p className="text-[10px] font-bold uppercase tracking-widest text-slate-600 mb-1.5">
-                Responsable funcional <span className="normal-case font-normal text-slate-600">(opcional)</span>
+              <p className="text-[10px] font-bold uppercase tracking-widest mb-1.5" style={{ color: '#667085' }}>
+                Responsable funcional <span className="normal-case font-normal" style={{ color: '#94A3B8' }}>(opcional)</span>
               </p>
               {cargandoFuncionarios ? (
-                <div className="flex items-center gap-2 text-xs text-slate-500 py-2">
-                  <span className="w-3 h-3 border-2 border-slate-500/30 border-t-slate-400 rounded-full animate-spin" />
+                <div className="flex items-center gap-2 text-xs py-2" style={{ color: '#94A3B8' }}>
+                  <span className="w-3 h-3 border-2 rounded-full animate-spin" style={{ borderColor: '#D9E2D9', borderTopColor: '#14532D' }} />
                   Cargando funcionarios…
                 </div>
               ) : funcionariosTenant.length > 0 ? (
@@ -1786,56 +1782,55 @@ function PanelDerecho({
                 />
               )}
               {responsableSelec && (
-                <p className="text-[10px] text-slate-500 mt-1.5">
+                <p className="text-[10px] mt-1.5" style={{ color: '#94A3B8' }}>
                   📧 {responsableSelec.email}
                 </p>
               )}
             </div>
 
             {/* Responsable actual del radicado */}
-            <div className="border-t border-white/[0.07] pt-3">
-              <p className="text-[10px] font-bold uppercase tracking-widest text-slate-600 mb-2">
+            <div className="pt-3" style={{ borderTop: '1px solid #D9E2D9' }}>
+              <p className="text-[10px] font-bold uppercase tracking-widest mb-2" style={{ color: '#667085' }}>
                 Responsable registrado actualmente
               </p>
               {radicado.clasificacion.funcionarioResponsableNombre ? (
-                <div className="bg-slate-900/40 border border-white/[0.07] rounded-lg p-3 space-y-1">
-                  <p className="text-sm font-semibold text-slate-200">{radicado.clasificacion.funcionarioResponsableNombre}</p>
+                <div className="rounded-lg p-3 space-y-1" style={{ background: '#EEF4EE', border: '1px solid #D9E2D9' }}>
+                  <p className="text-sm font-semibold" style={{ color: '#1F2933' }}>{radicado.clasificacion.funcionarioResponsableNombre}</p>
                   {radicado.clasificacion.funcionarioResponsableCargo && (
-                    <p className="text-xs text-slate-500">{radicado.clasificacion.funcionarioResponsableCargo}</p>
+                    <p className="text-xs" style={{ color: '#667085' }}>{radicado.clasificacion.funcionarioResponsableCargo}</p>
                   )}
                   {radicado.clasificacion.funcionarioResponsableEmail && (
-                    <p className="text-xs text-slate-500">📧 {radicado.clasificacion.funcionarioResponsableEmail}</p>
+                    <p className="text-xs" style={{ color: '#667085' }}>📧 {radicado.clasificacion.funcionarioResponsableEmail}</p>
                   )}
                   {radicado.clasificacion.fechaAsignacionResponsable && (
-                    <p className="text-[10px] text-slate-600 mt-1">
+                    <p className="text-[10px] mt-1" style={{ color: '#94A3B8' }}>
                       Asignado: {new Date(radicado.clasificacion.fechaAsignacionResponsable).toLocaleDateString('es-CO')}
                     </p>
                   )}
                 </div>
               ) : radicado.clasificacion.funcionarioResponsableUid ? (
-                <p className="text-xs text-slate-600">
+                <p className="text-xs" style={{ color: '#94A3B8' }}>
                   UID: {radicado.clasificacion.funcionarioResponsableUid}
-                  <span className="ml-2 text-slate-700">(radicado anterior — nombre no registrado)</span>
+                  <span className="ml-2" style={{ color: '#94A3B8' }}>(radicado anterior — nombre no registrado)</span>
                 </p>
               ) : (
-                <p className="text-xs text-slate-700">Sin responsable asignado</p>
+                <p className="text-xs italic" style={{ color: '#94A3B8' }}>Sin responsable asignado</p>
               )}
             </div>
 
-            <button
-              type="button"
-              onClick={asignar}
-              disabled={guardando || soloLectura}
+            <button type="button" onClick={asignar} disabled={guardando || soloLectura}
               title={soloLectura ? 'Tu rol no permite realizar acciones sobre radicados.' : undefined}
-              className="w-full py-2.5 rounded-lg bg-indigo-600 hover:bg-indigo-500 active:scale-[0.98] text-white text-sm font-bold transition-all duration-150 disabled:opacity-60 flex items-center justify-center gap-2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-400"
-            >
+              className="w-full py-2.5 rounded-lg text-white text-sm font-bold transition-all duration-150 disabled:opacity-60 flex items-center justify-center gap-2"
+              style={{ background: '#14532D' }}
+              onMouseEnter={(e) => { if (!guardando && !soloLectura) (e.currentTarget as HTMLElement).style.background = '#166534'; }}
+              onMouseLeave={(e) => { (e.currentTarget as HTMLElement).style.background = '#14532D'; }}>
               {guardando && <span className="w-3.5 h-3.5 border-2 border-white/30 border-t-white rounded-full animate-spin" />}
               Confirmar traslado
             </button>
 
-            <div className="border-t border-white/[0.07] pt-4">
-              <p className="text-[10px] font-bold uppercase tracking-widest text-slate-500 mb-2">Destino actual</p>
-              <p className="text-sm text-slate-300">{NOMBRES_TENANT[radicado.clasificacion.oficinaDestino]}</p>
+            <div className="pt-4" style={{ borderTop: '1px solid #D9E2D9' }}>
+              <p className="text-[10px] font-bold uppercase tracking-widest mb-2" style={{ color: '#94A3B8' }}>Destino actual</p>
+              <p className="text-sm font-medium" style={{ color: '#1F2933' }}>{NOMBRES_TENANT[radicado.clasificacion.oficinaDestino]}</p>
             </div>
           </div>
         )}
@@ -1843,131 +1838,111 @@ function PanelDerecho({
         {/* ── TAB 3: Trazabilidad MIPG ── */}
         {tab === 'trazabilidad' && (
           <div>
-            {cargandoTrazabilidad
-              ? (
-                <div className="flex items-center gap-2 text-sm text-slate-500">
-                  <span className="w-4 h-4 border-2 border-indigo-500/30 border-t-indigo-500 rounded-full animate-spin" />
-                  Cargando trazabilidad...
-                </div>
-              )
-              : trazabilidad.length === 0
-              ? <p className="text-sm text-slate-600 italic">Sin eventos de trazabilidad.</p>
-              : (
-                <ol className="relative flex flex-col gap-0">
-                  {[...trazabilidad]
-                    .sort((a, b) => new Date(b.fecha).getTime() - new Date(a.fecha).getTime())
-                    .map((evento, idx, arr) => (
-                      <li key={`${evento.fecha}-${idx}`} className="relative flex gap-3 pb-5 last:pb-0">
-                        {idx < arr.length - 1 && (
-                          <div className="absolute left-[9px] top-5 bottom-0 w-px bg-white/[0.07]" />
+            {cargandoTrazabilidad ? (
+              <div className="flex items-center gap-2 text-sm" style={{ color: '#94A3B8' }}>
+                <span className="w-4 h-4 border-2 rounded-full animate-spin"
+                      style={{ borderColor: '#D9E2D9', borderTopColor: '#14532D' }} />
+                Cargando trazabilidad...
+              </div>
+            ) : trazabilidad.length === 0 ? (
+              <p className="text-sm italic" style={{ color: '#94A3B8' }}>Sin eventos de trazabilidad.</p>
+            ) : (
+              <ol className="relative flex flex-col gap-0">
+                {[...trazabilidad]
+                  .sort((a, b) => new Date(b.fecha).getTime() - new Date(a.fecha).getTime())
+                  .map((evento, idx, arr) => (
+                    <li key={`${evento.fecha}-${idx}`} className="relative flex gap-3 pb-5 last:pb-0">
+                      {idx < arr.length - 1 && (
+                        <div className="absolute left-[9px] top-5 bottom-0 w-px" style={{ background: '#D9E2D9' }} />
+                      )}
+                      <div className="shrink-0 w-[18px] h-[18px] mt-0.5 rounded-full flex items-center justify-center z-10"
+                           style={{ background: '#EEF4EE', border: '2px solid #14532D' }}>
+                        <span className="w-1.5 h-1.5 rounded-full" style={{ background: '#14532D' }} />
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-baseline justify-between gap-2 flex-wrap mb-0.5">
+                          <span className="text-xs font-semibold" style={{ color: '#1F2933' }}>{evento.accion}</span>
+                          <time className="shrink-0 text-[10px] font-mono" style={{ color: '#94A3B8' }}>
+                            {fmtFechaLarga(evento.fecha)}
+                          </time>
+                        </div>
+                        <p className="text-xs" style={{ color: '#667085' }}>{evento.actorNombre}</p>
+                        <p className="text-xs mt-0.5 leading-relaxed" style={{ color: '#94A3B8' }}>{evento.nota}</p>
+                        {(evento.oficinaOrigen || evento.oficinaDestino) && (
+                          <p className="text-[10px] font-mono mt-0.5" style={{ color: '#94A3B8' }}>
+                            {evento.oficinaOrigen && NOMBRES_TENANT[evento.oficinaOrigen]}
+                            {evento.oficinaOrigen && evento.oficinaDestino && ' → '}
+                            {evento.oficinaDestino && NOMBRES_TENANT[evento.oficinaDestino]}
+                          </p>
                         )}
-                        <div className="shrink-0 w-[18px] h-[18px] mt-0.5 rounded-full bg-indigo-500/30 border border-indigo-500/50 flex items-center justify-center z-10">
-                          <span className="w-1.5 h-1.5 rounded-full bg-indigo-400" />
-                        </div>
-                        <div className="flex-1 min-w-0">
-                          <div className="flex items-baseline justify-between gap-2 flex-wrap mb-0.5">
-                            <span className="text-xs font-semibold text-slate-200">{evento.accion}</span>
-                            <time className="shrink-0 text-[10px] font-mono text-slate-600">
-                              {fmtFechaLarga(evento.fecha)}
-                            </time>
-                          </div>
-                          <p className="text-xs text-slate-500">{evento.actorNombre}</p>
-                          <p className="text-xs text-slate-400 mt-0.5 leading-relaxed">{evento.nota}</p>
-                          {(evento.oficinaOrigen || evento.oficinaDestino) && (
-                            <p className="text-[10px] text-slate-600 font-mono mt-0.5">
-                              {evento.oficinaOrigen && NOMBRES_TENANT[evento.oficinaOrigen]}
-                              {evento.oficinaOrigen && evento.oficinaDestino && ' → '}
-                              {evento.oficinaDestino && NOMBRES_TENANT[evento.oficinaDestino]}
-                            </p>
-                          )}
-                        </div>
-                      </li>
-                    ))}
-                </ol>
-              )}
+                      </div>
+                    </li>
+                  ))}
+              </ol>
+            )}
           </div>
         )}
 
         {/* ── TAB 4: Prórroga / Respuesta ── */}
         {tab === 'respuesta' && (
-          <div className="space-y-5">
+          <div className="space-y-4">
             {/* Devolver */}
-            <div className="bg-rose-500/5 border border-rose-500/20 rounded-xl p-4 space-y-3">
-              <p className="text-xs font-bold uppercase tracking-widest text-rose-400">Devolver al ciudadano</p>
+            <div className="rounded-xl p-4 space-y-3" style={{ background: '#FEF2F2', border: '1px solid #FECACA' }}>
+              <p className="text-xs font-bold uppercase tracking-widest text-red-700">Devolver al ciudadano</p>
               <div>
-                <p className="text-[10px] font-bold uppercase tracking-widest text-slate-600 mb-1.5">Motivo</p>
-                <textarea
-                  value={motivo}
-                  onChange={(e) => setMotivo(e.target.value)}
-                  rows={3}
-                  placeholder="Indica la razón de la devolución…"
-                  className="input-internal resize-none"
-                />
+                <p className="text-[10px] font-bold uppercase tracking-widest mb-1.5" style={{ color: '#667085' }}>Motivo</p>
+                <textarea value={motivo} onChange={(e) => setMotivo(e.target.value)} rows={3}
+                  placeholder="Indica la razón de la devolución…" className="input-internal resize-none" />
               </div>
-              <button
-                type="button"
-                onClick={devolver}
-                disabled={guardando || soloLectura}
+              <button type="button" onClick={devolver} disabled={guardando || soloLectura}
                 title={soloLectura ? 'Tu rol no permite realizar acciones sobre radicados.' : undefined}
-                className="w-full py-2 rounded-lg border border-rose-500/40 text-rose-300 text-sm font-bold hover:bg-rose-500/10 active:scale-[0.98] transition-all duration-150 disabled:opacity-60 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-rose-500/40"
-              >
+                className="w-full py-2 rounded-lg text-sm font-bold transition-all disabled:opacity-60 active:scale-[0.98]"
+                style={{ border: '1px solid #FECACA', color: '#DC2626', background: 'transparent' }}
+                onMouseEnter={(e) => { (e.currentTarget as HTMLElement).style.background = '#FEE2E2'; }}
+                onMouseLeave={(e) => { (e.currentTarget as HTMLElement).style.background = 'transparent'; }}>
                 Devolver
               </button>
             </div>
 
             {/* Prórroga */}
-            <div className="bg-amber-500/5 border border-amber-500/20 rounded-xl p-4 space-y-3">
-              <p className="text-xs font-bold uppercase tracking-widest text-amber-400">Aplicar prórroga legal</p>
+            <div className="rounded-xl p-4 space-y-3" style={{ background: '#FFFBEB', border: '1px solid #FDE68A' }}>
+              <p className="text-xs font-bold uppercase tracking-widest text-amber-700">Aplicar prórroga legal</p>
               <div className="flex gap-3">
                 <div className="flex-1">
-                  <p className="text-[10px] font-bold uppercase tracking-widest text-slate-600 mb-1.5">Motivo</p>
-                  <input
-                    value={motivo}
-                    onChange={(e) => setMotivo(e.target.value)}
-                    placeholder="Fundamento legal de la prórroga"
-                    className="input-internal"
-                  />
+                  <p className="text-[10px] font-bold uppercase tracking-widest mb-1.5" style={{ color: '#667085' }}>Motivo</p>
+                  <input value={motivo} onChange={(e) => setMotivo(e.target.value)}
+                    placeholder="Fundamento legal de la prórroga" className="input-internal" />
                 </div>
                 <div className="w-24">
-                  <p className="text-[10px] font-bold uppercase tracking-widest text-slate-600 mb-1.5">Días</p>
-                  <input
-                    type="number"
-                    min={1}
-                    max={30}
-                    value={diasProrroga}
+                  <p className="text-[10px] font-bold uppercase tracking-widest mb-1.5" style={{ color: '#667085' }}>Días</p>
+                  <input type="number" min={1} max={30} value={diasProrroga}
                     onChange={(e) => setDiasProrroga(Math.max(1, Number(e.target.value)))}
-                    className="input-internal text-center"
-                  />
+                    className="input-internal text-center" />
                 </div>
               </div>
-              <button
-                type="button"
-                onClick={aplicarProrroga}
-                disabled={guardando || soloLectura}
+              <button type="button" onClick={aplicarProrroga} disabled={guardando || soloLectura}
                 title={soloLectura ? 'Tu rol no permite realizar acciones sobre radicados.' : undefined}
-                className="w-full py-2 rounded-lg border border-amber-500/40 text-amber-300 text-sm font-bold hover:bg-amber-500/10 active:scale-[0.98] transition-all duration-150 disabled:opacity-60 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-500/40"
-              >
+                className="w-full py-2 rounded-lg text-sm font-bold transition-all disabled:opacity-60 active:scale-[0.98]"
+                style={{ border: '1px solid #FDE68A', color: '#B45309', background: 'transparent' }}
+                onMouseEnter={(e) => { (e.currentTarget as HTMLElement).style.background = '#FEF3C7'; }}
+                onMouseLeave={(e) => { (e.currentTarget as HTMLElement).style.background = 'transparent'; }}>
                 Aplicar prórroga (+{diasProrroga} días)
               </button>
             </div>
 
             {/* Respuesta final */}
-            <div className="bg-emerald-500/5 border border-emerald-500/20 rounded-xl p-4 space-y-3">
-              <p className="text-xs font-bold uppercase tracking-widest text-emerald-400">Cargar respuesta / resolver</p>
+            <div className="rounded-xl p-4 space-y-3" style={{ background: '#F0FDF4', border: '1px solid #BBF7D0' }}>
+              <p className="text-xs font-bold uppercase tracking-widest text-green-700">Cargar respuesta / resolver</p>
 
-              {/* Oficio archivado — visible si el radicado ya fue resuelto con PDF */}
               {radicado.respuestaOficial && (
-                <div className="rounded-lg bg-slate-800/60 border border-white/[0.07] p-3 space-y-1">
-                  <p className="text-[10px] font-bold uppercase tracking-widest text-slate-500">Oficio de respuesta archivado</p>
-                  <p className="text-xs text-slate-300 leading-relaxed">{radicado.respuestaOficial.nota}</p>
+                <div className="rounded-lg p-3 space-y-1 bg-white" style={{ border: '1px solid #D9E2D9' }}>
+                  <p className="text-[10px] font-bold uppercase tracking-widest" style={{ color: '#667085' }}>Oficio de respuesta archivado</p>
+                  <p className="text-xs leading-relaxed" style={{ color: '#1F2933' }}>{radicado.respuestaOficial.nota}</p>
                   <div className="flex items-center justify-between pt-1">
-                    <span className="text-[10px] text-slate-600 font-mono truncate">{radicado.respuestaOficial.archivoNombre}</span>
-                    <a
-                      href={`/api/interno/archivo?path=${encodeURIComponent(radicado.respuestaOficial.archivoPath)}`}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="shrink-0 text-xs text-indigo-400 hover:text-indigo-300 underline underline-offset-2 ml-3"
-                    >
+                    <span className="text-[10px] font-mono truncate" style={{ color: '#94A3B8' }}>{radicado.respuestaOficial.archivoNombre}</span>
+                    <a href={`/api/interno/archivo?path=${encodeURIComponent(radicado.respuestaOficial.archivoPath)}`}
+                      target="_blank" rel="noopener noreferrer"
+                      className="shrink-0 text-xs underline underline-offset-2 ml-3 font-semibold" style={{ color: '#14532D' }}>
                       Descargar oficio
                     </a>
                   </div>
@@ -1975,78 +1950,63 @@ function PanelDerecho({
               )}
 
               <div>
-                <p className="text-[10px] font-bold uppercase tracking-widest text-slate-600 mb-1.5">Nota de resolución</p>
-                <textarea
-                  value={respuesta}
-                  onChange={(e) => setRespuesta(e.target.value)}
-                  rows={4}
+                <p className="text-[10px] font-bold uppercase tracking-widest mb-1.5" style={{ color: '#667085' }}>Nota de resolución</p>
+                <textarea value={respuesta} onChange={(e) => setRespuesta(e.target.value)} rows={4}
                   placeholder="Describe la respuesta dada al ciudadano…"
-                  className="input-internal resize-none"
-                  disabled={radicado.estadoActual === 'RESUELTO'}
-                />
+                  className="input-internal resize-none" disabled={radicado.estadoActual === 'RESUELTO'} />
               </div>
 
-              {/* Upload PDF firmado */}
               {radicado.estadoActual !== 'RESUELTO' && (
                 <div>
-                  <p className="text-[10px] font-bold uppercase tracking-widest text-slate-600 mb-1.5">
-                    PDF firmado <span className="text-slate-700 normal-case font-normal">(opcional)</span>
+                  <p className="text-[10px] font-bold uppercase tracking-widest mb-1.5" style={{ color: '#667085' }}>
+                    PDF firmado <span className="normal-case font-normal" style={{ color: '#94A3B8' }}>(opcional)</span>
                   </p>
                   {archivoPdf ? (
-                    <div className="flex items-center justify-between gap-2 px-3 py-2 rounded-lg bg-emerald-500/10 border border-emerald-500/30">
-                      <span className="text-xs text-emerald-300 truncate min-w-0">{archivoPdf.name}</span>
-                      <button
-                        type="button"
-                        onClick={() => setArchivoPdf(null)}
-                        className="shrink-0 text-[10px] text-slate-500 hover:text-rose-400 transition-colors"
-                      >
+                    <div className="flex items-center justify-between gap-2 px-3 py-2 rounded-lg"
+                         style={{ background: '#F0FDF4', border: '1px solid #BBF7D0' }}>
+                      <span className="text-xs text-green-700 truncate min-w-0">{archivoPdf.name}</span>
+                      <button type="button" onClick={() => setArchivoPdf(null)}
+                        className="shrink-0 text-[10px] transition-colors" style={{ color: '#94A3B8' }}
+                        onMouseEnter={(e) => { (e.currentTarget as HTMLElement).style.color = '#DC2626'; }}
+                        onMouseLeave={(e) => { (e.currentTarget as HTMLElement).style.color = '#94A3B8'; }}>
                         Quitar
                       </button>
                     </div>
                   ) : (
-                    <label className="flex items-center gap-2 px-3 py-2.5 rounded-lg border border-dashed border-white/[0.12] hover:border-indigo-500/40 cursor-pointer transition-colors group">
-                      <svg className="w-4 h-4 text-slate-600 group-hover:text-indigo-400 transition-colors shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
+                    <label className="flex items-center gap-2 px-3 py-2.5 rounded-lg border border-dashed cursor-pointer transition-colors"
+                           style={{ borderColor: '#D9E2D9' }}>
+                      <svg className="w-4 h-4 shrink-0" style={{ color: '#94A3B8' }} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
                         <path strokeLinecap="round" strokeLinejoin="round" d="M18.375 12.739l-7.693 7.693a4.5 4.5 0 01-6.364-6.364l10.94-10.94A3 3 0 1119.5 7.372L8.552 18.32m.009-.01l-.01.01m5.699-9.941l-7.81 7.81a1.5 1.5 0 002.112 2.13" />
                       </svg>
-                      <span className="text-xs text-slate-600 group-hover:text-slate-400 transition-colors">Adjuntar oficio firmado (PDF, máx. 10 MB)</span>
-                      <input
-                        type="file"
-                        accept="application/pdf"
-                        className="sr-only"
+                      <span className="text-xs" style={{ color: '#667085' }}>Adjuntar oficio firmado (PDF, máx. 10 MB)</span>
+                      <input type="file" accept="application/pdf" className="sr-only"
                         onChange={(e) => {
                           const f = e.target.files?.[0];
                           if (!f) return;
-                          if (f.size > 10 * 1024 * 1024) {
-                            setErrorLocal('El archivo supera los 10 MB.');
-                          } else {
-                            setArchivoPdf(f);
-                          }
+                          if (f.size > 10 * 1024 * 1024) { setErrorLocal('El archivo supera los 10 MB.'); }
+                          else { setArchivoPdf(f); }
                           e.target.value = '';
-                        }}
-                      />
+                        }} />
                     </label>
                   )}
                 </div>
               )}
 
-              <button
-                type="button"
-                onClick={responderCaso}
+              <button type="button" onClick={responderCaso}
                 disabled={guardando || radicado.estadoActual === 'RESUELTO' || soloLectura}
                 title={soloLectura ? 'Tu rol no permite realizar acciones sobre radicados.' : undefined}
-                className="w-full py-2 rounded-lg bg-emerald-700 hover:bg-emerald-600 active:scale-[0.98] text-white text-sm font-bold transition-all duration-150 disabled:opacity-60 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500/50"
-              >
-                {soloLectura
-                  ? 'Vista de solo lectura'
-                  : radicado.estadoActual === 'RESUELTO'
-                    ? 'Ya está resuelto'
-                    : 'Marcar como resuelto'}
+                className="w-full py-2 rounded-lg text-white text-sm font-bold transition-all disabled:opacity-60 active:scale-[0.98]"
+                style={{ background: '#14532D' }}
+                onMouseEnter={(e) => { (e.currentTarget as HTMLElement).style.background = '#166534'; }}
+                onMouseLeave={(e) => { (e.currentTarget as HTMLElement).style.background = '#14532D'; }}>
+                {soloLectura ? 'Vista de solo lectura' : radicado.estadoActual === 'RESUELTO' ? 'Ya está resuelto' : 'Marcar como resuelto'}
               </button>
             </div>
 
             {guardando && (
-              <div className="flex items-center justify-center gap-2 text-xs text-slate-500">
-                <span className="w-3.5 h-3.5 border-2 border-slate-500/30 border-t-slate-400 rounded-full animate-spin" />
+              <div className="flex items-center justify-center gap-2 text-xs" style={{ color: '#94A3B8' }}>
+                <span className="w-3.5 h-3.5 border-2 rounded-full animate-spin"
+                      style={{ borderColor: '#D9E2D9', borderTopColor: '#14532D' }} />
                 Guardando en Firestore…
               </div>
             )}
@@ -2141,16 +2101,21 @@ function DrawerNuevoRadicado({
       <div className="fixed inset-0 z-40 bg-black/60 backdrop-blur-sm" onClick={onCerrar} />
 
       {/* Panel */}
-      <div className="fixed inset-y-0 right-0 z-50 w-full max-w-2xl bg-[#0D1117] border-l border-white/10 flex flex-col shadow-2xl">
+      <div className="fixed inset-y-0 right-0 z-50 w-full max-w-2xl bg-white flex flex-col shadow-2xl"
+           style={{ borderLeft: '1px solid #D9E2D9' }}>
 
         {/* Header */}
-        <div className="flex items-center justify-between px-5 py-4 border-b border-white/[0.07] shrink-0">
+        <div className="flex items-center justify-between px-5 py-4 shrink-0 bg-white"
+             style={{ borderBottom: '1px solid #D9E2D9' }}>
           <div>
-            <h2 className="text-base font-black text-slate-100">Radicación Rápida</h2>
-            <p className="text-xs text-slate-500">Nuevo radicado institucional · Ventanilla Única</p>
+            <h2 className="text-base font-black" style={{ color: '#1F2933' }}>Radicación Rápida</h2>
+            <p className="text-xs" style={{ color: '#667085' }}>Nuevo radicado institucional · Ventanilla Única</p>
           </div>
           <button onClick={onCerrar}
-            className="p-2 rounded-xl text-slate-400 hover:text-slate-100 hover:bg-white/[0.06] active:scale-90 transition-all duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/25">
+            className="p-2 rounded-xl active:scale-90 transition-all duration-150 focus-visible:outline-none"
+            style={{ color: '#94A3B8' }}
+            onMouseEnter={(e) => { (e.currentTarget as HTMLElement).style.color = '#1F2933'; (e.currentTarget as HTMLElement).style.background = '#EEF4EE'; }}
+            onMouseLeave={(e) => { (e.currentTarget as HTMLElement).style.color = '#94A3B8'; (e.currentTarget as HTMLElement).style.background = ''; }}>
             <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
               <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
             </svg>
@@ -2158,24 +2123,23 @@ function DrawerNuevoRadicado({
         </div>
 
         {/* Cuerpo */}
-        <div className="flex-1 overflow-y-auto px-5 py-5">
+        <div className="flex-1 overflow-y-auto px-5 py-5" style={{ background: '#F8FAF7' }}>
 
           {/* ── Estado de éxito ── */}
           {radicadoGenerado && datosComprobante && (
             <div className="flex flex-col items-center gap-6 py-8">
-              {/* Confirmación visual */}
               <div className="text-center">
-                <div className="inline-flex w-14 h-14 rounded-full bg-emerald-500/15 border border-emerald-500/30 items-center justify-center mb-3">
-                  <svg className="w-7 h-7 text-emerald-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
+                <div className="inline-flex w-14 h-14 rounded-full items-center justify-center mb-3"
+                     style={{ background: '#F0FDF4', border: '1px solid #BBF7D0' }}>
+                  <svg className="w-7 h-7 text-green-600" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
                     <path strokeLinecap="round" strokeLinejoin="round" d="M4.5 12.75l6 6 9-13.5" />
                   </svg>
                 </div>
-                <p className="text-xs font-bold uppercase tracking-widest text-emerald-400 mb-1">Radicado registrado</p>
-                <p className="text-2xl font-black font-mono text-indigo-300">{radicadoGenerado}</p>
-                <p className="text-xs text-slate-500 mt-1">Informe este número al ciudadano para seguimiento.</p>
+                <p className="text-xs font-bold uppercase tracking-widest mb-1" style={{ color: '#16A34A' }}>Radicado registrado</p>
+                <p className="text-2xl font-black font-mono" style={{ color: '#14532D' }}>{radicadoGenerado}</p>
+                <p className="text-xs mt-1" style={{ color: '#94A3B8' }}>Informe este número al ciudadano para seguimiento.</p>
               </div>
 
-              {/* Comprobante imprimible */}
               <ComprobanteRadicado
                 radicadoId={radicadoGenerado}
                 solicitanteNombre={datosComprobante.solicitanteNombre}
@@ -2194,56 +2158,47 @@ function DrawerNuevoRadicado({
                 numeroFolios={datosComprobante.numeroFolios}
               />
 
-              {/* Acciones */}
               <div className="flex gap-3">
                 <button
-                  onClick={() => {
-                    setRadicadoGenerado(null);
-                    setDatosComprobante(null);
-                    setProgreso('');
-                    setProgresoPct(0);
-                  }}
-                  className="px-5 py-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-500 active:scale-95 text-white text-sm font-bold transition-all duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-400"
-                >
-                  Radicar otro
-                </button>
-                <button
-                  onClick={onCerrar}
-                  className="px-5 py-2.5 rounded-xl border border-white/10 text-slate-300 hover:bg-white/[0.06] hover:border-white/20 active:scale-95 text-sm transition-all duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/25"
-                >
-                  Cerrar
-                </button>
+                  onClick={() => { setRadicadoGenerado(null); setDatosComprobante(null); setProgreso(''); setProgresoPct(0); }}
+                  className="px-5 py-2.5 rounded-xl text-white text-sm font-bold transition-all duration-150 active:scale-95"
+                  style={{ background: '#14532D' }}
+                  onMouseEnter={(e) => { (e.currentTarget as HTMLElement).style.background = '#166534'; }}
+                  onMouseLeave={(e) => { (e.currentTarget as HTMLElement).style.background = '#14532D'; }}
+                >Radicar otro</button>
+                <button onClick={onCerrar}
+                  className="px-5 py-2.5 rounded-xl text-sm transition-all duration-150 active:scale-95"
+                  style={{ border: '1px solid #D9E2D9', color: '#667085' }}
+                  onMouseEnter={(e) => { (e.currentTarget as HTMLElement).style.background = '#EEF4EE'; }}
+                  onMouseLeave={(e) => { (e.currentTarget as HTMLElement).style.background = ''; }}
+                >Cerrar</button>
               </div>
             </div>
           )}
 
           {/* ── Barra de progreso ── */}
           {!radicadoGenerado && progreso && (
-            <div className="mb-5 p-4 bg-slate-800/40 border border-white/10 rounded-xl">
+            <div className="mb-5 p-4 rounded-xl bg-white" style={{ border: '1px solid #D9E2D9' }}>
               <div className="flex items-center justify-between mb-2">
-                <span className="text-xs text-slate-400">{progreso}</span>
-                <span className="text-xs font-bold text-indigo-400 tabular-nums">{progresoPct}%</span>
+                <span className="text-xs" style={{ color: '#667085' }}>{progreso}</span>
+                <span className="text-xs font-bold tabular-nums" style={{ color: '#14532D' }}>{progresoPct}%</span>
               </div>
-              <div className="h-1.5 bg-slate-700/50 rounded-full overflow-hidden">
-                <div className="h-full bg-indigo-500 rounded-full transition-all duration-500"
-                  style={{ width: `${progresoPct}%` }} />
+              <div className="h-1.5 rounded-full overflow-hidden" style={{ background: '#EEF4EE' }}>
+                <div className="h-full rounded-full transition-all duration-500"
+                  style={{ width: `${progresoPct}%`, background: '#14532D' }} />
               </div>
             </div>
           )}
 
           {/* ── Error ── */}
           {errorGuardado && (
-            <div className="mb-4 p-3 bg-rose-500/10 border border-rose-500/30 rounded-xl text-xs text-rose-400">
+            <div className="mb-4 p-3 rounded-xl text-xs" style={{ background: '#FEF2F2', border: '1px solid #FECACA', color: '#DC2626' }}>
               {errorGuardado}
             </div>
           )}
 
-          {/* ── Formulario ── */}
           {!radicadoGenerado && (
-            <RadicacionFuncionarioForm
-              radicadoPreview="Se generará al radicar"
-              onSubmit={handleSubmit}
-            />
+            <RadicacionFuncionarioForm radicadoPreview="Se generará al radicar" onSubmit={handleSubmit} />
           )}
         </div>
       </div>
@@ -2491,18 +2446,20 @@ function BandejaAsignacion({
     <div className="flex-1 flex flex-col overflow-hidden min-h-0">
 
       {/* Encabezado */}
-      <div className="flex items-center justify-between gap-3 px-4 py-2.5 border-b border-white/[0.07] shrink-0">
+      <div className="flex items-center justify-between gap-3 px-4 py-2.5 shrink-0 bg-white"
+           style={{ borderBottom: '1px solid #D9E2D9' }}>
         <div className="flex items-center gap-2">
-          <h2 className="text-sm font-bold text-slate-200">Bandeja de Asignación</h2>
-          <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-indigo-500/15 text-indigo-300 border border-indigo-500/20">
+          <h2 className="text-sm font-bold" style={{ color: '#1F2933' }}>Bandeja de Asignación</h2>
+          <span className="text-[10px] font-bold px-2 py-0.5 rounded-full border"
+                style={{ background: '#EEF4EE', color: '#14532D', borderColor: '#D9E2D9' }}>
             {radicados.length} pendiente{radicados.length !== 1 ? 's' : ''}
           </span>
         </div>
         {seleccionMasiva.size > 0 && (
-          <button
-            onClick={() => dispatch({ type: 'LIMPIAR_SELECCION' })}
-            className="text-xs text-slate-500 hover:text-slate-300 transition-colors"
-          >
+          <button onClick={() => dispatch({ type: 'LIMPIAR_SELECCION' })}
+            className="text-xs transition-colors" style={{ color: '#94A3B8' }}
+            onMouseEnter={(e) => { (e.currentTarget as HTMLElement).style.color = '#667085'; }}
+            onMouseLeave={(e) => { (e.currentTarget as HTMLElement).style.color = '#94A3B8'; }}>
             Limpiar selección ({seleccionMasiva.size})
           </button>
         )}
@@ -2510,190 +2467,156 @@ function BandejaAsignacion({
 
       {/* Barra de asignación masiva */}
       {seleccionMasiva.size > 0 && (
-        <div className="flex items-center gap-3 px-4 py-2.5 bg-indigo-500/5 border-b border-indigo-500/20 shrink-0">
-          <span className="text-xs font-bold text-indigo-300 shrink-0">
+        <div className="flex items-center gap-3 px-4 py-2.5 shrink-0"
+             style={{ background: '#EEF4EE', borderBottom: '1px solid #D9E2D9' }}>
+          <span className="text-xs font-bold shrink-0" style={{ color: '#14532D' }}>
             {seleccionMasiva.size} seleccionado{seleccionMasiva.size !== 1 ? 's' : ''}
           </span>
-          <select
-            value={tenantMasivo}
-            onChange={(e) =>
-              dispatch({ type: 'SET_TENANT_MASIVO', tenant: e.target.value as TenantId | '' })
-            }
-            className="select-internal flex-1 text-xs"
-          >
+          <select value={tenantMasivo}
+            onChange={(e) => dispatch({ type: 'SET_TENANT_MASIVO', tenant: e.target.value as TenantId | '' })}
+            className="select-internal flex-1 text-xs">
             <option value="">— Selecciona dependencia destino —</option>
             {(Object.keys(DIRECTORIO_TENANTS) as TenantId[]).map((id) => (
               <option key={id} value={id}>{NOMBRES_TENANT[id]}</option>
             ))}
           </select>
-          <button
-            onClick={asignarSeleccionados}
-            disabled={!tenantMasivo || asignandoMasivo}
-            className="shrink-0 flex items-center gap-1.5 px-4 py-1.5 rounded-lg bg-indigo-600 hover:bg-indigo-500 active:scale-95 text-white text-xs font-bold transition-all duration-150 disabled:opacity-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-400/60"
-          >
-            {asignandoMasivo && (
-              <span className="w-3 h-3 border-2 border-white/30 border-t-white rounded-full animate-spin" />
-            )}
+          <button onClick={asignarSeleccionados} disabled={!tenantMasivo || asignandoMasivo}
+            className="shrink-0 flex items-center gap-1.5 px-4 py-1.5 rounded-lg text-white text-xs font-bold transition-all duration-150 disabled:opacity-50 active:scale-95"
+            style={{ background: '#14532D' }}
+            onMouseEnter={(e) => { (e.currentTarget as HTMLElement).style.background = '#166534'; }}
+            onMouseLeave={(e) => { (e.currentTarget as HTMLElement).style.background = '#14532D'; }}>
+            {asignandoMasivo && <span className="w-3 h-3 border-2 border-white/30 border-t-white rounded-full animate-spin" />}
             Asignar {seleccionMasiva.size}
           </button>
         </div>
       )}
 
-      {/* Feedback masivo */}
       {resultadoMasivo && (
-        <div className="mx-4 mt-2 px-3 py-2 bg-emerald-500/10 border border-emerald-500/30 rounded-lg text-xs text-emerald-300 shrink-0">
+        <div className="mx-4 mt-2 px-3 py-2 rounded-lg text-xs shrink-0"
+             style={{ background: '#F0FDF4', border: '1px solid #BBF7D0', color: '#166534' }}>
           {resultadoMasivo}
         </div>
       )}
-
       {error && (
-        <div className="mx-4 mt-3 p-3 rounded-xl bg-rose-500/10 border border-rose-500/30 text-xs text-rose-400 shrink-0">
+        <div className="mx-4 mt-3 p-3 rounded-xl text-xs shrink-0"
+             style={{ background: '#FEF2F2', border: '1px solid #FECACA', color: '#DC2626' }}>
           Error de conexión: {error}
         </div>
       )}
 
       {/* Tabla */}
-      <div className="flex-1 overflow-y-auto overflow-x-auto">
+      <div className="flex-1 overflow-y-auto overflow-x-auto bg-white">
         <table className="w-full text-sm">
-          <thead className="sticky top-0 z-10 bg-slate-900/90 backdrop-blur-sm">
-            <tr className="border-b border-white/[0.07]">
+          <thead className="sticky top-0 z-10" style={{ background: '#EEF4EE' }}>
+            <tr style={{ borderBottom: '1px solid #D9E2D9' }}>
               <th className="px-4 py-2.5 w-10">
-                <input
-                  type="checkbox"
-                  checked={todosSeleccionados}
-                  onChange={() =>
-                    dispatch({ type: 'SELECCIONAR_TODOS', radicadoIds: todosIds })
-                  }
-                  className="w-3.5 h-3.5 rounded border-slate-600 bg-slate-800 text-indigo-500 focus:ring-0 cursor-pointer"
-                />
+                <input type="checkbox" checked={todosSeleccionados}
+                  onChange={() => dispatch({ type: 'SELECCIONAR_TODOS', radicadoIds: todosIds })}
+                  className="w-3.5 h-3.5 rounded cursor-pointer"
+                  style={{ accentColor: '#14532D' }} />
               </th>
               {['Radicado', 'Solicitante', 'Tipo', 'Días', 'Dependencia destino', 'Acción'].map((h) => (
-                <th key={h} className="px-4 py-2.5 text-left text-[10px] font-bold uppercase tracking-widest text-slate-400 whitespace-nowrap">
+                <th key={h} className="px-4 py-2.5 text-left text-[10px] font-bold uppercase tracking-widest whitespace-nowrap"
+                    style={{ color: '#14532D' }}>
                   {h}
                 </th>
               ))}
             </tr>
           </thead>
           <tbody>
-            {cargando &&
-              Array.from({ length: 5 }).map((_, i) => (
-                <tr key={i} className="animate-pulse border-b border-white/[0.05]">
-                  {Array.from({ length: 7 }).map((_, j) => (
-                    <td key={j} className="px-4 py-3">
-                      <div className="h-3 rounded bg-slate-800/80" style={{ width: `${40 + (j % 3) * 20}%` }} />
-                    </td>
-                  ))}
-                </tr>
-              ))}
+            {cargando && Array.from({ length: 5 }).map((_, i) => (
+              <tr key={i} className="animate-pulse" style={{ borderBottom: '1px solid #EEF4EE' }}>
+                {Array.from({ length: 7 }).map((_, j) => (
+                  <td key={j} className="px-4 py-3">
+                    <div className="h-3 rounded" style={{ width: `${40 + (j % 3) * 20}%`, background: '#EEF4EE' }} />
+                  </td>
+                ))}
+              </tr>
+            ))}
 
             {!cargando && radicados.length === 0 && (
               <tr>
                 <td colSpan={7} className="px-4 py-16 text-center">
-                  <p className="text-slate-400 font-medium mb-1">Sin pendientes</p>
-                  <p className="text-xs text-slate-600">No hay radicados esperando asignación.</p>
+                  <p className="font-medium mb-1" style={{ color: '#667085' }}>Sin pendientes</p>
+                  <p className="text-xs" style={{ color: '#94A3B8' }}>No hay radicados esperando asignación.</p>
                 </td>
               </tr>
             )}
 
-            {!cargando &&
-              radicados.map((r) => {
-                const dias       = calcDiasRestantes(r);
-                const seleccionado = seleccionMasiva.has(r.radicadoId);
-                const esRojo     = r.prioridad === 'ROJO';
-                const ok         = exitoFila[r.radicadoId];
+            {!cargando && radicados.map((r) => {
+              const dias       = calcDiasRestantes(r);
+              const seleccionado = seleccionMasiva.has(r.radicadoId);
+              const esRojo     = r.prioridad === 'ROJO';
+              const ok         = exitoFila[r.radicadoId];
 
-                return (
-                  <tr
-                    key={r.radicadoId}
-                    className={`border-b border-white/[0.04] transition-colors ${
-                      seleccionado ? 'bg-indigo-500/5' : 'hover:bg-white/[0.025]'
-                    }`}
-                  >
-                    {/* Checkbox */}
-                    <td className="px-4 py-3">
-                      <input
-                        type="checkbox"
-                        checked={seleccionado}
-                        onChange={() =>
-                          dispatch({ type: 'TOGGLE_SELECCION', radicadoId: r.radicadoId })
-                        }
-                        className="w-3.5 h-3.5 rounded border-slate-600 bg-slate-800 text-indigo-500 focus:ring-0 cursor-pointer"
-                      />
-                    </td>
+              return (
+                <tr key={r.radicadoId} className="transition-colors"
+                    style={{ borderBottom: '1px solid #EEF4EE', background: seleccionado ? '#EEF4EE' : undefined }}
+                    onMouseEnter={(e) => { if (!seleccionado) (e.currentTarget as HTMLElement).style.background = '#F8FAF7'; }}
+                    onMouseLeave={(e) => { if (!seleccionado) (e.currentTarget as HTMLElement).style.background = ''; }}>
+                  <td className="px-4 py-3">
+                    <input type="checkbox" checked={seleccionado}
+                      onChange={() => dispatch({ type: 'TOGGLE_SELECCION', radicadoId: r.radicadoId })}
+                      className="w-3.5 h-3.5 rounded cursor-pointer"
+                      style={{ accentColor: '#14532D' }} />
+                  </td>
 
-                    {/* Radicado */}
-                    <td className="px-4 py-3 whitespace-nowrap">
-                      <div className="flex items-center gap-1.5">
-                        {esRojo && (
-                          <span className="w-1.5 h-1.5 rounded-full bg-red-500 animate-pulse shrink-0" />
-                        )}
-                        <span className="font-mono text-xs text-indigo-300">{r.radicadoId}</span>
-                      </div>
-                      <p className="text-[10px] text-slate-600 mt-0.5">{fmtFecha(r.control.fechaRadicado)}</p>
-                    </td>
+                  <td className="px-4 py-3 whitespace-nowrap">
+                    <div className="flex items-center gap-1.5">
+                      {esRojo && <span className="w-1.5 h-1.5 rounded-full bg-red-500 animate-pulse shrink-0" />}
+                      <span className="font-mono text-xs font-bold" style={{ color: '#14532D' }}>{r.radicadoId}</span>
+                    </div>
+                    <p className="text-[10px] mt-0.5" style={{ color: '#94A3B8' }}>{fmtFecha(r.control.fechaRadicado)}</p>
+                  </td>
 
-                    {/* Solicitante */}
-                    <td className="px-4 py-3 max-w-[160px]">
-                      <p className="text-xs font-medium text-slate-200 truncate">{r.solicitante.nombreCompleto}</p>
-                      <p className="text-[10px] text-slate-600 font-mono">
-                        {r.solicitante.tipoDocumento} {r.solicitante.numeroDocumento}
-                      </p>
-                    </td>
+                  <td className="px-4 py-3 max-w-[160px]">
+                    <p className="text-xs font-medium truncate" style={{ color: '#1F2933' }}>{r.solicitante.nombreCompleto}</p>
+                    <p className="text-[10px] font-mono" style={{ color: '#94A3B8' }}>
+                      {r.solicitante.tipoDocumento} {r.solicitante.numeroDocumento}
+                    </p>
+                  </td>
 
-                    {/* Tipo */}
-                    <td className="px-4 py-3 whitespace-nowrap">
-                      <p className="text-xs text-slate-400">{r.termino.tipoSolicitudNombre}</p>
-                      <p className="text-[10px] text-slate-600">{r.termino.diasRespuesta}d</p>
-                    </td>
+                  <td className="px-4 py-3 whitespace-nowrap">
+                    <p className="text-xs" style={{ color: '#667085' }}>{r.termino.tipoSolicitudNombre}</p>
+                    <p className="text-[10px]" style={{ color: '#94A3B8' }}>{r.termino.diasRespuesta}d</p>
+                  </td>
 
-                    {/* Días restantes */}
-                    <td className="px-4 py-3 whitespace-nowrap">
-                      <span className={`text-sm font-bold tabular-nums ${
-                        dias < 0 ? 'text-rose-400' : dias <= 2 ? 'text-orange-400' : 'text-slate-400'
-                      }`}>
-                        {dias < 0 ? `${Math.abs(dias)}d venc.` : `${dias}d`}
-                      </span>
-                    </td>
+                  <td className="px-4 py-3 whitespace-nowrap">
+                    <span className={`text-sm font-bold tabular-nums ${
+                      dias < 0 ? 'text-red-600' : dias <= 2 ? 'text-orange-600' : ''
+                    }`} style={dias > 2 ? { color: '#667085' } : {}}>
+                      {dias < 0 ? `${Math.abs(dias)}d venc.` : `${dias}d`}
+                    </span>
+                  </td>
 
-                    {/* Select destino */}
-                    <td className="px-4 py-3">
-                      <select
-                        value={getTenantFila(r.radicadoId)}
-                        onChange={(e) =>
-                          setTenantPorFila((p) => ({
-                            ...p,
-                            [r.radicadoId]: e.target.value as TenantId,
-                          }))
-                        }
-                        className="select-internal text-[11px] min-w-[150px]"
-                      >
-                        {(Object.keys(DIRECTORIO_TENANTS) as TenantId[]).map((id) => (
-                          <option key={id} value={id}>{NOMBRES_TENANT[id]}</option>
-                        ))}
-                      </select>
-                    </td>
+                  <td className="px-4 py-3">
+                    <select value={getTenantFila(r.radicadoId)}
+                      onChange={(e) => setTenantPorFila((p) => ({ ...p, [r.radicadoId]: e.target.value as TenantId }))}
+                      className="select-internal text-[11px] min-w-[150px]">
+                      {(Object.keys(DIRECTORIO_TENANTS) as TenantId[]).map((id) => (
+                        <option key={id} value={id}>{NOMBRES_TENANT[id]}</option>
+                      ))}
+                    </select>
+                  </td>
 
-                    {/* Botón */}
-                    <td className="px-4 py-3 whitespace-nowrap">
-                      {ok ? (
-                        <span className="text-xs text-emerald-400 font-bold">✓ Asignado</span>
-                      ) : (
-                        <button
-                          onClick={() => asignarUno(r)}
-                          disabled={!!asignandoFila[r.radicadoId]}
-                          className="flex items-center gap-1 px-3 py-1.5 rounded-lg bg-slate-700 hover:bg-slate-600 active:scale-95 text-white text-xs font-bold transition-all duration-150 disabled:opacity-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/30"
-                        >
-                          {asignandoFila[r.radicadoId] ? (
-                            <span className="w-3 h-3 border-2 border-white/30 border-t-white rounded-full animate-spin" />
-                          ) : (
-                            'Asignar →'
-                          )}
-                        </button>
-                      )}
-                    </td>
-                  </tr>
-                );
-              })}
+                  <td className="px-4 py-3 whitespace-nowrap">
+                    {ok ? (
+                      <span className="text-xs font-bold text-green-700">✓ Asignado</span>
+                    ) : (
+                      <button onClick={() => asignarUno(r)} disabled={!!asignandoFila[r.radicadoId]}
+                        className="flex items-center gap-1 px-3 py-1.5 rounded-lg text-white text-xs font-bold transition-all active:scale-95 disabled:opacity-50"
+                        style={{ background: '#14532D' }}
+                        onMouseEnter={(e) => { (e.currentTarget as HTMLElement).style.background = '#166534'; }}
+                        onMouseLeave={(e) => { (e.currentTarget as HTMLElement).style.background = '#14532D'; }}>
+                        {asignandoFila[r.radicadoId]
+                          ? <span className="w-3 h-3 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                          : 'Asignar →'}
+                      </button>
+                    )}
+                  </td>
+                </tr>
+              );
+            })}
           </tbody>
         </table>
       </div>

@@ -46,31 +46,27 @@ function KpiCard({
   color?: 'indigo' | 'emerald' | 'rose' | 'amber' | 'sky';
   icono: React.ReactNode;
 }) {
-  const ring: Record<typeof color, string> = {
-    indigo:  'border-indigo-500/30 bg-indigo-500/10',
-    emerald: 'border-emerald-500/30 bg-emerald-500/10',
-    rose:    'border-rose-500/30 bg-rose-500/10',
-    amber:   'border-amber-500/30 bg-amber-500/10',
-    sky:     'border-sky-500/30 bg-sky-500/10',
+  const ring: Record<typeof color, { border: string; bg: string; text: string; iconBg: string }> = {
+    indigo:  { border: '#D9E2D9', bg: '#EEF4EE', text: '#14532D', iconBg: '#D9E2D9' },
+    emerald: { border: '#BBF7D0', bg: '#F0FDF4', text: '#166534', iconBg: '#BBF7D0' },
+    rose:    { border: '#FECACA', bg: '#FEF2F2', text: '#DC2626', iconBg: '#FECACA' },
+    amber:   { border: '#FDE68A', bg: '#FFFBEB', text: '#B45309', iconBg: '#FDE68A' },
+    sky:     { border: '#BAE6FD', bg: '#F0F9FF', text: '#0369A1', iconBg: '#BAE6FD' },
   };
-  const txt: Record<typeof color, string> = {
-    indigo:  'text-indigo-400',
-    emerald: 'text-emerald-400',
-    rose:    'text-rose-400',
-    amber:   'text-amber-400',
-    sky:     'text-sky-400',
-  };
+  const c = ring[color];
 
   return (
-    <div className={`rounded-2xl border ${ring[color]} p-5 flex flex-col gap-3`}>
-      <div className={`w-9 h-9 rounded-xl ${ring[color]} border flex items-center justify-center ${txt[color]}`}>
+    <div className="rounded-2xl p-5 flex flex-col gap-3 bg-white"
+         style={{ border: `1px solid ${c.border}`, boxShadow: '0 1px 3px rgba(20,83,45,0.06)' }}>
+      <div className="w-9 h-9 rounded-xl flex items-center justify-center"
+           style={{ background: c.iconBg, color: c.text }}>
         {icono}
       </div>
       <div>
-        <p className="text-2xl font-black text-slate-50 tabular-nums leading-none">{valor}</p>
-        {sub && <p className={`text-xs mt-0.5 ${txt[color]}`}>{sub}</p>}
+        <p className="text-2xl font-black tabular-nums leading-none" style={{ color: '#1F2933' }}>{valor}</p>
+        {sub && <p className="text-xs mt-0.5" style={{ color: c.text }}>{sub}</p>}
       </div>
-      <p className="text-[11px] font-bold uppercase tracking-widest text-slate-500">{label}</p>
+      <p className="text-[11px] font-bold uppercase tracking-widest" style={{ color: '#94A3B8' }}>{label}</p>
     </div>
   );
 }
@@ -85,7 +81,7 @@ function BarraProgreso({
   height?: string;
 }) {
   return (
-    <div className={`w-full ${height} rounded-full bg-white/[0.06] overflow-hidden`}>
+    <div className={`w-full ${height} rounded-full overflow-hidden`} style={{ background: '#EEF4EE' }}>
       <div
         className={`${height} rounded-full ${color} transition-all duration-700`}
         style={{ width: `${Math.min(100, Math.max(0, pct))}%` }}
@@ -117,8 +113,8 @@ function AnilloSvg({ pct, color }: { pct: number; color: string }) {
 function SeccionTitulo({ label, sub }: { label: string; sub?: string }) {
   return (
     <div className="mb-5">
-      <h3 className="text-base font-bold text-slate-100">{label}</h3>
-      {sub && <p className="text-[11px] text-slate-500 mt-0.5">{sub}</p>}
+      <h3 className="text-base font-bold" style={{ color: '#1F2933' }}>{label}</h3>
+      {sub && <p className="text-[11px] mt-0.5" style={{ color: '#94A3B8' }}>{sub}</p>}
     </div>
   );
 }
@@ -206,32 +202,32 @@ function SectionKPIs({ g }: { g: MetricasGlobales }) {
 function SectionDependencias({ rows }: { rows: MetricaPorDependencia[] }) {
   const max = rows[0]?.recibidos ?? 1;
   return (
-    <div className="rounded-2xl border border-white/[0.07] bg-white/[0.02] p-5">
+    <div className="rounded-2xl p-5 bg-white" style={{ border: '1px solid #D9E2D9', boxShadow: '0 1px 3px rgba(20,83,45,0.06)' }}>
       <SeccionTitulo label="Ranking por dependencia" sub="Ordenado por volumen recibido" />
       <div className="space-y-3">
         {rows.length === 0 && (
-          <p className="text-sm text-slate-500 py-4 text-center">Sin datos en el período</p>
+          <p className="text-sm py-4 text-center" style={{ color: '#94A3B8' }}>Sin datos en el período</p>
         )}
         {rows.map((r) => (
           <div key={r.tenantId} className="flex items-center gap-3">
             <div className="flex-1 min-w-0">
               <div className="flex items-center justify-between mb-1">
-                <p className="text-xs font-semibold text-slate-200 truncate">{r.nombre}</p>
+                <p className="text-xs font-semibold truncate" style={{ color: '#1F2933' }}>{r.nombre}</p>
                 <div className="flex items-center gap-2 shrink-0 ml-2">
-                  <span className="text-xs font-black text-slate-100 tabular-nums">{r.recibidos}</span>
+                  <span className="text-xs font-black tabular-nums" style={{ color: '#1F2933' }}>{r.recibidos}</span>
                   {r.vencidos > 0 && (
-                    <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-rose-500/20 text-rose-300 border border-rose-500/30 font-bold">
+                    <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-red-50 text-red-700 border border-red-200 font-bold">
                       {r.vencidos}v
                     </span>
                   )}
                 </div>
               </div>
-              <BarraProgreso pct={(r.recibidos / max) * 100} color="bg-indigo-500" />
+              <BarraProgreso pct={(r.recibidos / max) * 100} color="bg-[#14532D]" />
               <div className="flex items-center gap-3 mt-1">
-                <span className="text-[10px] text-slate-600">
+                <span className="text-[10px]" style={{ color: '#94A3B8' }}>
                   ✓ {r.resueltos} resueltos · ~{r.promDias}d hab.
                 </span>
-                <span className="text-[10px] text-slate-600 ml-auto">{r.pctCarga}% del total</span>
+                <span className="text-[10px] ml-auto" style={{ color: '#94A3B8' }}>{r.pctCarga}% del total</span>
               </div>
             </div>
           </div>
@@ -247,23 +243,23 @@ function SectionTipos({ tipos }: { tipos: TipoFrecuente[] }) {
   const max = tipos[0]?.pct ?? 1;
   const colores = ['bg-indigo-500', 'bg-sky-500', 'bg-violet-500', 'bg-emerald-500', 'bg-amber-500', 'bg-rose-500'];
   return (
-    <div className="rounded-2xl border border-white/[0.07] bg-white/[0.02] p-5">
+    <div className="rounded-2xl p-5 bg-white" style={{ border: '1px solid #D9E2D9', boxShadow: '0 1px 3px rgba(20,83,45,0.06)' }}>
       <SeccionTitulo label="Tipos de solicitud más frecuentes" sub="Top 6 por volumen" />
       <div className="space-y-3">
         {tipos.map((t, i) => (
           <div key={t.nombre}>
             <div className="flex items-center justify-between mb-1">
-              <p className="text-xs text-slate-300 truncate flex-1">{t.nombre}</p>
+              <p className="text-xs truncate flex-1" style={{ color: '#1F2933' }}>{t.nombre}</p>
               <div className="flex items-center gap-2 shrink-0 ml-2">
-                <span className="text-[10px] text-slate-500 tabular-nums">{t.conteo}</span>
-                <span className="text-[10px] font-bold text-slate-400">{t.pct}%</span>
+                <span className="text-[10px] tabular-nums" style={{ color: '#94A3B8' }}>{t.conteo}</span>
+                <span className="text-[10px] font-bold" style={{ color: '#667085' }}>{t.pct}%</span>
               </div>
             </div>
             <BarraProgreso pct={(t.pct / max) * 100} color={colores[i % colores.length]} />
           </div>
         ))}
         {tipos.length === 0 && (
-          <p className="text-sm text-slate-500 py-4 text-center">Sin datos en el período</p>
+          <p className="text-sm py-4 text-center" style={{ color: '#94A3B8' }}>Sin datos en el período</p>
         )}
       </div>
     </div>
@@ -272,28 +268,29 @@ function SectionTipos({ tipos }: { tipos: TipoFrecuente[] }) {
 
 /* ── Zonas geográficas ────────────────────────────────────── */
 
-const ZONA_COLOR: Record<string, { anillo: string; badge: string; bg: string }> = {
-  CASCO_URBANO:   { anillo: '#6366F1', badge: 'bg-indigo-500/20 text-indigo-300 border-indigo-500/30',  bg: 'bg-indigo-500/5'  },
-  ZONA_RURAL:     { anillo: '#10B981', badge: 'bg-emerald-500/20 text-emerald-300 border-emerald-500/30', bg: 'bg-emerald-500/5' },
-  ZONA_YARIGUIES: { anillo: '#F59E0B', badge: 'bg-amber-500/20 text-amber-300 border-amber-500/30',      bg: 'bg-amber-500/5'   },
+const ZONA_COLOR: Record<string, { anillo: string; badge: string; bg: string; border: string }> = {
+  CASCO_URBANO:   { anillo: '#14532D', badge: 'bg-[#EEF4EE] text-[#14532D] border-[#D9E2D9]', bg: '#EEF4EE', border: '#D9E2D9' },
+  ZONA_RURAL:     { anillo: '#16A34A', badge: 'bg-green-50 text-green-700 border-green-200',   bg: '#F0FDF4', border: '#BBF7D0' },
+  ZONA_YARIGUIES: { anillo: '#D97706', badge: 'bg-amber-50 text-amber-700 border-amber-200',   bg: '#FFFBEB', border: '#FDE68A' },
 };
 
 function SectionZonas({ zonas }: { zonas: MetricaZona[] }) {
   return (
-    <div className="rounded-2xl border border-white/[0.07] bg-white/[0.02] p-5">
+    <div className="rounded-2xl p-5 bg-white" style={{ border: '1px solid #D9E2D9', boxShadow: '0 1px 3px rgba(20,83,45,0.06)' }}>
       <SeccionTitulo label="Distribución por zona geográfica" sub="Casco Urbano · Rural · Yariguíes" />
       <div className="grid grid-cols-3 gap-3">
         {zonas.map((z) => {
-          const c = ZONA_COLOR[z.zona];
+          const c = ZONA_COLOR[z.zona] ?? { anillo: '#94A3B8', badge: 'bg-gray-100 text-gray-600 border-gray-200', bg: '#F8FAF7', border: '#D9E2D9' };
           return (
-            <div key={z.zona} className={`rounded-xl ${c.bg} border border-white/[0.06] p-4 flex flex-col items-center gap-2`}>
+            <div key={z.zona} className="rounded-xl p-4 flex flex-col items-center gap-2"
+                 style={{ background: c.bg, border: `1px solid ${c.border}` }}>
               <div className="relative flex items-center justify-center">
                 <AnilloSvg pct={z.pct} color={c.anillo} />
-                <span className="absolute text-base font-black text-slate-100 tabular-nums">{z.pct}%</span>
+                <span className="absolute text-base font-black tabular-nums" style={{ color: '#1F2933' }}>{z.pct}%</span>
               </div>
               <p className={`text-[10px] font-bold px-2 py-0.5 rounded-full border ${c.badge}`}>{z.label}</p>
-              <p className="text-xs font-black text-slate-100 tabular-nums">{z.total}</p>
-              <p className="text-[10px] text-slate-500 text-center leading-tight truncate w-full px-1">
+              <p className="text-xs font-black tabular-nums" style={{ color: '#1F2933' }}>{z.total}</p>
+              <p className="text-[10px] text-center leading-tight truncate w-full px-1" style={{ color: '#94A3B8' }}>
                 {z.tipoMasFrecuente}
               </p>
             </div>
@@ -324,28 +321,27 @@ export function VistaAnalytics({ radicados, esAdmin, tenantIdUsuario }: Props) {
   ];
 
   return (
-    <div className="flex-1 overflow-y-auto bg-[#0A0A0B]">
+    <div className="flex-1 overflow-y-auto" style={{ background: '#F8FAF7' }}>
       {/* Header */}
-      <div className="sticky top-0 z-10 bg-[#0A0A0B]/90 backdrop-blur-md border-b border-white/[0.07] px-6 py-4 flex items-center justify-between shrink-0">
+      <div className="sticky top-0 z-10 px-6 py-4 flex items-center justify-between shrink-0 bg-white"
+           style={{ borderBottom: '1px solid #D9E2D9', boxShadow: '0 1px 3px rgba(20,83,45,0.06)' }}>
         <div>
-          <h2 className="text-sm font-bold text-slate-100">Centro de Inteligencia Operativa</h2>
-          <p className="text-[11px] text-slate-500 mt-0.5">
+          <h2 className="text-sm font-bold" style={{ color: '#1F2933' }}>Centro de Inteligencia Operativa</h2>
+          <p className="text-[11px] mt-0.5" style={{ color: '#667085' }}>
             {globales.totalPeriodo} radicados analizados · {totalBase} en histórico
           </p>
         </div>
 
         {/* Selector de período */}
-        <div className="flex items-center gap-1 bg-white/[0.04] border border-white/[0.08] rounded-xl p-1">
+        <div className="flex items-center gap-1 rounded-xl p-1" style={{ background: '#EEF4EE', border: '1px solid #D9E2D9' }}>
           {opciones.map((o) => (
-            <button
-              key={String(o.valor)}
-              onClick={() => setPeriodo(o.valor)}
-              className={`px-3 py-1.5 rounded-lg text-[11px] font-bold transition-all duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500/50 ${
-                periodo === o.valor
-                  ? 'bg-indigo-600 text-white shadow-sm'
-                  : 'text-slate-400 hover:text-slate-200 hover:bg-white/[0.04]'
-              }`}
-            >
+            <button key={String(o.valor)} onClick={() => setPeriodo(o.valor)}
+              className="px-3 py-1.5 rounded-lg text-[11px] font-bold transition-all duration-150"
+              style={periodo === o.valor
+                ? { background: '#14532D', color: '#ffffff' }
+                : { color: '#667085' }}
+              onMouseEnter={(e) => { if (periodo !== o.valor) (e.currentTarget as HTMLElement).style.color = '#1F2933'; }}
+              onMouseLeave={(e) => { if (periodo !== o.valor) (e.currentTarget as HTMLElement).style.color = '#667085'; }}>
               {o.label}
             </button>
           ))}
@@ -354,20 +350,13 @@ export function VistaAnalytics({ radicados, esAdmin, tenantIdUsuario }: Props) {
 
       {/* Contenido */}
       <div className="p-6 space-y-6 max-w-6xl mx-auto">
-        {/* KPIs */}
         <SectionKPIs g={globales} />
-
-        {/* Fila: ranking + tipos */}
         <div className="grid lg:grid-cols-2 gap-6">
           <SectionDependencias rows={porDependencia.slice(0, 8)} />
           <SectionTipos tipos={tiposFrecuentes} />
         </div>
-
-        {/* Zonas */}
         <SectionZonas zonas={porZona} />
-
-        {/* Footer contextual */}
-        <p className="text-[10px] text-slate-700 text-center pb-2">
+        <p className="text-[10px] text-center pb-2" style={{ color: '#D9E2D9' }}>
           Alcaldía Municipal de Simacota · Datos en tiempo real · severityScore activo (Fase 3 ready)
         </p>
       </div>
