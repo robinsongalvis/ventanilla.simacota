@@ -7,6 +7,7 @@
  */
 
 import { getFirebaseAdminDb } from '@/lib/firebase-admin';
+import { removeUndefinedDeep } from '@/lib/firestore/removeUndefined';
 import { validateReadyToSend } from './validateReadyToSend';
 import type { ApprovalFlow }   from '@/src/types/simi-approval';
 import type { RespuestaFirma, CanalEnvio } from '@/src/types/simi-firma';
@@ -97,7 +98,7 @@ export async function createFinalSignature(
     updatedAt:           ahora,
   };
 
-  const ref = await db.collection('simi_respuestas_firma').add(firma);
+  const ref = await db.collection('simi_respuestas_firma').add(removeUndefinedDeep(firma));
 
   // 4. Actualizar el flujo de aprobación a listo_para_envio
   await db.collection('simi_aprobaciones_respuesta')
@@ -123,10 +124,10 @@ export async function updateFirmaEstado(params: {
   await getFirebaseAdminDb()
     .collection('simi_respuestas_firma')
     .doc(params.firmaId)
-    .update({
+    .update(removeUndefinedDeep({
       estado:             params.nuevoEstado,
       fechaEnvio:         params.fechaEnvio ?? (params.nuevoEstado === 'enviado_ciudadano' ? ahora : undefined),
       notificadoWhatsApp: params.notificado ?? false,
       updatedAt:          ahora,
-    });
+    }));
 }

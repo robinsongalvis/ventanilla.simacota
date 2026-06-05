@@ -7,6 +7,7 @@
  */
 
 import { getFirebaseAdminDb } from '@/lib/firebase-admin';
+import { removeUndefinedDeep } from '@/lib/firestore/removeUndefined';
 
 export interface BorradorVersion {
   id?:                string;
@@ -48,11 +49,11 @@ export async function guardarVersionBorrador(
   const ultimaVersion = countSnap.empty ? 0 : (countSnap.docs[0].data().version as number ?? 0);
   const nuevaVersion = ultimaVersion + 1;
 
-  const ref = await db.collection('simi_borrador_versiones').add({
+  const ref = await db.collection('simi_borrador_versiones').add(removeUndefinedDeep({
     ...params,
     version:   nuevaVersion,
     createdAt: new Date().toISOString(),
-  });
+  }));
 
   return { versionId: ref.id, numeroVersion: nuevaVersion };
 }

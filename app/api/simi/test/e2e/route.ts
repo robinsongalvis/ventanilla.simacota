@@ -3,6 +3,7 @@ import { cookies } from 'next/headers';
 import { FieldValue } from 'firebase-admin/firestore';
 import { SESSION_COOKIE_NAME } from '@/lib/auth-cookie';
 import { getFirebaseAdminAuth, getFirebaseAdminDb } from '@/lib/firebase-admin';
+import { removeUndefinedDeep } from '@/lib/firestore/removeUndefined';
 import { checkRateLimit, getClientIp, rateLimitHeaders } from '@/lib/ai/rate-limit';
 import { guardarVersionBorrador } from '@/lib/simi-juridico/borradorVersiones';
 import { createApprovalFlow, updateApprovalFlow } from '@/lib/simi-juridico/createApprovalFlow';
@@ -80,12 +81,24 @@ async function addStep(
   const entry: E2ETestStep = { ...step, fecha: nowIso() };
   pasos.push(entry);
   if (runRef) {
-    await runRef.update({
+    await runRef.update(removeUndefinedDeep({
       pasos,
       resumen: resumen(pasos),
       updatedAt: nowIso(),
-    }).catch(() => null);
+    })).catch(() => null);
   }
+}
+
+async function safeSet(ref: FirebaseFirestore.DocumentReference, data: Record<string, unknown>) {
+  await ref.set(removeUndefinedDeep(data));
+}
+
+async function safeAdd(collection: FirebaseFirestore.CollectionReference, data: Record<string, unknown>) {
+  return collection.add(removeUndefinedDeep(data));
+}
+
+async function safeUpdate(ref: FirebaseFirestore.DocumentReference, data: Record<string, unknown>) {
+  await ref.update(removeUndefinedDeep(data));
 }
 
 function buildRadicado(testRunId: string, usuario: UsuarioE2E, radicadoId: string): VentanillaRadicado & Record<string, unknown> {
@@ -191,7 +204,7 @@ export async function POST(request: Request): Promise<NextResponse> {
   const entidades: E2ETestResponse['entidades'] = {};
 
   if (runRef) {
-    await runRef.set({
+    await safeSet(runRef, {
       testRunId,
       id: testRunId,
       tenantId: usuario.tenantId,
@@ -249,8 +262,8 @@ export async function POST(request: Request): Promise<NextResponse> {
     }
 
     const radicado = buildRadicado(testRunId, usuario, radicadoId);
-    await db.collection('ventanilla_radicados').doc(radicadoId).set(radicado);
-    await db.collection(`ventanilla_radicados/${radicadoId}/trazabilidad`).add({
+    await safeSet(db.collection('ventanilla_radicados').doc(radicadoId), radicado);
+    await safeAdd(db.collection(`ventanilla_radicados/${radicadoId}/trazabilidad`), {
       eventoId: `ev_${radicadoId}_E2E_RADICACION`,
       fecha: nowIso(),
       accion: 'RADICACION',
@@ -265,7 +278,7 @@ export async function POST(request: Request): Promise<NextResponse> {
     });
     await addStep(pasos, runRef, { nombre: 'Crear radicado de prueba', estado: 'success', entidadCreadaId: radicadoId });
 
-    await db.collection('simi_juridico_auditoria').add({
+    await safeAdd(db.collection('simi_juridico_auditoria'), {
       radicadoId,
       usuarioId: usuario.uid,
       usuarioNombre: usuario.nombre,
@@ -329,7 +342,7 @@ export async function POST(request: Request): Promise<NextResponse> {
       },
     });
     entidades.approvalId = approval.approvalId;
-    await db.collection('simi_aprobaciones_respuesta').doc(approval.approvalId).update({
+    await safeUpdate(db.collection('simi_aprobaciones_respuesta').doc(approval.approvalId), {
       isTest: true,
       testRunId,
       excludeFromMetrics: true,
@@ -360,7 +373,7 @@ export async function POST(request: Request): Promise<NextResponse> {
       borradorVersionId: version.versionId,
     });
     entidades.firmaId = firma.firmaId;
-    await db.collection('simi_respuestas_firma').doc(firma.firmaId).update({
+    await safeUpdate(db.collection('simi_respuestas_firma').doc(firma.firmaId), {
       isTest: true,
       testRunId,
       excludeFromMetrics: true,
@@ -377,7 +390,7 @@ export async function POST(request: Request): Promise<NextResponse> {
         radicado,
         dependenciaNombre: usuario.tenantId,
       });
-      await firmaSnap.ref.update({
+      await safeUpdate(firmaSnap.ref, {
         pdfUrl: `/api/simi/respuestas/firma/${firma.firmaId}/pdf`,
         pdfGeneratedAt: nowIso(),
         pdfHash: pdf.hash,
@@ -390,7 +403,7 @@ export async function POST(request: Request): Promise<NextResponse> {
     }
 
     await updateFirmaEstado({ firmaId: firma.firmaId, nuevoEstado: 'notificado', notificado: false });
-    await db.collection('ventanilla_radicados').doc(radicadoId).update({
+    await safeUpdate(db.collection('ventanilla_radicados').doc(radicadoId), {
       estadoActual: 'RESUELTO',
       cumplioTermino: true,
       ultimaActualizacion: nowIso(),
@@ -436,7 +449,7 @@ export async function POST(request: Request): Promise<NextResponse> {
         process.env.WHATSAPP_PROVIDER = previousProvider;
       }
       await db.collection('simi_operational_auditoria').where('radicadoId', '==', radicadoId).limit(10).get()
-        .then((snap) => Promise.all(snap.docs.map((doc) => doc.ref.update({ isTest: true, testRunId, excludeFromMetrics: true, entorno: 'test_e2e' }))))
+        .then((snap) => Promise.all(snap.docs.map((doc) => safeUpdate(doc.ref, { isTest: true, testRunId, excludeFromMetrics: true, entorno: 'test_e2e' }))))
         .catch(() => null);
       await addStep(pasos, runRef, {
         nombre: 'Enviar WhatsApp mock',
@@ -457,7 +470,7 @@ export async function POST(request: Request): Promise<NextResponse> {
     const finalSummary = resumen(pasos);
     const estado = finalSummary.fallidos > 0 ? 'partial' : 'success';
     if (runRef) {
-      await runRef.update({
+      await safeUpdate(runRef, {
         estado,
         fechaFin: fin,
         pasos,
@@ -483,7 +496,7 @@ export async function POST(request: Request): Promise<NextResponse> {
     await addStep(pasos, runRef, { nombre: 'Error global controlado', estado: 'failed', error: message });
     const finalSummary = resumen(pasos);
     if (runRef) {
-      await runRef.update({
+      await safeUpdate(runRef, {
         estado: 'failed',
         fechaFin: nowIso(),
         pasos,
@@ -505,7 +518,7 @@ export async function POST(request: Request): Promise<NextResponse> {
     }, { status: 500 });
   } finally {
     if (runRef) {
-      await runRef.update({ touchedAt: FieldValue.serverTimestamp() }).catch(() => null);
+      await safeUpdate(runRef, { touchedAt: FieldValue.serverTimestamp() }).catch(() => null);
     }
   }
 }

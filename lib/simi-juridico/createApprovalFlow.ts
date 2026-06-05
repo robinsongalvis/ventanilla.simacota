@@ -6,6 +6,7 @@
  */
 
 import { getFirebaseAdminDb } from '@/lib/firebase-admin';
+import { removeUndefinedDeep } from '@/lib/firestore/removeUndefined';
 import type { ApprovalFlow, ApprovalRules, ApprovalStatus, ApprovalFlowResult } from '@/src/types/simi-approval';
 import { notificarCambioAprobacion } from './createNotification';
 
@@ -93,7 +94,7 @@ export async function createApprovalFlow(params: {
   const ahora = new Date().toISOString();
   const flujo: Omit<ApprovalFlow, 'id'> = {
     radicadoId:               params.radicadoId,
-    simiAuditId:              params.simiAuditId,
+    ...(params.simiAuditId ? { simiAuditId: params.simiAuditId } : {}),
     tenantId:                 params.tenantId,
     estado,
     nivelRiesgo:              params.rules.nivelRiesgo,
@@ -115,7 +116,7 @@ export async function createApprovalFlow(params: {
 
   const ref = await getFirebaseAdminDb()
     .collection('simi_aprobaciones_respuesta')
-    .add(flujo);
+    .add(removeUndefinedDeep(flujo));
 
   const mensajes: Record<ApprovalStatus, string> = {
     borrador_generado:             'Borrador generado. Disponible para revisión voluntaria.',
@@ -179,7 +180,7 @@ export async function updateApprovalFlow(params: {
     observacion:  params.observacion,
   };
 
-  await docRef.update({
+  await docRef.update(removeUndefinedDeep({
     estado:     params.nuevoEstado,
     historial:  [...(data.historial ?? []), nuevoItem],
     updatedAt:  ahora,
@@ -189,5 +190,5 @@ export async function updateApprovalFlow(params: {
     ...(params.nuevoEstado === 'devuelto_para_ajustes'
       ? { devueltoPor: params.usuarioId, motivoDevolucion: params.observacion }
       : {}),
-  });
+  }));
 }

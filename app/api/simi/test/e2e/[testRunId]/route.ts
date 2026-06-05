@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import { cookies } from 'next/headers';
 import { SESSION_COOKIE_NAME } from '@/lib/auth-cookie';
 import { getFirebaseAdminAuth, getFirebaseAdminDb } from '@/lib/firebase-admin';
+import { removeUndefinedDeep } from '@/lib/firestore/removeUndefined';
 import type { RolInterno } from '@/lib/hooks/useAuth';
 
 export const runtime = 'nodejs';
@@ -33,13 +34,13 @@ async function archiveByTestRun(collectionName: string, testRunId: string, delet
   const batch = db.batch();
   const deletedAt = new Date().toISOString();
   for (const doc of snap.docs) {
-    batch.update(doc.ref, {
+    batch.update(doc.ref, removeUndefinedDeep({
       estadoTest: 'archived',
       archived: true,
       deletedAt,
       deletedBy,
       updatedAt: deletedAt,
-    });
+    }));
   }
   if (snap.docs.length > 0) await batch.commit();
   return snap.docs.length;
@@ -71,14 +72,14 @@ export async function DELETE(
     counts[collectionName] = await archiveByTestRun(collectionName, testRunId, usuario.uid);
   }
 
-  await getFirebaseAdminDb().collection('simi_e2e_test_runs').doc(testRunId).set({
+  await getFirebaseAdminDb().collection('simi_e2e_test_runs').doc(testRunId).set(removeUndefinedDeep({
     estado: 'archived',
     archived: true,
     deletedAt: new Date().toISOString(),
     deletedBy: usuario.uid,
     updatedAt: new Date().toISOString(),
     cleanupCounts: counts,
-  }, { merge: true });
+  }), { merge: true });
 
   return NextResponse.json({ ok: true, testRunId, archived: counts });
 }
