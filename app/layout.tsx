@@ -1,7 +1,7 @@
 import type { Metadata } from 'next';
 import './globals.css';
-import { SimiChat } from '@/app/components/ai/SimiChat';
 import { SimiProvider } from '@/lib/store/simiContext';
+import { SimiChatCondicional } from '@/app/components/SimiChatCondicional';
 
 export const metadata: Metadata = {
   // ── Base URL — obligatorio para que los OG relativos funcionen ──
@@ -96,7 +96,7 @@ export default function RootLayout({
       <body className="min-h-full antialiased">
         <SimiProvider>
           {children}
-          <SimiChat />
+          <SimiChatCondicional />
         </SimiProvider>
       </body>
     </html>

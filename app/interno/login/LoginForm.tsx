@@ -72,8 +72,8 @@ export function LoginForm() {
       setStatus('Creando sesión segura...');
       const idToken = await credential.user.getIdToken();
       logLogin('token obtenido');
-      const session = await createInternalSession(idToken, () => credential.user.getIdToken(true));
-      logLogin('cookie creada', { rol: session.rol, tenantId: session.tenantId });
+      await createInternalSession(idToken, () => credential.user.getIdToken(true));
+      logLogin('cookie creada');
       setStatus('Ingresando al panel...');
       redirectToPanel(nextUrl);
     } catch (err) {
@@ -81,16 +81,6 @@ export function LoginForm() {
       setError(resolveErrorMessage(err));
       setStatus('');
       setLoading(false);
-      return;
-    } finally {
-      if (window.location.pathname === '/interno/login') {
-        window.setTimeout(() => {
-          if (window.location.pathname === '/interno/login') {
-            setLoading(false);
-            setStatus('');
-          }
-        }, 2_500);
-      }
     }
   };
 

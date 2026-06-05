@@ -3,6 +3,7 @@
 import { useEffect } from 'react';
 import { usePathname, useRouter } from 'next/navigation';
 import { useAuth } from '@/lib/hooks/useAuth';
+import { DashboardErrorBoundary } from '@/app/components/ErrorBoundary';
 
 function CargandoModuloInterno() {
   return (
@@ -41,5 +42,9 @@ export default function InternoLayout({
   if (esLogin) return <>{children}</>;
   if (cargando || !usuario) return <CargandoModuloInterno />;
 
-  return <>{children}</>;
+  return (
+    <DashboardErrorBoundary>
+      {children}
+    </DashboardErrorBoundary>
+  );
 }

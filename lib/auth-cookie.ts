@@ -8,7 +8,7 @@ export function sessionCookieOptions(maxAgeSeconds: number): Partial<ResponseCoo
   return {
     httpOnly: true,
     secure: process.env.NODE_ENV === 'production',
-    sameSite: 'strict',
+    sameSite: 'lax',   // 'strict' bloquea navegación post-login en iOS Safari / Chrome Android
     path: '/',
     maxAge: maxAgeSeconds,
   };
@@ -18,7 +18,7 @@ export function clearSessionCookieOptions(): Partial<ResponseCookie> {
   return {
     httpOnly: true,
     secure: process.env.NODE_ENV === 'production',
-    sameSite: 'strict',
+    sameSite: 'lax',   // 'strict' bloquea navegación post-login en iOS Safari / Chrome Android
     path: '/',
     maxAge: 0,
   };
