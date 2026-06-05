@@ -73,7 +73,9 @@ export async function generateDeadlineAlerts(): Promise<AlertaResult> {
     .limit(500)
     .get();
 
-  const radicados = snap.docs.map((d) => d.data() as VentanillaRadicado);
+  const radicados = snap.docs
+    .map((d) => d.data() as VentanillaRadicado & { isTest?: boolean; excludeFromMetrics?: boolean })
+    .filter((r) => !r.isTest && !r.excludeFromMetrics);
 
   let alertasCreadas   = 0;
   let alertasOmitidas  = 0;
@@ -90,6 +92,7 @@ export async function generateDeadlineAlerts(): Promise<AlertaResult> {
 
   for (const doc of approvalSnap.docs) {
     const d = doc.data();
+    if (d.isTest || d.excludeFromMetrics) continue;
     if (d.estado === 'pendiente_revision_jefe')     pendientesJefeSet.add(d.radicadoId as string);
     if (d.estado === 'pendiente_revision_juridica') pendientesJuridicaSet.add(d.radicadoId as string);
   }

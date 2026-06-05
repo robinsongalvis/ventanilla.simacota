@@ -43,9 +43,16 @@ export async function calculateControlInternoMetrics(params: {
       .get().catch(() => ({ docs: [] as FirebaseFirestore.QueryDocumentSnapshot[] })),
   ]);
 
-  const radicados  = radSnap.docs.map((d) => d.data() as VentanillaRadicado);
-  const approvals  = approvalSnap.docs.map((d) => d.data() as ApprovalFlow);
-  const audits     = auditSnap.docs;
+  const radicados  = radSnap.docs
+    .map((d) => d.data() as VentanillaRadicado & { isTest?: boolean; excludeFromMetrics?: boolean })
+    .filter((r) => !r.isTest && !r.excludeFromMetrics);
+  const approvals  = approvalSnap.docs
+    .map((d) => d.data() as ApprovalFlow & { isTest?: boolean; excludeFromMetrics?: boolean })
+    .filter((a) => !a.isTest && !a.excludeFromMetrics);
+  const audits     = auditSnap.docs.filter((d) => {
+    const data = d.data() as { isTest?: boolean; excludeFromMetrics?: boolean };
+    return !data.isTest && !data.excludeFromMetrics;
+  });
 
   /* ── Filtrar por período ── */
   const radPeriodo = radicados.filter((r) => {

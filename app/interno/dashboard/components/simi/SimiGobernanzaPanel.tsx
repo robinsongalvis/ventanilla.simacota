@@ -9,9 +9,10 @@
 import { useState } from 'react';
 import { NormogramaPanel } from './NormogramaPanel';
 import { QualityMetricsPanel } from './QualityMetricsPanel';
+import { E2ETestPanel } from './E2ETestPanel';
 import type { UsuarioAutenticado } from '@/lib/hooks/useAuth';
 
-type GobTab = 'normograma' | 'plantillas' | 'metricas';
+type GobTab = 'normograma' | 'plantillas' | 'metricas' | 'pruebas';
 
 interface SimiGobernanzaPanelProps {
   usuario: UsuarioAutenticado;
@@ -42,6 +43,7 @@ export function SimiGobernanzaPanel({ usuario }: SimiGobernanzaPanelProps) {
     { id: 'normograma', label: 'Normograma',  icono: '📚', roles: ['ADMIN'] },
     { id: 'plantillas', label: 'Plantillas',  icono: '📝', roles: ['ADMIN'] },
     { id: 'metricas',   label: 'Métricas',    icono: '📊', roles: ['ADMIN', 'CONTROL_INTERNO', 'JEFE_DEPENDENCIA'] },
+    { id: 'pruebas',    label: 'Pruebas E2E', icono: '🧪', roles: ['ADMIN'] },
   ];
 
   const tabsVisibles = TABS.filter((t) => t.roles.includes(usuario.rol));
@@ -116,6 +118,10 @@ export function SimiGobernanzaPanel({ usuario }: SimiGobernanzaPanelProps) {
 
         {tab === 'metricas' && (
           <QualityMetricsPanel />
+        )}
+
+        {tab === 'pruebas' && usuario.rol === 'ADMIN' && (
+          <E2ETestPanel />
         )}
       </div>
     </div>

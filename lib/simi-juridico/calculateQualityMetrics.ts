@@ -39,8 +39,12 @@ export async function calculateQualityMetrics(tenantId: string): Promise<Quality
       .catch(() => ({ docs: [] as FirebaseFirestore.QueryDocumentSnapshot[] })),
   ]);
 
-  const audits = auditSnap.docs.map((d) => d.data() as SimiJuridicoAuditoria);
-  const approvals = approvalSnap.docs.map((d) => ({ id: d.id, ...d.data() } as ApprovalFlow));
+  const audits = auditSnap.docs
+    .map((d) => d.data() as SimiJuridicoAuditoria & { isTest?: boolean; excludeFromMetrics?: boolean })
+    .filter((a) => !a.isTest && !a.excludeFromMetrics);
+  const approvals = approvalSnap.docs
+    .map((d) => ({ id: d.id, ...d.data() } as ApprovalFlow & { isTest?: boolean; excludeFromMetrics?: boolean }))
+    .filter((a) => !a.isTest && !a.excludeFromMetrics);
 
   // Modos más usados
   const modoCount: Record<string, number> = {};
@@ -62,7 +66,8 @@ export async function calculateQualityMetrics(tenantId: string): Promise<Quality
 
   const fuenteCount: Record<string, number> = {};
   for (const doc of ragSnap.docs) {
-    const d = doc.data();
+    const d = doc.data() as { isTest?: boolean; excludeFromMetrics?: boolean; fuentesUsadas?: Array<{ titulo: string }> };
+    if (d.isTest || d.excludeFromMetrics) continue;
     for (const f of (d.fuentesUsadas ?? [])) {
       fuenteCount[f.titulo] = (fuenteCount[f.titulo] ?? 0) + 1;
     }

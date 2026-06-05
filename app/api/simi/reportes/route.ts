@@ -91,7 +91,9 @@ export async function GET(request: Request): Promise<NextResponse> {
     }
 
     const snap = await q.get();
-    let aprobaciones = snap.docs.map((d) => ({ id: d.id, ...d.data() } as ApprovalFlow & { id: string }));
+    let aprobaciones = snap.docs
+      .map((d) => ({ id: d.id, ...d.data() } as ApprovalFlow & { id: string; isTest?: boolean; excludeFromMetrics?: boolean }))
+      .filter((a) => !a.isTest && !a.excludeFromMetrics);
 
     if (desde) aprobaciones = aprobaciones.filter((a) => (a.createdAt ?? '') >= desde);
     if (hasta) aprobaciones = aprobaciones.filter((a) => (a.createdAt ?? '') <= hasta);
@@ -132,7 +134,9 @@ export async function GET(request: Request): Promise<NextResponse> {
     }
 
     const snap = await q.get();
-    const radicados = snap.docs.map((d) => d.data() as VentanillaRadicado);
+    const radicados = snap.docs
+      .map((d) => d.data() as VentanillaRadicado & { isTest?: boolean; excludeFromMetrics?: boolean })
+      .filter((r) => !r.isTest && !r.excludeFromMetrics);
 
     const headers = [
       'Radicado', 'Asunto', 'Solicitante', 'Dependencia',
@@ -172,8 +176,12 @@ export async function GET(request: Request): Promise<NextResponse> {
         .catch(() => ({ docs: [] as FirebaseFirestore.QueryDocumentSnapshot[] })),
     ]);
 
-    const audits   = auditSnap.docs.map((d) => d.data());
-    const approvals = approvalSnap.docs.map((d) => ({ ...d.data() } as ApprovalFlow));
+    const audits   = auditSnap.docs
+      .map((d) => d.data() as { isTest?: boolean; excludeFromMetrics?: boolean })
+      .filter((a) => !a.isTest && !a.excludeFromMetrics);
+    const approvals = approvalSnap.docs
+      .map((d) => ({ ...d.data() } as ApprovalFlow & { isTest?: boolean; excludeFromMetrics?: boolean }))
+      .filter((a) => !a.isTest && !a.excludeFromMetrics);
 
     const headers = ['Métrica', 'Valor'];
     const rows: unknown[][] = [

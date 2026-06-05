@@ -36,9 +36,11 @@ export function calculatePqrsdDashboard(
   radicados: VentanillaRadicado[],
   filtroTenant?: TenantId | 'TODOS',
 ): PqrsdDashboardData {
+  const oficiales = (radicados as Array<VentanillaRadicado & { isTest?: boolean; excludeFromMetrics?: boolean }>)
+    .filter((r) => !r.isTest && !r.excludeFromMetrics);
   const filtrados = filtroTenant && filtroTenant !== 'TODOS'
-    ? radicados.filter((r) => r.clasificacion.oficinaDestino === filtroTenant)
-    : radicados;
+    ? oficiales.filter((r) => r.clasificacion.oficinaDestino === filtroTenant)
+    : oficiales;
 
   const activos = filtrados.filter((r) => ESTADOS_ACTIVOS.has(r.estadoActual));
   const resueltos = filtrados.filter((r) => ESTADOS_RESUELTOS.has(r.estadoActual));

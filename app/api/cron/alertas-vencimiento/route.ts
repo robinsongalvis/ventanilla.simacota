@@ -45,8 +45,8 @@ export async function GET(request: Request): Promise<NextResponse> {
     // Consultar TODOS los radicados activos (los cron no tienen contexto de tenant)
     const snap = await db.collection('ventanilla_radicados').get();
     const radicados = snap.docs
-      .map((d) => d.data() as VentanillaRadicado)
-      .filter((r) => ESTADOS_ACTIVOS.has(r.estadoActual));
+      .map((d) => d.data() as VentanillaRadicado & { isTest?: boolean; excludeFromMetrics?: boolean })
+      .filter((r) => ESTADOS_ACTIVOS.has(r.estadoActual) && !r.isTest && !r.excludeFromMetrics);
 
     for (const r of radicados) {
       const diasRestantes = diasRestantesHabiles(r.termino.fechaVencimiento);
