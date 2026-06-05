@@ -17,8 +17,8 @@ export default function manifest(): MetadataRoute.Manifest {
       'Plataforma oficial de radicación ciudadana de la Alcaldía Municipal de Simacota, Santander',
     start_url: '/',
     display: 'standalone',
-    background_color: '#0A0A0B',
-    theme_color: '#6366F1',
+    background_color: '#F8FAF7',   // Fondo institucional claro
+    theme_color:      '#14532D',   // Verde institucional Alcaldía de Simacota
     lang: 'es',
     icons: [
       {

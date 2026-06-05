@@ -38,7 +38,8 @@ export type VistaActual =
   | 'SUPERVISION_IA' // Panel de Supervisión y Gobernanza de IA — Fase 3.5
   | 'ANTICIPACION_OPERATIVA' // Anticipación Operativa y Análisis Predictivo — Fase 4.1
   | 'ADMINISTRACION'         // Gestión de usuarios internos — Solo ADMIN
-  | 'APROBACIONES';          // Cola de aprobaciones — Jefe + Admin
+  | 'APROBACIONES'           // Cola de aprobaciones — Jefe + Admin
+  | 'CONTROL_INTERNO';       // Dashboard métricas MIPG — Control Interno
 
 
 interface VentanillaState {
