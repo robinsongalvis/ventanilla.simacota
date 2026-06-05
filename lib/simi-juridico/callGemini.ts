@@ -23,7 +23,7 @@ export async function callGeminiJuridico<T = string>(
   opts: GeminiJuridicoOptions,
 ): Promise<T> {
   const apiKey = process.env.GEMINI_API_KEY;
-  if (!apiKey) throw new Error('GEMINI_API_KEY no configurado.');
+  if (!apiKey) throw new Error('GEMINI_API_KEY_MISSING: Falta configurar GEMINI_API_KEY en Vercel.');
 
   const payload = {
     system_instruction: { parts: [{ text: opts.systemPrompt }] },
@@ -43,44 +43,34 @@ export async function callGeminiJuridico<T = string>(
     ],
   };
 
-  let result: string;
+  const result = await ejecutarConResiliencia(
+    'gemini-juridico',
+    async () => {
+      const response = await fetch(
+        `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash-001:generateContent?key=${apiKey}`,
+        {
+          method:  'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body:    JSON.stringify(payload),
+          signal:  AbortSignal.timeout(45_000),
+        },
+      );
 
-  try {
-    result = await ejecutarConResiliencia(
-      'gemini-juridico',
-      async () => {
-        const response = await fetch(
-          `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash-001:generateContent?key=${apiKey}`,
-          {
-            method:  'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body:    JSON.stringify(payload),
-            signal:  AbortSignal.timeout(45_000),
-          },
-        );
+      if (!response.ok) {
+        const err = await response.text();
+        throw new Error(`GEMINI_ERROR: Gemini HTTP ${response.status}: ${err.slice(0, 200)}`);
+      }
 
-        if (!response.ok) {
-          const err = await response.text();
-          throw new Error(`Gemini HTTP ${response.status}: ${err.slice(0, 200)}`);
-        }
-
-        const data = await response.json();
-        const text: string = data?.candidates?.[0]?.content?.parts?.[0]?.text ?? '';
-        if (!text) throw new Error('Gemini devolvió respuesta vacía.');
-        return text;
-      },
-    );
-  } catch {
-    // Fallback: respuesta de error controlada
-    if (opts.expectJson) {
-      result = JSON.stringify({
-        error: 'Servicio de IA temporalmente no disponible. Reintente en unos momentos.',
-        fallback: true,
-      });
-    } else {
-      result = 'Servicio de IA temporalmente no disponible. Por favor reintente en unos momentos. El análisis manual sigue siendo posible.';
-    }
-  }
+      const data = await response.json();
+      const text: string = data?.candidates?.[0]?.content?.parts?.[0]?.text ?? '';
+      if (!text) throw new Error('GEMINI_ERROR: Gemini devolvió respuesta vacía.');
+      return text;
+    },
+  ).catch((error) => {
+    const message = error instanceof Error ? error.message : String(error);
+    if (message.includes('GEMINI_ERROR')) throw new Error(message);
+    throw new Error(`GEMINI_ERROR: No fue posible conectar con Gemini. ${message}`);
+  });
 
   if (opts.expectJson) {
     try {

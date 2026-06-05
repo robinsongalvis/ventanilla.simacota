@@ -338,6 +338,7 @@ export function SimiJuridicoPanel({
       const res = await fetch('/api/simi/juridico', {
         method:  'POST',
         headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
         body:    JSON.stringify({
           radicadoId:     radicado.radicadoId,
           modo,
@@ -348,19 +349,31 @@ export function SimiJuridicoPanel({
         }),
       });
 
-      const data = await res.json() as SimiJuridicoResponse & {
+      const data = await res.json().catch(() => null) as (SimiJuridicoResponse & {
         error?: string;
+        code?: string;
         fuentesRag?: RagSource[];
         aprobacion?: ApprovalFlowResult;
         usedRag?: boolean;
-      };
+      }) | null;
 
-      if (!res.ok) throw new Error(data.error ?? `HTTP ${res.status}`);
+      if (!res.ok) {
+        const code = data?.code ? ` (${data.code})` : '';
+        const message = data?.error ?? `Error HTTP ${res.status}`;
+        throw new Error(`${message}${code}`);
+      }
+      if (!data) {
+        throw new Error('SIMI Jurídico no devolvió una respuesta válida.');
+      }
       setRespuesta(data);
       if (data.fuentesRag) setFuentesRag(data.fuentesRag);
       if (data.aprobacion) setApprovalResult(data.aprobacion);
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Error al consultar SIMI Jurídico.');
+      const detalle = err instanceof Error ? err.message : 'Error desconocido.';
+      setError(
+        `No fue posible conectar con SIMI Jurídico. ${detalle} ` +
+        'Verifica sesión, variables de entorno o disponibilidad de la API Gemini.',
+      );
     } finally {
       setCargando(false);
     }

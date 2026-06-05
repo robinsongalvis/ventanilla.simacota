@@ -45,6 +45,17 @@ import type { VentanillaRadicado } from '@/src/types/ventanilla';
 
 export const runtime = 'nodejs';
 
+type SimiApiErrorCode =
+  | 'SIMI_RATE_LIMIT'
+  | 'UNAUTHORIZED'
+  | 'TENANT_MISSING'
+  | 'INVALID_PAYLOAD'
+  | 'RADICADO_NOT_FOUND'
+  | 'FORBIDDEN'
+  | 'GEMINI_API_KEY_MISSING'
+  | 'GEMINI_ERROR'
+  | 'INTERNAL_ERROR';
+
 /* ── Frase final obligatoria ── */
 const FRASE_FINAL =
   'SIMI Jurídico-Administrativo analiza, orienta, proyecta y advierte riesgos, ' +
@@ -56,6 +67,98 @@ const MODOS_VALIDOS = new Set<SimiModoJuridico>([
   'checklist_mipg', 'traslado_competencia', 'solicitud_aclaracion',
   'datos_personales', 'escalar_juridica',
 ]);
+
+function jsonError(code: SimiApiErrorCode, error: string, status: number, headers?: HeadersInit): NextResponse {
+  return NextResponse.json({ ok: false, code, error }, { status, headers });
+}
+
+function mockResultadoTest(modo: SimiModoJuridico, textoBase: string, datosRadicado: string, dependencia: string): {
+  resultado: SimiJuridicoResponse['resultado'];
+  nivelRiesgo: NivelRiesgoJuridico | null;
+  advertencias: string[];
+  requiereRevisionJuridica: boolean;
+} {
+  const checklist = {
+    claridad: true,
+    respuestaFondo: true,
+    oportunidad: true,
+    trazabilidad: true,
+    competencia: true,
+    proteccionDatos: true,
+    gestionDocumental: true,
+    requiereRevisionJuridica: false,
+    observaciones: ['Resultado mock para radicado de prueba E2E.'],
+  };
+
+  if (modo === 'analizar_solicitud') {
+    return {
+      resultado: {
+        tipoSolicitudPrincipal: 'Petición de información',
+        tiposSecundarios: [],
+        temaCentral: 'Validación integral E2E',
+        dependenciaSugerida: dependencia,
+        motivoDependencia: 'Radicado de prueba institucional.',
+        terminoProbable: '15 días hábiles',
+        nivelRiesgo: 'bajo',
+        datosFaltantes: [],
+        requiereTraslado: false,
+        requiereAclaracion: false,
+        requiereRevisionJuridica: false,
+        rutaInternaRecomendada: 'Atención por dependencia asignada.',
+        fundamentosNormativos: [],
+        checklistMipg: checklist,
+        mensajeSemaforo: 'Caso de prueba sin riesgo jurídico real.',
+        advertenciasPersonalData: [],
+      },
+      nivelRiesgo: 'bajo',
+      advertencias: ['Modo test E2E: análisis generado sin consumir Gemini.'],
+      requiereRevisionJuridica: false,
+    };
+  }
+
+  if (modo === 'proyectar_respuesta') {
+    return {
+      resultado: `Respuesta mock E2E para la dependencia ${dependencia}. Con base en el radicado de prueba, se deja constancia de que el flujo SIMI opera correctamente. Texto base: ${textoBase.slice(0, 220)}`,
+      nivelRiesgo: 'bajo',
+      advertencias: ['Modo test E2E: borrador generado sin consumir Gemini. Debe usarse solo para validación interna.'],
+      requiereRevisionJuridica: false,
+    };
+  }
+
+  if (modo === 'checklist_mipg') {
+    return {
+      resultado: checklist,
+      nivelRiesgo: 'bajo',
+      advertencias: ['Checklist mock para prueba E2E.'],
+      requiereRevisionJuridica: false,
+    };
+  }
+
+  if (modo === 'riesgo_juridico') {
+    return {
+      resultado: { nivel: 'bajo', mensaje: 'Riesgo bajo en prueba E2E.', factores: ['Radicado marcado como prueba.'] },
+      nivelRiesgo: 'bajo',
+      advertencias: ['Evaluación mock para prueba E2E.'],
+      requiereRevisionJuridica: false,
+    };
+  }
+
+  if (modo === 'datos_personales') {
+    return {
+      resultado: { detectados: [], advertencia: 'No se detectan datos sensibles adicionales en modo test.' },
+      nivelRiesgo: 'bajo',
+      advertencias: ['Análisis mock para prueba E2E.'],
+      requiereRevisionJuridica: false,
+    };
+  }
+
+  return {
+    resultado: `Resultado mock E2E para ${modo}. Contexto seguro:\n${datosRadicado}`,
+    nivelRiesgo: 'bajo',
+    advertencias: ['Modo test E2E: respuesta generada sin consumir Gemini.'],
+    requiereRevisionJuridica: false,
+  };
+}
 
 /* ══════════════════════════════════════════════════════════════
    VERIFICAR SESIÓN
@@ -118,16 +221,21 @@ export async function POST(request: Request): Promise<NextResponse> {
   const limite = { maxRequests: 20, windowMs: 60_000 };
   const bloqueado = checkRateLimit(`simi-juridico:${ip}`, limite);
   if (bloqueado) {
-    return NextResponse.json(
-      { error: 'Demasiadas consultas. Espere un momento e intente de nuevo.' },
-      { status: 429, headers: rateLimitHeaders(limite.maxRequests, bloqueado.retryAfterSeconds) },
+    return jsonError(
+      'SIMI_RATE_LIMIT',
+      'Demasiadas consultas. Espere un momento e intente de nuevo.',
+      429,
+      rateLimitHeaders(limite.maxRequests, bloqueado.retryAfterSeconds),
     );
   }
 
   /* 2. Autenticación */
   const usuario = await verificarSesion();
   if (!usuario) {
-    return NextResponse.json({ error: 'No autorizado.' }, { status: 401 });
+    return jsonError('UNAUTHORIZED', 'Sesión no válida o expirada.', 401);
+  }
+  if (!usuario.tenantId) {
+    return jsonError('TENANT_MISSING', 'No se encontró tenantId para el usuario actual.', 403);
   }
 
   /* 3. Parsear payload */
@@ -135,7 +243,7 @@ export async function POST(request: Request): Promise<NextResponse> {
   try {
     payload = await request.json() as SimiJuridicoPayload;
   } catch {
-    return NextResponse.json({ error: 'Payload inválido.' }, { status: 400 });
+    return jsonError('INVALID_PAYLOAD', 'Payload inválido.', 400);
   }
 
   const {
@@ -144,16 +252,13 @@ export async function POST(request: Request): Promise<NextResponse> {
   } = payload as typeof payload & { useRag?: boolean; createApproval?: boolean };
 
   if (!radicadoId || !modo || !MODOS_VALIDOS.has(modo)) {
-    return NextResponse.json(
-      { error: 'Parámetros requeridos: radicadoId y modo válido.' },
-      { status: 400 },
-    );
+    return jsonError('INVALID_PAYLOAD', 'Parámetros requeridos: radicadoId y modo válido.', 400);
   }
 
   /* 4. Obtener radicado */
   const radicado = await obtenerRadicado(radicadoId);
   if (!radicado) {
-    return NextResponse.json({ error: 'Radicado no encontrado.' }, { status: 404 });
+    return jsonError('RADICADO_NOT_FOUND', 'Radicado no encontrado.', 404);
   }
 
   /* 5. Verificar acceso al radicado */
@@ -162,7 +267,7 @@ export async function POST(request: Request): Promise<NextResponse> {
     usuario.rol === 'CONTROL_INTERNO' ||
     radicado.clasificacion.oficinaDestino === usuario.tenantId;
   if (!tieneAcceso) {
-    return NextResponse.json({ error: 'Sin acceso a este radicado.' }, { status: 403 });
+    return jsonError('FORBIDDEN', 'Sin acceso a este radicado.', 403);
   }
 
   /* 6. Determinar texto de solicitud */
@@ -177,6 +282,7 @@ export async function POST(request: Request): Promise<NextResponse> {
   let requiereRevisionJuridica = false;
   let fuentesRag: RagSource[] = [];
   let approvalResult: ApprovalFlowResult | null = null;
+  const esRadicadoTest = Boolean((radicado as VentanillaRadicado & { isTest?: boolean }).isTest);
 
   /* Helper RAG: llama con contexto o sin él según `useRag` */
   const usuarioActual = usuario;        // captura para closure tipado
@@ -203,6 +309,21 @@ export async function POST(request: Request): Promise<NextResponse> {
   }
 
   try {
+    if (!process.env.GEMINI_API_KEY) {
+      if (esRadicadoTest) {
+        const mock = mockResultadoTest(modo, textoBase, datosRadicado, dependencia);
+        resultadoBruto = mock.resultado;
+        nivelRiesgo = mock.nivelRiesgo;
+        advertencias = mock.advertencias;
+        requiereRevisionJuridica = mock.requiereRevisionJuridica;
+      } else {
+        return jsonError(
+          'GEMINI_API_KEY_MISSING',
+          'Falta configurar GEMINI_API_KEY en Vercel.',
+          503,
+        );
+      }
+    } else {
     switch (modo) {
 
       case 'analizar_solicitud': {
@@ -325,14 +446,24 @@ SIMI ha detectado que este caso requiere análisis jurídico especializado. No g
       }
 
       default:
-        return NextResponse.json({ error: 'Modo no soportado.' }, { status: 400 });
+        return jsonError('INVALID_PAYLOAD', 'Modo no soportado.', 400);
+    }
     }
   } catch (err) {
     const msg = err instanceof Error ? err.message : String(err);
     console.error(`[simi-juridico/${modo}] Error:`, msg);
-    return NextResponse.json(
-      { error: `Error al procesar la consulta jurídica: ${msg}` },
-      { status: 500 },
+    const code: SimiApiErrorCode = msg.includes('GEMINI_API_KEY_MISSING')
+      ? 'GEMINI_API_KEY_MISSING'
+      : msg.includes('GEMINI_ERROR') || msg.includes('Gemini')
+        ? 'GEMINI_ERROR'
+        : 'INTERNAL_ERROR';
+    const status = code === 'GEMINI_API_KEY_MISSING' ? 503 : 500;
+    return jsonError(
+      code,
+      code === 'GEMINI_API_KEY_MISSING'
+        ? 'Falta configurar GEMINI_API_KEY en Vercel.'
+        : `Error al procesar la consulta jurídica: ${msg.replace(process.env.GEMINI_API_KEY ?? '', '[redacted]')}`,
+      status,
     );
   }
 
