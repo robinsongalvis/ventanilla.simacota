@@ -2,6 +2,7 @@ import type { Metadata } from 'next';
 import './globals.css';
 import { SimiProvider } from '@/lib/store/simiContext';
 import { SimiChatCondicional } from '@/app/components/SimiChatCondicional';
+import { PwaInstallPrompt } from '@/app/components/pwa/PwaInstallPrompt';
 
 export const metadata: Metadata = {
   // ── Base URL — obligatorio para que los OG relativos funcionen ──
@@ -35,6 +36,12 @@ export const metadata: Metadata = {
   authors: [{ name: 'Alcaldía Municipal de Simacota' }],
   creator: 'Alcaldía Municipal de Simacota',
   publisher: 'Alcaldía Municipal de Simacota',
+  manifest: '/manifest.webmanifest',
+  appleWebApp: {
+    capable: true,
+    title: 'Ventanilla Simacota',
+    statusBarStyle: 'black-translucent',
+  },
 
   // ── Canonical raíz ──────────────────────────────────────────────
   alternates: {
@@ -97,6 +104,7 @@ export default function RootLayout({
         <SimiProvider>
           {children}
           <SimiChatCondicional />
+          <PwaInstallPrompt />
         </SimiProvider>
       </body>
     </html>

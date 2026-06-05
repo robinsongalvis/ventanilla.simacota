@@ -7,6 +7,7 @@ import { DIRECTORIO_TENANTS } from '@/src/types/reglas-negocio';
 import type { AccionAuditoria, EstadoRadicado, TenantId } from '@/src/types/radicado';
 import { InstitucionalHeader } from '@/app/components/institucional/InstitucionalHeader';
 import { SelloRadicado } from '@/app/components/institucional/SelloRadicado';
+import { RadicadoTimeline, mapAccionToTimeline, type TimelinePublicoItem } from '@/app/components/ciudadano/RadicadoTimeline';
 
 /* ══════════════════════════════════════════════════════════════
    DATOS: ESTADOS Y AUDITORÍA EN LENGUAJE CIUDADANO
@@ -100,17 +101,6 @@ const EMOJI_ESTADO: Record<EstadoPublico, string> = {
   PRORROGA:    '🕒',
 };
 
-const ACCION_CIUDADANO: Partial<Record<AccionAuditoria, string>> = {
-  RADICACION:             'Solicitud recibida',
-  CLASIFICACION_IA:       'Solicitud clasificada',
-  ASIGNACION:             'Asignada a dependencia',
-  CAMBIO_ESTADO:          'Estado actualizado',
-  RESPUESTA_FUNCIONARIO:  'Respuesta del funcionario',
-  DEVOLUCION:             'Se requiere documentación adicional',
-  RECLASIFICACION:        'Reasignada a otra dependencia',
-  NOTIFICACION_WHATSAPP:  'Notificación enviada',
-};
-
 interface RadicadoPublico {
   radicadoId: string;
   fechaCreacion?: string;
@@ -140,11 +130,6 @@ function formatearFecha(iso: string): string {
     hour:   '2-digit',
     minute: '2-digit',
   });
-}
-
-function formatearFechaCorta(iso: string): string {
-  const d = new Date(iso);
-  return `${String(d.getDate()).padStart(2, '0')}/${String(d.getMonth() + 1).padStart(2, '0')} ${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`;
 }
 
 function labelCanalRespuesta(canal: string): string {
@@ -238,6 +223,13 @@ function ConsultaInterna() {
   const estado       = radicado?.estadoActual;
   const estadoInfo   = estado ? DESCRIPCION_ESTADO[estado] : null;
   const auditoria    = radicado?.auditoria ?? [];
+  const timelineItems = auditoria.reduce<TimelinePublicoItem[]>((items, entrada) => {
+    const estadoTimeline = mapAccionToTimeline(entrada.accion as AccionAuditoria);
+    if (estadoTimeline) {
+      items.push({ estado: estadoTimeline, fecha: entrada.fecha });
+    }
+    return items;
+  }, []);
   const oficinaId    = radicado?.clasificacionIA?.oficinaDestino;
   const oficina      = oficinaId ? DIRECTORIO_TENANTS[oficinaId] : null;
   const fechaCreacion = radicado?.fechaCreacion;
@@ -465,30 +457,7 @@ function ConsultaInterna() {
               </div>
             )}
 
-            {/* Historial */}
-            {auditoria.length > 0 && (
-              <div className="px-6 py-5 border-b border-white/[0.06]">
-                <p className="text-[10px] font-bold uppercase tracking-widest text-slate-500 mb-4">
-                  Historial
-                </p>
-                <ol className="space-y-3">
-                  {auditoria.map((entrada, i) => {
-                    const textoAmigable = ACCION_CIUDADANO[entrada.accion as AccionAuditoria] ?? 'Actualización';
-                    return (
-                      <li key={i} className="flex items-start gap-3">
-                        <div className="mt-0.5 w-5 h-5 rounded-full border border-indigo-500/30 bg-indigo-500/10 flex items-center justify-center shrink-0">
-                          <div className="w-1.5 h-1.5 rounded-full bg-indigo-400" />
-                        </div>
-                        <div>
-                          <p className="text-xs text-slate-300">{textoAmigable}</p>
-                          <p className="text-[10px] text-slate-600 mt-0.5">{formatearFechaCorta(entrada.fecha)}</p>
-                        </div>
-                      </li>
-                    );
-                  })}
-                </ol>
-              </div>
-            )}
+            <RadicadoTimeline items={timelineItems} />
 
             {/* Acciones */}
             <div className="px-6 py-4 flex flex-wrap gap-2">

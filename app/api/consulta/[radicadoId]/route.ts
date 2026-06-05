@@ -48,6 +48,20 @@ async function getVentanillaRadicadoPublico(id: string) {
       accion: entrada.accion as AccionAuditoria,
     }));
 
+  const firmaSnap = await db.collection('simi_respuestas_firma')
+    .where('radicadoId', '==', id)
+    .where('estado', 'in', ['enviado_ciudadano', 'notificado', 'cerrado'])
+    .limit(1)
+    .get();
+
+  if (!firmaSnap.empty) {
+    const firma = firmaSnap.docs[0].data() as { fechaEnvio?: string; fechaFirma?: string };
+    auditoria.push({
+      fecha: firma.fechaEnvio ?? firma.fechaFirma ?? data.ultimaActualizacion,
+      accion: 'RESPUESTA_FUNCIONARIO',
+    });
+  }
+
   return {
     radicadoId: data.radicadoId ?? id,
     fechaCreacion: data.control?.fechaRadicado,

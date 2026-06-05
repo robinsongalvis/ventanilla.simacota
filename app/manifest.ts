@@ -15,17 +15,25 @@ export default function manifest(): MetadataRoute.Manifest {
     short_name: 'Ventanilla Simacota',
     description:
       'Plataforma oficial de radicación ciudadana de la Alcaldía Municipal de Simacota, Santander',
-    start_url: '/',
+    start_url: '/interno/login',
     display: 'standalone',
+    display_override: ['standalone', 'minimal-ui'],
     background_color: '#F8FAF7',   // Fondo institucional claro
     theme_color:      '#14532D',   // Verde institucional Alcaldía de Simacota
     lang: 'es',
+    scope: '/',
     icons: [
       {
-        src: '/og-image.png',
-        sizes: '1200x630',
+        src: '/brand/logo-alcaldia-simacota.png',
+        sizes: '512x512',
         type: 'image/png',
         purpose: 'any',
+      },
+      {
+        src: '/brand/logo-alcaldia-simacota.png',
+        sizes: '512x512',
+        type: 'image/png',
+        purpose: 'maskable',
       },
     ],
   };

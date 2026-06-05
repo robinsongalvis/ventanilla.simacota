@@ -4,7 +4,7 @@
  * ControlInternoDashboard — Vista de métricas MIPG para Control Interno.
  */
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import type { ControlInternoDashboardData } from '@/src/types/simi-control-interno';
 
 function KpiCard({ label, valor, color, bg, border, sub }: {
@@ -27,7 +27,7 @@ export function ControlInternoDashboard() {
   const [desde,    setDesde]    = useState('');
   const [hasta,    setHasta]    = useState('');
 
-  async function cargar() {
+  const cargar = useCallback(async () => {
     setCargando(true); setError(null);
     try {
       const params = new URLSearchParams();
@@ -42,9 +42,9 @@ export function ControlInternoDashboard() {
     } finally {
       setCargando(false);
     }
-  }
+  }, [desde, hasta]);
 
-  useEffect(() => { void cargar(); }, []);
+  useEffect(() => { void cargar(); }, [cargar]);
 
   if (cargando) return (
     <div className="flex items-center justify-center py-16 gap-3" style={{ color: '#94A3B8' }}>

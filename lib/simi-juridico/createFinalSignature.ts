@@ -91,6 +91,7 @@ export async function createFinalSignature(
     fechaFirma:          ahora,
     canalEnvio:          params.canalEnvio,
     emailCiudadano:      params.emailCiudadano,
+    digitalSignatureStatus: 'no_requerida',
     tenantId:            params.tenantId,
     createdAt:           ahora,
     updatedAt:           ahora,

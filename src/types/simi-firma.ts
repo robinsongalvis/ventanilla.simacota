@@ -30,6 +30,15 @@ export interface RespuestaFirma {
   canalEnvio?:            CanalEnvio;
   emailCiudadano?:        string;   // Solo si se notificó por email
   notificadoWhatsApp?:    boolean;
+  pdfUrl?:                string;
+  pdfGeneratedAt?:        string;
+  pdfHash?:               string;
+  digitalSignatureStatus?: 'no_requerida' | 'pendiente' | 'enviada_a_proveedor' | 'firmada' | 'rechazada' | 'error';
+  digitalSignatureProvider?: string;
+  digitalSignatureRequestId?: string;
+  digitalSignatureSignedAt?: string;
+  digitalSignatureCertificateInfo?: Record<string, string | undefined>;
+  digitalSignatureError?: string;
   tenantId:               string;
   createdAt?:             string;
   updatedAt?:             string;
