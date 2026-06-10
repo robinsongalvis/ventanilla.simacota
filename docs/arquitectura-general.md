@@ -38,7 +38,9 @@ sequenceDiagram
     API->>G: Inferencia estructurada (JSON Schema)
     G-->>API: Retorna dependencias, etiquetas, prioridad y resumen
     API-->>C: Sugerencia de oficina y prioridad en caliente
-    C->>FS: Crea documento en 'radicados/{radicadoId}'
+    C->>API: POST /api/radicacion (formulario + anexos)
+    API->>FS: Crea documento en 'ventanilla_radicados/{radicadoId}'
+    API->>FS: Agrega evento inicial en subcolección trazabilidad
 ```
 
 * **Debounce de Entrada**: Para evitar sobre-saturar la API de Gemini, se implementa un debounce de `800ms` en el input del texto descriptivo antes de disparar la llamada al clasificador.

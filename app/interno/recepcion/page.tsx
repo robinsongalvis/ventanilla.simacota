@@ -2,7 +2,6 @@
 
 import { useCallback, useEffect, useRef, useState } from 'react';
 import Link from 'next/link';
-import { radicarSolicitud } from '@/lib/radicacion';
 import type { UploadProgress } from '@/lib/storage';
 
 /* ══════════════════════════════════════════════════════════════
@@ -90,16 +89,6 @@ function validarCampo(campo: CampoForm, valor: string): string {
     default:
       return '';
   }
-}
-
-function validarTodo(form: Record<CampoForm, string>): Record<CampoForm, string> {
-  return {
-    nombre:      validarCampo('nombre',      form.nombre),
-    cedula:      validarCampo('cedula',      form.cedula),
-    email:       validarCampo('email',       form.email),
-    telefono:    validarCampo('telefono',    form.telefono),
-    descripcion: validarCampo('descripcion', form.descripcion),
-  };
 }
 
 /* ══════════════════════════════════════════════════════════════
@@ -603,57 +592,10 @@ export default function RecepcionFisica() {
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
-
-    // Marcar todos los campos como tocados
-    setTouched({ nombre: true, cedula: true, email: true, telefono: true, descripcion: true });
-    const erroresFinal = validarTodo(form);
-    setErrors(erroresFinal);
-
-    // Verificar archivos obligatorios
-    if (archivos.length === 0) {
-      setErrorSinArch('Debe adjuntar al menos un documento escaneado.');
-      document.getElementById('zona-drop')?.focus();
-    }
-
-    const hayErroresCampos = Object.values(erroresFinal).some((m) => m !== '');
-    if (hayErroresCampos || archivos.length === 0) {
-      // Llevar foco al primer campo con error
-      if (hayErroresCampos) {
-        const primerCampo = (Object.keys(erroresFinal) as CampoForm[])
-          .find((k) => erroresFinal[k] !== '');
-        if (primerCampo) document.getElementById(primerCampo)?.focus();
-      }
-      return;
-    }
-
-    setEstado('enviando');
-    setProgresoMensaje('Iniciando radicación...');
-    setProgresoPct(0);
-    setProgresosArchivos([]);
-
-    const res = await radicarSolicitud(
-      {
-        origen: 'FISICO_ESCANER',
-        ciudadano: {
-          nombre:   form.nombre.trim(),
-          email:    form.email.trim().toLowerCase(),
-          telefono: form.telefono.replace(/\s/g, ''),
-          cedula:   form.cedula.trim(),
-        },
-        descripcion:    form.descripcion.trim(),
-        notasInternas:  form.notasInternas.trim() || undefined,
-        archivos:       archivos.map((a) => a.archivo),
-      },
-      (mensaje, pct, progresos) => {
-        setProgresoMensaje(mensaje);
-        setProgresoPct(pct);
-        if (progresos) setProgresosArchivos(progresos);
-      },
-    );
-
-    setErroresSubmit(res.errores);
-    setRadicadoId(res.radicadoId);
-    setEstado('confirmacion');
+    setErroresSubmit([
+      'Este formulario legacy fue reemplazado por la Radicación Rápida del dashboard moderno. Ingresa a /interno/dashboard para crear radicados en ventanilla_radicados.',
+    ]);
+    setEstado('formulario');
   }
 
   /* ── Reset completo ── */

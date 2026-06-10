@@ -40,6 +40,7 @@ Los correos del directorio de dependencias (ej. `gobierno@simacota-santander.gov
 ## Funcionalidades validadas
 
 - Radicación ciudadana.
+- Radicación pública unificada con `ventanilla_radicados` mediante `POST /api/radicacion`.
 - Asignación por dependencia.
 - Responsable funcional MIPG (snapshot inmutable).
 - Resolución por funcionario.
@@ -58,6 +59,20 @@ Los correos del directorio de dependencias (ej. `gobierno@simacota-santander.gov
 - Storage con signed URLs (15 min).
 - 15 tests automatizados (Vitest).
 - UAT-1 completa: 21/21 pasos (100%).
+
+## Flujo vigente de radicación
+
+Desde este refuerzo institucional, toda solicitud nueva creada en `/radicacion` entra al flujo moderno:
+
+1. El ciudadano diligencia `/radicacion`.
+2. El navegador envía `multipart/form-data` a `POST /api/radicacion`.
+3. El servidor usa Firebase Admin SDK para generar el consecutivo oficial `1-WEB-AAAA-########`.
+4. Los anexos se guardan en Storage bajo `radicados/{radicadoId}/...`.
+5. El documento principal se crea en `ventanilla_radicados`.
+6. La trazabilidad inicial se crea en `ventanilla_radicados/{radicadoId}/trazabilidad`.
+7. El dashboard interno, SIMI, CSV MIPG y consulta ciudadana operan sobre ese radicado.
+
+La colección `radicados` queda únicamente para compatibilidad temporal de consultas históricas.
 
 ## Pendientes antes de publicación oficial
 

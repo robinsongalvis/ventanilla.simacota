@@ -39,28 +39,26 @@ export function InstitucionalHeader({
   /* ── SIDEBAR variant: logo arriba, texto institucional debajo ── */
   if (resolved === 'sidebar') {
     return (
-      <div className={`flex flex-col gap-2 w-full min-w-0 overflow-hidden ${className}`}>
-        {/* Logo — ancho completo, altura fija para no empujar el layout */}
-        <div className="relative w-full h-8 shrink-0">
+      <div className={`flex flex-col gap-2.5 w-full min-w-0 ${className}`}>
+        <div className="relative w-full h-12 shrink-0 overflow-hidden">
           <Image
             src={INSTITUCION.logo}
             alt={INSTITUCION.nombre}
             fill
             priority
-            sizes="178px"
+            sizes="220px"
             className="object-contain object-left"
           />
         </div>
-        {/* Texto institucional apilado, todo dentro del sidebar */}
         <div className="flex flex-col gap-0.5 min-w-0 w-full">
-          <p className="text-[9px] font-bold uppercase tracking-[0.18em] text-emerald-400/70 truncate">
+          <p className="text-[9px] font-bold uppercase tracking-[0.18em] text-emerald-200/80">
             {eyebrow}
           </p>
-          <p className="text-[11px] font-black tracking-tight text-slate-200 leading-tight truncate"
+          <p className="text-[12px] font-black tracking-tight text-white leading-tight"
              style={{ fontFamily: 'var(--font-manrope)' }}>
-            {INSTITUCION.municipio}
+            {title}
           </p>
-          <p className="text-[9px] text-slate-600 truncate">
+          <p className="text-[10px] text-emerald-50/65 leading-snug">
             {subtitle}
           </p>
         </div>

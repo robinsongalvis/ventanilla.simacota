@@ -2,7 +2,6 @@
 
 import { useCallback, useRef, useState } from 'react';
 import Link from 'next/link';
-import { radicarSolicitud } from '@/lib/radicacion';
 import type { UploadProgress } from '@/lib/storage';
 import type { AnalisisIA }    from '@/src/types/ventanilla';
 import { NOMBRES_TENANT }      from '@/src/types/reglas-negocio';
@@ -30,6 +29,15 @@ interface FormData {
 }
 
 type CampoForm = keyof FormData;
+
+interface RadicacionApiResponse {
+  exito: boolean;
+  radicadoId?: string;
+  errores?: string[];
+  error?: string;
+  fechaRadicado?: string;
+  dependenciaReceptora?: string;
+}
 
 
 /* ══════════════════════════════════════════════════════════════
@@ -104,6 +112,44 @@ function validarTodo(form: FormData): Record<CampoForm, string> {
     canalRespuesta:   '',
     descripcion:      validarCampo('descripcion',      form.descripcion, form),
   };
+}
+
+async function radicarEnVentanillaModerna(
+  form: FormData,
+  archivos: File[],
+  analisisIa: AnalisisIA | null,
+): Promise<RadicacionApiResponse> {
+  const payload = new globalThis.FormData();
+  payload.set('nombre', form.tipoPresentacion === 'ANONIMA' ? '' : form.nombre.trim());
+  payload.set('email', form.email.trim().toLowerCase());
+  payload.set('telefono', form.telefono.replace(/\s/g, ''));
+  payload.set('direccion', form.direccion.trim());
+  payload.set('tipoSolicitudId', form.tipoSolicitudId);
+  payload.set('tipoPresentacion', form.tipoPresentacion);
+  payload.set('canalRespuesta', form.canalRespuesta);
+  payload.set('descripcion', form.descripcion.trim());
+
+  if (analisisIa) {
+    payload.set('analisisIa', JSON.stringify(analisisIa));
+  }
+
+  archivos.forEach((archivo) => payload.append('archivos', archivo));
+
+  const response = await fetch('/api/radicacion', {
+    method: 'POST',
+    body: payload,
+  });
+  const data = await response.json().catch(() => null) as RadicacionApiResponse | null;
+
+  if (!response.ok || !data?.exito || !data.radicadoId) {
+    throw new Error(
+      data?.errores?.[0]
+      ?? data?.error
+      ?? 'No fue posible radicar la solicitud. Intenta nuevamente.',
+    );
+  }
+
+  return data;
 }
 
 /* ══════════════════════════════════════════════════════════════
@@ -308,51 +354,57 @@ export default function PortalCiudadano() {
     setEstado('enviando');
     setProgresoMensaje('Iniciando radicación...');
     setProgresoPct(0);
-    setProgresosArchivos([]);
+    setProgresosArchivos(archivos.map((archivo) => ({
+      archivo: archivo.name,
+      porcentaje: 0,
+      estado: 'subiendo',
+    })));
     const fechaSolicitud = new Date();
 
-    const res = await radicarSolicitud(
-      {
-        origen: 'WEB',
-        ciudadano: {
-          nombre:   form.tipoPresentacion === 'ANONIMA' ? 'Ciudadano anonimo' : form.nombre.trim(),
-          email:    form.email.trim().toLowerCase(),
-          telefono: form.telefono.replace(/\s/g, ''),
-          direccion: form.direccion.trim(),
-        },
-        descripcion: form.descripcion.trim(),
-        archivos,
-        analisisIa: analisisIa || undefined,
-        tipoSolicitudId: form.tipoSolicitudId,
-        tipoPresentacion: form.tipoPresentacion,
+    try {
+      setProgresoMensaje('Enviando solicitud al servidor institucional...');
+      setProgresoPct(35);
+      const res = await radicarEnVentanillaModerna(form, archivos, analisisIa);
+      const fechaRadicado = res.fechaRadicado ? new Date(res.fechaRadicado) : fechaSolicitud;
+
+      setProgresoMensaje('Radicado creado y trazabilidad inicial registrada.');
+      setProgresoPct(100);
+      setProgresosArchivos((prev) => prev.map((progreso) => ({
+        ...progreso,
+        porcentaje: 100,
+        estado: 'completado',
+      })));
+      setErroresSubmit(res.errores ?? []);
+      setSelloRadicado({
+        radicadoId: res.radicadoId!,
+        fechaRadicado,
+        horaRadicado: fechaRadicado,
+        medioRecepcion: 'WEB',
+        tipoSolicitud: TIPOS_SOLICITUD[form.tipoSolicitudId].nombre,
+        canalRespuesta: form.canalRespuesta,
+        dependencia: 'Ventanilla Única',
+        estado: 'Radicado',
+        solicitante: form.tipoPresentacion === 'ANONIMA' ? null : form.nombre.trim(),
+        documento: null,
+        correo: form.tipoPresentacion === 'ANONIMA' ? null : form.email.trim().toLowerCase() || null,
         esAnonimo: form.tipoPresentacion === 'ANONIMA',
         identidadReservada: form.tipoPresentacion === 'RESERVADA',
-        canalRespuesta: form.canalRespuesta,
-      },
-      (mensaje, pct, progresos) => {
-        setProgresoMensaje(mensaje);
-        setProgresoPct(pct);
-        if (progresos) setProgresosArchivos(progresos);
-      },
-    );
-
-    setErroresSubmit(res.errores);
-    setSelloRadicado({
-      radicadoId: res.radicadoId,
-      fechaRadicado: fechaSolicitud,
-      horaRadicado: fechaSolicitud,
-      medioRecepcion: 'WEB',
-      tipoSolicitud: TIPOS_SOLICITUD[form.tipoSolicitudId].nombre,
-      canalRespuesta: form.canalRespuesta,
-      dependencia: NOMBRES_TENANT[analisisIa?.dependenciaSugerida ?? 'VENTANILLA_UNICA'] ?? 'Ventanilla Única',
-      estado: 'Radicado',
-      solicitante: form.tipoPresentacion === 'ANONIMA' ? null : form.nombre.trim(),
-      documento: null,
-      correo: form.email.trim().toLowerCase() || null,
-      esAnonimo: form.tipoPresentacion === 'ANONIMA',
-      identidadReservada: form.tipoPresentacion === 'RESERVADA',
-    });
-    setEstado('confirmacion');
+      });
+      setEstado('confirmacion');
+    } catch (error) {
+      const message = error instanceof Error
+        ? error.message
+        : 'No fue posible radicar la solicitud. Intenta nuevamente.';
+      setErroresSubmit([message]);
+      setProgresoMensaje('');
+      setProgresoPct(0);
+      setProgresosArchivos((prev) => prev.map((progreso) => ({
+        ...progreso,
+        estado: 'error',
+        error: message,
+      })));
+      setEstado('formulario');
+    }
   }
 
   function resetFormulario() {
@@ -803,6 +855,17 @@ export default function PortalCiudadano() {
 
               {/* ─ Submit ─ */}
               <div className="pt-2 field-animate" style={{ animationDelay: `${STAGGER[5]}ms` }}>
+                {estado === 'formulario' && erroresSubmit.length > 0 && (
+                  <div className="mb-4 rounded-xl border border-rose-500/25 bg-rose-500/10 p-4">
+                    <p className="text-sm font-semibold text-rose-200">No fue posible radicar la solicitud</p>
+                    <ul className="mt-2 space-y-1 text-xs text-rose-100/80">
+                      {erroresSubmit.map((error, index) => (
+                        <li key={`${error}-${index}`}>{error}</li>
+                      ))}
+                    </ul>
+                  </div>
+                )}
+
                 {estado === 'enviando' && (
                   <div className="mb-4 rounded-xl border border-white/10 p-4 bg-slate-800/40">
                     <div className="flex items-center justify-between mb-1.5">

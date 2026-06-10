@@ -11,7 +11,7 @@ La plataforma implementa un control de acceso basado en roles (**RBAC - Role-Bas
 
 | Rol | Descripción | Permisos Clave |
 | :--- | :--- | :--- |
-| **CIUDADANO** (No autenticado) | Público en general que ingresa al portal ciudadano. | * Crear radicados (`write` en `/radicados/*` bajo validación estricta de campos).<br>* Lectura de su propio radicado si posee el ID y código de verificación. |
+| **CIUDADANO** (No autenticado) | Público en general que ingresa al portal ciudadano. | * Crear radicados únicamente mediante `POST /api/radicacion`, usando Admin SDK server-side.<br>* Consultar información pública de su radicado si posee el número oficial. |
 | **RECEPCIONISTA** | Funcionario de correspondencia física u oficina de atención al ciudadano. | * Crear radicados manuales.<br>* Modificar metadatos de clasificación inicial.<br>* Realizar traslados físicos primarios. |
 | **FUNCIONARIO** | Servidor público asignado a una secretaría o dependencia específica. | * Leer radicados asignados a su oficina.<br>* Usar copilotos especializados.<br>* Cargar respuestas y solicitar prórrogas.<br>* Generar trazabilidad en trámites bajo su custodia. |
 | **ADMIN** | Alcalde, Despacho, Jefe de Control Interno o Administrador de TI. | * Acceso total de lectura a nivel municipal.<br>* Visualización del panel de supervisión de IA.<br>* Modificación de Feature Flags globales en caliente. |
@@ -22,7 +22,7 @@ La plataforma implementa un control de acceso basado en roles (**RBAC - Role-Bas
 
 El archivo `firestore.rules` del repositorio contiene las políticas lógicas que restringen las transacciones directamente en la base de datos:
 
-* **Inmutabilidad de Trazabilidad**: La colección `/radicados/{radicadoId}/trazabilidad/{eventoId}` es estrictamente inmutable (`allow update, delete: if false;`). Un evento de bitácora no puede modificarse ni borrarse una vez creado, garantizando la integridad de auditorías gubernamentales.
+* **Inmutabilidad de Trazabilidad**: La colección `/ventanilla_radicados/{radicadoId}/trazabilidad/{eventoId}` es estrictamente inmutable (`allow update, delete: if false;`). Un evento de bitácora no puede modificarse ni borrarse una vez creado, garantizando la integridad de auditorías gubernamentales.
 * **Control de Modificaciones en Radicados**: Solo los funcionarios con rol verificado en `/usuarios/{uid}` pueden alterar campos transaccionales de control, estados o re-clasificar oficinas.
 * **Aislamiento de Telemetría**: El ciudadano no tiene acceso de lectura ni escritura a las colecciones de gobernanza e infraestructura (`ai_logs`, `ai_auditoria`, `ai_feedback`).
 

@@ -43,13 +43,13 @@ Para que las búsquedas, listados reactivos de trámites y cálculos del motor d
 
 | Colección | Campos y Orden | Query Operativo Relacionado |
 | :--- | :--- | :--- |
-| `radicados` | `clasificacion.oficinaDestino` ASC, `control.fechaRadicado` DESC | Dashboard interno ordenado por llegada en secretaría |
-| `radicados` | `estadoActual` ASC, `termino.fechaVencimiento` ASC | Listado de alertas y urgencia operativa por funcionario |
-| `radicados` | `control.medioRecepcion` ASC, `control.fechaRadicado` DESC | Auditoría de canales públicos y físicos de radicación |
+| `ventanilla_radicados` | `clasificacion.oficinaDestino` ASC, `control.fechaRadicado` DESC | Dashboard interno ordenado por llegada en secretaría |
+| `ventanilla_radicados` | `estadoActual` ASC, `termino.fechaVencimiento` ASC | Listado de alertas y urgencia operativa por funcionario |
+| `ventanilla_radicados` | `control.medioRecepcion` ASC, `control.fechaRadicado` DESC | Auditoría de canales públicos y físicos de radicación |
 | `ai_logs` | `tipo` ASC, `timestamp` DESC | Monitoreo y telemetrías del panel de supervisión de IA |
 
 ### 3.2. Reglas de Seguridad (`firestore.rules`)
-Asegúrate de que las reglas de seguridad restringen la escritura y lectura cruzada. Los ciudadanos solo pueden crear radicados en la colección `radicados` y no tienen permisos sobre `usuarios`, `ai_logs` ni `ai_auditoria`. Los funcionarios internos autenticados tienen permisos según su rol verificado en `usuarios/{uid}`.
+Asegúrate de que las reglas de seguridad restringen la escritura y lectura cruzada. Los ciudadanos no escriben directamente en Firestore: la creación pública pasa por `POST /api/radicacion` y el servidor crea documentos en `ventanilla_radicados`. Los funcionarios internos autenticados tienen permisos según su rol verificado en `usuarios/{uid}`.
 
 ---
 

@@ -505,10 +505,10 @@ function SidebarNav({
   }
 
   return (
-    <aside className={`h-full flex flex-col shrink-0 w-[210px] overflow-hidden ${className}`}
+    <aside className={`h-full flex flex-col shrink-0 w-[250px] overflow-hidden ${className}`}
            style={{ background: '#14532D' }}>
       {/* Bloque institucional */}
-      <div className="px-4 py-3 w-full overflow-hidden" style={{ borderBottom: '1px solid rgba(255,255,255,0.10)' }}>
+      <div className="px-4 py-4 w-full overflow-hidden" style={{ borderBottom: '1px solid rgba(255,255,255,0.10)' }}>
         <InstitucionalHeader variant="sidebar" subtitle="Ventanilla Única Digital" />
       </div>
 

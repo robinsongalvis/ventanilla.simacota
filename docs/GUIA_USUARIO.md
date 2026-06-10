@@ -21,7 +21,7 @@
 
 ### Radicar una solicitud
 
-1. En el menú lateral, hacer clic en **Radicación**.
+1. En el dashboard interno, hacer clic en **Radicación Rápida**.
 2. Llenar el formulario:
    - Datos del solicitante (nombre, documento, email, teléfono).
    - Tipo de solicitud (Petición, Informativo, etc.).
@@ -165,6 +165,16 @@ El ciudadano puede consultar el estado de su solicitud sin necesidad de crear cu
    - Historial de eventos en lenguaje ciudadano.
 
 **Nota:** Solo se muestra información pública. Datos internos como notas del funcionario, responsable asignado o clasificación IA no son visibles para el ciudadano.
+
+## Radicación ciudadana pública
+
+La ciudadanía puede crear solicitudes desde:
+
+`https://ventanilla-simacota.vercel.app/radicacion`
+
+El formulario permite seleccionar el tipo PQRSD, el canal de respuesta preferido, marcar solicitud anónima o reservada cuando aplica, adjuntar PDF/JPG/PNG y enviar la solicitud. Al finalizar, el sistema muestra una constancia imprimible con el número oficial de radicado.
+
+Los radicados nuevos creados por este portal aparecen automáticamente en el dashboard interno como pendientes de gestión en Ventanilla Única.
 
 ---
 
