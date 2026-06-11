@@ -2,9 +2,15 @@
 
 interface TabBloqueadaProps {
   onTomarControl: () => void;
+  onRevisarYContinuar: () => Promise<boolean>;
+  segundosDesdeHeartbeat: number | null;
 }
 
-export function TabBloqueada({ onTomarControl }: TabBloqueadaProps) {
+export function TabBloqueada({
+  onTomarControl,
+  onRevisarYContinuar,
+  segundosDesdeHeartbeat,
+}: TabBloqueadaProps) {
   return (
     <div className="min-h-screen bg-[#0A0A0B] flex items-center justify-center p-4">
       <div className="w-full max-w-md">
@@ -30,11 +36,11 @@ export function TabBloqueada({ onTomarControl }: TabBloqueadaProps) {
           </div>
 
           <h1 className="font-headline text-xl text-slate-50 mb-2">
-            Sesión activa en otra pestaña
+            Panel abierto en otra pestaña
           </h1>
           <p className="text-sm text-slate-400 leading-relaxed max-w-xs mx-auto">
-            El panel de gestión ya está abierto en otra pestaña de este navegador.
-            Solo se permite una sesión activa a la vez.
+            Para evitar doble operación sobre los mismos radicados, solo una pestaña
+            puede controlar el panel interno a la vez.
           </p>
         </div>
 
@@ -48,17 +54,29 @@ export function TabBloqueada({ onTomarControl }: TabBloqueadaProps) {
               <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-emerald-500" />
             </span>
             <span className="text-xs text-emerald-400 font-medium">
-              Sesión en curso en otra pestaña
+              {segundosDesdeHeartbeat === null
+                ? 'Verificando pestaña activa'
+                : segundosDesdeHeartbeat < 8
+                  ? 'La otra pestaña parece activa'
+                  : 'La otra pestaña no responde hace unos segundos'}
             </span>
           </div>
 
-          {/* Acción principal: tomar control */}
+          <button
+            type="button"
+            onClick={() => void onRevisarYContinuar()}
+            className="btn-primary w-full min-h-12 touch-manipulation"
+          >
+            Revisar y continuar aquí
+          </button>
+
           <button
             type="button"
             onClick={onTomarControl}
-            className="btn-primary w-full min-h-12 touch-manipulation"
+            className="w-full min-h-11 rounded-xl border border-amber-500/30 bg-amber-500/10 text-amber-200 text-sm font-semibold
+                       hover:bg-amber-500/15 transition-colors touch-manipulation"
           >
-            Usar el panel en esta pestaña
+            Tomar control de todos modos
           </button>
 
           {/* Acción secundaria: cerrar esta pestaña */}
@@ -74,8 +92,8 @@ export function TabBloqueada({ onTomarControl }: TabBloqueadaProps) {
 
         {/* Nota informativa */}
         <p className="text-center text-xs text-slate-600 mt-5 leading-relaxed">
-          Por seguridad, el sistema limita el acceso a una sola pestaña por sesión.
-          <br />Si la otra pestaña fue cerrada, puedes continuar aquí.
+          Esto no crea otra sesión ni duplica el inicio de sesión.
+          <br />Solo mueve el control del panel a una pestaña del mismo navegador.
         </p>
 
       </div>

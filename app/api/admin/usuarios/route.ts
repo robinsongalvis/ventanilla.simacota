@@ -236,9 +236,11 @@ export async function POST(request: Request): Promise<NextResponse> {
       advertencia: emailInstitucional ? null : 'El correo no parece institucional. Verifique que sea autorizado para UAT.',
     });
 
-  } catch (err: any) {
+  } catch (err: unknown) {
     const msg = err instanceof Error ? err.message : String(err);
-    const code = err?.code;
+    const code = typeof err === 'object' && err !== null && 'code' in err
+      ? String(err.code)
+      : '';
     console.error('[admin/usuarios] Error al crear:', err);
 
     if (

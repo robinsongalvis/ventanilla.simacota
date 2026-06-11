@@ -6,8 +6,11 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 
 const CHANNEL_NAME    = 'vu-tab-control';
 const LS_ACTIVE_TAB   = 'vu-active-tab-id';
+const LS_ACTIVE_TS    = 'vu-active-tab-ts';
 const HEARTBEAT_MS    = 2_000;   // Cada cuánto la pestaña activa anuncia que sigue viva
 const CLAIM_WAIT_MS   = 500;     // Tiempo que espera una pestaña nueva antes de reclamar
+const STALE_AFTER_MS  = 7_000;   // Si no hay heartbeat reciente, se considera pestaña muerta
+const RECHECK_WAIT_MS = 800;
 
 type TabMsg =
   | { type: 'HEARTBEAT';  tabId: string }
@@ -36,11 +39,24 @@ export interface UseSingleTabReturn {
   isResolving: boolean;
   /** Toma el control de la sesión, bloqueando las demás pestañas */
   tomarControl: () => void;
+  /** Verifica si la pestaña anterior sigue viva; si no, toma control sin fricción */
+  revisarYContinuar: () => Promise<boolean>;
+  /** Segundos desde el último heartbeat de la pestaña activa conocida */
+  segundosDesdeHeartbeat: number | null;
+}
+
+function getStoredActive(): { tabId: string | null; lastSeen: number | null; stale: boolean } {
+  const tabId = localStorage.getItem(LS_ACTIVE_TAB);
+  const rawTs = localStorage.getItem(LS_ACTIVE_TS);
+  const lastSeen = rawTs ? Number(rawTs) : null;
+  const stale = !lastSeen || Number.isNaN(lastSeen) || Date.now() - lastSeen > STALE_AFTER_MS;
+  return { tabId, lastSeen, stale };
 }
 
 export function useSingleTab(): UseSingleTabReturn {
   const [isActive,    setIsActive]    = useState(false);
   const [isResolving, setIsResolving] = useState(true);
+  const [segundosDesdeHeartbeat, setSegundosDesdeHeartbeat] = useState<number | null>(null);
 
   const tabIdRef    = useRef<string>('');
   const channelRef  = useRef<BroadcastChannel | null>(null);
@@ -48,11 +64,14 @@ export function useSingleTab(): UseSingleTabReturn {
 
   // Inicia el heartbeat de la pestaña activa
   const startHeartbeat = useCallback((ch: BroadcastChannel, tabId: string) => {
-    if (heartbeatRef.current) clearInterval(heartbeatRef.current);
-    heartbeatRef.current = setInterval(() => {
+    const beat = () => {
       ch.postMessage({ type: 'HEARTBEAT', tabId } satisfies TabMsg);
       localStorage.setItem(LS_ACTIVE_TAB, tabId);
-    }, HEARTBEAT_MS);
+      localStorage.setItem(LS_ACTIVE_TS, String(Date.now()));
+    };
+    if (heartbeatRef.current) clearInterval(heartbeatRef.current);
+    beat();
+    heartbeatRef.current = setInterval(beat, HEARTBEAT_MS);
   }, []);
 
   const stopHeartbeat = useCallback(() => {
@@ -77,8 +96,42 @@ export function useSingleTab(): UseSingleTabReturn {
 
     ch.postMessage({ type: 'TAKEOVER', tabId } satisfies TabMsg);
     localStorage.setItem(LS_ACTIVE_TAB, tabId);
+    localStorage.setItem(LS_ACTIVE_TS, String(Date.now()));
     setIsActive(true);
     startHeartbeat(ch, tabId);
+  }, [startHeartbeat]);
+
+  const revisarYContinuar = useCallback(async (): Promise<boolean> => {
+    const ch = channelRef.current;
+    const tabId = tabIdRef.current;
+    if (!ch) return false;
+
+    let alive = false;
+    const listener = (event: MessageEvent<TabMsg>) => {
+      if (event.data.type === 'PONG' && event.data.tabId !== tabId) {
+        alive = true;
+      }
+    };
+
+    ch.addEventListener('message', listener as EventListener);
+    ch.postMessage({ type: 'PING', tabId } satisfies TabMsg);
+
+    await new Promise((resolve) => window.setTimeout(resolve, RECHECK_WAIT_MS));
+    ch.removeEventListener('message', listener as EventListener);
+
+    const stored = getStoredActive();
+    if (!alive || stored.stale || !stored.tabId || stored.tabId === tabId) {
+      localStorage.setItem(LS_ACTIVE_TAB, tabId);
+      localStorage.setItem(LS_ACTIVE_TS, String(Date.now()));
+      setIsActive(true);
+      startHeartbeat(ch, tabId);
+      return true;
+    }
+
+    setSegundosDesdeHeartbeat(
+      stored.lastSeen ? Math.max(0, Math.round((Date.now() - stored.lastSeen) / 1000)) : null,
+    );
+    return false;
   }, [startHeartbeat]);
 
   useEffect(() => {
@@ -104,6 +157,7 @@ export function useSingleTab(): UseSingleTabReturn {
           // Otra pestaña está activa → si esta no lo era, se mantiene bloqueada
           if (msg.tabId !== tabId) {
             localStorage.setItem(LS_ACTIVE_TAB, msg.tabId);
+            localStorage.setItem(LS_ACTIVE_TS, String(Date.now()));
             // Si esta pestaña creía que era activa por error, cede
             setIsActive(prev => {
               if (prev) stopHeartbeat();
@@ -128,6 +182,7 @@ export function useSingleTab(): UseSingleTabReturn {
               const current = localStorage.getItem(LS_ACTIVE_TAB);
               if (!current || current === msg.tabId) {
                 localStorage.setItem(LS_ACTIVE_TAB, tabId);
+                localStorage.setItem(LS_ACTIVE_TS, String(Date.now()));
                 setIsActive(true);
                 startHeartbeat(ch, tabId);
               }
@@ -164,15 +219,19 @@ export function useSingleTab(): UseSingleTabReturn {
     const claimTimer = window.setTimeout(() => {
       ch.removeEventListener('message', pongListener as EventListener);
 
-      const storedActive = localStorage.getItem(LS_ACTIVE_TAB);
-      const hasActiveTab = pongReceived || (!!storedActive && storedActive !== tabId);
+      const stored = getStoredActive();
+      const hasActiveTab = pongReceived || (!!stored.tabId && stored.tabId !== tabId && !stored.stale);
 
       if (hasActiveTab) {
         // Hay otra pestaña activa → esta se bloquea
         setIsActive(false);
+        setSegundosDesdeHeartbeat(
+          stored.lastSeen ? Math.max(0, Math.round((Date.now() - stored.lastSeen) / 1000)) : null,
+        );
       } else {
         // No hay ninguna activa → esta toma el control
         localStorage.setItem(LS_ACTIVE_TAB, tabId);
+        localStorage.setItem(LS_ACTIVE_TS, String(Date.now()));
         setIsActive(true);
         startHeartbeat(ch, tabId);
       }
@@ -185,6 +244,7 @@ export function useSingleTab(): UseSingleTabReturn {
       const current = localStorage.getItem(LS_ACTIVE_TAB);
       if (current === tabId) {
         localStorage.removeItem(LS_ACTIVE_TAB);
+        localStorage.removeItem(LS_ACTIVE_TS);
         yield_(ch, tabId);
       }
     };
@@ -199,6 +259,7 @@ export function useSingleTab(): UseSingleTabReturn {
       const current = localStorage.getItem(LS_ACTIVE_TAB);
       if (current === tabId) {
         localStorage.removeItem(LS_ACTIVE_TAB);
+        localStorage.removeItem(LS_ACTIVE_TS);
         yield_(ch, tabId);
       }
 
@@ -206,5 +267,21 @@ export function useSingleTab(): UseSingleTabReturn {
     };
   }, [startHeartbeat, stopHeartbeat, yield_]);
 
-  return { isActive, isResolving, tomarControl };
+  useEffect(() => {
+    if (isActive || isResolving) {
+      setSegundosDesdeHeartbeat(null);
+      return;
+    }
+
+    const timer = window.setInterval(() => {
+      const stored = getStoredActive();
+      setSegundosDesdeHeartbeat(
+        stored.lastSeen ? Math.max(0, Math.round((Date.now() - stored.lastSeen) / 1000)) : null,
+      );
+    }, 1_000);
+
+    return () => window.clearInterval(timer);
+  }, [isActive, isResolving]);
+
+  return { isActive, isResolving, tomarControl, revisarYContinuar, segundosDesdeHeartbeat };
 }

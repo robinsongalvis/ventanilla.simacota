@@ -29,7 +29,7 @@ export default function InternoLayout({
   const esLogin = pathname === '/interno/login';
 
   // Control de pestaña única: solo aplica fuera de la página de login
-  const { isActive, isResolving, tomarControl } = useSingleTab();
+  const { isActive, isResolving, tomarControl, revisarYContinuar, segundosDesdeHeartbeat } = useSingleTab();
 
   useEffect(() => {
     if (cargando) return;
@@ -52,7 +52,13 @@ export default function InternoLayout({
 
   // Esta pestaña no es la activa → mostrar pantalla de bloqueo
   if (!isActive) {
-    return <TabBloqueada onTomarControl={tomarControl} />;
+    return (
+      <TabBloqueada
+        onTomarControl={tomarControl}
+        onRevisarYContinuar={revisarYContinuar}
+        segundosDesdeHeartbeat={segundosDesdeHeartbeat}
+      />
+    );
   }
 
   return (
