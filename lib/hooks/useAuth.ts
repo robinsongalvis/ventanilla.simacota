@@ -60,6 +60,14 @@ export function useAuth(): UseAuthReturn {
           setUsuario(null);
         } else {
           const data = snap.data();
+          if (data.activo === false) {
+            void clearInternalSession();
+            await signOut(auth);
+            setError('Tu usuario está inactivo. Contacta al administrador del sistema.');
+            setUsuario(null);
+            return;
+          }
+
           setUsuario({
             uid:      firebaseUser.uid,
             email:    firebaseUser.email ?? '',

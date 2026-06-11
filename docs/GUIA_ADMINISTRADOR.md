@@ -18,6 +18,13 @@ Desde el módulo **Administración** el rol `ADMIN` puede:
 - Enviar restablecimiento de contraseña.
 - Revisar auditoría administrativa.
 
+Al desactivar un usuario, el sistema:
+
+- Marca `users/{uid}.activo = false`.
+- Deshabilita la cuenta en Firebase Auth.
+- Revoca refresh tokens para cortar sesiones vigentes.
+- Registra el evento en `admin_auditoria`.
+
 ## Roles
 
 - `ADMIN`: visibilidad global y administración del sistema.
@@ -41,3 +48,14 @@ Cada usuario debe quedar asociado a un `tenantId`. Esa dependencia controla qué
 ## Seguridad
 
 No registrar credenciales, llaves de Firebase, claves SMTP ni tokens de IA en documentos, capturas o commits. Las variables sensibles deben permanecer en Vercel/Firebase y en `.env.local` fuera de Git.
+
+## Operación segura de radicados
+
+Las acciones críticas no deben hacerse editando Firestore manualmente. Usar siempre el dashboard:
+
+- Asignar o trasladar radicados.
+- Registrar devolución.
+- Registrar prórroga.
+- Resolver con respuesta oficial.
+
+El dashboard ejecuta APIs internas que validan sesión, rol, dependencia y usuario activo. La colección legacy `radicados` está cerrada para nuevas escrituras; el flujo vigente opera sobre `ventanilla_radicados`.

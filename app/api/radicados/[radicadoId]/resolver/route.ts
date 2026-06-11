@@ -1,0 +1,146 @@
+import { NextResponse } from 'next/server';
+import { getFirebaseAdminDb } from '@/lib/firebase-admin';
+import { enviarEmail } from '@/lib/email/mailer';
+import {
+  buildRespuestaCiudadanoHtml,
+  buildRespuestaCiudadanoSubject,
+} from '@/lib/email/templates/respuesta-ciudadano';
+import {
+  canOperateTenant,
+  InternalAuthError,
+  requireActiveInternalUser,
+} from '@/lib/server/internal-auth';
+import {
+  appendTrazabilidadAdmin,
+  buildRespuestaOficial,
+  getRadicadoOrFail,
+  RadicadoActionError,
+  uploadRespuestaPdfAdmin,
+} from '@/lib/server/radicados-security';
+import { DIRECTORIO_TENANTS } from '@/src/types/reglas-negocio';
+
+export const runtime = 'nodejs';
+
+interface RouteContext {
+  params: Promise<{ radicadoId: string }>;
+}
+
+function jsonError(error: unknown) {
+  if (error instanceof InternalAuthError || error instanceof RadicadoActionError) {
+    return NextResponse.json({ error: error.message }, { status: error.status });
+  }
+  return NextResponse.json({ error: 'No fue posible resolver el radicado.' }, { status: 500 });
+}
+
+async function notificarCiudadano(params: {
+  email: string | null | undefined;
+  nombre: string;
+  radicadoId: string;
+  asunto: string;
+  nota: string;
+  tenantId: string;
+  fechaRespuesta: string;
+  tieneArchivo: boolean;
+}): Promise<boolean> {
+  if (!params.email) return false;
+
+  const dependencia = DIRECTORIO_TENANTS[params.tenantId as keyof typeof DIRECTORIO_TENANTS];
+  if (!dependencia) return false;
+
+  await enviarEmail({
+    to: params.email,
+    subject: buildRespuestaCiudadanoSubject(params.radicadoId),
+    html: buildRespuestaCiudadanoHtml({
+      radicadoId: params.radicadoId,
+      ciudadanoNombre: params.nombre,
+      asunto: params.asunto || 'Sin asunto',
+      nota: params.nota,
+      dependenciaNombre: dependencia.nombreOficial,
+      dependenciaEmail: dependencia.emailOficial,
+      fechaRespuesta: params.fechaRespuesta,
+      tieneArchivo: params.tieneArchivo,
+    }),
+    replyTo: dependencia.emailOficial,
+  });
+
+  return true;
+}
+
+export async function POST(request: Request, context: RouteContext): Promise<NextResponse> {
+  try {
+    const usuario = await requireActiveInternalUser();
+    const { radicadoId } = await context.params;
+    const formData = await request.formData();
+    const nota = typeof formData.get('nota') === 'string' ? String(formData.get('nota')).trim() : '';
+    const archivo = formData.get('archivo');
+
+    if (nota.length < 10) {
+      return NextResponse.json({ error: 'La respuesta debe tener al menos 10 caracteres.' }, { status: 400 });
+    }
+
+    const radicado = await getRadicadoOrFail(radicadoId);
+    if (radicado.estadoActual === 'RESUELTO' || radicado.cumplioTermino !== null && radicado.cumplioTermino !== undefined) {
+      return NextResponse.json({ error: 'El radicado ya fue resuelto y no puede recalcular cumplimiento.' }, { status: 409 });
+    }
+
+    if (!canOperateTenant(usuario, radicado.clasificacion.oficinaDestino)) {
+      return NextResponse.json({ error: 'Tu rol no permite resolver este radicado.' }, { status: 403 });
+    }
+
+    const ahora = new Date().toISOString();
+    const archivoPdf = archivo instanceof File && archivo.size > 0
+      ? await uploadRespuestaPdfAdmin(archivo, radicadoId)
+      : null;
+    const respuestaOficial = buildRespuestaOficial(archivoPdf, nota, ahora, usuario);
+    const cumplioTermino = new Date(ahora) <= new Date(radicado.termino.fechaVencimiento);
+
+    await getFirebaseAdminDb().doc(`ventanilla_radicados/${radicadoId}`).update({
+      estadoActual: 'RESUELTO',
+      ultimaActualizacion: ahora,
+      cumplioTermino,
+      ...(respuestaOficial ? { respuestaOficial } : {}),
+    });
+    await appendTrazabilidadAdmin(radicadoId, {
+      fecha: ahora,
+      accion: 'RESPUESTA_FUNCIONARIO',
+      actorUid: usuario.uid,
+      actorNombre: usuario.nombre,
+      nota,
+      metadata: {
+        actorRol: usuario.rol,
+        dependencia: radicado.clasificacion.oficinaDestino,
+        cumplioTermino,
+        fechaVencimiento: radicado.termino.fechaVencimiento,
+        archivoAdjunto: archivoPdf?.nombre ?? null,
+      },
+    });
+
+    let emailEnviado = false;
+    try {
+      emailEnviado = await notificarCiudadano({
+        email: radicado.solicitante.email,
+        nombre: radicado.solicitante.nombreCompleto,
+        radicadoId,
+        asunto: radicado.detalle.asunto,
+        nota,
+        tenantId: radicado.clasificacion.oficinaDestino,
+        fechaRespuesta: ahora,
+        tieneArchivo: Boolean(archivoPdf),
+      });
+    } catch (error) {
+      console.error('[radicados/resolver] Error notificando ciudadano:', error);
+    }
+
+    return NextResponse.json({
+      ok: true,
+      estadoActual: 'RESUELTO',
+      ultimaActualizacion: ahora,
+      archivoNombre: archivoPdf?.nombre ?? null,
+      cumplioTermino,
+      emailEnviado,
+    });
+  } catch (error) {
+    console.error('[radicados/resolver]', error);
+    return jsonError(error);
+  }
+}

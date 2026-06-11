@@ -17,8 +17,9 @@ service firebase.storage {
     }
 
     match /radicados/{radicadoId}/{archivo} {
-      // Permite radicacion ciudadana sin cuenta, con limites estrictos de tipo y tamano.
-      allow create: if isAllowedRadicadoFile();
+      // La radicación pública sube anexos vía Admin SDK en /api/radicacion.
+      // Solo usuarios internos autenticados conservan subida directa temporal para radicación interna.
+      allow create: if signedIn() && isAllowedRadicadoFile();
 
       allow read: if false;
 
@@ -26,7 +27,8 @@ service firebase.storage {
     }
 
     match /respuestas/{radicadoId}/{archivo} {
-      // Solo funcionarios autenticados pueden subir el PDF firmado de respuesta.
+      // La resolución moderna sube vía Admin SDK en /api/radicados/{id}/resolver.
+      // Se mantiene autenticado para compatibilidad interna, nunca público.
       allow create: if signedIn()
         && request.resource != null
         && request.resource.size > 0

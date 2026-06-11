@@ -1,8 +1,4 @@
-import { addDoc, collection, doc, updateDoc, writeBatch } from 'firebase/firestore';
-import { getDb }              from '@/lib/firebase';
-import { NOMBRES_TENANT }     from '@/src/types/reglas-negocio';
 import type { TenantId }      from '@/src/types/radicado';
-import type { TrazabilidadRadicado } from '@/src/types/ventanilla';
 import type { RolInterno }    from '@/lib/hooks/useAuth';
 
 /* ── Tipos públicos ─────────────────────────────────────────── */
@@ -44,61 +40,18 @@ export async function asignarRadicado(
   /** Tenant de origen (para trazabilidad) */
   tenantOrigen?: TenantId,
 ): Promise<void> {
-  const db   = getDb();
-  const ref  = doc(db, 'ventanilla_radicados', radicadoId);
-  const ahora = new Date().toISOString();
-
-  // Snapshot MIPG-2 — solo se escribe si hay responsable definido
-  const snapshotResponsable = responsable
-    ? {
-        'clasificacion.funcionarioResponsableUid':    responsable.uid,
-        'clasificacion.funcionarioResponsableNombre': responsable.nombre,
-        'clasificacion.funcionarioResponsableEmail':  responsable.email,
-        'clasificacion.funcionarioResponsableRol':    responsable.rol,
-        ...(responsable.cargo
-          ? { 'clasificacion.funcionarioResponsableCargo': responsable.cargo }
-          : {}),
-        'clasificacion.fechaAsignacionResponsable':   ahora,
-      }
-    : {};
-
-  await updateDoc(ref, {
-    'clasificacion.oficinaDestino': tenantDestino,
-    ...snapshotResponsable,
-    estadoActual:        'ASIGNADO',
-    ultimaActualizacion: ahora,
+  void actor;
+  void tenantOrigen;
+  const response = await fetch(`/api/radicados/${encodeURIComponent(radicadoId)}/asignar`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    credentials: 'include',
+    body: JSON.stringify({ tenantDestino, responsable: responsable ?? null }),
   });
-
-  // Trazabilidad enriquecida con datos auditoriables (MIPG Req. 3)
-  const metadataResponsable = responsable
-    ? {
-        funcionarioResponsableUid:    responsable.uid,
-        funcionarioResponsableNombre: responsable.nombre,
-        funcionarioResponsableEmail:  responsable.email,
-        funcionarioResponsableRol:    responsable.rol,
-        ...(responsable.cargo ? { funcionarioResponsableCargo: responsable.cargo } : {}),
-      }
-    : {};
-
-  await addDoc(
-    collection(db, 'ventanilla_radicados', radicadoId, 'trazabilidad'),
-    {
-      eventoId:    `ev_${radicadoId}_${Date.now()}`,
-      fecha:        ahora,
-      accion:       'TRASLADO',
-      actorUid:     actor.uid,
-      actorNombre:  actor.nombre,
-      ...(tenantOrigen ? { oficinaOrigen: tenantOrigen } : {}),
-      oficinaDestino: tenantDestino,
-      nota: `Asignado a ${NOMBRES_TENANT[tenantDestino] ?? tenantDestino} por ${actor.nombre}`,
-      metadata: {
-        dependenciaOrigen:  tenantOrigen  ?? null,
-        dependenciaDestino: tenantDestino,
-        actorRol:           actor.rol ?? null,
-        ...metadataResponsable,
-      },
-    } satisfies TrazabilidadRadicado,
-  );
+  const data = await response.json().catch(() => null) as { error?: string } | null;
+  if (!response.ok) {
+    throw new Error(data?.error ?? 'Error al asignar el radicado.');
+  }
 }
 
 /* ══════════════════════════════════════════════════════════════
@@ -113,53 +66,16 @@ export async function asignarMasivo(
   actor:         ActorAsignacion,
   onProgress?:   (asignados: number, total: number) => void,
 ): Promise<ResultadoAsignacion> {
-  const db    = getDb();
-  const CHUNK = 400;
-  const ahora = new Date().toISOString();
   let asignados = 0;
   let fallidos  = 0;
 
-  const entrada: Omit<TrazabilidadRadicado, 'eventoId'> = {
-    fecha:       ahora,
-    accion:      'TRASLADO',
-    actorUid:    actor.uid,
-    actorNombre: actor.nombre,
-    oficinaDestino: tenantDestino,
-    nota: `Asignación masiva a ${NOMBRES_TENANT[tenantDestino] ?? tenantDestino} por ${actor.nombre}`,
-    metadata: {
-      dependenciaDestino: tenantDestino,
-      actorRol:           actor.rol ?? null,
-      masivo:             true,
-    },
-  };
-
-  for (let i = 0; i < radicadoIds.length; i += CHUNK) {
-    const lote  = radicadoIds.slice(i, i + CHUNK);
-    const batch = writeBatch(db);
-
-    for (const id of lote) {
-      batch.update(doc(db, 'ventanilla_radicados', id), {
-        'clasificacion.oficinaDestino': tenantDestino,
-        estadoActual:                   'ASIGNADO',
-        ultimaActualizacion:            ahora,
-      });
-    }
-
+  for (const id of radicadoIds) {
     try {
-      await batch.commit();
-      await Promise.allSettled(
-        lote.map((id, idx) =>
-          addDoc(
-            collection(db, 'ventanilla_radicados', id, 'trazabilidad'),
-            { ...entrada, eventoId: `ev_${id}_${Date.now()}_${idx}` } satisfies TrazabilidadRadicado,
-          ),
-        ),
-      );
-      asignados += lote.length;
+      await asignarRadicado(id, tenantDestino, actor);
+      asignados += 1;
     } catch {
-      fallidos += lote.length;
+      fallidos += 1;
     }
-
     onProgress?.(asignados, radicadoIds.length);
   }
 

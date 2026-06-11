@@ -1,5 +1,10 @@
 'use client';
 
+/*
+ * DEPRECATED: componente legacy de la colección `radicados`.
+ * La resolución vigente del dashboard usa POST /api/radicados/[radicadoId]/resolver.
+ */
+
 import { useState } from 'react';
 import { doc, updateDoc, arrayUnion } from 'firebase/firestore';
 import { getDb }                        from '@/lib/firebase';

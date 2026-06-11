@@ -3,7 +3,7 @@ import type { DecodedIdToken } from 'firebase-admin/auth';
 import { doc, getDoc, collection, getDocs } from 'firebase/firestore';
 import { getDb } from '@/lib/firebase';
 import { SESSION_COOKIE_NAME } from '@/lib/auth-cookie';
-import { getFirebaseAdminAuth } from '@/lib/firebase-admin';
+import { getFirebaseAdminAuth, getFirebaseAdminDb } from '@/lib/firebase-admin';
 import { checkRateLimit, rateLimitHeaders } from '@/lib/ai/rate-limit';
 import { construirContextoAgente } from '@/lib/ai/context-engine';
 import { invocarCopilotoEspecializado } from '@/lib/ai/agents';
@@ -20,7 +20,10 @@ async function verificarSesionInterna(request: Request): Promise<DecodedIdToken 
   if (!sessionCookie) return null;
 
   try {
-    return await getFirebaseAdminAuth().verifySessionCookie(sessionCookie, true);
+    const decoded = await getFirebaseAdminAuth().verifySessionCookie(sessionCookie, true);
+    const snap = await getFirebaseAdminDb().doc(`users/${decoded.uid}`).get();
+    if (!snap.exists || snap.data()?.activo === false) return null;
+    return decoded;
   } catch {
     return null;
   }

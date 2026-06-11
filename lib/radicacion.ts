@@ -1,8 +1,8 @@
 /* ══════════════════════════════════════════════════════════════
    lib/radicacion.ts
    Orquestador centralizado del proceso de radicación.
-   Usado por el portal ciudadano (/ciudadano/radicar) y la
-   ventanilla física (/interno/recepcion).
+   DEPRECATED: compatibilidad legacy. El flujo público vigente usa
+   POST /api/radicacion y crea en ventanilla_radicados con Admin SDK.
 ══════════════════════════════════════════════════════════════ */
 
 import { doc, setDoc }    from 'firebase/firestore';

@@ -24,6 +24,7 @@ export async function GET(): Promise<NextResponse> {
     const snap    = await getFirebaseAdminDb().doc(`users/${decoded.uid}`).get();
     if (!snap.exists) return NextResponse.json({ error: 'Usuario no encontrado.' }, { status: 404 });
     const d       = snap.data()!;
+    if (d.activo === false) return NextResponse.json({ error: 'Usuario inactivo.' }, { status: 403 });
     const rol     = d.rol as RolInterno;
     const tenantId = d.tenantId as TenantId;
 

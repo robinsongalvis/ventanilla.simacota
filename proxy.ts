@@ -1,6 +1,6 @@
 import { NextResponse, type NextRequest } from 'next/server';
 import { SESSION_COOKIE_NAME } from '@/lib/auth-cookie';
-import { getFirebaseAdminAuth } from '@/lib/firebase-admin';
+import { getFirebaseAdminAuth, getFirebaseAdminDb } from '@/lib/firebase-admin';
 
 async function hasValidInternalSession(request: NextRequest): Promise<boolean> {
   const sessionCookie = request.cookies.get(SESSION_COOKIE_NAME)?.value;
@@ -8,7 +8,12 @@ async function hasValidInternalSession(request: NextRequest): Promise<boolean> {
 
   try {
     const decoded = await getFirebaseAdminAuth().verifySessionCookie(sessionCookie, true);
-    return typeof decoded.tenantId === 'string' && typeof decoded.rol === 'string';
+    if (typeof decoded.tenantId !== 'string' || typeof decoded.rol !== 'string') {
+      return false;
+    }
+
+    const userSnap = await getFirebaseAdminDb().doc(`users/${decoded.uid}`).get();
+    return userSnap.exists && userSnap.data()?.activo !== false;
   } catch {
     return false;
   }

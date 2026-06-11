@@ -32,7 +32,7 @@ Cada documento en `ventanilla_radicados` debe poder responder:
 | 5 | **En qué fecha** | `respuestaOficial.fecha` + `ultimaActualizacion` + timestamps en trazabilidad | v1.0 |
 | 6 | **Qué soporte se adjuntó** | `respuestaOficial.archivoNombre` + `archivoPath` (Storage) | v1.0 |
 | 7 | **Qué trazabilidad quedó** | Subcollección `/trazabilidad/` append-only, inmutable, con `eventoId` único | ALTO-1 |
-| 8 | **Si se cumplió el término** | `cumplioTermino: boolean` — persistido al resolver | MIPG-1 |
+| 8 | **Si se cumplió el término** | `cumplioTermino: boolean` — calculado server-side una sola vez al resolver | MIPG-1 / Cierre Go-Live |
 
 ---
 
@@ -111,6 +111,14 @@ Cada documento en `ventanilla_radicados` debe poder responder:
   feedbackIa?:  FeedbackIA;
 }
 ```
+
+## Blindaje de evidencias MIPG
+
+Desde el cierre de seguridad go-live, los campos críticos del documento principal no se modifican directamente desde el cliente. Las operaciones de asignación, devolución, prórroga y resolución pasan por APIs server-side con Admin SDK.
+
+`cumplioTermino` es evidencia de cumplimiento legal. Se define únicamente en `POST /api/radicados/[radicadoId]/resolver`, comparando la fecha de resolución contra `termino.fechaVencimiento`. Si el radicado ya está resuelto o el campo ya fue definido, el backend rechaza una nueva resolución para evitar recalcular la evidencia.
+
+La trazabilidad permanece en subcolección append-only y cada acción crítica registra un evento operativo separado.
 
 ---
 

@@ -34,7 +34,7 @@ async function verificarAdmin(): Promise<{ uid: string; nombre: string; rol: str
     const userSnap = await getFirebaseAdminDb().doc(`users/${decoded.uid}`).get();
     if (!userSnap.exists) return null;
     const data = userSnap.data()!;
-    if (data.rol !== 'ADMIN') return null;
+    if (data.rol !== 'ADMIN' || data.activo === false) return null;
     return { uid: decoded.uid, nombre: (data.nombre as string) ?? 'Admin', rol: 'ADMIN' };
   } catch {
     return null;
@@ -138,6 +138,9 @@ export async function PATCH(request: Request, context: RouteContext): Promise<Ne
       eventos.push({ accion: accionActivo, metadata: {} });
       // Deshabilitar/habilitar en Firebase Auth
       await auth.updateUser(targetUid, { disabled: !payload.activo });
+      if (!payload.activo) {
+        await auth.revokeRefreshTokens(targetUid);
+      }
     }
 
     if (Object.keys(update).length <= 1) {

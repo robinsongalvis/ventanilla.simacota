@@ -73,6 +73,17 @@ Desde este refuerzo institucional, toda solicitud nueva creada en `/radicacion` 
 7. El dashboard interno, SIMI, CSV MIPG y consulta ciudadana operan sobre ese radicado.
 
 La colección `radicados` queda únicamente para compatibilidad temporal de consultas históricas.
+Las reglas de Firestore bloquean nuevas escrituras en esa colección legacy.
+
+## Cierre de seguridad go-live
+
+- Las acciones críticas de asignación, devolución, prórroga y resolución pasan por APIs server-side.
+- El dashboard no debe modificar directamente `ventanilla_radicados` para cambios de estado o respuesta.
+- `cumplioTermino` se calcula únicamente al resolver por backend y queda como evidencia MIPG inmutable.
+- Los usuarios inactivos no pueden iniciar sesión, entrar al dashboard ni operar APIs internas.
+- Al desactivar un usuario, se deshabilita en Firebase Auth y se revocan sus refresh tokens.
+- La radicación pública no escribe en Firestore ni Storage desde el cliente; todo pasa por `POST /api/radicacion`.
+- La subida pública anónima directa a Storage está bloqueada.
 
 ## Pendientes antes de publicación oficial
 

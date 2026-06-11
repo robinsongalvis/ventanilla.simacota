@@ -241,13 +241,11 @@ service cloud.firestore {
       allow list: if isAdmin()
         || ((isFuncionario() || isRecepcionista()) && canReadRadicado(resource.data));
 
-      // Radicacion web publica y radicacion fisica desde recepcion.
-      allow create: if validRadicadoCreate()
-        && request.resource.data.radicadoId == radicadoId;
+      // Legacy cerrado para nuevas escrituras. La radicación vigente usa
+      // /api/radicacion + Admin SDK sobre ventanilla_radicados.
+      allow create: if false;
 
-      // Cambios de estado/respuesta desde el panel interno.
-      allow update: if canUpdateRadicado(resource.data)
-        && validRadicadoUpdate();
+      allow update: if false;
 
       allow delete: if false;
     }
@@ -268,17 +266,9 @@ service cloud.firestore {
       allow create: if (isAdmin() || isRecepcionista())
         && request.resource.data.radicadoId == radicadoId;
 
-      // Jefe de Dependencia y Control Interno son roles de solo lectura — no pueden actualizar.
-      allow update: if (
-          isAdmin()
-          || isRecepcionista()
-          || (
-            isFuncionario()
-            && resource.data.clasificacion.oficinaDestino == userTenant()
-            && request.resource.data.clasificacion.oficinaDestino == userTenant()
-          )
-        )
-        && validVentanillaUpdate();
+      // Mutaciones críticas pasan por APIs server-side con Admin SDK.
+      // Esto blinda cumplioTermino, estadoActual, clasificación, prórrogas y respuesta oficial.
+      allow update: if false;
 
       allow delete: if false;
     }

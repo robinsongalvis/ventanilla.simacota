@@ -1,6 +1,10 @@
 /* ══════════════════════════════════════════════════════════════
    RESOLVER RADICADO — Lógica desacoplada por criticidad
 
+   DEPRECATED: las resoluciones institucionales vigentes deben pasar por
+   POST /api/radicados/[radicadoId]/resolver para validar rol, usuario activo
+   y blindar cumplioTermino como evidencia MIPG.
+
    OPERACIONES CRÍTICAS  (ejecutarResolucion)
      • Upload del PDF firmado a Firebase Storage
      • updateDoc del radicado → estadoActual: RESUELTO

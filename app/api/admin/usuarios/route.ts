@@ -42,7 +42,7 @@ async function verificarAdmin(): Promise<{ uid: string; nombre: string; rol: str
     if (!userSnap.exists) return null;
 
     const data = userSnap.data()!;
-    if (data.rol !== 'ADMIN') return null;
+    if (data.rol !== 'ADMIN' || data.activo === false) return null;
 
     return { uid, nombre: (data.nombre as string) ?? 'Admin', rol: data.rol as string };
   } catch {

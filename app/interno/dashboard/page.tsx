@@ -3,7 +3,7 @@
 export const dynamic = 'force-dynamic';
 
 import { useEffect, useMemo, useState } from 'react';
-import { addDoc, collection, doc, getDocs, updateDoc } from 'firebase/firestore';
+import { collection, getDocs } from 'firebase/firestore';
 import { signInWithEmailAndPassword }     from 'firebase/auth';
 import { getFirebaseAuth, getDb }         from '@/lib/firebase';
 import { useAuth }                        from '@/lib/hooks/useAuth';
@@ -25,10 +25,6 @@ import type {
   VistaActual,
 }                                         from '@/lib/store/ventanillaStore';
 import type { TenantId }                  from '@/src/types/radicado';
-import {
-  ejecutarResolucion,
-  despacharNotificaciones,
-} from '@/lib/acciones/resolver-radicado';
 import { SemaforoTermino, calcularSemaforo } from '@/app/interno/dashboard/components/mipg/SemaforoTermino';
 import { VistaAdministracion }                from '@/app/interno/dashboard/components/admin/VistaAdministracion';
 import { PanelSimi }                         from '@/app/interno/dashboard/components/simi/PanelSimi';
@@ -1250,31 +1246,6 @@ function PanelDerecho({
     }
   }
 
-  function trazabilidadEntry(
-    accion: TrazabilidadRadicado['accion'],
-    nota: string,
-    extra?: Record<string, unknown>,
-  ): Omit<TrazabilidadRadicado, 'eventoId'> {
-    return {
-      fecha:       new Date().toISOString(),
-      accion,
-      actorUid:    usuario.uid,
-      actorNombre: usuario.nombre,
-      nota,
-      ...(extra ?? {}),
-    };
-  }
-
-  async function appendTrazabilidad(
-    radicadoId: string,
-    entrada: Omit<TrazabilidadRadicado, 'eventoId'>,
-  ): Promise<void> {
-    await addDoc(
-      collection(getDb(), 'ventanilla_radicados', radicadoId, 'trazabilidad'),
-      { ...entrada, eventoId: `ev_${radicadoId}_${Date.now()}` },
-    );
-  }
-
   async function asignar() {
     if (!tenantDestino) return;
 
@@ -1300,9 +1271,6 @@ function PanelDerecho({
     }
 
     await ejecutarAccion(async () => {
-      const ahora = new Date().toISOString();
-
-      // MIPG-2: snapshot del responsable — prioridad al selector; fallback al UID libre (legacy)
       const responsable: ResponsableFuncionario | null = responsableSelec
         ? {
             uid:    responsableSelec.uid,
@@ -1315,58 +1283,14 @@ function PanelDerecho({
           ? { uid: funcionarioUid, nombre: 'No registrado', email: '', rol: 'FUNCIONARIO' }
           : null;
 
-      const snapshotResponsable = responsable
-        ? {
-            'clasificacion.funcionarioResponsableUid':    responsable.uid,
-            'clasificacion.funcionarioResponsableNombre': responsable.nombre,
-            'clasificacion.funcionarioResponsableEmail':  responsable.email,
-            'clasificacion.funcionarioResponsableRol':    responsable.rol,
-            ...(responsable.cargo
-              ? { 'clasificacion.funcionarioResponsableCargo': responsable.cargo }
-              : {}),
-            'clasificacion.fechaAsignacionResponsable':   ahora,
-          }
-        : {};
-
-      await updateDoc(doc(getDb(), 'ventanilla_radicados', radicado.radicadoId), {
-        'clasificacion.oficinaDestino': tenantDestino,
-        ...snapshotResponsable,
-        estadoActual:        'ASIGNADO',
-        ultimaActualizacion: ahora,
-        ...(radicado.analisisIa && radicado.analisisIa.dependenciaSugerida !== tenantDestino ? {
-          feedbackIa: {
-            usuarioId:        usuario.uid,
-            actorNombre:      usuario.nombre,
-            puntuacion:       'CORREGIDO',
-            motivoCorreccion: `Trasladado manualmente a ${NOMBRES_TENANT[tenantDestino]}.`,
-            fecha:             ahora,
-          },
-        } : {}),
+      const response = await fetch(`/api/radicados/${encodeURIComponent(radicado.radicadoId)}/asignar`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify({ tenantDestino, responsable }),
       });
-
-      // Trazabilidad enriquecida con datos auditoriables
-      const metadataResponsable = responsable && responsable.nombre !== 'No registrado'
-        ? {
-            funcionarioResponsableUid:    responsable.uid,
-            funcionarioResponsableNombre: responsable.nombre,
-            funcionarioResponsableEmail:  responsable.email,
-            funcionarioResponsableRol:    responsable.rol,
-          }
-        : {};
-
-      await appendTrazabilidad(radicado.radicadoId, {
-        fecha:       ahora,
-        accion:      'ASIGNACION',
-        actorUid:    usuario.uid,
-        actorNombre: usuario.nombre,
-        nota:        `Trasladado a ${NOMBRES_TENANT[tenantDestino]}`,
-        metadata: {
-          dependenciaOrigen:  radicado.clasificacion.oficinaDestino,
-          dependenciaDestino: tenantDestino,
-          actorRol:           usuario.rol,
-          ...metadataResponsable,
-        },
-      });
+      const data = await response.json().catch(() => null) as { error?: string } | null;
+      if (!response.ok) throw new Error(data?.error ?? 'Error al asignar el radicado.');
     });
   }
 
@@ -1403,34 +1327,30 @@ function PanelDerecho({
   async function devolver() {
     if (motivo.trim().length < 10) { setErrorLocal('El motivo debe tener al menos 10 caracteres.'); return; }
     await ejecutarAccion(async () => {
-      const entrada = trazabilidadEntry('DEVOLUCION', motivo.trim());
-      await updateDoc(doc(getDb(), 'ventanilla_radicados', radicado.radicadoId), {
-        estadoActual: 'DEVUELTO',
-        ultimaActualizacion: entrada.fecha,
+      const response = await fetch(`/api/radicados/${encodeURIComponent(radicado.radicadoId)}/devolver`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify({ motivo: motivo.trim() }),
       });
-      await appendTrazabilidad(radicado.radicadoId, entrada);
+      const data = await response.json().catch(() => null) as { error?: string } | null;
+      if (!response.ok) throw new Error(data?.error ?? 'Error al devolver el radicado.');
     });
     setMotivo('');
   }
 
   async function aplicarProrroga() {
     if (motivo.trim().length < 5) { setErrorLocal('Ingresa el motivo de la prórroga.'); return; }
-    const fechaActual  = new Date(radicado.termino.fechaVencimiento);
-    const nuevaFecha   = new Date(fechaActual);
-    nuevaFecha.setDate(nuevaFecha.getDate() + diasProrroga);
 
     await ejecutarAccion(async () => {
-      const entrada = trazabilidadEntry('PRORROGA', motivo.trim(), {
-        diasProrroga,
-        fechaVencimientoAnterior: radicado.termino.fechaVencimiento,
+      const response = await fetch(`/api/radicados/${encodeURIComponent(radicado.radicadoId)}/prorroga`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify({ motivo: motivo.trim(), diasProrroga }),
       });
-      await updateDoc(doc(getDb(), 'ventanilla_radicados', radicado.radicadoId), {
-        'termino.fechaVencimiento':    nuevaFecha.toISOString(),
-        'termino.prorrogasAplicadas':  (radicado.termino.prorrogasAplicadas ?? 0) + 1,
-        estadoActual: 'PRORROGA',
-        ultimaActualizacion: entrada.fecha,
-      });
-      await appendTrazabilidad(radicado.radicadoId, entrada);
+      const data = await response.json().catch(() => null) as { error?: string } | null;
+      if (!response.ok) throw new Error(data?.error ?? 'Error al aplicar la prórroga.');
     });
     setMotivo('');
   }
@@ -1441,51 +1361,32 @@ function PanelDerecho({
       return;
     }
 
-    // Capturamos ANTES del ciclo async — el estado se limpia en éxito.
-    const nota          = respuesta.trim();
-    const tieneArchivo  = !!archivoPdf;
-
-    // ── OPERACIONES CRÍTICAS ───────────────────────────────────
-    // Storage (si hay PDF) + updateDoc en Firestore.
-    // Si cualquiera falla → ok:false → NO limpiamos formulario,
-    // NO enviamos email, mostramos error al funcionario.
+    const nota = respuesta.trim();
     setGuardando(true);
     setErrorLocal(null);
     setMensajeOk(null);
 
-    const resultado = await ejecutarResolucion({
-      radicado, usuario, nota, archivoPdf,
-    });
+    try {
+      const payload = new FormData();
+      payload.set('nota', nota);
+      if (archivoPdf) payload.set('archivo', archivoPdf);
 
-    setGuardando(false);
+      const response = await fetch(`/api/radicados/${encodeURIComponent(radicado.radicadoId)}/resolver`, {
+        method: 'POST',
+        credentials: 'include',
+        body: payload,
+      });
+      const data = await response.json().catch(() => null) as { error?: string } | null;
+      if (!response.ok) throw new Error(data?.error ?? 'Error al resolver el radicado.');
 
-    if (!resultado.ok) {
-      // logError ya fue llamado dentro de ejecutarResolucion
-      setErrorLocal(`Error al guardar: ${resultado.mensaje}`);
-      return;
+      setMensajeOk('Operación guardada correctamente.');
+      setRespuesta('');
+      setArchivoPdf(null);
+    } catch (error) {
+      setErrorLocal(`Error al guardar: ${error instanceof Error ? error.message : String(error)}`);
+    } finally {
+      setGuardando(false);
     }
-
-    // ── ÉXITO CRÍTICO ──────────────────────────────────────────
-    setMensajeOk('Operación guardada correctamente.');
-    setRespuesta('');
-    setArchivoPdf(null);
-
-    // ── OPERACIONES SECUNDARIAS (fire-and-forget) ──────────────
-    // Trazabilidad + email. Su fallo se loguea pero nunca
-    // revierte ni bloquea la resolución ya confirmada.
-    despacharNotificaciones({
-      radicadoId:      radicado.radicadoId,
-      actorUid:        usuario.uid,
-      actorNombre:     usuario.nombre,
-      nota,
-      archivoNombre:   resultado.archivoNombre,
-      ahora:           resultado.ahora,
-      emailCiudadano:  radicado.solicitante.email,
-      nombreCiudadano: radicado.solicitante.nombreCompleto,
-      asunto:          radicado.detalle.asunto,
-      tenantId:        radicado.clasificacion.oficinaDestino,
-      tieneArchivo,
-    });
   }
 
   const esRojo = radicado.prioridad === 'ROJO';

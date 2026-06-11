@@ -46,6 +46,26 @@ sequenceDiagram
 * **Debounce de Entrada**: Para evitar sobre-saturar la API de Gemini, se implementa un debounce de `800ms` en el input del texto descriptivo antes de disparar la llamada al clasificador.
 * **Fallback Silencioso**: Si la API de Gemini excede el tiempo límite o falla, se activa un motor de regex determinístico local por palabras clave para inferir dependencias críticas (ej. "agua", "acueducto" -> *Planeación e Infraestructura*), garantizando resiliencia del 100%.
 
+## 2.1 Mutaciones institucionales críticas
+
+El documento principal `ventanilla_radicados/{radicadoId}` contiene evidencias MIPG sensibles. Por seguridad, las operaciones que cambian estado, dependencia, responsable, prórroga, respuesta oficial o `cumplioTermino` no se hacen con escrituras directas del cliente.
+
+```mermaid
+sequenceDiagram
+    participant F as Funcionario
+    participant API as API Server-side
+    participant FS as Firestore Admin SDK
+    participant T as Trazabilidad
+
+    F->>API: POST /api/radicados/{id}/asignar|resolver|prorroga|devolver
+    API->>API: Verifica sesión, usuario activo, rol y dependencia
+    API->>FS: Actualiza ventanilla_radicados con Admin SDK
+    API->>T: Agrega evento append-only
+    API-->>F: Resultado operativo
+```
+
+La colección legacy `radicados` queda cerrada para nuevas escrituras y solo se conserva como referencia histórica temporal.
+
 ---
 
 ## 3. Reactividad en Tiempo Real (Real-time Streams)
