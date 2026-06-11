@@ -53,6 +53,18 @@ Asegúrate de que las reglas de seguridad restringen la escritura y lectura cruz
 
 ---
 
+## 3.3. Caché de favicon e íconos PWA
+
+Los navegadores suelen cachear `favicon.ico`, `apple-touch-icon.png` y los íconos del manifest por más tiempo que el HTML. Si después de un deploy el navegador sigue mostrando el ícono anterior:
+
+- Abrir en modo incógnito.
+- Limpiar caché del navegador.
+- En celular, eliminar el acceso directo anterior y volver a agregarlo.
+- Confirmar que Vercel desplegó `favicon.ico`, `icon-192x192.png`, `icon-512x512.png` y `manifest.json`.
+- Esperar propagación de caché si el usuario ya había abierto la página antes.
+
+---
+
 ## 4. Despliegue Paso a Paso (Vercel CLI)
 
 Para realizar un despliegue rápido desde tu estación de desarrollo:

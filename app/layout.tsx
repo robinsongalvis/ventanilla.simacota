@@ -1,4 +1,4 @@
-import type { Metadata } from 'next';
+import type { Metadata, Viewport } from 'next';
 import './globals.css';
 import { SimiProvider } from '@/lib/store/simiContext';
 import { SimiChatCondicional } from '@/app/components/SimiChatCondicional';
@@ -10,8 +10,8 @@ export const metadata: Metadata = {
 
   // ── Template de título: las rutas hijas heredan automáticamente ──
   title: {
-    default: 'Ventanilla Única Digital – Alcaldía de Simacota',
-    template: '%s | Ventanilla Única · Simacota',
+    default: 'Ventanilla Única Digital | Alcaldía Municipal de Simacota',
+    template: '%s | Alcaldía Municipal de Simacota',
   },
 
   // ── Descripción optimizada para snippet de Google (≤160 chars) ──
@@ -36,7 +36,18 @@ export const metadata: Metadata = {
   authors: [{ name: 'Alcaldía Municipal de Simacota' }],
   creator: 'Alcaldía Municipal de Simacota',
   publisher: 'Alcaldía Municipal de Simacota',
-  manifest: '/manifest.webmanifest',
+  manifest: '/manifest.json',
+  icons: {
+    icon: [
+      { url: '/favicon.ico' },
+      { url: '/favicon-16x16.png', sizes: '16x16', type: 'image/png' },
+      { url: '/favicon-32x32.png', sizes: '32x32', type: 'image/png' },
+    ],
+    apple: [
+      { url: '/apple-touch-icon.png', sizes: '180x180', type: 'image/png' },
+    ],
+    shortcut: ['/favicon.ico'],
+  },
   appleWebApp: {
     capable: true,
     title: 'Ventanilla Simacota',
@@ -88,6 +99,10 @@ export const metadata: Metadata = {
       'max-snippet': -1,
     },
   },
+};
+
+export const viewport: Viewport = {
+  themeColor: '#14532d',
 };
 
 export default function RootLayout({
