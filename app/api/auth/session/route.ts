@@ -28,7 +28,7 @@ async function resolveClaims(uid: string, tokenClaims: Record<string, unknown>):
   const userSnap = await getFirebaseAdminDb().doc(`users/${uid}`).get();
   if (userSnap.exists) {
     const data = userSnap.data();
-    if (data?.activo === false) {
+    if (data?.activo === false || data?.archivado === true) {
       return null;
     }
     if (data && isRolInterno(data.rol) && typeof data.tenantId === 'string') {

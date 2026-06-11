@@ -13,7 +13,8 @@ async function hasValidInternalSession(request: NextRequest): Promise<boolean> {
     }
 
     const userSnap = await getFirebaseAdminDb().doc(`users/${decoded.uid}`).get();
-    return userSnap.exists && userSnap.data()?.activo !== false;
+    const data = userSnap.data();
+    return userSnap.exists && data?.activo !== false && data?.archivado !== true;
   } catch {
     return false;
   }

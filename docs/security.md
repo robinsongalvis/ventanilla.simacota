@@ -27,7 +27,9 @@ El archivo `firestore.rules` del repositorio contiene las políticas lógicas qu
 * **Control de Modificaciones en Radicados**: Las mutaciones críticas sobre `ventanilla_radicados` pasan por APIs server-side con Admin SDK. El cliente no puede actualizar directamente estado, clasificación, respuesta oficial, prórrogas ni `cumplioTermino`.
 * **Evidencia MIPG inmutable**: `cumplioTermino` se calcula una sola vez en `POST /api/radicados/[radicadoId]/resolver` y queda persistido como evidencia auditable. Una vez definido, no debe recalcularse ni modificarse desde cliente.
 * **Aislamiento de Telemetría**: El ciudadano no tiene acceso de lectura ni escritura a las colecciones de gobernanza e infraestructura (`ai_logs`, `ai_auditoria`, `ai_feedback`).
-* **Usuarios inactivos**: El proxy, la creación de sesión y las APIs internas rechazan usuarios con `activo === false`. Al desactivar un usuario desde Administración, Firebase Auth se deshabilita y se revocan refresh tokens.
+* **Usuarios inactivos o archivados**: El proxy, la creación de sesión y las APIs internas rechazan usuarios con `activo === false` o `archivado === true`. Al desactivar o archivar un usuario desde Administración, Firebase Auth se deshabilita y se revocan refresh tokens.
+* **Roles y dependencias cerradas**: Administración acepta únicamente los roles institucionales oficiales y los `tenantId` definidos en `DIRECTORIO_TENANTS`.
+* **Reset password seguro**: El enlace de restablecimiento se envía al correo registrado y no se expone ni se copia desde la interfaz del ADMIN.
 
 ## 2.1 Acciones críticas server-side
 

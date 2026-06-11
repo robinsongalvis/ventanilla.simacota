@@ -5,6 +5,7 @@ import {
   getFirebaseAdminAuth,
   getFirebaseAdminDb,
 } from '@/lib/firebase-admin';
+import { enviarEmail }          from '@/lib/email/mailer';
 import { DIRECTORIO_TENANTS }   from '@/src/types/reglas-negocio';
 import type { TenantId }        from '@/src/types/radicado';
 import type { RolInterno }      from '@/lib/hooks/useAuth';
@@ -19,6 +20,7 @@ const ROLES_VALIDOS: Set<RolInterno> = new Set([
   'ADMIN', 'RECEPCIONISTA', 'FUNCIONARIO', 'JEFE_DEPENDENCIA', 'CONTROL_INTERNO',
 ]);
 const TENANTS_VALIDOS: Set<string> = new Set(Object.keys(DIRECTORIO_TENANTS));
+const TIPOS_USUARIO_VALIDOS = new Set(['INSTITUCIONAL', 'UAT', 'PRUEBA']);
 
 /* ══════════════════════════════════════════════════════════════
    Helpers
@@ -34,7 +36,7 @@ async function verificarAdmin(): Promise<{ uid: string; nombre: string; rol: str
     const userSnap = await getFirebaseAdminDb().doc(`users/${decoded.uid}`).get();
     if (!userSnap.exists) return null;
     const data = userSnap.data()!;
-    if (data.rol !== 'ADMIN' || data.activo === false) return null;
+    if (data.rol !== 'ADMIN' || data.activo === false || data.archivado === true) return null;
     return { uid: decoded.uid, nombre: (data.nombre as string) ?? 'Admin', rol: 'ADMIN' };
   } catch {
     return null;
@@ -57,6 +59,9 @@ interface PatchPayload {
   rol?:      RolInterno;
   tenantId?: TenantId;
   activo?:   boolean;
+  archivado?: boolean;
+  tipoUsuario?: 'INSTITUCIONAL' | 'UAT' | 'PRUEBA';
+  motivo?: string;
 }
 
 export async function PATCH(request: Request, context: RouteContext): Promise<NextResponse> {
@@ -86,6 +91,9 @@ export async function PATCH(request: Request, context: RouteContext): Promise<Ne
   }
   if (payload.tenantId !== undefined && !TENANTS_VALIDOS.has(payload.tenantId)) {
     return NextResponse.json({ error: `Dependencia inválida: ${payload.tenantId}.` }, { status: 400 });
+  }
+  if (payload.tipoUsuario !== undefined && !TIPOS_USUARIO_VALIDOS.has(payload.tipoUsuario)) {
+    return NextResponse.json({ error: `Tipo de usuario inválido: ${payload.tipoUsuario}.` }, { status: 400 });
   }
 
   const db   = getFirebaseAdminDb();
@@ -126,13 +134,46 @@ export async function PATCH(request: Request, context: RouteContext): Promise<Ne
 
     if (payload.tenantId !== undefined && payload.tenantId !== antes.tenantId) {
       update.tenantId = payload.tenantId;
-      eventos.push({ accion: 'DEPENDENCIA_USUARIO_CAMBIADA', metadata: { tenantAnterior: antes.tenantId, tenantNuevo: payload.tenantId } });
+      eventos.push({ accion: 'DEPENDENCIA_USUARIO_CAMBIADA', metadata: { dependenciaAnterior: antes.tenantId, dependenciaNueva: payload.tenantId } });
       // Actualizar custom claims
       const currentClaims = { rol: payload.rol ?? antes.rol, tenantId: payload.tenantId };
       await auth.setCustomUserClaims(targetUid, currentClaims);
     }
 
-    if (payload.activo !== undefined && payload.activo !== antes.activo) {
+    if (payload.tipoUsuario !== undefined && payload.tipoUsuario !== (antes.tipoUsuario ?? (antes.esPrueba ? 'PRUEBA' : 'INSTITUCIONAL'))) {
+      update.tipoUsuario = payload.tipoUsuario;
+      update.esPrueba = payload.tipoUsuario !== 'INSTITUCIONAL';
+      eventos.push({
+        accion: payload.tipoUsuario === 'INSTITUCIONAL' ? 'USUARIO_MARCADO_INSTITUCIONAL' : 'USUARIO_MARCADO_PRUEBA',
+        metadata: {
+          tipoAnterior: antes.tipoUsuario ?? (antes.esPrueba ? 'PRUEBA' : 'INSTITUCIONAL'),
+          tipoNuevo: payload.tipoUsuario,
+        },
+      });
+    }
+
+    if (payload.archivado !== undefined && payload.archivado !== (antes.archivado ?? false)) {
+      update.archivado = payload.archivado;
+      update.fechaArchivado = payload.archivado ? ahora : null;
+      update.archivadoPorUid = payload.archivado ? admin.uid : null;
+      update.archivadoPorNombre = payload.archivado ? admin.nombre : null;
+      update.motivoArchivado = payload.archivado ? (payload.motivo?.trim() || 'Archivado desde Administración') : null;
+      eventos.push({
+        accion: payload.archivado ? 'USUARIO_ARCHIVADO' : 'USUARIO_REACTIVADO',
+        metadata: {
+          archivadoAnterior: antes.archivado ?? false,
+          archivadoNuevo: payload.archivado,
+          motivo: payload.motivo?.trim() || null,
+        },
+      });
+      if (payload.archivado) {
+        update.activo = false;
+        await auth.updateUser(targetUid, { disabled: true });
+        await auth.revokeRefreshTokens(targetUid);
+      }
+    }
+
+    if (payload.activo !== undefined && payload.activo !== antes.activo && payload.archivado !== true) {
       update.activo = payload.activo;
       const accionActivo = payload.activo ? 'USUARIO_ACTIVADO' : 'USUARIO_DESACTIVADO';
       eventos.push({ accion: accionActivo, metadata: {} });
@@ -162,7 +203,11 @@ export async function PATCH(request: Request, context: RouteContext): Promise<Ne
         accion:               ev.accion,
         usuarioAfectadoUid:   targetUid,
         usuarioAfectadoEmail: antes.email ?? '',
-        tenantId:             payload.tenantId ?? antes.tenantId,
+        rolAnterior:           ev.metadata.rolAnterior ?? antes.rol ?? null,
+        rolNuevo:              ev.metadata.rolNuevo ?? payload.rol ?? antes.rol ?? null,
+        dependenciaAnterior:   ev.metadata.dependenciaAnterior ?? antes.tenantId ?? null,
+        dependenciaNueva:      ev.metadata.dependenciaNueva ?? payload.tenantId ?? antes.tenantId ?? null,
+        tenantId:              payload.tenantId ?? antes.tenantId,
         fecha:                ahora,
         metadata:             ev.metadata,
       });
@@ -184,7 +229,7 @@ export async function PATCH(request: Request, context: RouteContext): Promise<Ne
 
 /* ══════════════════════════════════════════════════════════════
    POST /api/admin/usuarios/[uid]
-   Acción: reset-password (genera enlace de restablecimiento).
+   Acción: reset-password (envía enlace de restablecimiento).
    Body: { accion: "reset-password" }
 ══════════════════════════════════════════════════════════════ */
 
@@ -224,13 +269,25 @@ export async function POST(request: Request, context: RouteContext): Promise<Nex
 
   try {
     const link = await auth.generatePasswordResetLink(email);
+    await enviarEmail({
+      to: email,
+      subject: 'Restablecimiento de contraseña - Ventanilla Única Digital Simacota',
+      html: `
+        <div style="font-family:Arial,sans-serif;line-height:1.5;color:#1F2933">
+          <h2>Alcaldía Municipal de Simacota</h2>
+          <p>Se solicitó el restablecimiento de contraseña para su usuario de la Ventanilla Única Digital.</p>
+          <p><a href="${link}" style="display:inline-block;padding:10px 14px;background:#14532D;color:white;text-decoration:none;border-radius:8px">Restablecer contraseña</a></p>
+          <p>Si usted no solicitó este cambio, informe al administrador del sistema.</p>
+        </div>
+      `,
+    });
 
     // Registrar en auditoría
     await db.collection('admin_auditoria').add({
       actorUid:             admin.uid,
       actorNombre:          admin.nombre,
       actorRol:             admin.rol,
-      accion:               'PASSWORD_RESET_SOLICITADO',
+      accion:               'RESET_PASSWORD_SOLICITADO',
       usuarioAfectadoUid:   targetUid,
       usuarioAfectadoEmail: email,
       tenantId:             userData.tenantId ?? '',
@@ -240,8 +297,7 @@ export async function POST(request: Request, context: RouteContext): Promise<Nex
 
     return NextResponse.json({
       ok:   true,
-      link,
-      mensaje: `Enlace de restablecimiento generado para ${email}.`,
+      mensaje: `Se envió enlace de restablecimiento al correo registrado.`,
     });
 
   } catch (err) {

@@ -60,7 +60,7 @@ async function verificarSesion(): Promise<UsuarioE2E | null> {
     const snap = await getFirebaseAdminDb().doc(`users/${decoded.uid}`).get();
     if (!snap.exists) return null;
     const d = snap.data()!;
-    if (d.activo === false) return null;
+    if (d.activo === false || d.archivado === true) return null;
     const rol = String(d.rol ?? '').toUpperCase() as UsuarioE2E['rol'];
     if (!ROLES_PERMITIDOS.has(rol)) return null;
     return {

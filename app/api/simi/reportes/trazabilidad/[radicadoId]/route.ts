@@ -32,7 +32,7 @@ export async function GET(
   const snap = await getFirebaseAdminDb().doc(`users/${decoded.uid}`).get();
   if (!snap.exists) return NextResponse.json({ error: 'Usuario no encontrado.' }, { status: 404 });
   const d   = snap.data()!;
-  if (d.activo === false) return NextResponse.json({ error: 'Usuario inactivo.' }, { status: 403 });
+  if (d.activo === false || d.archivado === true) return NextResponse.json({ error: 'Usuario inactivo.' }, { status: 403 });
   const rol = d.rol as RolInterno;
   if (!ROLES_PERMITIDOS.has(rol)) return NextResponse.json({ error: 'Sin permiso.' }, { status: 403 });
 

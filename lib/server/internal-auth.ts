@@ -54,8 +54,8 @@ export async function requireActiveInternalUser(): Promise<InternalUserSession> 
       throw new InternalAuthError('Usuario interno sin permisos válidos.', 403);
     }
 
-    if (data.activo === false) {
-      throw new InternalAuthError('Usuario inactivo.', 403);
+    if (data.activo === false || data.archivado === true) {
+      throw new InternalAuthError('Usuario inactivo o archivado.', 403);
     }
 
     return {

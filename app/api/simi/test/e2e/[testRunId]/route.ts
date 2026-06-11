@@ -16,7 +16,7 @@ async function verificarAdmin() {
     const snap = await getFirebaseAdminDb().doc(`users/${decoded.uid}`).get();
     if (!snap.exists) return null;
     const d = snap.data()!;
-    if (d.activo === false) return null;
+    if (d.activo === false || d.archivado === true) return null;
     const rol = String(d.rol ?? '').toUpperCase() as RolInterno | 'SUPER_ADMIN' | 'DESARROLLADOR';
     if (!['ADMIN', 'SUPER_ADMIN', 'DESARROLLADOR'].includes(rol)) return null;
     return { uid: decoded.uid, rol };

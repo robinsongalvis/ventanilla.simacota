@@ -20,6 +20,8 @@ const ROLES_VALIDOS: Set<RolInterno> = new Set([
 ]);
 
 const TENANTS_VALIDOS: Set<string> = new Set(Object.keys(DIRECTORIO_TENANTS));
+const TIPOS_USUARIO_VALIDOS = new Set(['INSTITUCIONAL', 'UAT', 'PRUEBA']);
+const DOMINIOS_INSTITUCIONALES = ['@simacota-santander.gov.co', '@simacota.gov.co'];
 
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
@@ -42,7 +44,7 @@ async function verificarAdmin(): Promise<{ uid: string; nombre: string; rol: str
     if (!userSnap.exists) return null;
 
     const data = userSnap.data()!;
-    if (data.rol !== 'ADMIN' || data.activo === false) return null;
+    if (data.rol !== 'ADMIN' || data.activo === false || data.archivado === true) return null;
 
     return { uid, nombre: (data.nombre as string) ?? 'Admin', rol: data.rol as string };
   } catch {
@@ -55,13 +57,15 @@ async function verificarAdmin(): Promise<{ uid: string; nombre: string; rol: str
    Solo ADMIN.
 ══════════════════════════════════════════════════════════════ */
 
-export async function GET(): Promise<NextResponse> {
+export async function GET(request: Request): Promise<NextResponse> {
   const admin = await verificarAdmin();
   if (!admin) {
     return NextResponse.json({ error: 'No autorizado.' }, { status: 401 });
   }
 
   try {
+    const url = new URL(request.url);
+    const incluirArchivados = url.searchParams.get('incluirArchivados') === '1';
     const snap = await getFirebaseAdminDb().collection('users').get();
     const usuarios = snap.docs.map((d) => {
       const data = d.data();
@@ -73,10 +77,14 @@ export async function GET(): Promise<NextResponse> {
         rol:                 data.rol       ?? 'FUNCIONARIO',
         tenantId:            data.tenantId  ?? 'VENTANILLA_UNICA',
         activo:              data.activo    ?? true,
+        archivado:           data.archivado ?? false,
+        tipoUsuario:         data.tipoUsuario ?? (data.esPrueba ? 'PRUEBA' : 'INSTITUCIONAL'),
+        esPrueba:            data.esPrueba ?? false,
+        ultimoAcceso:         data.ultimoAcceso ?? null,
         fechaCreacion:       data.fechaCreacion       ?? null,
         fechaActualizacion:  data.fechaActualizacion  ?? null,
       };
-    });
+    }).filter((u) => incluirArchivados || !u.archivado);
 
     return NextResponse.json({ usuarios });
   } catch (err) {
@@ -98,6 +106,8 @@ interface CrearUsuarioPayload {
   rol:       RolInterno;
   tenantId:  TenantId;
   password:  string;
+  tipoUsuario?: 'INSTITUCIONAL' | 'UAT' | 'PRUEBA';
+  activo?: boolean;
 }
 
 export async function POST(request: Request): Promise<NextResponse> {
@@ -115,6 +125,10 @@ export async function POST(request: Request): Promise<NextResponse> {
   }
 
   const { nombre, email, cargo, rol, tenantId, password } = payload;
+  const tipoUsuario = payload.tipoUsuario ?? 'INSTITUCIONAL';
+  const activo = payload.activo ?? true;
+  const emailNormalizado = email?.trim().toLowerCase();
+  const emailInstitucional = DOMINIOS_INSTITUCIONALES.some((dominio) => emailNormalizado?.endsWith(dominio));
 
   // Validaciones
   if (!nombre?.trim() || !email?.trim() || !rol || !tenantId || !password) {
@@ -142,6 +156,13 @@ export async function POST(request: Request): Promise<NextResponse> {
     );
   }
 
+  if (!TIPOS_USUARIO_VALIDOS.has(tipoUsuario)) {
+    return NextResponse.json(
+      { error: `Tipo de usuario inválido: ${tipoUsuario}.` },
+      { status: 400 },
+    );
+  }
+
   if (password.length < 8) {
     return NextResponse.json(
       { error: 'La contraseña debe tener al menos 8 caracteres.' },
@@ -156,9 +177,10 @@ export async function POST(request: Request): Promise<NextResponse> {
   try {
     // 1. Crear en Firebase Auth
     const userRecord = await auth.createUser({
-      email:       email.trim().toLowerCase(),
+      email:       emailNormalizado,
       password,
       displayName: nombre.trim(),
+      disabled:    !activo,
     });
 
     const uid = userRecord.uid;
@@ -174,7 +196,11 @@ export async function POST(request: Request): Promise<NextResponse> {
       cargo:            cargo?.trim() ?? '',
       rol,
       tenantId,
-      activo:           true,
+      activo,
+      archivado:        false,
+      tipoUsuario,
+      esPrueba:         tipoUsuario !== 'INSTITUCIONAL',
+      emailInstitucional,
       fechaCreacion:    ahora,
       creadoPorUid:     admin.uid,
       creadoPorNombre:  admin.nombre,
@@ -187,12 +213,16 @@ export async function POST(request: Request): Promise<NextResponse> {
       actorRol:             admin.rol,
       accion:               'USUARIO_CREADO',
       usuarioAfectadoUid:   uid,
-      usuarioAfectadoEmail: email.trim().toLowerCase(),
+      usuarioAfectadoEmail: emailNormalizado,
       tenantId,
       fecha:                ahora,
       metadata: {
-        rolAsignado: rol,
-        cargo:       cargo?.trim() ?? '',
+        rolNuevo:            rol,
+        dependenciaNueva:    tenantId,
+        tipoUsuario,
+        activo,
+        emailInstitucional,
+        cargo:               cargo?.trim() ?? '',
       },
     });
 
@@ -200,6 +230,7 @@ export async function POST(request: Request): Promise<NextResponse> {
       ok:  true,
       uid,
       mensaje: `Usuario ${nombre.trim()} creado exitosamente.`,
+      advertencia: emailInstitucional ? null : 'El correo no parece institucional. Verifique que sea autorizado para UAT.',
     });
 
   } catch (err) {

@@ -15,6 +15,9 @@ Desde el módulo **Administración** el rol `ADMIN` puede:
 - Crear usuarios.
 - Editar nombre, cargo, dependencia y rol.
 - Desactivar usuarios.
+- Reactivar usuarios.
+- Marcar usuarios como institucionales, UAT o prueba.
+- Archivar usuarios de prueba sin borrarlos físicamente.
 - Enviar restablecimiento de contraseña.
 - Revisar auditoría administrativa.
 
@@ -24,6 +27,15 @@ Al desactivar un usuario, el sistema:
 - Deshabilita la cuenta en Firebase Auth.
 - Revoca refresh tokens para cortar sesiones vigentes.
 - Registra el evento en `admin_auditoria`.
+
+Al archivar un usuario, el sistema:
+
+- Marca `users/{uid}.archivado = true`.
+- Marca `activo = false`.
+- Deshabilita la cuenta en Firebase Auth.
+- Revoca refresh tokens.
+- Conserva el documento para auditoría histórica.
+- Oculta el usuario de la lista normal, salvo cuando el ADMIN active el filtro de archivados.
 
 ## Roles
 
@@ -37,12 +49,31 @@ Al desactivar un usuario, el sistema:
 
 Cada usuario debe quedar asociado a un `tenantId`. Esa dependencia controla qué radicados puede ver y gestionar.
 
+El selector de dependencia usa únicamente el directorio oficial del sistema. No se deben escribir dependencias manualmente.
+
+## Matriz UAT por Roles
+
+La vista Administración incluye la sección **Matriz UAT por Roles** con:
+
+- Nombre, correo, cargo, rol y dependencia.
+- Tipo de usuario: `INSTITUCIONAL`, `UAT` o `PRUEBA`.
+- Estado: activo, inactivo o archivado.
+- Último acceso si está disponible.
+- Filtros por tipo, estado, rol y dependencia.
+- Acciones masivas seguras para marcar prueba, desactivar o archivar.
+
+Use `INSTITUCIONAL` para usuarios reales de la Alcaldía. Use `UAT` para usuarios de prueba controlada por dependencia. Use `PRUEBA` para cuentas temporales técnicas.
+
+## Reset password
+
+El sistema no muestra enlaces de restablecimiento en pantalla. El ADMIN solicita el reset y el sistema envía el enlace al correo registrado, dejando evento `RESET_PASSWORD_SOLICITADO` en auditoría.
+
 ## Recomendaciones de operación
 
 1. Crear primero usuarios de prueba por dependencia.
 2. Validar login en computador y celular.
 3. Confirmar que cada rol ve solo lo esperado.
-4. Desactivar cuentas de prueba antes de operación abierta.
+4. Archivar cuentas de prueba antes de operación abierta.
 5. No compartir contraseñas entre dependencias.
 
 ## Seguridad

@@ -31,7 +31,7 @@ async function verificarSesion(): Promise<UsuarioPdf | null> {
     const snap = await getFirebaseAdminDb().doc(`users/${decoded.uid}`).get();
     if (!snap.exists) return null;
     const d = snap.data()!;
-    if (d.activo === false) return null;
+    if (d.activo === false || d.archivado === true) return null;
     const rol = d.rol as RolInterno;
     if (!ROLES_INTERNOS.has(rol)) return null;
     return {

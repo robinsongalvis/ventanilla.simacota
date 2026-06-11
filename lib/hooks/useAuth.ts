@@ -60,10 +60,10 @@ export function useAuth(): UseAuthReturn {
           setUsuario(null);
         } else {
           const data = snap.data();
-          if (data.activo === false) {
+          if (data.activo === false || data.archivado === true) {
             void clearInternalSession();
             await signOut(auth);
-            setError('Tu usuario está inactivo. Contacta al administrador del sistema.');
+            setError('Tu usuario está inactivo o archivado. Contacta al administrador del sistema.');
             setUsuario(null);
             return;
           }

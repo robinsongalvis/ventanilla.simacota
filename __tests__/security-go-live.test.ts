@@ -42,7 +42,7 @@ describe('cierre seguridad go-live', () => {
   it('valida usuario activo en proxy y sesión interna', () => {
     expect(read('proxy.ts')).toContain('activo !== false');
     expect(read('app/api/auth/session/route.ts')).toContain('activo === false');
-    expect(read('lib/server/internal-auth.ts')).toContain('Usuario inactivo.');
+    expect(read('lib/server/internal-auth.ts')).toContain('Usuario inactivo o archivado.');
   });
 
   it('el dashboard usa APIs server-side para acciones críticas', () => {

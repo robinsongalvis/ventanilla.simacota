@@ -81,9 +81,20 @@ Las reglas de Firestore bloquean nuevas escrituras en esa colección legacy.
 - El dashboard no debe modificar directamente `ventanilla_radicados` para cambios de estado o respuesta.
 - `cumplioTermino` se calcula únicamente al resolver por backend y queda como evidencia MIPG inmutable.
 - Los usuarios inactivos no pueden iniciar sesión, entrar al dashboard ni operar APIs internas.
+- Los usuarios archivados tampoco pueden iniciar sesión ni operar APIs; se conservan solo por auditoría.
 - Al desactivar un usuario, se deshabilita en Firebase Auth y se revocan sus refresh tokens.
+- Al archivar un usuario, se desactiva, se revoca sesión y se oculta de listados normales.
 - La radicación pública no escribe en Firestore ni Storage desde el cliente; todo pasa por `POST /api/radicacion`.
 - La subida pública anónima directa a Storage está bloqueada.
+
+## Preparación UAT por dependencias
+
+- Crear usuarios reales como `INSTITUCIONAL`.
+- Crear usuarios de prueba controlada como `UAT`.
+- Marcar cuentas temporales técnicas como `PRUEBA`.
+- Mantener roles cerrados: `ADMIN`, `RECEPCIONISTA`, `FUNCIONARIO`, `JEFE_DEPENDENCIA`, `CONTROL_INTERNO`.
+- Mantener dependencias cerradas usando el directorio oficial.
+- Archivar usuarios de prueba cuando termine la validación para preservar auditoría sin permitir acceso.
 
 ## Pendientes antes de publicación oficial
 
@@ -102,7 +113,7 @@ Las reglas de Firestore bloquean nuevas escrituras en esa colección legacy.
    - `funcionario.test@simacota.gov.co`
    - `jefe.test@simacota.gov.co`
    - `controlinterno.test@simacota.gov.co`
-   - Desactivar vía Firebase Console o Admin SDK
+   - Archivar desde Administración para revocar acceso y conservar auditoría.
 
 4. **Coordinar redirección oficial:**
    - Origen: `www.simacota-santander.gov.co/peticiones-quejas-reclamos`
