@@ -3,7 +3,9 @@
 import { useEffect } from 'react';
 import { usePathname, useRouter } from 'next/navigation';
 import { useAuth } from '@/lib/hooks/useAuth';
+import { useSingleTab } from '@/lib/hooks/useSingleTab';
 import { DashboardErrorBoundary } from '@/app/components/ErrorBoundary';
+import { TabBloqueada } from '@/app/components/TabBloqueada';
 
 function CargandoModuloInterno() {
   return (
@@ -22,9 +24,12 @@ export default function InternoLayout({
   children: React.ReactNode;
 }>) {
   const pathname = usePathname();
-  const router = useRouter();
+  const router   = useRouter();
   const { usuario, cargando } = useAuth();
   const esLogin = pathname === '/interno/login';
+
+  // Control de pestaña única: solo aplica fuera de la página de login
+  const { isActive, isResolving, tomarControl } = useSingleTab();
 
   useEffect(() => {
     if (cargando) return;
@@ -39,8 +44,16 @@ export default function InternoLayout({
     }
   }, [cargando, esLogin, pathname, router, usuario]);
 
+  // La página de login no requiere control de pestaña única
   if (esLogin) return <>{children}</>;
-  if (cargando || !usuario) return <CargandoModuloInterno />;
+
+  // Aún verificando autenticación o cuál pestaña es la activa
+  if (cargando || !usuario || isResolving) return <CargandoModuloInterno />;
+
+  // Esta pestaña no es la activa → mostrar pantalla de bloqueo
+  if (!isActive) {
+    return <TabBloqueada onTomarControl={tomarControl} />;
+  }
 
   return (
     <DashboardErrorBoundary>
