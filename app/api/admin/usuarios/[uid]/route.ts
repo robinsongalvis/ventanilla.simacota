@@ -32,7 +32,9 @@ async function verificarAdmin(): Promise<{ uid: string; nombre: string; rol: str
   if (!sessionCookie) return null;
 
   try {
-    const decoded = await getFirebaseAdminAuth().verifySessionCookie(sessionCookie, true);
+    // checkRevoked=false: la cookie httpOnly ya es suficiente garantía.
+    // El check de revocación causa falsos 401 tras revokeRefreshTokens en logout.
+    const decoded = await getFirebaseAdminAuth().verifySessionCookie(sessionCookie, false);
     const userSnap = await getFirebaseAdminDb().doc(`users/${decoded.uid}`).get();
     if (!userSnap.exists) return null;
     const data = userSnap.data()!;
@@ -42,6 +44,7 @@ async function verificarAdmin(): Promise<{ uid: string; nombre: string; rol: str
     return null;
   }
 }
+
 
 interface RouteContext {
   params: Promise<{ uid: string }>;

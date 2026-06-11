@@ -56,7 +56,7 @@ export async function POST(request: NextRequest) {
     }
 
     const auth = getFirebaseAdminAuth();
-    const decoded = await auth.verifyIdToken(idToken, true);
+    const decoded = await auth.verifyIdToken(idToken);
     const claims = await resolveClaims(decoded.uid, decoded);
 
     if (!claims) {

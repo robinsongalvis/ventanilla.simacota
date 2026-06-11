@@ -36,10 +36,11 @@ async function verificarAdmin(): Promise<{ uid: string; nombre: string; rol: str
   if (!sessionCookie) return null;
 
   try {
-    const decoded = await getFirebaseAdminAuth().verifySessionCookie(sessionCookie, true);
+    // checkRevoked=false: la cookie httpOnly ya es suficiente garantía.
+    // El check de revocación causa falsos 401 tras revokeRefreshTokens en logout.
+    const decoded = await getFirebaseAdminAuth().verifySessionCookie(sessionCookie, false);
     const uid = decoded.uid;
 
-    // Verificar rol en Firestore (no confiar solo en claims)
     const userSnap = await getFirebaseAdminDb().doc(`users/${uid}`).get();
     if (!userSnap.exists) return null;
 
@@ -47,10 +48,12 @@ async function verificarAdmin(): Promise<{ uid: string; nombre: string; rol: str
     if (data.rol !== 'ADMIN' || data.activo === false || data.archivado === true) return null;
 
     return { uid, nombre: (data.nombre as string) ?? 'Admin', rol: data.rol as string };
-  } catch {
+  } catch (err) {
+    console.error('[verificarAdmin]', err instanceof Error ? err.message : String(err));
     return null;
   }
 }
+
 
 /* ══════════════════════════════════════════════════════════════
    GET /api/admin/usuarios — Listar usuarios internos

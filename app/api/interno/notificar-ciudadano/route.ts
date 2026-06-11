@@ -40,7 +40,7 @@ export async function POST(request: Request): Promise<NextResponse> {
     return NextResponse.json({ error: 'No autorizado.' }, { status: 401 });
   }
   try {
-    await getFirebaseAdminAuth().verifySessionCookie(sessionCookie, true);
+    await getFirebaseAdminAuth().verifySessionCookie(sessionCookie, false);
   } catch {
     return NextResponse.json({ error: 'Sesión inválida.' }, { status: 401 });
   }

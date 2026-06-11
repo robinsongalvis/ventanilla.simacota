@@ -17,7 +17,7 @@ export async function GET(request: Request): Promise<NextResponse> {
   }
 
   try {
-    await getFirebaseAdminAuth().verifySessionCookie(sessionCookie, true);
+    await getFirebaseAdminAuth().verifySessionCookie(sessionCookie, false);
   } catch {
     return NextResponse.json({ error: 'Sesión inválida.' }, { status: 401 });
   }

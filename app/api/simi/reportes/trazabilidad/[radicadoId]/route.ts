@@ -26,7 +26,7 @@ export async function GET(
   const sc = cookieStore.get(SESSION_COOKIE_NAME)?.value;
   if (!sc) return NextResponse.json({ error: 'No autorizado.' }, { status: 401 });
 
-  const decoded = await getFirebaseAdminAuth().verifySessionCookie(sc, true).catch(() => null);
+  const decoded = await getFirebaseAdminAuth().verifySessionCookie(sc, false).catch(() => null);
   if (!decoded) return NextResponse.json({ error: 'Sesión inválida.' }, { status: 401 });
 
   const snap = await getFirebaseAdminDb().doc(`users/${decoded.uid}`).get();
