@@ -107,7 +107,9 @@ export function VistaAdministracion() {
     setCargando(true);
     setError(null);
     try {
-      const res = await fetch('/api/admin/usuarios?incluirArchivados=1');
+      const res = await fetch('/api/admin/usuarios?incluirArchivados=1', {
+        credentials: 'include',
+      });
       if (!res.ok) {
         const body = await res.json().catch(() => ({})) as { error?: string };
         throw new Error(body.error ?? `HTTP ${res.status}`);
@@ -128,6 +130,7 @@ export function VistaAdministracion() {
     const res = await fetch(`/api/admin/usuarios/${uid}`, {
       method: 'PATCH',
       headers: { 'Content-Type': 'application/json' },
+      credentials: 'include',
       body: JSON.stringify(body),
     });
     const data = await res.json().catch(() => ({})) as { ok?: boolean; error?: string; mensaje?: string };
@@ -194,6 +197,7 @@ export function VistaAdministracion() {
       const res = await fetch(`/api/admin/usuarios/${u.uid}`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
         body: JSON.stringify({ accion: 'reset-password' }),
       });
       const data = await res.json() as { ok?: boolean; mensaje?: string; error?: string };
@@ -515,9 +519,10 @@ export function VistaAdministracion() {
       {showModal && (
         <ModalCrearUsuario
           onClose={() => setShowModal(false)}
-          onCreado={() => {
+          onCreado={async (mensaje) => {
             setShowModal(false);
-            cargarUsuarios();
+            setMsgGlobal({ tipo: 'ok', texto: mensaje });
+            await cargarUsuarios();
           }}
         />
       )}
@@ -547,7 +552,7 @@ function ModalCrearUsuario({
   onCreado,
 }: {
   onClose:  () => void;
-  onCreado: () => void;
+  onCreado: (mensaje: string) => void | Promise<void>;
 }) {
   const [nombre,   setNombre]   = useState('');
   const [email,    setEmail]    = useState('');
@@ -572,6 +577,7 @@ function ModalCrearUsuario({
       const res = await fetch('/api/admin/usuarios', {
         method:  'POST',
         headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
         body:    JSON.stringify({
           nombre: nombre.trim(),
           email:  email.trim().toLowerCase(),
@@ -590,12 +596,11 @@ function ModalCrearUsuario({
         throw new Error(data.error ?? `HTTP ${res.status}`);
       }
 
-      setExito(`${data.mensaje ?? 'Usuario creado exitosamente.'}${data.advertencia ? ` ${data.advertencia}` : ''}`);
+      const mensaje = `${data.mensaje ?? 'Usuario creado exitosamente.'}${data.advertencia ? ` ${data.advertencia}` : ''}`;
+      setExito(mensaje);
 
-      // Limpiar formulario después de 1.5s y cerrar
-      setTimeout(() => {
-        onCreado();
-      }, 1500);
+      setPassword('');
+      await onCreado(mensaje);
 
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Error al crear usuario.');
@@ -773,6 +778,7 @@ function ModalEditarUsuario({
       const res = await fetch(`/api/admin/usuarios/${usuario.uid}`, {
         method:  'PATCH',
         headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
         body:    JSON.stringify({
           nombre: nombre.trim(),
           cargo:  cargo.trim(),

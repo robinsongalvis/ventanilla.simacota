@@ -29,6 +29,7 @@ export async function createInternalSession(
   const response = await fetchWithTimeout('/api/auth/session', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
+    credentials: 'include',
     body: JSON.stringify({ idToken }),
   });
 
@@ -47,5 +48,5 @@ export async function createInternalSession(
 }
 
 export async function clearInternalSession() {
-  await fetch('/api/auth/logout', { method: 'POST' }).catch(() => null);
+  await fetch('/api/auth/logout', { method: 'POST', credentials: 'include' }).catch(() => null);
 }

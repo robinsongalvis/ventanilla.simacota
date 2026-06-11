@@ -176,6 +176,7 @@ export async function POST(request: Request): Promise<NextResponse> {
   const auth = getFirebaseAdminAuth();
   const db   = getFirebaseAdminDb();
   const ahora = new Date().toISOString();
+  let uidCreado: string | null = null;
 
   try {
     // 1. Crear en Firebase Auth
@@ -187,12 +188,17 @@ export async function POST(request: Request): Promise<NextResponse> {
     });
 
     const uid = userRecord.uid;
+    uidCreado = uid;
 
     // 2. Set custom claims
     await auth.setCustomUserClaims(uid, { rol, tenantId });
 
-    // 3. Crear documento en Firestore /users/{uid}
-    await db.doc(`users/${uid}`).set({
+    // 3. Crear documento + auditoría en Firestore de forma atómica
+    const batch = db.batch();
+    const userRef = db.doc(`users/${uid}`);
+    const auditRef = db.collection('admin_auditoria').doc();
+
+    batch.set(userRef, {
       uid,
       nombre:           nombre.trim(),
       email:            email.trim().toLowerCase(),
@@ -209,8 +215,7 @@ export async function POST(request: Request): Promise<NextResponse> {
       creadoPorNombre:  admin.nombre,
     });
 
-    // 4. Registrar en admin_auditoria
-    await db.collection('admin_auditoria').add({
+    batch.set(auditRef, {
       actorUid:             admin.uid,
       actorNombre:          admin.nombre,
       actorRol:             admin.rol,
@@ -229,6 +234,8 @@ export async function POST(request: Request): Promise<NextResponse> {
       },
     });
 
+    await batch.commit();
+
     return NextResponse.json({
       ok:  true,
       uid,
@@ -242,6 +249,15 @@ export async function POST(request: Request): Promise<NextResponse> {
       ? String(err.code)
       : '';
     console.error('[admin/usuarios] Error al crear:', err);
+
+    if (uidCreado) {
+      await auth.deleteUser(uidCreado).catch((cleanupErr) => {
+        console.error(
+          '[admin/usuarios] No se pudo limpiar usuario parcial:',
+          cleanupErr instanceof Error ? cleanupErr.message : String(cleanupErr),
+        );
+      });
+    }
 
     if (
       code === 'auth/email-already-exists' ||
