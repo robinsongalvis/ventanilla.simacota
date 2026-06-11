@@ -236,12 +236,17 @@ export async function POST(request: Request): Promise<NextResponse> {
       advertencia: emailInstitucional ? null : 'El correo no parece institucional. Verifique que sea autorizado para UAT.',
     });
 
-  } catch (err) {
+  } catch (err: any) {
     const msg = err instanceof Error ? err.message : String(err);
-    console.error('[admin/usuarios] Error al crear:', msg);
+    const code = err?.code;
+    console.error('[admin/usuarios] Error al crear:', err);
 
-    // Firebase Auth errors have specific codes
-    if (msg.includes('email-already-exists') || msg.includes('EMAIL_EXISTS')) {
+    if (
+      code === 'auth/email-already-exists' ||
+      msg.includes('email-already-exists') ||
+      msg.includes('EMAIL_EXISTS') ||
+      msg.includes('already in use')
+    ) {
       return NextResponse.json(
         { error: 'Ya existe un usuario con ese correo electrónico.' },
         { status: 409 },
