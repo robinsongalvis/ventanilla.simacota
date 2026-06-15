@@ -8,6 +8,9 @@ import {
   buildRespuestaCiudadanoSubject,
 } from '@/lib/email/templates/respuesta-ciudadano';
 import { DIRECTORIO_TENANTS }  from '@/src/types/reglas-negocio';
+import { logError }             from '@/lib/logger';
+import { registrarTrazabilidadNotificacion } from '@/lib/trazabilidad/notificacion';
+import { debeNotificarCiudadano } from '@/lib/email/debe-notificar-ciudadano';
 import type { TenantId }       from '@/src/types/radicado';
 
 export const runtime = 'nodejs';
@@ -16,6 +19,8 @@ export const runtime = 'nodejs';
    POST /api/interno/notificar-ciudadano
    Envía email al ciudadano cuando su radicado es respondido.
    Requiere sesión de funcionario válida.
+   Registra trazabilidad NOTIFICACION_CORREO_ENVIADA / FALLIDA
+   usando el helper centralizado.
 ══════════════════════════════════════════════════════════════ */
 
 interface NotificarCiudadanoPayload {
@@ -28,8 +33,6 @@ interface NotificarCiudadanoPayload {
   fechaRespuesta:    string;
   tieneArchivo:      boolean;
 }
-
-const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
 export async function POST(request: Request): Promise<NextResponse> {
   // 1. Verificar sesión de funcionario
@@ -71,9 +74,14 @@ export async function POST(request: Request): Promise<NextResponse> {
     );
   }
 
-  if (!EMAIL_RE.test(emailCiudadano)) {
+  // Aplica la regla central de privacidad: anonimato + email válido + no placeholder.
+  const puedeNotificar = debeNotificarCiudadano({
+    tipoPresentacion: 'IDENTIFICADA',
+    solicitante: { email: emailCiudadano },
+  });
+  if (!puedeNotificar) {
     return NextResponse.json(
-      { error: 'El email del ciudadano no tiene formato válido.' },
+      { error: 'El email del ciudadano no es válido o corresponde a un placeholder.' },
       { status: 400 },
     );
   }
@@ -107,11 +115,35 @@ export async function POST(request: Request): Promise<NextResponse> {
       replyTo: dependencia.emailOficial,
     });
 
+    await registrarTrazabilidadNotificacion({
+      radicadoId,
+      tipoNotificacion: 'RESPUESTA_OFICIAL',
+      destinatario:     emailCiudadano,
+      estado:           'ENVIADA',
+      metadata: {
+        dependencia: tenantId,
+        tieneArchivo,
+      },
+    });
+
     return NextResponse.json({ enviado: true });
 
   } catch (err) {
     const msg = err instanceof Error ? err.message : String(err);
-    console.error('[notificar-ciudadano] Error al enviar email:', msg);
+    logError({ radicadoId, modulo: 'notificar-ciudadano', error: err });
+
+    await registrarTrazabilidadNotificacion({
+      radicadoId,
+      tipoNotificacion: 'RESPUESTA_OFICIAL',
+      destinatario:     emailCiudadano,
+      estado:           'FALLIDA',
+      error:            msg,
+      metadata: {
+        dependencia: tenantId,
+        tieneArchivo,
+      },
+    });
+
     // No exponemos detalles del SMTP al cliente
     return NextResponse.json(
       { error: 'No se pudo enviar la notificación por email.' },

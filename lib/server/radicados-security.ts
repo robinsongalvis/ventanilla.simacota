@@ -120,21 +120,30 @@ export async function uploadRespuestaPdfAdmin(
   };
 }
 
+/**
+ * Construye el objeto RespuestaOficial persistido en el documento del radicado.
+ *
+ * Se persiste SIEMPRE que el funcionario haya escrito una `nota` válida,
+ * independientemente de si adjuntó un PDF firmado. Las respuestas sin PDF
+ * son legítimas (consultas administrativas, respuestas verbales formalizadas,
+ * etc.) y deben quedar visibles para el ciudadano y en el CSV MIPG.
+ */
 export function buildRespuestaOficial(
   archivo: ArchivoRadicado | null,
   nota: string,
   ahora: string,
   usuario: InternalUserSession,
 ): RespuestaOficial | null {
-  if (!archivo) return null;
+  const notaLimpia = nota?.trim() ?? '';
+  if (notaLimpia.length === 0) return null;
 
   return {
-    archivoPath: archivo.path,
-    archivoNombre: archivo.nombre,
-    nota,
-    fecha: ahora,
-    actorUid: usuario.uid,
-    actorNombre: usuario.nombre,
+    archivoPath:   archivo?.path ?? null,
+    archivoNombre: archivo?.nombre ?? null,
+    nota:          notaLimpia,
+    fecha:         ahora,
+    actorUid:      usuario.uid,
+    actorNombre:   usuario.nombre,
   };
 }
 

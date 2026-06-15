@@ -75,8 +75,12 @@ describe('administración institucional de usuarios', () => {
     const editRoute = read('app/api/admin/usuarios/[uid]/route.ts');
     const ui = read('app/interno/dashboard/components/admin/VistaAdministracion.tsx');
 
+    // El route debe usar enviarEmail (link va al correo, no al cliente)
     expect(editRoute).toContain('enviarEmail');
-    expect(editRoute).not.toContain('link,');
+    // El link NO debe devolverse como parte del response JSON al cliente
+    expect(editRoute).not.toContain('"link"');
+    expect(editRoute).not.toContain("'link'");
+    // La UI no debe manipular el link ni copiarlo al portapapeles
     expect(ui).not.toContain('clipboard');
     expect(ui).not.toContain('data.link');
   });

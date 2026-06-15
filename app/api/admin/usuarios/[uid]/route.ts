@@ -6,9 +6,14 @@ import {
   getFirebaseAdminDb,
 } from '@/lib/firebase-admin';
 import { enviarEmail }          from '@/lib/email/mailer';
+import {
+  buildResetPasswordHtml,
+  buildResetPasswordSubject,
+} from '@/lib/email/templates/reset-password';
 import { DIRECTORIO_TENANTS }   from '@/src/types/reglas-negocio';
 import type { TenantId }        from '@/src/types/radicado';
 import type { RolInterno }      from '@/lib/hooks/useAuth';
+
 
 export const runtime = 'nodejs';
 
@@ -273,16 +278,13 @@ export async function POST(request: Request, context: RouteContext): Promise<Nex
   try {
     const link = await auth.generatePasswordResetLink(email);
     await enviarEmail({
-      to: email,
-      subject: 'Restablecimiento de contraseña - Ventanilla Única Digital Simacota',
-      html: `
-        <div style="font-family:Arial,sans-serif;line-height:1.5;color:#1F2933">
-          <h2>Alcaldía Municipal de Simacota</h2>
-          <p>Se solicitó el restablecimiento de contraseña para su usuario de la Ventanilla Única Digital.</p>
-          <p><a href="${link}" style="display:inline-block;padding:10px 14px;background:#14532D;color:white;text-decoration:none;border-radius:8px">Restablecer contraseña</a></p>
-          <p>Si usted no solicitó este cambio, informe al administrador del sistema.</p>
-        </div>
-      `,
+      to:      email,
+      subject: buildResetPasswordSubject(),
+      html:    buildResetPasswordHtml({
+        destinatarioNombre: (userData.nombre as string) || email,
+        resetLink:          link,
+        solicitadoPor:      admin.nombre,
+      }),
     });
 
     // Registrar en auditoría

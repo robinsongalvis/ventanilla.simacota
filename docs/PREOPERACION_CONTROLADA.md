@@ -45,7 +45,21 @@ Los correos del directorio de dependencias (ej. `gobierno@simacota-santander.gov
 - Responsable funcional MIPG (snapshot inmutable).
 - Resolución por funcionario.
 - Oficio PDF adjunto.
-- Email SMTP (Gmail App Password verificado).
+- Email SMTP — **6 flujos institucionales con trazabilidad unificada:**
+  - Confirmación de radicación al ciudadano (síncrono `await`, trazabilidad garantizada).
+  - **Notificación de asignación** al ciudadano cuando se asigna a dependencia (cortesía informativa).
+  - **Notificación de prórroga** al ciudadano con nueva fecha límite y motivo.
+  - Respuesta oficial al ciudadano (template HTML institucional).
+  - Alerta de vencimiento próximo al funcionario responsable.
+  - Reset de contraseña al funcionario (template HTML institucional, sin exponer link).
+- Trazabilidad de notificaciones (helper único `registrarTrazabilidadNotificacion`):
+  - `NOTIFICACION_CORREO_ENVIADA` / `NOTIFICACION_CORREO_FALLIDA`
+  - `NOTIFICACION_OMITIDA_DUPLICADA` (idempotencia 5 min en asignación/prórroga)
+  - `NOTIFICACION_GESTIONADA_MANUALMENTE` (canal alternativo)
+- Flag raíz `alertaNotificacionFallida` para dashboard en tiempo real (sin escanear subcolección).
+- Regla central de privacidad `debeNotificarCiudadano`: radicados anónimos NUNCA reciben correo.
+- Respuesta oficial persistida **aunque no haya PDF adjunto** (CSV MIPG y consulta ciudadana muestran texto siempre).
+- Dashboard: contador sidebar "Correos fallidos" + banner rojo en PanelDerecho con acción "Marcar gestionada".
 - Trazabilidad append-only (subcollección inmutable).
 - Roles institucionales (5 roles).
 - Control Interno (solo lectura, visibilidad global).
@@ -57,7 +71,7 @@ Los correos del directorio de dependencias (ej. `gobierno@simacota-santander.gov
 - Firebase Security Rules hardened.
 - Firestore índices compuestos desplegados.
 - Storage con signed URLs (15 min).
-- 15 tests automatizados (Vitest).
+- 53 tests automatizados (Vitest).
 - UAT-1 completa: 21/21 pasos (100%).
 
 ## Flujo vigente de radicación

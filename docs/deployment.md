@@ -82,3 +82,79 @@ Para realizar un despliegue rápido desde tu estación de desarrollo:
    npx vercel --prod
    ```
 4. **Verificar variables de entorno**: Ejecuta un ping visual de prueba a `/api/ai/classify` o revisa el monitor de *AI Health Status* para certificar que la conexión con Gemini API y Firestore es correcta.
+
+---
+
+## 5. Configuración SMTP Institucional
+
+El sistema de notificaciones por correo electrónico requiere las siguientes variables en Vercel (Production):
+
+```ini
+# Notificaciones institucionales — Gmail con App Password
+EMAIL_HOST=smtp.gmail.com
+EMAIL_PORT=587
+EMAIL_USER=notificaciones@simacota-santander.gov.co
+EMAIL_PASS=[App Password de 16 caracteres — SOLO en Vercel, nunca en código]
+EMAIL_FROM=Alcaldía de Simacota <notificaciones@simacota-santander.gov.co>
+```
+
+### Correos institucionales enviados
+
+| Evento | Destinatario | Template | Condición de envío |
+|---|---|---|---|
+| Radicación exitosa del ciudadano | Ciudadano | `confirmacion-radicacion.ts` | No anónimo + email válido |
+| **Asignación a dependencia** | Ciudadano | `notificacion-estado.ts` (ASIGNADO) | No anónimo + email válido |
+| **Prórroga aplicada** | Ciudadano | `notificacion-estado.ts` (PRORROGA) | No anónimo + email válido |
+| Respuesta oficial del funcionario | Ciudadano | `respuesta-ciudadano.ts` | No anónimo + email válido |
+| Alerta de vencimiento próximo | Funcionario responsable | HTML en `alertas-vencimiento/route.ts` | Radicado a ≤ 2 días hábiles del vencimiento |
+| Reset de contraseña (ADMIN) | Funcionario interno | `reset-password.ts` | ADMIN solicita reset |
+
+Las condiciones de envío al ciudadano se centralizan en `lib/email/debe-notificar-ciudadano.ts`. Un radicado **anónimo** o con email placeholder NUNCA recibe correo, sin importar el canal de respuesta seleccionado.
+
+### Trazabilidad de notificaciones
+
+Cada intento de envío registra un evento en `ventanilla_radicados/{id}/trazabilidad` mediante el helper unificado `registrarTrazabilidadNotificacion`:
+
+| Acción | Significado |
+|---|---|
+| `NOTIFICACION_CORREO_ENVIADA` | Correo enviado correctamente |
+| `NOTIFICACION_CORREO_FALLIDA` | SMTP falló — levanta el flag `alertaNotificacionFallida = true` en raíz del radicado |
+| `NOTIFICACION_OMITIDA_DUPLICADA` | Idempotencia: misma asignación/prórroga ya notificada en los últimos 5 min |
+| `NOTIFICACION_GESTIONADA_MANUALMENTE` | Funcionario marcó el fallo como gestionado por canal alternativo (baja el flag) |
+
+Metadata incluida en cada evento: `tipoNotificacion`, `destinatario`, `estado`, `error?`, y datos específicos del evento (dependencia destino, nueva fecha, etc.).
+
+> [!IMPORTANT]
+> El fallo SMTP es **no bloqueante**: el radicado se guarda siempre. El sistema registra el fallo en trazabilidad, sube el flag raíz `alertaNotificacionFallida` (visible en el dashboard como badge rojo) y deja el error en logs de Vercel para diagnóstico posterior. El funcionario debe contactar al ciudadano por canal alternativo y marcar la notificación como gestionada desde el PanelDerecho.
+
+### Validación SMTP antes de go-live
+
+1. Configurar variables SMTP en Vercel + verificar SPF/DKIM en DNS del dominio
+2. Hacer redeploy
+3. Crear radicado de prueba en `/radicacion` con correo real del equipo TI → verificar correo de confirmación en < 60 segundos
+4. Asignar el radicado a una dependencia → verificar correo de asignación
+5. Aplicar prórroga → verificar correo con nueva fecha límite
+6. Resolver el radicado desde el dashboard interno → verificar correo de respuesta oficial
+7. Crear un radicado **anónimo** con email en el formulario → verificar que NO se envía correo
+8. Reasignar el mismo radicado a la misma dependencia 2 veces seguidas → verificar evento `NOTIFICACION_OMITIDA_DUPLICADA`
+
+### Referencia adicional
+
+Ver [RUNBOOK_INCIDENTES_SMTP.md](./RUNBOOK_INCIDENTES_SMTP.md) para diagnóstico completo de fallos y procedimientos de escalamiento.
+
+### Cron de alertas (vercel.json)
+
+El cron `GET /api/cron/alertas-vencimiento` se ejecuta automáticamente:
+- **Schedule:** Lunes a viernes a las 12:00 UTC (7:00 AM COT)
+- **Seguridad:** Header `Authorization: Bearer {CRON_SECRET}` — configurar `CRON_SECRET` en Vercel
+- **Umbral:** Radicados con ≤ 2 días hábiles al vencimiento
+
+```bash
+# Prueba manual del cron
+curl -X GET https://ventanilla-simacota.vercel.app/api/cron/alertas-vencimiento \
+  -H "Authorization: Bearer {CRON_SECRET}"
+```
+
+---
+
+*Actualizado el 2026-06-14 — Sprint SMTP Institucional completado.*
