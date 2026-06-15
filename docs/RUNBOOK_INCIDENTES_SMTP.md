@@ -8,15 +8,28 @@
 
 | Evento | Trigger | Endpoint | Template |
 |---|---|---|---|
-| Confirmación de radicación | POST /api/radicacion (automático) | server-side fire-and-forget | `confirmacion-radicacion.ts` |
-| Respuesta oficial al ciudadano | Funcionario resuelve radicado | POST /api/interno/notificar-ciudadano | `respuesta-ciudadano.ts` |
+| Confirmación de radicación | POST /api/radicacion (síncrono, `await`) | en el mismo handler | `confirmacion-radicacion.ts` |
+| Asignación a dependencia | Funcionario asigna radicado | POST /api/radicados/[id]/asignar | `notificacion-estado.ts` (evento ASIGNADO) |
+| Prórroga aplicada | Funcionario aplica prórroga | POST /api/radicados/[id]/prorroga | `notificacion-estado.ts` (evento PRORROGA) |
+| Respuesta oficial al ciudadano | Funcionario resuelve radicado | POST /api/radicados/[id]/resolver + /api/interno/notificar-ciudadano | `respuesta-ciudadano.ts` |
 | Alerta de vencimiento próximo | Cron diario (L-V 12:00 UTC) | GET /api/cron/alertas-vencimiento | HTML inline en route |
 | Reset de contraseña | ADMIN solicita reset | POST /api/admin/usuarios/[uid] | `reset-password.ts` |
 
-**Trazabilidad en Firestore:**
-- `NOTIFICACION_CORREO_ENVIADA` — se escribe cuando el email sale correctamente
-- `NOTIFICACION_CORREO_FALLIDA` — se escribe cuando SMTP falla (incluye mensaje de error)
-- Ambos eventos aparecen en la subcollección `ventanilla_radicados/{id}/trazabilidad`
+**Trazabilidad en Firestore (helper único `registrarTrazabilidadNotificacion`):**
+- `NOTIFICACION_CORREO_ENVIADA` — el email sale correctamente
+- `NOTIFICACION_CORREO_FALLIDA` — SMTP falla (mensaje de error en `metadata.error`) → además levanta el flag `alertaNotificacionFallida = true` en la raíz del radicado
+- `NOTIFICACION_OMITIDA_DUPLICADA` — idempotencia: misma asignación/prórroga ya notificada en los últimos 5 min
+- `NOTIFICACION_GESTIONADA_MANUALMENTE` — el funcionario marcó el fallo como gestionado por canal alternativo (baja el flag a `false`)
+
+Cada evento queda en `ventanilla_radicados/{id}/trazabilidad` con `metadata.tipoNotificacion` (`RADICACION` | `ASIGNACION` | `PRORROGA` | `RESPUESTA_OFICIAL` | `RESET_PASSWORD`).
+
+**Reglas de privacidad** (`lib/email/debe-notificar-ciudadano.ts`):
+- Radicados con `esAnonimo === true` o `tipoPresentacion === 'ANONIMA'` → **nunca** reciben correo aunque tengan email persistido.
+- Emails inválidos o de la lista de placeholders (`anonimo@…`, `noreply@…`) → bloqueados.
+- El canal de respuesta (`PRESENCIAL`, `TELEFONO`, etc.) NO bloquea: las notificaciones de estado son cortesía informativa, no la respuesta oficial.
+
+**Sender requerido — SPF / DKIM:**
+Antes del primer envío productivo, validar que `simacota-santander.gov.co` tenga registros SPF y DKIM correctos. Sin esto Gmail enviará todo a spam aunque la App Password funcione. Ver sección 7.
 
 ---
 
@@ -154,11 +167,19 @@ Error: connect ETIMEDOUT smtp.gmail.com:587
 ### Checklist de verificación
 
 - [ ] Email de confirmación de radicación llega al ciudadano
+- [ ] Email de **asignación** llega al ciudadano cuando se asigna a dependencia
+- [ ] Email de **prórroga** llega al ciudadano con la nueva fecha límite
 - [ ] Email de respuesta oficial llega al ciudadano cuando funcionario resuelve
 - [ ] Email de alerta de vencimiento llega al funcionario responsable (verificar con radicado de prueba próximo a vencer)
 - [ ] Email de reset password llega al funcionario (sin exponer link en pantalla)
+- [ ] Radicación **anónima** con email en el formulario → NO se envía correo (verificar con `tipoPresentacion: ANONIMA`)
+- [ ] Reasignar el mismo radicado a la misma dependencia 2 veces seguidas → solo 1 correo + 1 evento `NOTIFICACION_OMITIDA_DUPLICADA`
+- [ ] Resolver radicado SIN PDF adjunto → `respuestaOficial.nota` queda persistido y visible en consulta ciudadana
+- [ ] Sidebar muestra contador "Correos fallidos" cuando hay fallos sin gestionar
+- [ ] PanelDerecho muestra banner rojo "Correo fallido" en el radicado afectado
+- [ ] Acción "Marcar gestionada" baja el flag `alertaNotificacionFallida` y registra `NOTIFICACION_GESTIONADA_MANUALMENTE`
 - [ ] En Vercel Logs: no hay errores `[ventanilla:error] {...modulo: "radicacion/email-confirmacion"...}`
-- [ ] En trazabilidad de Firestore: evento `NOTIFICACION_CORREO_ENVIADA` presente en radicados de prueba
+- [ ] En trazabilidad de Firestore: eventos `NOTIFICACION_CORREO_ENVIADA` presentes para los 4 tipos
 - [ ] El radicado se guarda correctamente aunque el email falle (SMTP fall-safe)
 
 ### Cómo verificar logs en Vercel
@@ -202,7 +223,55 @@ Respuesta esperada:
 
 ---
 
-## 7. Contactos de escalamiento
+## 7. Diagnóstico de notificación faltante o "correo no llegó"
+
+Cuando un ciudadano o funcionario reporta que un correo no llegó, seguir este flujo en orden:
+
+1. **Verificar trazabilidad del radicado en Firestore:**
+   - Firebase Console → `ventanilla_radicados/{id}/trazabilidad`
+   - Si existe `NOTIFICACION_CORREO_ENVIADA` para el `tipoNotificacion` esperado → el sistema sí envió. Revisar bandeja de spam del destinatario.
+   - Si existe `NOTIFICACION_CORREO_FALLIDA` → el sistema intentó pero SMTP falló. Leer `metadata.error` para diagnóstico.
+   - Si existe `NOTIFICACION_OMITIDA_DUPLICADA` → el funcionario disparó el mismo evento dos veces en < 5 min; comportamiento esperado.
+   - Si NO existe ningún evento → la notificación nunca fue intentada. Posibles causas:
+     - El radicado es anónimo (verificar `esAnonimo` / `tipoPresentacion`)
+     - No tiene `solicitante.email`
+     - El email es un placeholder (`anonimo@simacota.gov.co`, etc.)
+
+2. **Verificar flag raíz `alertaNotificacionFallida`:**
+   - Si es `true`, el dashboard muestra el badge rojo y el contador del sidebar lo cuenta.
+   - El funcionario puede marcarlo como gestionado desde el PanelDerecho.
+
+3. **Verificar logs de Vercel:**
+   - Buscar `[ventanilla:error]` con `modulo` que termine en `email-*` o `email-respuesta` / `email-ciudadano`.
+   - Cruzar timestamp con el evento de Firestore.
+
+4. **Verificar SPF / DKIM si llegan a spam consistentemente:**
+   - `dig TXT simacota-santander.gov.co` debe incluir `v=spf1 include:_spf.google.com ~all`
+   - Verificar DKIM desde Google Workspace Admin → Gmail → Autenticar correo
+   - Verificar DMARC en `_dmarc.simacota-santander.gov.co`
+
+---
+
+## 8. Lectura de trazabilidad de un radicado
+
+Cómo entender los eventos en `ventanilla_radicados/{id}/trazabilidad`:
+
+| Accion | Significado |
+|---|---|
+| `RADICACION` | El radicado fue creado por el portal ciudadano |
+| `ASIGNACION` | Trasladado a una dependencia (con responsable opcional) |
+| `PRORROGA` | Plazo de respuesta extendido |
+| `RESPUESTA_FUNCIONARIO` | El funcionario cargó respuesta oficial (con o sin PDF) |
+| `NOTIFICACION_CORREO_ENVIADA` | Email salió correctamente — ver `metadata.tipoNotificacion` |
+| `NOTIFICACION_CORREO_FALLIDA` | Email intentado, SMTP falló — `metadata.error` tiene el detalle |
+| `NOTIFICACION_OMITIDA_DUPLICADA` | Idempotencia: evento repetido en < 5 min, no se reenvió |
+| `NOTIFICACION_GESTIONADA_MANUALMENTE` | Funcionario marcó un fallo como resuelto por canal alternativo |
+
+`metadata.tipoNotificacion` distingue el evento que originó la notificación: `RADICACION` | `ASIGNACION` | `PRORROGA` | `RESPUESTA_OFICIAL` | `RESET_PASSWORD`.
+
+---
+
+## 9. Contactos de escalamiento
 
 | Nivel | Responsable | Cuándo escalar |
 |---|---|---|
@@ -212,4 +281,4 @@ Respuesta esperada:
 
 ---
 
-*Documento generado el 2026-06-14 · Ventanilla Única Digital · Alcaldía de Simacota, Santander, Colombia*
+*Documento generado el 2026-06-14 · Última actualización: sprint unificado de notificaciones progresivas · Ventanilla Única Digital · Alcaldía de Simacota, Santander, Colombia*

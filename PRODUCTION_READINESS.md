@@ -104,7 +104,18 @@ FIREBASE_STORAGE_BUCKET=tu-proyecto.appspot.com
 - [ ] **ENV-1** Configurar `FIREBASE_SERVICE_ACCOUNT` en Vercel (Environment Variables → Production)
 - [ ] **ENV-2** Configurar `FIREBASE_STORAGE_BUCKET` en Vercel
 - [ ] **ENV-3** Configurar `EMAIL_HOST`, `EMAIL_USER`, `EMAIL_PASS`, `EMAIL_FROM` en Vercel
-- [ ] **ENV-4** Configurar `GEMINI_API_KEY` en Vercel
+- [ ] **ENV-4 SMTP institucional en Vercel (notificaciones progresivas + trazabilidad unificada)** — COMPLETADO en código. Solo queda configurar `EMAIL_PASS` real y validar:
+  - [ ] EMAIL_USER, EMAIL_PASS, EMAIL_FROM configurados
+  - [ ] Redeploy realizado
+  - [ ] Correo de **radicación** llega + evento `NOTIFICACION_CORREO_ENVIADA / RADICACION`
+  - [ ] Correo de **asignación** llega + evento `... / ASIGNACION`
+  - [ ] Correo de **prórroga** llega con nueva fecha + evento `... / PRORROGA`
+  - [ ] Correo de **respuesta oficial** llega + evento `... / RESPUESTA_OFICIAL`
+  - [ ] Radicado anónimo: NO se envía correo
+  - [ ] Reasignación a misma dependencia <5min: solo 1 correo + evento `NOTIFICACION_OMITIDA_DUPLICADA`
+  - [ ] Respuesta SIN PDF: nota visible en consulta ciudadana
+  - [ ] SPF/DKIM del dominio verificados (no llega a spam)
+- [ ] **ENV-5** Configurar `GEMINI_API_KEY` en Vercel
 - [ ] **RULES-1** Desplegar reglas Firestore: `firebase deploy --only firestore:rules`
 - [ ] **RULES-2** Desplegar reglas Storage: `firebase deploy --only storage`
 - [ ] **INDEX-1** Desplegar índice compuesto: `firebase deploy --only firestore:indexes`
@@ -112,7 +123,7 @@ FIREBASE_STORAGE_BUCKET=tu-proyecto.appspot.com
   - Colección: `ventanilla_radicados`, Campo 1: `clasificacion.oficinaDestino` (ASC), Campo 2: `control.fechaRadicado` (DESC)
   - ⚠️ La creación del índice toma 5-15 minutos
 - [ ] **BUILD-1** Ejecutar `npm run build` localmente — verificar cero errores
-- [ ] **TEST-1** Ejecutar `npm run test` — verificar 28/28 passing
+- [ ] **TEST-1** Ejecutar `npm run test` — verificar 53/53 passing
 - [ ] **SMTP-1** Probar envío de email desde local con variables reales
 
 ### Despliegue

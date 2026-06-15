@@ -11,6 +11,19 @@ import {
   getRadicadoOrFail,
   RadicadoActionError,
 } from '@/lib/server/radicados-security';
+import { enviarEmail } from '@/lib/email/mailer';
+import {
+  buildNotificacionEstadoHtml,
+  buildNotificacionEstadoSubject,
+} from '@/lib/email/templates/notificacion-estado';
+import { debeNotificarCiudadano } from '@/lib/email/debe-notificar-ciudadano';
+import {
+  notificacionRecienteEnviada,
+  registrarNotificacionOmitida,
+  registrarTrazabilidadNotificacion,
+} from '@/lib/trazabilidad/notificacion';
+import { logError } from '@/lib/logger';
+import { DIRECTORIO_TENANTS } from '@/src/types/reglas-negocio';
 
 export const runtime = 'nodejs';
 
@@ -73,11 +86,87 @@ export async function POST(request: Request, context: RouteContext): Promise<Nex
       },
     });
 
+    // ── Notificación progresiva al ciudadano ──
+    const dependencia = DIRECTORIO_TENANTS[radicado.clasificacion.oficinaDestino];
+    const emailDestino = radicado.solicitante?.email ?? null;
+    const puedeNotificar = debeNotificarCiudadano({
+      esAnonimo: radicado.esAnonimo,
+      tipoPresentacion: radicado.tipoPresentacion,
+      solicitante: { email: emailDestino },
+    });
+
+    let emailEnviado = false;
+    let emailError: string | undefined;
+
+    if (puedeNotificar && emailDestino) {
+      const nuevaFechaIso = nuevaFecha.toISOString();
+      const duplicado = await notificacionRecienteEnviada({
+        radicadoId,
+        tipoNotificacion: 'PRORROGA',
+        metadataMatch: { nuevaFechaLimite: nuevaFechaIso },
+      });
+
+      if (duplicado) {
+        await registrarNotificacionOmitida({
+          radicadoId,
+          tipoNotificacion: 'PRORROGA',
+          destinatario: emailDestino,
+          motivo: `Prórroga a la misma fecha ${nuevaFechaIso} ya notificada en los últimos 5 minutos`,
+        });
+      } else {
+        try {
+          await enviarEmail({
+            to: emailDestino,
+            subject: buildNotificacionEstadoSubject(radicadoId, 'PRORROGA'),
+            html: buildNotificacionEstadoHtml({
+              radicadoId,
+              ciudadanoNombre: radicado.solicitante.nombreCompleto,
+              evento: 'PRORROGA',
+              nuevaFechaLimite: nuevaFechaIso,
+              diasProrroga,
+              motivo,
+              fechaEvento: ahora,
+            }),
+            replyTo: dependencia?.emailOficial,
+          });
+          emailEnviado = true;
+          await registrarTrazabilidadNotificacion({
+            radicadoId,
+            tipoNotificacion: 'PRORROGA',
+            destinatario: emailDestino,
+            estado: 'ENVIADA',
+            metadata: {
+              diasProrroga,
+              nuevaFechaLimite: nuevaFechaIso,
+              dependencia: radicado.clasificacion.oficinaDestino,
+            },
+          });
+        } catch (err) {
+          emailError = err instanceof Error ? err.message : String(err);
+          logError({ radicadoId, modulo: 'prorroga/email-ciudadano', error: err });
+          await registrarTrazabilidadNotificacion({
+            radicadoId,
+            tipoNotificacion: 'PRORROGA',
+            destinatario: emailDestino,
+            estado: 'FALLIDA',
+            error: emailError,
+            metadata: {
+              diasProrroga,
+              nuevaFechaLimite: nuevaFechaIso,
+              dependencia: radicado.clasificacion.oficinaDestino,
+            },
+          });
+        }
+      }
+    }
+
     return NextResponse.json({
       ok: true,
       estadoActual: 'PRORROGA',
       fechaVencimiento: nuevaFecha.toISOString(),
       ultimaActualizacion: ahora,
+      emailEnviado,
+      ...(emailError ? { emailError } : {}),
     });
   } catch (error) {
     console.error('[radicados/prorroga]', error);

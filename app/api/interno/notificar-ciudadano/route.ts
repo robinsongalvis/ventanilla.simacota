@@ -1,7 +1,7 @@
 import { NextResponse }       from 'next/server';
 import { cookies }             from 'next/headers';
 import { SESSION_COOKIE_NAME } from '@/lib/auth-cookie';
-import { getFirebaseAdminAuth, getFirebaseAdminDb } from '@/lib/firebase-admin';
+import { getFirebaseAdminAuth } from '@/lib/firebase-admin';
 import { enviarEmail }          from '@/lib/email/mailer';
 import {
   buildRespuestaCiudadanoHtml,
@@ -9,6 +9,8 @@ import {
 } from '@/lib/email/templates/respuesta-ciudadano';
 import { DIRECTORIO_TENANTS }  from '@/src/types/reglas-negocio';
 import { logError }             from '@/lib/logger';
+import { registrarTrazabilidadNotificacion } from '@/lib/trazabilidad/notificacion';
+import { debeNotificarCiudadano } from '@/lib/email/debe-notificar-ciudadano';
 import type { TenantId }       from '@/src/types/radicado';
 
 export const runtime = 'nodejs';
@@ -17,7 +19,8 @@ export const runtime = 'nodejs';
    POST /api/interno/notificar-ciudadano
    Envía email al ciudadano cuando su radicado es respondido.
    Requiere sesión de funcionario válida.
-   Registra trazabilidad NOTIFICACION_CORREO_ENVIADA / FALLIDA.
+   Registra trazabilidad NOTIFICACION_CORREO_ENVIADA / FALLIDA
+   usando el helper centralizado.
 ══════════════════════════════════════════════════════════════ */
 
 interface NotificarCiudadanoPayload {
@@ -29,44 +32,6 @@ interface NotificarCiudadanoPayload {
   tenantId:          TenantId;
   fechaRespuesta:    string;
   tieneArchivo:      boolean;
-}
-
-const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-
-/** Registra evento de notificación en la subcollección de trazabilidad del radicado. */
-async function registrarTrazabilidadNotificacion({
-  radicadoId,
-  destinatario,
-  estado,
-  error,
-}: {
-  radicadoId:   string;
-  destinatario: string;
-  estado:       'ENVIADA' | 'FALLIDA';
-  error?:       string;
-}): Promise<void> {
-  try {
-    const db  = getFirebaseAdminDb();
-    const ahora = new Date().toISOString();
-    await db.collection(`ventanilla_radicados/${radicadoId}/trazabilidad`).add({
-      eventoId:    `ev_${radicadoId}_NOTIF_RESPUESTA_${ahora}`,
-      fecha:       ahora,
-      accion:      estado === 'ENVIADA' ? 'NOTIFICACION_CORREO_ENVIADA' : 'NOTIFICACION_CORREO_FALLIDA',
-      actorUid:    'sistema',
-      actorNombre: 'Sistema',
-      nota:        estado === 'ENVIADA'
-        ? `Correo de respuesta oficial enviado a ${destinatario}`
-        : `Falló el correo de respuesta oficial a ${destinatario}`,
-      metadata: {
-        tipoNotificacion: 'RESPUESTA_OFICIAL',
-        destinatario,
-        estado,
-        ...(error ? { error } : {}),
-      },
-    });
-  } catch {
-    // No propagar — la trazabilidad falla silenciosamente
-  }
 }
 
 export async function POST(request: Request): Promise<NextResponse> {
@@ -109,9 +74,14 @@ export async function POST(request: Request): Promise<NextResponse> {
     );
   }
 
-  if (!EMAIL_RE.test(emailCiudadano)) {
+  // Aplica la regla central de privacidad: anonimato + email válido + no placeholder.
+  const puedeNotificar = debeNotificarCiudadano({
+    tipoPresentacion: 'IDENTIFICADA',
+    solicitante: { email: emailCiudadano },
+  });
+  if (!puedeNotificar) {
     return NextResponse.json(
-      { error: 'El email del ciudadano no tiene formato válido.' },
+      { error: 'El email del ciudadano no es válido o corresponde a un placeholder.' },
       { status: 400 },
     );
   }
@@ -145,11 +115,15 @@ export async function POST(request: Request): Promise<NextResponse> {
       replyTo: dependencia.emailOficial,
     });
 
-    // Registrar trazabilidad de notificación exitosa
     await registrarTrazabilidadNotificacion({
       radicadoId,
-      destinatario: emailCiudadano,
-      estado:       'ENVIADA',
+      tipoNotificacion: 'RESPUESTA_OFICIAL',
+      destinatario:     emailCiudadano,
+      estado:           'ENVIADA',
+      metadata: {
+        dependencia: tenantId,
+        tieneArchivo,
+      },
     });
 
     return NextResponse.json({ enviado: true });
@@ -158,12 +132,16 @@ export async function POST(request: Request): Promise<NextResponse> {
     const msg = err instanceof Error ? err.message : String(err);
     logError({ radicadoId, modulo: 'notificar-ciudadano', error: err });
 
-    // Registrar trazabilidad de fallo
     await registrarTrazabilidadNotificacion({
       radicadoId,
-      destinatario: emailCiudadano,
-      estado:       'FALLIDA',
-      error:        msg,
+      tipoNotificacion: 'RESPUESTA_OFICIAL',
+      destinatario:     emailCiudadano,
+      estado:           'FALLIDA',
+      error:            msg,
+      metadata: {
+        dependencia: tenantId,
+        tieneArchivo,
+      },
     });
 
     // No exponemos detalles del SMTP al cliente
@@ -173,4 +151,3 @@ export async function POST(request: Request): Promise<NextResponse> {
     );
   }
 }
-

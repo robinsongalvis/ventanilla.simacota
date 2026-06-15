@@ -95,9 +95,10 @@ export interface FeedbackIA {
 }
 
 export interface RespuestaOficial {
-  /** Ruta en Storage: respuestas/{radicadoId}/{timestamp_filename} */
-  archivoPath:   string;
-  archivoNombre: string;
+  /** Ruta en Storage: respuestas/{radicadoId}/{timestamp_filename}. Null cuando la respuesta no incluye PDF firmado. */
+  archivoPath:   string | null;
+  /** Nombre del PDF firmado. Null cuando la respuesta no incluye archivo. */
+  archivoNombre: string | null;
   nota:          string;
   fecha:         string;        // ISO
   actorUid:      string;
@@ -172,6 +173,14 @@ export interface VentanillaRadicado {
   analisisIa?:       AnalisisIA;
   feedbackIa?:       FeedbackIA;
   respuestaOficial?: RespuestaOficial | null;
+  /**
+   * Bandera de alerta visual para el dashboard: indica que al menos un correo
+   * institucional asociado a este radicado falló y aún no fue gestionado por
+   * canal alternativo. Se pone en `true` al persistir un evento
+   * `NOTIFICACION_CORREO_FALLIDA` y solo se baja a `false` cuando un
+   * funcionario marca explícitamente la notificación como gestionada.
+   */
+  alertaNotificacionFallida?: boolean;
 }
 
 

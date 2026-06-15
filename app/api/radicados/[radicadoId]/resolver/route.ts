@@ -5,6 +5,9 @@ import {
   buildRespuestaCiudadanoHtml,
   buildRespuestaCiudadanoSubject,
 } from '@/lib/email/templates/respuesta-ciudadano';
+import { debeNotificarCiudadano } from '@/lib/email/debe-notificar-ciudadano';
+import { registrarTrazabilidadNotificacion } from '@/lib/trazabilidad/notificacion';
+import { logError } from '@/lib/logger';
 import {
   canOperateTenant,
   InternalAuthError,
@@ -32,8 +35,16 @@ function jsonError(error: unknown) {
   return NextResponse.json({ error: 'No fue posible resolver el radicado.' }, { status: 500 });
 }
 
+/**
+ * Envía la notificación oficial al ciudadano y registra trazabilidad
+ * unificada. Aplica `debeNotificarCiudadano` para honrar anonimato y
+ * rechazar placeholders. Si SMTP falla, deja huella en trazabilidad y
+ * sube `alertaNotificacionFallida` sin propagar la excepción.
+ */
 async function notificarCiudadano(params: {
   email: string | null | undefined;
+  esAnonimo?: boolean;
+  tipoPresentacion?: 'IDENTIFICADA' | 'ANONIMA' | 'RESERVADA';
   nombre: string;
   radicadoId: string;
   asunto: string;
@@ -41,29 +52,64 @@ async function notificarCiudadano(params: {
   tenantId: string;
   fechaRespuesta: string;
   tieneArchivo: boolean;
-}): Promise<boolean> {
-  if (!params.email) return false;
+}): Promise<{ emailEnviado: boolean; error?: string }> {
+  const puedeNotificar = debeNotificarCiudadano({
+    esAnonimo: params.esAnonimo,
+    tipoPresentacion: params.tipoPresentacion,
+    solicitante: { email: params.email },
+  });
+  if (!puedeNotificar) return { emailEnviado: false };
 
   const dependencia = DIRECTORIO_TENANTS[params.tenantId as keyof typeof DIRECTORIO_TENANTS];
-  if (!dependencia) return false;
+  if (!dependencia) return { emailEnviado: false };
 
-  await enviarEmail({
-    to: params.email,
-    subject: buildRespuestaCiudadanoSubject(params.radicadoId),
-    html: buildRespuestaCiudadanoHtml({
-      radicadoId: params.radicadoId,
-      ciudadanoNombre: params.nombre,
-      asunto: params.asunto || 'Sin asunto',
-      nota: params.nota,
-      dependenciaNombre: dependencia.nombreOficial,
-      dependenciaEmail: dependencia.emailOficial,
-      fechaRespuesta: params.fechaRespuesta,
-      tieneArchivo: params.tieneArchivo,
-    }),
-    replyTo: dependencia.emailOficial,
-  });
+  const destinatario = params.email as string;
 
-  return true;
+  try {
+    await enviarEmail({
+      to: destinatario,
+      subject: buildRespuestaCiudadanoSubject(params.radicadoId),
+      html: buildRespuestaCiudadanoHtml({
+        radicadoId: params.radicadoId,
+        ciudadanoNombre: params.nombre,
+        asunto: params.asunto || 'Sin asunto',
+        nota: params.nota,
+        dependenciaNombre: dependencia.nombreOficial,
+        dependenciaEmail: dependencia.emailOficial,
+        fechaRespuesta: params.fechaRespuesta,
+        tieneArchivo: params.tieneArchivo,
+      }),
+      replyTo: dependencia.emailOficial,
+    });
+
+    await registrarTrazabilidadNotificacion({
+      radicadoId:       params.radicadoId,
+      tipoNotificacion: 'RESPUESTA_OFICIAL',
+      destinatario,
+      estado:           'ENVIADA',
+      metadata: {
+        dependencia:  params.tenantId,
+        tieneArchivo: params.tieneArchivo,
+      },
+    });
+
+    return { emailEnviado: true };
+  } catch (err) {
+    const mensaje = err instanceof Error ? err.message : String(err);
+    logError({ radicadoId: params.radicadoId, modulo: 'resolver/email-respuesta', error: err });
+    await registrarTrazabilidadNotificacion({
+      radicadoId:       params.radicadoId,
+      tipoNotificacion: 'RESPUESTA_OFICIAL',
+      destinatario,
+      estado:           'FALLIDA',
+      error:            mensaje,
+      metadata: {
+        dependencia:  params.tenantId,
+        tieneArchivo: params.tieneArchivo,
+      },
+    });
+    return { emailEnviado: false, error: mensaje };
+  }
 }
 
 export async function POST(request: Request, context: RouteContext): Promise<NextResponse> {
@@ -115,21 +161,18 @@ export async function POST(request: Request, context: RouteContext): Promise<Nex
       },
     });
 
-    let emailEnviado = false;
-    try {
-      emailEnviado = await notificarCiudadano({
-        email: radicado.solicitante.email,
-        nombre: radicado.solicitante.nombreCompleto,
-        radicadoId,
-        asunto: radicado.detalle.asunto,
-        nota,
-        tenantId: radicado.clasificacion.oficinaDestino,
-        fechaRespuesta: ahora,
-        tieneArchivo: Boolean(archivoPdf),
-      });
-    } catch (error) {
-      console.error('[radicados/resolver] Error notificando ciudadano:', error);
-    }
+    const { emailEnviado, error: emailError } = await notificarCiudadano({
+      email: radicado.solicitante.email,
+      esAnonimo: radicado.esAnonimo,
+      tipoPresentacion: radicado.tipoPresentacion,
+      nombre: radicado.solicitante.nombreCompleto,
+      radicadoId,
+      asunto: radicado.detalle.asunto,
+      nota,
+      tenantId: radicado.clasificacion.oficinaDestino,
+      fechaRespuesta: ahora,
+      tieneArchivo: Boolean(archivoPdf),
+    });
 
     return NextResponse.json({
       ok: true,
@@ -138,6 +181,7 @@ export async function POST(request: Request, context: RouteContext): Promise<Nex
       archivoNombre: archivoPdf?.nombre ?? null,
       cumplioTermino,
       emailEnviado,
+      ...(emailError ? { emailError } : {}),
     });
   } catch (error) {
     console.error('[radicados/resolver]', error);

@@ -417,6 +417,7 @@ function SidebarNav({
   onCerrarSesion,
   pendientesBandeja,
   pendientesAlertas,
+  pendientesNotificacionFallida,
   className = '',
 }: {
   vistaActual: VistaActual;
@@ -426,6 +427,7 @@ function SidebarNav({
   onCerrarSesion: () => void;
   pendientesBandeja: number;
   pendientesAlertas: number;
+  pendientesNotificacionFallida: number;
   className?: string;
 }) {
   const LABEL_ROL: Record<string, string> = {
@@ -525,6 +527,29 @@ function SidebarNav({
             </svg>
             Radicación Rápida
           </button>
+        </div>
+      )}
+
+      {/* Alerta operativa: correos institucionales fallidos sin gestionar */}
+      {pendientesNotificacionFallida > 0 && (
+        <div className="px-3 pt-1 pb-2">
+          <div
+            className="w-full flex items-center gap-2 px-3 py-2 rounded-xl text-[11px] font-semibold"
+            style={{
+              background: 'rgba(220,38,38,0.18)',
+              color: '#fecaca',
+              border: '1px solid rgba(248,113,113,0.35)',
+            }}
+            title="Radicados cuya notificación oficial por correo falló y aún no se ha gestionado por canal alternativo."
+          >
+            <svg className="w-3.5 h-3.5 shrink-0 animate-pulse" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+              <path strokeLinecap="round" strokeLinejoin="round" d="M12 9v3.75m9-.75a9 9 0 11-18 0 9 9 0 0118 0zm-9 3.75h.008v.008H12v-.008z" />
+            </svg>
+            <span className="flex-1 truncate">Correos fallidos</span>
+            <span className="shrink-0 min-w-[20px] h-[18px] rounded-full bg-red-600 text-white text-[10px] font-black flex items-center justify-center px-1">
+              {pendientesNotificacionFallida > 99 ? '99+' : pendientesNotificacionFallida}
+            </span>
+          </div>
         </div>
       )}
 
@@ -1207,6 +1232,10 @@ function PanelDerecho({
   const [trazabilidad,         setTrazabilidad]         = useState<TrazabilidadRadicado[]>([]);
   const [cargandoTrazabilidad, setCargandoTrazabilidad] = useState(false);
   const [archivoPdf,           setArchivoPdf]           = useState<File | null>(null);
+  // Estado local para la gestión manual de notificaciones fallidas
+  const [mostrarGestionNotif,  setMostrarGestionNotif]  = useState(false);
+  const [motivoGestion,        setMotivoGestion]        = useState('');
+  const [gestionandoNotif,     setGestionandoNotif]     = useState(false);
 
   // MIPG-2: carga funcionarios del tenant destino para el selector de responsable
   const { funcionarios: funcionariosTenant, cargando: cargandoFuncionarios } =
@@ -1355,6 +1384,36 @@ function PanelDerecho({
     setMotivo('');
   }
 
+  async function marcarNotificacionGestionada() {
+    if (motivoGestion.trim().length < 5) {
+      setErrorLocal('Describe cómo se gestionó la notificación (mínimo 5 caracteres).');
+      return;
+    }
+    setGestionandoNotif(true);
+    setErrorLocal(null);
+    setMensajeOk(null);
+    try {
+      const response = await fetch(
+        `/api/radicados/${encodeURIComponent(radicado.radicadoId)}/notificacion-gestionada`,
+        {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          credentials: 'include',
+          body: JSON.stringify({ motivo: motivoGestion.trim() }),
+        },
+      );
+      const data = await response.json().catch(() => null) as { error?: string } | null;
+      if (!response.ok) throw new Error(data?.error ?? 'No se pudo registrar la gestión.');
+      setMensajeOk('Notificación marcada como gestionada por canal alternativo.');
+      setMotivoGestion('');
+      setMostrarGestionNotif(false);
+    } catch (err) {
+      setErrorLocal(`Error: ${err instanceof Error ? err.message : String(err)}`);
+    } finally {
+      setGestionandoNotif(false);
+    }
+  }
+
   async function responderCaso() {
     if (respuesta.trim().length < 10) {
       setErrorLocal('La respuesta debe tener al menos 10 caracteres.');
@@ -1423,6 +1482,68 @@ function PanelDerecho({
           </button>
         </div>
       </div>
+
+      {/* Banner de notificación oficial fallida — visible solo si el radicado tiene el flag */}
+      {radicado.alertaNotificacionFallida === true && (
+        <div
+          className="shrink-0 px-4 py-2.5"
+          style={{ background: '#FEF2F2', borderBottom: '1px solid #FCA5A5' }}
+        >
+          <div className="flex items-start gap-2">
+            <svg className="w-4 h-4 shrink-0 mt-0.5" fill="none" viewBox="0 0 24 24" stroke="#B91C1C" strokeWidth={2}>
+              <path strokeLinecap="round" strokeLinejoin="round" d="M12 9v3.75m-9.303 3.376c-.866 1.5.217 3.374 1.948 3.374h14.71c1.73 0 2.813-1.874 1.948-3.374L13.949 3.378c-.866-1.5-3.032-1.5-3.898 0L2.697 16.126zM12 15.75h.007v.008H12v-.008z" />
+            </svg>
+            <div className="flex-1 min-w-0">
+              <p className="text-[11px] font-bold uppercase tracking-wide" style={{ color: '#B91C1C' }}>
+                Correo fallido
+              </p>
+              <p className="text-xs mt-0.5" style={{ color: '#7F1D1D' }}>
+                Una notificación oficial a <span className="font-semibold">{radicado.solicitante.email ?? 'el ciudadano'}</span> no pudo entregarse.
+                Contacta al ciudadano por canal alternativo y registra la gestión.
+              </p>
+              {!soloLectura && !mostrarGestionNotif && (
+                <button
+                  onClick={() => { setMostrarGestionNotif(true); setErrorLocal(null); setMensajeOk(null); }}
+                  className="mt-2 text-[11px] font-bold px-3 py-1.5 rounded-lg active:scale-95 transition"
+                  style={{ background: '#B91C1C', color: '#ffffff' }}
+                >
+                  Marcar gestionada
+                </button>
+              )}
+              {mostrarGestionNotif && (
+                <div className="mt-2 flex flex-col gap-2">
+                  <textarea
+                    value={motivoGestion}
+                    onChange={(e) => setMotivoGestion(e.target.value)}
+                    placeholder="¿Cómo se notificó al ciudadano? (Ej: llamada telefónica al 312-xxx-xxxx el 2026-06-14)"
+                    className="w-full text-xs rounded-lg px-2.5 py-2 border focus-visible:outline-none focus-visible:ring-2"
+                    style={{ borderColor: '#FCA5A5', minHeight: 60 }}
+                    disabled={gestionandoNotif}
+                  />
+                  <div className="flex gap-2">
+                    <button
+                      onClick={marcarNotificacionGestionada}
+                      disabled={gestionandoNotif || motivoGestion.trim().length < 5}
+                      className="text-[11px] font-bold px-3 py-1.5 rounded-lg active:scale-95 transition disabled:opacity-50 disabled:cursor-not-allowed"
+                      style={{ background: '#B91C1C', color: '#ffffff' }}
+                    >
+                      {gestionandoNotif ? 'Registrando…' : 'Confirmar gestión'}
+                    </button>
+                    <button
+                      onClick={() => { setMostrarGestionNotif(false); setMotivoGestion(''); }}
+                      disabled={gestionandoNotif}
+                      className="text-[11px] font-bold px-3 py-1.5 rounded-lg active:scale-95 transition"
+                      style={{ background: 'transparent', color: '#7F1D1D', border: '1px solid #FCA5A5' }}
+                    >
+                      Cancelar
+                    </button>
+                  </div>
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Tabs */}
       <div className="flex shrink-0 overflow-x-auto bg-white" style={{ borderBottom: '1px solid #D9E2D9' }}>
@@ -1866,16 +1987,20 @@ function PanelDerecho({
 
               {radicado.respuestaOficial && (
                 <div className="rounded-lg p-3 space-y-1 bg-white" style={{ border: '1px solid #D9E2D9' }}>
-                  <p className="text-[10px] font-bold uppercase tracking-widest" style={{ color: '#667085' }}>Oficio de respuesta archivado</p>
+                  <p className="text-[10px] font-bold uppercase tracking-widest" style={{ color: '#667085' }}>
+                    {radicado.respuestaOficial.archivoPath ? 'Oficio de respuesta archivado' : 'Respuesta registrada (sin oficio adjunto)'}
+                  </p>
                   <p className="text-xs leading-relaxed" style={{ color: '#1F2933' }}>{radicado.respuestaOficial.nota}</p>
-                  <div className="flex items-center justify-between pt-1">
-                    <span className="text-[10px] font-mono truncate" style={{ color: '#94A3B8' }}>{radicado.respuestaOficial.archivoNombre}</span>
-                    <a href={`/api/interno/archivo?path=${encodeURIComponent(radicado.respuestaOficial.archivoPath)}`}
-                      target="_blank" rel="noopener noreferrer"
-                      className="shrink-0 text-xs underline underline-offset-2 ml-3 font-semibold" style={{ color: '#14532D' }}>
-                      Descargar oficio
-                    </a>
-                  </div>
+                  {radicado.respuestaOficial.archivoPath && (
+                    <div className="flex items-center justify-between pt-1">
+                      <span className="text-[10px] font-mono truncate" style={{ color: '#94A3B8' }}>{radicado.respuestaOficial.archivoNombre}</span>
+                      <a href={`/api/interno/archivo?path=${encodeURIComponent(radicado.respuestaOficial.archivoPath)}`}
+                        target="_blank" rel="noopener noreferrer"
+                        className="shrink-0 text-xs underline underline-offset-2 ml-3 font-semibold" style={{ color: '#14532D' }}>
+                        Descargar oficio
+                      </a>
+                    </div>
+                  )}
                 </div>
               )}
 
@@ -2609,6 +2734,19 @@ function DashboardInterior({ usuario, cerrarSesion }: { usuario: UsuarioAutentic
     [todosLosRadicados, esAdmin, usuario.tenantId],
   );
 
+  // Sprint SMTP — alerta por correos institucionales fallidos sin gestionar.
+  // El flag se persiste en raíz del documento (alertaNotificacionFallida)
+  // para evitar leer la subcolección de trazabilidad en cada render.
+  const pendientesNotificacionFallida = useMemo(() => {
+    return todosLosRadicados.reduce((acc, r) => {
+      if (r.alertaNotificacionFallida !== true) return acc;
+      // Solo contar los del tenant del usuario (o todos si es admin/control interno)
+      if (esAdmin) return acc + 1;
+      if (r.clasificacion.oficinaDestino === usuario.tenantId) return acc + 1;
+      return acc;
+    }, 0);
+  }, [todosLosRadicados, esAdmin, usuario.tenantId]);
+
   function cambiarVista(vista: VistaActual) {
     dispatch({ type: 'SET_VISTA', vista });
     setMenuMovilAbierto(false);
@@ -2628,6 +2766,7 @@ function DashboardInterior({ usuario, cerrarSesion }: { usuario: UsuarioAutentic
         onCerrarSesion={cerrarSesion}
         pendientesBandeja={radicadosPendientes.length}
         pendientesAlertas={pendientesAlertas}
+        pendientesNotificacionFallida={pendientesNotificacionFallida}
       />
 
       {/* ── COLUMNA 2: Cuerpo central ── */}
@@ -2790,6 +2929,7 @@ function DashboardInterior({ usuario, cerrarSesion }: { usuario: UsuarioAutentic
             onCerrarSesion={cerrarSesion}
             pendientesBandeja={radicadosPendientes.length}
             pendientesAlertas={pendientesAlertas}
+            pendientesNotificacionFallida={pendientesNotificacionFallida}
           />
         </div>
       )}

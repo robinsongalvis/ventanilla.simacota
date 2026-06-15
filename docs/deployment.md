@@ -100,30 +100,43 @@ EMAIL_FROM=Alcaldía de Simacota <notificaciones@simacota-santander.gov.co>
 
 ### Correos institucionales enviados
 
-| Evento | Destinatario | Template |
-|---|---|---|
-| Radicación exitosa del ciudadano | Ciudadano (si tiene email) | `confirmacion-radicacion.ts` |
-| Respuesta oficial del funcionario | Ciudadano | `respuesta-ciudadano.ts` |
-| Alerta de vencimiento próximo | Funcionario responsable | HTML en `alertas-vencimiento/route.ts` |
-| Reset de contraseña (ADMIN) | Funcionario interno | `reset-password.ts` |
+| Evento | Destinatario | Template | Condición de envío |
+|---|---|---|---|
+| Radicación exitosa del ciudadano | Ciudadano | `confirmacion-radicacion.ts` | No anónimo + email válido |
+| **Asignación a dependencia** | Ciudadano | `notificacion-estado.ts` (ASIGNADO) | No anónimo + email válido |
+| **Prórroga aplicada** | Ciudadano | `notificacion-estado.ts` (PRORROGA) | No anónimo + email válido |
+| Respuesta oficial del funcionario | Ciudadano | `respuesta-ciudadano.ts` | No anónimo + email válido |
+| Alerta de vencimiento próximo | Funcionario responsable | HTML en `alertas-vencimiento/route.ts` | Radicado a ≤ 2 días hábiles del vencimiento |
+| Reset de contraseña (ADMIN) | Funcionario interno | `reset-password.ts` | ADMIN solicita reset |
+
+Las condiciones de envío al ciudadano se centralizan en `lib/email/debe-notificar-ciudadano.ts`. Un radicado **anónimo** o con email placeholder NUNCA recibe correo, sin importar el canal de respuesta seleccionado.
 
 ### Trazabilidad de notificaciones
 
-Cada envío registra un evento en la subcollección `ventanilla_radicados/{id}/trazabilidad`:
-- `NOTIFICACION_CORREO_ENVIADA` — correo enviado exitosamente
-- `NOTIFICACION_CORREO_FALLIDA` — fallo SMTP (incluye mensaje de error en metadata)
+Cada intento de envío registra un evento en `ventanilla_radicados/{id}/trazabilidad` mediante el helper unificado `registrarTrazabilidadNotificacion`:
+
+| Acción | Significado |
+|---|---|
+| `NOTIFICACION_CORREO_ENVIADA` | Correo enviado correctamente |
+| `NOTIFICACION_CORREO_FALLIDA` | SMTP falló — levanta el flag `alertaNotificacionFallida = true` en raíz del radicado |
+| `NOTIFICACION_OMITIDA_DUPLICADA` | Idempotencia: misma asignación/prórroga ya notificada en los últimos 5 min |
+| `NOTIFICACION_GESTIONADA_MANUALMENTE` | Funcionario marcó el fallo como gestionado por canal alternativo (baja el flag) |
+
+Metadata incluida en cada evento: `tipoNotificacion`, `destinatario`, `estado`, `error?`, y datos específicos del evento (dependencia destino, nueva fecha, etc.).
 
 > [!IMPORTANT]
-> El fallo SMTP es **no bloqueante**: el radicado se guarda siempre. El ciudadano no pierde su solicitud si el correo falla. El sistema registra el fallo en trazabilidad y en logs de Vercel para diagnóstico posterior.
+> El fallo SMTP es **no bloqueante**: el radicado se guarda siempre. El sistema registra el fallo en trazabilidad, sube el flag raíz `alertaNotificacionFallida` (visible en el dashboard como badge rojo) y deja el error en logs de Vercel para diagnóstico posterior. El funcionario debe contactar al ciudadano por canal alternativo y marcar la notificación como gestionada desde el PanelDerecho.
 
 ### Validación SMTP antes de go-live
 
-1. Configurar variables en Vercel
+1. Configurar variables SMTP en Vercel + verificar SPF/DKIM en DNS del dominio
 2. Hacer redeploy
-3. Crear radicado de prueba en `/radicacion` con correo real del equipo TI
-4. Verificar que llega el correo de confirmación en < 60 segundos
-5. Resolver el radicado desde el dashboard interno
-6. Verificar que llega el correo de respuesta oficial
+3. Crear radicado de prueba en `/radicacion` con correo real del equipo TI → verificar correo de confirmación en < 60 segundos
+4. Asignar el radicado a una dependencia → verificar correo de asignación
+5. Aplicar prórroga → verificar correo con nueva fecha límite
+6. Resolver el radicado desde el dashboard interno → verificar correo de respuesta oficial
+7. Crear un radicado **anónimo** con email en el formulario → verificar que NO se envía correo
+8. Reasignar el mismo radicado a la misma dependencia 2 veces seguidas → verificar evento `NOTIFICACION_OMITIDA_DUPLICADA`
 
 ### Referencia adicional
 
