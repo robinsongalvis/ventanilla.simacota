@@ -2505,6 +2505,31 @@ function exportarCSVMIPG(radicados: VentanillaRadicado[]): void {
   URL.revokeObjectURL(url);
 }
 
+async function descargarExcelMipg(): Promise<{ ok: boolean; error?: string }> {
+  try {
+    const res = await fetch('/api/reportes/mipg/excel', { method: 'POST', credentials: 'include' });
+    if (!res.ok) {
+      const data = await res.json().catch(() => null) as { error?: string } | null;
+      return { ok: false, error: data?.error ?? `HTTP ${res.status}` };
+    }
+    const blob = await res.blob();
+    const cd = res.headers.get('content-disposition') ?? '';
+    const m  = cd.match(/filename="([^"]+)"/);
+    const filename = m?.[1] ?? `Reporte_MIPG_Simacota_${new Date().toISOString().slice(0, 10)}.xlsx`;
+    const url  = URL.createObjectURL(blob);
+    const a    = document.createElement('a');
+    a.href     = url;
+    a.download = filename;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+    return { ok: true };
+  } catch (err) {
+    return { ok: false, error: err instanceof Error ? err.message : String(err) };
+  }
+}
+
 function VistaReportes({
   metricas,
   total,
@@ -2514,6 +2539,15 @@ function VistaReportes({
   total:     number;
   radicados: VentanillaRadicado[];
 }) {
+  const [descargandoExcel, setDescargandoExcel] = useState(false);
+  const [errorExcel, setErrorExcel] = useState<string | null>(null);
+  async function onExportarExcel() {
+    setDescargandoExcel(true);
+    setErrorExcel(null);
+    const res = await descargarExcelMipg();
+    if (!res.ok) setErrorExcel(res.error ?? 'No se pudo generar el reporte Excel.');
+    setDescargandoExcel(false);
+  }
   // KPI de cumplimiento de términos — calculado sobre datos reales de Firestore
   const resueltosConDato = radicados.filter(
     (r) => r.cumplioTermino !== undefined && r.cumplioTermino !== null,
@@ -2543,21 +2577,41 @@ function VistaReportes({
           <p className="text-[10px] font-bold uppercase tracking-widest mb-1" style={{ color: '#667085' }}>MIPG · Rendición de Cuentas</p>
           <h2 className="text-xl font-black" style={{ color: '#1F2933' }}>Indicadores de Eficiencia</h2>
         </div>
-        <button
-          type="button"
-          onClick={() => exportarCSVMIPG(radicados)}
-          className="shrink-0 flex items-center gap-2 px-4 py-2 rounded-lg text-xs font-bold transition-colors"
-          style={{ background: '#EEF4EE', border: '1px solid #D9E2D9', color: '#14532D' }}
-          onMouseEnter={(e) => { (e.currentTarget as HTMLElement).style.background = '#D9E2D9'; }}
-          onMouseLeave={(e) => { (e.currentTarget as HTMLElement).style.background = '#EEF4EE'; }}
-          title="Exportar reporte MIPG en formato CSV (compatible con Excel)"
-        >
-          <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-            <path strokeLinecap="round" strokeLinejoin="round" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
-          </svg>
-          Exportar CSV MIPG
-        </button>
+        <div className="shrink-0 flex items-center gap-2">
+          <button
+            type="button"
+            onClick={onExportarExcel}
+            disabled={descargandoExcel}
+            className="flex items-center gap-2 px-4 py-2 rounded-lg text-xs font-bold transition-colors disabled:opacity-60"
+            style={{ background: '#14532D', color: '#FFFFFF', border: '1px solid #14532D' }}
+            onMouseEnter={(e) => { if (!descargandoExcel) (e.currentTarget as HTMLElement).style.background = '#0F5F35'; }}
+            onMouseLeave={(e) => { (e.currentTarget as HTMLElement).style.background = '#14532D'; }}
+            title="Exportar Reporte MIPG en formato Excel institucional (8 hojas)"
+          >
+            <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+              <path strokeLinecap="round" strokeLinejoin="round" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+            </svg>
+            {descargandoExcel ? 'Generando…' : 'Exportar Excel MIPG'}
+          </button>
+          <button
+            type="button"
+            onClick={() => exportarCSVMIPG(radicados)}
+            className="flex items-center gap-2 px-3 py-2 rounded-lg text-xs font-bold transition-colors"
+            style={{ background: '#EEF4EE', border: '1px solid #D9E2D9', color: '#475569' }}
+            onMouseEnter={(e) => { (e.currentTarget as HTMLElement).style.background = '#D9E2D9'; }}
+            onMouseLeave={(e) => { (e.currentTarget as HTMLElement).style.background = '#EEF4EE'; }}
+            title="Exportar CSV técnico (respaldo plano para integraciones)"
+          >
+            CSV técnico
+          </button>
+        </div>
       </div>
+      {errorExcel && (
+        <div className="mb-4 px-3 py-2 rounded-lg text-xs"
+             style={{ background: '#FEE2E2', border: '1px solid #FCA5A5', color: '#991B1B' }}>
+          <strong>Excel MIPG:</strong> {errorExcel}
+        </div>
+      )}
 
       <div className="grid grid-cols-2 xl:grid-cols-5 gap-4 mb-6">
         {items.map((item) => (
