@@ -1,6 +1,6 @@
 # Production Readiness — Ventanilla Única Simacota
 
-**Fecha de auditoría:** 2026-05-30  
+**Fecha de auditoría:** 2026-06-14 *(actualizado — suite expandida)*  
 **Versión:** Next.js 16.2.6 · Firebase 12 / Admin 13 · React 19  
 **Módulo auditado:** Flujo completo de resolución de radicados + notificación al ciudadano
 
@@ -16,7 +16,7 @@
 | Firebase Security Rules | ✅ Revisadas y hardened | No |
 | Firestore Índice compuesto | ✅ Creado (`firestore.indexes.json`) | No |
 | Build TypeScript | ✅ Limpio | No |
-| Tests automatizados | ✅ 8/8 passing | No |
+| Tests automatizados | ✅ 28/28 passing | No |
 | Logger estructurado | ✅ Implementado | No |
 | Rollback documentado | ✅ Ver sección 8 | No |
 
@@ -112,7 +112,7 @@ FIREBASE_STORAGE_BUCKET=tu-proyecto.appspot.com
   - Colección: `ventanilla_radicados`, Campo 1: `clasificacion.oficinaDestino` (ASC), Campo 2: `control.fechaRadicado` (DESC)
   - ⚠️ La creación del índice toma 5-15 minutos
 - [ ] **BUILD-1** Ejecutar `npm run build` localmente — verificar cero errores
-- [ ] **TEST-1** Ejecutar `npm run test` — verificar 8/8 passing
+- [ ] **TEST-1** Ejecutar `npm run test` — verificar 28/28 passing
 - [ ] **SMTP-1** Probar envío de email desde local con variables reales
 
 ### Despliegue

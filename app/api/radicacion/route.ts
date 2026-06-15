@@ -8,6 +8,12 @@ import {
   TIPOS_SOLICITUD,
   type TipoSolicitudId,
 } from '@/lib/tiempos-radicado';
+import { enviarEmail } from '@/lib/email/mailer';
+import {
+  buildConfirmacionRadicacionHtml,
+  buildConfirmacionRadicacionSubject,
+} from '@/lib/email/templates/confirmacion-radicacion';
+import { logError } from '@/lib/logger';
 import type { Prioridad, TenantId, TipoPresentacionPqrsd, ZonaGeografica } from '@/src/types/radicado';
 import type {
   AnalisisIA,
@@ -17,6 +23,7 @@ import type {
   TipoDocumento,
   VentanillaRadicado,
 } from '@/src/types/ventanilla';
+
 
 export const runtime = 'nodejs';
 
@@ -377,6 +384,69 @@ export async function POST(request: Request) {
         archivos: archivos.length,
       },
     }));
+
+    // ── Email de confirmación al ciudadano (fire-and-forget) ──
+    // Se envía solo si no es anónimo y tiene email registrado.
+    // Su fallo NUNCA revierte el radicado ya guardado.
+    if (!esAnonimo && email) {
+      const emailConfirmacion = email;
+      const radicadoIdLocal   = radicadoId;
+      void (async () => {
+        const ahoraIso = ahora.toISOString();
+        try {
+          await enviarEmail({
+            to:      emailConfirmacion,
+            subject: buildConfirmacionRadicacionSubject(radicadoIdLocal),
+            html:    buildConfirmacionRadicacionHtml({
+              radicadoId:       radicadoIdLocal,
+              ciudadanoNombre:  solicitanteNombre,
+              tipoSolicitud:    tipoSolicitud.nombre,
+              fechaRadicado:    ahoraIso,
+              fechaVencimiento: termino.fechaVencimiento,
+              canalRespuesta:   canalRespuestaRaw,
+              descripcionCorta: descripcion.slice(0, 120),
+            }),
+          });
+          // Registrar notificación enviada en trazabilidad
+          await db.collection(`ventanilla_radicados/${radicadoIdLocal}/trazabilidad`).add({
+            eventoId:    `ev_${radicadoIdLocal}_NOTIF_CONFIRMACION`,
+            fecha:       ahoraIso,
+            accion:      'NOTIFICACION_CORREO_ENVIADA',
+            actorUid:    'sistema',
+            actorNombre: 'Sistema',
+            nota:        `Correo de confirmación enviado a ${emailConfirmacion}`,
+            metadata: {
+              tipoNotificacion: 'RADICACION',
+              destinatario:     emailConfirmacion,
+              estado:           'ENVIADA',
+            },
+          });
+        } catch (err) {
+          logError({
+            radicadoId: radicadoIdLocal,
+            modulo:     'radicacion/email-confirmacion',
+            error:      err,
+          });
+          // Registrar fallo en trazabilidad sin lanzar excepción
+          try {
+            await db.collection(`ventanilla_radicados/${radicadoIdLocal}/trazabilidad`).add({
+              eventoId:    `ev_${radicadoIdLocal}_NOTIF_CONFIRMACION_FALLIDA`,
+              fecha:       new Date().toISOString(),
+              accion:      'NOTIFICACION_CORREO_FALLIDA',
+              actorUid:    'sistema',
+              actorNombre: 'Sistema',
+              nota:        `Falló el correo de confirmación a ${emailConfirmacion}`,
+              metadata: {
+                tipoNotificacion: 'RADICACION',
+                destinatario:     emailConfirmacion,
+                estado:           'FALLIDA',
+                error:            err instanceof Error ? err.message : String(err),
+              },
+            });
+          } catch { /* ignorar error de trazabilidad */ }
+        }
+      })();
+    }
 
     return NextResponse.json({
       exito: true,

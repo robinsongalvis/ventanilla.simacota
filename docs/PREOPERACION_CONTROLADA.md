@@ -45,7 +45,12 @@ Los correos del directorio de dependencias (ej. `gobierno@simacota-santander.gov
 - Responsable funcional MIPG (snapshot inmutable).
 - Resolución por funcionario.
 - Oficio PDF adjunto.
-- Email SMTP (Gmail App Password verificado).
+- Email SMTP — **4 flujos institucionales completos:**
+  - Confirmación de radicación al ciudadano (template HTML institucional).
+  - Respuesta oficial al ciudadano (template HTML institucional).
+  - Alerta de vencimiento próximo al funcionario responsable.
+  - Reset de contraseña al funcionario (template HTML institucional, sin exponer link).
+- Trazabilidad de notificaciones: `NOTIFICACION_CORREO_ENVIADA` / `NOTIFICACION_CORREO_FALLIDA`.
 - Trazabilidad append-only (subcollección inmutable).
 - Roles institucionales (5 roles).
 - Control Interno (solo lectura, visibilidad global).
@@ -57,7 +62,7 @@ Los correos del directorio de dependencias (ej. `gobierno@simacota-santander.gov
 - Firebase Security Rules hardened.
 - Firestore índices compuestos desplegados.
 - Storage con signed URLs (15 min).
-- 15 tests automatizados (Vitest).
+- 28 tests automatizados (Vitest).
 - UAT-1 completa: 21/21 pasos (100%).
 
 ## Flujo vigente de radicación
