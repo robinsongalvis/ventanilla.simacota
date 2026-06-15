@@ -113,9 +113,11 @@ describe('construirContextoSimi — privacidad', () => {
     return {
       radicadoId: 'RAD-TEST-001',
       estadoActual: 'EN_PROCESO',
+      ultimaActualizacion: '2026-06-01T10:00:00.000Z',
+      prioridad: 'AMARILLO',
       esAnonimo: false,
       identidadReservada: false,
-      tipoPresentacion: 'PRESENCIAL',
+      tipoPresentacion: 'IDENTIFICADA',
       canalRespuesta: 'CORREO',
       archivos: [],
       solicitante: {
@@ -146,7 +148,9 @@ describe('construirContextoSimi — privacidad', () => {
       },
       respuestaOficial: null,
       ...overrides,
-    } as Parameters<typeof construirContextoSimi>[0]['radicado'];
+      // Fixture mínimo para tests del context builder; los campos que faltan
+      // (tipoPersona, ubicacion, etc.) no son leídos por construirContextoSimi.
+    } as unknown as Parameters<typeof construirContextoSimi>[0]['radicado'];
   }
 
   const usuarioBase = { rol: 'FUNCIONARIO' as const, tenantId: 'SEC_GOBIERNO' as const, nombre: 'Test User' };

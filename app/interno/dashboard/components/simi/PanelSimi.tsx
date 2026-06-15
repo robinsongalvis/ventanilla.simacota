@@ -449,8 +449,10 @@ export function PanelSimi({ radicado, usuario, onAdoptarRespuesta }: PanelSimiPr
                   )}
                 </div>
               </div>
-              <div className="text-xs leading-relaxed whitespace-pre-wrap max-h-80 overflow-y-auto"
-                   style={{ color: '#1F2933' }}>
+              <div
+                className="text-xs leading-relaxed whitespace-pre-wrap max-h-[28rem] xl:max-h-[36rem] overflow-y-auto"
+                style={{ color: '#1F2933' }}
+              >
                 {respuesta.resultado}
               </div>
             </div>
