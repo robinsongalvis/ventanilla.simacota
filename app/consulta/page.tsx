@@ -101,6 +101,13 @@ const EMOJI_ESTADO: Record<EstadoPublico, string> = {
   PRORROGA:    '🕒',
 };
 
+interface RespuestaOficialPublica {
+  nota:              string;
+  fecha:             string;
+  dependenciaNombre: string;
+  tieneArchivo:      boolean;
+}
+
 interface RadicadoPublico {
   radicadoId: string;
   fechaCreacion?: string;
@@ -115,6 +122,7 @@ interface RadicadoPublico {
     fecha: string;
     accion: AccionAuditoria;
   }[];
+  respuestaOficial?: RespuestaOficialPublica;
 }
 
 /* ══════════════════════════════════════════════════════════════
@@ -453,6 +461,43 @@ function ConsultaInterna() {
                     </svg>
                     {oficina.celularOficial.replace(/(\d{3})(\d{3})(\d{4})/, '$1 $2 $3')}
                   </a>
+                </div>
+              </div>
+            )}
+
+            {/* Respuesta oficial institucional — solo si RESUELTO + nota válida */}
+            {radicado.respuestaOficial && (
+              <div className="px-6 py-5 border-b border-white/[0.06]">
+                <div className="flex items-center gap-2 mb-3">
+                  <svg viewBox="0 0 24 24" fill="none" stroke="#10B981" strokeWidth={2} className="w-4 h-4 shrink-0">
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M9 12.75L11.25 15 15 9.75M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                  </svg>
+                  <p className="text-[10px] font-bold uppercase tracking-widest text-emerald-400">
+                    Respuesta oficial de la Alcaldía
+                  </p>
+                </div>
+                <div
+                  className="rounded-xl border border-emerald-500/15 p-4"
+                  style={{ background: 'rgba(16,185,129,0.06)' }}
+                >
+                  <p
+                    className="text-sm text-slate-200 leading-relaxed whitespace-pre-wrap"
+                    style={{ fontFamily: 'var(--font-manrope)' }}
+                  >
+                    {radicado.respuestaOficial.nota}
+                  </p>
+                  <div className="mt-4 pt-3 border-t border-emerald-500/10 flex flex-wrap items-center justify-between gap-2">
+                    <div className="text-[11px] text-slate-500">
+                      <span className="font-semibold text-slate-400">{radicado.respuestaOficial.dependenciaNombre}</span>
+                      <span className="mx-1.5">·</span>
+                      <span>{formatearFecha(radicado.respuestaOficial.fecha)}</span>
+                    </div>
+                    {radicado.respuestaOficial.tieneArchivo && (
+                      <span className="text-[10px] font-bold uppercase tracking-wider px-2 py-1 rounded-md bg-amber-500/10 text-amber-300 border border-amber-500/20">
+                        📎 Oficio firmado disponible en la dependencia
+                      </span>
+                    )}
+                  </div>
                 </div>
               </div>
             )}

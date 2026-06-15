@@ -1,6 +1,8 @@
 import { NextResponse, type NextRequest } from 'next/server';
 import { getRadicadoAdmin } from '@/lib/firestore-admin-rest';
 import { getFirebaseAdminDb } from '@/lib/firebase-admin';
+import { buildRespuestaPublicaCiudadano } from '@/lib/server/respuesta-publica';
+import { NOMBRES_TENANT } from '@/src/types/reglas-negocio';
 import type { AccionAuditoria, EstadoRadicado, TenantId } from '@/src/types/radicado';
 import type { TrazabilidadRadicado, VentanillaRadicado } from '@/src/types/ventanilla';
 
@@ -62,6 +64,11 @@ async function getVentanillaRadicadoPublico(id: string) {
     });
   }
 
+  const dependenciaNombre = data.clasificacion?.oficinaDestino
+    ? NOMBRES_TENANT[data.clasificacion.oficinaDestino] ?? 'Alcaldía de Simacota'
+    : 'Alcaldía de Simacota';
+  const respuestaOficial = buildRespuestaPublicaCiudadano(data, dependenciaNombre);
+
   return {
     radicadoId: data.radicadoId ?? id,
     fechaCreacion: data.control?.fechaRadicado,
@@ -73,6 +80,7 @@ async function getVentanillaRadicadoPublico(id: string) {
       ? { oficinaDestino: data.clasificacion.oficinaDestino }
       : null,
     auditoria,
+    ...(respuestaOficial ? { respuestaOficial } : {}),
   };
 }
 

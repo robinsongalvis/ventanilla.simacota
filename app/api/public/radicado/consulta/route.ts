@@ -11,6 +11,7 @@ import { NextResponse }          from 'next/server';
 import { getFirebaseAdminDb }    from '@/lib/firebase-admin';
 import { checkRateLimit, getClientIp, rateLimitHeaders } from '@/lib/ai/rate-limit';
 import { NOMBRES_TENANT }        from '@/src/types/reglas-negocio';
+import { buildRespuestaPublicaCiudadano } from '@/lib/server/respuesta-publica';
 import type { VentanillaRadicado } from '@/src/types/ventanilla';
 import type { EstadoCiudadano, RadicadoPublico, ConsultaCiudadanaLog } from '@/src/types/simi-citizen';
 import type { RespuestaFirma }   from '@/src/types/simi-firma';
@@ -109,22 +110,31 @@ export async function GET(request: Request): Promise<NextResponse> {
       .limit(1)
       .get();
 
-    const fueRespondido  = !firmaSnap.empty;
-    const firmaData      = fueRespondido ? firmaSnap.docs[0].data() as RespuestaFirma : null;
+    const fueRespondidoSimi = !firmaSnap.empty;
+    const firmaData         = fueRespondidoSimi ? firmaSnap.docs[0].data() as RespuestaFirma : null;
+
+    /* Respuesta oficial pública desde el flujo Ventanilla Única (sanitizada) */
+    const dependenciaNombre   = NOMBRES_TENANT[radicado.clasificacion.oficinaDestino] ?? 'Alcaldía de Simacota';
+    const respuestaPublica    = buildRespuestaPublicaCiudadano(radicado, dependenciaNombre);
+
+    /* Estado "respondido" se activa si SIMI envió oficialmente O si Ventanilla
+       Única tiene respuesta sanitizada disponible. */
+    const fueRespondido = fueRespondidoSimi || respuestaPublica !== null;
 
     /* Construir respuesta pública — sin datos internos */
     const respuesta: RadicadoPublico = {
       radicadoId:         radicado.radicadoId,
       fechaRadicacion:    radicado.control.fechaRadicado,
       estadoCiudadano:    mapEstadoCiudadano(radicado.estadoActual, fueRespondido),
-      dependencia:        NOMBRES_TENANT[radicado.clasificacion.oficinaDestino] ?? 'Alcaldía de Simacota',
+      dependencia:        dependenciaNombre,
       tipoSolicitud:      radicado.termino.tipoSolicitudNombre,
       fechaVencimiento:   radicado.termino.fechaVencimiento,
       requiereAclaracion: radicado.estadoActual === 'DEVUELTO',
       fueRespondido,
-      fechaRespuesta:     firmaData?.fechaEnvio ?? undefined,
+      fechaRespuesta:     firmaData?.fechaEnvio ?? respuestaPublica?.fecha ?? undefined,
       canalRespuesta:     firmaData?.canalEnvio ?? undefined,
       respuestaDisponible: fueRespondido,
+      ...(respuestaPublica ? { respuestaOficial: respuestaPublica } : {}),
     };
 
     /* Auditoría exitosa */

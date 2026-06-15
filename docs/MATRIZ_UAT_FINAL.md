@@ -23,9 +23,9 @@
 
 ---
 
-## Hallazgo bloqueante conocido — Fase 11
+## Hallazgo bloqueante conocido — Fase 11 — **RESUELTO**
 
-El endpoint público `/api/public/radicado/consulta` no expone `respuestaOficial.nota`; solo expone `respuestaDisponible: boolean` y datos de SIMI. La Fase 11 "Respuesta oficial visible si aplica" fallará para respuestas que no pasaron por el flujo SIMI. Mitigación: agregar `respuestaTexto` al payload público en un sprint corto antes del piloto gradual.
+> ✅ Corregido en commit posterior. Los endpoints `/api/consulta/[radicadoId]` y `/api/public/radicado/consulta` ahora exponen `respuestaOficial: { nota, fecha, dependenciaNombre, tieneArchivo }` cuando el radicado está `RESUELTO` y tiene `respuestaOficial.nota` válida, vía el sanitizador `lib/server/respuesta-publica.ts`. NO se exponen `actorUid`, `actorNombre`, ni `archivoPath`. La UI de `/consulta` renderiza el bloque institucional. Verificable en Fase 11.4.
 
 ---
 
@@ -219,7 +219,7 @@ Sesión: `admin.uat@simacota.gov.co`
 | 11.1 | Ir a `/consulta` desde el link del correo (escritorio) | Página carga, formulario funciona | | ⏳ | | | | |
 | 11.2 | Ingresar radicadoId UAT + últimos 4 cédula | Datos correctos visibles | | ⏳ | | | | |
 | 11.3 | Estado actualizado (`RESUELTO`) | Visible | | ⏳ | | | | |
-| 11.4 | Respuesta oficial visible | ❌ **HALLAZGO PREVIO**: endpoint público no expone `respuestaOficial.nota`. Esperado fallar. | | 🚫 | | Bug conocido — flagged en pre-audit | | |
+| 11.4 | Respuesta oficial visible | Bloque institucional con la nota, fecha, dependencia y badge si hay PDF (no descargable desde público) | | ⏳ | | Fix aplicado en commit posterior: sanitizador `buildRespuestaPublicaCiudadano` + UI | | |
 | 11.5 | Trazabilidad pública (eventos permitidos) | Visible y filtrada | | ⏳ | | | | |
 | 11.6 | Misma URL en móvil (responsive) | UI usable | | ⏳ | | | | |
 
@@ -273,9 +273,9 @@ Crear `docs/evidencias/uat-final-{YYYY-MM-DD}/` y guardar:
 | 8 — Admin | 8 | | | | | 8 | ⏳ |
 | 9 — Privacidad | 7 | | | | | 7 | ⏳ |
 | 10 — Notif. fallidas | 8 | | | | | 8 | ⏳ |
-| 11 — Consulta | 6 | | | | 1 | 5 | 🚫 (bug previo) |
+| 11 — Consulta | 6 | | | | | 6 | ⏳ |
 | 14 — Técnicas | 6 | | | | | 6 | ⏳ |
-| **TOTAL** | **72** | | | | **1** | **71** | ⏳ |
+| **TOTAL** | **72** | | | | | **72** | ⏳ |
 
 ---
 

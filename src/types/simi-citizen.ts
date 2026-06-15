@@ -39,6 +39,22 @@ export const ESTADO_CIUDADANO_DESC: Record<EstadoCiudadano, string> = {
   cerrado:                 'El trámite fue cerrado. Si tiene dudas, puede radicar una nueva solicitud.',
 };
 
+/**
+ * Bloque público de respuesta oficial — solo expone lo estrictamente
+ * necesario para que el ciudadano lea la respuesta de la Alcaldía.
+ *
+ * NO incluye:
+ *   - actorUid / actorNombre (funcionario interno)
+ *   - archivoPath (ruta privada de Storage)
+ *   - metadata interna ni auditoría
+ */
+export interface RespuestaOficialPublica {
+  nota:              string;
+  fecha:             string;
+  dependenciaNombre: string;
+  tieneArchivo:      boolean;
+}
+
 /** Información pública de un radicado */
 export interface RadicadoPublico {
   radicadoId:           string;
@@ -53,6 +69,8 @@ export interface RadicadoPublico {
   canalRespuesta?:      string;
   /** Solo si ya fue enviado oficialmente */
   respuestaDisponible?: boolean;
+  /** Texto institucional de la respuesta oficial — solo si RESUELTO + nota válida */
+  respuestaOficial?:    RespuestaOficialPublica;
 }
 
 /** Registro de auditoría de consultas ciudadanas */
