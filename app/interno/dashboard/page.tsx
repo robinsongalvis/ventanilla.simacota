@@ -39,6 +39,7 @@ import type { FuncionarioTenant }             from '@/lib/hooks/useFuncionariosT
 import type { ResponsableFuncionario }        from '@/lib/actions/asignarRadicado';
 import type { TrazabilidadRadicado, VentanillaRadicado } from '@/src/types/ventanilla';
 import type { UsuarioAutenticado }        from '@/lib/hooks/useAuth';
+import { buildOficioInstitucional } from '@/lib/respuesta-oficial/oficio-institucional';
 
 /* ══════════════════════════════════════════════════════════════
    CONSTANTES
@@ -1236,6 +1237,37 @@ function PanelDerecho({
   const [mostrarGestionNotif,  setMostrarGestionNotif]  = useState(false);
   const [motivoGestion,        setMotivoGestion]        = useState('');
   const [gestionandoNotif,     setGestionandoNotif]     = useState(false);
+  // Vista previa institucional de la respuesta oficial
+  const [vistaPreviaActiva,    setVistaPreviaActiva]    = useState(false);
+
+  /** Genera el oficio formal y lo deja en el textarea para que el funcionario edite. */
+  function generarPlantillaOficio() {
+    const responsable = radicado.clasificacion.funcionarioResponsableNombre;
+    const cargoSnapshot = radicado.clasificacion.funcionarioResponsableCargo;
+    const dependenciaNombre = NOMBRES_TENANT[radicado.clasificacion.oficinaDestino] ?? 'Alcaldía Municipal de Simacota';
+
+    const texto = buildOficioInstitucional({
+      radicadoId: radicado.radicadoId,
+      fecha:      new Date(),
+      ciudadano: {
+        nombre:    radicado.solicitante?.nombreCompleto,
+        correo:    radicado.solicitante?.email ?? undefined,
+        direccion: radicado.solicitante?.direccion ?? undefined,
+        esAnonimo: radicado.esAnonimo,
+        reservado: radicado.tipoPresentacion === 'RESERVADA' || radicado.identidadReservada === true,
+      },
+      dependencia: dependenciaNombre,
+      funcionario: {
+        nombre: responsable ?? usuario.nombre,
+        cargo:  cargoSnapshot ?? undefined,
+        rol:    usuario.rol,
+      },
+      cuerpoRespuesta: respuesta.trim().length >= 10 ? respuesta : undefined,
+    });
+    setRespuesta(texto);
+    setMensajeOk(null);
+    setErrorLocal(null);
+  }
 
   // MIPG-2: carga funcionarios del tenant destino para el selector de responsable
   const { funcionarios: funcionariosTenant, cargando: cargandoFuncionarios } =
@@ -2005,11 +2037,64 @@ function PanelDerecho({
               )}
 
               <div>
-                <p className="text-[10px] font-bold uppercase tracking-widest mb-1.5" style={{ color: '#667085' }}>Nota de resolución</p>
-                <textarea value={respuesta} onChange={(e) => setRespuesta(e.target.value)} rows={4}
-                  placeholder="Describe la respuesta dada al ciudadano…"
-                  className="input-internal resize-none" disabled={radicado.estadoActual === 'RESUELTO'} />
+                <div className="flex items-center justify-between mb-1.5 gap-2">
+                  <p className="text-[10px] font-bold uppercase tracking-widest" style={{ color: '#667085' }}>
+                    Respuesta oficial (oficio)
+                  </p>
+                  {radicado.estadoActual !== 'RESUELTO' && !soloLectura && (
+                    <div className="flex items-center gap-1.5">
+                      <button
+                        type="button"
+                        onClick={generarPlantillaOficio}
+                        disabled={guardando}
+                        title="Inserta una plantilla institucional tipo oficio que luego puedes editar."
+                        className="text-[10px] font-bold uppercase tracking-wider px-2 py-1 rounded-md transition active:scale-95 disabled:opacity-50"
+                        style={{ background: '#EEF4EE', color: '#14532D', border: '1px solid #D9E2D9' }}
+                      >
+                        Generar plantilla
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setVistaPreviaActiva((v) => !v)}
+                        disabled={guardando || respuesta.trim().length === 0}
+                        className="text-[10px] font-bold uppercase tracking-wider px-2 py-1 rounded-md transition active:scale-95 disabled:opacity-40"
+                        style={vistaPreviaActiva
+                          ? { background: '#14532D', color: '#ffffff', border: '1px solid #14532D' }
+                          : { background: 'transparent', color: '#14532D', border: '1px solid #D9E2D9' }}
+                      >
+                        {vistaPreviaActiva ? 'Ocultar previa' : 'Vista previa'}
+                      </button>
+                    </div>
+                  )}
+                </div>
+                <textarea value={respuesta} onChange={(e) => setRespuesta(e.target.value)} rows={vistaPreviaActiva ? 8 : 4}
+                  placeholder="Describe la respuesta dada al ciudadano o usa “Generar plantilla” para un oficio institucional…"
+                  className="input-internal resize-none" disabled={radicado.estadoActual === 'RESUELTO'}
+                  style={{ fontFamily: '"DM Sans", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif' }}
+                />
+                <p className="mt-1 text-[10px]" style={{ color: '#94A3B8' }}>
+                  Este texto se enviará por correo al ciudadano y quedará visible en la consulta pública con formato institucional.
+                </p>
               </div>
+
+              {vistaPreviaActiva && respuesta.trim().length > 0 && (
+                <div
+                  className="rounded-xl p-5"
+                  style={{ background: '#FFFFFF', border: '1px solid #14532D' }}
+                >
+                  <p className="text-[10px] font-bold uppercase tracking-widest mb-3 pb-2"
+                     style={{ color: '#14532D', borderBottom: '1px dashed #D9E2D9' }}>
+                    Vista previa institucional · cómo lo verá el ciudadano
+                  </p>
+                  <pre
+                    className="text-[13px] leading-relaxed whitespace-pre-wrap break-words"
+                    style={{
+                      fontFamily: '"DM Sans", "Manrope", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif',
+                      color: '#1F2933',
+                    }}
+                  >{respuesta}</pre>
+                </div>
+              )}
 
               {radicado.estadoActual !== 'RESUELTO' && (
                 <div>
