@@ -5,44 +5,45 @@ import {
   getFirebaseAdminAuth,
   getFirebaseAdminDb,
 } from '@/lib/firebase-admin';
-import { NOMBRES_TENANT } from '@/src/types/reglas-negocio';
-import { diasRestantesHabiles } from '@/lib/tiempos-radicado';
 import type { VentanillaRadicado, TrazabilidadRadicado } from '@/src/types/ventanilla';
 import type { TenantId } from '@/src/types/radicado';
 import type { RolInterno } from '@/lib/hooks/useAuth';
+import { SIMI_PROMPT_MAESTRO } from '@/lib/simi/prompt-institucional';
+import { construirContextoSimi } from '@/lib/simi/contexto-radicado';
+import {
+  ACCIONES_SIMI_VALIDAS,
+  instruccionParaAccion,
+  pareceSalidaTruncada,
+  requiereEstructuraCompleta,
+  type AccionSimi,
+} from '@/lib/simi/instrucciones-acciones';
 
 export const runtime = 'nodejs';
 
 /* ══════════════════════════════════════════════════════════════
-   TIPOS
+   POST /api/simi/radicado
+
+   Endpoint principal del asistente SIMI para funcionarios.
+   Combina:
+   - Prompt maestro institucional (lib/simi/prompt-institucional).
+   - Contexto sanitizado del radicado (lib/simi/contexto-radicado),
+     que incluye evaluación automática de competencia.
+   - Instrucción por acción (lib/simi/instrucciones-acciones).
+   - Llamada a Gemini con maxOutputTokens elevado.
+   - Detección de truncamiento + auditoría persistida.
+
+   Devuelve también la evaluación de competencia para que la UI
+   la muestre directamente sin esperar la salida del modelo.
 ══════════════════════════════════════════════════════════════ */
-
-type AccionSimi =
-  | 'RESUMIR_RADICADO'
-  | 'EXPLICAR_ESTADO'
-  | 'REVISAR_TERMINO'
-  | 'SUGERIR_DEPENDENCIA'
-  | 'SUGERIR_RESPUESTA'
-  | 'VALIDAR_RESPUESTA'
-  | 'GENERAR_BORRADOR_OFICIO'
-  | 'RESUMIR_TRAZABILIDAD';
-
-const ACCIONES_VALIDAS = new Set<AccionSimi>([
-  'RESUMIR_RADICADO', 'EXPLICAR_ESTADO', 'REVISAR_TERMINO',
-  'SUGERIR_DEPENDENCIA', 'SUGERIR_RESPUESTA', 'VALIDAR_RESPUESTA',
-  'GENERAR_BORRADOR_OFICIO', 'RESUMIR_TRAZABILIDAD',
-]);
 
 interface SimiPayload {
-  radicadoId:         string;
-  accion:             AccionSimi;
-  mensajeUsuario?:    string;
-  respuestaBorrador?: string;
+  radicadoId:          string;
+  accion:              AccionSimi;
+  mensajeUsuario?:     string;
+  respuestaBorrador?:  string;
+  /** Texto previo de SIMI cuando la acción es CONTINUAR_RESPUESTA. */
+  ultimaSalidaPrevia?: string;
 }
-
-/* ══════════════════════════════════════════════════════════════
-   HELPERS
-══════════════════════════════════════════════════════════════ */
 
 async function verificarSesion(): Promise<{
   uid: string; nombre: string; rol: RolInterno; tenantId: TenantId;
@@ -73,77 +74,31 @@ function puedeAccederRadicado(
   return radicado.clasificacion.oficinaDestino === usuario.tenantId;
 }
 
-/* ══════════════════════════════════════════════════════════════
-   PROMPT BUILDER
-══════════════════════════════════════════════════════════════ */
-
-function buildPrompt(params: {
-  accion:    AccionSimi;
-  radicado:  VentanillaRadicado;
-  trazabilidad: TrazabilidadRadicado[];
-  usuario:   { nombre: string; rol: RolInterno; tenantId: TenantId };
-  diasRestantes: number;
-  mensajeUsuario?: string;
-  respuestaBorrador?: string;
-}): string {
-  const { accion, radicado: r, trazabilidad, usuario, diasRestantes } = params;
-  const depNombre = NOMBRES_TENANT[r.clasificacion.oficinaDestino] ?? r.clasificacion.oficinaDestino;
-  const respNombre = r.clasificacion.funcionarioResponsableNombre ?? 'No asignado';
-
-  const contexto = `
-CONTEXTO DEL RADICADO:
-- Número: ${r.radicadoId}
-- Forma de presentación: ${r.tipoPresentacion ?? (r.esAnonimo ? 'ANONIMA' : 'IDENTIFICADA')}
-- Solicitud anónima: ${r.esAnonimo ? 'Sí' : 'No'}
-- Identidad reservada: ${r.identidadReservada ? 'Sí' : 'No'}
-- Solicitante: ${r.esAnonimo ? 'Ciudadano anónimo; no inventes identidad ni datos de contacto.' : `${r.solicitante.nombreCompleto} (${r.solicitante.tipoDocumento} ${r.solicitante.numeroDocumento})`}
-- Email ciudadano: ${r.solicitante.email ?? 'No proporcionado'}
-- Canal de respuesta preferido: ${r.canalRespuesta ?? 'No registrado'}
-- Asunto: ${r.detalle.asunto}
-- Descripción: ${r.detalle.descripcion}
-- Tipo solicitud: ${r.termino.tipoSolicitudNombre} (${r.termino.diasRespuesta} días ${r.termino.unidad.toLowerCase()})
-- Estado actual: ${r.estadoActual}
-- Dependencia asignada: ${depNombre}
-- Responsable funcional: ${respNombre}
-- Fecha radicación: ${r.control.fechaRadicado}
-- Fecha vencimiento: ${r.termino.fechaVencimiento}
-- Días hábiles restantes: ${diasRestantes} ${diasRestantes < 0 ? '(VENCIDO)' : diasRestantes <= 2 ? '(PRÓXIMO A VENCER)' : ''}
-- Prórrogas aplicadas: ${r.termino.prorrogasAplicadas}
-- Archivos adjuntos: ${r.archivos.length > 0 ? r.archivos.map(a => a.nombre).join(', ') : 'Ninguno'}
-${r.respuestaOficial ? `- Respuesta registrada: ${r.respuestaOficial.nota}\n- Oficio: ${r.respuestaOficial.archivoNombre ?? 'Sin oficio'}` : '- Sin respuesta aún'}
-
-TRAZABILIDAD (${trazabilidad.length} eventos):
-${trazabilidad.slice(0, 10).map(t => `  ${t.fecha.slice(0, 10)} | ${t.accion} | ${t.actorNombre} | ${t.nota}`).join('\n')}
-
-USUARIO QUE CONSULTA:
-- Nombre: ${usuario.nombre}
-- Rol: ${usuario.rol}
-- Dependencia: ${NOMBRES_TENANT[usuario.tenantId] ?? usuario.tenantId}
-`.trim();
-
-  const instrucciones: Record<AccionSimi, string> = {
-    RESUMIR_RADICADO: 'Genera un resumen ejecutivo del radicado. Incluye: quién lo presentó, qué solicita, cuándo fue radicado, a qué dependencia fue asignado, y cuál es su estado actual. Máximo 200 palabras.',
-    EXPLICAR_ESTADO: 'Explica el estado actual del radicado en lenguaje institucional claro. Indica qué significa este estado, qué acciones se esperan, y quién es responsable. Si está vencido o próximo a vencer, destácalo.',
-    REVISAR_TERMINO: 'Analiza el cumplimiento del término legal. Indica: fecha de radicación, fecha de vencimiento, días hábiles restantes, si hay prórrogas, y recomendaciones para cumplir el plazo. Si está vencido, indica las implicaciones MIPG.',
-    SUGERIR_DEPENDENCIA: 'Basándote en el asunto y la descripción de la solicitud, sugiere cuál dependencia debería atender este caso. Justifica brevemente. Lista las dependencias posibles y la más adecuada.',
-    SUGERIR_RESPUESTA: `Sugiere una respuesta preliminar para esta solicitud. La respuesta debe ser institucional, respetuosa y completa. ${params.mensajeUsuario ? `\nIndicación adicional del funcionario: ${params.mensajeUsuario}` : ''}\nIMPORTANTE: Esto es un borrador para revisión del funcionario, NO una respuesta oficial.`,
-    VALIDAR_RESPUESTA: `El funcionario ha preparado la siguiente respuesta borrador:\n"${params.respuestaBorrador ?? '(no proporcionada)'}"\n\nRevisa si esta respuesta: 1) Aborda la solicitud del ciudadano, 2) Es completa y clara, 3) Cumple con el tono institucional, 4) Incluye la información necesaria. Señala lo que falta o podría mejorarse.`,
-    GENERAR_BORRADOR_OFICIO: `Genera un borrador de oficio de respuesta formal para este radicado. Debe incluir: encabezado institucional (Alcaldía Municipal de Simacota), número de radicado, datos del destinatario, cuerpo de respuesta, despedida y pie institucional. ${params.mensajeUsuario ? `\nIndicación del funcionario: ${params.mensajeUsuario}` : ''}`,
-    RESUMIR_TRAZABILIDAD: 'Genera un resumen cronológico de la trazabilidad del radicado. Para cada evento relevante, explica qué ocurrió, quién lo hizo, y cuándo. Destaca tiempos entre eventos y posibles demoras.',
-  };
-
-  return `${contexto}\n\nINSTRUCCIÓN: ${instrucciones[accion]}`;
+interface GeminiResultado {
+  texto:        string;
+  finishReason: string | null;
+  modelo:       string;
 }
 
-/* ══════════════════════════════════════════════════════════════
-   GEMINI CALL
-══════════════════════════════════════════════════════════════ */
-
-async function llamarGemini(systemPrompt: string, userPrompt: string): Promise<string> {
+async function llamarGemini(
+  systemPrompt: string,
+  userPrompt: string,
+  accion: AccionSimi,
+): Promise<GeminiResultado> {
   const apiKey = process.env.GEMINI_API_KEY;
-  if (!apiKey) return '[SIMI no disponible — GEMINI_API_KEY no configurada]';
+  if (!apiKey) {
+    return {
+      texto: '[SIMI no disponible — GEMINI_API_KEY no configurada en el entorno.]',
+      finishReason: 'NO_API_KEY',
+      modelo: 'mock',
+    };
+  }
 
-  const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${apiKey}`;
+  const modelo = 'gemini-2.5-flash';
+  const url = `https://generativelanguage.googleapis.com/v1beta/models/${modelo}:generateContent?key=${apiKey}`;
+
+  // Acciones que requieren estructura completa o redactan oficio: más espacio.
+  const maxOutputTokens = requiereEstructuraCompleta(accion) ? 4096 : 1536;
 
   const res = await fetch(url, {
     method: 'POST',
@@ -152,8 +107,8 @@ async function llamarGemini(systemPrompt: string, userPrompt: string): Promise<s
       system_instruction: { parts: [{ text: systemPrompt }] },
       contents: [{ role: 'user', parts: [{ text: userPrompt }] }],
       generationConfig: {
-        temperature: 0.3,
-        maxOutputTokens: 2048,
+        temperature:      0.25,
+        maxOutputTokens,
       },
     }),
   });
@@ -164,33 +119,25 @@ async function llamarGemini(systemPrompt: string, userPrompt: string): Promise<s
   }
 
   const data = await res.json() as {
-    candidates?: { content?: { parts?: { text?: string }[] } }[];
+    candidates?: Array<{
+      content?: { parts?: Array<{ text?: string }> };
+      finishReason?: string;
+    }>;
   };
 
-  return data.candidates?.[0]?.content?.parts?.[0]?.text ?? '[Sin respuesta del modelo]';
+  const candidato     = data.candidates?.[0];
+  const texto         = candidato?.content?.parts?.[0]?.text ?? '';
+  const finishReason  = candidato?.finishReason ?? null;
+
+  if (!texto) {
+    throw new Error('Gemini devolvió respuesta vacía.');
+  }
+
+  return { texto, finishReason, modelo };
 }
 
-/* ══════════════════════════════════════════════════════════════
-   POST /api/simi/radicado
-══════════════════════════════════════════════════════════════ */
-
-const SYSTEM_PROMPT = `Eres SIMI, asistente institucional de la Ventanilla Única Digital de la Alcaldía Municipal de Simacota, Santander, Colombia.
-
-Debes ayudar a funcionarios públicos a comprender y gestionar radicados de manera clara, responsable y alineada con el Modelo Integrado de Planeación y Gestión (MIPG).
-
-REGLAS ABSOLUTAS:
-- No tomas decisiones oficiales.
-- No envías respuestas al ciudadano.
-- No modificas radicados.
-- No inventas información que no esté en el contexto proporcionado.
-- Solo generas análisis, resúmenes, sugerencias y borradores que deben ser revisados por un funcionario autorizado.
-- Respeta el rol del usuario, la dependencia, la trazabilidad y el estado del trámite.
-- Si falta información, dilo claramente.
-- Usa lenguaje institucional, claro y respetuoso.
-- Cuando generes borradores de oficio, indica claramente que es un BORRADOR para revisión.
-- Las fechas y plazos deben seguir el calendario colombiano (días hábiles excluyen fines de semana y festivos).`;
-
 export async function POST(request: Request): Promise<NextResponse> {
+  const inicio = Date.now();
   const usuario = await verificarSesion();
   if (!usuario) {
     return NextResponse.json({ error: 'No autorizado.' }, { status: 401 });
@@ -203,26 +150,38 @@ export async function POST(request: Request): Promise<NextResponse> {
     return NextResponse.json({ error: 'Payload inválido.' }, { status: 400 });
   }
 
-  const { radicadoId, accion, mensajeUsuario, respuestaBorrador } = payload;
+  const { radicadoId, accion, mensajeUsuario, respuestaBorrador, ultimaSalidaPrevia } = payload;
 
   if (!radicadoId || !accion) {
     return NextResponse.json({ error: 'Campos requeridos: radicadoId, accion.' }, { status: 400 });
   }
-
-  if (!ACCIONES_VALIDAS.has(accion)) {
+  if (!ACCIONES_SIMI_VALIDAS.has(accion)) {
     return NextResponse.json({ error: `Acción inválida: ${accion}` }, { status: 400 });
+  }
+  if (accion === 'CONTINUAR_RESPUESTA' && !ultimaSalidaPrevia?.trim()) {
+    return NextResponse.json(
+      { error: 'CONTINUAR_RESPUESTA requiere ultimaSalidaPrevia.' },
+      { status: 400 },
+    );
+  }
+  if (
+    (accion === 'MEJORAR_RESPUESTA' || accion === 'VERIFICAR_CALIDAD' || accion === 'VALIDAR_RESPUESTA')
+    && !respuestaBorrador?.trim()
+  ) {
+    return NextResponse.json(
+      { error: `${accion} requiere respuestaBorrador con la respuesta del funcionario.` },
+      { status: 400 },
+    );
   }
 
   const db = getFirebaseAdminDb();
 
-  // Cargar radicado
   const radSnap = await db.doc(`ventanilla_radicados/${radicadoId}`).get();
   if (!radSnap.exists) {
     return NextResponse.json({ error: 'Radicado no encontrado.' }, { status: 404 });
   }
   const radicado = radSnap.data() as VentanillaRadicado;
 
-  // Verificar acceso por rol/tenant
   if (!puedeAccederRadicado(usuario, radicado)) {
     return NextResponse.json(
       { error: 'No tienes permiso para consultar este radicado.' },
@@ -230,62 +189,118 @@ export async function POST(request: Request): Promise<NextResponse> {
     );
   }
 
-  // Cargar trazabilidad
   const trazSnap = await db
     .collection(`ventanilla_radicados/${radicadoId}/trazabilidad`)
     .orderBy('fecha', 'asc')
-    .limit(20)
+    .limit(40)
     .get();
-  const trazabilidad = trazSnap.docs.map(d => d.data() as TrazabilidadRadicado);
+  const trazabilidad = trazSnap.docs.map((d) => d.data() as TrazabilidadRadicado);
 
-  const diasRestantes = diasRestantesHabiles(radicado.termino.fechaVencimiento);
+  // Contexto sanitizado + evaluación de competencia
+  const contexto = construirContextoSimi({
+    radicado,
+    trazabilidad,
+    usuario: { rol: usuario.rol, tenantId: usuario.tenantId, nombre: usuario.nombre },
+  });
 
-  // Construir prompt y llamar a Gemini
+  const instruccion = instruccionParaAccion({
+    accion,
+    mensajeUsuario,
+    respuestaBorrador,
+    ultimaSalidaPrevia,
+  });
+
+  const userPrompt = `${contexto.bloqueTexto}\n\n${instruccion}`;
+
   try {
-    const userPrompt = buildPrompt({
-      accion, radicado, trazabilidad, usuario, diasRestantes,
-      mensajeUsuario, respuestaBorrador,
-    });
+    const { texto, finishReason, modelo } = await llamarGemini(SIMI_PROMPT_MAESTRO, userPrompt, accion);
+    const truncadoPorTokens = finishReason === 'MAX_TOKENS';
+    const truncadoHeuristica = pareceSalidaTruncada(texto);
+    const truncado = truncadoPorTokens || truncadoHeuristica;
 
-    const resultado = await llamarGemini(SYSTEM_PROMPT, userPrompt);
-
-    // Advertencias contextuales
+    // Advertencias contextuales para la UI
     const advertencias: string[] = [];
-    if (diasRestantes < 0) advertencias.push(`Este radicado está VENCIDO hace ${Math.abs(diasRestantes)} días hábiles.`);
-    else if (diasRestantes <= 2) advertencias.push(`Este radicado vence en ${diasRestantes} día(s) hábil(es).`);
-    if (!radicado.clasificacion.funcionarioResponsableNombre) advertencias.push('No hay funcionario responsable asignado.');
+    if (contexto.meta.estadoTermino === 'VENCIDO') {
+      advertencias.push(`Este radicado está VENCIDO hace ${Math.abs(contexto.meta.diasRestantes)} días hábiles.`);
+    } else if (contexto.meta.estadoTermino === 'POR_VENCER') {
+      advertencias.push(`Este radicado vence en ${contexto.meta.diasRestantes} día(s) hábil(es).`);
+    }
+    if (contexto.meta.responsable === 'No asignado') {
+      advertencias.push('No hay funcionario responsable asignado.');
+    }
+    if (contexto.meta.evaluacionCompetencia.requiereEscalamiento) {
+      advertencias.push(`Posible reasignación: ${contexto.meta.evaluacionCompetencia.razon}`);
+    }
+    if (contexto.meta.evaluacionCompetencia.requiereRevisionJuridica) {
+      advertencias.push('La solicitud sugiere riesgo jurídico — recomendable validación jurídica antes de responder.');
+    }
+    if (truncado) {
+      advertencias.push('La respuesta parece haberse cortado. Puedes pedir "Continuar respuesta".');
+    }
 
-    // Fuentes usadas
     const fuentesUsadas = [
       `Radicado ${radicadoId}`,
-      `Trazabilidad: ${trazabilidad.length} eventos`,
-      `Dependencia: ${NOMBRES_TENANT[radicado.clasificacion.oficinaDestino] ?? radicado.clasificacion.oficinaDestino}`,
+      `Trazabilidad: ${contexto.trazabilidadResumida.length} eventos resumidos`,
+      `Dependencia: ${contexto.meta.dependenciaActual}`,
+      `Competencia: ${contexto.meta.evaluacionCompetencia.nivelConfianza}`,
     ];
 
-    // Auditoría
+    // Auditoría persistida (await — ya no fire-and-forget)
+    const auditoriaId = await db.collection('simi_auditoria').add({
+      actorUid:    usuario.uid,
+      actorNombre: usuario.nombre,
+      actorRol:    usuario.rol,
+      tenantId:    usuario.tenantId,
+      radicadoId,
+      dependenciaRadicado: contexto.meta.dependenciaActual,
+      accion,
+      fecha:       new Date().toISOString(),
+      modelo,
+      finishReason,
+      truncado,
+      latenciaMs:  Date.now() - inicio,
+      resumenEntrada: instruccion.slice(0, 300),
+      resumenSalida:  texto.slice(0, 300),
+      evaluacionCompetenciaNivel: contexto.meta.evaluacionCompetencia.nivelConfianza,
+    }).then((ref) => ref.id).catch(() => null);
+
+    return NextResponse.json({
+      ok: true,
+      accion,
+      resultado: texto,
+      truncado,
+      finishReason,
+      advertencias,
+      fuentesUsadas,
+      competenciaEvaluada: contexto.meta.evaluacionCompetencia,
+      auditoriaId,
+    });
+
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : String(err);
+    console.error('[simi/radicado] Error:', msg);
+
+    // Registrar el fallo en auditoría
     await db.collection('simi_auditoria').add({
       actorUid:    usuario.uid,
       actorNombre: usuario.nombre,
       actorRol:    usuario.rol,
       tenantId:    usuario.tenantId,
       radicadoId,
+      dependenciaRadicado: contexto.meta.dependenciaActual,
       accion,
       fecha:       new Date().toISOString(),
       modelo:      'gemini-2.5-flash',
-      resultadoResumen: resultado.slice(0, 200),
-    }).catch(() => {}); // Fire-and-forget
+      latenciaMs:  Date.now() - inicio,
+      error:       msg.slice(0, 500),
+    }).catch(() => {});
 
-    return NextResponse.json({
-      ok: true,
-      accion,
-      resultado,
-      advertencias: advertencias.length > 0 ? advertencias : undefined,
-      fuentesUsadas,
-    });
-
-  } catch (err) {
-    const msg = err instanceof Error ? err.message : String(err);
-    console.error('[simi/radicado] Error:', msg);
-    return NextResponse.json({ error: 'Error al procesar la consulta SIMI.' }, { status: 500 });
+    return NextResponse.json(
+      {
+        error: 'SIMI no pudo completar la respuesta en este momento. Puedes intentar nuevamente o continuar editando manualmente.',
+        detalle: msg.slice(0, 200),
+      },
+      { status: 502 },
+    );
   }
 }

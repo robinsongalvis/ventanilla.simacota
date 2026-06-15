@@ -39,6 +39,7 @@ import type { FuncionarioTenant }             from '@/lib/hooks/useFuncionariosT
 import type { ResponsableFuncionario }        from '@/lib/actions/asignarRadicado';
 import type { TrazabilidadRadicado, VentanillaRadicado } from '@/src/types/ventanilla';
 import type { UsuarioAutenticado }        from '@/lib/hooks/useAuth';
+import { buildOficioInstitucional } from '@/lib/respuesta-oficial/oficio-institucional';
 
 /* ══════════════════════════════════════════════════════════════
    CONSTANTES
@@ -685,12 +686,14 @@ function MobileTopBar({
 ══════════════════════════════════════════════════════════════ */
 
 interface TarjetaMIPGItem {
-  filtro:  FiltroMIPG;
-  label:   string;
-  valor:   number;
-  borde:   string;
-  texto:   string;
-  icono?:  React.ReactNode;
+  filtro:    FiltroMIPG;
+  label:     string;
+  valor:     number;
+  /** Color hex del riel izquierdo (4px) que distingue el KPI. */
+  rielColor: string;
+  /** Color de texto del número y label (alto contraste sobre fondo claro). */
+  textoColor: string;
+  icono?:    React.ReactNode;
 }
 
 function TarjetasMIPG({
@@ -708,20 +711,23 @@ function TarjetasMIPG({
   tenantFiltro:   TenantId | 'TODOS';
   onTenantChange: (t: TenantId | 'TODOS') => void;
 }) {
+  // Paleta operativa institucional: fondos claros + números y labels en
+  // tonos de alto contraste (-700/-800). Cada KPI se identifica por el
+  // riel izquierdo de 4px, no por el fondo (que se reserva para selección).
   const tarjetas: TarjetaMIPGItem[] = [
     {
-      filtro: 'RADICADAS',
-      label:  'Radicadas',
-      valor:  metricas.radicadas,
-      borde:  'border-emerald-500',
-      texto:  'text-emerald-300',
+      filtro:     'RADICADAS',
+      label:      'Radicadas',
+      valor:      metricas.radicadas,
+      rielColor:  '#475569', // gris neutro institucional (totales)
+      textoColor: '#1F2933',
     },
     {
-      filtro: 'PRIORIDAD_MIPG',
-      label:  'Prioridad MIPG',
-      valor:  metricas.prioridadMIPG,
-      borde:  'border-red-500',
-      texto:  'text-red-300',
+      filtro:     'PRIORIDAD_MIPG',
+      label:      'Prioridad MIPG',
+      valor:      metricas.prioridadMIPG,
+      rielColor:  '#B91C1C', // rojo riesgo
+      textoColor: '#991B1B',
       icono: (
         <svg className="w-3 h-3" viewBox="0 0 24 24" fill="currentColor">
           <path d="M11.049 2.927c.3-.921 1.603-.921 1.902 0l1.519 4.674a1 1 0 00.95.69h4.915c.969 0 1.371 1.24.588 1.81l-3.976 2.888a1 1 0 00-.363 1.118l1.518 4.674c.3.922-.755 1.688-1.538 1.118l-3.976-2.888a1 1 0 00-1.176 0l-3.976 2.888c-.783.57-1.838-.197-1.538-1.118l1.518-4.674a1 1 0 00-.363-1.118l-3.976-2.888c-.784-.57-.38-1.81.588-1.81h4.914a1 1 0 00.951-.69l1.519-4.674z" />
@@ -729,46 +735,46 @@ function TarjetasMIPG({
       ),
     },
     {
-      filtro: 'ASIGNADAS',
-      label:  'Asignadas',
-      valor:  metricas.asignadas,
-      borde:  'border-sky-500',
-      texto:  'text-sky-300',
+      filtro:     'ASIGNADAS',
+      label:      'Asignadas',
+      valor:      metricas.asignadas,
+      rielColor:  '#1D4ED8', // azul operativo
+      textoColor: '#1E40AF',
     },
     {
-      filtro: 'EN_TERMINO',
-      label:  'En término',
-      valor:  metricas.enTermino,
-      borde:  'border-emerald-600',
-      texto:  'text-emerald-300',
+      filtro:     'EN_TERMINO',
+      label:      'En término',
+      valor:      metricas.enTermino,
+      rielColor:  '#14532D', // verde institucional
+      textoColor: '#14532D',
     },
     {
-      filtro: 'POR_VENCER',
-      label:  'Por Vencer',
-      valor:  metricas.porVencer,
-      borde:  'border-orange-500',
-      texto:  'text-orange-300',
+      filtro:     'POR_VENCER',
+      label:      'Por Vencer',
+      valor:      metricas.porVencer,
+      rielColor:  '#D97706', // ámbar
+      textoColor: '#B45309',
     },
     {
-      filtro: 'VENCIDAS',
-      label:  'Vencidas',
-      valor:  metricas.vencidas,
-      borde:  'border-rose-600',
-      texto:  'text-rose-300',
+      filtro:     'VENCIDAS',
+      label:      'Vencidas',
+      valor:      metricas.vencidas,
+      rielColor:  '#DC2626', // rojo vencido
+      textoColor: '#B91C1C',
     },
     {
-      filtro: 'DEVUELTAS_PRORROGA',
-      label:  'Devueltas / Prórroga',
-      valor:  metricas.devueltasProrroga,
-      borde:  'border-amber-600',
-      texto:  'text-amber-300',
+      filtro:     'DEVUELTAS_PRORROGA',
+      label:      'Devueltas / Prórroga',
+      valor:      metricas.devueltasProrroga,
+      rielColor:  '#CA8A04', // amarillo
+      textoColor: '#854D0E',
     },
     {
-      filtro: 'RESUELTOS_FUERA_TERMINO',
-      label:  'Resueltos fuera de término',
-      valor:  metricas.resueltosFueraTermino,
-      borde:  'border-pink-600',
-      texto:  'text-pink-300',
+      filtro:     'RESUELTOS_FUERA_TERMINO',
+      label:      'Resueltos fuera de término',
+      valor:      metricas.resueltosFueraTermino,
+      rielColor:  '#DB2777', // rosa fuera de término
+      textoColor: '#9D174D',
     },
   ];
 
@@ -798,18 +804,26 @@ function TarjetasMIPG({
             <button
               key={t.filtro}
               onClick={() => onFiltroChange(t.filtro)}
-              className="micro-card shrink-0 flex flex-col items-start px-4 py-3 rounded-xl cursor-pointer focus-visible:outline-none"
+              aria-pressed={activo}
+              className="micro-card shrink-0 flex flex-col items-start px-4 py-3 rounded-xl cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-700/30"
               style={{
                 background: activo ? '#EEF4EE' : '#F8FAF7',
                 border: `1px solid ${activo ? '#14532D' : '#D9E2D9'}`,
+                borderLeftColor: t.rielColor,
                 borderLeftWidth: 4,
               }}
             >
-              <span className={`text-2xl font-black leading-none tabular-nums flex items-center gap-1 ${t.texto}`}>
+              <span
+                className="text-2xl font-black leading-none tabular-nums flex items-center gap-1"
+                style={{ color: t.textoColor }}
+              >
                 {t.icono && <span className="mt-0.5">{t.icono}</span>}
                 {t.valor}
               </span>
-              <span className={`text-[10px] font-bold uppercase tracking-widest mt-0.5 ${t.texto} opacity-80`}>
+              <span
+                className="text-[10px] font-bold uppercase tracking-widest mt-0.5"
+                style={{ color: t.textoColor }}
+              >
                 {t.label}
               </span>
             </button>
@@ -1064,16 +1078,17 @@ function TablaRadicados({
               type="button"
               onClick={() => onSeleccionar(r)}
               className="micro-row w-full text-left px-4 py-3"
+              aria-current={seleccionado ? 'true' : undefined}
               style={{
                 borderBottom: '1px solid #EEF4EE',
-                borderLeft: seleccionado ? '3px solid #14532D' : undefined,
+                borderLeft: seleccionado ? '4px solid #14532D' : '4px solid transparent',
                 background: seleccionado ? '#EEF4EE' : undefined,
               }}
             >
               <div className="flex items-start justify-between gap-2 mb-1.5">
                 <div className="flex items-center gap-1.5 min-w-0">
                   {esRojo && <span className="shrink-0 w-1.5 h-1.5 rounded-full bg-red-500 animate-pulse mt-0.5" />}
-                  <span className="font-mono text-xs font-bold truncate" style={{ color: '#14532D' }}>{r.radicadoId}</span>
+                  <span className="font-mono text-[13px] font-extrabold tracking-tight truncate" style={{ color: '#14532D' }}>{r.radicadoId}</span>
                 </div>
                 <span className={`shrink-0 inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wide border ${
                   BADGE_ESTADO[r.estadoActual] ?? 'bg-gray-100 text-gray-600 border-gray-200'
@@ -1095,9 +1110,9 @@ function TablaRadicados({
         })}
       </div>
 
-      {/* Tabla — sm+ */}
+      {/* Tabla — sm+ : ancho mínimo en escritorio para preservar legibilidad de columnas */}
       <div className="hidden sm:block flex-1 overflow-y-auto overflow-x-auto bg-white">
-        <table className="w-full text-sm">
+        <table className="w-full text-sm md:min-w-[920px]">
           <thead className="sticky top-0 z-10">
             <tr style={{ background: '#EEF4EE', borderBottom: '1px solid #D9E2D9' }}>
               {['Radicado', 'Solicitante', 'Tipo Trámite', 'Dependencia', 'Estado', 'Vencimiento', 'Días'].map((h) => (
@@ -1132,17 +1147,19 @@ function TablaRadicados({
                 <tr
                   key={r.radicadoId}
                   onClick={() => onSeleccionar(r)}
-                  className="micro-row cursor-pointer"
+                  className={`micro-row cursor-pointer ${seleccionado ? 'is-selected' : ''}`}
+                  aria-selected={seleccionado}
                   style={{
                     borderBottom: '1px solid #EEF4EE',
                     background: seleccionado ? '#EEF4EE' : undefined,
-                    borderLeft: seleccionado ? '3px solid #14532D' : undefined,
+                    borderLeft: seleccionado ? '4px solid #14532D' : '4px solid transparent',
+                    boxShadow: seleccionado ? 'inset 0 0 0 1px rgba(20,83,45,0.08)' : undefined,
                   }}
                 >
                   <td className="px-4 py-3 whitespace-nowrap">
                     <div className="flex items-center gap-2">
                       {esRojo && <span className="shrink-0 w-1.5 h-1.5 rounded-full bg-red-500 animate-pulse" />}
-                      <span className="font-mono text-xs font-bold" style={{ color: '#14532D' }}>{r.radicadoId}</span>
+                      <span className="font-mono text-[13px] font-extrabold tracking-tight" style={{ color: '#14532D' }}>{r.radicadoId}</span>
                     </div>
                     <p className="text-[10px] mt-0.5" style={{ color: '#94A3B8' }}>{fmtFecha(r.control.fechaRadicado)}</p>
                   </td>
@@ -1210,12 +1227,18 @@ function PanelDerecho({
   usuario,
   onCerrar,
   soloLectura = false,
+  modoAmplio = false,
+  onToggleModo,
 }: {
   radicado:    VentanillaRadicado;
   usuario:     UsuarioAutenticado;
   onCerrar:    () => void;
   /** Roles JEFE_DEPENDENCIA y CONTROL_INTERNO: ven el panel pero no ejecutan acciones. */
   soloLectura?: boolean;
+  /** Modo amplio: ancho extendido para lectura/redacción largos (escritorio). */
+  modoAmplio?:  boolean;
+  /** Toggle del modo amplio/normal — persiste en localStorage. */
+  onToggleModo?: () => void;
 }) {
   const [tab,              setTab]              = useState<TabPanelId>('info');
   const [tenantDestino,    setTenantDestino]    = useState<TenantId>(radicado.clasificacion.oficinaDestino);
@@ -1236,6 +1259,37 @@ function PanelDerecho({
   const [mostrarGestionNotif,  setMostrarGestionNotif]  = useState(false);
   const [motivoGestion,        setMotivoGestion]        = useState('');
   const [gestionandoNotif,     setGestionandoNotif]     = useState(false);
+  // Vista previa institucional de la respuesta oficial
+  const [vistaPreviaActiva,    setVistaPreviaActiva]    = useState(false);
+
+  /** Genera el oficio formal y lo deja en el textarea para que el funcionario edite. */
+  function generarPlantillaOficio() {
+    const responsable = radicado.clasificacion.funcionarioResponsableNombre;
+    const cargoSnapshot = radicado.clasificacion.funcionarioResponsableCargo;
+    const dependenciaNombre = NOMBRES_TENANT[radicado.clasificacion.oficinaDestino] ?? 'Alcaldía Municipal de Simacota';
+
+    const texto = buildOficioInstitucional({
+      radicadoId: radicado.radicadoId,
+      fecha:      new Date(),
+      ciudadano: {
+        nombre:    radicado.solicitante?.nombreCompleto,
+        correo:    radicado.solicitante?.email ?? undefined,
+        direccion: radicado.solicitante?.direccion ?? undefined,
+        esAnonimo: radicado.esAnonimo,
+        reservado: radicado.tipoPresentacion === 'RESERVADA' || radicado.identidadReservada === true,
+      },
+      dependencia: dependenciaNombre,
+      funcionario: {
+        nombre: responsable ?? usuario.nombre,
+        cargo:  cargoSnapshot ?? undefined,
+        rol:    usuario.rol,
+      },
+      cuerpoRespuesta: respuesta.trim().length >= 10 ? respuesta : undefined,
+    });
+    setRespuesta(texto);
+    setMensajeOk(null);
+    setErrorLocal(null);
+  }
 
   // MIPG-2: carga funcionarios del tenant destino para el selector de responsable
   const { funcionarios: funcionariosTenant, cargando: cargandoFuncionarios } =
@@ -1471,15 +1525,39 @@ function PanelDerecho({
               <SemaforoTermino radicado={radicado} variante="compact" />
             </div>
           </div>
-          <button onClick={onCerrar}
-            className="shrink-0 p-1.5 rounded-lg active:scale-90 transition-all duration-150"
-            style={{ color: '#94A3B8' }}
-            onMouseEnter={(e) => { (e.currentTarget as HTMLElement).style.color = '#1F2933'; (e.currentTarget as HTMLElement).style.background = '#EEF4EE'; }}
-            onMouseLeave={(e) => { (e.currentTarget as HTMLElement).style.color = '#94A3B8'; (e.currentTarget as HTMLElement).style.background = ''; }}>
-            <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-              <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
-            </svg>
-          </button>
+          <div className="shrink-0 flex items-center gap-1">
+            {onToggleModo && (
+              <button
+                type="button"
+                onClick={onToggleModo}
+                className="hidden md:inline-flex p-1.5 rounded-lg active:scale-90 transition-all duration-150"
+                style={{ color: modoAmplio ? '#14532D' : '#94A3B8', background: modoAmplio ? '#EEF4EE' : 'transparent' }}
+                title={modoAmplio ? 'Volver a panel normal' : 'Expandir panel para redacción larga'}
+                aria-label={modoAmplio ? 'Volver a panel normal' : 'Expandir panel'}
+                onMouseEnter={(e) => { if (!modoAmplio) { (e.currentTarget as HTMLElement).style.color = '#14532D'; (e.currentTarget as HTMLElement).style.background = '#EEF4EE'; } }}
+                onMouseLeave={(e) => { if (!modoAmplio) { (e.currentTarget as HTMLElement).style.color = '#94A3B8'; (e.currentTarget as HTMLElement).style.background = 'transparent'; } }}
+              >
+                {modoAmplio ? (
+                  <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M9 15l-3 3m0 0l-3-3m3 3V3m6 6l3-3m0 0l3 3m-3-3v18" />
+                  </svg>
+                ) : (
+                  <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M4 8V4m0 0h4M4 4l5 5m11-5h-4m4 0v4m0-4l-5 5M4 16v4m0 0h4m-4 0l5-5m11 5l-5-5m5 5v-4m0 4h-4" />
+                  </svg>
+                )}
+              </button>
+            )}
+            <button onClick={onCerrar}
+              className="p-1.5 rounded-lg active:scale-90 transition-all duration-150"
+              style={{ color: '#94A3B8' }}
+              onMouseEnter={(e) => { (e.currentTarget as HTMLElement).style.color = '#1F2933'; (e.currentTarget as HTMLElement).style.background = '#EEF4EE'; }}
+              onMouseLeave={(e) => { (e.currentTarget as HTMLElement).style.color = '#94A3B8'; (e.currentTarget as HTMLElement).style.background = ''; }}>
+              <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
+              </svg>
+            </button>
+          </div>
         </div>
       </div>
 
@@ -1545,20 +1623,38 @@ function PanelDerecho({
         </div>
       )}
 
-      {/* Tabs */}
-      <div className="flex shrink-0 overflow-x-auto bg-white" style={{ borderBottom: '1px solid #D9E2D9' }}>
-        {TABS_PANEL.map((t) => (
-          <button key={t.id}
-            onClick={() => { setTab(t.id); setMensajeOk(null); setErrorLocal(null); }}
-            className="shrink-0 px-3 py-2.5 text-[11px] font-bold uppercase tracking-wider whitespace-nowrap focus-visible:outline-none"
-            style={tab === t.id
-              ? { color: '#14532D', borderBottom: '2px solid #14532D', transition: 'color 0.15s ease-out, background 0.15s ease-out' }
-              : { color: '#94A3B8', transition: 'color 0.15s ease-out, background 0.15s ease-out' }}
-            onMouseEnter={(e) => { if (tab !== t.id) { (e.currentTarget as HTMLElement).style.color = '#667085'; (e.currentTarget as HTMLElement).style.background = '#F8FAF7'; } }}
-            onMouseLeave={(e) => { if (tab !== t.id) { (e.currentTarget as HTMLElement).style.color = '#94A3B8'; (e.currentTarget as HTMLElement).style.background = ''; } }}>
-            {t.label}
-          </button>
-        ))}
+      {/* Tabs — scroll horizontal interno cuando no caben */}
+      <div
+        className="flex shrink-0 overflow-x-auto overflow-y-hidden bg-white gap-1 px-2 py-1.5"
+        style={{ borderBottom: '1px solid #D9E2D9', scrollbarWidth: 'thin' }}
+        role="tablist"
+      >
+        {TABS_PANEL.map((t) => {
+          const activo = tab === t.id;
+          return (
+            <button key={t.id}
+              role="tab"
+              aria-selected={activo}
+              onClick={() => { setTab(t.id); setMensajeOk(null); setErrorLocal(null); }}
+              className="shrink-0 px-3 py-1.5 rounded-lg text-[11px] font-bold uppercase tracking-wider whitespace-nowrap focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-700/30 transition-all duration-150"
+              style={activo
+                ? {
+                    color: '#FFFFFF',
+                    background: '#14532D',
+                    border: '1px solid #14532D',
+                    boxShadow: '0 1px 3px rgba(20,83,45,0.30)',
+                  }
+                : {
+                    color: '#475569',
+                    background: '#F8FAF7',
+                    border: '1px solid #D9E2D9',
+                  }}
+              onMouseEnter={(e) => { if (!activo) { (e.currentTarget as HTMLElement).style.color = '#14532D'; (e.currentTarget as HTMLElement).style.background = '#EEF4EE'; (e.currentTarget as HTMLElement).style.borderColor = '#14532D'; } }}
+              onMouseLeave={(e) => { if (!activo) { (e.currentTarget as HTMLElement).style.color = '#475569'; (e.currentTarget as HTMLElement).style.background = '#F8FAF7'; (e.currentTarget as HTMLElement).style.borderColor = '#D9E2D9'; } }}>
+              {t.label}
+            </button>
+          );
+        })}
       </div>
 
       {/* Feedback global */}
@@ -2005,11 +2101,69 @@ function PanelDerecho({
               )}
 
               <div>
-                <p className="text-[10px] font-bold uppercase tracking-widest mb-1.5" style={{ color: '#667085' }}>Nota de resolución</p>
-                <textarea value={respuesta} onChange={(e) => setRespuesta(e.target.value)} rows={4}
-                  placeholder="Describe la respuesta dada al ciudadano…"
-                  className="input-internal resize-none" disabled={radicado.estadoActual === 'RESUELTO'} />
+                <div className="flex items-center justify-between mb-1.5 gap-2">
+                  <p className="text-[10px] font-bold uppercase tracking-widest" style={{ color: '#667085' }}>
+                    Respuesta oficial (oficio)
+                  </p>
+                  {radicado.estadoActual !== 'RESUELTO' && !soloLectura && (
+                    <div className="flex items-center gap-1.5">
+                      <button
+                        type="button"
+                        onClick={generarPlantillaOficio}
+                        disabled={guardando}
+                        title="Inserta una plantilla institucional tipo oficio que luego puedes editar."
+                        className="text-[10px] font-bold uppercase tracking-wider px-2 py-1 rounded-md transition active:scale-95 disabled:opacity-50"
+                        style={{ background: '#EEF4EE', color: '#14532D', border: '1px solid #D9E2D9' }}
+                      >
+                        Generar plantilla
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setVistaPreviaActiva((v) => !v)}
+                        disabled={guardando || respuesta.trim().length === 0}
+                        className="text-[10px] font-bold uppercase tracking-wider px-2 py-1 rounded-md transition active:scale-95 disabled:opacity-40"
+                        style={vistaPreviaActiva
+                          ? { background: '#14532D', color: '#ffffff', border: '1px solid #14532D' }
+                          : { background: 'transparent', color: '#14532D', border: '1px solid #D9E2D9' }}
+                      >
+                        {vistaPreviaActiva ? 'Ocultar previa' : 'Vista previa'}
+                      </button>
+                    </div>
+                  )}
+                </div>
+                <textarea value={respuesta} onChange={(e) => setRespuesta(e.target.value)}
+                  rows={modoAmplio ? (vistaPreviaActiva ? 14 : 10) : (vistaPreviaActiva ? 8 : 4)}
+                  placeholder="Describe la respuesta dada al ciudadano o usa “Generar plantilla” para un oficio institucional…"
+                  className={`input-internal ${modoAmplio ? 'resize-y' : 'resize-none'}`}
+                  disabled={radicado.estadoActual === 'RESUELTO'}
+                  style={{
+                    fontFamily: '"DM Sans", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif',
+                    minHeight: modoAmplio ? 220 : undefined,
+                  }}
+                />
+                <p className="mt-1 text-[10px]" style={{ color: '#94A3B8' }}>
+                  Este texto se enviará por correo al ciudadano y quedará visible en la consulta pública con formato institucional.
+                </p>
               </div>
+
+              {vistaPreviaActiva && respuesta.trim().length > 0 && (
+                <div
+                  className="rounded-xl p-5"
+                  style={{ background: '#FFFFFF', border: '1px solid #14532D' }}
+                >
+                  <p className="text-[10px] font-bold uppercase tracking-widest mb-3 pb-2"
+                     style={{ color: '#14532D', borderBottom: '1px dashed #D9E2D9' }}>
+                    Vista previa institucional · cómo lo verá el ciudadano
+                  </p>
+                  <pre
+                    className="text-[13px] leading-relaxed whitespace-pre-wrap break-words"
+                    style={{
+                      fontFamily: '"DM Sans", "Manrope", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif',
+                      color: '#1F2933',
+                    }}
+                  >{respuesta}</pre>
+                </div>
+              )}
 
               {radicado.estadoActual !== 'RESUELTO' && (
                 <div>
@@ -2681,8 +2835,27 @@ function BandejaAsignacion({
    COMPONENTE INTERNO PRINCIPAL (dentro del Provider)
 ══════════════════════════════════════════════════════════════ */
 
+type PanelDerechoModo = 'normal' | 'amplio';
+const PANEL_MODO_KEY = 'panelDerechoModo';
+
 function DashboardInterior({ usuario, cerrarSesion }: { usuario: UsuarioAutenticado; cerrarSesion: () => Promise<void> }) {
   const [menuMovilAbierto, setMenuMovilAbierto] = useState(false);
+  // Preferencia persistente del usuario para el ancho del panel derecho en escritorio.
+  // Móvil siempre ignora este valor (siempre full-screen como drawer).
+  const [panelDerechoModo, setPanelDerechoModo] = useState<PanelDerechoModo>('normal');
+  useEffect(() => {
+    try {
+      const v = window.localStorage.getItem(PANEL_MODO_KEY);
+      if (v === 'amplio' || v === 'normal') setPanelDerechoModo(v);
+    } catch { /* sin acceso a localStorage: usa default */ }
+  }, []);
+  function togglePanelDerechoModo() {
+    setPanelDerechoModo((prev) => {
+      const next: PanelDerechoModo = prev === 'normal' ? 'amplio' : 'normal';
+      try { window.localStorage.setItem(PANEL_MODO_KEY, next); } catch { /* noop */ }
+      return next;
+    });
+  }
   const { state, dispatch } = useVentanilla();
   const {
     radicadoSeleccionado,
@@ -2884,7 +3057,9 @@ function DashboardInterior({ usuario, cerrarSesion }: { usuario: UsuarioAutentic
         <div
           className={`fixed inset-y-0 right-0 z-40 max-w-full transition-transform duration-300 ease-in-out md:relative md:z-auto md:shrink-0 md:overflow-hidden md:transition-all ${
             panelDerechoAbierto
-              ? 'w-full translate-x-0 md:w-[420px]'
+              ? panelDerechoModo === 'amplio'
+                ? 'w-full translate-x-0 md:w-[640px] xl:w-[720px]'
+                : 'w-full translate-x-0 md:w-[420px]'
               : 'w-full translate-x-full md:w-0 md:translate-x-0'
           }`}
         >
@@ -2894,6 +3069,8 @@ function DashboardInterior({ usuario, cerrarSesion }: { usuario: UsuarioAutentic
               usuario={usuario}
               onCerrar={() => dispatch({ type: 'CERRAR_PANEL_DERECHO' })}
               soloLectura={esVistaReadOnly}
+              modoAmplio={panelDerechoModo === 'amplio'}
+              onToggleModo={togglePanelDerechoModo}
             />
           )}
         </div>
