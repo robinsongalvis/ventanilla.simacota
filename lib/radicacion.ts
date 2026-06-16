@@ -9,7 +9,7 @@ import { doc, setDoc }    from 'firebase/firestore';
 import { getDb }          from './firebase';
 import { subirArchivos, type UploadResult, type UploadProgress } from './storage';
 import type { AnalisisIA } from '@/src/types/ventanilla';
-import { TIPOS_SOLICITUD, type TipoSolicitudId } from '@/lib/tiempos-radicado';
+import { resolverTipoSolicitud, type TipoSolicitudId } from '@/lib/tiempos-radicado';
 
 /* ──────────────────────────────────────────────
    ID de radicado
@@ -131,8 +131,8 @@ export async function radicarSolicitud(
     // ── Paso 2: Crear documento en Firestore ─────────────────────────────
     onProgreso?.('Registrando radicado...', 60);
 
-    const tipoSolicitudId = datos.tipoSolicitudId ?? 'PETICION';
-    const tipoSolicitud = TIPOS_SOLICITUD[tipoSolicitudId];
+    const tipoSolicitudId = datos.tipoSolicitudId ?? 'PETICION_GENERAL';
+    const tipoSolicitud = resolverTipoSolicitud(tipoSolicitudId);
     const tipoPresentacion = datos.tipoPresentacion ?? (datos.esAnonimo ? 'ANONIMA' : 'IDENTIFICADA');
     const esAnonimo = tipoPresentacion === 'ANONIMA';
     const identidadReservada = tipoPresentacion === 'RESERVADA' || !!datos.identidadReservada;

@@ -10,7 +10,7 @@ import { useAuth }                        from '@/lib/hooks/useAuth';
 import { useVentanillaRadicados }         from '@/lib/hooks/useVentanillaRadicados';
 import { VentanillaProvider, useVentanilla } from '@/lib/store/ventanillaStore';
 import { NOMBRES_TENANT, DIRECTORIO_TENANTS } from '@/src/types/reglas-negocio';
-import { diasRestantesHabiles, TIPOS_SOLICITUD } from '@/lib/tiempos-radicado';
+import { diasRestantesHabiles, resolverTipoSolicitud } from '@/lib/tiempos-radicado';
 import { RadicacionFuncionarioForm }       from '@/app/interno/recepcion/components/RadicacionFuncionarioForm';
 import { radicarInstitucionalmente }       from '@/lib/actions/radicarVentanilla';
 import { asignarRadicado, asignarMasivo }  from '@/lib/actions/asignarRadicado';
@@ -2281,7 +2281,7 @@ function DrawerNuevoRadicado({
         { uid: usuario.uid, nombre: usuario.nombre, tenantId: usuario.tenantId },
         (msg, pct) => { setProgreso(msg); setProgresoPct(pct); },
       );
-      const tipoConf = TIPOS_SOLICITUD[payload.tipoSolicitudId];
+      const tipoConf = resolverTipoSolicitud(payload.tipoSolicitudId);
       setDatosComprobante({
         solicitanteNombre: payload.nombreCompleto,
         numeroDocumento:   payload.numeroDocumento,

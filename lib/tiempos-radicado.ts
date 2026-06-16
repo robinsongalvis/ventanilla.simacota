@@ -1,25 +1,40 @@
+/* ══════════════════════════════════════════════════════════════
+   lib/tiempos-radicado.ts
+
+   Cálculo de términos legales y festivos colombianos.
+
+   Esta capa se apoya en el catálogo central
+   `lib/catalogos/tipos-solicitud.ts` como fuente única de verdad para
+   los tipos de solicitud, sus términos y unidad (hábiles/calendario).
+
+   Se preserva la API histórica (TIPOS_SOLICITUD, TipoSolicitudId,
+   TIPOS_PQRSD_CIUDADANO, LISTA_TIPOS_SOLICITUD, calcularFechaVencimiento)
+   para no romper a los consumidores existentes.
+══════════════════════════════════════════════════════════════ */
+
+import {
+  CATALOGO_TIPOS_SOLICITUD,
+  TIPO_SOLICITUD_FALLBACK_ID,
+  getTipoSolicitudById,
+  getTiposSolicitudCiudadano,
+  type PrioridadSugerida,
+  type TipoSolicitudCatalogo,
+} from './catalogos/tipos-solicitud';
+
+/* ──────────────────────────────────────────────
+   Tipos públicos (compatibilidad histórica)
+────────────────────────────────────────────── */
+
 export type UnidadTermino = 'HABILES' | 'CALENDARIO';
 
-export type TipoSolicitudId =
-  | 'PETICION'
-  | 'PETICION_INFORMACION'
-  | 'PETICION_AUTORIDADES'
-  | 'QUEJA'
-  | 'RECLAMO'
-  | 'SUGERENCIA'
-  | 'FELICITACION'
-  | 'DENUNCIA'
-  | 'HABEAS_DATA'
-  | 'INFORMATIVO'
-  | 'LICENCIA_CONSTRUCCION'
-  | 'ENTES_CONTROL_URGENTE';
+export type TipoSolicitudId = (typeof CATALOGO_TIPOS_SOLICITUD)[number]['id'];
 
 export interface TipoSolicitudConfig {
   id: TipoSolicitudId;
   nombre: string;
   diasRespuesta: number;
   unidad: UnidadTermino;
-  prioridadSugerida: 'ROJO' | 'NARANJA' | 'AMARILLO';
+  prioridadSugerida: PrioridadSugerida;
 }
 
 export interface CalculoVencimiento {
@@ -30,109 +45,77 @@ export interface CalculoVencimiento {
   unidad: UnidadTermino;
 }
 
-export const TIPOS_SOLICITUD: Record<TipoSolicitudId, TipoSolicitudConfig> = {
-  /* ── PQRSD — Catálogo completo Ley 1755 de 2015 ─────────── */
-  PETICION: {
-    id: 'PETICION',
-    nombre: 'Petición (Derecho de petición)',
-    diasRespuesta: 15,
-    unidad: 'HABILES',
-    prioridadSugerida: 'NARANJA',
-  },
-  PETICION_INFORMACION: {
-    id: 'PETICION_INFORMACION',
-    nombre: 'Solicitud de información',
-    diasRespuesta: 10,
-    unidad: 'HABILES',
-    prioridadSugerida: 'AMARILLO',
-  },
-  PETICION_AUTORIDADES: {
-    id: 'PETICION_AUTORIDADES',
-    nombre: 'Consulta a autoridades',
-    diasRespuesta: 30,
-    unidad: 'HABILES',
-    prioridadSugerida: 'NARANJA',
-  },
-  QUEJA: {
-    id: 'QUEJA',
-    nombre: 'Queja',
-    diasRespuesta: 15,
-    unidad: 'HABILES',
-    prioridadSugerida: 'NARANJA',
-  },
-  RECLAMO: {
-    id: 'RECLAMO',
-    nombre: 'Reclamo',
-    diasRespuesta: 15,
-    unidad: 'HABILES',
-    prioridadSugerida: 'NARANJA',
-  },
-  SUGERENCIA: {
-    id: 'SUGERENCIA',
-    nombre: 'Sugerencia',
-    diasRespuesta: 15,
-    unidad: 'HABILES',
-    prioridadSugerida: 'AMARILLO',
-  },
-  FELICITACION: {
-    id: 'FELICITACION',
-    nombre: 'Felicitación',
-    diasRespuesta: 15,
-    unidad: 'CALENDARIO',
-    prioridadSugerida: 'AMARILLO',
-  },
-  DENUNCIA: {
-    id: 'DENUNCIA',
-    nombre: 'Denuncia',
-    diasRespuesta: 15,
-    unidad: 'HABILES',
-    prioridadSugerida: 'ROJO',
-  },
-  HABEAS_DATA: {
-    id: 'HABEAS_DATA',
-    nombre: 'Solicitud de datos personales (Habeas Data)',
-    diasRespuesta: 10,
-    unidad: 'HABILES',
-    prioridadSugerida: 'NARANJA',
-  },
-  /* ── Tipos especializados existentes ─────────────────────── */
-  INFORMATIVO: {
-    id: 'INFORMATIVO',
-    nombre: 'Informativo',
-    diasRespuesta: 10,
-    unidad: 'CALENDARIO',
-    prioridadSugerida: 'AMARILLO',
-  },
-  LICENCIA_CONSTRUCCION: {
-    id: 'LICENCIA_CONSTRUCCION',
-    nombre: 'Licencia de construcción',
-    diasRespuesta: 45,
-    unidad: 'HABILES',
-    prioridadSugerida: 'AMARILLO',
-  },
-  ENTES_CONTROL_URGENTE: {
-    id: 'ENTES_CONTROL_URGENTE',
-    nombre: 'Petición entes de control (urgente)',
-    diasRespuesta: 2,
-    unidad: 'HABILES',
-    prioridadSugerida: 'ROJO',
-  },
+/* ──────────────────────────────────────────────
+   Adaptador catálogo → TipoSolicitudConfig
+────────────────────────────────────────────── */
+
+function toConfig(tipo: TipoSolicitudCatalogo): TipoSolicitudConfig {
+  return {
+    id: tipo.id as TipoSolicitudId,
+    nombre: tipo.nombre,
+    diasRespuesta: tipo.terminoDias,
+    unidad: tipo.tipoDias,
+    prioridadSugerida: tipo.prioridadSugerida ?? 'AMARILLO',
+  };
+}
+
+/* ──────────────────────────────────────────────
+   Registro plano TIPOS_SOLICITUD derivado del catálogo
+────────────────────────────────────────────── */
+
+export const TIPOS_SOLICITUD: Record<TipoSolicitudId, TipoSolicitudConfig> =
+  Object.fromEntries(
+    CATALOGO_TIPOS_SOLICITUD.map((t) => [t.id, toConfig(t)] as const),
+  ) as Record<TipoSolicitudId, TipoSolicitudConfig>;
+
+/** Tipos visibles para el ciudadano en el formulario público de radicación. */
+export const TIPOS_PQRSD_CIUDADANO: TipoSolicitudId[] = getTiposSolicitudCiudadano().map(
+  (t) => t.id as TipoSolicitudId,
+);
+
+/** Lista plana de tipos del catálogo en orden estable. */
+export const LISTA_TIPOS_SOLICITUD: TipoSolicitudConfig[] = CATALOGO_TIPOS_SOLICITUD.map(toConfig);
+
+/* ──────────────────────────────────────────────
+   Alias legacy → catálogo nuevo
+
+   Documentos radicados antes de la unificación del catálogo usaron IDs
+   que ya no existen en `lib/catalogos/tipos-solicitud.ts`. Para mantener
+   la compatibilidad de lectura, mapeamos esos IDs al equivalente actual.
+   El resolver consulta este mapa antes de aplicar el fallback duro.
+────────────────────────────────────────────── */
+
+const LEGACY_TIPO_ALIASES: Record<string, TipoSolicitudId> = {
+  PETICION: 'PETICION_GENERAL',
+  PETICION_AUTORIDADES: 'CONSULTA',
+  ENTES_CONTROL_URGENTE: 'PETICION_ENTES_CONTROL',
 };
 
-/** Tipos visibles para el ciudadano en el formulario público de radicación */
-export const TIPOS_PQRSD_CIUDADANO: TipoSolicitudId[] = [
-  'PETICION',
-  'QUEJA',
-  'RECLAMO',
-  'SUGERENCIA',
-  'FELICITACION',
-  'DENUNCIA',
-  'PETICION_INFORMACION',
-  'PETICION_AUTORIDADES',
-  'HABEAS_DATA',
-];
+/**
+ * Devuelve la configuración de un tipo a partir de su id.
+ * Resuelve alias legacy y, si el id no existe, aplica fallback a
+ * PETICION_GENERAL (15 días hábiles).
+ */
+export function resolverTipoSolicitud(id: string | null | undefined): TipoSolicitudConfig {
+  if (id) {
+    const directo = TIPOS_SOLICITUD[id as TipoSolicitudId];
+    if (directo) return directo;
+    const alias = LEGACY_TIPO_ALIASES[id];
+    if (alias) {
+      const aliasConfig = TIPOS_SOLICITUD[alias];
+      if (aliasConfig) return aliasConfig;
+    }
+  }
+  const fallback = getTipoSolicitudById(TIPO_SOLICITUD_FALLBACK_ID);
+  if (!fallback) {
+    throw new Error('Catálogo de tipos de solicitud corrupto: fallback ausente.');
+  }
+  return toConfig(fallback);
+}
 
-export const LISTA_TIPOS_SOLICITUD = Object.values(TIPOS_SOLICITUD);
+/* ──────────────────────────────────────────────
+   Calendario hábil colombiano
+────────────────────────────────────────────── */
 
 function toDateOnly(date: Date): string {
   const y = date.getFullYear();
@@ -218,12 +201,25 @@ export function esDiaHabil(date: Date, festivos = festivosColombia(date.getFullY
   return !isWeekend(date) && !festivos.has(toDateOnly(date));
 }
 
+/* ──────────────────────────────────────────────
+   Cálculo de vencimiento
+────────────────────────────────────────────── */
+
+/**
+ * Calcula la fecha de vencimiento legal a partir del tipo de solicitud.
+ *
+ * - Si `tipoDias === HABILES`, se cuentan días hábiles colombianos
+ *   (excluye sábados, domingos y festivos).
+ * - Si `tipoDias === CALENDARIO`, se suman días calendario.
+ * - Si `tipoSolicitudId` no existe en el catálogo, se aplica fallback a
+ *   PETICION_GENERAL (15 días hábiles).
+ */
 export function calcularFechaVencimiento(
   fechaRadicado: string | Date,
-  tipoSolicitudId: TipoSolicitudId,
+  tipoSolicitudId: string,
   festivosExtra: string[] = [],
 ): CalculoVencimiento {
-  const tipoSolicitud = TIPOS_SOLICITUD[tipoSolicitudId];
+  const tipoSolicitud = resolverTipoSolicitud(tipoSolicitudId);
   const inicio = atLocalNoon(fechaRadicado);
   const festivos = new Set([
     ...festivosColombia(inicio.getFullYear()),

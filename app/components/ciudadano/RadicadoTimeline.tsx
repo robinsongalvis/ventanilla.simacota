@@ -59,6 +59,7 @@ export function mapAccionToTimeline(accion: AccionAuditoria): EstadoTimelinePubl
     case 'DEVOLUCION':
       return 'requiere_aclaracion';
     case 'RECLASIFICACION':
+    case 'TIPO_SOLICITUD_RECLASIFICADO':
       return 'trasladado';
     case 'RESPUESTA_FUNCIONARIO':
       return 'respondido';

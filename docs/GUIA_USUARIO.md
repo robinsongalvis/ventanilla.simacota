@@ -15,6 +15,19 @@
 
 ---
 
+## Tipos de solicitud
+
+Los tipos disponibles para el ciudadano (formulario público `/radicacion`) son
+los PQRSD definidos por Ley 1755/2015. El listado proviene del catálogo
+institucional `lib/catalogos/tipos-solicitud.ts`. Trámites internos (licencia
+de construcción, ICA, subdivisión, etc.) se manejan en Ventanilla por el
+RECEPCIONISTA y no aparecen al ciudadano.
+
+Si Ventanilla detecta que un radicado debe atenderse bajo otro tipo (por
+ejemplo, una “Petición general” que realmente es una licencia de construcción),
+puede reclasificarlo desde el dashboard. El sistema guarda el tipo original y
+recalcula la fecha de vencimiento.
+
 ## Rol: RECEPCIONISTA
 
 **Función:** Recibir solicitudes ciudadanas y asignarlas a la dependencia competente.

@@ -50,8 +50,8 @@ function mockRadicado(overrides: Partial<VentanillaRadicado['clasificacion']> = 
       origen: 'WEB',
     },
     termino: {
-      tipoSolicitudId: 'PETICION',
-      tipoSolicitudNombre: 'Petición',
+      tipoSolicitudId: 'PETICION_GENERAL',
+      tipoSolicitudNombre: 'Petición general (Derecho de petición)',
       diasRespuesta: 15,
       unidad: 'HABILES',
       fechaVencimiento: '2026-06-20T00:00:00.000Z',

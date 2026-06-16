@@ -5,6 +5,14 @@
 **Modelo:** Gemini 2.5 Flash  
 **API:** `POST /api/simi/radicado`
 
+> **Sprint Catálogo (2026-06-16):** SIMI ahora recibe en su contexto el bloque
+> del catálogo (`tipoSolicitudId`, `categoriaSolicitud`, `terminoDias`,
+> `tipoDias`, `dependenciaSugeridaTipo`, `requiereValidacionJuridica`,
+> `heredadoSistemaActual`). Si el tipo está marcado como heredado del sistema
+> actual o requiere validación jurídica, SIMI emite la advertencia institucional
+> *"Este tipo fue heredado del sistema actual y requiere validación
+> jurídica/institucional antes de usarse como criterio definitivo."*
+
 ---
 
 ## Principio fundamental

@@ -6,6 +6,7 @@ import type {
 import type { RolInterno } from '@/lib/hooks/useAuth';
 import { NOMBRES_TENANT } from '@/src/types/reglas-negocio';
 import { diasRestantesHabiles } from '@/lib/tiempos-radicado';
+import { getTipoSolicitudById } from '@/lib/catalogos/tipos-solicitud';
 import { obtenerCompetencia } from './competencias-dependencias';
 import { evaluarCompetenciaRadicado, type EvaluacionCompetencia } from './evaluar-competencia';
 
@@ -36,6 +37,13 @@ export interface ContextoSimi {
   meta: {
     radicadoId:         string;
     tipoSolicitud:      string;
+    tipoSolicitudId:    string;
+    categoriaSolicitud: string;
+    terminoDias:        number;
+    tipoDias:           'HABILES' | 'CALENDARIO';
+    dependenciaSugeridaTipo: string | null;
+    requiereValidacionJuridica: boolean;
+    heredadoSistemaActual: boolean;
     asunto:             string;
     descripcionResumen: string;
     estadoActual:       string;
@@ -93,6 +101,12 @@ export function construirContextoSimi(params: {
   const dependencia     = NOMBRES_TENANT[r.clasificacion.oficinaDestino] ?? r.clasificacion.oficinaDestino;
   const ocultarIdentidad = debeOcultarIdentidad(r);
   const competencia     = obtenerCompetencia(r.clasificacion.oficinaDestino);
+  const definicionTipo  = getTipoSolicitudById(r.termino.tipoSolicitudId);
+  const requiereValidacion = definicionTipo?.requiereValidacionJuridica === true;
+  const heredadoSistema    = definicionTipo?.heredadoSistemaActual === true;
+  const dependenciaSugeridaTipo = definicionTipo?.dependenciaSugerida
+    ? NOMBRES_TENANT[definicionTipo.dependenciaSugerida] ?? definicionTipo.dependenciaSugerida
+    : null;
 
   const evaluacion = evaluarCompetenciaRadicado({
     dependenciaActual: r.clasificacion.oficinaDestino,
@@ -116,6 +130,14 @@ export function construirContextoSimi(params: {
     'CONTEXTO DEL RADICADO',
     `- Número: ${r.radicadoId}`,
     `- Tipo de solicitud (PQRSD): ${r.termino.tipoSolicitudNombre} (${r.termino.diasRespuesta} días ${r.termino.unidad.toLowerCase()})`,
+    `- Tipo ID catálogo: ${r.termino.tipoSolicitudId}`,
+    `- Categoría: ${definicionTipo?.categoria ?? 'NO_REGISTRADA'}`,
+    `- Dependencia sugerida por catálogo: ${dependenciaSugeridaTipo ?? 'No definida'}`,
+    `- Requiere validación jurídica: ${requiereValidacion ? 'Sí' : 'No'}`,
+    `- Heredado del sistema actual: ${heredadoSistema ? 'Sí' : 'No'}`,
+    ...(heredadoSistema || requiereValidacion
+      ? ['- ADVERTENCIA: Este tipo fue heredado del sistema actual y requiere validación jurídica/institucional antes de usarse como criterio definitivo.']
+      : []),
     `- Asunto: ${r.detalle.asunto}`,
     `- Descripción: ${r.detalle.descripcion}`,
     `- Estado actual: ${r.estadoActual}`,
@@ -187,6 +209,13 @@ export function construirContextoSimi(params: {
     meta: {
       radicadoId:        r.radicadoId,
       tipoSolicitud:     r.termino.tipoSolicitudNombre,
+      tipoSolicitudId:   r.termino.tipoSolicitudId,
+      categoriaSolicitud: definicionTipo?.categoria ?? 'NO_REGISTRADA',
+      terminoDias:       r.termino.diasRespuesta,
+      tipoDias:          r.termino.unidad,
+      dependenciaSugeridaTipo,
+      requiereValidacionJuridica: requiereValidacion,
+      heredadoSistemaActual: heredadoSistema,
       asunto:            r.detalle.asunto,
       descripcionResumen: r.detalle.descripcion.length > 220
         ? `${r.detalle.descripcion.slice(0, 219)}…`

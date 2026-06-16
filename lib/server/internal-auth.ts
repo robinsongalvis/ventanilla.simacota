@@ -90,3 +90,12 @@ export function canAssignRadicado(user: InternalUserSession, currentTenant: Tena
     || user.rol === 'RECEPCIONISTA'
     || (user.rol === 'FUNCIONARIO' && user.tenantId === currentTenant);
 }
+
+/**
+ * Reclasificación del tipo de solicitud: limitada a RECEPCIONISTA y ADMIN.
+ * Otros roles no pueden modificar el tipo legal del radicado para evitar
+ * alterar términos de respuesta sin trazabilidad institucional.
+ */
+export function canReclassifyTipoSolicitud(user: InternalUserSession): boolean {
+  return user.rol === 'ADMIN' || user.rol === 'RECEPCIONISTA';
+}
