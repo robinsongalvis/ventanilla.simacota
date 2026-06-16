@@ -3,6 +3,12 @@
 
 **Clasificación:** Uso Institucional Interno · **Aplica desde:** 2026-06-15
 
+> **Sprint Catálogo (2026-06-16):** las hojas Radicados y Diccionario de Datos
+> incorporan los metadatos del catálogo institucional de tipos de solicitud
+> (`lib/catalogos/tipos-solicitud.ts`): id, categoría, término, validación
+> jurídica, herencia del sistema actual y, si aplica, el tipo original previo
+> a la reclasificación interna. Ver `docs/CATALOGO_SOLICITUDES.md`.
+
 ---
 
 ## 1. Qué entrega el módulo
@@ -24,7 +30,7 @@ El Excel es el reporte oficial. El CSV se conserva solo como respaldo técnico.
 |---|---|---|---|
 | 1 | Resumen Ejecutivo | Datos de generación + 14 indicadores clave + conclusión automática | Vista de una página para director |
 | 2 | Indicadores MIPG | Tabla con valor, fórmula, interpretación y estado (semáforo) por cada indicador | Evidencia auditable de cómo se calcula cada KPI |
-| 3 | Radicados | Una fila por radicado, 24 columnas operativas. NO incluye respuesta completa ni trazabilidad larga | Análisis maestro |
+| 3 | Radicados | Una fila por radicado, columnas operativas + bloque del catálogo (`Tipo Solicitud ID`, `Categoría Solicitud`, `Término Días`, `Tipo Días`, `Requiere Validación Jurídica`, `Heredado Sistema Actual`, `Tipo Reclasificado`, `Tipo Original`). NO incluye respuesta completa ni trazabilidad larga | Análisis maestro |
 | 4 | Trazabilidad | Una fila por evento de auditoría de cada radicado | Línea de tiempo completa |
 | 5 | Cumplimiento Dependencia | Agregado por secretaría: total, resueltos, vencidos, % cumplimiento | Comparación entre dependencias |
 | 6 | Notificaciones | Eventos de correo: enviadas, fallidas, omitidas por idempotencia, gestionadas manualmente | Garantía de comunicación con el ciudadano |

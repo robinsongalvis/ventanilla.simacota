@@ -2,10 +2,13 @@
 
 import { useMemo, useRef, useState } from 'react';
 import {
-  LISTA_TIPOS_SOLICITUD,
   calcularFechaVencimiento,
   type TipoSolicitudId,
 } from '@/lib/tiempos-radicado';
+import {
+  getTiposSolicitudInternos,
+  getTipoSolicitudById,
+} from '@/lib/catalogos/tipos-solicitud';
 import type { MedioRecepcion, TipoDocumento, TipoPersona } from '@/src/types/ventanilla';
 
 const MUNICIPIOS_SANTANDER = [
@@ -222,16 +225,31 @@ export function RadicacionFuncionarioForm({ radicadoPreview, onSubmit }: Props) 
             label="Tipo solicitud / doc"
             value={form.tipoSolicitudId}
             onChange={(v) => update('tipoSolicitudId', v as TipoSolicitudId)}
-            options={LISTA_TIPOS_SOLICITUD.map((t) => [
-              t.id,
-              `${t.nombre} — ${t.diasRespuesta} días ${t.unidad.toLowerCase()}`,
-            ])}
+            options={getTiposSolicitudInternos().map((t) => {
+              const unidad = t.tipoDias === 'HABILES' ? 'hábiles' : 'calendario';
+              const validacion = t.requiereValidacionJuridica ? ' · Validar jurídicamente' : '';
+              return [
+                t.id,
+                `${t.nombre} · ${t.categoria} · ${t.terminoDias} días ${unidad}${validacion}`,
+              ];
+            })}
             className="md:col-span-2"
           />
           <ReadOnlyField
             label="Días de respuesta"
             value={`${vencimiento.diasRespuesta} ${vencimiento.unidad.toLowerCase()}`}
           />
+          {getTipoSolicitudById(form.tipoSolicitudId)?.requiereValidacionJuridica && (
+            <div
+              className="md:col-span-4 rounded-md border px-3 py-2 text-xs"
+              style={{ borderColor: '#FBBF24', background: '#FEF3C7', color: '#92400E' }}
+              role="alert"
+            >
+              <strong>Validación jurídica pendiente:</strong>{' '}
+              Este tipo fue heredado del sistema actual o tiene tratamiento especial.
+              Confirme con el área jurídica antes de cerrar el radicado.
+            </div>
+          )}
           <TextField
             label="Número de folios"
             value={String(form.numeroFolios)}

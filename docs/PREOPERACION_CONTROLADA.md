@@ -12,6 +12,14 @@ https://ventanilla-simacota.vercel.app
 
 El sistema puede usarse para pruebas internas con funcionarios y usuarios autorizados.
 
+## Catálogo de tipos de solicitud
+
+Durante la preoperación se incorporó el **catálogo institucional centralizado**
+(`lib/catalogos/tipos-solicitud.ts`) con los tipos heredados del sistema
+actual. Los tipos marcados con `heredadoSistemaActual: true` y
+`requiereValidacionJuridica: true` deben pasar revisión jurídica/institucional
+**antes** del go-live oficial. Ver `docs/CATALOGO_SOLICITUDES.md`.
+
 ## Aclaración
 
 Este sistema **no afecta** el sistema actual de la Alcaldía mientras:

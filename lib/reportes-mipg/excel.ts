@@ -1,6 +1,7 @@
 import ExcelJS from 'exceljs';
 import type { VentanillaRadicado, TrazabilidadRadicado } from '@/src/types/ventanilla';
 import { NOMBRES_TENANT } from '@/src/types/reglas-negocio';
+import { getTipoSolicitudById } from '@/lib/catalogos/tipos-solicitud';
 import {
   debeOcultarIdentidad,
   nombreOficioPublico,
@@ -167,7 +168,7 @@ export async function generarReporteExcelMipg(input: ReporteExcelInput): Promise
   // El orden importa: las hojas aparecen en este orden en Excel.
   construirResumenEjecutivo(wb, usuario, indicadores, radicados.length, rangoFechas);
   construirIndicadoresMipg(wb, indicadores);
-  construirRadicados(wb, radicados);
+  construirRadicados(wb, radicados, trazabilidadPorRadicado);
   construirTrazabilidad(wb, trazabilidadPorRadicado);
   construirCumplimientoDependencia(wb, cumplimiento);
   construirNotificaciones(wb, notificaciones);
@@ -300,7 +301,11 @@ function construirIndicadoresMipg(wb: ExcelJS.Workbook, ind: IndicadoresMipg) {
 }
 
 /* ── Hoja 3: Radicados ────────────────────────────────────── */
-function construirRadicados(wb: ExcelJS.Workbook, radicados: VentanillaRadicado[]) {
+function construirRadicados(
+  wb: ExcelJS.Workbook,
+  radicados: VentanillaRadicado[],
+  trazabilidadPorRadicadoLookup?: Map<string, TrazabilidadRadicado[]>,
+) {
   const ws = wb.addWorksheet('Radicados');
   ws.columns = [
     { header: 'N° Radicado',                key: 'radicadoId',         width: 28 },
@@ -310,6 +315,14 @@ function construirRadicados(wb: ExcelJS.Workbook, radicados: VentanillaRadicado[
     { header: 'Solicitante',                key: 'solicitante',        width: 28 },
     { header: 'Documento',                  key: 'documento',          width: 16 },
     { header: 'Tipo Solicitud',             key: 'tipoSolicitud',      width: 22 },
+    { header: 'Tipo Solicitud ID',          key: 'tipoSolicitudId',    width: 24 },
+    { header: 'Categoría Solicitud',        key: 'categoriaSolicitud', width: 14 },
+    { header: 'Término Días',               key: 'terminoDias',        width: 12 },
+    { header: 'Tipo Días',                  key: 'tipoDias',           width: 12 },
+    { header: 'Requiere Validación Jurídica', key: 'reqValidJuridica', width: 16 },
+    { header: 'Heredado Sistema Actual',    key: 'heredado',           width: 16 },
+    { header: 'Tipo Reclasificado',         key: 'tipoReclasificado',  width: 16 },
+    { header: 'Tipo Original',              key: 'tipoOriginal',       width: 24 },
     { header: 'Forma Presentación PQRSD',   key: 'tipoPresentacion',   width: 18 },
     { header: 'Solicitud Anónima',          key: 'esAnonimo',          width: 12 },
     { header: 'Identidad Reservada',        key: 'reservada',          width: 14 },
@@ -342,6 +355,19 @@ function construirRadicados(wb: ExcelJS.Workbook, radicados: VentanillaRadicado[
                     : r.cumplioTermino === false ? 'No — fuera de término'
                     : 'Pendiente';
       const archivosCount = Array.isArray(r.archivos) ? r.archivos.length : 0;
+      const tipoIdRaw = r.termino?.tipoSolicitudId ?? '';
+      const definicionTipo = getTipoSolicitudById(tipoIdRaw);
+      const tipoOriginalAud = (() => {
+        if (!trazabilidadPorRadicadoLookup) return '';
+        const eventos = trazabilidadPorRadicadoLookup.get(r.radicadoId) ?? [];
+        const ultimaReclasif = [...eventos]
+          .reverse()
+          .find((ev) => ev.accion === 'TIPO_SOLICITUD_RECLASIFICADO');
+        if (!ultimaReclasif) return '';
+        const meta = ultimaReclasif.metadata as Record<string, unknown> | undefined;
+        const original = meta?.tipoAnteriorNombre;
+        return typeof original === 'string' ? original : '';
+      })();
       const row = ws.addRow({
         radicadoId:       s(r.radicadoId),
         fechaRadicacion:  s(r.control?.fechaRadicado, 'No registrada'),
@@ -350,6 +376,14 @@ function construirRadicados(wb: ExcelJS.Workbook, radicados: VentanillaRadicado[
         solicitante:      sv.nombre,
         documento:        sv.documento,
         tipoSolicitud:    s(r.termino?.tipoSolicitudNombre, '—'),
+        tipoSolicitudId:  s(tipoIdRaw, '—'),
+        categoriaSolicitud: definicionTipo?.categoria ?? '—',
+        terminoDias:      r.termino?.diasRespuesta ?? '—',
+        tipoDias:         s(r.termino?.unidad, '—'),
+        reqValidJuridica: definicionTipo?.requiereValidacionJuridica ? 'Sí' : 'No',
+        heredado:         definicionTipo?.heredadoSistemaActual ? 'Sí' : 'No',
+        tipoReclasificado: tipoOriginalAud ? 'Sí' : 'No',
+        tipoOriginal:     tipoOriginalAud || '—',
         tipoPresentacion: s(r.tipoPresentacion ?? (r.esAnonimo ? 'ANONIMA' : 'IDENTIFICADA')),
         esAnonimo:        r.esAnonimo ? 'Sí' : 'No',
         reservada:        debeOcultarIdentidad(r) && !r.esAnonimo ? 'Sí' : (r.identidadReservada ? 'Sí' : 'No'),
@@ -622,6 +656,11 @@ function construirDiccionario(wb: ExcelJS.Workbook) {
 
   const diccionario: Array<[string, string, string, string, string]> = [
     ['radicadoId', 'Identificador único del radicado en el formato 1-{CANAL}-{AÑO}-{CONSECUTIVO}.', 'ventanilla_radicados.radicadoId', 'Identificación oficial del trámite.', 'Inmutable. Generado por contador transaccional.'],
+    ['termino.tipoSolicitudId', 'Identificador del tipo de solicitud en el catálogo institucional.', 'ventanilla_radicados.termino.tipoSolicitudId · lib/catalogos/tipos-solicitud.ts', 'Clasificación legal y cálculo de términos.', 'Catálogo único centralizado. Cambios requieren evento TIPO_SOLICITUD_RECLASIFICADO.'],
+    ['categoriaSolicitud', 'Categoría del tipo de solicitud: PQRSD, TRAMITE, INTERNO o ESPECIAL.', 'lib/catalogos/tipos-solicitud.ts', 'Reportes MIPG y consulta pública.', 'Determina si es visible al ciudadano.'],
+    ['requiereValidacionJuridica', 'Bandera del catálogo que indica que el tipo requiere visto bueno jurídico antes de operar.', 'lib/catalogos/tipos-solicitud.ts', 'Control jurídico institucional.', 'Aplicada en tipos heredados del sistema actual: licencia construcción, querella, urgente, entre otros.'],
+    ['heredadoSistemaActual', 'Indica si el tipo fue incorporado desde el sistema interno previo a la Ventanilla Digital.', 'lib/catalogos/tipos-solicitud.ts', 'Trazabilidad de migración del catálogo.', 'Se valida jurídicamente antes del go-live oficial.'],
+    ['Tipo Reclasificado / Tipo Original', 'Indica si Ventanilla cambió el tipo del radicado y cuál era el original.', 'Subcolección trazabilidad — evento TIPO_SOLICITUD_RECLASIFICADO.', 'Auditoría de reclasificación interna.', 'Se conserva el nombre del tipo previo en metadata para evidencia MIPG.'],
     ['estadoActual', 'Estado del ciclo de vida del radicado.', 'ventanilla_radicados.estadoActual', 'Ciclo de vida MIPG.', 'PENDIENTE · EN_REVISION · ASIGNADO · EN_PROCESO · PRORROGA · RESUELTO · DEVUELTO · RECHAZADO.'],
     ['cumplioTermino', 'Indica si el radicado fue respondido dentro del término legal.', 'ventanilla_radicados.cumplioTermino', 'Medición de cumplimiento de términos.', 'Campo inmutable al resolver. true = en término · false = fuera de término · null = aún activo.'],
     ['esAnonimo', 'Indica si la solicitud fue presentada de forma anónima.', 'ventanilla_radicados.esAnonimo', 'Protege identidad — Ley 1755/2015 art. 14.', 'Si es true, no se exporta nombre/documento/correo.'],

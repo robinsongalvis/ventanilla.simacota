@@ -326,8 +326,8 @@ describe('generarReporteExcelMipg — libro completo', () => {
         origen: 'WEB',
       },
       termino: {
-        tipoSolicitudId: 'PETICION',
-        tipoSolicitudNombre: 'Petición',
+        tipoSolicitudId: 'PETICION_GENERAL',
+        tipoSolicitudNombre: 'Petición general (Derecho de petición)',
         diasRespuesta: 15,
         unidad: 'HABILES',
         fechaVencimiento: '', // ← inválido

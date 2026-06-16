@@ -7,8 +7,9 @@ import {
 } from '@/lib/tiempos-radicado';
 
 const TIPOS_REQUERIDOS: TipoSolicitudId[] = [
+  'PETICION_GENERAL',
   'PETICION_INFORMACION',
-  'PETICION_AUTORIDADES',
+  'CONSULTA',
   'QUEJA',
   'RECLAMO',
   'SUGERENCIA',
@@ -25,14 +26,14 @@ describe('Validación PQRSD — catálogo público y términos legales', () => {
   });
 
   it('mantiene los términos legales esperados por tipo', () => {
-    expect(TIPOS_SOLICITUD.PETICION.diasRespuesta).toBe(15);
-    expect(TIPOS_SOLICITUD.PETICION.unidad).toBe('HABILES');
+    expect(TIPOS_SOLICITUD.PETICION_GENERAL.diasRespuesta).toBe(15);
+    expect(TIPOS_SOLICITUD.PETICION_GENERAL.unidad).toBe('HABILES');
 
     expect(TIPOS_SOLICITUD.PETICION_INFORMACION.diasRespuesta).toBe(10);
     expect(TIPOS_SOLICITUD.PETICION_INFORMACION.unidad).toBe('HABILES');
 
-    expect(TIPOS_SOLICITUD.PETICION_AUTORIDADES.diasRespuesta).toBe(30);
-    expect(TIPOS_SOLICITUD.PETICION_AUTORIDADES.unidad).toBe('HABILES');
+    expect(TIPOS_SOLICITUD.CONSULTA.diasRespuesta).toBe(30);
+    expect(TIPOS_SOLICITUD.CONSULTA.unidad).toBe('HABILES');
 
     expect(TIPOS_SOLICITUD.QUEJA.diasRespuesta).toBe(15);
     expect(TIPOS_SOLICITUD.RECLAMO.diasRespuesta).toBe(15);
