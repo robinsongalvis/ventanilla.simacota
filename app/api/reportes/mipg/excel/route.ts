@@ -36,6 +36,7 @@ export async function POST(): Promise<NextResponse> {
   }
 
   const db = getFirebaseAdminDb();
+  const inicio = Date.now();
 
   try {
     // 1. Cargar radicados completos
@@ -43,31 +44,49 @@ export async function POST(): Promise<NextResponse> {
     const radicadosTotales = radSnap.docs.map((d) => d.data() as VentanillaRadicado);
     const visibles = radicadosVisiblesParaRol(radicadosTotales, usuario);
 
-    // 2. Cargar trazabilidad de cada radicado visible
+    // 2. Cargar trazabilidad de cada radicado visible — Promise.allSettled
+    //    para que un fallo individual NO aborte todo el reporte. La hoja
+    //    Trazabilidad simplemente muestra menos filas en ese caso.
     const trazabilidadPorRadicado = new Map<string, TrazabilidadRadicado[]>();
-    await Promise.all(
+    let radicadosConTrazaFallida = 0;
+    const cargas = await Promise.allSettled(
       visibles.map(async (r) => {
         const ts = await db
           .collection(`ventanilla_radicados/${r.radicadoId}/trazabilidad`)
           .orderBy('fecha', 'asc')
           .get();
-        trazabilidadPorRadicado.set(r.radicadoId, ts.docs.map((d) => d.data() as TrazabilidadRadicado));
+        return { radicadoId: r.radicadoId, docs: ts.docs.map((d) => d.data() as TrazabilidadRadicado) };
       }),
     );
+    for (const c of cargas) {
+      if (c.status === 'fulfilled') {
+        trazabilidadPorRadicado.set(c.value.radicadoId, c.value.docs);
+      } else {
+        radicadosConTrazaFallida += 1;
+        console.error('[MIPG_EXCEL_ERROR] trazabilidad', {
+          mensaje: c.reason instanceof Error ? c.reason.message : String(c.reason),
+        });
+      }
+    }
 
-    // 3. Cargar auditoría y feedback SIMI (filtrar por rol cuando aplique)
+    // 3. Cargar auditoría y feedback SIMI — best-effort, jamás bloquea
     let simiQuery: FirebaseFirestore.Query = db.collection('simi_auditoria');
     let feedbackQuery: FirebaseFirestore.Query = db.collection('simi_feedback');
     if (usuario.rol === 'FUNCIONARIO' || usuario.rol === 'JEFE_DEPENDENCIA') {
       simiQuery = simiQuery.where('tenantId', '==', usuario.tenantId);
       feedbackQuery = feedbackQuery.where('tenantId', '==', usuario.tenantId);
     }
-    const [simiSnap, feedbackSnap] = await Promise.all([
-      simiQuery.get().catch(() => ({ docs: [] as FirebaseFirestore.QueryDocumentSnapshot[] })),
-      feedbackQuery.get().catch(() => ({ docs: [] as FirebaseFirestore.QueryDocumentSnapshot[] })),
-    ]);
-    const simiAuditoria = simiSnap.docs.map((d) => d.data() as SimiAuditoriaRecord);
-    const simiFeedback  = feedbackSnap.docs.map((d) => d.data() as SimiFeedbackRecord);
+    const [simiRes, feedRes] = await Promise.allSettled([simiQuery.get(), feedbackQuery.get()]);
+    const simiAuditoria: SimiAuditoriaRecord[] = simiRes.status === 'fulfilled'
+      ? simiRes.value.docs.map((d) => d.data() as SimiAuditoriaRecord)
+      : (console.error('[MIPG_EXCEL_ERROR] simi_auditoria', {
+          mensaje: simiRes.reason instanceof Error ? simiRes.reason.message : String(simiRes.reason),
+        }), []);
+    const simiFeedback: SimiFeedbackRecord[] = feedRes.status === 'fulfilled'
+      ? feedRes.value.docs.map((d) => d.data() as SimiFeedbackRecord)
+      : (console.error('[MIPG_EXCEL_ERROR] simi_feedback', {
+          mensaje: feedRes.reason instanceof Error ? feedRes.reason.message : String(feedRes.reason),
+        }), []);
 
     // 4. Generar el libro
     const buffer = await generarReporteExcelMipg({
@@ -83,18 +102,40 @@ export async function POST(): Promise<NextResponse> {
       simiFeedback,
     });
 
+    console.log('[MIPG_EXCEL_OK]', {
+      rol: usuario.rol,
+      tenant: usuario.tenantId,
+      visibles: visibles.length,
+      trazaFallidas: radicadosConTrazaFallida,
+      simi: simiAuditoria.length,
+      feedback: simiFeedback.length,
+      ms: Date.now() - inicio,
+      bytes: buffer.byteLength,
+    });
+
     const filename = `Reporte_MIPG_Simacota_${new Date().toISOString().slice(0, 10)}.xlsx`;
     return new NextResponse(new Uint8Array(buffer), {
       status: 200,
       headers: {
         'Content-Type': 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
         'Content-Disposition': `attachment; filename="${filename}"`,
+        'Content-Length': String(buffer.byteLength),
         'Cache-Control': 'no-store',
       },
     });
   } catch (err) {
     const msg = err instanceof Error ? err.message : String(err);
-    console.error('[api/reportes/mipg/excel]', msg);
-    return NextResponse.json({ error: 'No fue posible generar el reporte Excel.', detalle: msg.slice(0, 200) }, { status: 500 });
+    const stack = err instanceof Error ? err.stack?.split('\n').slice(0, 5).join('\n') : '';
+    console.error('[MIPG_EXCEL_ERROR] fatal', {
+      rol: usuario.rol,
+      tenant: usuario.tenantId,
+      ms: Date.now() - inicio,
+      mensaje: msg,
+      stack,
+    });
+    return NextResponse.json(
+      { error: 'No fue posible generar el reporte Excel.', detalle: msg.slice(0, 300) },
+      { status: 500 },
+    );
   }
 }

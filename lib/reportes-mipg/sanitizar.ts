@@ -50,11 +50,12 @@ export function solicitanteVisible(r: VentanillaRadicado): SolicitanteVisible {
       direccion: PLACEHOLDER_NO_DISPONIBLE,
     };
   }
+  const s = r.solicitante ?? ({} as Partial<VentanillaRadicado['solicitante']>);
   return {
-    nombre:    r.solicitante.nombreCompleto || PLACEHOLDER_NO_DISPONIBLE,
-    documento: r.solicitante.numeroDocumento || PLACEHOLDER_NO_DISPONIBLE,
-    correo:    r.solicitante.email ?? PLACEHOLDER_NO_DISPONIBLE,
-    direccion: r.solicitante.direccion ?? PLACEHOLDER_NO_DISPONIBLE,
+    nombre:    s.nombreCompleto?.trim() || PLACEHOLDER_NO_DISPONIBLE,
+    documento: s.numeroDocumento?.trim() || PLACEHOLDER_NO_DISPONIBLE,
+    correo:    s.email?.trim() || PLACEHOLDER_NO_DISPONIBLE,
+    direccion: s.direccion?.trim() || PLACEHOLDER_NO_DISPONIBLE,
   };
 }
 
@@ -67,11 +68,12 @@ export interface ResponsableVisible {
 }
 
 export function responsableVisible(r: VentanillaRadicado): ResponsableVisible {
+  const c = r.clasificacion ?? ({} as Partial<VentanillaRadicado['clasificacion']>);
   return {
-    nombre: r.clasificacion.funcionarioResponsableNombre ?? 'No asignado',
-    email:  r.clasificacion.funcionarioResponsableEmail  ?? '—',
-    rol:    r.clasificacion.funcionarioResponsableRol    ?? '—',
-    cargo:  r.clasificacion.funcionarioResponsableCargo  ?? '—',
+    nombre: c.funcionarioResponsableNombre ?? 'No asignado',
+    email:  c.funcionarioResponsableEmail  ?? '—',
+    rol:    c.funcionarioResponsableRol    ?? '—',
+    cargo:  c.funcionarioResponsableCargo  ?? '—',
   };
 }
 
