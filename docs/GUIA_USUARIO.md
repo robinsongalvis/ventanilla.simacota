@@ -15,6 +15,24 @@
 
 ---
 
+## Encontrar radicados antiguos
+
+Sobre la tabla maestra del dashboard hay un botón **Filtros avanzados**. Al
+abrirlo aparece un panel con filtros para fecha, dependencia, estado, tipo de
+solicitud, responsable, solicitante, documento, correo, asunto y banderas
+(anónimo, reservado, cumplió término, notificación fallida, con respuesta
+oficial). Los presets de fecha permiten escoger **Hoy**, **Esta semana**,
+**Este mes**, **Mes anterior**, **Año actual** o un rango personalizado.
+
+Los resultados se paginan (25/50/100 por página) y se ordenan por fecha de
+radicación descendente. El botón **Exportar Excel filtrado** descarga el reporte
+MIPG con los radicados que cumplen los filtros aplicados.
+
+Cada funcionario solo verá los radicados de su propia dependencia; la
+Administración, Recepción y Control Interno ven el histórico completo.
+
+Detalles técnicos: `docs/BUSQUEDA_HISTORICA.md`.
+
 ## Tipos de solicitud
 
 Los tipos disponibles para el ciudadano (formulario público `/radicacion`) son

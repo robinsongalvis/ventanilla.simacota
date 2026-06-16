@@ -1,5 +1,27 @@
 # Guía de Administrador
 
+## Búsqueda histórica avanzada
+
+El módulo de Búsqueda Histórica (Sprint 2) requiere los índices declarados en
+`firestore.indexes.json`. Para desplegarlos:
+
+```bash
+firebase deploy --only firestore:indexes
+```
+
+Verifica en la consola de Firebase → Firestore → Índices que todos queden en
+estado **Activo** antes de habilitar la búsqueda en producción.
+
+Permisos:
+
+- ADMIN, CONTROL_INTERNO y RECEPCIONISTA acceden a todo el histórico.
+- FUNCIONARIO y JEFE_DEPENDENCIA solo a su propia dependencia (filtrado
+  server-side por `clasificacion.oficinaDestino`).
+
+El endpoint sanitiza la respuesta antes de devolverla al cliente: identidad de
+anónimos/reservados, UID del responsable y `archivoPath` de Storage no salen
+nunca al frontend. Ver `docs/BUSQUEDA_HISTORICA.md`.
+
 ## Catálogo de tipos de solicitud
 
 Los tipos de solicitud (PQRSD y trámites internos) están centralizados en

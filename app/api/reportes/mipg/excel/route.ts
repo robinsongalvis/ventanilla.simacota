@@ -7,6 +7,11 @@ import { getFirebaseAdminDb } from '@/lib/firebase-admin';
 import { generarReporteExcelMipg, type SimiAuditoriaRecord, type SimiFeedbackRecord } from '@/lib/reportes-mipg/excel';
 import { radicadosVisiblesParaRol } from '@/lib/reportes-mipg/sanitizar';
 import type { TrazabilidadRadicado, VentanillaRadicado } from '@/src/types/ventanilla';
+import {
+  filtrarRadicados,
+  type AlcanceRol,
+  type FiltrosBusqueda,
+} from '@/lib/busqueda/filtros-radicado';
 
 export const runtime = 'nodejs';
 
@@ -24,7 +29,7 @@ export const runtime = 'nodejs';
    Devuelve el .xlsx como attachment con Content-Disposition.
 ══════════════════════════════════════════════════════════════ */
 
-export async function POST(): Promise<NextResponse> {
+export async function POST(request: Request): Promise<NextResponse> {
   let usuario;
   try {
     usuario = await requireActiveInternalUser();
@@ -35,6 +40,19 @@ export async function POST(): Promise<NextResponse> {
     return NextResponse.json({ error: 'No autorizado.' }, { status: 401 });
   }
 
+  // Sprint 2: el body puede contener `filtros` para exportar resultados de la
+  // búsqueda histórica. Se ignora silenciosamente si el cuerpo está vacío.
+  let filtros: FiltrosBusqueda = {};
+  try {
+    const body = await request.json().catch(() => null) as { filtros?: FiltrosBusqueda } | null;
+    if (body?.filtros && typeof body.filtros === 'object') {
+      filtros = body.filtros;
+    }
+  } catch {
+    filtros = {};
+  }
+  const hayFiltros = Object.values(filtros).some((v) => v !== '' && v !== null && v !== undefined);
+
   const db = getFirebaseAdminDb();
   const inicio = Date.now();
 
@@ -42,7 +60,12 @@ export async function POST(): Promise<NextResponse> {
     // 1. Cargar radicados completos
     const radSnap = await db.collection('ventanilla_radicados').get();
     const radicadosTotales = radSnap.docs.map((d) => d.data() as VentanillaRadicado);
-    const visibles = radicadosVisiblesParaRol(radicadosTotales, usuario);
+    let visibles = radicadosVisiblesParaRol(radicadosTotales, usuario);
+
+    if (hayFiltros) {
+      const alcance: AlcanceRol = { rol: usuario.rol, tenantId: usuario.tenantId };
+      visibles = filtrarRadicados(visibles, filtros, alcance);
+    }
 
     // 2. Cargar trazabilidad de cada radicado visible — Promise.allSettled
     //    para que un fallo individual NO aborte todo el reporte. La hoja
@@ -89,6 +112,9 @@ export async function POST(): Promise<NextResponse> {
         }), []);
 
     // 4. Generar el libro
+    //    Cuando hay filtros activos, pasamos `visibles` ya filtrados — el
+    //    composer aplica visibilidad por rol idempotentemente, pero los filtros
+    //    finos (fecha, dependencia, tipo, etc.) solo viven aquí.
     const buffer = await generarReporteExcelMipg({
       usuario: {
         uid:      usuario.uid,
@@ -96,10 +122,11 @@ export async function POST(): Promise<NextResponse> {
         rol:      usuario.rol,
         tenantId: usuario.tenantId,
       },
-      radicados: radicadosTotales, // el composer aplica radicadosVisiblesParaRol internamente
+      radicados: hayFiltros ? visibles : radicadosTotales,
       trazabilidadPorRadicado,
       simiAuditoria,
       simiFeedback,
+      filtrosAplicados: hayFiltros ? (filtros as Record<string, unknown>) : undefined,
     });
 
     console.log('[MIPG_EXCEL_OK]', {

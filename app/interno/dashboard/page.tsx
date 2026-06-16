@@ -15,6 +15,7 @@ import { RadicacionFuncionarioForm }       from '@/app/interno/recepcion/compone
 import { radicarInstitucionalmente }       from '@/lib/actions/radicarVentanilla';
 import { asignarRadicado, asignarMasivo }  from '@/lib/actions/asignarRadicado';
 import { ComprobanteRadicado }             from '@/app/interno/dashboard/components/ComprobanteRadicado';
+import { BusquedaAvanzadaPanel }           from '@/app/interno/dashboard/components/BusquedaAvanzadaPanel';
 import { PanelCargaDependencias }          from '@/app/interno/dashboard/components/dependencias/PanelCargaDependencias';
 import { VistaAnalytics }                  from '@/app/interno/dashboard/components/analytics/VistaAnalytics';
 import { VistaAlertas, contarAlertasActivas } from '@/app/interno/dashboard/components/analytics/VistaAlertas';
@@ -997,6 +998,7 @@ function TablaRadicados({
   onSeleccionar,
   onNuevoRadicado,
   puedeRadicar,
+  onAbrirBusquedaAvanzada,
 }: {
   radicados:              VentanillaRadicado[];
   cargando:               boolean;
@@ -1007,6 +1009,7 @@ function TablaRadicados({
   onSeleccionar:          (r: VentanillaRadicado) => void;
   onNuevoRadicado:        () => void;
   puedeRadicar:           boolean;
+  onAbrirBusquedaAvanzada?: () => void;
 }) {
   return (
     <div className="flex-1 flex flex-col overflow-hidden min-h-0">
@@ -1030,6 +1033,20 @@ function TablaRadicados({
           />
         </div>
         <span className="text-xs shrink-0" style={{ color: '#94A3B8' }}>{radicados.length} resultado{radicados.length !== 1 ? 's' : ''}</span>
+        {onAbrirBusquedaAvanzada && (
+          <button
+            onClick={onAbrirBusquedaAvanzada}
+            type="button"
+            className="shrink-0 flex items-center gap-1.5 px-3 py-2 rounded-lg text-xs font-bold focus-visible:outline-none border"
+            style={{ background: 'white', color: '#14532D', borderColor: '#14532D' }}
+            title="Búsqueda histórica avanzada (Sprint 2)"
+          >
+            <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+              <path strokeLinecap="round" strokeLinejoin="round" d="M3 4a1 1 0 011-1h16a1 1 0 011 1v2a1 1 0 01-.293.707L14 13.414V19a1 1 0 01-.553.894l-4 2A1 1 0 018 21v-7.586L3.293 6.707A1 1 0 013 6V4z" />
+            </svg>
+            Filtros avanzados
+          </button>
+        )}
         {puedeRadicar && (
           <button
             onClick={onNuevoRadicado}
@@ -2505,9 +2522,16 @@ function exportarCSVMIPG(radicados: VentanillaRadicado[]): void {
   URL.revokeObjectURL(url);
 }
 
-async function descargarExcelMipg(): Promise<{ ok: boolean; error?: string }> {
+async function descargarExcelMipg(filtros?: Record<string, unknown>): Promise<{ ok: boolean; error?: string }> {
   try {
-    const res = await fetch('/api/reportes/mipg/excel', { method: 'POST', credentials: 'include' });
+    const hayFiltros = filtros && Object.values(filtros).some((v) => v !== '' && v !== null && v !== undefined);
+    const res = await fetch('/api/reportes/mipg/excel', {
+      method: 'POST',
+      credentials: 'include',
+      ...(hayFiltros
+        ? { headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ filtros }) }
+        : {}),
+    });
     if (!res.ok) {
       // Lee como texto y trata de parsear JSON si aplica. Si el server
       // devolvió HTML (p. ej. 500 sin handler) lo muestra recortado.
@@ -2940,6 +2964,7 @@ function DashboardInterior({ usuario, cerrarSesion }: { usuario: UsuarioAutentic
   const esAdmin = usuario.rol === 'ADMIN' || usuario.rol === 'CONTROL_INTERNO';
   const tienePermisoRadicar = puedeRadicar(usuario);
   const tienePermisoBandeja = puedeUsarBandejaAsignacion(usuario);
+  const [busquedaAvanzadaAbierta, setBusquedaAvanzadaAbierta] = useState(false);
   /** Roles de solo lectura: pueden ver pero no ejecutar acciones sobre radicados. */
   const esVistaReadOnly = usuario.rol === 'JEFE_DEPENDENCIA' || usuario.rol === 'CONTROL_INTERNO';
 
@@ -3113,6 +3138,7 @@ function DashboardInterior({ usuario, cerrarSesion }: { usuario: UsuarioAutentic
                 if (tienePermisoRadicar) dispatch({ type: 'TOGGLE_DRAWER_NUEVO' });
               }}
               puedeRadicar={tienePermisoRadicar}
+              onAbrirBusquedaAvanzada={() => setBusquedaAvanzadaAbierta(true)}
             />
           </>
         )}
@@ -3153,6 +3179,19 @@ function DashboardInterior({ usuario, cerrarSesion }: { usuario: UsuarioAutentic
           onCerrar={() => dispatch({ type: 'CERRAR_DRAWER_NUEVO' })}
         />
       )}
+
+      {/* ── Sprint 2: Búsqueda Histórica Avanzada ── */}
+      <BusquedaAvanzadaPanel
+        abierto={busquedaAvanzadaAbierta}
+        onCerrar={() => setBusquedaAvanzadaAbierta(false)}
+        onSeleccionar={(r) => {
+          dispatch({ type: 'SELECCIONAR_RADICADO', radicado: r });
+          setBusquedaAvanzadaAbierta(false);
+        }}
+        onExportarExcel={async (filtros) => {
+          await descargarExcelMipg(filtros as Record<string, unknown>);
+        }}
+      />
 
       {menuMovilAbierto && (
         <div className="fixed inset-0 z-50 md:hidden">
