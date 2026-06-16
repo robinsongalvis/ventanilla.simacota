@@ -2509,10 +2509,26 @@ async function descargarExcelMipg(): Promise<{ ok: boolean; error?: string }> {
   try {
     const res = await fetch('/api/reportes/mipg/excel', { method: 'POST', credentials: 'include' });
     if (!res.ok) {
-      const data = await res.json().catch(() => null) as { error?: string } | null;
-      return { ok: false, error: data?.error ?? `HTTP ${res.status}` };
+      // Lee como texto y trata de parsear JSON si aplica. Si el server
+      // devolvió HTML (p. ej. 500 sin handler) lo muestra recortado.
+      const raw = await res.text().catch(() => '');
+      let parsed: { error?: string; detalle?: string } | null = null;
+      try { parsed = JSON.parse(raw) as { error?: string; detalle?: string }; } catch { /* no-json */ }
+      const msg = parsed?.detalle
+        ? `${parsed.error ?? 'Error'} (${parsed.detalle})`
+        : parsed?.error ?? raw.slice(0, 200) ?? `HTTP ${res.status}`;
+      return { ok: false, error: msg };
+    }
+    // Verifica Content-Type antes de descargar para no entregar un HTML
+    // como si fuera xlsx.
+    const ct = res.headers.get('content-type') ?? '';
+    if (!ct.includes('spreadsheetml')) {
+      return { ok: false, error: `Respuesta inesperada del servidor (content-type: ${ct || 'desconocido'}). Revise logs del backend.` };
     }
     const blob = await res.blob();
+    if (blob.size === 0) {
+      return { ok: false, error: 'El servidor devolvió un archivo vacío. Revise logs del backend.' };
+    }
     const cd = res.headers.get('content-disposition') ?? '';
     const m  = cd.match(/filename="([^"]+)"/);
     const filename = m?.[1] ?? `Reporte_MIPG_Simacota_${new Date().toISOString().slice(0, 10)}.xlsx`;

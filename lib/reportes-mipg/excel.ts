@@ -1,8 +1,6 @@
 import ExcelJS from 'exceljs';
 import type { VentanillaRadicado, TrazabilidadRadicado } from '@/src/types/ventanilla';
 import { NOMBRES_TENANT } from '@/src/types/reglas-negocio';
-import { diasRestantesHabiles } from '@/lib/tiempos-radicado';
-import { calcularSemaforo } from '@/app/interno/dashboard/components/mipg/SemaforoTermino';
 import {
   debeOcultarIdentidad,
   nombreOficioPublico,
@@ -17,6 +15,22 @@ import {
   extraerNotificaciones,
   type IndicadoresMipg,
 } from './indicadores';
+import { estadoTerminoServer } from './estado-termino';
+
+/* ══════════════════════════════════════════════════════════════
+   Helper defensivo: lee strings con fallback. Evita que un
+   `undefined` o `null` rompa la generación del libro.
+══════════════════════════════════════════════════════════════ */
+function s(v: unknown, fallback = '—'): string {
+  if (v === null || v === undefined) return fallback;
+  if (typeof v === 'string') return v.trim().length > 0 ? v : fallback;
+  return String(v);
+}
+
+function nombreDependencia(tenantId: unknown): string {
+  if (typeof tenantId !== 'string') return '—';
+  return NOMBRES_TENANT[tenantId as keyof typeof NOMBRES_TENANT] ?? tenantId;
+}
 
 /* ══════════════════════════════════════════════════════════════
    Composer del Reporte Excel MIPG institucional.
@@ -317,55 +331,69 @@ function construirRadicados(wb: ExcelJS.Workbook, radicados: VentanillaRadicado[
   aplicarEstiloEncabezado(ws.getRow(1));
 
   for (const r of radicados) {
-    const sv = solicitanteVisible(r);
-    const rv = responsableVisible(r);
-    const sem = calcularSemaforo(r);
-    const diasRestantes = diasRestantesHabiles(r.termino.fechaVencimiento);
-    const cumplio = r.cumplioTermino === true ? 'Sí — en término'
-                  : r.cumplioTermino === false ? 'No — fuera de término'
-                  : 'Pendiente';
-    const row = ws.addRow({
-      radicadoId:       r.radicadoId,
-      fechaRadicacion:  r.control.fechaRadicado,
-      horaRadicacion:   r.control.horaRadicado,
-      medio:            r.control.medioRecepcion,
-      solicitante:      sv.nombre,
-      documento:        sv.documento,
-      tipoSolicitud:    r.termino.tipoSolicitudNombre,
-      tipoPresentacion: r.tipoPresentacion ?? (r.esAnonimo ? 'ANONIMA' : 'IDENTIFICADA'),
-      esAnonimo:        r.esAnonimo ? 'Sí' : 'No',
-      reservada:        debeOcultarIdentidad(r) && !r.esAnonimo ? 'Sí' : (r.identidadReservada ? 'Sí' : 'No'),
-      canalRespuesta:   r.canalRespuesta ?? 'No registrado',
-      dependencia:      NOMBRES_TENANT[r.clasificacion.oficinaDestino] ?? r.clasificacion.oficinaDestino,
-      respNombre:       rv.nombre,
-      respEmail:        rv.email,
-      respRol:          rv.rol,
-      estado:           r.estadoActual,
-      fechaLimite:      r.termino.fechaVencimiento,
-      diasRestantes,
-      estadoTermino:    sem.estado,
-      fechaResp:        r.respuestaOficial?.fecha ?? '—',
-      cumplio,
-      tieneAnexos:      r.archivos.length > 0 ? `Sí (${r.archivos.length})` : 'No',
-      tieneRespuesta:   r.respuestaOficial?.nota ? `Sí${r.respuestaOficial.archivoNombre ? ' + oficio' : ''}` : 'No',
-      notifFallida:     r.alertaNotificacionFallida === true ? 'Sí — sin gestionar' : 'No',
-    });
-    aplicarBordeFila(row);
-    // Colorea fila por estado de término
-    const estadoCell = row.getCell('estadoTermino');
-    if (sem.estado === 'VENCIDO')   pintarEstado(estadoCell, 'CRITICO');
-    else if (sem.estado === 'POR_VENCER') pintarEstado(estadoCell, 'ATENCION');
-    else if (sem.estado === 'RESUELTO') pintarEstado(estadoCell, 'BUENO');
-    else pintarEstado(estadoCell, 'INFO');
-    if (r.alertaNotificacionFallida === true) {
-      pintarEstado(row.getCell('notifFallida'), 'CRITICO');
+    // Cada radicado se procesa con defensas: si un campo viene undefined
+    // (radicado legacy o documento parcial) se sustituye por '—' / 'No
+    // registrado' antes de pasarlo a ExcelJS.
+    try {
+      const sv  = solicitanteVisible(r);
+      const rv  = responsableVisible(r);
+      const sem = estadoTerminoServer(r);
+      const cumplio = r.cumplioTermino === true ? 'Sí — en término'
+                    : r.cumplioTermino === false ? 'No — fuera de término'
+                    : 'Pendiente';
+      const archivosCount = Array.isArray(r.archivos) ? r.archivos.length : 0;
+      const row = ws.addRow({
+        radicadoId:       s(r.radicadoId),
+        fechaRadicacion:  s(r.control?.fechaRadicado, 'No registrada'),
+        horaRadicacion:   s(r.control?.horaRadicado, '—'),
+        medio:            s(r.control?.medioRecepcion, '—'),
+        solicitante:      sv.nombre,
+        documento:        sv.documento,
+        tipoSolicitud:    s(r.termino?.tipoSolicitudNombre, '—'),
+        tipoPresentacion: s(r.tipoPresentacion ?? (r.esAnonimo ? 'ANONIMA' : 'IDENTIFICADA')),
+        esAnonimo:        r.esAnonimo ? 'Sí' : 'No',
+        reservada:        debeOcultarIdentidad(r) && !r.esAnonimo ? 'Sí' : (r.identidadReservada ? 'Sí' : 'No'),
+        canalRespuesta:   s(r.canalRespuesta, 'No registrado'),
+        dependencia:      nombreDependencia(r.clasificacion?.oficinaDestino),
+        respNombre:       rv.nombre,
+        respEmail:        rv.email,
+        respRol:          rv.rol,
+        estado:           s(r.estadoActual),
+        fechaLimite:      s(r.termino?.fechaVencimiento, 'No registrada'),
+        diasRestantes:    sem.diasRestantes,
+        estadoTermino:    sem.estado,
+        fechaResp:        s(r.respuestaOficial?.fecha),
+        cumplio,
+        tieneAnexos:      archivosCount > 0 ? `Sí (${archivosCount})` : 'No',
+        tieneRespuesta:   r.respuestaOficial?.nota ? `Sí${r.respuestaOficial.archivoNombre ? ' + oficio' : ''}` : 'No',
+        notifFallida:     r.alertaNotificacionFallida === true ? 'Sí — sin gestionar' : 'No',
+      });
+      aplicarBordeFila(row);
+      // Colorea fila por estado de término
+      const estadoCell = row.getCell('estadoTermino');
+      if (sem.estado === 'VENCIDO')        pintarEstado(estadoCell, 'CRITICO');
+      else if (sem.estado === 'POR_VENCER') pintarEstado(estadoCell, 'ATENCION');
+      else if (sem.estado === 'RESUELTO')   pintarEstado(estadoCell, 'BUENO');
+      else                                  pintarEstado(estadoCell, 'INFO');
+      if (r.alertaNotificacionFallida === true) {
+        pintarEstado(row.getCell('notifFallida'), 'CRITICO');
+      }
+      // Aviso visible cuando es anónimo o el oficio existe
+      if (debeOcultarIdentidad(r)) {
+        row.getCell('solicitante').font = { italic: true, color: { argb: 'FF475569' } };
+      }
+      void nombreOficioPublico(r);
+    } catch (err) {
+      // No abortar todo el reporte por una fila corrupta.
+      console.error('[MIPG_EXCEL_ERROR] fila omitida', {
+        radicadoId: r?.radicadoId ?? '?',
+        mensaje: err instanceof Error ? err.message : String(err),
+      });
+      ws.addRow({
+        radicadoId:       s(r?.radicadoId, '?'),
+        fechaRadicacion:  'Error al procesar — registro omitido',
+      });
     }
-    // Aviso visible cuando es anónimo o el oficio existe
-    if (debeOcultarIdentidad(r)) {
-      row.getCell('solicitante').font = { italic: true, color: { argb: 'FF475569' } };
-    }
-    // No exponer archivoPath; nombreOficioPublico se documenta como dato público
-    void nombreOficioPublico(r);
   }
 
   ws.autoFilter = { from: { row: 1, column: 1 }, to: { row: 1, column: ws.columnCount } };

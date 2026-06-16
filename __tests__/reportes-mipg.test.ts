@@ -299,6 +299,74 @@ describe('generarReporteExcelMipg — libro completo', () => {
     expect(textoCompleto).not.toContain('\nB\n');
   }, TIMEOUT);
 
+  it('genera el libro aun con radicados parciales / sin trazabilidad / sin SIMI', async () => {
+    // Reproduce el escenario que rompía en producción: radicados legacy
+    // sin todos los campos opcionales.
+    const parcial = {
+      radicadoId: 'LEGACY-001',
+      estadoActual: 'PENDIENTE',
+      // ultimaActualizacion ausente
+      // prioridad ausente
+      // esAnonimo / tipoPresentacion ausentes
+      // canalRespuesta ausente
+      // solicitante con campos vacíos
+      solicitante: {
+        tipoPersona: 'NATURAL',
+        tipoDocumento: 'OTRO',
+        numeroDocumento: '',
+        nombreCompleto: '',
+        ubicacion: { pais: 'Colombia', departamento: 'Santander', municipio: 'Simacota' },
+      },
+      control: {
+        radicadoId: 'LEGACY-001',
+        consecutivo: 1,
+        fechaRadicado: '2026-06-01T10:00:00.000Z',
+        horaRadicado: '10:00',
+        medioRecepcion: 'WEB',
+        origen: 'WEB',
+      },
+      termino: {
+        tipoSolicitudId: 'PETICION',
+        tipoSolicitudNombre: 'Petición',
+        diasRespuesta: 15,
+        unidad: 'HABILES',
+        fechaVencimiento: '', // ← inválido
+        prorrogasAplicadas: 0,
+      },
+      clasificacion: {
+        oficinaDestino: 'SEC_GOBIERNO',
+        zonaGeografica: 'CASCO_URBANO',
+        // sin funcionarioResponsable*
+      },
+      detalle: { asunto: '', descripcion: '', numeroFolios: 0 },
+      archivos: [], // ok
+      // respuestaOficial ausente
+    } as unknown as VentanillaRadicado;
+
+    const buf = await generarReporteExcelMipg({
+      usuario: USUARIO_ADMIN,
+      radicados: [parcial],
+      trazabilidadPorRadicado: new Map(), // sin trazabilidad
+      simiAuditoria: [],                  // sin SIMI
+      simiFeedback: [],                   // sin feedback
+    });
+    expect(buf).toBeInstanceOf(Buffer);
+    const wb = new ExcelJS.Workbook();
+    await wb.xlsx.load(buf as unknown as ExcelJS.Buffer);
+
+    // El libro tiene las 8 hojas siempre, incluso sin datos.
+    const hojas = wb.worksheets.map((w) => w.name);
+    expect(hojas).toHaveLength(8);
+
+    // La fila del radicado se generó con fallbacks (no se omitió).
+    const ws = wb.getWorksheet('Radicados')!;
+    let textoCompleto = '';
+    ws.eachRow((row) => { row.eachCell((c) => { textoCompleto += '\n' + String(c.value ?? ''); }); });
+    expect(textoCompleto).toContain('LEGACY-001');
+    expect(textoCompleto).toContain('No asignado'); // responsable fallback
+    expect(textoCompleto).toContain('No disponible'); // solicitante sin nombre
+  }, TIMEOUT);
+
   it('hoja Trazabilidad separa eventos en filas, no rompe la hoja Radicados', async () => {
     const traza: TrazabilidadRadicado[] = [
       { fecha: '2026-06-01T10:00:00Z', accion: 'RADICACION' as const, actorUid: 's', actorNombre: 'Portal', nota: 'Radicado creado' },

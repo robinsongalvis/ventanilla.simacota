@@ -254,7 +254,14 @@ export function calcularFechaVencimiento(
 
 export function diasRestantesHabiles(fechaVencimiento: string | Date, desde: string | Date = new Date()): number {
   const fin = atLocalNoon(fechaVencimiento);
-  let cursor = atLocalNoon(desde);
+  const cursorInicial = atLocalNoon(desde);
+  // Defensa contra fechas inválidas: si cualquiera de los extremos no es
+  // una fecha válida, devolver 0. Sin esta guarda el `while` de abajo
+  // entraría en loop infinito (toDateOnly de Invalid Date nunca cuadra).
+  if (Number.isNaN(fin.getTime()) || Number.isNaN(cursorInicial.getTime())) {
+    return 0;
+  }
+  let cursor = cursorInicial;
   const direction = cursor <= fin ? 1 : -1;
   let count = 0;
 
