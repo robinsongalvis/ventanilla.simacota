@@ -90,6 +90,11 @@ export interface ReporteExcelInput {
   simiAuditoria:             SimiAuditoriaRecord[];
   simiFeedback:              SimiFeedbackRecord[];
   rangoFechas?:              { desde?: string; hasta?: string };
+  /**
+   * Sprint 2 — Búsqueda histórica avanzada.
+   * Cuando viene definido, el resumen ejecutivo indica los filtros activos.
+   */
+  filtrosAplicados?:         Record<string, unknown>;
 }
 
 /* ── helpers de estilo ─────────────────────────────────────── */
@@ -150,7 +155,7 @@ function pintarEstado(cell: ExcelJS.Cell, estado: 'BUENO' | 'ATENCION' | 'CRITIC
 ══════════════════════════════════════════════════════════════ */
 
 export async function generarReporteExcelMipg(input: ReporteExcelInput): Promise<Buffer> {
-  const { usuario, trazabilidadPorRadicado, simiAuditoria, simiFeedback, rangoFechas } = input;
+  const { usuario, trazabilidadPorRadicado, simiAuditoria, simiFeedback, rangoFechas, filtrosAplicados } = input;
 
   // Filtro por rol
   const radicados = radicadosVisiblesParaRol(input.radicados, usuario);
@@ -166,7 +171,7 @@ export async function generarReporteExcelMipg(input: ReporteExcelInput): Promise
   const notificaciones = extraerNotificaciones(trazabilidadPorRadicado);
 
   // El orden importa: las hojas aparecen en este orden en Excel.
-  construirResumenEjecutivo(wb, usuario, indicadores, radicados.length, rangoFechas);
+  construirResumenEjecutivo(wb, usuario, indicadores, radicados.length, rangoFechas, filtrosAplicados);
   construirIndicadoresMipg(wb, indicadores);
   construirRadicados(wb, radicados, trazabilidadPorRadicado);
   construirTrazabilidad(wb, trazabilidadPorRadicado);
@@ -180,12 +185,45 @@ export async function generarReporteExcelMipg(input: ReporteExcelInput): Promise
 }
 
 /* ── Hoja 1: Resumen Ejecutivo ────────────────────────────── */
+const ETIQUETAS_FILTROS: Record<string, string> = {
+  q: 'Búsqueda rápida',
+  radicadoId: 'Radicado',
+  nombre: 'Solicitante',
+  documento: 'Documento',
+  correo: 'Correo',
+  asunto: 'Asunto',
+  tipoSolicitudId: 'Tipo solicitud',
+  categoria: 'Categoría',
+  dependencia: 'Dependencia',
+  responsable: 'Responsable',
+  estado: 'Estado',
+  fechaDesde: 'Fecha desde',
+  fechaHasta: 'Fecha hasta',
+  mes: 'Mes',
+  anio: 'Año',
+  canalRespuesta: 'Canal de respuesta',
+  anonimo: 'Anónimo',
+  reservado: 'Reservado',
+  cumplioTermino: 'Cumplió término',
+  conNotificacionFallida: 'Con notificación fallida',
+  conRespuestaOficial: 'Con respuesta oficial',
+};
+
+function describirFiltro(clave: string, valor: unknown): string {
+  if (clave === 'dependencia' && typeof valor === 'string') {
+    return NOMBRES_TENANT[valor as keyof typeof NOMBRES_TENANT] ?? valor;
+  }
+  if (typeof valor === 'boolean') return valor ? 'Sí' : 'No';
+  return String(valor ?? '');
+}
+
 function construirResumenEjecutivo(
   wb: ExcelJS.Workbook,
   usuario: UsuarioReporte,
   ind: IndicadoresMipg,
   totalVisibles: number,
   rangoFechas?: { desde?: string; hasta?: string },
+  filtrosAplicados?: Record<string, unknown>,
 ) {
   const ws = wb.addWorksheet('Resumen Ejecutivo', { properties: { tabColor: { argb: 'FF' + COLOR.VERDE_INST } } });
   ws.columns = [{ width: 40 }, { width: 50 }];
@@ -242,6 +280,24 @@ function construirResumenEjecutivo(
     const row = ws.addRow([k, v]);
     aplicarBordeFila(row);
   });
+
+  // Sprint 2 — Filtros aplicados
+  if (filtrosAplicados) {
+    const entradas = Object.entries(filtrosAplicados).filter(
+      ([, v]) => v !== '' && v !== null && v !== undefined,
+    );
+    if (entradas.length > 0) {
+      ws.addRow([]);
+      const headerFiltros = ws.addRow(['Filtros aplicados', '']);
+      aplicarEstiloEncabezado(headerFiltros);
+      for (const [k, v] of entradas) {
+        const etiqueta = ETIQUETAS_FILTROS[k] ?? k;
+        const row = ws.addRow([etiqueta, describirFiltro(k, v)]);
+        row.getCell(1).font = { bold: true };
+        aplicarBordeFila(row);
+      }
+    }
+  }
 
   // Conclusión automática
   ws.addRow([]);

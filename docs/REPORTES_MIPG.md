@@ -9,6 +9,12 @@
 > jurídica, herencia del sistema actual y, si aplica, el tipo original previo
 > a la reclasificación interna. Ver `docs/CATALOGO_SOLICITUDES.md`.
 
+> **Sprint Búsqueda Histórica (2026-06-16):** el botón **Exportar Excel MIPG**
+> respeta los filtros activos de la **Búsqueda Histórica Avanzada**
+> (`docs/BUSQUEDA_HISTORICA.md`). Cuando hay filtros, el Resumen Ejecutivo
+> incluye una sección "Filtros aplicados" con la lista completa, y solo se
+> exportan los radicados que cumplen los filtros y son visibles para el rol.
+
 ---
 
 ## 1. Qué entrega el módulo

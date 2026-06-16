@@ -12,6 +12,16 @@ https://ventanilla-simacota.vercel.app
 
 El sistema puede usarse para pruebas internas con funcionarios y usuarios autorizados.
 
+## Búsqueda histórica avanzada
+
+Durante la preoperación se habilitó la **Búsqueda Histórica Avanzada**
+(`docs/BUSQUEDA_HISTORICA.md`) sobre `ventanilla_radicados`. El módulo permite
+encontrar radicados antiguos por fecha, dependencia, estado, tipo, responsable,
+solicitante y banderas; respeta los permisos por rol; pagina los resultados; y
+puede exportar el subconjunto filtrado al libro Excel MIPG. Los índices nuevos
+están declarados en `firestore.indexes.json` y deben quedar activos antes del
+go-live.
+
 ## Catálogo de tipos de solicitud
 
 Durante la preoperación se incorporó el **catálogo institucional centralizado**

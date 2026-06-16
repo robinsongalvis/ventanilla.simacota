@@ -4,8 +4,39 @@
       "collectionGroup": "ventanilla_radicados",
       "queryScope": "COLLECTION",
       "fields": [
-        { "fieldPath": "clasificacion.oficinaDestino", "order": "ASCENDING"  },
+        { "fieldPath": "control.fechaRadicado", "order": "DESCENDING" }
+      ]
+    },
+    {
+      "collectionGroup": "ventanilla_radicados",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "clasificacion.oficinaDestino", "order": "ASCENDING" },
         { "fieldPath": "control.fechaRadicado",        "order": "DESCENDING" }
+      ]
+    },
+    {
+      "collectionGroup": "ventanilla_radicados",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "estadoActual",          "order": "ASCENDING" },
+        { "fieldPath": "control.fechaRadicado", "order": "DESCENDING" }
+      ]
+    },
+    {
+      "collectionGroup": "ventanilla_radicados",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "termino.tipoSolicitudId", "order": "ASCENDING" },
+        { "fieldPath": "control.fechaRadicado",   "order": "DESCENDING" }
+      ]
+    },
+    {
+      "collectionGroup": "ventanilla_radicados",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "cumplioTermino",        "order": "ASCENDING" },
+        { "fieldPath": "control.fechaRadicado", "order": "DESCENDING" }
       ]
     },
     {
