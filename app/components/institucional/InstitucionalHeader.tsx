@@ -21,6 +21,8 @@ interface Props {
   subtitle?: string;
   align?: 'left' | 'center';
   className?: string;
+  /** Sprint Rebranding: 'dark' (sobre obsidian, default) o 'light' (sobre fondo blanco institucional). */
+  theme?: 'dark' | 'light';
 }
 
 export function InstitucionalHeader({
@@ -31,6 +33,7 @@ export function InstitucionalHeader({
   subtitle = INSTITUCION.sistema,
   align = 'left',
   className = '',
+  theme = 'dark',
 }: Props) {
   // Backward-compat: compact prop maps to 'compact' variant
   const resolved: Variant = variant ?? (compact ? 'compact' : 'default');
@@ -99,16 +102,28 @@ export function InstitucionalHeader({
         />
       </div>
       <div className={`min-w-0 ${centered ? '' : ''}`}>
-        <p className="text-[10px] font-bold uppercase tracking-[0.22em] text-emerald-300/80 truncate">
+        <p
+          className={`text-[10px] font-bold uppercase tracking-[0.22em] truncate ${
+            theme === 'light' ? 'text-emerald-800' : 'text-emerald-300/80'
+          }`}
+        >
           {eyebrow}
         </p>
         <p
-          className={`${resolved === 'compact' ? 'text-sm' : 'text-base sm:text-lg'} font-black tracking-tight text-slate-50 leading-tight truncate`}
+          className={`${resolved === 'compact' ? 'text-sm' : 'text-base sm:text-lg'} font-black tracking-tight leading-tight truncate ${
+            theme === 'light' ? 'text-slate-900' : 'text-slate-50'
+          }`}
           style={{ fontFamily: 'var(--font-manrope)' }}
         >
           {title}
         </p>
-        <p className="text-xs sm:text-sm text-slate-400 leading-snug truncate">{subtitle}</p>
+        <p
+          className={`text-xs sm:text-sm leading-snug truncate ${
+            theme === 'light' ? 'text-slate-600' : 'text-slate-400'
+          }`}
+        >
+          {subtitle}
+        </p>
       </div>
     </div>
   );

@@ -85,9 +85,9 @@ export function LoginForm() {
   };
 
   return (
-    <form onSubmit={handleSubmit} className="glass-card p-6 sm:p-8 flex flex-col gap-5">
+    <form onSubmit={handleSubmit} className="card-institucional p-6 sm:p-8 flex flex-col gap-5">
       <div className="flex flex-col gap-1.5">
-        <label htmlFor="email" className="text-xs font-label text-slate-400 uppercase tracking-widest">
+        <label htmlFor="email" className="text-xs font-label text-slate-600 uppercase tracking-widest">
           Correo institucional
         </label>
         <input
@@ -97,7 +97,7 @@ export function LoginForm() {
           onChange={(e) => setEmail(e.target.value)}
           required
           placeholder="funcionario@simacota.gov.co"
-          className="input-obsidian"
+          className="input-internal"
           autoComplete="email"
           inputMode="email"
           disabled={loading}
@@ -105,8 +105,8 @@ export function LoginForm() {
       </div>
 
       <div className="flex flex-col gap-1.5">
-        <label htmlFor="password" className="text-xs font-label text-slate-400 uppercase tracking-widest">
-          Contrasena
+        <label htmlFor="password" className="text-xs font-label text-slate-600 uppercase tracking-widest">
+          Contraseña
         </label>
         <input
           id="password"
@@ -115,20 +115,20 @@ export function LoginForm() {
           onChange={(e) => setPassword(e.target.value)}
           required
           placeholder="********"
-          className="input-obsidian"
+          className="input-internal"
           autoComplete="current-password"
           disabled={loading}
         />
       </div>
 
       {error && (
-        <p className="text-sm text-rose-400 bg-rose-500/10 border border-rose-500/20 rounded-lg px-4 py-2.5" role="alert">
+        <p className="text-sm text-rose-700 bg-rose-50 border border-rose-300 rounded-lg px-4 py-2.5" role="alert">
           {error}
         </p>
       )}
 
       {status && (
-        <p className="text-xs text-emerald-200 bg-emerald-500/10 border border-emerald-500/20 rounded-lg px-4 py-2.5" aria-live="polite">
+        <p className="text-xs text-emerald-800 bg-emerald-50 border border-emerald-300 rounded-lg px-4 py-2.5" aria-live="polite">
           {status}
         </p>
       )}
