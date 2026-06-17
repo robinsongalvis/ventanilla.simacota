@@ -28,16 +28,10 @@ export interface ComprobanteProps {
    HELPERS
 ══════════════════════════════════════════════════════════════ */
 
+import { formatFechaColombia, formatFechaHoraColombia } from '@/lib/fecha-colombia';
+
 function formatFecha(iso: string): string {
-  try {
-    return new Date(iso).toLocaleDateString('es-CO', {
-      day: '2-digit',
-      month: '2-digit',
-      year: 'numeric',
-    });
-  } catch {
-    return iso;
-  }
+  return formatFechaColombia(iso);
 }
 
 const MEDIO_LABEL: Record<string, string> = {
@@ -218,7 +212,7 @@ export function ComprobanteRadicado({
           <span className="font-semibold">ventanilla@simacota-boyaca.gov.co</span>
         </p>
         <p className="mt-2 text-center text-[8px] text-gray-400">
-          Generado: {new Date().toLocaleString('es-CO')}
+          Generado: {formatFechaHoraColombia(new Date())}
         </p>
       </div>
     </div>

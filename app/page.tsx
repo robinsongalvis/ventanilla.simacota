@@ -55,6 +55,13 @@ export default function HomePage() {
               Directorio
             </Link>
             <Link
+              href="/consulta"
+              className="font-label text-slate-500 hover:text-slate-300 transition-colors text-[11px]"
+              aria-label="Consultar estado de un radicado por su número"
+            >
+              Consultar radicado
+            </Link>
+            <Link
               href="/interno/dashboard"
               className="font-label text-slate-400 hover:text-slate-200 transition-colors text-[11px]"
               aria-label="Acceso al panel interno para funcionarios de la Alcaldía"
@@ -101,18 +108,31 @@ export default function HomePage() {
 
         {/* CTAs */}
         <div
-          className="flex flex-col sm:flex-row gap-4 items-center animate-fade-in-up"
+          className="flex flex-col sm:flex-row gap-4 items-stretch sm:items-center animate-fade-in-up w-full sm:w-auto"
           style={{ animationDelay: '0.3s', opacity: 0 }}
         >
-          <Link href="/radicacion" className="btn-primary text-base px-8 py-4 rounded-xl">
+          <Link
+            href="/radicacion"
+            className="btn-primary text-base px-8 py-4 rounded-xl w-full sm:w-auto justify-center"
+          >
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} className="w-5 h-5">
               <path strokeLinecap="round" strokeLinejoin="round" d="M12 4.5v15m7.5-7.5h-15" />
             </svg>
             Radicar mi Solicitud
           </Link>
+          <Link
+            href="/consulta"
+            className="inline-flex items-center justify-center gap-2 text-base px-8 py-4 rounded-xl border border-white/15 text-slate-200 hover:bg-white/[0.04] hover:border-white/30 transition-colors w-full sm:w-auto"
+            aria-label="Consultar el estado de un radicado"
+          >
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} className="w-5 h-5">
+              <path strokeLinecap="round" strokeLinejoin="round" d="M21 21l-5.197-5.197m0 0A7.5 7.5 0 105.196 5.196a7.5 7.5 0 0010.607 10.607z" />
+            </svg>
+            Consultar radicado
+          </Link>
           <a
             href="#como-funciona"
-            className="text-slate-400 hover:text-slate-200 transition-colors font-medium text-base px-6 py-4"
+            className="text-slate-400 hover:text-slate-200 transition-colors font-medium text-base px-6 py-4 text-center"
           >
             ¿Cómo funciona?
           </a>

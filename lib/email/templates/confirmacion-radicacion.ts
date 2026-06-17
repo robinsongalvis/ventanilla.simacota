@@ -16,21 +16,14 @@ export interface TemplateConfirmacionRadicacionParams {
   descripcionCorta:  string;   // primeros ~90 chars de la descripción
 }
 
+import { formatFechaColombia, formatFechaLargaColombia } from '@/lib/fecha-colombia';
+
 function formatearFecha(iso: string): string {
-  return new Date(iso).toLocaleDateString('es-CO', {
-    weekday: 'long',
-    day:     'numeric',
-    month:   'long',
-    year:    'numeric',
-  });
+  return formatFechaLargaColombia(iso);
 }
 
 function formatearFechaCorta(iso: string): string {
-  return new Date(iso).toLocaleDateString('es-CO', {
-    day:   '2-digit',
-    month: '2-digit',
-    year:  'numeric',
-  });
+  return formatFechaColombia(iso);
 }
 
 const CANAL_LABEL: Record<string, string> = {

@@ -129,15 +129,10 @@ interface RadicadoPublico {
    UTILIDADES
 ══════════════════════════════════════════════════════════════ */
 
+import { formatFechaHoraColombia } from '@/lib/fecha-colombia';
+
 function formatearFecha(iso: string): string {
-  const d = new Date(iso);
-  return d.toLocaleDateString('es-CO', {
-    year:   'numeric',
-    month:  'long',
-    day:    'numeric',
-    hour:   '2-digit',
-    minute: '2-digit',
-  });
+  return formatFechaHoraColombia(iso);
 }
 
 function labelCanalRespuesta(canal: string): string {
