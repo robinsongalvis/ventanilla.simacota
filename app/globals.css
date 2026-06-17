@@ -161,6 +161,24 @@ body {
     #0A0A0B;
 }
 
+/* Sprint Rebranding Institucional — fondo claro para portal público y login.
+   Cremas y verdes muy suaves para mantener identidad sin oscurecer la página. */
+.bg-institucional-light {
+  background:
+    radial-gradient(ellipse 80% 50% at 50% -10%, rgba(20, 83, 45, 0.10) 0%, transparent 60%),
+    radial-gradient(ellipse 60% 40% at 85% 90%, rgba(212, 160, 23, 0.10) 0%, transparent 55%),
+    radial-gradient(ellipse 60% 40% at 10% 90%, rgba(20, 83, 45, 0.06) 0%, transparent 55%),
+    #F8FAF7;
+}
+
+/* Card clara institucional — equivalente a glass-card pero para fondos claros. */
+.card-institucional {
+  background: #FFFFFF;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-card);
+  box-shadow: var(--shadow-soft);
+}
+
 /* ─────────────────────────────────────────────────────────────
    TIPOGRAFÍA
 ───────────────────────────────────────────────────────────── */
