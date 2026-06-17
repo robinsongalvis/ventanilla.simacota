@@ -106,6 +106,35 @@
   --portal-accent:    #4ADE80;        /* verde claro para acentos sobre oscuro */
   --portal-accent-2:  #86EFAC;        /* verde aún más claro */
   --portal-gold-soft: rgba(212, 160, 23, 0.20);
+
+  /* ── Sprint UI Premium — paleta institucional extendida ────────
+     Tokens listos para uso futuro. Solo se usan en home y login
+     por ahora; no reemplazan tokens existentes. */
+  --brand-forest:        #0F3D2E;
+  --brand-green:         #14532D;
+  --brand-green-action:  #047857;
+  --brand-green-soft:    #DFF5E8;
+  --brand-gold:          #D4A017;
+  --brand-gold-soft:     #FFF6D8;
+
+  --bg-institutional:      #F7FAF6;
+  --bg-institutional-warm: #FBFAF4;
+
+  --text-primary-2:    #172033;
+  --text-secondary-2:  #506176;
+  --text-muted-2:      #738299;
+
+  --border-soft:    #D9E7DD;
+  --border-accent:  #B8D8C2;
+
+  --gradient-digital:
+    linear-gradient(90deg, #047857 0%, #16A34A 45%, #D4A017 100%);
+  --gradient-digital-soft:
+    linear-gradient(135deg, rgba(4,120,87,0.12), rgba(212,160,23,0.10));
+
+  --shadow-institutional-sm:   0 8px 22px rgba(15,61,46,0.08);
+  --shadow-institutional-md:   0 18px 45px rgba(15,61,46,0.12);
+  --shadow-institutional-glow: 0 18px 55px rgba(4,120,87,0.18);
 }
 
 /* ── Reset base ── */
@@ -161,22 +190,168 @@ body {
     #0A0A0B;
 }
 
-/* Sprint Rebranding Institucional — fondo claro para portal público y login.
-   Cremas y verdes muy suaves para mantener identidad sin oscurecer la página. */
+/* Sprint UI Premium — fondo institucional con profundidad.
+   Tres capas radiales muy suaves + base ligeramente cálida.
+   Resultado: no plano, no saturado, sigue siendo "blanco". */
 .bg-institucional-light {
   background:
-    radial-gradient(ellipse 80% 50% at 50% -10%, rgba(20, 83, 45, 0.10) 0%, transparent 60%),
-    radial-gradient(ellipse 60% 40% at 85% 90%, rgba(212, 160, 23, 0.10) 0%, transparent 55%),
-    radial-gradient(ellipse 60% 40% at 10% 90%, rgba(20, 83, 45, 0.06) 0%, transparent 55%),
-    #F8FAF7;
+    radial-gradient(ellipse 70% 45% at 15% -5%,  rgba(4, 120, 87, 0.10) 0%, transparent 60%),
+    radial-gradient(ellipse 60% 40% at 90% 0%,   rgba(212, 160, 23, 0.10) 0%, transparent 55%),
+    radial-gradient(ellipse 60% 40% at 50% 100%, rgba(15, 61, 46, 0.06)  0%, transparent 55%),
+    linear-gradient(180deg, #FBFAF4 0%, var(--bg-institutional) 60%, #F1F6F0 100%);
 }
 
 /* Card clara institucional — equivalente a glass-card pero para fondos claros. */
 .card-institucional {
   background: #FFFFFF;
-  border: 1px solid var(--color-border);
+  border: 1px solid var(--border-soft);
   border-radius: var(--radius-card);
-  box-shadow: var(--shadow-soft);
+  box-shadow: var(--shadow-institutional-sm);
+  transition:
+    box-shadow 220ms ease,
+    border-color 220ms ease,
+    transform 220ms ease;
+}
+.card-institucional.is-hoverable:hover {
+  border-color: var(--border-accent);
+  box-shadow: var(--shadow-institutional-md);
+  transform: translateY(-2px);
+}
+.card-institucional.is-hoverable:hover::before {
+  opacity: 1;
+}
+.card-institucional.is-hoverable {
+  position: relative;
+  overflow: hidden;
+}
+.card-institucional.is-hoverable::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: var(--gradient-digital-soft);
+  opacity: 0;
+  transition: opacity 220ms ease;
+  pointer-events: none;
+  border-radius: inherit;
+}
+
+/* ── Sprint UI Premium — utilidades para hover gradiente Digital ── */
+
+/* Botón primario premium (Radicar mi Solicitud) */
+.btn-institucional-primary {
+  position: relative;
+  isolation: isolate;
+  background: var(--brand-green);
+  color: #fff;
+  box-shadow: var(--shadow-institutional-sm);
+  transition:
+    transform 200ms ease,
+    box-shadow 220ms ease,
+    background 220ms ease;
+}
+.btn-institucional-primary::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: var(--gradient-digital);
+  opacity: 0;
+  transition: opacity 220ms ease;
+  z-index: -1;
+  border-radius: inherit;
+}
+.btn-institucional-primary:hover {
+  transform: translateY(-1px);
+  box-shadow: var(--shadow-institutional-glow);
+}
+.btn-institucional-primary:hover::after { opacity: 1; }
+.btn-institucional-primary:active { transform: translateY(0); }
+
+/* Botón secundario claro (Consultar radicado) */
+.btn-institucional-secondary {
+  position: relative;
+  isolation: isolate;
+  background: #FFFFFF;
+  color: var(--brand-green);
+  border: 1px solid var(--border-accent);
+  box-shadow: var(--shadow-institutional-sm);
+  transition:
+    transform 200ms ease,
+    box-shadow 220ms ease,
+    border-color 220ms ease,
+    color 220ms ease;
+}
+.btn-institucional-secondary::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: var(--gradient-digital-soft);
+  opacity: 0;
+  transition: opacity 220ms ease;
+  z-index: -1;
+  border-radius: inherit;
+}
+.btn-institucional-secondary:hover {
+  transform: translateY(-1px);
+  border-color: var(--brand-green-action);
+  color: var(--brand-forest);
+  box-shadow: var(--shadow-institutional-md);
+}
+.btn-institucional-secondary:hover::after { opacity: 1; }
+.btn-institucional-secondary:active { transform: translateY(0); }
+
+/* Subrayado gradiente Digital — útil para enlaces del navbar/CTA enlace */
+.link-gradient-underline {
+  position: relative;
+  display: inline-block;
+  transition: color 200ms ease;
+}
+.link-gradient-underline::after {
+  content: '';
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: -2px;
+  height: 2px;
+  background: var(--gradient-digital);
+  border-radius: 2px;
+  transform: scaleX(0);
+  transform-origin: center;
+  transition: transform 220ms ease;
+}
+.link-gradient-underline:hover {
+  color: var(--brand-forest);
+}
+.link-gradient-underline:hover::after {
+  transform: scaleX(1);
+}
+
+/* Texto con gradiente Digital — uso en "Digital" del headline */
+.text-gradient-digital {
+  background: var(--gradient-digital);
+  -webkit-background-clip: text;
+          background-clip: text;
+  color: transparent;
+}
+
+/* Respeta prefers-reduced-motion: desactiva microanimaciones,
+   conserva color/border de hover. */
+@media (prefers-reduced-motion: reduce) {
+  .btn-institucional-primary,
+  .btn-institucional-secondary,
+  .card-institucional,
+  .card-institucional.is-hoverable,
+  .link-gradient-underline,
+  .link-gradient-underline::after,
+  .btn-institucional-primary::after,
+  .btn-institucional-secondary::after,
+  .card-institucional.is-hoverable::before {
+    transition: none !important;
+  }
+  .btn-institucional-primary:hover,
+  .btn-institucional-secondary:hover,
+  .card-institucional.is-hoverable:hover {
+    transform: none !important;
+  }
 }
 
 /* ─────────────────────────────────────────────────────────────

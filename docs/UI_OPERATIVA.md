@@ -228,3 +228,85 @@ en escritorio (`xl`) en cuatro.
   vencimiento, validaciones funcionales.
 - Reglas Firestore, SIMI, MIPG, notificaciones.
 - ComprobanteRadicado y el estado de éxito tras radicar.
+
+---
+
+# Home / Login — Profundidad institucional y hover premium
+
+**Sprint:** UI Premium Institucional.
+
+Sigue al Sprint Rebranding Institucional: la home y el login quedaron sobre
+fondo claro, pero se sentían planos y el texto blanco del logo se perdía sobre
+fondo claro. Este sprint agrega profundidad sin saturar, microinteracciones
+hover con el degradado de "Digital" y arregla el header en modo claro.
+
+## Paleta final (tokens)
+
+Tokens declarados en `app/globals.css` (`:root`), disponibles vía
+`var(--token)`:
+
+| Token | Valor | Uso |
+|---|---|---|
+| `--brand-forest`        | `#0F3D2E` | Texto/números institucionales sobre claro |
+| `--brand-green`         | `#14532D` | Botón primario y acción principal |
+| `--brand-green-action`  | `#047857` | Acentos verdes vivos, eyebrows |
+| `--brand-green-soft`    | `#DFF5E8` | Fondo de badges y pills suaves |
+| `--brand-gold`          | `#D4A017` | Acento dorado (solo bordes/glow/gradient) |
+| `--brand-gold-soft`     | `#FFF6D8` | Fondo cálido muy sutil |
+| `--bg-institutional`    | `#F7FAF6` | Base clara con leve tinte verde |
+| `--bg-institutional-warm` | `#FBFAF4` | Esquina cálida del fondo |
+| `--text-primary-2`      | `#172033` | Texto principal sobre claro |
+| `--text-secondary-2`    | `#506176` | Texto secundario sobre claro |
+| `--border-soft`         | `#D9E7DD` | Bordes suaves de cards |
+| `--border-accent`       | `#B8D8C2` | Bordes acentuados (hover, badges) |
+| `--gradient-digital`    | `linear-gradient(90deg, #047857 → #16A34A → #D4A017)` | Gradiente protagonista |
+| `--gradient-digital-soft` | gradient verde+oro a baja opacidad | Overlay hover en cards/botones |
+| `--shadow-institutional-sm/-md/-glow` | sombras suaves verdes | Profundidad y hover |
+
+## Uso del gradiente Digital
+
+- **Texto del headline**: clase `.text-gradient-digital` se aplica solo a la
+  palabra "Digital".
+- **Hover de botón primario**: `.btn-institucional-primary::after` con el
+  gradient se cross-fade sobre el verde institucional al pasar el mouse.
+- **Hover de botón secundario y cards**: `--gradient-digital-soft` como overlay
+  a baja opacidad. No invade el contenido ni cambia el color de los textos.
+- **Subrayado del navbar**: `.link-gradient-underline::after` traza una línea
+  de 2px con el gradiente al hover, animada con scaleX (220ms).
+
+## Hover states
+
+| Elemento | Cómo se siente |
+|---|---|
+| **Radicar mi Solicitud** | Lift de -1px, sombra glow verde, gradient verde→dorado emerge |
+| **Consultar radicado**   | Lift de -1px, borde verde más vivo, overlay gradient soft |
+| **Navbar (Directorio, Consultar, Acceso funcionarios)** | Texto en `--brand-forest`, subrayado gradient se anima |
+| **Cards stats / Cómo funciona** | Lift de -2px, borde acentuado, glow soft y overlay gradient muy sutil |
+| **¿Cómo funciona?** (enlace) | Subrayado gradient idéntico al del navbar |
+
+Todas las animaciones duran 200–220ms y respetan
+`prefers-reduced-motion: reduce` (se conserva el cambio de color/borde,
+desactiva translate/transition).
+
+## Corrección del header en modo claro
+
+`InstitucionalHeader` ahora dibuja, en `theme="light"`, un **wrapper verde
+institucional con sombra suave** alrededor del PNG del logo. Esto resuelve
+visualmente el problema de que el archivo gráfico oficial trae texto blanco
+interno: el fondo verde dentro del recuadro deja el texto perfectamente
+legible **sin retocar el archivo gráfico original** y sin afectar el sidebar
+oscuro del dashboard ni la constancia impresa, que siguen usando `theme="dark"`
+por defecto.
+
+Eyebrow, título y subtítulo del header en modo claro usan los tokens
+`--brand-green-action`, `--brand-forest` y `--text-secondary-2`.
+
+## Qué NO se tocó
+
+- Tokens viejos (`--color-primary`, `--shadow-soft`, etc.) — los premium se
+  agregan en paralelo para no romper consumidores existentes (sidebar,
+  dashboard, constancia).
+- `bg-obsidian-gradient`, sidebar interno, `ComprobanteRadicado`, `SelloRadicado`.
+- Open Graph y metadata: la imagen `/og-image.png` y la URL absoluta del Sprint
+  anterior siguen funcionando igual.
+- Lógica de login, sesión, radicación, consulta, dashboard, SIMI, MIPG.

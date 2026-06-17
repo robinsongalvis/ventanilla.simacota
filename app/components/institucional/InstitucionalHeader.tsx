@@ -87,11 +87,23 @@ export function InstitucionalHeader({
     ? 'h-10 w-36 sm:h-12 sm:w-44'
     : 'h-14 w-48 sm:h-16 sm:w-60 lg:w-72';
 
+  /* En modo claro, si el PNG del logo trae texto blanco interno, el
+     fondo verde institucional dentro del recuadro lo deja legible
+     sin tener que retocar el archivo gráfico original. */
+  const logoWrapStyle: React.CSSProperties = theme === 'light'
+    ? {
+        background: 'linear-gradient(135deg, #0F3D2E 0%, #14532D 100%)',
+        borderRadius: '0.625rem',
+        padding: '0.35rem 0.5rem',
+        boxShadow: 'var(--shadow-institutional-sm)',
+      }
+    : {};
+
   return (
     <div
       className={`flex ${centered ? 'flex-col text-center items-center' : 'items-center'} gap-3 min-w-0 ${className}`}
     >
-      <div className={`${imgClass} relative shrink-0`}>
+      <div className={`${imgClass} relative shrink-0`} style={logoWrapStyle}>
         <Image
           src={INSTITUCION.logo}
           alt={INSTITUCION.nombre}
@@ -103,24 +115,23 @@ export function InstitucionalHeader({
       </div>
       <div className={`min-w-0 ${centered ? '' : ''}`}>
         <p
-          className={`text-[10px] font-bold uppercase tracking-[0.22em] truncate ${
-            theme === 'light' ? 'text-emerald-800' : 'text-emerald-300/80'
-          }`}
+          className="text-[10px] font-bold uppercase tracking-[0.22em] truncate"
+          style={{ color: theme === 'light' ? 'var(--brand-green-action)' : 'rgba(110, 231, 183, 0.85)' }}
         >
           {eyebrow}
         </p>
         <p
-          className={`${resolved === 'compact' ? 'text-sm' : 'text-base sm:text-lg'} font-black tracking-tight leading-tight truncate ${
-            theme === 'light' ? 'text-slate-900' : 'text-slate-50'
-          }`}
-          style={{ fontFamily: 'var(--font-manrope)' }}
+          className={`${resolved === 'compact' ? 'text-sm' : 'text-base sm:text-lg'} font-black tracking-tight leading-tight truncate`}
+          style={{
+            fontFamily: 'var(--font-manrope)',
+            color: theme === 'light' ? 'var(--brand-forest)' : '#F8FAFC',
+          }}
         >
           {title}
         </p>
         <p
-          className={`text-xs sm:text-sm leading-snug truncate ${
-            theme === 'light' ? 'text-slate-600' : 'text-slate-400'
-          }`}
+          className="text-xs sm:text-sm leading-snug truncate"
+          style={{ color: theme === 'light' ? 'var(--text-secondary-2)' : '#94A3B8' }}
         >
           {subtitle}
         </p>
