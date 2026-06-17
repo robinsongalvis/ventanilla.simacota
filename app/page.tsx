@@ -47,23 +47,23 @@ export default function HomePage() {
         <div className="max-w-6xl mx-auto px-4 sm:px-6 py-3 sm:py-4 flex items-center justify-between gap-2">
           <InstitucionalHeader compact theme="light" />
           {/* Navegación principal */}
-          <nav aria-label="Navegación principal" className="flex items-center gap-4">
+          <nav aria-label="Navegación principal" className="flex items-center gap-5">
             <Link
               href="/directorio"
-              className="font-label text-slate-600 hover:text-emerald-700 transition-colors text-[11px]"
+              className="font-label text-slate-700 link-gradient-underline text-[11px]"
             >
               Directorio
             </Link>
             <Link
               href="/consulta"
-              className="font-label text-slate-600 hover:text-emerald-700 transition-colors text-[11px]"
+              className="font-label text-slate-700 link-gradient-underline text-[11px]"
               aria-label="Consultar estado de un radicado por su número"
             >
               Consultar radicado
             </Link>
             <Link
               href="/interno/dashboard"
-              className="font-label text-slate-700 hover:text-emerald-800 transition-colors text-[11px]"
+              className="font-label text-slate-800 link-gradient-underline text-[11px]"
               aria-label="Acceso al panel interno para funcionarios de la Alcaldía"
             >
               Acceso funcionarios →
@@ -77,33 +77,38 @@ export default function HomePage() {
 
         {/* Badge — estado del sistema en tiempo real */}
         <div
-          className="inline-flex items-center gap-2 px-4 py-2 rounded-full border border-emerald-600/25 bg-emerald-50 mb-8 animate-fade-in-up"
+          className="inline-flex items-center gap-2 px-4 py-2 rounded-full mb-8 animate-fade-in-up"
+          style={{
+            background: 'var(--brand-green-soft)',
+            border: '1px solid var(--border-accent)',
+            boxShadow: 'var(--shadow-institutional-sm)',
+          }}
           aria-live="polite"
           aria-label="Estado del sistema: activo"
         >
-          <span className="w-2 h-2 rounded-full bg-emerald-600 animate-pulse-glow" aria-hidden="true" />
-          <span className="font-label text-emerald-800 text-[11px]">{INSTITUCION.contexto} — Sistema activo</span>
+          <span className="w-2 h-2 rounded-full animate-pulse-glow" style={{ background: 'var(--brand-green-action)' }} aria-hidden="true" />
+          <span className="font-label text-[11px]" style={{ color: 'var(--brand-forest)' }}>
+            {INSTITUCION.contexto} — Sistema activo
+          </span>
         </div>
 
         {/* Headline — degradado institucional verde→dorado en "Digital" */}
         <h1
           className="font-headline text-5xl md:text-7xl max-w-4xl mb-6 animate-fade-in-up"
-          style={{ animationDelay: '0.1s', opacity: 0, color: '#1F2933' }}
+          style={{ animationDelay: '0.1s', opacity: 0, color: 'var(--text-primary-2)' }}
         >
           Ventanilla Única{' '}
-          <span className="text-transparent bg-clip-text bg-gradient-to-r from-emerald-700 via-emerald-600 to-amber-500">
-            Digital
-          </span>
+          <span className="text-gradient-digital">Digital</span>
         </h1>
 
         {/* Subtítulo */}
         <p
-          className="text-slate-600 text-lg md:text-xl max-w-2xl leading-relaxed mb-12 animate-fade-in-up"
-          style={{ animationDelay: '0.2s', opacity: 0 }}
+          className="text-lg md:text-xl max-w-2xl leading-relaxed mb-12 animate-fade-in-up"
+          style={{ animationDelay: '0.2s', opacity: 0, color: 'var(--text-secondary-2)' }}
         >
           Radica tu solicitud desde cualquier lugar. La inteligencia artificial la clasifica
           y la envía a la dependencia correcta en segundos.{' '}
-          <span className="text-slate-800 font-medium">Trazabilidad total, cuentas claras.</span>
+          <span className="font-semibold" style={{ color: 'var(--text-primary-2)' }}>Trazabilidad total, cuentas claras.</span>
         </p>
 
         {/* CTAs */}
@@ -113,7 +118,7 @@ export default function HomePage() {
         >
           <Link
             href="/radicacion"
-            className="btn-primary text-base px-8 py-4 rounded-xl w-full sm:w-auto justify-center"
+            className="btn-institucional-primary inline-flex items-center justify-center gap-2 text-base font-bold px-8 py-4 rounded-xl w-full sm:w-auto"
           >
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} className="w-5 h-5">
               <path strokeLinecap="round" strokeLinejoin="round" d="M12 4.5v15m7.5-7.5h-15" />
@@ -122,7 +127,7 @@ export default function HomePage() {
           </Link>
           <Link
             href="/consulta"
-            className="inline-flex items-center justify-center gap-2 text-base px-8 py-4 rounded-xl border border-emerald-700/30 bg-white text-emerald-800 hover:bg-emerald-50 hover:border-emerald-700/50 transition-colors w-full sm:w-auto shadow-sm"
+            className="btn-institucional-secondary inline-flex items-center justify-center gap-2 text-base font-bold px-8 py-4 rounded-xl w-full sm:w-auto"
             aria-label="Consultar el estado de un radicado"
           >
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} className="w-5 h-5">
@@ -132,7 +137,8 @@ export default function HomePage() {
           </Link>
           <a
             href="#como-funciona"
-            className="text-slate-600 hover:text-emerald-800 transition-colors font-medium text-base px-6 py-4 text-center"
+            className="link-gradient-underline text-base font-medium px-6 py-4 text-center"
+            style={{ color: 'var(--text-secondary-2)' }}
           >
             ¿Cómo funciona?
           </a>
@@ -147,10 +153,17 @@ export default function HomePage() {
           {STATS.map((s) => (
             <div
               key={s.label}
-              className="card-institucional text-center px-3 py-5 sm:px-5 sm:py-6"
+              className="card-institucional is-hoverable text-center px-3 py-5 sm:px-5 sm:py-6"
             >
-              <dd className="font-headline text-2xl sm:text-3xl text-emerald-800 mb-1">{s.value}</dd>
-              <dt className="font-label text-slate-500 text-[10px] leading-snug">{s.label}</dt>
+              <dd
+                className="font-headline text-2xl sm:text-3xl mb-1"
+                style={{ color: 'var(--brand-forest)' }}
+              >
+                {s.value}
+              </dd>
+              <dt className="font-label text-[10px] leading-snug" style={{ color: 'var(--text-secondary-2)' }}>
+                {s.label}
+              </dt>
             </div>
           ))}
         </dl>
@@ -163,24 +176,35 @@ export default function HomePage() {
         aria-labelledby="como-funciona-titulo"
       >
         <div className="text-center mb-12">
-          <p className="font-label text-emerald-700 mb-3" aria-hidden="true">Proceso</p>
-          <h2 id="como-funciona-titulo" className="font-headline text-3xl md:text-4xl" style={{ color: '#1F2933' }}>Cómo funciona</h2>
+          <p className="font-label mb-3" style={{ color: 'var(--brand-green-action)' }} aria-hidden="true">Proceso</p>
+          <h2 id="como-funciona-titulo" className="font-headline text-3xl md:text-4xl" style={{ color: 'var(--text-primary-2)' }}>
+            Cómo funciona
+          </h2>
         </div>
 
         <div className="grid md:grid-cols-3 gap-6" role="list" aria-label="Características del sistema">
           {FEATURES.map((f, i) => (
-            <article key={f.title} className="card-institucional p-8 relative overflow-hidden group" role="listitem">
-              <span className="absolute top-4 right-5 font-headline text-6xl text-emerald-900/[0.06] select-none" aria-hidden="true">
+            <article key={f.title} className="card-institucional is-hoverable p-8 group" role="listitem">
+              <span
+                className="absolute top-4 right-5 font-headline text-6xl select-none"
+                style={{ color: 'rgba(15, 61, 46, 0.06)' }}
+                aria-hidden="true"
+              >
                 {i + 1}
               </span>
               <div
-                className="w-12 h-12 rounded-xl bg-emerald-50 border border-emerald-700/20 flex items-center justify-center text-emerald-700 mb-5 group-hover:bg-emerald-100 transition-colors"
+                className="w-12 h-12 rounded-xl flex items-center justify-center mb-5 transition-colors relative"
+                style={{
+                  background: 'var(--brand-green-soft)',
+                  border: '1px solid var(--border-accent)',
+                  color: 'var(--brand-green-action)',
+                }}
                 aria-hidden="true"
               >
                 {f.icon}
               </div>
-              <h3 className="font-headline text-xl mb-3" style={{ color: '#1F2933' }}>{f.title}</h3>
-              <p className="text-slate-600 text-sm leading-relaxed">{f.desc}</p>
+              <h3 className="font-headline text-xl mb-3 relative" style={{ color: 'var(--text-primary-2)' }}>{f.title}</h3>
+              <p className="text-sm leading-relaxed relative" style={{ color: 'var(--text-secondary-2)' }}>{f.desc}</p>
             </article>
           ))}
         </div>

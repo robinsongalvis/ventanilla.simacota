@@ -31,14 +31,27 @@ export default function LoginInternoPage() {
         <div className="text-center mb-8">
           <InstitucionalHeader align="center" theme="light" subtitle="Acceso Funcionarios · Ventanilla Única Digital" />
           {/* Eyebrow institucional */}
-          <div className="inline-flex items-center gap-2 px-3 py-1 mt-4 mb-3 rounded-full border border-emerald-700/25 bg-emerald-50">
-            <span className="w-1.5 h-1.5 rounded-full bg-emerald-600" aria-hidden="true" />
-            <span className="font-label text-emerald-800 text-[10px]">Panel institucional seguro</span>
+          <div
+            className="inline-flex items-center gap-2 px-3 py-1 mt-4 mb-3 rounded-full"
+            style={{
+              background: 'var(--brand-green-soft)',
+              border: '1px solid var(--border-accent)',
+              boxShadow: 'var(--shadow-institutional-sm)',
+            }}
+          >
+            <span
+              className="w-1.5 h-1.5 rounded-full"
+              style={{ background: 'var(--brand-green-action)' }}
+              aria-hidden="true"
+            />
+            <span className="font-label text-[10px]" style={{ color: 'var(--brand-forest)' }}>
+              Panel institucional seguro
+            </span>
           </div>
-          <h1 className="font-headline text-2xl sm:text-3xl" style={{ color: '#1F2933' }}>
+          <h1 className="font-headline text-2xl sm:text-3xl" style={{ color: 'var(--text-primary-2)' }}>
             Panel de Gestión
           </h1>
-          <p className="text-sm text-slate-600 mt-2">
+          <p className="text-sm mt-2" style={{ color: 'var(--text-secondary-2)' }}>
             Ingreso seguro para usuarios institucionales de la Alcaldía Municipal de Simacota.
           </p>
         </div>

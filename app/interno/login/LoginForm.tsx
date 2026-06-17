@@ -85,7 +85,11 @@ export function LoginForm() {
   };
 
   return (
-    <form onSubmit={handleSubmit} className="card-institucional p-6 sm:p-8 flex flex-col gap-5">
+    <form
+      onSubmit={handleSubmit}
+      className="card-institucional p-6 sm:p-8 flex flex-col gap-5"
+      style={{ boxShadow: 'var(--shadow-institutional-md)' }}
+    >
       <div className="flex flex-col gap-1.5">
         <label htmlFor="email" className="text-xs font-label text-slate-600 uppercase tracking-widest">
           Correo institucional
@@ -133,7 +137,11 @@ export function LoginForm() {
         </p>
       )}
 
-      <button type="submit" disabled={loading} className="btn-primary w-full mt-1 min-h-12 touch-manipulation">
+      <button
+        type="submit"
+        disabled={loading}
+        className="btn-institucional-primary inline-flex items-center justify-center gap-2 w-full mt-1 min-h-12 rounded-xl px-6 py-3 text-sm font-bold touch-manipulation disabled:opacity-60"
+      >
         {loading ? (
           <>
             <span className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin-smooth" />
