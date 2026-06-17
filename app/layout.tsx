@@ -4,9 +4,18 @@ import { SimiProvider } from '@/lib/store/simiContext';
 import { SimiChatCondicional } from '@/app/components/SimiChatCondicional';
 import { PwaInstallPrompt } from '@/app/components/pwa/PwaInstallPrompt';
 
+/* ── Base URL absoluto.
+      Prioridad: NEXT_PUBLIC_SITE_URL → VERCEL_URL → dominio institucional.
+      Esto es lo que hace que WhatsApp resuelva la imagen OG, porque
+      necesita acceder a https://<host>/og-image.png públicamente. */
+const SITE_URL_RAW =
+  process.env.NEXT_PUBLIC_SITE_URL
+  || (process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : null)
+  || 'https://ventanilla-simacota.vercel.app';
+const SITE_URL = SITE_URL_RAW.startsWith('http') ? SITE_URL_RAW : `https://${SITE_URL_RAW}`;
+
 export const metadata: Metadata = {
-  // ── Base URL — obligatorio para que los OG relativos funcionen ──
-  metadataBase: new URL('https://ventanilla.simacota.gov.co'),
+  metadataBase: new URL(SITE_URL),
 
   // ── Template de título: las rutas hijas heredan automáticamente ──
   title: {
@@ -60,21 +69,24 @@ export const metadata: Metadata = {
   },
 
   // ── OpenGraph: WhatsApp, Facebook, LinkedIn ─────────────────────
+  //   URLs absolutas para que WhatsApp/Telegram/Slack resuelvan la
+  //   imagen previa sin ambigüedad.
   openGraph: {
     type: 'website',
     locale: 'es_CO',
-    url: '/',
+    url: SITE_URL,
     siteName: 'Ventanilla Única Digital – Simacota',
     title: 'Ventanilla Única Digital – Alcaldía de Simacota',
     description:
       'Radica tu solicitud ciudadana en segundos. Plataforma oficial con IA y trazabilidad total. Simacota, Santander, Colombia.',
     images: [
       {
-        url: '/og-image.png',
+        url: `${SITE_URL}/og-image.png`,
         width: 1200,
         height: 630,
         alt: 'Ventanilla Única Digital – Alcaldía de Simacota, Santander',
         type: 'image/png',
+        secureUrl: `${SITE_URL}/og-image.png`,
       },
     ],
   },
@@ -82,10 +94,11 @@ export const metadata: Metadata = {
   // ── Twitter / X Card ────────────────────────────────────────────
   twitter: {
     card: 'summary_large_image',
+    site: '@AlcaldiaSimacota',
     title: 'Ventanilla Única Digital – Alcaldía de Simacota',
     description:
       'Radica tu solicitud ciudadana en segundos. Plataforma oficial con IA y trazabilidad total.',
-    images: ['/og-image.png'],
+    images: [`${SITE_URL}/og-image.png`],
   },
 
   // ── Directivas de indexación ────────────────────────────────────
