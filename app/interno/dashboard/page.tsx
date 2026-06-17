@@ -2333,6 +2333,21 @@ function DrawerNuevoRadicado({
   const [progreso,          setProgreso]          = useState('');
   const [progresoPct,       setProgresoPct]       = useState(0);
   const [errorGuardado,     setErrorGuardado]     = useState<string | null>(null);
+  const FORM_ID = 'rad-rapida-form';
+
+  // Sprint UI Radicación Rápida:
+  //  - Bloquear scroll del body mientras el modal está abierto.
+  //  - Cerrar con ESC.
+  useEffect(() => {
+    const prevOverflow = document.body.style.overflow;
+    document.body.style.overflow = 'hidden';
+    const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') onCerrar(); };
+    window.addEventListener('keydown', onKey);
+    return () => {
+      document.body.style.overflow = prevOverflow;
+      window.removeEventListener('keydown', onKey);
+    };
+  }, [onCerrar]);
 
   async function handleSubmit(
     payload: Parameters<NonNullable<React.ComponentProps<typeof RadicacionFuncionarioForm>['onSubmit']>>[0],
@@ -2372,34 +2387,61 @@ function DrawerNuevoRadicado({
   }
 
   return (
-    <>
-      {/* Overlay */}
-      <div className="fixed inset-0 z-40 bg-black/60 backdrop-blur-sm" onClick={onCerrar} />
+    <div
+      className="fixed inset-0 z-50 flex items-center justify-center px-3 py-3 sm:px-4 sm:py-4"
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby="rad-rapida-title"
+      aria-describedby="rad-rapida-subtitle"
+    >
+      {/* Overlay con blur institucional */}
+      <button
+        type="button"
+        aria-label="Cerrar"
+        onClick={onCerrar}
+        className="absolute inset-0 bg-black/45 backdrop-blur-md animate-modal-overlay"
+      />
 
-      {/* Panel */}
-      <div className="fixed inset-y-0 right-0 z-50 w-full max-w-2xl bg-white flex flex-col shadow-2xl"
-           style={{ borderLeft: '1px solid #D9E2D9' }}>
+      {/* Panel centrado */}
+      <div
+        className="relative w-full bg-white flex flex-col shadow-2xl rounded-2xl overflow-hidden animate-modal-panel"
+        style={{
+          border: '1px solid #D9E2D9',
+          maxWidth: 'min(1120px, calc(100vw - 24px))',
+          maxHeight: 'calc(100dvh - 24px)',
+        }}
+      >
 
-        {/* Header */}
-        <div className="flex items-center justify-between px-5 py-4 shrink-0 bg-white"
-             style={{ borderBottom: '1px solid #D9E2D9' }}>
-          <div>
-            <h2 className="text-base font-black" style={{ color: '#1F2933' }}>Radicación Rápida</h2>
-            <p className="text-xs" style={{ color: '#667085' }}>Nuevo radicado institucional · Ventanilla Única</p>
+        {/* Header fijo */}
+        <header
+          className="flex items-center justify-between gap-3 px-5 sm:px-6 py-4 shrink-0 bg-white"
+          style={{ borderBottom: '1px solid #D9E2D9' }}
+        >
+          <div className="min-w-0">
+            <h2 id="rad-rapida-title" className="text-base sm:text-lg font-black truncate" style={{ color: '#1F2933' }}>
+              Radicación Rápida
+            </h2>
+            <p id="rad-rapida-subtitle" className="text-xs mt-0.5 truncate" style={{ color: '#667085' }}>
+              Nuevo radicado institucional · Ventanilla Única
+            </p>
           </div>
-          <button onClick={onCerrar}
-            className="p-2 rounded-xl active:scale-90 transition-all duration-150 focus-visible:outline-none"
+          <button
+            type="button"
+            onClick={onCerrar}
+            aria-label="Cerrar modal de radicación rápida"
+            className="shrink-0 p-2 rounded-xl active:scale-90 transition-all duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-700/30"
             style={{ color: '#94A3B8' }}
             onMouseEnter={(e) => { (e.currentTarget as HTMLElement).style.color = '#1F2933'; (e.currentTarget as HTMLElement).style.background = '#EEF4EE'; }}
-            onMouseLeave={(e) => { (e.currentTarget as HTMLElement).style.color = '#94A3B8'; (e.currentTarget as HTMLElement).style.background = ''; }}>
+            onMouseLeave={(e) => { (e.currentTarget as HTMLElement).style.color = '#94A3B8'; (e.currentTarget as HTMLElement).style.background = ''; }}
+          >
             <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
               <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
             </svg>
           </button>
-        </div>
+        </header>
 
-        {/* Cuerpo */}
-        <div className="flex-1 overflow-y-auto px-5 py-5" style={{ background: '#F8FAF7' }}>
+        {/* Cuerpo con scroll interno */}
+        <div className="flex-1 min-h-0 overflow-y-auto px-4 sm:px-6 py-5" style={{ background: '#F8FAF7' }}>
 
           {/* ── Estado de éxito ── */}
           {radicadoGenerado && datosComprobante && (
@@ -2474,11 +2516,46 @@ function DrawerNuevoRadicado({
           )}
 
           {!radicadoGenerado && (
-            <RadicacionFuncionarioForm radicadoPreview="Se generará al radicar" onSubmit={handleSubmit} />
+            <RadicacionFuncionarioForm
+              radicadoPreview="Se generará al radicar"
+              onSubmit={handleSubmit}
+              formId={FORM_ID}
+              hideSubmitButton
+            />
           )}
         </div>
+
+        {/* Footer fijo de acciones */}
+        {!radicadoGenerado && (
+          <footer
+            className="shrink-0 flex flex-col-reverse sm:flex-row items-stretch sm:items-center justify-end gap-2 px-4 sm:px-6 py-3 bg-white"
+            style={{ borderTop: '1px solid #D9E2D9' }}
+          >
+            <button
+              type="button"
+              onClick={onCerrar}
+              className="rounded-xl px-5 py-2.5 text-sm font-bold transition-all active:scale-[0.98] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-700/30"
+              style={{ background: 'white', color: '#475569', border: '1px solid #D9E2D9' }}
+              onMouseEnter={(e) => { (e.currentTarget as HTMLElement).style.background = '#EEF4EE'; }}
+              onMouseLeave={(e) => { (e.currentTarget as HTMLElement).style.background = 'white'; }}
+            >
+              Cancelar
+            </button>
+            <button
+              type="submit"
+              form={FORM_ID}
+              disabled={!!progreso && progresoPct > 0 && progresoPct < 100}
+              className="rounded-xl px-6 py-2.5 text-sm font-bold text-white transition-all active:scale-[0.98] disabled:opacity-60 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-700/30"
+              style={{ background: '#14532D' }}
+              onMouseEnter={(e) => { (e.currentTarget as HTMLElement).style.background = '#166534'; }}
+              onMouseLeave={(e) => { (e.currentTarget as HTMLElement).style.background = '#14532D'; }}
+            >
+              {progreso && progresoPct > 0 && progresoPct < 100 ? 'Radicando…' : 'Registrar radicado'}
+            </button>
+          </footer>
+        )}
       </div>
-    </>
+    </div>
   );
 }
 

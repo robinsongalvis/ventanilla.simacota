@@ -101,3 +101,130 @@ requirieron cambios.
 - Lógica de roles y permisos.
 - Búsqueda histórica avanzada (Sprint 2) — sigue funcionando igual.
 - Panel derecho (PanelDerecho) — sigue abriéndose en `xl` sin afectar scroll.
+
+---
+
+# Radicación Rápida — Modal centrado
+
+**Sprint:** UI Radicación Rápida.
+
+## Diagnóstico previo
+
+`DrawerNuevoRadicado` se renderizaba como **drawer lateral** pegado a la derecha:
+
+```
+<div className="fixed inset-y-0 right-0 z-50 w-full max-w-2xl ..."/>
+```
+
+No estaba centrado, no tenía `max-height`, los botones de acción vivían dentro
+del formulario (no había footer fijo) y los inputs/selects usaban paddings
+ligeramente distintos lo que provocaba alturas desiguales en la grilla.
+
+## Cambios aplicados
+
+### 1. Modal centrado con backdrop blur
+
+`DrawerNuevoRadicado` ahora renderiza:
+
+```
+<div className="fixed inset-0 z-50 flex items-center justify-center px-3 py-3 sm:px-4 sm:py-4"
+     role="dialog" aria-modal="true" aria-labelledby aria-describedby>
+  <button className="absolute inset-0 bg-black/45 backdrop-blur-md animate-modal-overlay" />
+  <div className="relative w-full bg-white flex flex-col shadow-2xl rounded-2xl overflow-hidden animate-modal-panel"
+       style={{ maxWidth: 'min(1120px, calc(100vw - 24px))',
+                maxHeight: 'calc(100dvh - 24px)' }}>
+    <header className="shrink-0 ..."/>
+    <div    className="flex-1 min-h-0 overflow-y-auto ..."/>
+    <footer className="shrink-0 ..."/>
+  </div>
+</div>
+```
+
+- Centrado horizontal y vertical.
+- `max-width: min(1120px, calc(100vw - 24px))` (max-w-5xl en dispositivos
+  grandes, sin desbordar en pequeños).
+- `max-height: calc(100dvh - 24px)` para asegurar márgenes en cualquier zoom.
+- Backdrop `bg-black/45 backdrop-blur-md`.
+- Animaciones `animate-modal-overlay` y `animate-modal-panel`
+  (≤ 180ms, definidas en `globals.css`).
+
+### 2. Header / Body / Footer
+
+- **Header** (shrink-0): título, subtítulo, botón cerrar con
+  `aria-label="Cerrar modal de radicación rápida"`.
+- **Body** (`flex-1 min-h-0 overflow-y-auto`): el formulario hace scroll dentro
+  del modal, no afecta al dashboard de fondo.
+- **Footer** (shrink-0): botones **Cancelar** y **Registrar radicado**. El
+  segundo dispara el submit del form vía atributo `form="rad-rapida-form"`.
+
+### 3. Scroll del body bloqueado
+
+Mientras el modal está abierto se aplica `document.body.style.overflow = 'hidden'` en `useEffect`. Al desmontar se restaura el valor anterior. Esto impide el scroll accidental del dashboard detrás.
+
+### 4. Inputs y selects con altura consistente
+
+En `app/globals.css`:
+
+```css
+.input-internal { min-height: 2.5rem; line-height: 1.4; }
+.select-internal { min-height: 2.5rem; line-height: 1.4; width: 100%; }
+```
+
+Inputs y selects ahora comparten `min-height: 2.5rem` y `line-height: 1.4`. Los
+campos de solo-lectura (ReadOnlyField) ya tenían padding propio que ahora
+coincide visualmente.
+
+### 5. Grilla uniforme
+
+`RadicacionFuncionarioForm` ahora usa:
+
+```
+grid gap-4 grid-cols-1 md:grid-cols-2 xl:grid-cols-4
+```
+
+para las tres secciones (Datos de recepción, Solicitante, Clasificación).
+Campos largos reciben `col-span`:
+
+- **Nombre / razón social** → `md:col-span-2 xl:col-span-2`
+- **Correo electrónico** → `xl:col-span-2`
+- **Dirección** → `md:col-span-2 xl:col-span-3`
+- **Municipio** → `md:col-span-2 xl:col-span-2`
+- **Tipo solicitud** → `md:col-span-2 xl:col-span-2`
+- **Asunto / Descripción** → `md:col-span-2 xl:col-span-4`
+- **Alerta jurídica** → `md:col-span-2 xl:col-span-4`
+
+En móvil (`< md`) toda la grilla queda en una columna; en tablet (`md`) en dos;
+en escritorio (`xl`) en cuatro.
+
+### 6. Soporte de submit externo
+
+`RadicacionFuncionarioForm` ahora acepta:
+
+- `formId?: string` — id que se aplica al `<form>` para que un botón externo
+  pueda dispararlo con `form="..."`.
+- `hideSubmitButton?: boolean` — oculta el botón Submit interno cuando el
+  contenedor pone su propio footer.
+
+### 7. Accesibilidad
+
+- `role="dialog"` y `aria-modal="true"` en el contenedor.
+- `aria-labelledby="rad-rapida-title"` y `aria-describedby="rad-rapida-subtitle"`.
+- Botón cerrar con `aria-label`.
+- ESC cierra el modal (listener registrado en el mismo `useEffect`).
+- Focus rings visibles con `focus-visible:ring-2 focus-visible:ring-emerald-700/30`.
+
+### 8. Responsive
+
+- Móvil (< sm): padding lateral 12px, grilla 1 col, footer apilado
+  (`flex-col-reverse`).
+- Tablet (`sm`–`md`): padding lateral 16px, grilla 2 col.
+- Escritorio (`xl`): grilla 4 col, footer en fila con botones a la derecha.
+
+## Qué NO se tocó
+
+- `RadicacionFuncionarioForm.handleSubmit` y `radicarInstitucionalmente` — la
+  lógica de radicación queda intacta.
+- API `POST /api/radicacion`, generación de consecutivo, cálculo de
+  vencimiento, validaciones funcionales.
+- Reglas Firestore, SIMI, MIPG, notificaciones.
+- ComprobanteRadicado y el estado de éxito tras radicar.

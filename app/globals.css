@@ -263,6 +263,17 @@ body {
 .input-internal {
   padding: 0.5rem 0.75rem;
   font-size: 0.875rem;
+  /* Sprint UI Radicación Rápida: altura uniforme para que inputs y selects
+     queden alineados en la grilla del modal. */
+  min-height: 2.5rem;
+  line-height: 1.4;
+}
+
+.input-internal:disabled,
+.input-internal[readonly] {
+  background: #F8FAF7;
+  color: #475569;
+  cursor: not-allowed;
 }
 
 .input-obsidian::placeholder,
@@ -302,6 +313,10 @@ body {
   transition: border-color 0.2s ease, box-shadow 0.2s ease;
   outline: none;
   cursor: pointer;
+  /* Sprint UI Radicación Rápida: altura uniforme con .input-internal. */
+  min-height: 2.5rem;
+  line-height: 1.4;
+  width: 100%;
 }
 
 .select-internal:hover { border-color: #14532D; }
@@ -332,6 +347,18 @@ body {
 .animate-fade-in-up   { animation: fadeInUp 0.5s ease forwards; }
 .animate-spin-smooth  { animation: spin 0.8s linear infinite; }
 .animate-pulse-glow   { animation: pulse-glow 2s infinite; }
+
+/* Sprint UI Radicación Rápida — entrada institucional del modal */
+@keyframes modalOverlayIn {
+  from { opacity: 0; }
+  to   { opacity: 1; }
+}
+@keyframes modalPanelIn {
+  from { opacity: 0; transform: translateY(8px) scale(0.985); }
+  to   { opacity: 1; transform: translateY(0)   scale(1); }
+}
+.animate-modal-overlay { animation: modalOverlayIn 160ms ease-out forwards; }
+.animate-modal-panel   { animation: modalPanelIn   180ms ease-out forwards; }
 
 /* Animación éxito */
 @keyframes successBounce {
