@@ -46,6 +46,10 @@ interface FormState {
 interface Props {
   radicadoPreview: string;
   onSubmit?: (payload: FormState & { archivos: File[]; fechaVencimiento: string }) => Promise<void> | void;
+  /** Sprint UI Radicación Rápida: id del <form> para disparar submit desde un botón externo (footer modal). */
+  formId?: string;
+  /** Sprint UI Radicación Rápida: ocultar el botón Submit interno cuando el contenedor pone su propio footer. */
+  hideSubmitButton?: boolean;
 }
 
 const INITIAL_FORM: FormState = {
@@ -80,7 +84,7 @@ const sectionStyle = { border: '1px solid #D9E2D9', boxShadow: '0 1px 2px rgba(2
 const labelCls = 'mb-1 block text-[10px] font-bold uppercase tracking-widest';
 const labelStyle = { color: '#667085' };
 
-export function RadicacionFuncionarioForm({ radicadoPreview, onSubmit }: Props) {
+export function RadicacionFuncionarioForm({ radicadoPreview, onSubmit, formId, hideSubmitButton = false }: Props) {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [form, setForm] = useState<FormState>(INITIAL_FORM);
   const [archivos, setArchivos] = useState<File[]>([]);
@@ -124,12 +128,16 @@ export function RadicacionFuncionarioForm({ radicadoPreview, onSubmit }: Props) 
   }
 
   return (
-    <form onSubmit={handleSubmit} className="space-y-4">
+    <form
+      id={formId}
+      onSubmit={handleSubmit}
+      className="space-y-5"
+    >
 
       {/* ── Bloque radicado ── */}
       <section className={sectionCls} style={sectionStyle}>
         <SectionTitle eyebrow="Radicado" title="Datos de recepción" />
-        <div className="grid gap-3 md:grid-cols-4">
+        <div className="grid gap-4 grid-cols-1 md:grid-cols-2 xl:grid-cols-4">
           <ReadOnlyField label="Número radicado" value={radicadoPreview} />
           <ReadOnlyField label="Fecha y hora"    value={formatDateTime(fechaRadicado)} />
           <SelectField
@@ -153,7 +161,7 @@ export function RadicacionFuncionarioForm({ radicadoPreview, onSubmit }: Props) 
       {/* ── Datos solicitante ── */}
       <section className={sectionCls} style={sectionStyle}>
         <SectionTitle eyebrow="Solicitante" title="Datos del solicitante" />
-        <div className="grid gap-3 md:grid-cols-4">
+        <div className="grid gap-4 grid-cols-1 md:grid-cols-2 xl:grid-cols-4">
           <SelectField
             label="Tipo persona"
             value={form.tipoPersona}
@@ -186,14 +194,14 @@ export function RadicacionFuncionarioForm({ radicadoPreview, onSubmit }: Props) 
             value={form.nombreCompleto}
             onChange={(v) => update('nombreCompleto', v)}
             required
-            className="md:col-span-1"
+            className="md:col-span-2 xl:col-span-2"
           />
-          <TextField label="Correo electrónico" value={form.email}    onChange={(v) => update('email', v)}    type="email" />
+          <TextField label="Correo electrónico" value={form.email}    onChange={(v) => update('email', v)}    type="email" className="xl:col-span-2" />
           <TextField label="Teléfono"            value={form.telefono} onChange={(v) => update('telefono', v)} />
-          <TextField label="Dirección"           value={form.direccion} onChange={(v) => update('direccion', v)} className="md:col-span-2" />
+          <TextField label="Dirección"           value={form.direccion} onChange={(v) => update('direccion', v)} className="md:col-span-2 xl:col-span-3" />
           <TextField label="País"          value={form.pais}         onChange={(v) => update('pais', v.toUpperCase())} />
           <TextField label="Departamento"  value={form.departamento} onChange={(v) => update('departamento', v.toUpperCase())} />
-          <div className="relative md:col-span-2">
+          <div className="relative md:col-span-2 xl:col-span-2">
             <TextField label="Municipio" value={form.municipio} onChange={(v) => update('municipio', v)} />
             {form.municipio && municipiosFiltrados.length > 0 && (
               <div className="absolute z-20 mt-1 w-full rounded-xl shadow-lg bg-white"
@@ -220,7 +228,7 @@ export function RadicacionFuncionarioForm({ radicadoPreview, onSubmit }: Props) 
       {/* ── Clasificación ── */}
       <section className={sectionCls} style={sectionStyle}>
         <SectionTitle eyebrow="Clasificación" title="Términos y detalle de la solicitud" />
-        <div className="grid gap-3 md:grid-cols-4">
+        <div className="grid gap-4 grid-cols-1 md:grid-cols-2 xl:grid-cols-4">
           <SelectField
             label="Tipo solicitud / doc"
             value={form.tipoSolicitudId}
@@ -233,15 +241,20 @@ export function RadicacionFuncionarioForm({ radicadoPreview, onSubmit }: Props) 
                 `${t.nombre} · ${t.categoria} · ${t.terminoDias} días ${unidad}${validacion}`,
               ];
             })}
-            className="md:col-span-2"
+            className="md:col-span-2 xl:col-span-2"
           />
           <ReadOnlyField
             label="Días de respuesta"
             value={`${vencimiento.diasRespuesta} ${vencimiento.unidad.toLowerCase()}`}
           />
+          <TextField
+            label="Número de folios"
+            value={String(form.numeroFolios)}
+            onChange={(v) => update('numeroFolios', Number(v.replace(/\D/g, '') || 0))}
+          />
           {getTipoSolicitudById(form.tipoSolicitudId)?.requiereValidacionJuridica && (
             <div
-              className="md:col-span-4 rounded-md border px-3 py-2 text-xs"
+              className="md:col-span-2 xl:col-span-4 rounded-md border px-3 py-2 text-xs"
               style={{ borderColor: '#FBBF24', background: '#FEF3C7', color: '#92400E' }}
               role="alert"
             >
@@ -251,18 +264,13 @@ export function RadicacionFuncionarioForm({ radicadoPreview, onSubmit }: Props) 
             </div>
           )}
           <TextField
-            label="Número de folios"
-            value={String(form.numeroFolios)}
-            onChange={(v) => update('numeroFolios', Number(v.replace(/\D/g, '') || 0))}
-          />
-          <TextField
             label="Asunto"
             value={form.asunto}
             onChange={(v) => update('asunto', v)}
             required
-            className="md:col-span-4"
+            className="md:col-span-2 xl:col-span-4"
           />
-          <div className="md:col-span-4">
+          <div className="md:col-span-2 xl:col-span-4">
             <label>
               <span className={labelCls} style={labelStyle}>Descripción</span>
               <textarea
@@ -329,22 +337,24 @@ export function RadicacionFuncionarioForm({ radicadoPreview, onSubmit }: Props) 
         )}
       </section>
 
-      {/* ── Submit ── */}
-      <div className="flex justify-end pt-1">
-        <button
-          type="submit"
-          disabled={guardando}
-          className="flex items-center gap-2 rounded-xl px-6 py-3 text-sm font-bold text-white transition-all disabled:opacity-60 active:scale-[0.98]"
-          style={{ background: '#14532D' }}
-          onMouseEnter={(e) => { if (!guardando) (e.currentTarget as HTMLElement).style.background = '#166534'; }}
-          onMouseLeave={(e) => { (e.currentTarget as HTMLElement).style.background = '#14532D'; }}
-        >
-          {guardando && (
-            <span className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
-          )}
-          {guardando ? 'Radicando...' : 'Registrar radicado'}
-        </button>
-      </div>
+      {/* ── Submit interno (oculto cuando el contenedor pone su propio footer) ── */}
+      {!hideSubmitButton && (
+        <div className="flex justify-end pt-1">
+          <button
+            type="submit"
+            disabled={guardando}
+            className="flex items-center gap-2 rounded-xl px-6 py-3 text-sm font-bold text-white transition-all disabled:opacity-60 active:scale-[0.98]"
+            style={{ background: '#14532D' }}
+            onMouseEnter={(e) => { if (!guardando) (e.currentTarget as HTMLElement).style.background = '#166534'; }}
+            onMouseLeave={(e) => { (e.currentTarget as HTMLElement).style.background = '#14532D'; }}
+          >
+            {guardando && (
+              <span className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+            )}
+            {guardando ? 'Radicando...' : 'Registrar radicado'}
+          </button>
+        </div>
+      )}
     </form>
   );
 }
