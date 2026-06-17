@@ -71,11 +71,10 @@ const INITIAL_FORM: FormState = {
   anexosDescripcion: '',
 };
 
+import { formatFechaHoraColombia } from '@/lib/fecha-colombia';
+
 function formatDateTime(date: Date): string {
-  return new Intl.DateTimeFormat('es-CO', {
-    dateStyle: 'medium',
-    timeStyle: 'short',
-  }).format(date);
+  return formatFechaHoraColombia(date);
 }
 
 /* ── Estilos compartidos ─────────────────────────────────────── */
@@ -153,7 +152,7 @@ export function RadicacionFuncionarioForm({ radicadoPreview, onSubmit, formId, h
           />
           <ReadOnlyField
             label="Fecha vencimiento"
-            value={new Date(vencimiento.fechaVencimiento).toLocaleDateString('es-CO')}
+            value={formatFechaHoraColombia(vencimiento.fechaVencimiento, { fallback: '—' })}
           />
         </div>
       </section>

@@ -2,6 +2,7 @@ import ExcelJS from 'exceljs';
 import type { VentanillaRadicado, TrazabilidadRadicado } from '@/src/types/ventanilla';
 import { NOMBRES_TENANT } from '@/src/types/reglas-negocio';
 import { getTipoSolicitudById } from '@/lib/catalogos/tipos-solicitud';
+import { formatFechaHoraColombia } from '@/lib/fecha-colombia';
 import {
   debeOcultarIdentidad,
   nombreOficioPublico,
@@ -241,7 +242,7 @@ function construirResumenEjecutivo(
   ws.getCell('A2').font = { italic: true, color: { argb: 'FF475569' } };
 
   const meta: [string, string][] = [
-    ['Fecha de generación', new Date().toLocaleString('es-CO', { hour12: false })],
+    ['Fecha de generación', formatFechaHoraColombia(new Date())],
     ['Generado por',        usuario.nombre],
     ['Rol del usuario',     usuario.rol],
     ['Tenant',              usuario.tenantId],
@@ -426,7 +427,7 @@ function construirRadicados(
       })();
       const row = ws.addRow({
         radicadoId:       s(r.radicadoId),
-        fechaRadicacion:  s(r.control?.fechaRadicado, 'No registrada'),
+        fechaRadicacion:  r.control?.fechaRadicado ? formatFechaHoraColombia(r.control.fechaRadicado) : 'No registrada',
         horaRadicacion:   s(r.control?.horaRadicado, '—'),
         medio:            s(r.control?.medioRecepcion, '—'),
         solicitante:      sv.nombre,
@@ -449,10 +450,10 @@ function construirRadicados(
         respEmail:        rv.email,
         respRol:          rv.rol,
         estado:           s(r.estadoActual),
-        fechaLimite:      s(r.termino?.fechaVencimiento, 'No registrada'),
+        fechaLimite:      r.termino?.fechaVencimiento ? formatFechaHoraColombia(r.termino.fechaVencimiento) : 'No registrada',
         diasRestantes:    sem.diasRestantes,
         estadoTermino:    sem.estado,
-        fechaResp:        s(r.respuestaOficial?.fecha),
+        fechaResp:        r.respuestaOficial?.fecha ? formatFechaHoraColombia(r.respuestaOficial.fecha) : '—',
         cumplio,
         tieneAnexos:      archivosCount > 0 ? `Sí (${archivosCount})` : 'No',
         tieneRespuesta:   r.respuestaOficial?.nota ? `Sí${r.respuestaOficial.archivoNombre ? ' + oficio' : ''}` : 'No',

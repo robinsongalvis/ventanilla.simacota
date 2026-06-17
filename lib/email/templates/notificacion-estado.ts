@@ -29,15 +29,10 @@ export interface TemplateNotificacionEstadoParams {
   fechaEvento:        string;
 }
 
+import { formatFechaLargaColombia } from '@/lib/fecha-colombia';
+
 function formatearFechaLarga(iso: string): string {
-  const d = new Date(iso);
-  if (Number.isNaN(d.getTime())) return iso;
-  return d.toLocaleDateString('es-CO', {
-    weekday: 'long',
-    day:     'numeric',
-    month:   'long',
-    year:    'numeric',
-  });
+  return formatFechaLargaColombia(iso, { fallback: iso });
 }
 
 function escapeHtml(str: string): string {

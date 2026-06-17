@@ -17,6 +17,12 @@ import { asignarRadicado, asignarMasivo }  from '@/lib/actions/asignarRadicado';
 import { ComprobanteRadicado }             from '@/app/interno/dashboard/components/ComprobanteRadicado';
 import { BusquedaAvanzadaPanel }           from '@/app/interno/dashboard/components/BusquedaAvanzadaPanel';
 import { useIndicadoresModo }              from '@/lib/hooks/useIndicadoresModo';
+import {
+  formatFechaColombia,
+  formatFechaCortaColombia,
+  formatFechaHoraColombia,
+  formatHoraColombia,
+} from '@/lib/fecha-colombia';
 import { PanelCargaDependencias }          from '@/app/interno/dashboard/components/dependencias/PanelCargaDependencias';
 import { VistaAnalytics }                  from '@/app/interno/dashboard/components/analytics/VistaAnalytics';
 import { VistaAlertas, contarAlertasActivas } from '@/app/interno/dashboard/components/analytics/VistaAlertas';
@@ -240,14 +246,11 @@ function puedeAccederVista(usuario: UsuarioAutenticado, vista: VistaActual): boo
 }
 
 function fmtFecha(iso: string): string {
-  return new Date(iso).toLocaleDateString('es-CO', { day: '2-digit', month: '2-digit', year: '2-digit' });
+  return formatFechaCortaColombia(iso);
 }
 
 function fmtFechaLarga(iso: string): string {
-  return new Date(iso).toLocaleString('es-CO', {
-    day: '2-digit', month: '2-digit', year: 'numeric',
-    hour: '2-digit', minute: '2-digit',
-  });
+  return formatFechaHoraColombia(iso);
 }
 
 /* ══════════════════════════════════════════════════════════════
@@ -2018,7 +2021,7 @@ function PanelDerecho({
                   )}
                   {radicado.clasificacion.fechaAsignacionResponsable && (
                     <p className="text-[10px] mt-1" style={{ color: '#94A3B8' }}>
-                      Asignado: {new Date(radicado.clasificacion.fechaAsignacionResponsable).toLocaleDateString('es-CO')}
+                      Asignado: {formatFechaColombia(radicado.clasificacion.fechaAsignacionResponsable)}
                     </p>
                   )}
                 </div>
@@ -2369,7 +2372,7 @@ function DrawerNuevoRadicado({
         numeroDocumento:   payload.numeroDocumento,
         tipoDocumento:     payload.tipoDocumento,
         fechaRadicado:     ahora.toISOString(),
-        horaRadicado:      ahora.toLocaleTimeString('es-CO', { hour: '2-digit', minute: '2-digit' }),
+        horaRadicado:      formatHoraColombia(ahora),
         medioRecepcion:    payload.medioRecepcion,
         tipoTramite:       tipoConf.nombre,
         diasRespuesta:     tipoConf.diasRespuesta,

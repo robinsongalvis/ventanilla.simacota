@@ -1,3 +1,5 @@
+import { formatFechaColombia, formatHoraColombia } from './fecha-colombia';
+
 export const INSTITUCION = {
   nombre: 'Alcaldía Municipal de Simacota',
   sistema: 'Ventanilla Única Digital',
@@ -36,24 +38,20 @@ export function labelMedioRecepcion(value?: string | null): string {
   return MEDIO_RECEPCION_LABEL[value] ?? value;
 }
 
+/**
+ * Sprint Fechas Colombia: estos formateadores institucionales delegan
+ * al helper centralizado `lib/fecha-colombia.ts` para garantizar que
+ * sello, comprobante y constancia muestren la fecha/hora en
+ * `America/Bogota` independientemente del navegador o servidor.
+ */
 export function formatFechaInstitucional(value?: string | Date | null): string {
-  if (!value) return 'No registrada';
-  const date = value instanceof Date ? value : new Date(value);
-  if (Number.isNaN(date.getTime())) return 'No registrada';
-  return date.toLocaleDateString('es-CO', {
-    day: '2-digit',
-    month: '2-digit',
-    year: 'numeric',
-  });
+  return formatFechaColombia(value);
 }
 
 export function formatHoraInstitucional(value?: string | Date | null): string {
-  if (!value) return 'No registrada';
-  if (typeof value === 'string' && /^\d{1,2}:\d{2}/.test(value)) return value;
-  const date = value instanceof Date ? value : new Date(value);
-  if (Number.isNaN(date.getTime())) return 'No registrada';
-  return date.toLocaleTimeString('es-CO', {
-    hour: '2-digit',
-    minute: '2-digit',
-  });
+  if (typeof value === 'string' && /^\d{1,2}:\d{2}/.test(value) && !value.includes('T')) {
+    // Si ya viene formato "HH:MM" plano (registros antiguos), respétalo.
+    return value;
+  }
+  return formatHoraColombia(value, { fallback: 'No registrada' });
 }

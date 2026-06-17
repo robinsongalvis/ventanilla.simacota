@@ -16,13 +16,10 @@ export interface TemplateRespuestaCiudadanoParams {
   tieneArchivo:      boolean;
 }
 
+import { formatFechaLargaColombia } from '@/lib/fecha-colombia';
+
 function formatearFecha(iso: string): string {
-  return new Date(iso).toLocaleDateString('es-CO', {
-    weekday: 'long',
-    day:     'numeric',
-    month:   'long',
-    year:    'numeric',
-  });
+  return formatFechaLargaColombia(iso, { fallback: iso });
 }
 
 export function buildRespuestaCiudadanoHtml(
