@@ -77,21 +77,21 @@ export default function HomePage() {
 
         {/* Badge — estado del sistema en tiempo real */}
         <div
-          className="inline-flex items-center gap-2 px-4 py-2 rounded-full border border-indigo-500/30 bg-indigo-500/10 mb-8 animate-fade-in-up"
+          className="inline-flex items-center gap-2 px-4 py-2 rounded-full border border-emerald-500/30 bg-emerald-500/10 mb-8 animate-fade-in-up"
           aria-live="polite"
           aria-label="Estado del sistema: activo"
         >
-          <span className="w-2 h-2 rounded-full bg-indigo-400 animate-pulse-glow" aria-hidden="true" />
-          <span className="font-label text-indigo-400 text-[11px]">{INSTITUCION.contexto} — Sistema activo</span>
+          <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse-glow" aria-hidden="true" />
+          <span className="font-label text-emerald-300 text-[11px]">{INSTITUCION.contexto} — Sistema activo</span>
         </div>
 
-        {/* Headline */}
+        {/* Headline — degradado institucional verde→dorado en "Digital" */}
         <h1
           className="font-headline text-5xl md:text-7xl text-slate-50 max-w-4xl mb-6 animate-fade-in-up"
           style={{ animationDelay: '0.1s', opacity: 0 }}
         >
           Ventanilla Única{' '}
-          <span className="text-transparent bg-clip-text bg-gradient-to-r from-indigo-400 to-purple-400">
+          <span className="text-transparent bg-clip-text bg-gradient-to-r from-emerald-300 via-emerald-200 to-amber-200">
             Digital
           </span>
         </h1>
@@ -122,7 +122,7 @@ export default function HomePage() {
           </Link>
           <Link
             href="/consulta"
-            className="inline-flex items-center justify-center gap-2 text-base px-8 py-4 rounded-xl border border-white/15 text-slate-200 hover:bg-white/[0.04] hover:border-white/30 transition-colors w-full sm:w-auto"
+            className="inline-flex items-center justify-center gap-2 text-base px-8 py-4 rounded-xl border border-emerald-500/30 bg-emerald-500/[0.06] text-emerald-100 hover:bg-emerald-500/[0.12] hover:border-emerald-400/50 transition-colors w-full sm:w-auto"
             aria-label="Consultar el estado de un radicado"
           >
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} className="w-5 h-5">
@@ -140,14 +140,17 @@ export default function HomePage() {
 
         {/* Stats — datos clave de la plataforma */}
         <dl
-          className="grid grid-cols-3 gap-4 sm:gap-8 mt-16 sm:mt-20 animate-fade-in-up"
+          className="grid grid-cols-3 gap-3 sm:gap-4 mt-16 sm:mt-20 animate-fade-in-up max-w-3xl w-full"
           style={{ animationDelay: '0.4s', opacity: 0 }}
           aria-label="Estadísticas de la plataforma"
         >
           {STATS.map((s) => (
-            <div key={s.label} className="text-center">
-              <dd className="font-headline text-3xl text-slate-50 mb-1">{s.value}</dd>
-              <dt className="font-label text-slate-500 text-[10px]">{s.label}</dt>
+            <div
+              key={s.label}
+              className="text-center rounded-2xl border border-white/[0.07] bg-white/[0.02] px-3 py-5 sm:px-5 sm:py-6 backdrop-blur-md"
+            >
+              <dd className="font-headline text-2xl sm:text-3xl text-emerald-200 mb-1">{s.value}</dd>
+              <dt className="font-label text-slate-500 text-[10px] leading-snug">{s.label}</dt>
             </div>
           ))}
         </dl>
@@ -160,7 +163,7 @@ export default function HomePage() {
         aria-labelledby="como-funciona-titulo"
       >
         <div className="text-center mb-12">
-          <p className="font-label text-indigo-400 mb-3" aria-hidden="true">Proceso</p>
+          <p className="font-label text-emerald-300 mb-3" aria-hidden="true">Proceso</p>
           <h2 id="como-funciona-titulo" className="font-headline text-3xl md:text-4xl text-slate-100">Cómo funciona</h2>
         </div>
 
@@ -171,7 +174,7 @@ export default function HomePage() {
                 {i + 1}
               </span>
               <div
-                className="w-12 h-12 rounded-xl bg-indigo-500/15 border border-indigo-500/25 flex items-center justify-center text-indigo-400 mb-5 group-hover:bg-indigo-500/25 transition-colors"
+                className="w-12 h-12 rounded-xl bg-emerald-500/15 border border-emerald-500/25 flex items-center justify-center text-emerald-300 mb-5 group-hover:bg-emerald-500/25 transition-colors"
                 aria-hidden="true"
               >
                 {f.icon}
