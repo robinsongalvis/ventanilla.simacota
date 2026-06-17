@@ -16,6 +16,7 @@ import { radicarInstitucionalmente }       from '@/lib/actions/radicarVentanilla
 import { asignarRadicado, asignarMasivo }  from '@/lib/actions/asignarRadicado';
 import { ComprobanteRadicado }             from '@/app/interno/dashboard/components/ComprobanteRadicado';
 import { BusquedaAvanzadaPanel }           from '@/app/interno/dashboard/components/BusquedaAvanzadaPanel';
+import { useIndicadoresModo }              from '@/lib/hooks/useIndicadoresModo';
 import { PanelCargaDependencias }          from '@/app/interno/dashboard/components/dependencias/PanelCargaDependencias';
 import { VistaAnalytics }                  from '@/app/interno/dashboard/components/analytics/VistaAnalytics';
 import { VistaAlertas, contarAlertasActivas } from '@/app/interno/dashboard/components/analytics/VistaAlertas';
@@ -704,6 +705,8 @@ function TarjetasMIPG({
   esAdmin,
   tenantFiltro,
   onTenantChange,
+  modoCompacto = false,
+  onToggleCompacto,
 }: {
   metricas:       MetricasMIPGData;
   filtroActivo:   FiltroMIPG;
@@ -711,6 +714,8 @@ function TarjetasMIPG({
   esAdmin:        boolean;
   tenantFiltro:   TenantId | 'TODOS';
   onTenantChange: (t: TenantId | 'TODOS') => void;
+  modoCompacto?:  boolean;
+  onToggleCompacto?: () => void;
 }) {
   // Paleta operativa institucional: fondos claros + números y labels en
   // tonos de alto contraste (-700/-800). Cada KPI se identifica por el
@@ -779,13 +784,21 @@ function TarjetasMIPG({
     },
   ];
 
+  // Sprint UI Bandeja Operativa — variante compacta:
+  // - py reducido (py-1.5 vs py-3).
+  // - Tarjetas px-3 py-1.5 con número text-base en lugar de 2xl.
+  // - Mantiene riel izquierdo y selección por color.
+  const cls = modoCompacto
+    ? { wrap: 'px-3 sm:px-4 py-1.5', card: 'px-2.5 py-1', num: 'text-base', label: 'text-[9px] mt-0' }
+    : { wrap: 'px-3 sm:px-4 py-3',    card: 'px-4 py-3',    num: 'text-2xl', label: 'text-[10px] mt-0.5' };
+
   return (
-    <div className="px-3 sm:px-4 py-3 shrink-0 bg-white" style={{ borderBottom: '1px solid #D9E2D9' }}>
-      <div className="flex gap-2 overflow-x-auto pb-0.5">
+    <div className={`${cls.wrap} shrink-0 bg-white`} style={{ borderBottom: '1px solid #D9E2D9' }}>
+      <div className="flex gap-2 overflow-x-auto pb-0.5 items-center">
         {/* Tarjeta TODOS */}
         <button
           onClick={() => onFiltroChange('TODOS')}
-          className="micro-card shrink-0 flex flex-col items-start px-4 py-3 rounded-xl border-l-4 cursor-pointer focus-visible:outline-none"
+          className={`micro-card shrink-0 flex flex-col items-start ${cls.card} rounded-xl border-l-4 cursor-pointer focus-visible:outline-none`}
           style={{
             background: filtroActivo === 'TODOS' ? '#EEF4EE' : '#F8FAF7',
             border: `1px solid ${filtroActivo === 'TODOS' ? '#14532D' : '#D9E2D9'}`,
@@ -793,10 +806,10 @@ function TarjetasMIPG({
             borderLeftWidth: 4,
           }}
         >
-          <span className="text-2xl font-black leading-none tabular-nums" style={{ color: '#14532D' }}>
+          <span className={`${cls.num} font-black leading-none tabular-nums`} style={{ color: '#14532D' }}>
             {tarjetas.reduce((s, t) => s + t.valor, 0)}
           </span>
-          <span className="text-[10px] font-bold uppercase tracking-widest mt-0.5" style={{ color: '#667085' }}>Todos</span>
+          <span className={`${cls.label} font-bold uppercase tracking-widest`} style={{ color: '#667085' }}>Todos</span>
         </button>
 
         {tarjetas.map((t) => {
@@ -806,7 +819,7 @@ function TarjetasMIPG({
               key={t.filtro}
               onClick={() => onFiltroChange(t.filtro)}
               aria-pressed={activo}
-              className="micro-card shrink-0 flex flex-col items-start px-4 py-3 rounded-xl cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-700/30"
+              className={`micro-card shrink-0 flex flex-col items-start ${cls.card} rounded-xl cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-700/30`}
               style={{
                 background: activo ? '#EEF4EE' : '#F8FAF7',
                 border: `1px solid ${activo ? '#14532D' : '#D9E2D9'}`,
@@ -815,14 +828,14 @@ function TarjetasMIPG({
               }}
             >
               <span
-                className="text-2xl font-black leading-none tabular-nums flex items-center gap-1"
+                className={`${cls.num} font-black leading-none tabular-nums flex items-center gap-1`}
                 style={{ color: t.textoColor }}
               >
                 {t.icono && <span className="mt-0.5">{t.icono}</span>}
                 {t.valor}
               </span>
               <span
-                className="text-[10px] font-bold uppercase tracking-widest mt-0.5"
+                className={`${cls.label} font-bold uppercase tracking-widest`}
                 style={{ color: t.textoColor }}
               >
                 {t.label}
@@ -830,6 +843,20 @@ function TarjetasMIPG({
             </button>
           );
         })}
+
+        {/* Toggle Contraer / Expandir indicadores */}
+        {onToggleCompacto && (
+          <button
+            type="button"
+            onClick={onToggleCompacto}
+            className="shrink-0 ml-2 text-[10px] font-bold uppercase tracking-widest px-2 py-1 rounded-md border"
+            style={{ background: 'white', color: '#14532D', borderColor: '#D9E2D9' }}
+            title={modoCompacto ? 'Mostrar indicadores en tamaño completo' : 'Contraer indicadores para dar más espacio a la bandeja'}
+            aria-pressed={modoCompacto}
+          >
+            {modoCompacto ? 'Expandir indicadores' : 'Contraer indicadores'}
+          </button>
+        )}
 
         {/* Selector de dependencia (admin) */}
         {esAdmin && (
@@ -856,11 +883,13 @@ function PanelOperacionDependencia({
   radicados,
   onSeleccionar,
   onFiltroChange,
+  modoCompacto = false,
 }: {
   usuario: UsuarioAutenticado;
   radicados: VentanillaRadicado[];
   onSeleccionar: (r: VentanillaRadicado) => void;
   onFiltroChange: (f: FiltroMIPG) => void;
+  modoCompacto?: boolean;
 }) {
   const resumen = useMemo(() => calcularResumenBandeja(radicados), [radicados]);
   const siguiente = resumen.siguiente;
@@ -869,11 +898,17 @@ function PanelOperacionDependencia({
     : NOMBRES_TENANT[usuario.tenantId];
   const dias = siguiente ? calcDiasRestantes(siguiente) : null;
 
+  // En modo compacto se reducen padding y se oculta la tarjeta de
+  // "Siguiente atención sugerida" para liberar altura al listado.
+  const wrapCls = modoCompacto
+    ? 'px-3 sm:px-4 py-1.5 shrink-0 bg-[#F8FAF7]'
+    : 'px-3 sm:px-4 py-3 shrink-0 bg-[#F8FAF7]';
+  const innerPad = modoCompacto ? 'px-3 py-2' : 'px-4 py-3';
   return (
-    <section className="px-3 sm:px-4 py-3 shrink-0 bg-[#F8FAF7]" style={{ borderBottom: '1px solid #D9E2D9' }}>
-      <div className="grid grid-cols-1 lg:grid-cols-[minmax(0,1.2fr)_minmax(0,1.8fr)] gap-3">
+    <section className={wrapCls} style={{ borderBottom: '1px solid #D9E2D9' }}>
+      <div className={modoCompacto ? '' : 'grid grid-cols-1 lg:grid-cols-[minmax(0,1.2fr)_minmax(0,1.8fr)] gap-3'}>
         {/* Panel bandeja */}
-        <div className="micro-card-read rounded-xl px-4 py-3 bg-white" style={{ border: '1px solid #D9E2D9', boxShadow: '0 1px 3px rgba(20,83,45,0.06)' }}>
+        <div className={`micro-card-read rounded-xl ${innerPad} bg-white`} style={{ border: '1px solid #D9E2D9', boxShadow: '0 1px 3px rgba(20,83,45,0.06)' }}>
           <div className="flex items-start justify-between gap-3">
             <div className="min-w-0">
               <p className="text-[10px] font-black uppercase tracking-widest" style={{ color: '#667085' }}>
@@ -915,7 +950,8 @@ function PanelOperacionDependencia({
           </div>
         </div>
 
-        {/* Panel siguiente acción */}
+        {/* Panel siguiente acción — oculto en modo compacto */}
+        {!modoCompacto && (
         <div className="micro-card-read rounded-xl px-4 py-3 bg-white" style={{ border: '1px solid #D9E2D9', boxShadow: '0 1px 3px rgba(20,83,45,0.06)' }}>
           <div className="flex items-start justify-between gap-3">
             <div className="min-w-0">
@@ -967,6 +1003,7 @@ function PanelOperacionDependencia({
             </p>
           )}
         </div>
+        )}
       </div>
     </section>
   );
@@ -1128,13 +1165,26 @@ function TablaRadicados({
       </div>
 
       {/* Tabla — sm+ : ancho mínimo en escritorio para preservar legibilidad de columnas */}
-      <div className="hidden sm:block flex-1 overflow-y-auto overflow-x-auto bg-white">
+      {/* Sprint UI Bandeja:
+          - `min-h-0` para que el flex-1 no quede infinito.
+          - El thead sticky con `background-clip: padding-box` y background
+            aplicado al `th` (no al `tr`) para evitar bordes desplazados.
+          - Sombra sutil bajo el thead para indicar scroll. */}
+      <div className="hidden sm:block flex-1 min-h-0 overflow-y-auto overflow-x-auto bg-white">
         <table className="w-full text-sm md:min-w-[920px]">
-          <thead className="sticky top-0 z-10">
-            <tr style={{ background: '#EEF4EE', borderBottom: '1px solid #D9E2D9' }}>
+          <thead className="sticky top-0 z-20">
+            <tr style={{ borderBottom: '1px solid #D9E2D9' }}>
               {['Radicado', 'Solicitante', 'Tipo Trámite', 'Dependencia', 'Estado', 'Vencimiento', 'Días'].map((h) => (
-                <th key={h} className="px-4 py-2.5 text-left text-[10px] font-bold uppercase tracking-widest whitespace-nowrap"
-                    style={{ color: '#14532D' }}>
+                <th
+                  key={h}
+                  className="px-4 py-2.5 text-left text-[10px] font-bold uppercase tracking-widest whitespace-nowrap"
+                  style={{
+                    color: '#14532D',
+                    background: '#EEF4EE',
+                    borderBottom: '1px solid #D9E2D9',
+                    boxShadow: '0 1px 0 rgba(20,83,45,0.08)',
+                  }}
+                >
                   {h}
                 </th>
               ))}
@@ -2965,6 +3015,8 @@ function DashboardInterior({ usuario, cerrarSesion }: { usuario: UsuarioAutentic
   const tienePermisoRadicar = puedeRadicar(usuario);
   const tienePermisoBandeja = puedeUsarBandejaAsignacion(usuario);
   const [busquedaAvanzadaAbierta, setBusquedaAvanzadaAbierta] = useState(false);
+  const { modo: indicadoresModo, toggle: toggleIndicadoresModo } = useIndicadoresModo();
+  const indicadoresCompactos = indicadoresModo === 'compacto';
   /** Roles de solo lectura: pueden ver pero no ejecutar acciones sobre radicados. */
   const esVistaReadOnly = usuario.rol === 'JEFE_DEPENDENCIA' || usuario.rol === 'CONTROL_INTERNO';
 
@@ -3037,8 +3089,11 @@ function DashboardInterior({ usuario, cerrarSesion }: { usuario: UsuarioAutentic
         pendientesNotificacionFallida={pendientesNotificacionFallida}
       />
 
-      {/* ── COLUMNA 2: Cuerpo central ── */}
-      <div className="flex-1 flex flex-col overflow-hidden min-w-0">
+      {/* ── COLUMNA 2: Cuerpo central ──
+            Sprint UI Bandeja: añadimos `min-h-0` para que los hijos con
+            `flex-1` puedan ceder altura al scroll interno sin crecer
+            indefinidamente y romper el layout. */}
+      <div className="flex-1 flex flex-col overflow-hidden min-w-0 min-h-0">
         <MobileTopBar
           usuario={usuario}
           vistaActual={vistaActual}
@@ -3094,8 +3149,9 @@ function DashboardInterior({ usuario, cerrarSesion }: { usuario: UsuarioAutentic
           </div>
         ) : (
           <>
-            {/* Dashboard PQRSD compacto — vencimientos y riesgo */}
-            {esAdmin && (
+            {/* Dashboard PQRSD compacto — vencimientos y riesgo.
+                En modo "compacto" se oculta para dar más altura al listado. */}
+            {esAdmin && !indicadoresCompactos && (
               <div className="px-4 py-3 bg-white shrink-0" style={{ borderBottom: '1px solid #D9E2D9' }}>
                 <p className="text-[9px] font-bold uppercase tracking-widest mb-2" style={{ color: '#14532D' }}>
                   Semáforo PQRSD
@@ -3116,6 +3172,8 @@ function DashboardInterior({ usuario, cerrarSesion }: { usuario: UsuarioAutentic
               esAdmin={esAdmin}
               tenantFiltro={tenantFiltro}
               onTenantChange={(t) => dispatch({ type: 'SET_TENANT_FILTRO', tenant: t })}
+              modoCompacto={indicadoresCompactos}
+              onToggleCompacto={toggleIndicadoresModo}
             />
 
             <PanelOperacionDependencia
@@ -3123,6 +3181,7 @@ function DashboardInterior({ usuario, cerrarSesion }: { usuario: UsuarioAutentic
               radicados={todosLosRadicados}
               onFiltroChange={(f) => dispatch({ type: 'SET_FILTRO_MIPG', filtro: f })}
               onSeleccionar={(r) => dispatch({ type: 'SELECCIONAR_RADICADO', radicado: r })}
+              modoCompacto={indicadoresCompactos}
             />
 
             {/* Tabla maestra */}
