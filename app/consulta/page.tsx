@@ -54,7 +54,7 @@ const DESCRIPCION_ESTADO: Record<EstadoPublico, { titulo: string; descripcion: s
   RECHAZADO: {
     titulo:      'No admitido',
     descripcion: 'Su solicitud no pudo ser procesada. Contacte la dependencia asignada para más información.',
-    color:       'text-slate-400',
+    color:       'text-slate-600',
     bg:          'bg-slate-500/10',
     border:      'border-slate-500/30',
   },
@@ -239,21 +239,17 @@ function ConsultaInterna() {
 
   return (
     <main
-      className="min-h-screen"
-      style={{
-        background: `
-          radial-gradient(ellipse 70% 40% at 50% -5%, rgba(99,102,241,0.10) 0%, transparent 55%),
-          #0A0A0B
-        `,
-      }}
+      className="min-h-screen bg-institucional-light"
+      style={{ color: 'var(--text-primary-2)' }}
     >
       {/* ── Header ── */}
-      <header className="border-b border-white/[0.06] backdrop-blur-[20px] bg-[#0A0A0B]/70">
-        <div className="max-w-4xl mx-auto px-4 sm:px-6 py-5 flex items-center gap-3">
-          <InstitucionalHeader compact subtitle="Consulta de Estado de Solicitud" />
+      <header className="border-b border-[var(--border-soft)] backdrop-blur-[20px] bg-white/85 sticky top-0 z-40">
+        <div className="max-w-4xl mx-auto px-4 sm:px-6 py-4 flex items-center gap-3">
+          <InstitucionalHeader compact theme="light" subtitle="Consulta de Estado de Solicitud" />
           <Link
             href="/"
-            className="ml-auto text-[10px] font-bold uppercase tracking-widest text-slate-600 hover:text-slate-400 transition-colors"
+            className="ml-auto font-label text-[11px] link-gradient-underline"
+            style={{ color: 'var(--text-secondary-2)' }}
           >
             Inicio
           </Link>
@@ -265,25 +261,22 @@ function ConsultaInterna() {
         {/* ── Título ── */}
         <div className="text-center mb-8">
           <h1
-            className="text-3xl sm:text-4xl font-black tracking-tighter text-slate-50 mb-3"
-            style={{ fontFamily: 'var(--font-manrope)' }}
+            className="text-3xl sm:text-4xl font-black tracking-tighter mb-3"
+            style={{ fontFamily: 'var(--font-manrope)', color: 'var(--text-primary-2)' }}
           >
             ¿En qué estado está<br className="hidden sm:block" /> su solicitud?
           </h1>
-          <p className="text-slate-400 text-sm leading-relaxed max-w-sm mx-auto">
+          <p className="text-sm leading-relaxed max-w-sm mx-auto" style={{ color: 'var(--text-secondary-2)' }}>
             Ingrese el número de radicado para ver el estado actual de su caso.
           </p>
         </div>
 
         {/* ── Caja de búsqueda ── */}
-        <div
-          className="rounded-2xl border border-white/10 p-6"
-          style={{ background: 'rgba(15,23,42,0.40)', backdropFilter: 'blur(25px)' }}
-        >
-          <label htmlFor="radicado-input" className="block text-xs font-bold uppercase tracking-widest text-slate-400 mb-3">
+        <div className="card-institucional p-6" style={{ boxShadow: 'var(--shadow-institutional-md)' }}>
+          <label htmlFor="radicado-input" className="block text-xs font-bold uppercase tracking-widest mb-3" style={{ color: 'var(--text-secondary-2)' }}>
             Número de radicado
           </label>
-          <div className="flex gap-2">
+          <div className="flex flex-col sm:flex-row gap-2">
             <input
               ref={inputRef}
               id="radicado-input"
@@ -292,21 +285,14 @@ function ConsultaInterna() {
               onChange={(e) => handleInputChange(e.target.value)}
               onKeyDown={(e) => e.key === 'Enter' && buscar(inputId)}
               placeholder="1-WEB-2026-00000047"
-              className="flex-1 bg-slate-800/50 border border-white/10 rounded-xl px-4 py-3
-                text-slate-50 placeholder:text-slate-600 text-sm font-mono
-                focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/20 outline-none
-                transition-all duration-300"
+              className="input-internal flex-1 text-sm font-mono"
               autoComplete="off"
               spellCheck={false}
             />
             <button
               onClick={() => buscar(inputId)}
               disabled={buscando}
-              className="px-5 py-3 rounded-xl font-bold text-sm text-white
-                bg-gradient-to-r from-indigo-600 to-indigo-500
-                hover:from-indigo-500 hover:to-indigo-400
-                disabled:opacity-50 disabled:cursor-not-allowed
-                transition-all duration-300 flex items-center gap-2 shrink-0"
+              className="btn-institucional-primary inline-flex items-center justify-center gap-2 px-5 py-3 rounded-xl font-bold text-sm shrink-0 disabled:opacity-60"
             >
               {buscando ? (
                 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} className="w-4 h-4 animate-spin-smooth">
@@ -324,11 +310,11 @@ function ConsultaInterna() {
 
         {/* ── Resultado: no encontrado ── */}
         {noEncontrado && (
-          <div className="rounded-2xl border border-rose-500/20 bg-rose-500/5 p-6 text-center">
+          <div className="card-institucional p-6 text-center" style={{ borderColor: '#FECACA', background: '#FFF5F5' }}>
             <p className="text-4xl mb-3">🔍</p>
-            <p className="text-slate-200 font-bold mb-2">Radicado no encontrado</p>
-            <p className="text-slate-400 text-sm leading-relaxed">
-              No se encontró un radicado con el número <span className="text-rose-400 font-mono">{inputId}</span>.
+            <p className="text-slate-800 font-bold mb-2">Radicado no encontrado</p>
+            <p className="text-slate-600 text-sm leading-relaxed">
+              No se encontró un radicado con el número <span className="text-rose-700 font-mono">{inputId}</span>.
               Verifique que lo escribió correctamente.
             </p>
           </div>
@@ -336,45 +322,42 @@ function ConsultaInterna() {
 
         {/* ── Resultado: error ── */}
         {error && (
-          <div className="rounded-2xl border border-rose-500/20 bg-rose-500/5 p-4 text-center">
-            <p className="text-rose-400 text-sm">{error}</p>
+          <div className="card-institucional p-4 text-center" style={{ borderColor: '#FECACA', background: '#FFF5F5' }}>
+            <p className="text-rose-700 text-sm">{error}</p>
           </div>
         )}
 
         {/* ── Resultado: radicado encontrado ── */}
         {radicado && estadoInfo && (
-          <div
-            className="rounded-2xl border border-white/10 overflow-hidden"
-            style={{ background: 'rgba(15,23,42,0.40)', backdropFilter: 'blur(25px)' }}
-          >
+          <div className="card-institucional overflow-hidden" style={{ boxShadow: 'var(--shadow-institutional-md)' }}>
             {/* Cabecera del resultado */}
-            <div className="px-6 pt-6 pb-4 border-b border-white/[0.06]">
+            <div className="px-6 pt-6 pb-4 border-b border-[var(--border-soft)]">
               <div className="flex items-start justify-between gap-4 flex-wrap">
                 <div>
-                  <p className="text-[10px] font-bold uppercase tracking-widest text-slate-500 mb-1">
+                  <p className="text-[10px] font-bold uppercase tracking-widest text-slate-600 mb-1">
                     Número de radicado
                   </p>
                   <p
-                    className="text-xl font-black tracking-widest text-indigo-400 font-mono break-all"
-                    style={{ fontFamily: 'var(--font-manrope)' }}
+                    className="text-xl font-black tracking-widest font-mono break-all"
+                    style={{ color: 'var(--brand-forest)', fontFamily: 'var(--font-manrope)' }}
                   >
                     {radicado.radicadoId}
                   </p>
                 </div>
                 {fechaCreacion && (
                   <div className="text-right shrink-0">
-                    <p className="text-[10px] font-bold uppercase tracking-widest text-slate-500 mb-1">
+                    <p className="text-[10px] font-bold uppercase tracking-widest text-slate-600 mb-1">
                       Fecha de radicación
                     </p>
-                    <p className="text-xs text-slate-300">{formatearFecha(fechaCreacion)}</p>
+                    <p className="text-xs text-slate-700">{formatearFecha(fechaCreacion)}</p>
                   </div>
                 )}
               </div>
             </div>
 
             {/* Estado actual */}
-            <div className="px-6 py-5 border-b border-white/[0.06]">
-              <p className="text-[10px] font-bold uppercase tracking-widest text-slate-500 mb-3">
+            <div className="px-6 py-5 border-b border-[var(--border-soft)]">
+              <p className="text-[10px] font-bold uppercase tracking-widest text-slate-600 mb-3">
                 Estado actual
               </p>
               <div className={`rounded-xl border ${estadoInfo.border} ${estadoInfo.bg} p-4`}>
@@ -384,11 +367,11 @@ function ConsultaInterna() {
                     {estadoInfo.titulo}
                   </span>
                 </div>
-                <p className="text-sm text-slate-300 leading-relaxed">{estadoInfo.descripcion}</p>
+                <p className="text-sm text-slate-700 leading-relaxed">{estadoInfo.descripcion}</p>
               </div>
             </div>
 
-            <div className="px-6 py-5 border-b border-white/[0.06]">
+            <div className="px-6 py-5 border-b border-[var(--border-soft)]">
               <SelloRadicado
                 variant="compact"
                 data={{
@@ -403,28 +386,28 @@ function ConsultaInterna() {
                 }}
               />
               {radicado.fechaVencimiento && (
-                <p className="mt-3 text-xs text-slate-500">
-                  Fecha límite estimada: <span className="font-semibold text-slate-300">{formatearFecha(radicado.fechaVencimiento)}</span>
+                <p className="mt-3 text-xs text-slate-600">
+                  Fecha límite estimada: <span className="font-semibold text-slate-700">{formatearFecha(radicado.fechaVencimiento)}</span>
                 </p>
               )}
             </div>
 
             {(radicado.tipoSolicitudNombre || radicado.canalRespuesta) && (
-              <div className="px-6 py-5 border-b border-white/[0.06] grid sm:grid-cols-2 gap-4">
+              <div className="px-6 py-5 border-b border-[var(--border-soft)] grid sm:grid-cols-2 gap-4">
                 {radicado.tipoSolicitudNombre && (
                   <div>
-                    <p className="text-[10px] font-bold uppercase tracking-widest text-slate-500 mb-2">
+                    <p className="text-[10px] font-bold uppercase tracking-widest text-slate-600 mb-2">
                       Tipo de solicitud
                     </p>
-                    <p className="text-sm font-semibold text-slate-200">{radicado.tipoSolicitudNombre}</p>
+                    <p className="text-sm font-semibold text-slate-800">{radicado.tipoSolicitudNombre}</p>
                   </div>
                 )}
                 {radicado.canalRespuesta && (
                   <div>
-                    <p className="text-[10px] font-bold uppercase tracking-widest text-slate-500 mb-2">
+                    <p className="text-[10px] font-bold uppercase tracking-widest text-slate-600 mb-2">
                       Canal de respuesta
                     </p>
-                    <p className="text-sm font-semibold text-slate-200">{labelCanalRespuesta(radicado.canalRespuesta)}</p>
+                    <p className="text-sm font-semibold text-slate-800">{labelCanalRespuesta(radicado.canalRespuesta)}</p>
                   </div>
                 )}
               </div>
@@ -432,15 +415,15 @@ function ConsultaInterna() {
 
             {/* Dependencia asignada */}
             {oficina && (
-              <div className="px-6 py-5 border-b border-white/[0.06]">
-                <p className="text-[10px] font-bold uppercase tracking-widest text-slate-500 mb-3">
+              <div className="px-6 py-5 border-b border-[var(--border-soft)]">
+                <p className="text-[10px] font-bold uppercase tracking-widest text-slate-600 mb-3">
                   Dependencia asignada
                 </p>
-                <p className="text-slate-200 font-bold mb-2">{oficina.nombreOficial}</p>
+                <p className="text-slate-800 font-bold mb-2">{oficina.nombreOficial}</p>
                 <div className="space-y-1.5">
                   <a
                     href={`mailto:${oficina.emailOficial}`}
-                    className="flex items-center gap-2 text-sm text-slate-400 hover:text-indigo-400 transition-colors"
+                    className="flex items-center gap-2 text-sm text-slate-600 hover:text-emerald-800 transition-colors"
                   >
                     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.5} className="w-4 h-4 shrink-0">
                       <path strokeLinecap="round" strokeLinejoin="round" d="M21.75 6.75v10.5a2.25 2.25 0 01-2.25 2.25h-15a2.25 2.25 0 01-2.25-2.25V6.75m19.5 0A2.25 2.25 0 0019.5 4.5h-15a2.25 2.25 0 00-2.25 2.25m19.5 0v.243a2.25 2.25 0 01-1.07 1.916l-7.5 4.615a2.25 2.25 0 01-2.36 0L3.32 8.91a2.25 2.25 0 01-1.07-1.916V6.75" />
@@ -449,7 +432,7 @@ function ConsultaInterna() {
                   </a>
                   <a
                     href={`tel:${oficina.celularOficial}`}
-                    className="flex items-center gap-2 text-sm text-slate-400 hover:text-indigo-400 transition-colors"
+                    className="flex items-center gap-2 text-sm text-slate-600 hover:text-emerald-800 transition-colors"
                   >
                     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.5} className="w-4 h-4 shrink-0">
                       <path strokeLinecap="round" strokeLinejoin="round" d="M2.25 6.75c0 8.284 6.716 15 15 15h2.25a2.25 2.25 0 002.25-2.25v-1.372c0-.516-.351-.966-.852-1.091l-4.423-1.106c-.44-.11-.902.055-1.173.417l-.97 1.293c-.282.376-.769.542-1.21.38a12.035 12.035 0 01-7.143-7.143c-.162-.441.004-.928.38-1.21l1.293-.97c.363-.271.527-.734.417-1.173L6.963 3.102a1.125 1.125 0 00-1.091-.852H4.5A2.25 2.25 0 002.25 4.5v2.25z" />
@@ -462,7 +445,7 @@ function ConsultaInterna() {
 
             {/* Respuesta oficial institucional — solo si RESUELTO + nota válida */}
             {radicado.respuestaOficial && (
-              <div className="px-6 py-5 border-b border-white/[0.06]">
+              <div className="px-6 py-5 border-b border-[var(--border-soft)]">
                 <div className="flex items-center gap-2 mb-3">
                   <svg viewBox="0 0 24 24" fill="none" stroke="#10B981" strokeWidth={2} className="w-4 h-4 shrink-0">
                     <path strokeLinecap="round" strokeLinejoin="round" d="M9 12.75L11.25 15 15 9.75M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
@@ -476,14 +459,14 @@ function ConsultaInterna() {
                   style={{ background: 'rgba(16,185,129,0.06)' }}
                 >
                   <p
-                    className="text-sm text-slate-200 leading-relaxed whitespace-pre-wrap"
+                    className="text-sm text-slate-800 leading-relaxed whitespace-pre-wrap"
                     style={{ fontFamily: 'var(--font-manrope)' }}
                   >
                     {radicado.respuestaOficial.nota}
                   </p>
                   <div className="mt-4 pt-3 border-t border-emerald-500/10 flex flex-wrap items-center justify-between gap-2">
-                    <div className="text-[11px] text-slate-500">
-                      <span className="font-semibold text-slate-400">{radicado.respuestaOficial.dependenciaNombre}</span>
+                    <div className="text-[11px] text-slate-600">
+                      <span className="font-semibold text-slate-600">{radicado.respuestaOficial.dependenciaNombre}</span>
                       <span className="mx-1.5">·</span>
                       <span>{formatearFecha(radicado.respuestaOficial.fecha)}</span>
                     </div>
@@ -504,8 +487,8 @@ function ConsultaInterna() {
               <button
                 onClick={copiarEnlace}
                 className="flex items-center gap-1.5 text-xs font-bold uppercase tracking-wider
-                  text-slate-500 hover:text-slate-300 transition-colors px-3 py-2 rounded-lg
-                  border border-white/[0.06] hover:border-white/10"
+                  text-slate-600 hover:text-slate-700 transition-colors px-3 py-2 rounded-lg
+                  border border-[var(--border-soft)] hover:border-[var(--border-soft)]"
               >
                 {copiado ? (
                   <>
@@ -528,20 +511,19 @@ function ConsultaInterna() {
         )}
 
         {/* ── Ayuda: no tiene número ── */}
-        <div
-          className="rounded-2xl border border-white/[0.07] p-5"
-          style={{ background: 'rgba(15,23,42,0.30)', backdropFilter: 'blur(25px)' }}
-        >
-          <p className="text-sm font-bold text-slate-300 mb-2">¿No tiene número de radicado?</p>
-          <p className="text-xs text-slate-500 leading-relaxed mb-4">
+        <div className="card-institucional p-5">
+          <p className="text-sm font-bold mb-2" style={{ color: 'var(--text-primary-2)' }}>
+            ¿No tiene número de radicado?
+          </p>
+          <p className="text-xs leading-relaxed mb-4" style={{ color: 'var(--text-secondary-2)' }}>
             Si presentó su solicitud en persona, el número está en el comprobante que le entregó
             la recepcionista. Si la presentó por internet, revise su correo electrónico o anote
             el número que apareció en la pantalla de confirmación.
           </p>
           <Link
             href="/radicacion"
-            className="inline-flex items-center gap-2 text-xs font-bold uppercase tracking-wider
-              text-indigo-400 hover:text-indigo-300 transition-colors"
+            className="link-gradient-underline inline-flex items-center gap-2 text-xs font-bold uppercase tracking-wider"
+            style={{ color: 'var(--brand-green-action)' }}
           >
             Radicar nueva solicitud
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} className="w-3.5 h-3.5">
@@ -553,8 +535,8 @@ function ConsultaInterna() {
       </div>
 
       {/* ── Footer ── */}
-      <footer className="border-t border-white/[0.06] py-6 text-center mt-4">
-        <p className="text-[10px] font-bold uppercase tracking-widest text-slate-700">
+      <footer className="border-t border-[var(--border-soft)] py-6 text-center mt-4 bg-white/40">
+        <p className="text-[10px] font-bold uppercase tracking-widest" style={{ color: 'var(--text-secondary-2)' }}>
           Alcaldía Municipal de Simacota · Santander · Sistema de Ventanilla Única Digital
         </p>
       </footer>
@@ -570,8 +552,8 @@ export default function ConsultaPage() {
   return (
     <Suspense
       fallback={
-        <div className="min-h-screen bg-[#0A0A0B] flex items-center justify-center">
-          <div className="flex items-center gap-3 text-slate-500">
+        <div className="min-h-screen bg-institucional-light flex items-center justify-center">
+          <div className="flex items-center gap-3 text-slate-600">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} className="w-5 h-5 animate-spin-smooth">
               <path strokeLinecap="round" strokeLinejoin="round" d="M16.023 9.348h4.992v-.001M2.985 19.644v-4.992m0 0h4.992m-4.993 0l3.181 3.183a8.25 8.25 0 0013.803-3.7M4.031 9.865a8.25 8.25 0 0113.803-3.7l3.181 3.182m0-4.991v4.99" />
             </svg>

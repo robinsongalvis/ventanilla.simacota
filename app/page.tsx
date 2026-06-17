@@ -55,13 +55,6 @@ export default function HomePage() {
               Directorio
             </Link>
             <Link
-              href="/consulta"
-              className="font-label text-slate-700 link-gradient-underline text-[11px]"
-              aria-label="Consultar estado de un radicado por su número"
-            >
-              Consultar radicado
-            </Link>
-            <Link
               href="/interno/dashboard"
               className="font-label text-slate-800 link-gradient-underline text-[11px]"
               aria-label="Acceso al panel interno para funcionarios de la Alcaldía"
