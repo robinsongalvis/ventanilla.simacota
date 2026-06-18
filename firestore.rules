@@ -317,6 +317,34 @@ service cloud.firestore {
       allow write: if false;
     }
 
+    // ── Control Interno: hallazgos, planes de mejora, alertas y eventos ─
+    // Todas las escrituras pasan por APIs server-side con Admin SDK que
+    // validan rol, tenantId y dejan trazabilidad. Las reglas blindan
+    // el acceso de lectura (Control Interno y Admin ven todo).
+
+    match /control_interno_hallazgos/{hallazgoId} {
+      allow get, list: if isAdmin() || isControlInterno() || isJefeDependencia();
+      allow create, update, delete: if false;
+    }
+
+    match /control_interno_planes_mejora/{planId} {
+      // Jefe de dependencia debe poder ver planes asignados a su tenant
+      // para reportar avances (la escritura pasa por API server-side).
+      allow get, list: if isAdmin() || isControlInterno() || isJefeDependencia()
+        || (isFuncionario() && resource.data.tenantId == userTenant());
+      allow create, update, delete: if false;
+    }
+
+    match /control_interno_alertas/{alertaId} {
+      allow get, list: if isAdmin() || isControlInterno();
+      allow create, update, delete: if false;
+    }
+
+    match /control_interno_eventos/{eventoId} {
+      allow get, list: if isAdmin() || isControlInterno();
+      allow create, update, delete: if false;
+    }
+
     match /{document=**} {
       allow read, write: if false;
     }
