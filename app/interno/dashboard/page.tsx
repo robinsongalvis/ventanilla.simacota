@@ -40,6 +40,7 @@ import { PqrsdDeadlineDashboard }            from '@/app/interno/dashboard/compo
 import { SimiGobernanzaPanel }              from '@/app/interno/dashboard/components/simi/SimiGobernanzaPanel';
 import { JefeAprobacionesPanel }            from '@/app/interno/dashboard/components/simi/JefeAprobacionesPanel';
 import { ControlInternoDashboard }          from '@/app/interno/dashboard/components/simi/ControlInternoDashboard';
+import { CentroControlInterno }              from '@/app/interno/dashboard/components/control-interno/CentroControlInterno';
 import { InstitucionalHeader }               from '@/app/components/institucional/InstitucionalHeader';
 import { SelloRadicado }                     from '@/app/components/institucional/SelloRadicado';
 import { useFuncionariosTenant }              from '@/lib/hooks/useFuncionariosTenant';
@@ -3213,8 +3214,16 @@ function DashboardInterior({ usuario, cerrarSesion }: { usuario: UsuarioAutentic
             <VistaAnticipacionOperativa radicados={todosLosRadicados} />
           </div>
         ) : vistaActual === 'CONTROL_INTERNO' ? (
-          <div className="flex-1 overflow-y-auto p-4 sm:p-6" style={{ background: '#F8FAF7' }}>
-            <ControlInternoDashboard />
+          <div className="flex-1 overflow-y-auto p-4 sm:p-6 space-y-6" style={{ background: '#F8FAF7' }}>
+            <CentroControlInterno />
+            <details className="rounded-xl bg-white p-4" style={{ border: '1px solid #D9E2D9' }}>
+              <summary className="cursor-pointer text-[10px] font-bold uppercase tracking-widest" style={{ color: '#667085' }}>
+                Dashboard MIPG histórico (Sprint 5)
+              </summary>
+              <div className="mt-3">
+                <ControlInternoDashboard />
+              </div>
+            </details>
           </div>
         ) : vistaActual === 'APROBACIONES' ? (
           <JefeAprobacionesPanel usuarioRol={usuario.rol} />
