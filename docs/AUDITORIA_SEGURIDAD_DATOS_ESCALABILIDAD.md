@@ -31,7 +31,7 @@
 
 | ID | Área | Riesgo | Prioridad |
 |----|------|--------|-----------|
-| H-01 | Control de acceso | Descarga de adjuntos sin validar dependencia ni rol (IDOR) | **P1** |
+| H-01 | Control de acceso | Descarga de adjuntos sin validar dependencia ni rol (IDOR) | **P1** — ✅ **Corregido** (Sprint Seguridad P1-01) |
 | H-02 | Control de acceso / Correo | Notificación al ciudadano sin validar rol ni dependencia; contenido y destinatario los pone el cliente | **P1** |
 | H-03 | Privacidad | Consulta pública enumerable (números secuenciales + verificación opcional) | **P1** |
 | H-04 | Abuso / Costos | `/api/ai/log` sin autenticación ni límite (escritura libre a Firestore) | **P2** |
@@ -497,7 +497,7 @@ revisar consumo mensual de Firestore y Gemini.
 
 | ID | Área | Riesgo | Impacto | Probabilidad | Nivel | Evidencia | Recomendación | Prioridad | Esfuerzo | Estado |
 |----|------|--------|---------|--------------|-------|-----------|---------------|-----------|----------|--------|
-| H-01 | Acceso | Descarga de adjuntos sin validar tenant/rol | Alto | Media | **Alto** | `app/api/interno/archivo/route.ts` | Verificar radicado→tenant→rol antes de firmar URL | **P1** | Bajo | Abierto |
+| H-01 | Acceso | Descarga de adjuntos sin validar tenant/rol | Alto | Media | **Alto** | `app/api/interno/archivo/route.ts` | Verificar radicado→tenant→rol antes de firmar URL | **P1** | Bajo | ✅ **Corregido (Sprint Seguridad P1-01)** |
 | H-02 | Acceso/Correo | Notificar al ciudadano sin rol/tenant; datos del cliente | Alto | Media | **Alto** | `app/api/interno/notificar-ciudadano/route.ts` | Tomar datos del radicado; validar rol/tenant | **P1** | Bajo | Abierto |
 | H-03 | Privacidad | Consulta pública enumerable | Medio-Alto | Alta | **Alto** | `app/api/consulta/[id]`, `public/radicado/consulta` | Verificación obligatoria + rate-limit | **P1** | Medio | Abierto |
 | H-04 | Abuso | `/api/ai/log` sin auth | Medio | Media | Medio | `app/api/ai/log/route.ts` | Auth + límite | **P2** | Bajo | Abierto |
