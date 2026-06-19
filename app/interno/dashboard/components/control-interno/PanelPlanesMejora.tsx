@@ -8,9 +8,17 @@ import type {
 } from '@/src/types/control-interno';
 import { LABEL_ESTADO_PLAN } from '@/src/types/control-interno';
 import { NOMBRES_TENANT } from '@/src/types/reglas-negocio';
-import { Aviso, Cargando } from './PanoramaGeneralPanel';
+import { Aviso, Cargando, EstadoVacio } from './PanoramaGeneralPanel';
 
 const ESTADOS_AVANCE: EstadoPlanMejora[] = ['PENDIENTE', 'EN_EJECUCION', 'CUMPLIDO', 'VENCIDO'];
+
+interface ResponsablePlan {
+  uid:    string;
+  nombre: string;
+  cargo:  string | null;
+  email:  string;
+  rol:    string;
+}
 
 function colorEstado(e: EstadoPlanMejora): string {
   if (e === 'CUMPLIDO')     return '#14532D';
@@ -35,6 +43,10 @@ export function PanelPlanesMejora() {
   const [fObservaciones, setFObservaciones] = useState('');
   const [enviando, setEnviando]   = useState(false);
   const [errorForm, setErrorForm] = useState<string | null>(null);
+  const [exito, setExito]         = useState<string | null>(null);
+  const [responsables, setResponsables] = useState<ResponsablePlan[]>([]);
+  const [cargandoResponsables, setCargandoResponsables] = useState(false);
+  const [errorResponsables, setErrorResponsables] = useState<string | null>(null);
 
   const cargar = useCallback(async () => {
     setCargando(true); setError(null);
@@ -54,6 +66,34 @@ export function PanelPlanesMejora() {
   }, []);
 
   useEffect(() => { void cargar(); }, [cargar]);
+
+  useEffect(() => {
+    const hallazgo = hallazgos.find((item) => item.id === fHallazgo);
+    setFRespUid('');
+    setFRespNombre('');
+    setResponsables([]);
+    setErrorResponsables(null);
+    if (!hallazgo) return;
+
+    let cancelado = false;
+    setCargandoResponsables(true);
+    fetch(`/api/interno/control/responsables?tenantId=${encodeURIComponent(hallazgo.tenantId)}`, {
+      credentials: 'include',
+    })
+      .then(async (response) => {
+        const data = await response.json() as { ok?: boolean; error?: string; responsables?: ResponsablePlan[] };
+        if (!response.ok || !data.ok) throw new Error(data.error ?? 'No fue posible cargar los responsables.');
+        if (!cancelado) setResponsables(data.responsables ?? []);
+      })
+      .catch((err) => {
+        if (!cancelado) setErrorResponsables(err instanceof Error ? err.message : 'No fue posible cargar los responsables.');
+      })
+      .finally(() => {
+        if (!cancelado) setCargandoResponsables(false);
+      });
+
+    return () => { cancelado = true; };
+  }, [fHallazgo, hallazgos]);
 
   const limpiar = () => {
     setFHallazgo(''); setFAccion(''); setFRespUid(''); setFRespNombre('');
@@ -83,8 +123,10 @@ export function PanelPlanesMejora() {
       await cargar();
       setCrear(false);
       limpiar();
+      setExito('Plan de mejora solicitado. La dependencia podrá registrar avances y evidencia.');
+      window.setTimeout(() => setExito(null), 6000);
     } catch (err) {
-      setErrorForm(err instanceof Error ? err.message : 'Error.');
+      setErrorForm(err instanceof Error ? err.message : 'No fue posible solicitar el plan.');
     } finally {
       setEnviando(false);
     }
@@ -123,48 +165,76 @@ export function PanelPlanesMejora() {
           className="px-3 py-2 rounded-lg text-xs font-bold text-white"
           style={{ background: crear ? '#94A3B8' : '#14532D' }}
         >
-          {crear ? 'Cancelar' : 'Solicitar plan'}
+          {crear ? 'Cancelar' : 'Solicitar plan de mejora'}
         </button>
       </div>
 
+      {exito && <Aviso tipo="info" mensaje={exito} />}
+
       {crear && (
         <form onSubmit={guardar} className="rounded-xl bg-white p-4 space-y-3" style={{ border: '1px solid #D9E2D9' }}>
+          <p className="text-xs" style={{ color: '#667085' }}>
+            Indique qué debe corregirse, quién debe hacerlo y hasta cuándo. La dependencia recibirá el plan para registrar avances.
+          </p>
           <label className="flex flex-col text-[10px] font-bold uppercase tracking-widest" style={{ color: '#94A3B8' }}>
-            Hallazgo origen
+            Hallazgo relacionado
             <select required className="select-internal mt-1 text-xs" value={fHallazgo} onChange={(e) => setFHallazgo(e.target.value)}>
-              <option value="">Selecciona un hallazgo abierto…</option>
+              <option value="">Seleccione un hallazgo abierto…</option>
               {hallazgos.map((h) => (
                 <option key={h.id} value={h.id}>
                   {h.id?.slice(0, 6)} · {NOMBRES_TENANT[h.tenantId] ?? h.tenantId} · {h.descripcion.slice(0, 40)}
                 </option>
               ))}
             </select>
+            <span className="mt-1 text-[10px]" style={{ color: '#94A3B8' }}>El plan se vincula automáticamente al hallazgo.</span>
           </label>
           <label className="flex flex-col text-[10px] font-bold uppercase tracking-widest" style={{ color: '#94A3B8' }}>
-            Acción correctiva (mín. 10 caracteres)
-            <textarea required rows={3} className="input-internal mt-1 text-xs" value={fAccion} onChange={(e) => setFAccion(e.target.value)} />
+            Acción de mejora
+            <textarea required rows={3} className="input-internal mt-1 text-xs" value={fAccion} onChange={(e) => setFAccion(e.target.value)}
+              placeholder="¿Qué debe corregirse para evitar que vuelva a ocurrir?" />
+            <span className="mt-1 text-[10px]" style={{ color: '#94A3B8' }}>Mínimo 10 caracteres.</span>
           </label>
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <label className="flex flex-col text-[10px] font-bold uppercase tracking-widest" style={{ color: '#94A3B8' }}>
-              UID responsable
-              <input required className="input-internal mt-1 text-xs" value={fRespUid} onChange={(e) => setFRespUid(e.target.value)} placeholder="UID de Firebase Auth" />
-            </label>
-            <label className="flex flex-col text-[10px] font-bold uppercase tracking-widest" style={{ color: '#94A3B8' }}>
-              Nombre responsable
-              <input required className="input-internal mt-1 text-xs" value={fRespNombre} onChange={(e) => setFRespNombre(e.target.value)} />
+              Responsable de cumplirla
+              <select
+                required
+                className="select-internal mt-1 text-xs"
+                value={fRespUid}
+                disabled={!fHallazgo || cargandoResponsables}
+                onChange={(e) => {
+                  const responsable = responsables.find((item) => item.uid === e.target.value);
+                  setFRespUid(responsable?.uid ?? '');
+                  setFRespNombre(responsable?.nombre ?? '');
+                }}
+              >
+                <option value="">
+                  {cargandoResponsables ? 'Cargando responsables…' : 'Seleccione una persona…'}
+                </option>
+                {responsables.map((responsable) => (
+                  <option key={responsable.uid} value={responsable.uid}>
+                    {responsable.nombre}{responsable.cargo ? ` · ${responsable.cargo}` : ''}
+                  </option>
+                ))}
+              </select>
+              <span className="mt-1 text-[10px]" style={{ color: errorResponsables ? '#991B1B' : '#94A3B8' }}>
+                {errorResponsables ?? (fHallazgo ? 'Personas activas de la dependencia responsable.' : 'Primero seleccione el hallazgo relacionado.')}
+              </span>
             </label>
             <label className="flex flex-col text-[10px] font-bold uppercase tracking-widest" style={{ color: '#94A3B8' }}>
               Fecha compromiso
               <input required type="date" className="input-internal mt-1 text-xs" value={fCompromiso} onChange={(e) => setFCompromiso(e.target.value)} />
+              <span className="mt-1 text-[10px]" style={{ color: '#94A3B8' }}>Hasta cuándo debe cumplirse la acción.</span>
             </label>
             <label className="flex flex-col text-[10px] font-bold uppercase tracking-widest" style={{ color: '#94A3B8' }}>
-              Evidencia requerida (mín. 5)
-              <input required className="input-internal mt-1 text-xs" value={fEvidencia} onChange={(e) => setFEvidencia(e.target.value)} />
+              Evidencia esperada
+              <input required className="input-internal mt-1 text-xs" value={fEvidencia} onChange={(e) => setFEvidencia(e.target.value)} placeholder="Qué soporte debe entregar la dependencia" />
+              <span className="mt-1 text-[10px]" style={{ color: '#94A3B8' }}>Por ejemplo: copia del oficio, registro, captura del sistema…</span>
             </label>
           </div>
           <label className="flex flex-col text-[10px] font-bold uppercase tracking-widest" style={{ color: '#94A3B8' }}>
             Observaciones
-            <textarea rows={2} className="input-internal mt-1 text-xs" value={fObservaciones} onChange={(e) => setFObservaciones(e.target.value)} />
+            <textarea rows={2} className="input-internal mt-1 text-xs" value={fObservaciones} onChange={(e) => setFObservaciones(e.target.value)} placeholder="Aclaraciones o contexto adicional (opcional)" />
           </label>
           {errorForm && <Aviso tipo="error" mensaje={errorForm} />}
           <div className="flex justify-end">
@@ -175,9 +245,22 @@ export function PanelPlanesMejora() {
         </form>
       )}
 
-      {cargando ? <Cargando label="Cargando planes…" /> : error ? <Aviso tipo="error" mensaje={error} /> : (
+      {cargando ? <Cargando label="Cargando planes de mejora…" /> : error ? <Aviso tipo="error" mensaje={error} /> : (
         planes.length === 0 ? (
-          <Aviso tipo="info" mensaje="No hay planes de mejora registrados." />
+          <EstadoVacio
+            titulo="No hay planes de mejora activos."
+            mensaje="Los planes se crean a partir de hallazgos o recomendaciones de Control Interno."
+            accion={hallazgos.length > 0 ? (
+              <button
+                type="button"
+                onClick={() => setCrear(true)}
+                className="px-3 py-2 rounded-lg text-xs font-bold text-white"
+                style={{ background: '#14532D' }}
+              >
+                Solicitar primer plan
+              </button>
+            ) : null}
+          />
         ) : (
           <div className="rounded-xl bg-white overflow-hidden" style={{ border: '1px solid #D9E2D9' }}>
             <div className="overflow-x-auto">

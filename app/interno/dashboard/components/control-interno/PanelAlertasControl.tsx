@@ -8,7 +8,7 @@ import type {
 import { LABEL_NIVEL_RIESGO, LABEL_TIPO_ALERTA } from '@/src/types/control-interno';
 import { NOMBRES_TENANT, DIRECTORIO_TENANTS } from '@/src/types/reglas-negocio';
 import type { TenantId } from '@/src/types/radicado';
-import { Aviso, Cargando } from './PanoramaGeneralPanel';
+import { Aviso, Cargando, EstadoVacio } from './PanoramaGeneralPanel';
 
 const NIVELES: NivelRiesgo[] = ['CRITICO', 'ALTO', 'MEDIO', 'BAJO'];
 
@@ -116,9 +116,12 @@ export function PanelAlertasControl() {
         })()}
       </div>
 
-      {cargando ? <Cargando label="Calculando alertas…" /> : error ? <Aviso tipo="error" mensaje={error} /> : (
+      {cargando ? <Cargando label="Buscando alertas pendientes…" /> : error ? <Aviso tipo="error" mensaje={error} /> : (
         alertasOrdenadas.length === 0 ? (
-          <Aviso tipo="info" mensaje="No hay alertas activas con los filtros aplicados." />
+          <EstadoVacio
+            titulo="No hay alertas pendientes."
+            mensaje="No se detectan situaciones que requieran su atención con los filtros aplicados."
+          />
         ) : (
           <div className="rounded-xl bg-white overflow-hidden" style={{ border: '1px solid #D9E2D9' }}>
             <div className="overflow-x-auto">

@@ -6,7 +6,8 @@ import type {
   NivelRiesgo,
 } from '@/src/types/control-interno';
 import { LABEL_NIVEL_RIESGO } from '@/src/types/control-interno';
-import { Aviso, Cargando } from './PanoramaGeneralPanel';
+import { Aviso, Cargando, EstadoVacio } from './PanoramaGeneralPanel';
+import { describirNivelRiesgo } from '@/lib/control-interno/recomendaciones';
 
 function colorNivelBadge(n: NivelRiesgo): { bg: string; bd: string; fg: string } {
   if (n === 'CRITICO') return { bg: '#FEF2F2', bd: '#FECACA', fg: '#991B1B' };
@@ -42,11 +43,20 @@ export function PanelDependenciasControl() {
 
   useEffect(() => { void cargar(); }, [cargar]);
 
-  if (cargando) return <Cargando label="Calculando desempeño por dependencia…" />;
+  if (cargando) return <Cargando label="Revisando el cumplimiento de cada dependencia…" />;
   if (error)    return <Aviso tipo="error" mensaje={error} />;
-  if (data.length === 0) return <Aviso tipo="info" mensaje="Sin datos de dependencias en el período." />;
+  if (data.length === 0) return (
+    <EstadoVacio
+      titulo="Aún no hay información de dependencias para el período."
+      mensaje="Cuando existan radicados gestionados, aparecerá aquí el resumen por dependencia."
+    />
+  );
 
   return (
+    <div className="space-y-3">
+      <p className="text-xs" style={{ color: '#667085' }}>
+        Las dependencias en rojo o naranja requieren seguimiento. Las verdes muestran buen cumplimiento.
+      </p>
     <div className="rounded-xl bg-white overflow-hidden" style={{ border: '1px solid #D9E2D9' }}>
       <div className="overflow-x-auto">
         <table className="w-full text-xs">
@@ -62,7 +72,14 @@ export function PanelDependenciasControl() {
               const c = colorNivelBadge(d.nivelRiesgo);
               return (
                 <tr key={d.tenantId} style={{ borderTop: '1px solid #EEF4EE' }}>
-                  <td className="px-3 py-2 font-medium" style={{ color: '#1F2933' }}>{d.nombre}</td>
+                  <td className="px-3 py-2 min-w-[220px]" style={{ color: '#1F2933' }}>
+                    <p className="font-medium">{d.nombre}</p>
+                    <p className="mt-0.5 text-[10px]" style={{ color: d.nivelRiesgo === 'ALTO' || d.nivelRiesgo === 'CRITICO' ? '#991B1B' : '#667085' }}>
+                      {d.nivelRiesgo === 'ALTO' || d.nivelRiesgo === 'CRITICO'
+                        ? 'Esta dependencia requiere seguimiento.'
+                        : 'Esta dependencia presenta buen cumplimiento.'}
+                    </p>
+                  </td>
                   <td className="px-3 py-2 tabular-nums" style={{ color: '#667085' }}>{d.total}</td>
                   <td className="px-3 py-2 tabular-nums" style={{ color: '#14532D' }}>{d.resueltos}</td>
                   <td className="px-3 py-2 tabular-nums font-bold" style={{ color: d.vencidos > 0 ? '#DC2626' : '#94A3B8' }}>{d.vencidos}</td>
@@ -81,9 +98,11 @@ export function PanelDependenciasControl() {
                   <td className="px-3 py-2 tabular-nums" style={{ color: d.planesMejoraAbiertos > 0 ? '#9A3412' : '#94A3B8' }}>{d.planesMejoraAbiertos}</td>
                   <td className="px-3 py-2 tabular-nums" style={{ color: d.notificacionesFallidas > 0 ? '#991B1B' : '#94A3B8' }}>{d.notificacionesFallidas}</td>
                   <td className="px-3 py-2">
-                    <span className="px-2 py-0.5 rounded-md text-[10px] font-bold uppercase" style={{
-                      background: c.bg, color: c.fg, border: `1px solid ${c.bd}`,
-                    }}>
+                    <span
+                      className="px-2 py-0.5 rounded-md text-[10px] font-bold uppercase"
+                      style={{ background: c.bg, color: c.fg, border: `1px solid ${c.bd}` }}
+                      title={describirNivelRiesgo(d.nivelRiesgo)}
+                    >
                       {LABEL_NIVEL_RIESGO[d.nivelRiesgo]}
                     </span>
                   </td>
@@ -93,6 +112,7 @@ export function PanelDependenciasControl() {
           </tbody>
         </table>
       </div>
+    </div>
     </div>
   );
 }

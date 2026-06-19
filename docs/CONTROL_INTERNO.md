@@ -1,9 +1,24 @@
 # Centro de Control Interno — Ventanilla Única Simacota
 
-Módulo profesional de auditoría, prevención, seguimiento y mejora continua
-para la administración municipal. Convierte el rol `CONTROL_INTERNO` en
-una oficina de vigilancia con métricas, alertas, hallazgos y planes de
-mejora, sin alterar la operación normal del funcionario.
+Módulo de seguimiento y mejora continua para la administración municipal.
+Su MVP permite revisar prioridades diarias, alertas, hallazgos, planes de
+mejora, cumplimiento por dependencia e informes, sin alterar la operación
+normal del funcionario.
+
+## Qué resuelve el MVP
+
+- Ordena las situaciones que Control Interno debe revisar primero.
+- Explica indicadores y niveles de riesgo en lenguaje sencillo.
+- Permite registrar hallazgos y solicitar planes de mejora.
+- Compara el cumplimiento de las dependencias.
+- Genera un informe Excel para soporte institucional.
+
+## Qué no resuelve
+
+- No responde ni modifica radicados.
+- No sustituye el criterio profesional de Control Interno.
+- No realiza auditoría individual avanzada ni genera informes PDF mensuales.
+- No se integra todavía con entes de control o plataformas externas.
 
 ## Principio rector
 
@@ -25,12 +40,12 @@ Ubicación del componente raíz:
 
 Pestañas disponibles:
 
-1. **Panorama general** — 15 KPIs con semáforo (verde / amarillo / rojo).
-2. **Riesgos y alertas** — Motor de riesgos + panel de alertas derivadas en vivo.
+1. **Resumen** — Qué revisar hoy, indicadores y semáforo.
+2. **Alertas** — Situaciones que requieren atención o seguimiento.
 3. **Hallazgos** — Registro y seguimiento de incumplimientos.
 4. **Planes de mejora** — Acciones correctivas con seguimiento.
 5. **Dependencias** — Desempeño comparado, semáforo y carga.
-6. **Reportes** — Exportación Excel con 7 hojas.
+6. **Reportes** — Informe Excel institucional con 7 hojas.
 
 ## Motor de riesgos
 
@@ -59,6 +74,10 @@ Umbrales:
 - `1–3` → **MEDIO**
 - `4–6` → **ALTO**
 - `7+` → **CRITICO**
+
+En la interfaz estos resultados se presentan como riesgo bajo, medio, alto
+o crítico, acompañados por una explicación y una acción sugerida. El cálculo
+sirve para ordenar el seguimiento; no toma decisiones por Control Interno.
 
 ## Alertas
 
@@ -135,6 +154,8 @@ Cada operación de Control Interno se registra en
 | Verbo | Ruta                                                  | Rol                       |
 |-------|-------------------------------------------------------|---------------------------|
 | GET   | `/api/interno/control/panorama`                       | CONTROL_INTERNO / ADMIN   |
+| GET   | `/api/interno/control/resumen-diario`                 | CONTROL_INTERNO / ADMIN   |
+| GET   | `/api/interno/control/responsables?tenantId=...`      | CONTROL_INTERNO / ADMIN   |
 | GET   | `/api/interno/control/alertas`                        | CONTROL_INTERNO / ADMIN   |
 | PATCH | `/api/interno/control/alertas/[id]`                   | CONTROL_INTERNO / ADMIN   |
 | GET   | `/api/interno/control/hallazgos`                      | + JEFE_DEPENDENCIA (lectura tenant) |
@@ -151,13 +172,13 @@ Generado por
 [reporte-excel.ts](../lib/control-interno/server/reporte-excel.ts).
 Contiene 7 hojas:
 
-1. Resumen Ejecutivo (KPIs + semáforos)
-2. Alertas activas
-3. Riesgos por radicado (filtro `nivel != BAJO`)
+1. Resumen (KPIs + semáforos)
+2. Alertas
+3. Radicados revisados (filtro `nivel != BAJO`)
 4. Hallazgos
-5. Planes de Mejora
-6. Cumplimiento por Dependencia
-7. Diccionario de Datos
+5. Planes de mejora
+6. Dependencias
+7. Diccionario
 
 ## Fuera de alcance en este sprint
 
@@ -172,5 +193,4 @@ Pendientes (no bloquean el cierre del sprint):
 ## Tests
 
 [__tests__/control-interno-riesgos.test.ts](../__tests__/control-interno-riesgos.test.ts)
-cubre 13 escenarios sobre motor de riesgos, generación de alertas y
-permisos.
+cubre riesgos, generación de alertas, recomendaciones diarias y permisos.

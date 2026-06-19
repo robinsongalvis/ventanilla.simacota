@@ -2,13 +2,13 @@
  * Generador del Reporte Excel Control Interno.
  *
  * Hojas:
- *   1. Resumen Ejecutivo (KPIs + semáforos)
- *   2. Alertas activas
- *   3. Riesgos por radicado
+ *   1. Resumen
+ *   2. Alertas
+ *   3. Radicados revisados
  *   4. Hallazgos
- *   5. Planes de Mejora
- *   6. Cumplimiento por Dependencia
- *   7. Diccionario de Datos
+ *   5. Planes de mejora
+ *   6. Dependencias
+ *   7. Diccionario
  */
 
 import ExcelJS from 'exceljs';
@@ -85,8 +85,8 @@ export async function generarReporteExcelControlInterno(
   wb.creator = 'Ventanilla Única — Control Interno';
   wb.created = new Date();
 
-  /* Hoja 1: Resumen Ejecutivo */
-  const wsResumen = wb.addWorksheet('Resumen Ejecutivo');
+  /* Hoja 1: Resumen */
+  const wsResumen = wb.addWorksheet('Resumen');
   wsResumen.addRow(['Período', `${input.periodo.desde} a ${input.periodo.hasta}`]);
   wsResumen.addRow([]);
   const headerKpis = wsResumen.addRow(['Indicador', 'Valor', 'Semáforo', 'Acción sugerida', 'Descripción']);
@@ -115,8 +115,8 @@ export async function generarReporteExcelControlInterno(
   }
   ajustarAncho(wsAlertas, [28, 12, 16, 30, 26, 50, 50, 14, 22]);
 
-  /* Hoja 3: Riesgos por radicado */
-  const wsRiesgos = wb.addWorksheet('Riesgos');
+  /* Hoja 3: Radicados revisados (con riesgo) */
+  const wsRiesgos = wb.addWorksheet('Radicados revisados');
   aplicarEncabezado(wsRiesgos.addRow(['Radicado', 'Nivel', 'Puntaje', 'Motivos', 'Acción sugerida']));
   for (const e of input.evaluaciones) {
     wsRiesgos.addRow([e.radicadoId, LABEL_NIVEL_RIESGO[e.nivel], e.puntaje, e.motivos.join(', '), e.accion]);
@@ -125,7 +125,10 @@ export async function generarReporteExcelControlInterno(
 
   /* Hoja 4: Hallazgos */
   const wsHallazgos = wb.addWorksheet('Hallazgos');
-  aplicarEncabezado(wsHallazgos.addRow(['ID', 'Radicado', 'Dependencia', 'Tipo', 'Nivel', 'Descripción', 'Estado', 'Creado por', 'Fecha', 'Plan asociado']));
+  aplicarEncabezado(wsHallazgos.addRow([
+    'ID', 'Radicado', 'Dependencia', 'Tipo', 'Nivel', 'Descripción',
+    'Acción recomendada', 'Fecha seguimiento', 'Estado', 'Creado por', 'Fecha', 'Plan asociado',
+  ]));
   for (const h of input.hallazgos) {
     wsHallazgos.addRow([
       h.id ?? '—',
@@ -134,16 +137,18 @@ export async function generarReporteExcelControlInterno(
       LABEL_TIPO_HALLAZGO[h.tipo],
       LABEL_NIVEL_RIESGO[h.nivel],
       h.descripcion,
+      h.accionRecomendada ?? '—',
+      h.fechaSeguimiento ?? '—',
       LABEL_ESTADO_HALLAZGO[h.estado],
       h.creadoPor?.nombre ?? '—',
       h.fecha,
       h.planMejoraId ?? '—',
     ]);
   }
-  ajustarAncho(wsHallazgos, [16, 16, 30, 28, 12, 60, 14, 24, 22, 16]);
+  ajustarAncho(wsHallazgos, [16, 16, 30, 28, 12, 60, 50, 18, 14, 24, 22, 16]);
 
   /* Hoja 5: Planes */
-  const wsPlanes = wb.addWorksheet('Planes de Mejora');
+  const wsPlanes = wb.addWorksheet('Planes de mejora');
   aplicarEncabezado(wsPlanes.addRow(['ID', 'Hallazgo', 'Dependencia', 'Acción correctiva', 'Responsable', 'Compromiso', 'Estado', 'Avances', 'Creado']));
   for (const p of input.planes) {
     wsPlanes.addRow([
@@ -160,8 +165,8 @@ export async function generarReporteExcelControlInterno(
   }
   ajustarAncho(wsPlanes, [16, 16, 30, 50, 24, 14, 14, 10, 22]);
 
-  /* Hoja 6: Cumplimiento por Dependencia */
-  const wsDep = wb.addWorksheet('Cumplimiento por Dependencia');
+  /* Hoja 6: Dependencias */
+  const wsDep = wb.addWorksheet('Dependencias');
   aplicarEncabezado(wsDep.addRow(['Dependencia', 'Total', 'Resueltos', 'Vencidos', 'Por vencer', 'Cumplimiento %', 'Días prom. resp.', 'Sin responsable', 'Hallazgos abiertos', 'Planes abiertos', 'Notif. fallidas', 'Riesgo']));
   for (const d of input.dependencias) {
     wsDep.addRow([
@@ -182,12 +187,12 @@ export async function generarReporteExcelControlInterno(
   ajustarAncho(wsDep, [32, 8, 10, 10, 12, 14, 14, 14, 16, 14, 14, 12]);
 
   /* Hoja 7: Diccionario */
-  const wsDic = wb.addWorksheet('Diccionario de Datos');
+  const wsDic = wb.addWorksheet('Diccionario');
   aplicarEncabezado(wsDic.addRow(['Campo', 'Descripción']));
   const diccionario: [string, string][] = [
     ['Cumplimiento %', 'Resueltos a tiempo / total resueltos × 100'],
-    ['Nivel de riesgo', 'BAJO / MEDIO / ALTO / CRITICO, derivado del motor de riesgos'],
-    ['Semáforo', 'VERDE = bueno; AMARILLO = atención; ROJO = crítico'],
+    ['Nivel de riesgo', 'Bajo = sin señales importantes; Medio = seguimiento preventivo; Alto = revisión prioritaria; Crítico = acción inmediata'],
+    ['Semáforo', 'Verde = dentro de lo esperado; Amarillo = atención; Rojo = urgente'],
     ['Por vencer', 'Activos cuyo vencimiento legal está a 2 días hábiles o menos'],
     ['Vencido', 'Activo con días restantes < 0 según calendario hábil'],
     ['Notif. fallidas', 'Correos institucionales con error de entrega no gestionados'],
