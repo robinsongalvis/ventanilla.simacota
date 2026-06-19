@@ -99,6 +99,8 @@ export interface HallazgoControlInterno {
   nivel:            NivelRiesgo;
   descripcion:      string;
   evidencia?:       string | null;
+  accionRecomendada?: string | null;
+  fechaSeguimiento?:  string | null;
   fecha:            string;
   creadoPor:        { uid: string; nombre: string; rol: RolInterno };
   estado:           EstadoHallazgo;

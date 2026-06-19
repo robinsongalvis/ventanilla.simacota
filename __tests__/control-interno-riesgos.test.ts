@@ -12,6 +12,9 @@ import {
   puedeCrearHallazgo,
   puedeReportarAvancePlan,
 } from '@/lib/control-interno/permisos';
+import { describirNivelRiesgo, generarRecomendacionesDia } from '@/lib/control-interno/recomendaciones';
+import { generarReporteExcelControlInterno } from '@/lib/control-interno/server/reporte-excel';
+import ExcelJS from 'exceljs';
 import type { VentanillaRadicado } from '@/src/types/ventanilla';
 
 const HOY = new Date('2026-06-18T10:00:00Z');
@@ -175,5 +178,71 @@ describe('Permisos Control Interno', () => {
     expect(puedeReportarAvancePlan('FUNCIONARIO')).toBe(true);
     expect(puedeReportarAvancePlan('JEFE_DEPENDENCIA')).toBe(true);
     expect(puedeReportarAvancePlan('CONTROL_INTERNO')).toBe(false);
+  });
+});
+
+describe('Experiencia humana de Control Interno', () => {
+  it('muestra un mensaje positivo cuando no hay asuntos pendientes', () => {
+    const recomendaciones = generarRecomendacionesDia({
+      alertas: [],
+      hallazgos: [],
+      planes: [],
+      dependencias: [],
+      ahora: HOY,
+    });
+
+    expect(recomendaciones).toHaveLength(1);
+    expect(recomendaciones[0]).toMatchObject({
+      severidad: 'POSITIVO',
+      titulo: 'No hay alertas críticas para hoy.',
+    });
+  });
+
+  it('prioriza radicados vencidos y limita la agenda diaria a cinco acciones', () => {
+    const alertas = generarAlertas([
+      radicado({ vencimiento: '2026-06-01T00:00:00Z', responsableUid: null }),
+      radicado({ vencimiento: '2026-06-19T00:00:00Z' }),
+    ], { ahora: HOY });
+
+    const recomendaciones = generarRecomendacionesDia({
+      alertas,
+      hallazgos: [
+        { estado: 'ABIERTO', nivel: 'CRITICO' },
+        { estado: 'ABIERTO', nivel: 'MEDIO' },
+      ] as Parameters<typeof generarRecomendacionesDia>[0]['hallazgos'],
+      planes: [
+        { estado: 'VENCIDO', fechaCompromiso: '2026-06-01' },
+        { estado: 'PENDIENTE', fechaCompromiso: '2026-06-30' },
+      ] as Parameters<typeof generarRecomendacionesDia>[0]['planes'],
+      dependencias: [
+        { nombre: 'Secretaría de Gobierno', nivelRiesgo: 'ALTO', total: 10, cumplimientoPct: 60, vencidos: 2, hallazgosAbiertos: 1 },
+      ] as Parameters<typeof generarRecomendacionesDia>[0]['dependencias'],
+      ahora: HOY,
+    });
+
+    expect(recomendaciones.length).toBeLessThanOrEqual(5);
+    expect(recomendaciones[0]?.severidad).toBe('URGENTE');
+    expect(recomendaciones.some((item) => item.titulo.includes('vencido'))).toBe(true);
+  });
+
+  it('explica los cuatro niveles de riesgo sin lenguaje técnico', () => {
+    expect(describirNivelRiesgo('BAJO')).toContain('Sin señales');
+    expect(describirNivelRiesgo('MEDIO')).toContain('preventivo');
+    expect(describirNivelRiesgo('ALTO')).toContain('prioritaria');
+    expect(describirNivelRiesgo('CRITICO')).toContain('inmediata');
+  });
+
+  it('genera el informe con nombres de hojas comprensibles', async () => {
+    const buffer = await generarReporteExcelControlInterno({
+      periodo: { desde: '2026-06-01', hasta: '2026-06-18' },
+      kpis: [], alertas: [], evaluaciones: [], hallazgos: [], planes: [], dependencias: [],
+    });
+    const workbook = new ExcelJS.Workbook();
+    await workbook.xlsx.load(buffer as unknown as Parameters<typeof workbook.xlsx.load>[0]);
+
+    expect(workbook.worksheets.map((sheet) => sheet.name)).toEqual([
+      'Resumen', 'Alertas', 'Radicados revisados', 'Hallazgos',
+      'Planes de mejora', 'Dependencias', 'Diccionario',
+    ]);
   });
 });

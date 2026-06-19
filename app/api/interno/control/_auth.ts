@@ -28,15 +28,29 @@ export async function autorizarAuditor(): Promise<{ ok: true; data: ResultadoAut
     return {
       ok: false,
       response: NextResponse.json(
-        { error: 'Solo Control Interno o Admin pueden acceder a este recurso.' },
+        { error: 'Su rol permite gestionar radicados, pero esta sección de seguimiento corresponde a Control Interno.' },
         { status: 403 },
       ),
     };
   } catch (err) {
     if (err instanceof InternalAuthError) {
-      return { ok: false, response: NextResponse.json({ error: err.message }, { status: err.status }) };
+      return {
+        ok: false,
+        response: NextResponse.json(
+          { error: err.status === 403
+            ? 'Su usuario no tiene acceso al Centro de Control Interno.'
+            : 'Su sesión terminó. Ingrese nuevamente al panel.' },
+          { status: err.status },
+        ),
+      };
     }
-    return { ok: false, response: NextResponse.json({ error: 'No autorizado.' }, { status: 401 }) };
+    return {
+      ok: false,
+      response: NextResponse.json(
+        { error: 'No fue posible verificar su sesión. Ingrese nuevamente al panel.' },
+        { status: 401 },
+      ),
+    };
   }
 }
 
@@ -53,14 +67,28 @@ export async function autorizarAuditorOJefe(): Promise<{ ok: true; data: Resulta
     return {
       ok: false,
       response: NextResponse.json(
-        { error: 'Sin permiso para este recurso.' },
+        { error: 'Su rol permite revisar y hacer seguimiento, pero no realizar esta acción.' },
         { status: 403 },
       ),
     };
   } catch (err) {
     if (err instanceof InternalAuthError) {
-      return { ok: false, response: NextResponse.json({ error: err.message }, { status: err.status }) };
+      return {
+        ok: false,
+        response: NextResponse.json(
+          { error: err.status === 403
+            ? 'Su rol permite revisar información, pero no realizar esta acción.'
+            : 'Su sesión terminó. Ingrese nuevamente al panel.' },
+          { status: err.status },
+        ),
+      };
     }
-    return { ok: false, response: NextResponse.json({ error: 'No autorizado.' }, { status: 401 }) };
+    return {
+      ok: false,
+      response: NextResponse.json(
+        { error: 'No fue posible verificar su sesión. Ingrese nuevamente al panel.' },
+        { status: 401 },
+      ),
+    };
   }
 }

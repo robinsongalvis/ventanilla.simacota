@@ -30,12 +30,12 @@ interface ItemTab {
 }
 
 const TABS: ItemTab[] = [
-  { id: 'PANORAMA',    label: 'Panorama general', sub: 'KPIs profesionales' },
-  { id: 'ALERTAS',     label: 'Riesgos y alertas', sub: 'Motor de riesgos' },
+  { id: 'PANORAMA',    label: 'Resumen',           sub: 'Qué revisar hoy' },
+  { id: 'ALERTAS',     label: 'Alertas',           sub: 'Situaciones por revisar' },
   { id: 'HALLAZGOS',   label: 'Hallazgos',         sub: 'Registro y seguimiento' },
   { id: 'PLANES',      label: 'Planes de mejora',  sub: 'Acciones correctivas' },
-  { id: 'DEPENDENCIAS', label: 'Dependencias',     sub: 'Desempeño comparado' },
-  { id: 'REPORTES',    label: 'Reportes',          sub: 'Exportación institucional' },
+  { id: 'DEPENDENCIAS', label: 'Dependencias',     sub: 'Cumplimiento por área' },
+  { id: 'REPORTES',    label: 'Reportes',          sub: 'Informes para soporte' },
 ];
 
 export function CentroControlInterno() {
@@ -52,10 +52,10 @@ export function CentroControlInterno() {
           Centro de Control Interno
         </h1>
         <p className="mt-1 text-xs sm:text-sm" style={{ color: '#667085' }}>
-          Seguimiento, auditoría, riesgos y mejora continua de la gestión PQRSD.
+          Seguimiento a riesgos, hallazgos, planes de mejora y cumplimiento de las dependencias.
         </p>
         <p className="mt-2 text-[10px] font-medium" style={{ color: '#94A3B8' }}>
-          Control Interno observa, audita y solicita planes de mejora. No modifica respuestas oficiales ni cierra radicados.
+          Este módulo le permite revisar, registrar hallazgos y solicitar planes de mejora. No reemplaza al funcionario que responde el radicado.
         </p>
       </header>
 

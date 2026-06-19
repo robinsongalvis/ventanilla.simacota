@@ -57,6 +57,8 @@ interface CrearHallazgoBody {
   nivel:              NivelRiesgo;
   descripcion:        string;
   evidencia?:         string | null;
+  accionRecomendada?: string | null;
+  fechaSeguimiento?:  string | null;
 }
 
 export async function POST(req: Request): Promise<NextResponse> {
@@ -76,6 +78,9 @@ export async function POST(req: Request): Promise<NextResponse> {
   if (!body.descripcion || body.descripcion.trim().length < 10) {
     return NextResponse.json({ error: 'La descripción debe tener al menos 10 caracteres.' }, { status: 400 });
   }
+  if (body.fechaSeguimiento && !/^\d{4}-\d{2}-\d{2}$/.test(body.fechaSeguimiento)) {
+    return NextResponse.json({ error: 'Seleccione una fecha de seguimiento válida.' }, { status: 400 });
+  }
 
   const fecha = new Date().toISOString();
   const hallazgo: Omit<HallazgoControlInterno, 'id'> = {
@@ -87,6 +92,8 @@ export async function POST(req: Request): Promise<NextResponse> {
     nivel:             body.nivel,
     descripcion:       body.descripcion.trim(),
     evidencia:         body.evidencia?.trim() || null,
+    accionRecomendada: body.accionRecomendada?.trim() || null,
+    fechaSeguimiento:  body.fechaSeguimiento || null,
     fecha,
     creadoPor: {
       uid:    auth.data.user.uid,
