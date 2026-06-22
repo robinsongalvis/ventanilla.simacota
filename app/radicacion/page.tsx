@@ -37,6 +37,7 @@ interface RadicacionApiResponse {
   error?: string;
   fechaRadicado?: string;
   dependenciaReceptora?: string;
+  consultaToken?: string;
 }
 
 
@@ -389,6 +390,7 @@ export default function PortalCiudadano() {
         correo: form.tipoPresentacion === 'ANONIMA' ? null : form.email.trim().toLowerCase() || null,
         esAnonimo: form.tipoPresentacion === 'ANONIMA',
         identidadReservada: form.tipoPresentacion === 'RESERVADA',
+        consultaToken: res.consultaToken,
       });
       setEstado('confirmacion');
     } catch (error) {

@@ -23,6 +23,8 @@ export interface SelloRadicadoData {
   correo?: string | null;
   esAnonimo?: boolean | null;
   identidadReservada?: boolean | null;
+  /** Código entregado una sola vez; nunca se recupera del servidor. */
+  consultaToken?: string | null;
 }
 
 interface Props {
@@ -78,11 +80,12 @@ export function SelloRadicado({ data, variant = 'card', className = '' }: Props)
         <Row label="Solicitante" value={solicitante} />
         {!anonimo && <Row label="Documento" value={data.documento} />}
         {!anonimo && <Row label="Correo" value={data.correo} />}
+        <Row label="Código consulta" value={data.consultaToken} />
       </dl>
 
       <div className="border-t border-slate-300 px-4 py-2">
         <p className="text-[10px] leading-relaxed text-slate-500">
-          Consulte el estado en {INSTITUCION.consultaUrl}. {INSTITUCION.municipio}, {INSTITUCION.departamento} - {INSTITUCION.pais}.
+          Consulte el estado en {INSTITUCION.consultaUrl}. Conserve también el correo registrado o el código de consulta mostrado en esta constancia. {INSTITUCION.municipio}, {INSTITUCION.departamento} - {INSTITUCION.pais}.
         </p>
       </div>
     </section>
