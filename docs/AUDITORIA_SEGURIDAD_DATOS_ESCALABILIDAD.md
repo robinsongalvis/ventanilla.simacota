@@ -33,7 +33,7 @@
 |----|------|--------|-----------|
 | H-01 | Control de acceso | Descarga de adjuntos sin validar dependencia ni rol (IDOR) | **P1** — ✅ **Corregido** (Sprint Seguridad P1-01) |
 | H-02 | Control de acceso / Correo | Notificación al ciudadano sin validar rol ni dependencia; contenido y destinatario los pone el cliente | **P1** |
-| H-03 | Privacidad | Consulta pública enumerable (números secuenciales + verificación opcional) | **P1** |
+| H-03 | Privacidad | Consulta pública enumerable (números secuenciales + verificación opcional) | **P1** — 🟡 Implementado, pendiente UAT P1-03 |
 | H-04 | Abuso / Costos | `/api/ai/log` sin autenticación ni límite (escritura libre a Firestore) | **P2** |
 | H-05 | Configuración | Cron "abierto" si falta `CRON_SECRET` (puede dispararse desde fuera) | **P2** |
 | H-06 | Abuso | Límite de peticiones (rate limit) en memoria, no distribuido | **P2** |
@@ -218,8 +218,8 @@ radicación, consulta y endpoints de IA del formulario.
 | Endpoint | Público/Privado | Auth | Rol | Datos devueltos | Riesgo | Recomendación |
 |----------|-----------------|------|-----|-----------------|--------|---------------|
 | `POST /api/radicacion` | Público | No | — | Acuse (radicadoId) | Rate-limit débil (H-06), sin CAPTCHA (H-09), tipo de archivo falsificable (H-08) | Turnstile + límite distribuido + validar magic bytes |
-| `GET /api/consulta/[id]` | Público | No | — | Estado + respuesta oficial (sanitizado) | **Enumerable, sin rate-limit (H-03)** | Verificación obligatoria + rate-limit |
-| `GET /api/public/radicado/consulta` | Público | No | — | Estado + respuesta (sanitizado) | Verificación **opcional** (H-03), rate-limit en memoria (H-06) | Hacer verificación obligatoria |
+| `GET /api/consulta/[id]` | Público | No | — | Retirado (`410 Gone`) | Sin exposición directa (H-03 implementado) | Validar en UAT |
+| `POST /api/public/radicado/consulta` | Público | No | — | Estado + respuesta sanitizada tras segundo factor | Verificación obligatoria + rate-limit Firestore (H-03 implementado) | Validar en UAT |
 | `POST /api/ai/classify` | Público | No | — | Clasificación | Costo Gemini; rate-limit en memoria (H-06) | Límite distribuido / Turnstile |
 | `POST /api/ai/chat` | Público | No | — | Texto | Igual | Igual |
 | `POST /api/ai/scan-doc` | Público | No | — | Extracción de documento | Costo + procesa archivo del usuario | Límite + tamaño |
@@ -499,7 +499,7 @@ revisar consumo mensual de Firestore y Gemini.
 |----|------|--------|---------|--------------|-------|-----------|---------------|-----------|----------|--------|
 | H-01 | Acceso | Descarga de adjuntos sin validar tenant/rol | Alto | Media | **Alto** | `app/api/interno/archivo/route.ts` | Verificar radicado→tenant→rol antes de firmar URL | **P1** | Bajo | ✅ **Corregido (Sprint Seguridad P1-01)** |
 | H-02 | Acceso/Correo | Notificar al ciudadano sin rol/tenant; datos del cliente | Alto | Media | **Alto** | `app/api/interno/notificar-ciudadano/route.ts` | Tomar datos del radicado; validar rol/tenant | **P1** | Bajo | Abierto |
-| H-03 | Privacidad | Consulta pública enumerable | Medio-Alto | Alta | **Alto** | `app/api/consulta/[id]`, `public/radicado/consulta` | Verificación obligatoria + rate-limit | **P1** | Medio | Abierto |
+| H-03 | Privacidad | Consulta pública enumerable | Medio-Alto | Alta | **Alto** | `app/api/consulta/[id]`, `public/radicado/consulta` | Verificación obligatoria + rate-limit | **P1** | Medio | Implementado; pendiente UAT |
 | H-04 | Abuso | `/api/ai/log` sin auth | Medio | Media | Medio | `app/api/ai/log/route.ts` | Auth + límite | **P2** | Bajo | Abierto |
 | H-05 | Config | Cron fail-open sin `CRON_SECRET` | Medio | Media | Medio | `cron/*/route.ts` | Exigir secreto siempre | **P2** | Bajo | Abierto |
 | H-06 | Abuso | Rate limit en memoria | Medio | Alta | Medio | `lib/ai/rate-limit.ts` | Almacén distribuido / WAF | **P2** | Medio | Abierto |
