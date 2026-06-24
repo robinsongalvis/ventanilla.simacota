@@ -16,6 +16,10 @@ import {
 import { debeNotificarCiudadano } from '@/lib/email/debe-notificar-ciudadano';
 import { registrarTrazabilidadNotificacion } from '@/lib/trazabilidad/notificacion';
 import { logError } from '@/lib/logger';
+import {
+  generarTokenConsulta,
+  hashTokenConsulta,
+} from '@/lib/seguridad/consulta-publica-radicado';
 import type { Prioridad, TenantId, TipoPresentacionPqrsd, ZonaGeografica } from '@/src/types/radicado';
 import type {
   AnalisisIA,
@@ -306,6 +310,7 @@ export async function POST(request: Request) {
     const esAnonimo = tipoPresentacionRaw === 'ANONIMA';
     const identidadReservada = tipoPresentacionRaw === 'RESERVADA';
     const solicitanteNombre = esAnonimo ? 'Anónimo / Reservado' : nombre;
+    const consultaToken = !email ? generarTokenConsulta() : undefined;
     const asunto = `${tipoSolicitud.nombre}: ${descripcion.slice(0, 90)}${descripcion.length > 90 ? '...' : ''}`;
 
     const radicado: VentanillaRadicado = removeUndefinedDeep({
@@ -317,6 +322,7 @@ export async function POST(request: Request) {
       esAnonimo,
       tipoPresentacion: tipoPresentacionRaw,
       identidadReservada,
+      ...(consultaToken ? { consultaTokenHash: hashTokenConsulta(consultaToken) } : {}),
       canalRespuesta: canalRespuestaRaw,
       solicitante: {
         tipoPersona: 'NATURAL',
@@ -451,6 +457,7 @@ export async function POST(request: Request) {
       fechaVencimiento: termino.fechaVencimiento,
       dependenciaReceptora: TENANT_RECEPCION,
       emailEnviado,
+      ...(consultaToken ? { consultaToken } : {}),
       ...(emailError ? { emailError } : {}),
     });
   } catch (error) {

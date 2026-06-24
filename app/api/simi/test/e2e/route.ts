@@ -397,7 +397,7 @@ export async function POST(request: Request): Promise<NextResponse> {
         pdfHash: pdf.hash,
         updatedAt: nowIso(),
       });
-      entidades.pdfUrl = `/api/simi/respuestas/firma/${firma.firmaId}/pdf?radicado=${radicadoId}&verificacion=7890`;
+      entidades.pdfUrl = `/api/simi/respuestas/firma/${firma.firmaId}/pdf`;
       await addStep(pasos, runRef, { nombre: 'Generar PDF oficial', estado: 'success', entidadCreadaId: firma.firmaId, detalle: `Hash ${pdf.hash.slice(0, 12)}...` });
     } else {
       await addStep(pasos, runRef, { nombre: 'Generar PDF oficial', estado: 'skipped', detalle: 'Omitido por configuración.' });
@@ -414,7 +414,12 @@ export async function POST(request: Request): Promise<NextResponse> {
 
     if (body.incluirConsultaCiudadana !== false) {
       const origin = new URL(request.url).origin;
-      const consultaRes = await fetch(`${origin}/api/consulta/${encodeURIComponent(radicadoId)}`, { cache: 'no-store' });
+      const consultaRes = await fetch(`${origin}/api/public/radicado/consulta`, {
+        method: 'POST',
+        cache: 'no-store',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ numeroRadicado: radicadoId, datoVerificacion: TEST_EMAIL }),
+      });
       await addStep(pasos, runRef, {
         nombre: 'Consultar como ciudadano',
         estado: consultaRes.ok ? 'success' : 'failed',
@@ -423,11 +428,12 @@ export async function POST(request: Request): Promise<NextResponse> {
       });
       const pdfRes = body.incluirPdf === false
         ? null
-        : await fetch(`${origin}/api/simi/respuestas/firma/${firma.firmaId}/pdf?radicado=${encodeURIComponent(radicadoId)}&verificacion=7890`, { cache: 'no-store' });
+        : await fetch(`${origin}/api/simi/respuestas/firma/${firma.firmaId}/pdf`, { cache: 'no-store' });
+      const pdfPublicoBloqueado = pdfRes?.status === 401;
       await addStep(pasos, runRef, {
-        nombre: 'Validar PDF ciudadano',
-        estado: body.incluirPdf === false ? 'skipped' : pdfRes?.ok ? 'success' : 'failed',
-        detalle: body.incluirPdf === false ? 'PDF omitido.' : pdfRes?.ok ? 'Acceso ciudadano al PDF permitido después de notificación.' : `PDF respondió ${pdfRes?.status ?? 'N/A'}.`,
+        nombre: 'Validar bloqueo de PDF ciudadano sin ticket',
+        estado: body.incluirPdf === false ? 'skipped' : pdfPublicoBloqueado ? 'success' : 'failed',
+        detalle: body.incluirPdf === false ? 'PDF omitido.' : pdfPublicoBloqueado ? 'Acceso público directo bloqueado correctamente.' : `PDF respondió ${pdfRes?.status ?? 'N/A'}.`,
         entidadCreadaId: firma.firmaId,
       });
     }

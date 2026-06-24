@@ -26,7 +26,7 @@ export function ConstanciaRadicacion({ sello, errores = [], onNueva }: Props) {
           Su solicitud fue radicada exitosamente
         </h2>
         <p className="mx-auto mt-3 max-w-xl text-sm leading-relaxed text-slate-400 print:text-slate-700">
-          Su solicitud fue radicada exitosamente en la {INSTITUCION.sistema} de la {INSTITUCION.nombre}. Conserve este número para consultar el estado de su solicitud.
+          Su solicitud fue radicada exitosamente en la {INSTITUCION.sistema} de la {INSTITUCION.nombre}. Conserve el número y, si aparece en la constancia, el código de consulta: no podrá recuperarlo después.
         </p>
       </div>
 

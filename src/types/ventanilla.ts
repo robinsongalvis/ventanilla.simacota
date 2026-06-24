@@ -156,6 +156,8 @@ export interface VentanillaRadicado {
   tipoPresentacion?: 'IDENTIFICADA' | 'ANONIMA' | 'RESERVADA';
   /** PQRSD: datos personales protegidos en vistas no autorizadas */
   identidadReservada?: boolean;
+  /** SHA-256 del código de consulta. El token original solo se entrega al radicar. */
+  consultaTokenHash?: string;
   /** Canal de respuesta preferido por el ciudadano */
   canalRespuesta?: CanalRespuesta | null;
   solicitante: SolicitanteRadicado;

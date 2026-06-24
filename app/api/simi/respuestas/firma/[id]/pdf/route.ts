@@ -11,7 +11,6 @@ import type { VentanillaRadicado } from '@/src/types/ventanilla';
 
 export const runtime = 'nodejs';
 
-const ESTADOS_PUBLICOS = new Set<RespuestaFirma['estado']>(['enviado_ciudadano', 'notificado', 'cerrado']);
 const ROLES_INTERNOS = new Set<RolInterno>(['ADMIN', 'CONTROL_INTERNO', 'JEFE_DEPENDENCIA', 'FUNCIONARIO']);
 
 interface UsuarioPdf {
@@ -50,22 +49,6 @@ function puedeAccederInterno(usuario: UsuarioPdf, firma: RespuestaFirma): boolea
   return firma.tenantId === usuario.tenantId;
 }
 
-function verificarCiudadano(request: Request, firma: RespuestaFirma, radicado: VentanillaRadicado | null): boolean {
-  if (!ESTADOS_PUBLICOS.has(firma.estado)) return false;
-
-  const url = new URL(request.url);
-  const radicadoParam = (url.searchParams.get('radicado') ?? '').trim().toUpperCase();
-  if (radicadoParam !== firma.radicadoId.toUpperCase()) return false;
-
-  if (!radicado || radicado.esAnonimo || radicado.identidadReservada) return true;
-
-  const verificacion = (url.searchParams.get('verificacion') ?? '').replace(/\D/g, '');
-  if (!verificacion) return false;
-
-  const documento = radicado.solicitante.numeroDocumento.replace(/\D/g, '');
-  return documento.slice(-4) === verificacion;
-}
-
 async function auditar(params: {
   firmaId: string;
   radicadoId: string;
@@ -85,7 +68,7 @@ async function auditar(params: {
 }
 
 export async function GET(
-  request: Request,
+  _request: Request,
   { params }: { params: Promise<{ id: string }> },
 ): Promise<NextResponse> {
   const { id } = await params;
@@ -101,9 +84,9 @@ export async function GET(
   const radicado = radicadoSnap.exists ? radicadoSnap.data() as VentanillaRadicado : null;
   const usuario = await verificarSesion();
   const actor = usuario ? 'interno' : 'ciudadano';
-  const autorizado = usuario
-    ? puedeAccederInterno(usuario, firma)
-    : verificarCiudadano(request, firma, radicado);
+  // H-03: los datos de verificación nunca viajan por query string. La descarga
+  // pública se mantiene cerrada hasta contar con tickets efímeros de un solo uso.
+  const autorizado = usuario ? puedeAccederInterno(usuario, firma) : false;
 
   if (!autorizado) {
     await auditar({
@@ -115,7 +98,10 @@ export async function GET(
       usuario,
       actor,
     });
-    return NextResponse.json({ error: 'No autorizado para descargar este documento.' }, { status: usuario ? 403 : 401 });
+    return NextResponse.json(
+      { error: 'No autorizado para descargar este documento.' },
+      { status: usuario ? 403 : 401, headers: { 'Cache-Control': 'no-store' } },
+    );
   }
 
   try {

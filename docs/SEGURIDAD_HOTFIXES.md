@@ -88,3 +88,96 @@ extrae adjuntos válidos del documento de Firestore.
 > acceso por rol/dependencia antes de generar URL firmada. Un funcionario
 > de una dependencia ya no puede descargar adjuntos de otra dependencia ni
 > de solicitudes anónimas o reservadas que no le correspondan.
+
+---
+
+## H-03 — Consulta pública protegida
+
+**Estado:** 🟡 Implementado — pendiente aprobación UAT de Seguridad P1-03.
+**Severidad original:** P1 — Alto.
+
+### Inventario y flujo anterior
+
+| Componente | Flujo anterior | Riesgo encontrado | Flujo seguro |
+|---|---|---|---|
+| `/consulta` | Enviaba solo el número a `GET /api/consulta/[id]` y hacía búsqueda automática desde `?id=` | Enumeración directa | Solicita número + dato de verificación y usa POST |
+| `GET /api/consulta/[radicadoId]` | Devolvía estado, dependencia, trazabilidad y respuesta sin segundo factor ni límite | IDOR público enumerable | Retirado con `410 Gone` y `Cache-Control: no-store` |
+| `GET /api/public/radicado/consulta` | Verificación documental opcional en query string y límite en memoria | Confirmaba existencia y filtraba el dato por URL | GET responde `405`; POST es la única ruta canónica |
+| Constancia y enlaces | Incluían `/consulta?id={radicado}` | El número precargado disparaba la consulta | Solo precargan el número; nunca el dato de verificación |
+| E2E SIMI | Consultaba el GET heredado | Conservaba una dependencia insegura | Usa POST canónico con segundo factor |
+| PDF de firma | Aceptaba radicado/verificación en URL y permitía anónimos/reservados sin segundo factor | Fuga por URL y bypass alternativo | Acceso público directo cerrado; solo sesión interna autorizada |
+
+El canal web almacena correo cuando el ciudadano lo registra, pero hoy no
+captura documento (`numeroDocumento` queda vacío). Por eso el correo es el
+método normal para solicitudes identificadas del portal. Los radicados creados
+por otros canales pueden usar los últimos cuatro dígitos cuando exista un
+documento válido.
+
+### Controles implementados
+
+- Verificación obligatoria y centralizada en
+  `lib/seguridad/consulta-publica-radicado.ts`.
+- Correo normalizado (`trim` + minúsculas), documento por últimos cuatro
+  dígitos y código de consulta mediante SHA-256/comparación constante.
+- Nuevas solicitudes sin correo —incluidas las anónimas— reciben un código
+  aleatorio de 256 bits una sola vez; Firestore guarda únicamente
+  `consultaTokenHash`.
+- Respuesta pública construida por lista positiva. Nunca propaga PII, UIDs,
+  rutas de Storage, adjuntos, comentarios internos ni auditoría privada.
+- Anónimos y reservados omiten además la dependencia en la respuesta pública.
+- Mensaje y código uniformes para formato inválido, inexistente, dato erróneo o
+  expediente sin método de verificación.
+- Rate limit compartido en `seguridad_rate_limits`: IP/minuto, radicado/hora,
+  combinación IP+radicado y bloqueo progresivo por fallos. IP y radicado se
+  guardan solo como HMAC SHA-256. El respaldo local se usa únicamente si falla
+  el contador compartido.
+- Auditoría agregada por ventanas de cinco minutos en
+  `seguridad_consultas_auditoria`, sin correo, documento, token, IP completa ni
+  contenido del expediente.
+- `Cache-Control: no-store, no-cache, must-revalidate` y `Pragma: no-cache` en
+  todas las respuestas de consulta.
+
+### Compatibilidad
+
+| Tipo de radicado | Método de verificación | Consulta pública | Acción |
+|---|---|---:|---|
+| Identificado con correo | Correo exacto normalizado | Sí | Sin migración |
+| Identificado con documento válido | Últimos 4 dígitos | Sí | Sin migración |
+| Identificado sin correo/documento, nuevo | Código aleatorio | Sí | Hash generado al radicar |
+| Anónimo nuevo | Código aleatorio | Sí | Mostrar código una sola vez en constancia |
+| Anónimo histórico sin código | Ninguno confiable | No | Orientar a Ventanilla Única; sin bypass |
+| Legacy `EXT-*` | No normalizado | No | Orientar a Ventanilla Única hasta migración aprobada |
+| Reservado | Correo/documento/código disponible | Sí, sanitizada | Ocultar identidad y dependencia |
+
+No se modifican datos históricos. Cualquier migración futura exige script,
+`dry run`, respaldo y aprobación explícita.
+
+### Operación
+
+Los límites se configuran mediante `CONSULTA_RATE_IP_MINUTO`,
+`CONSULTA_RATE_RADICADO_HORA`, `CONSULTA_RATE_COMBINACION_MINUTO`,
+`CONSULTA_RATE_FALLOS_RADICADO` y `CONSULTA_RATE_BLOQUEO_MINUTOS`.
+`CONSULTA_HASH_SECRET` es recomendado; si no existe, el servidor utiliza la
+credencial Firebase ya configurada como clave HMAC sin exponerla.
+
+Configurar políticas TTL de Firestore sobre `expiresAt` para
+`seguridad_rate_limits` y `seguridad_consultas_auditoria`. El código ya escribe
+la fecha de expiración, pero la activación de TTL es una operación de
+infraestructura y no debe ejecutarse automáticamente desde la aplicación.
+
+La guía manual está en `docs/UAT_SEGURIDAD_H03_CONSULTA_PUBLICA.md`. Este
+hallazgo solo debe pasar a ✅ Corregido después de aprobarla.
+
+### Validación técnica ejecutada
+
+- `npx tsc --noEmit`: aprobado.
+- `npm run lint`: aprobado.
+- `npm run test`: 19 archivos y 235 pruebas aprobadas.
+- Pruebas específicas H-03 y sanitización: 34 aprobadas.
+- `npm run build`: aprobado con Next.js 16.2.6.
+- `npm audit --omit=dev`: 0 vulnerabilidades.
+- `npm audit --audit-level=high`: 0 vulnerabilidades.
+- Revisión responsive: escritorio y 390 px sin desbordamiento horizontal; el
+  dato de verificación no aparece en URL ni en logs del navegador.
+- Búsqueda de secretos: solo variables/placeholders documentales ya existentes;
+  no se añadieron credenciales.

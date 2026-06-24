@@ -57,10 +57,10 @@ export interface RespuestaOficialPublica {
 
 /** Información pública de un radicado */
 export interface RadicadoPublico {
-  radicadoId:           string;
+  numeroRadicado:       string;
   fechaRadicacion:      string;
-  estadoCiudadano:      EstadoCiudadano;
-  dependencia:          string;
+  estadoPublico:        EstadoCiudadano;
+  dependencia?:         string;
   tipoSolicitud:        string;
   fechaVencimiento:     string;
   requiereAclaracion:   boolean;
@@ -71,6 +71,12 @@ export interface RadicadoPublico {
   respuestaDisponible?: boolean;
   /** Texto institucional de la respuesta oficial — solo si RESUELTO + nota válida */
   respuestaOficial?:    RespuestaOficialPublica;
+  lineaTiempo?:         LineaTiempoPublica[];
+}
+
+export interface LineaTiempoPublica {
+  fecha: string;
+  evento: string;
 }
 
 /** Registro de auditoría de consultas ciudadanas */
@@ -81,5 +87,5 @@ export interface ConsultaCiudadanaLog {
   fechaConsulta:  string;
   ipHash?:        string;
   userAgent?:     string;
-  resultado:      'encontrado' | 'no_encontrado' | 'verificacion_fallida';
+  resultado:      'encontrado' | 'no_encontrado' | 'verificacion_fallida' | 'bloqueado' | 'sin_metodo';
 }
