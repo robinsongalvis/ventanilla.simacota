@@ -293,7 +293,7 @@ describe('despacharNotificaciones', () => {
       '/api/interno/notificar-ciudadano',
       expect.objectContaining({
         method: 'POST',
-        body:   expect.stringContaining('"emailCiudadano":"juan@example.com"'),
+        body:   expect.not.stringContaining('juan@example.com'),
       }),
     );
   });
@@ -309,7 +309,7 @@ describe('despacharNotificaciones', () => {
     expect(fetch).not.toHaveBeenCalled();
   });
 
-  it('Payload del email contiene todos los campos requeridos por la API', async () => {
+  it('Payload del email solo envía identificador y acción cerrada', async () => {
     vi.mocked(addDoc).mockResolvedValueOnce({ id: 'ev_003' } as never);
     vi.mocked(fetch).mockResolvedValueOnce(
       new Response(JSON.stringify({ enviado: true }), { status: 200 }),
@@ -323,15 +323,11 @@ describe('despacharNotificaciones', () => {
     expect(url).toBe('/api/interno/notificar-ciudadano');
 
     const body = JSON.parse((options as RequestInit).body as string);
-    expect(body).toMatchObject({
-      radicadoId:      'SIM-2025-001',
-      emailCiudadano:  'juan@example.com',
-      nombreCiudadano: 'Juan Ciudadano',
-      asunto:          'Solicitud de información',
-      nota:            'Respuesta oficial.',
-      tenantId:        'SEC_GOBIERNO',
-      tieneArchivo:    true,
+    expect(body).toEqual({
+      radicadoId: 'SIM-2025-001',
+      accion:     'RESPUESTA_OFICIAL',
     });
-    expect(body.fechaRespuesta).toBeTruthy();
+    expect(JSON.stringify(body)).not.toContain('juan@example.com');
+    expect(JSON.stringify(body)).not.toContain('Respuesta oficial.');
   });
 });

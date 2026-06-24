@@ -6,6 +6,109 @@ historial vivo del avance hacia el go-live.
 
 ---
 
+## H-02 — Notificación al ciudadano protegida por rol y dependencia
+
+**Estado:** 🟡 Implementado — pendiente aprobación UAT de Seguridad P1-02.
+**Severidad original:** P1 — Alto.
+**Archivos:**
+- `lib/seguridad/autorizar-notificacion-ciudadano.ts` *(nuevo, helper puro)*
+- `app/api/interno/notificar-ciudadano/route.ts` *(reescrito)*
+- `lib/acciones/resolver-radicado.ts` *(cliente interno ajustado)*
+- `__tests__/autorizar-notificacion-ciudadano.test.ts` *(nuevo)*
+
+### Qué se hizo
+
+Se eliminó el comportamiento de relay de correo arbitrario. El endpoint interno
+ya no acepta destinatario, asunto, HTML, mensaje, nombre ciudadano, dependencia
+ni contenido libre desde el cliente.
+
+Flujo seguro aplicado por `POST /api/interno/notificar-ciudadano`:
+
+1. Valida sesión interna activa mediante `requireActiveInternalUser()`
+   incluyendo revocación, perfil registrado y usuario no archivado/inactivo.
+2. Acepta únicamente `radicadoId` y una acción cerrada:
+   `RESPUESTA_OFICIAL` o `REINTENTO_NOTIFICACION`.
+3. Rechaza cualquier intento de enviar `emailCiudadano`, `correo`,
+   `destinatario`, `asunto`, `mensaje`, `html`, `nota`, `tenantId` u otros
+   campos libres equivalentes.
+4. Carga el radicado desde `ventanilla_radicados/{radicadoId}`.
+5. Autoriza por rol y dependencia:
+   - `ADMIN` y `RECEPCIONISTA` → acceso global.
+   - `FUNCIONARIO` → solo si
+     `usuario.tenantId === radicado.clasificacion.oficinaDestino`.
+   - `CONTROL_INTERNO`, `JEFE_DEPENDENCIA` y roles desconocidos → bloqueados.
+6. Toma el correo desde `radicado.solicitante.email`.
+7. Bloquea radicados anónimos, reservados o sin correo válido.
+8. Construye asunto y HTML con templates institucionales desde datos del
+   radicado (`respuestaOficial`, `detalle`, `clasificacion`).
+9. Registra auditoría de seguridad sin PII.
+10. Registra trazabilidad de envío/falla sin correo ni contenido completo del
+    mensaje.
+
+### Respuestas humanas y seguras
+
+| Código | Cuándo | Mensaje |
+|--------|--------|---------|
+| `400` | Payload inválido, radicado anónimo/reservado, correo inválido o sin respuesta oficial notificable | `Solicitud inválida.` / `El radicado no cuenta con un correo válido para notificación.` |
+| `401` | Sin sesión o sesión expirada | `Debe iniciar sesión nuevamente.` |
+| `403` | Rol no autorizado, usuario inactivo/archivado, funcionario de otra dependencia o payload con campos libres | `No tiene permiso para realizar esta acción.` |
+| `404` | Radicado inexistente | `No fue posible localizar el radicado.` |
+| `500` | Falla SMTP o interna de envío | `No fue posible enviar la notificación.` |
+
+Nunca se devuelve: correo destino, contenido del email, configuración SMTP,
+stack trace, dependencia interna desconocida ni credenciales.
+
+### Auditoría / trazabilidad
+
+Auditoría de seguridad en `seguridad_notificaciones_auditoria`:
+
+- `NOTIFICACION_CIUDADANO_AUTORIZADA`
+- `NOTIFICACION_CIUDADANO_DENEGADA`
+- `NOTIFICACION_CIUDADANO_ENVIADA`
+- `NOTIFICACION_CIUDADANO_FALLIDA`
+
+Campos permitidos:
+
+- `actorUid`
+- `actorRol`
+- `actorTenant`
+- `radicadoId`
+- `motivo`
+- `fecha`
+
+La trazabilidad del radicado mantiene `NOTIFICACION_CORREO_ENVIADA` /
+`NOTIFICACION_CORREO_FALLIDA`, pero la nueva ruta no guarda destinatario ni
+contenido completo del correo.
+
+### Tests
+
+`__tests__/autorizar-notificacion-ciudadano.test.ts` cubre la matriz exigida:
+
+1. ADMIN puede notificar cualquier radicado.
+2. RECEPCIONISTA puede notificar cualquier radicado.
+3. FUNCIONARIO puede notificar su dependencia.
+4. FUNCIONARIO no puede notificar otra dependencia.
+5. CONTROL_INTERNO recibe 403.
+6. JEFE_DEPENDENCIA recibe 403.
+7. Usuario sin sesión recibe 401.
+8. Usuario inactivo recibe 403.
+9. Radicado inexistente recibe respuesta segura.
+10. Radicado anónimo no genera correo.
+11. Radicado reservado no genera correo desde este endpoint.
+12. Correo inválido no genera envío ni filtra el dato.
+13. Destinatario libre del cliente se rechaza.
+14. Contenido libre del cliente se rechaza.
+15. Solo se aceptan acciones cerradas.
+
+### Pendiente UAT
+
+Este hallazgo solo debe pasar a ✅ Corregido después de aprobar UAT manual con
+cuentas reales de `ADMIN`, `RECEPCIONISTA`, `FUNCIONARIO`,
+`CONTROL_INTERNO` y `JEFE_DEPENDENCIA`, validando además un fallo SMTP
+controlado en ambiente de pruebas.
+
+---
+
 ## H-01 — Descarga de adjuntos protegida por rol y dependencia
 
 **Estado:** ✅ Corregido — Sprint Seguridad P1-01.
