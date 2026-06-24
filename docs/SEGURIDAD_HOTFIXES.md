@@ -6,6 +6,92 @@ historial vivo del avance hacia el go-live.
 
 ---
 
+## H-04, H-05 y H-07 — Hardening de producción
+
+**Estado:** 🟡 Implementado — pendiente Preview/UAT de hardening.
+**Severidad original:** P2 — Medio.
+**Archivos:**
+- `app/api/ai/log/route.ts` *(reescrito)*
+- `lib/seguridad/ai-log-seguro.ts` *(nuevo, helper puro)*
+- `lib/seguridad/autorizar-cron.ts` *(nuevo, helper puro)*
+- `app/api/cron/alertas-vencimiento/route.ts`
+- `app/api/cron/simi/alertas-vencimiento/route.ts`
+- `next.config.ts`
+- `.env.example`
+- `__tests__/hardening-produccion.test.ts` *(nuevo)*
+
+### H-04 — `/api/ai/log` protegido
+
+El endpoint dejó de ser una escritura pública a Firestore.
+
+Controles implementados:
+
+1. Exige sesión interna activa con `requireActiveInternalUser()`.
+2. Solo permite `ADMIN` y `CONTROL_INTERNO`.
+3. Aplica rate limit por UID.
+4. Lee el cuerpo como texto y rechaza payloads mayores a 4 KB.
+5. Rechaza campos desconocidos.
+6. Acepta solo telemetría acotada: `radicadoId`, `endpoint`, `latenciaMs`,
+   `error`/`errorCode`, `fallbackActivo` y `promptVersion`.
+7. No persiste correo, documento, teléfono, dirección, token, prompt completo
+   ni mensaje de error crudo.
+8. Convierte errores a `errorPresente` + `errorCategoria`.
+9. Registra denegados en `seguridad_ai_log_auditoria` sin PII.
+10. Devuelve errores genéricos sin stack ni detalles de Firestore.
+
+Los flujos normales de IA ya registran telemetría server-side mediante
+`lib/ai/telemetry.ts`; por eso no se requiere escritura pública desde el
+navegador.
+
+### H-05 — Cron fail-closed
+
+Se creó `lib/seguridad/autorizar-cron.ts` y todos los endpoints bajo
+`app/api/cron/**` lo usan.
+
+Comportamiento:
+
+| Caso | Respuesta | Ejecuta tarea |
+|------|-----------|---------------|
+| `CRON_SECRET` ausente | `503 Servicio no disponible.` | No |
+| Sin `Authorization` | `401 No autorizado.` | No |
+| Formato no Bearer | `401 No autorizado.` | No |
+| Token incorrecto | `401 No autorizado.` | No |
+| `Authorization: Bearer <CRON_SECRET>` correcto | `200` si el job completa | Sí |
+
+La comparación usa `timingSafeEqual` y los logs solo registran el motivo, nunca
+el secreto ni el token recibido. `.env.example` incluye únicamente el
+placeholder `CRON_SECRET=CAMBIAR_POR_SECRETO_SEGURO`.
+
+### H-07 — Cabeceras de seguridad
+
+Se configuró `headers()` en `next.config.ts` y se desactivó
+`poweredByHeader`.
+
+Cabeceras añadidas:
+
+- `X-Content-Type-Options: nosniff`
+- `Referrer-Policy: strict-origin-when-cross-origin`
+- `X-Frame-Options: DENY`
+- `Permissions-Policy: camera=(), microphone=(), geolocation=()`
+- `Strict-Transport-Security: max-age=31536000; includeSubDomains`
+- `Content-Security-Policy-Report-Only`
+
+La CSP se deja inicialmente en modo **Report-Only** para validar Preview sin
+romper login, Firebase Auth/Firestore/Storage, Gemini, Sentry, imágenes locales
+o assets de Next.js. Después de validar Preview puede promoverse a
+`Content-Security-Policy`.
+
+### Pendiente Preview/UAT
+
+- Verificar cabeceras con `curl -I` en Preview para `/`, `/consulta` e
+  `/interno/login`.
+- Verificar que login Firebase, carga de dashboard, SIMI y Sentry no generen
+  violaciones críticas de CSP.
+- Verificar cron sin token, con token incorrecto y con `CRON_SECRET` ausente.
+- No ejecutar cron real contra datos productivos durante pruebas.
+
+---
+
 ## H-02 — Notificación al ciudadano protegida por rol y dependencia
 
 **Estado:** 🟡 Implementado — pendiente aprobación UAT de Seguridad P1-02.

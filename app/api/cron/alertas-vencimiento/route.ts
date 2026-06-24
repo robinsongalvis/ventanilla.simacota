@@ -4,6 +4,7 @@ import { enviarEmail }           from '@/lib/email/mailer';
 import { diasRestantesHabiles }  from '@/lib/tiempos-radicado';
 import { DIRECTORIO_TENANTS }    from '@/src/types/reglas-negocio';
 import { logError }              from '@/lib/logger';
+import { autorizarCron }         from '@/lib/seguridad/autorizar-cron';
 import type { VentanillaRadicado } from '@/src/types/ventanilla';
 import type { TenantId }         from '@/src/types/radicado';
 
@@ -28,11 +29,14 @@ const UMBRAL_DIAS = 2; // Alerta cuando quedan ≤ 2 días hábiles
 
 export async function GET(request: Request): Promise<NextResponse> {
   // Verificar autorización
-  const authHeader = request.headers.get('authorization');
-  const cronSecret = process.env.CRON_SECRET;
+  const auth = autorizarCron({
+    authorization: request.headers.get('authorization'),
+    secret:        process.env.CRON_SECRET,
+  });
 
-  if (cronSecret && authHeader !== `Bearer ${cronSecret}`) {
-    return NextResponse.json({ error: 'No autorizado.' }, { status: 401 });
+  if (!auth.ok) {
+    console.warn('[cron/alertas-vencimiento] acceso denegado', { motivo: auth.motivo });
+    return NextResponse.json({ error: auth.mensaje }, { status: auth.status });
   }
 
   const db    = getFirebaseAdminDb();
@@ -121,7 +125,7 @@ export async function GET(request: Request): Promise<NextResponse> {
   } catch (err) {
     const msg = err instanceof Error ? err.message : String(err);
     console.error('[cron/alertas-vencimiento] Error fatal:', msg);
-    return NextResponse.json({ error: msg }, { status: 500 });
+    return NextResponse.json({ error: 'No fue posible ejecutar el cron.' }, { status: 500 });
   }
 }
 

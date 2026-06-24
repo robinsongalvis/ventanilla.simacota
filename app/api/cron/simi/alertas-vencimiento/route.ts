@@ -9,15 +9,19 @@
 import { NextResponse }          from 'next/server';
 import { generateDeadlineAlerts } from '@/lib/simi-juridico/predictDeadlineAlerts';
 import { createNotification }    from '@/lib/simi-juridico/createNotification';
+import { autorizarCron }         from '@/lib/seguridad/autorizar-cron';
 
 export const runtime = 'nodejs';
 
 export async function GET(request: Request): Promise<NextResponse> {
-  const authHeader = request.headers.get('authorization');
-  const cronSecret = process.env.CRON_SECRET;
+  const auth = autorizarCron({
+    authorization: request.headers.get('authorization'),
+    secret:        process.env.CRON_SECRET,
+  });
 
-  if (cronSecret && authHeader !== `Bearer ${cronSecret}`) {
-    return NextResponse.json({ error: 'No autorizado.' }, { status: 401 });
+  if (!auth.ok) {
+    console.warn('[cron/simi/alertas] acceso denegado', { motivo: auth.motivo });
+    return NextResponse.json({ error: auth.mensaje }, { status: auth.status });
   }
 
   const inicio = Date.now();
@@ -55,6 +59,9 @@ export async function GET(request: Request): Promise<NextResponse> {
   } catch (err) {
     const msg = err instanceof Error ? err.message : String(err);
     console.error('[cron/simi/alertas]', msg);
-    return NextResponse.json({ error: msg, duracionMs: Date.now() - inicio }, { status: 500 });
+    return NextResponse.json(
+      { error: 'No fue posible ejecutar el cron.', duracionMs: Date.now() - inicio },
+      { status: 500 },
+    );
   }
 }

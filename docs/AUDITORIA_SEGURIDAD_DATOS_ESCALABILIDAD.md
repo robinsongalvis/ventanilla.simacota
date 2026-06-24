@@ -34,10 +34,10 @@
 | H-01 | Control de acceso | Descarga de adjuntos sin validar dependencia ni rol (IDOR) | **P1** — ✅ **Corregido** (Sprint Seguridad P1-01) |
 | H-02 | Control de acceso / Correo | Notificación al ciudadano sin validar rol ni dependencia; contenido y destinatario los pone el cliente | **P1** — 🟡 Implementado, pendiente UAT P1-02 |
 | H-03 | Privacidad | Consulta pública enumerable (números secuenciales + verificación opcional) | **P1** — 🟡 Implementado, pendiente UAT P1-03 |
-| H-04 | Abuso / Costos | `/api/ai/log` sin autenticación ni límite (escritura libre a Firestore) | **P2** |
-| H-05 | Configuración | Cron "abierto" si falta `CRON_SECRET` (puede dispararse desde fuera) | **P2** |
+| H-04 | Abuso / Costos | `/api/ai/log` sin autenticación ni límite (escritura libre a Firestore) | **P2** — 🟡 Implementado, pendiente UAT |
+| H-05 | Configuración | Cron "abierto" si falta `CRON_SECRET` (puede dispararse desde fuera) | **P2** — 🟡 Implementado, pendiente UAT |
 | H-06 | Abuso | Límite de peticiones (rate limit) en memoria, no distribuido | **P2** |
-| H-07 | Configuración web | Faltan cabeceras de seguridad (CSP, HSTS, etc.) | **P2** |
+| H-07 | Configuración web | Faltan cabeceras de seguridad (CSP, HSTS, etc.) | **P2** — 🟡 Implementado, pendiente Preview |
 | H-08 | Adjuntos | Tipo de archivo validado por dato del navegador (falsificable); sin antivirus | **P2** |
 | H-09 | Abuso | Radicación pública sin CAPTCHA/Turnstile | **P2** |
 | H-10 | Reglas Firestore | Jefe de Dependencia puede leer hallazgos/planes de todas las dependencias | **P2** |
@@ -102,7 +102,7 @@ también debilita la verificación de identidad en la consulta pública (ver H-0
 | Correos al ciudadano | **Cumple parcialmente** | H-02 implementado: `/api/interno/notificar-ciudadano` ya valida rol/dependencia y toma destinatario/contenido del radicado. Pendiente UAT. |
 | Exportaciones Excel | **Cumple** | El generador MIPG sanitiza por rol (`radicadosVisiblesParaRol`, `solicitanteVisible`). |
 | Usuarios internos | **Cumple** | Solo Admin administra; queda auditado en `admin_auditoria`. |
-| Principio de seguridad | **Cumple parcialmente** | Buena base; H-01/H-02/H-03 implementados o corregidos; pendientes UAT H-02/H-03 y cabeceras (H-07). |
+| Principio de seguridad | **Cumple parcialmente** | Buena base; H-01/H-02/H-03 implementados o corregidos; H-04/H-05/H-07 implementados pendientes de Preview/UAT. |
 | Acceso restringido | **Cumple parcialmente** | Falla en descarga de adjuntos (H-01) y hallazgos para Jefe (H-10). |
 | Circulación restringida | **Cumple parcialmente** | PII a Gemini (H-11) debe declararse y cubrirse con encargo. |
 | Transparencia | **Cumple** | Trazabilidad completa y consulta de estado. |
@@ -154,7 +154,7 @@ Validaciones solicitadas:
 | `radicados` (legacy) | Admin; Func/Recepción de su tenant | Cerrado (`false`) | Bajo | OK, legado en solo lectura. |
 | `ventanilla_radicados` | Admin/Recepción/CI global; Func/Jefe su tenant | Crear: Admin/Recepción. Update/Delete: `false` (solo Admin SDK) | Bajo | Excelente: mutaciones críticas pasan por servidor. |
 | `.../trazabilidad` | Internos (Func/Jefe su tenant) | Crear: Admin/Func/Recepción. Update/Delete: `false` | Bajo | OK (append-only). |
-| `ai_logs` | Solo Admin | `false` (cliente) | Bajo en reglas | OK; **pero** se escribe vía API sin auth (H-04). |
+| `ai_logs` | Solo Admin | `false` (cliente) | Bajo en reglas | H-04 implementado: API exige sesión interna, rol autorizado, rate-limit y payload sanitizado. |
 | `ai_feedback` | Internos | `false` | Bajo | OK. |
 | `ai_auditoria` | Internos | `false` | Bajo | OK. |
 | `counters` | Admin/Recepción | Admin/Recepción | Bajo | OK (consecutivo transaccional). |
@@ -225,7 +225,7 @@ radicación, consulta y endpoints de IA del formulario.
 | `POST /api/ai/chat` | Público | No | — | Texto | Igual | Igual |
 | `POST /api/ai/scan-doc` | Público | No | — | Extracción de documento | Costo + procesa archivo del usuario | Límite + tamaño |
 | `POST /api/ai/feedback` | Público | No | — | OK | Bajo | Mantener límite |
-| `POST /api/ai/log` | Público | **No** | — | logId | **Escritura libre a Firestore (H-04)** | Exigir auth o mover a interno + límite |
+| `POST /api/ai/log` | Privado | Sesión interna activa | ADMIN/CONTROL_INTERNO | logId | H-04 implementado, pendiente UAT | Mantener payload mínimo sin PII |
 | `POST /api/ai/copilot` | Privado | Sesión | Internos | Sugerencia | Bajo | OK (auth + límite por uid) |
 | `POST /api/auth/session` | Público (login) | idToken | Internos | Cookie sesión | Bajo | OK |
 | `POST /api/auth/logout` | Privado | Sesión | — | OK | Bajo | OK |
@@ -238,8 +238,8 @@ radicación, consulta y endpoints de IA del formulario.
 | `GET /api/reportes/mipg/excel` | Privado | `requireActiveInternalUser` | Internos | Excel sanitizado | Bajo | OK |
 | `GET/POST/PATCH /api/admin/usuarios*` | Privado | Sesión + **rol ADMIN** | Admin | Usuarios | Bajo | OK |
 | `/api/interno/control/*` | Privado | `autorizarAuditor`/`OJefe` | CI/Admin (+Jefe) | KPIs/alertas/etc. | Bajo-Medio (volumen H-12) | OK en permisos |
-| `GET /api/cron/alertas-vencimiento` | Cron | `CRON_SECRET` **si existe** | — | Dispara correos | **Fail-open (H-05)** | Exigir secreto siempre |
-| `GET /api/cron/simi/alertas-vencimiento` | Cron | `CRON_SECRET` **si existe** | — | Alertas | **Fail-open (H-05)** | Igual |
+| `GET /api/cron/alertas-vencimiento` | Cron | `CRON_SECRET` obligatorio | — | Dispara correos | H-05 implementado, pendiente UAT | Fail-closed; no probar contra producción |
+| `GET /api/cron/simi/alertas-vencimiento` | Cron | `CRON_SECRET` obligatorio | — | Alertas | H-05 implementado, pendiente UAT | Igual |
 
 Riesgos buscados: endpoints sin auth que devuelvan PII → **no** (los públicos
 están sanitizados); mutaciones sin rol → H-02 implementado pendiente UAT;
@@ -352,10 +352,10 @@ riesgo lo amerite.
 | Riesgo OWASP | Estado | Evidencia | Recomendación | Prioridad |
 |--------------|--------|-----------|---------------|-----------|
 | A01 Broken Access Control | **Atención** | H-01 (adjuntos), H-02 (notificar), H-10 (hallazgos Jefe) | Validar tenant/rol en cada recurso | **P1** |
-| A02 Cryptographic Failures | OK | HTTPS (Vercel), cookie secure/httpOnly, sin secretos en Git | Mantener; HSTS (H-07) | P2 |
+| A02 Cryptographic Failures | OK | HTTPS (Vercel), cookie secure/httpOnly, sin secretos en Git; HSTS implementado pendiente Preview | Mantener validación de cabeceras | P2 |
 | A03 Injection | OK / Atención | Sin SQL; Firestore tipado; **prompt injection** en SIMI (H-16) | Delimitar texto no confiable | P3 |
 | A04 Insecure Design | Atención | Enumeración por IDs secuenciales (H-03); rate-limit débil (H-06) | Verificación obligatoria; límite distribuido | P1/P2 |
-| A05 Security Misconfiguration | **Atención** | Sin cabeceras (H-07); cron fail-open (H-05) | CSP/HSTS; secreto cron obligatorio | P2 |
+| A05 Security Misconfiguration | **Atención** | H-05/H-07 implementados pendientes de Preview/UAT | Validar CSP Report-Only y cron fail-closed | P2 |
 | A06 Vulnerable Components | **OK** | `npm audit --omit=dev` = 0 vulnerabilidades | Monitoreo continuo | P3 |
 | A07 Auth Failures | OK / Atención | Buenas sesiones; sin MFA (H-15); `checkRevoked=false` (H-13) | MFA roles críticos | P2/P3 |
 | A08 Data Integrity Failures | OK | Mutaciones por servidor; auditorías append-only | Mantener | P3 |
@@ -375,8 +375,8 @@ riesgo lo amerite.
 | Fuerza bruta al login | Firebase Auth (límites propios) | Bajo-Medio | MFA + monitoreo de intentos |
 | Spam a SIMI / IA | Límite por IP/uid en memoria | Medio (costo Gemini) | Límite distribuido + presupuesto |
 | Abuso de subida de archivos | 3 × 5 MB validado | Medio (H-08) | Magic bytes + antivirus |
-| Abuso de correos | H-02 implementado pendiente UAT; cron fail-open (H-05) | **Alto** | Aprobar UAT H-02; cerrar H-05 + evaluar límite de correos |
-| `/api/ai/log` abierto | Sin auth (H-04) | Medio (costo/almacenamiento) | Auth + límite |
+| Abuso de correos | H-02 implementado pendiente UAT; H-05 implementado pendiente UAT | **Alto** | Aprobar UAT H-02/H-05 + evaluar límite de correos |
+| `/api/ai/log` abierto | H-04 implementado pendiente UAT | Medio (costo/almacenamiento) | Validar auth, rol y rate-limit |
 | Exportaciones pesadas | Carga grande (H-12) | Medio | Fecha obligatoria + paginación |
 
 **Nota técnica sobre el límite actual:** `lib/ai/rate-limit.ts` usa un `Map` en
@@ -481,11 +481,11 @@ colección; los reportes pueden pedir todo sin rango obligatorio.
 | Recurso | Nivel | Comentario |
 |---------|-------|------------|
 | Lecturas Firestore | **Requiere monitoreo** | H-12 multiplica lecturas en CI/reportes |
-| Escrituras Firestore | Bajo-Medio | ~4 docs por radicado; `/api/ai/log` abierto puede inflar (H-04) |
+| Escrituras Firestore | Bajo-Medio | ~4 docs por radicado; H-04 limita `/api/ai/log` por auth/rol/rate-limit |
 | Storage | Medio | Crece con adjuntos; aplicar retención (Parte 15) |
 | Salida de datos | Bajo-Medio | Descargas de adjuntos/Excel |
 | Funciones Vercel | Medio | Tiempo de cómputo en agregaciones grandes (H-12) |
-| Correos | Bajo-Medio | Vigilar abuso (H-02/H-05) |
+| Correos | Bajo-Medio | Vigilar abuso; H-02/H-05 implementados pendientes UAT |
 | SIMI / Gemini | **Requiere monitoreo** | Endpoints IA públicos + límite débil (H-06) |
 | Exportaciones | Medio | Pesadas sin rango (Parte 15) |
 
@@ -501,10 +501,10 @@ revisar consumo mensual de Firestore y Gemini.
 | H-01 | Acceso | Descarga de adjuntos sin validar tenant/rol | Alto | Media | **Alto** | `app/api/interno/archivo/route.ts` | Verificar radicado→tenant→rol antes de firmar URL | **P1** | Bajo | ✅ **Corregido (Sprint Seguridad P1-01)** |
 | H-02 | Acceso/Correo | Notificar al ciudadano sin rol/tenant; datos del cliente | Alto | Media | **Alto** | `app/api/interno/notificar-ciudadano/route.ts` | Tomar datos del radicado; validar rol/tenant | **P1** | Bajo | Implementado; pendiente UAT |
 | H-03 | Privacidad | Consulta pública enumerable | Medio-Alto | Alta | **Alto** | `app/api/consulta/[id]`, `public/radicado/consulta` | Verificación obligatoria + rate-limit | **P1** | Medio | Implementado; pendiente UAT |
-| H-04 | Abuso | `/api/ai/log` sin auth | Medio | Media | Medio | `app/api/ai/log/route.ts` | Auth + límite | **P2** | Bajo | Abierto |
-| H-05 | Config | Cron fail-open sin `CRON_SECRET` | Medio | Media | Medio | `cron/*/route.ts` | Exigir secreto siempre | **P2** | Bajo | Abierto |
+| H-04 | Abuso | `/api/ai/log` sin auth | Medio | Media | Medio | `app/api/ai/log/route.ts` | Auth + límite | **P2** | Bajo | Implementado; pendiente UAT |
+| H-05 | Config | Cron fail-open sin `CRON_SECRET` | Medio | Media | Medio | `cron/*/route.ts` | Exigir secreto siempre | **P2** | Bajo | Implementado; pendiente UAT |
 | H-06 | Abuso | Rate limit en memoria | Medio | Alta | Medio | `lib/ai/rate-limit.ts` | Almacén distribuido / WAF | **P2** | Medio | Abierto |
-| H-07 | Config | Faltan cabeceras de seguridad | Medio | Media | Medio | `next.config.ts` | CSP/HSTS/X-Frame/etc. | **P2** | Bajo | Abierto |
+| H-07 | Config | Faltan cabeceras de seguridad | Medio | Media | Medio | `next.config.ts` | CSP/HSTS/X-Frame/etc. | **P2** | Bajo | Implementado; pendiente Preview |
 | H-08 | Adjuntos | Tipo validado por cliente; sin AV | Medio | Media | Medio | `api/radicacion`, `storage.rules` | Magic bytes + antivirus | **P2** | Medio | Abierto |
 | H-09 | Abuso | Radicación sin CAPTCHA | Medio | Media | Medio | `api/radicacion` | Turnstile | **P2** | Bajo | Abierto |
 | H-10 | Reglas | Jefe lee hallazgos/planes globales | Medio | Baja | Medio | `firestore.rules` | Filtrar por tenant | **P2** | Bajo | Abierto |
@@ -522,12 +522,12 @@ revisar consumo mensual de Firestore y Gemini.
 ### Acciones inmediatas (esta semana)
 - **H-01** Validar dependencia/rol antes de entregar adjuntos. ✅ Corregido.
 - **H-02** Asegurar que `notificar-ciudadano` use datos del radicado y valide rol/tenant. 🟡 Implementado, pendiente UAT.
-- **H-05** Hacer obligatorio `CRON_SECRET` (fail-closed).
-- **H-04** Cerrar o autenticar `/api/ai/log`.
+- **H-05** Hacer obligatorio `CRON_SECRET` (fail-closed). 🟡 Implementado, pendiente UAT.
+- **H-04** Cerrar o autenticar `/api/ai/log`. 🟡 Implementado, pendiente UAT.
 
 ### Antes del go-live oficial
 - **H-03** Verificación obligatoria + rate-limit en la consulta pública.
-- **H-07** Cabeceras de seguridad (CSP, HSTS, X-Content-Type-Options, etc.).
+- **H-07** Cabeceras de seguridad (CSP, HSTS, X-Content-Type-Options, etc.). 🟡 Implementado, pendiente Preview.
 - **H-10** Restringir hallazgos/planes del Jefe a su dependencia.
 - Confirmar **SPF/DKIM/DMARC** del dominio institucional.
 - Publicar **Política de Tratamiento de Datos** y declarar uso de IA/nube.
@@ -570,8 +570,9 @@ deben marcarse como cierre definitivo hasta validar UAT.
 3. **H-03** — implementado, pendiente UAT: consulta pública con segundo factor,
    rate limit y respuestas anti-enumeración.
 
-Recomendado también antes del lanzamiento: **H-05** (cron), **H-04** (ai/log),
-**H-07** (cabeceras) y confirmar **SPF/DKIM/DMARC**.
+Recomendado también antes del lanzamiento: aprobar Preview/UAT de **H-05**
+(cron), **H-04** (ai/log), **H-07** (cabeceras) y confirmar
+**SPF/DKIM/DMARC**.
 
 **Riesgos aceptables (vigilar, no bloquean):**
 - Rate limit en memoria (H-06) — aceptable para volúmenes bajos; reforzar pronto.
