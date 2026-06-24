@@ -205,11 +205,12 @@ Buscar documentos con accion: "NOTIFICACION_CORREO_ENVIADA" o "NOTIFICACION_CORR
 | Autorización | Header `Authorization: Bearer {CRON_SECRET}` |
 | Umbral de alerta | Radicados con ≤ 2 días hábiles al vencimiento |
 
-**Variable requerida (opcional pero recomendada):**
+**Variable requerida:**
 ```
 CRON_SECRET=cadena-aleatoria-segura-de-32-caracteres
 ```
-Sin `CRON_SECRET`, el endpoint acepta cualquier llamada sin autenticación. Se recomienda configurarlo antes del go-live.
+Sin `CRON_SECRET`, el endpoint responde `503` y no ejecuta el cron. Con token
+ausente o incorrecto responde `401`.
 
 **Prueba manual del cron:**
 ```bash
