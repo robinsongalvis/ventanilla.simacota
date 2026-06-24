@@ -166,13 +166,7 @@ export function despacharNotificaciones(params: DespacharNotificacionesParams): 
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({
       radicadoId,
-      emailCiudadano:  params.emailCiudadano,
-      nombreCiudadano: params.nombreCiudadano,
-      asunto:          params.asunto,
-      nota:            params.nota,
-      tenantId:        params.tenantId,
-      fechaRespuesta:  params.ahora,
-      tieneArchivo:    params.tieneArchivo,
+      accion: 'RESPUESTA_OFICIAL',
     }),
   }).catch((err) =>
     logError({ radicadoId, modulo: 'resolver-radicado/email-ciudadano', error: err }),

@@ -32,7 +32,7 @@
 | ID | Área | Riesgo | Prioridad |
 |----|------|--------|-----------|
 | H-01 | Control de acceso | Descarga de adjuntos sin validar dependencia ni rol (IDOR) | **P1** — ✅ **Corregido** (Sprint Seguridad P1-01) |
-| H-02 | Control de acceso / Correo | Notificación al ciudadano sin validar rol ni dependencia; contenido y destinatario los pone el cliente | **P1** |
+| H-02 | Control de acceso / Correo | Notificación al ciudadano sin validar rol ni dependencia; contenido y destinatario los pone el cliente | **P1** — 🟡 Implementado, pendiente UAT P1-02 |
 | H-03 | Privacidad | Consulta pública enumerable (números secuenciales + verificación opcional) | **P1** — 🟡 Implementado, pendiente UAT P1-03 |
 | H-04 | Abuso / Costos | `/api/ai/log` sin autenticación ni límite (escritura libre a Firestore) | **P2** |
 | H-05 | Configuración | Cron "abierto" si falta `CRON_SECRET` (puede dispararse desde fuera) | **P2** |
@@ -99,10 +99,10 @@ también debilita la verificación de identidad en la consulta pública (ver H-0
 | Solicitudes reservadas | **Cumple** | `identidadReservada`/`RESERVADA` ocultan identidad en SIMI y consulta. |
 | Habeas Data | **Cumple parcialmente** | Existe tipo de solicitud `HABEAS_DATA`, pero no hay un flujo automatizado de supresión/rectificación de datos del titular. |
 | Consulta pública | **Cumple parcialmente** | Respuesta sanitizada (sin actorUid/rutas), pero enumerable (H-03). |
-| Correos al ciudadano | **Cumple parcialmente** | No envía a anónimos; pero `/api/interno/notificar-ciudadano` confía en datos del cliente (H-02). |
+| Correos al ciudadano | **Cumple parcialmente** | H-02 implementado: `/api/interno/notificar-ciudadano` ya valida rol/dependencia y toma destinatario/contenido del radicado. Pendiente UAT. |
 | Exportaciones Excel | **Cumple** | El generador MIPG sanitiza por rol (`radicadosVisiblesParaRol`, `solicitanteVisible`). |
 | Usuarios internos | **Cumple** | Solo Admin administra; queda auditado en `admin_auditoria`. |
-| Principio de seguridad | **Cumple parcialmente** | Buena base; pendientes H-01, H-02, cabeceras (H-07). |
+| Principio de seguridad | **Cumple parcialmente** | Buena base; H-01/H-02/H-03 implementados o corregidos; pendientes UAT H-02/H-03 y cabeceras (H-07). |
 | Acceso restringido | **Cumple parcialmente** | Falla en descarga de adjuntos (H-01) y hallazgos para Jefe (H-10). |
 | Circulación restringida | **Cumple parcialmente** | PII a Gemini (H-11) debe declararse y cubrirse con encargo. |
 | Transparencia | **Cumple** | Trazabilidad completa y consulta de estado. |
@@ -132,7 +132,8 @@ Vercel) y (b) la IA de apoyo (SIMI) procesa el contenido de la solicitud.
 Validaciones solicitadas:
 
 - ✅ **Control Interno ve global pero no responde** — correcto en reglas y APIs;
-  **excepción:** puede notificar al ciudadano vía H-02 (corregir).
+  la excepción de notificación al ciudadano (H-02) quedó implementada pendiente
+  de UAT: `CONTROL_INTERNO` recibe 403.
 - ✅ **Funcionario ve su dependencia** — reglas Firestore correctas para
   `ventanilla_radicados`; **excepción:** adjuntos (H-01).
 - ✅ **Jefe ve su dependencia en lectura** — correcto para radicados;
@@ -228,8 +229,8 @@ radicación, consulta y endpoints de IA del formulario.
 | `POST /api/ai/copilot` | Privado | Sesión | Internos | Sugerencia | Bajo | OK (auth + límite por uid) |
 | `POST /api/auth/session` | Público (login) | idToken | Internos | Cookie sesión | Bajo | OK |
 | `POST /api/auth/logout` | Privado | Sesión | — | OK | Bajo | OK |
-| `GET /api/interno/archivo` | Privado | Sesión | **Cualquiera interno** | URL firmada del adjunto | **IDOR (H-01)** | Validar tenant/rol del radicado |
-| `POST /api/interno/notificar-ciudadano` | Privado | Sesión | **Cualquiera interno** | Envía correo | **Abuso de correo (H-02)** | Validar rol/tenant; tomar datos del radicado, no del cliente |
+| `GET /api/interno/archivo` | Privado | Sesión activa | Rol/dependencia | URL firmada del adjunto | H-01 corregido | Mantener pruebas de tenant/rol |
+| `POST /api/interno/notificar-ciudadano` | Privado | Sesión activa | ADMIN/RECEPCIONISTA/FUNCIONARIO propio tenant | Envía correo con datos del radicado | H-02 implementado, pendiente UAT | Validar UAT; no aceptar destinatario/contenido del cliente |
 | `POST /api/radicados/[id]/asignar` | Privado | `requireActiveInternalUser` | Admin/Recepción/Func | OK | Bajo | OK |
 | `POST /api/radicados/[id]/resolver` | Privado | + `canOperateTenant` | Func/Admin | OK | Bajo | OK |
 | `POST /api/radicados/[id]/devolver`/`prorroga`/`reclasificar`/`notificacion-gestionada` | Privado | + tenant | Según acción | OK | Bajo | OK |
@@ -241,9 +242,9 @@ radicación, consulta y endpoints de IA del formulario.
 | `GET /api/cron/simi/alertas-vencimiento` | Cron | `CRON_SECRET` **si existe** | — | Alertas | **Fail-open (H-05)** | Igual |
 
 Riesgos buscados: endpoints sin auth que devuelvan PII → **no** (los públicos
-están sanitizados); mutaciones sin rol → **H-02**; exportaciones sin permiso →
-**no**; errores que revelen datos internos → mensajes genéricos al usuario (bien);
-logs con PII → ver Parte 10.
+están sanitizados); mutaciones sin rol → H-02 implementado pendiente UAT;
+exportaciones sin permiso → **no**; errores que revelen datos internos →
+mensajes genéricos al usuario (bien); logs con PII → ver Parte 10.
 
 ---
 
@@ -296,11 +297,11 @@ la persona decide".
 | Trazabilidad de envío/fallo | **Cumple** | `registrarTrazabilidadNotificacion` (ENVIADA/FALLIDA) + flag `alertaNotificacionFallida`. |
 | Falla si SMTP cae | **Cumple (degradado)** | El radicado se persiste aunque el correo falle; se marca alerta. |
 | SPF/DKIM/DMARC | **No verificable en código** | Es configuración DNS del dominio `simacota-santander.gov.co`. Pendiente confirmar. |
-| Relay/abuso | **No cumple (H-02)** | `/api/interno/notificar-ciudadano` permite a cualquier interno enviar correo con destinatario y texto arbitrarios. |
+| Relay/abuso | **Mitigado; pendiente UAT (H-02)** | `/api/interno/notificar-ciudadano` ya bloquea campos libres del cliente, valida rol/tenant y toma destinatario/contenido del radicado. |
 
 **Recomendaciones:** configurar **SPF, DKIM y DMARC** en el DNS institucional;
-cerrar H-02 (tomar destinatario/contenido del radicado, validar rol); límite de
-correos por usuario/hora; tablero de rebotes y fallos.
+aprobar UAT de H-02; evaluar límite de correos por usuario/hora; tablero de
+rebotes y fallos.
 
 ---
 
@@ -374,7 +375,7 @@ riesgo lo amerite.
 | Fuerza bruta al login | Firebase Auth (límites propios) | Bajo-Medio | MFA + monitoreo de intentos |
 | Spam a SIMI / IA | Límite por IP/uid en memoria | Medio (costo Gemini) | Límite distribuido + presupuesto |
 | Abuso de subida de archivos | 3 × 5 MB validado | Medio (H-08) | Magic bytes + antivirus |
-| Abuso de correos | `/notificar-ciudadano` abierto (H-02); cron fail-open (H-05) | **Alto** | Cerrar H-02/H-05 + límite de correos |
+| Abuso de correos | H-02 implementado pendiente UAT; cron fail-open (H-05) | **Alto** | Aprobar UAT H-02; cerrar H-05 + evaluar límite de correos |
 | `/api/ai/log` abierto | Sin auth (H-04) | Medio (costo/almacenamiento) | Auth + límite |
 | Exportaciones pesadas | Carga grande (H-12) | Medio | Fecha obligatoria + paginación |
 
@@ -498,7 +499,7 @@ revisar consumo mensual de Firestore y Gemini.
 | ID | Área | Riesgo | Impacto | Probabilidad | Nivel | Evidencia | Recomendación | Prioridad | Esfuerzo | Estado |
 |----|------|--------|---------|--------------|-------|-----------|---------------|-----------|----------|--------|
 | H-01 | Acceso | Descarga de adjuntos sin validar tenant/rol | Alto | Media | **Alto** | `app/api/interno/archivo/route.ts` | Verificar radicado→tenant→rol antes de firmar URL | **P1** | Bajo | ✅ **Corregido (Sprint Seguridad P1-01)** |
-| H-02 | Acceso/Correo | Notificar al ciudadano sin rol/tenant; datos del cliente | Alto | Media | **Alto** | `app/api/interno/notificar-ciudadano/route.ts` | Tomar datos del radicado; validar rol/tenant | **P1** | Bajo | Abierto |
+| H-02 | Acceso/Correo | Notificar al ciudadano sin rol/tenant; datos del cliente | Alto | Media | **Alto** | `app/api/interno/notificar-ciudadano/route.ts` | Tomar datos del radicado; validar rol/tenant | **P1** | Bajo | Implementado; pendiente UAT |
 | H-03 | Privacidad | Consulta pública enumerable | Medio-Alto | Alta | **Alto** | `app/api/consulta/[id]`, `public/radicado/consulta` | Verificación obligatoria + rate-limit | **P1** | Medio | Implementado; pendiente UAT |
 | H-04 | Abuso | `/api/ai/log` sin auth | Medio | Media | Medio | `app/api/ai/log/route.ts` | Auth + límite | **P2** | Bajo | Abierto |
 | H-05 | Config | Cron fail-open sin `CRON_SECRET` | Medio | Media | Medio | `cron/*/route.ts` | Exigir secreto siempre | **P2** | Bajo | Abierto |
@@ -519,8 +520,8 @@ revisar consumo mensual de Firestore y Gemini.
 # PARTE 19 — Plan de acción recomendado
 
 ### Acciones inmediatas (esta semana)
-- **H-01** Validar dependencia/rol antes de entregar adjuntos.
-- **H-02** Asegurar que `notificar-ciudadano` use datos del radicado y valide rol/tenant.
+- **H-01** Validar dependencia/rol antes de entregar adjuntos. ✅ Corregido.
+- **H-02** Asegurar que `notificar-ciudadano` use datos del radicado y valide rol/tenant. 🟡 Implementado, pendiente UAT.
 - **H-05** Hacer obligatorio `CRON_SECRET` (fail-closed).
 - **H-04** Cerrar o autenticar `/api/ai/log`.
 
@@ -558,17 +559,16 @@ revisar consumo mensual de Firestore y Gemini.
 internas (UAT) pueden realizarse de inmediato con usuarios reales de la Alcaldía.
 
 **¿Está listo para publicación ciudadana masiva?**
-**Todavía no, sin antes cerrar los P1.** El sistema funciona, pero hay tres
-puntos que deben corregirse antes de abrirlo masivamente al público.
+**Todavía no, sin aprobar UAT de los P1 y cerrar los P2 recomendados de borde.**
+El sistema funciona y los tres P1 ya tienen corrección/implementación, pero no
+deben marcarse como cierre definitivo hasta validar UAT.
 
 **Bloqueantes reales (cerrar antes del lanzamiento masivo):**
-1. **H-01** — un usuario interno puede descargar adjuntos de otra dependencia o
-   de solicitudes anónimas/reservadas.
-2. **H-02** — cualquier usuario interno puede enviar correo institucional con
-   destinatario y contenido arbitrarios (incluido Control Interno, que no debería
-   responder).
-3. **H-03** — la consulta pública es enumerable: con números secuenciales se
-   podría recorrer estados y respuestas de otros ciudadanos.
+1. **H-01** — corregido: descarga de adjuntos con validación de rol/dependencia.
+2. **H-02** — implementado, pendiente UAT: notificación ciudadana con rol,
+   dependencia y datos tomados del radicado.
+3. **H-03** — implementado, pendiente UAT: consulta pública con segundo factor,
+   rate limit y respuestas anti-enumeración.
 
 Recomendado también antes del lanzamiento: **H-05** (cron), **H-04** (ai/log),
 **H-07** (cabeceras) y confirmar **SPF/DKIM/DMARC**.
