@@ -846,10 +846,10 @@ function TarjetasMIPG({
               color: modoCompacto ? 'white' : '#14532D',
               borderColor: '#14532D',
             }}
-            title={modoCompacto ? 'Mostrar Bandeja Operativa y Siguiente Atención' : 'Ocultar paneles operativos y ampliar la lista de radicados'}
+            title={modoCompacto ? 'Mostrar Bandeja Operativa y Siguiente Atención' : 'Minimizar paneles operativos y ampliar la lista de radicados'}
             aria-pressed={modoCompacto}
           >
-            {modoCompacto ? 'Mostrar paneles' : 'Ocultar paneles'}
+            {modoCompacto ? 'Mostrar paneles' : 'Minimizar paneles'}
           </button>
         )}
 
@@ -927,13 +927,19 @@ function PanelOperacionDependencia({
   radicados,
   onSeleccionar,
   onFiltroChange,
-  modoCompacto = false,
+  bandejaMinimizada,
+  siguienteMinimizada,
+  onToggleBandeja,
+  onToggleSiguiente,
 }: {
   usuario: UsuarioAutenticado;
   radicados: VentanillaRadicado[];
   onSeleccionar: (r: VentanillaRadicado) => void;
   onFiltroChange: (f: FiltroMIPG) => void;
-  modoCompacto?: boolean;
+  bandejaMinimizada: boolean;
+  siguienteMinimizada: boolean;
+  onToggleBandeja: () => void;
+  onToggleSiguiente: () => void;
 }) {
   const resumen = useMemo(() => calcularResumenBandeja(radicados), [radicados]);
   const siguiente = resumen.siguiente;
@@ -942,17 +948,36 @@ function PanelOperacionDependencia({
     : NOMBRES_TENANT[usuario.tenantId];
   const dias = siguiente ? calcDiasRestantes(siguiente) : null;
 
-  // En modo compacto se reducen padding y se oculta la tarjeta de
-  // "Siguiente atención sugerida" para liberar altura al listado.
-  const wrapCls = modoCompacto
-    ? 'px-3 sm:px-4 py-1.5 shrink-0 bg-[#F8FAF7]'
-    : 'px-3 sm:px-4 py-3 shrink-0 bg-[#F8FAF7]';
-  const innerPad = modoCompacto ? 'px-3 py-2' : 'px-4 py-3';
+  const ambosMinimizados = bandejaMinimizada && siguienteMinimizada;
   return (
-    <section className={wrapCls} style={{ borderBottom: '1px solid #D9E2D9' }}>
-      <div className={modoCompacto ? '' : 'grid grid-cols-1 lg:grid-cols-[minmax(0,1.2fr)_minmax(0,1.8fr)] gap-3'}>
+    <section
+      className={`shrink-0 bg-[#F8FAF7] px-3 sm:px-4 ${ambosMinimizados ? 'py-1.5' : 'py-3'}`}
+      style={{ borderBottom: '1px solid #D9E2D9' }}
+    >
+      <div className="grid grid-cols-1 lg:grid-cols-[minmax(0,1.2fr)_minmax(0,1.8fr)] gap-2 sm:gap-3">
         {/* Panel bandeja */}
-        <div className={`micro-card-read rounded-xl ${innerPad} bg-white`} style={{ border: '1px solid #D9E2D9', boxShadow: '0 1px 3px rgba(20,83,45,0.06)' }}>
+        {bandejaMinimizada ? (
+          <div
+            className="min-h-12 rounded-xl bg-white px-3 py-2 flex items-center justify-between gap-3 overflow-hidden"
+            style={{ border: '1px solid #D9E2D9' }}
+          >
+            <p className="min-w-0 truncate text-xs font-semibold" style={{ color: '#1F2933' }}>
+              <span className="font-black" style={{ color: '#14532D' }}>{nombreAmbito}</span>
+              <span style={{ color: '#667085' }}> · {resumen.totalActivos} activos · </span>
+              <span style={{ color: resumen.vencidos > 0 ? '#B91C1C' : '#667085' }}>{resumen.vencidos} vencidos</span>
+            </p>
+            <button
+              type="button"
+              onClick={onToggleBandeja}
+              className="shrink-0 min-h-9 rounded-lg border px-3 text-xs font-bold focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-700/30"
+              style={{ borderColor: '#D9E2D9', color: '#14532D', background: '#F8FAF7' }}
+              aria-expanded="false"
+            >
+              Mostrar
+            </button>
+          </div>
+        ) : (
+        <div className="micro-card-read rounded-xl px-4 py-3 bg-white" style={{ border: '1px solid #D9E2D9', boxShadow: '0 1px 3px rgba(20,83,45,0.06)' }}>
           <div className="flex items-start justify-between gap-3">
             <div className="min-w-0">
               <p className="text-[10px] font-black uppercase tracking-widest" style={{ color: '#667085' }}>
@@ -962,10 +987,21 @@ function PanelOperacionDependencia({
                 {nombreAmbito}
               </h2>
             </div>
-            <span className="shrink-0 rounded-full px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider border"
-                  style={{ background: '#EEF4EE', color: '#14532D', borderColor: '#D9E2D9' }}>
-              {usuario.rol}
-            </span>
+            <div className="shrink-0 flex items-center gap-2">
+              <span className="rounded-full px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider border"
+                    style={{ background: '#EEF4EE', color: '#14532D', borderColor: '#D9E2D9' }}>
+                {usuario.rol}
+              </span>
+              <button
+                type="button"
+                onClick={onToggleBandeja}
+                className="min-h-9 rounded-lg px-2.5 text-[11px] font-bold"
+                style={{ color: '#14532D', background: '#F8FAF7', border: '1px solid #D9E2D9' }}
+                aria-expanded="true"
+              >
+                Minimizar
+              </button>
+            </div>
           </div>
 
           <div className="mt-3 grid grid-cols-3 sm:grid-cols-5 gap-2">
@@ -993,9 +1029,32 @@ function PanelOperacionDependencia({
             ))}
           </div>
         </div>
+        )}
 
-        {/* Panel siguiente acción — oculto en modo compacto */}
-        {!modoCompacto && (
+        {/* Panel siguiente acción */}
+        {siguienteMinimizada ? (
+          <div
+            className="min-h-12 rounded-xl bg-white px-3 py-2 flex items-center justify-between gap-3 overflow-hidden"
+            style={{ border: '1px solid #D9E2D9' }}
+          >
+            <p className="min-w-0 truncate text-xs font-semibold" style={{ color: '#1F2933' }}>
+              <span className="font-black" style={{ color: '#14532D' }}>Siguiente atención</span>
+              <span style={{ color: dias !== null && dias < 0 ? '#B91C1C' : '#667085' }}>
+                {' · '}{mensajeSiguienteAccion(siguiente)}
+              </span>
+              {siguiente && <span className="font-mono" style={{ color: '#667085' }}> · {siguiente.radicadoId}</span>}
+            </p>
+            <button
+              type="button"
+              onClick={onToggleSiguiente}
+              className="shrink-0 min-h-9 rounded-lg border px-3 text-xs font-bold focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-700/30"
+              style={{ borderColor: '#D9E2D9', color: '#14532D', background: '#F8FAF7' }}
+              aria-expanded="false"
+            >
+              Mostrar
+            </button>
+          </div>
+        ) : (
         <div className="micro-card-read rounded-xl px-4 py-3 bg-white" style={{ border: '1px solid #D9E2D9', boxShadow: '0 1px 3px rgba(20,83,45,0.06)' }}>
           <div className="flex items-start justify-between gap-3">
             <div className="min-w-0">
@@ -1012,6 +1071,16 @@ function PanelOperacionDependencia({
                 {mensajeSiguienteAccion(siguiente)}
               </p>
             </div>
+            <div className="shrink-0 flex items-center gap-2">
+              <button
+                type="button"
+                onClick={onToggleSiguiente}
+                className="min-h-9 rounded-lg px-2.5 text-[11px] font-bold"
+                style={{ color: '#14532D', background: '#F8FAF7', border: '1px solid #D9E2D9' }}
+                aria-expanded="true"
+              >
+                Minimizar
+              </button>
             {siguiente && (
               <button
                 type="button"
@@ -1022,6 +1091,7 @@ function PanelOperacionDependencia({
                 Abrir
               </button>
             )}
+            </div>
           </div>
 
           {siguiente ? (
@@ -3201,7 +3271,14 @@ function DashboardInterior({ usuario, cerrarSesion }: { usuario: UsuarioAutentic
   const tienePermisoRadicar = puedeRadicar(usuario);
   const tienePermisoBandeja = puedeUsarBandejaAsignacion(usuario);
   const [busquedaAvanzadaAbierta, setBusquedaAvanzadaAbierta] = useState(false);
-  const { modo: indicadoresModo, toggle: toggleIndicadoresModo } = useIndicadoresModo();
+  const {
+    modo: indicadoresModo,
+    toggle: toggleIndicadoresModo,
+    bandejaMinimizada,
+    siguienteMinimizada,
+    toggleBandeja,
+    toggleSiguiente,
+  } = useIndicadoresModo();
   const indicadoresCompactos = indicadoresModo === 'compacto';
   /** Roles de solo lectura: pueden ver pero no ejecutar acciones sobre radicados. */
   const esVistaReadOnly = usuario.rol === 'JEFE_DEPENDENCIA' || usuario.rol === 'CONTROL_INTERNO';
@@ -3408,7 +3485,7 @@ function DashboardInterior({ usuario, cerrarSesion }: { usuario: UsuarioAutentic
           <>
             {/* Dashboard PQRSD compacto — vencimientos y riesgo.
                 En modo "compacto" se oculta para dar más altura al listado. */}
-            {esAdmin && !indicadoresCompactos && (
+            {esAdmin && (
               <div className="px-4 py-3 bg-white shrink-0" style={{ borderBottom: '1px solid #D9E2D9' }}>
                 <p className="text-[9px] font-bold uppercase tracking-widest mb-2" style={{ color: '#14532D' }}>
                   Semáforo PQRSD
@@ -3433,14 +3510,16 @@ function DashboardInterior({ usuario, cerrarSesion }: { usuario: UsuarioAutentic
               onToggleCompacto={toggleIndicadoresModo}
             />
 
-            {!indicadoresCompactos && (
-              <PanelOperacionDependencia
-                usuario={usuario}
-                radicados={todosLosRadicados}
-                onFiltroChange={(f) => dispatch({ type: 'SET_FILTRO_MIPG', filtro: f })}
-                onSeleccionar={(r) => dispatch({ type: 'SELECCIONAR_RADICADO', radicado: r })}
-              />
-            )}
+            <PanelOperacionDependencia
+              usuario={usuario}
+              radicados={todosLosRadicados}
+              onFiltroChange={(f) => dispatch({ type: 'SET_FILTRO_MIPG', filtro: f })}
+              onSeleccionar={(r) => dispatch({ type: 'SELECCIONAR_RADICADO', radicado: r })}
+              bandejaMinimizada={bandejaMinimizada}
+              siguienteMinimizada={siguienteMinimizada}
+              onToggleBandeja={toggleBandeja}
+              onToggleSiguiente={toggleSiguiente}
+            />
 
             {/* Tabla maestra */}
             <TablaRadicados
