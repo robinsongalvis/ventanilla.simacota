@@ -32,6 +32,15 @@ describe('Panel de Alertas Predictivas — navegación Ver radicado', () => {
     expect(dashboard).toContain('panelDerechoAbierto');
   });
 
+  it('al cerrar el panel elimina radicadoId de la URL para evitar reapertura automática', () => {
+    expect(dashboard).toContain('const cerrarPanelDerecho = useCallback(() => {');
+    expect(dashboard).toContain("params.delete('radicadoId')");
+    expect(dashboard).toContain("router.replace(query ? `/interno/dashboard?${query}` : '/interno/dashboard'");
+    expect(dashboard).toContain("dispatch({ type: 'CERRAR_PANEL_DERECHO' })");
+    expect(dashboard).toContain('radicadoCerradoDesdeUrlRef.current === radicadoId');
+    expect(dashboard).toContain('onCerrar={cerrarPanelDerecho}');
+  });
+
   it('conserva permisos por rol/dependencia usando el stream filtrado', () => {
     expect(dashboard).toContain('todosLosRadicados.find((r) => r.radicadoId === id)');
     expect(hookRadicados).toContain("usuario.rol === 'ADMIN' || usuario.rol === 'CONTROL_INTERNO'");

@@ -2,7 +2,7 @@
 
 export const dynamic = 'force-dynamic';
 
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { collection, getDocs } from 'firebase/firestore';
 import { signInWithEmailAndPassword }     from 'firebase/auth';
@@ -3101,6 +3101,7 @@ function DashboardInterior({ usuario, cerrarSesion }: { usuario: UsuarioAutentic
   const [resumenData, setResumenData] = useState<ResumenDiarioData | null>(null);
   const [resumenModalAbierto, setResumenModalAbierto] = useState(false);
   const [errorAbrirRadicado, setErrorAbrirRadicado] = useState<string | null>(null);
+  const radicadoCerradoDesdeUrlRef = useRef<string | null>(null);
 
   const tieneAlertasResumen = (data: ResumenDiarioData | null) =>
     Boolean(data && Object.values(data.totales).some((valor) => typeof valor === 'number' && valor > 0));
@@ -3215,6 +3216,7 @@ function DashboardInterior({ usuario, cerrarSesion }: { usuario: UsuarioAutentic
     }
 
     setErrorAbrirRadicado(null);
+    radicadoCerradoDesdeUrlRef.current = null;
     if (actualizarUrl) {
       router.push(`/interno/dashboard?radicadoId=${encodeURIComponent(id)}`, { scroll: false });
     }
@@ -3223,6 +3225,18 @@ function DashboardInterior({ usuario, cerrarSesion }: { usuario: UsuarioAutentic
     setMenuMovilAbierto(false);
     return true;
   }, [dispatch, router, todosLosRadicados]);
+
+  const cerrarPanelDerecho = useCallback(() => {
+    const radicadoId = radicadoSeleccionado?.radicadoId ?? searchParams.get('radicadoId');
+    radicadoCerradoDesdeUrlRef.current = radicadoId;
+
+    const params = new URLSearchParams(searchParams.toString());
+    params.delete('radicadoId');
+    const query = params.toString();
+
+    router.replace(query ? `/interno/dashboard?${query}` : '/interno/dashboard', { scroll: false });
+    dispatch({ type: 'CERRAR_PANEL_DERECHO' });
+  }, [dispatch, radicadoSeleccionado?.radicadoId, router, searchParams]);
 
   /* Sincronizar radicado seleccionado con datos en tiempo real */
   useEffect(() => {
@@ -3235,6 +3249,7 @@ function DashboardInterior({ usuario, cerrarSesion }: { usuario: UsuarioAutentic
     if (cargando) return;
     const radicadoId = searchParams.get('radicadoId');
     if (!radicadoId) return;
+    if (radicadoCerradoDesdeUrlRef.current === radicadoId) return;
     if (radicadoSeleccionado?.radicadoId === radicadoId && panelDerechoAbierto) return;
     abrirRadicadoPorId(radicadoId, false);
   }, [
@@ -3457,7 +3472,7 @@ function DashboardInterior({ usuario, cerrarSesion }: { usuario: UsuarioAutentic
             <PanelDerecho
               radicado={radicadoSeleccionado}
               usuario={usuario}
-              onCerrar={() => dispatch({ type: 'CERRAR_PANEL_DERECHO' })}
+              onCerrar={cerrarPanelDerecho}
               soloLectura={esVistaReadOnly}
               modoAmplio={panelDerechoModo === 'amplio'}
               onToggleModo={togglePanelDerechoModo}
