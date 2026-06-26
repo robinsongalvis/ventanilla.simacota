@@ -830,6 +830,24 @@ function TarjetasMIPG({
   return (
     <div className={`${cls.wrap} shrink-0 bg-white`} style={{ borderBottom: '1px solid #D9E2D9' }}>
       <div className="flex gap-2 overflow-x-auto pb-0.5 items-center">
+        {/* Toggle Vista amplia de radicados */}
+        {onToggleCompacto && (
+          <button
+            type="button"
+            onClick={onToggleCompacto}
+            className="shrink-0 text-[10px] font-bold uppercase tracking-widest px-3 py-2 rounded-lg border focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-700/30"
+            style={{
+              background: modoCompacto ? '#14532D' : 'white',
+              color: modoCompacto ? 'white' : '#14532D',
+              borderColor: '#14532D',
+            }}
+            title={modoCompacto ? 'Mostrar Bandeja Operativa y Siguiente Atención' : 'Ocultar paneles operativos y ampliar la lista de radicados'}
+            aria-pressed={modoCompacto}
+          >
+            {modoCompacto ? 'Mostrar paneles' : 'Vista amplia'}
+          </button>
+        )}
+
         {/* Tarjeta TODOS */}
         <button
           onClick={() => onFiltroChange('TODOS')}
@@ -878,20 +896,6 @@ function TarjetasMIPG({
             </button>
           );
         })}
-
-        {/* Toggle Contraer / Expandir indicadores */}
-        {onToggleCompacto && (
-          <button
-            type="button"
-            onClick={onToggleCompacto}
-            className="shrink-0 ml-2 text-[10px] font-bold uppercase tracking-widest px-2 py-1 rounded-md border"
-            style={{ background: 'white', color: '#14532D', borderColor: '#D9E2D9' }}
-            title={modoCompacto ? 'Mostrar indicadores en tamaño completo' : 'Contraer indicadores para dar más espacio a la bandeja'}
-            aria-pressed={modoCompacto}
-          >
-            {modoCompacto ? 'Expandir indicadores' : 'Contraer indicadores'}
-          </button>
-        )}
 
         {/* Selector de dependencia (admin) */}
         {esAdmin && (
@@ -3416,13 +3420,14 @@ function DashboardInterior({ usuario, cerrarSesion }: { usuario: UsuarioAutentic
               onToggleCompacto={toggleIndicadoresModo}
             />
 
-            <PanelOperacionDependencia
-              usuario={usuario}
-              radicados={todosLosRadicados}
-              onFiltroChange={(f) => dispatch({ type: 'SET_FILTRO_MIPG', filtro: f })}
-              onSeleccionar={(r) => dispatch({ type: 'SELECCIONAR_RADICADO', radicado: r })}
-              modoCompacto={indicadoresCompactos}
-            />
+            {!indicadoresCompactos && (
+              <PanelOperacionDependencia
+                usuario={usuario}
+                radicados={todosLosRadicados}
+                onFiltroChange={(f) => dispatch({ type: 'SET_FILTRO_MIPG', filtro: f })}
+                onSeleccionar={(r) => dispatch({ type: 'SELECCIONAR_RADICADO', radicado: r })}
+              />
+            )}
 
             {/* Tabla maestra */}
             <TablaRadicados
