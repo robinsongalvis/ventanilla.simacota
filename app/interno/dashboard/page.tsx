@@ -49,6 +49,8 @@ import type { ResponsableFuncionario }        from '@/lib/actions/asignarRadicad
 import type { TrazabilidadRadicado, VentanillaRadicado } from '@/src/types/ventanilla';
 import type { UsuarioAutenticado }        from '@/lib/hooks/useAuth';
 import { buildOficioInstitucional } from '@/lib/respuesta-oficial/oficio-institucional';
+import { ResumenDiarioModal, type ResumenDiarioData } from '@/app/interno/dashboard/components/ResumenDiarioModal';
+
 
 /* ══════════════════════════════════════════════════════════════
    CONSTANTES
@@ -425,6 +427,7 @@ function SidebarNav({
   pendientesBandeja,
   pendientesAlertas,
   pendientesNotificacionFallida,
+  onAbrirResumen,
   className = '',
 }: {
   vistaActual: VistaActual;
@@ -435,6 +438,7 @@ function SidebarNav({
   pendientesBandeja: number;
   pendientesAlertas: number;
   pendientesNotificacionFallida: number;
+  onAbrirResumen: () => void;
   className?: string;
 }) {
   const LABEL_ROL: Record<string, string> = {
@@ -602,6 +606,19 @@ function SidebarNav({
         })}
       </nav>
 
+      {/* Resumen del Día */}
+      <div className="px-3 pt-1 pb-2">
+        <button
+          onClick={onAbrirResumen}
+          className="w-full flex items-center gap-2 px-3 py-2 rounded-xl border border-white/10 bg-white/[0.04] text-xs font-semibold text-slate-200 hover:bg-white/[0.07] active:scale-95 transition-all text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500/50"
+        >
+          <svg className="w-4 h-4 shrink-0 text-emerald-300" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+            <path strokeLinecap="round" strokeLinejoin="round" d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253" />
+          </svg>
+          Resumen del día
+        </button>
+      </div>
+
       {/* Usuario */}
       <div className="px-3 pb-3 pt-2" style={{ borderTop: '1px solid rgba(255,255,255,0.10)' }}>
         <div className="rounded-xl px-3 py-2.5 flex flex-col gap-2" style={{ background: 'rgba(0,0,0,0.20)' }}>
@@ -637,10 +654,12 @@ function MobileTopBar({
   usuario,
   vistaActual,
   onAbrirMenu,
+  onAbrirResumen,
 }: {
   usuario: UsuarioAutenticado;
   vistaActual: VistaActual;
   onAbrirMenu: () => void;
+  onAbrirResumen: () => void;
 }) {
   const vista = NAV_ITEMS.find((item) => item.vista === vistaActual)?.label
     ?? (vistaActual === 'SUPERVISION_IA'
@@ -682,6 +701,17 @@ function MobileTopBar({
               style={{ background: '#EEF4EE', color: '#14532D', borderColor: '#D9E2D9' }}>
           {rolCompacto[usuario.rol] ?? 'Func.'}
         </span>
+        <button
+          type="button"
+          onClick={onAbrirResumen}
+          className="shrink-0 flex h-9 w-9 items-center justify-center rounded-xl border border-emerald-500/30 bg-emerald-500/15 text-emerald-200 active:scale-95 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500/50"
+          title="Ver resumen del día"
+          aria-label="Ver resumen del día"
+        >
+          <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+            <path strokeLinecap="round" strokeLinejoin="round" d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9" />
+          </svg>
+        </button>
       </div>
     </header>
   );
@@ -3065,6 +3095,67 @@ const PANEL_MODO_KEY = 'panelDerechoModo';
 
 function DashboardInterior({ usuario, cerrarSesion }: { usuario: UsuarioAutenticado; cerrarSesion: () => Promise<void> }) {
   const [menuMovilAbierto, setMenuMovilAbierto] = useState(false);
+  const [resumenData, setResumenData] = useState<ResumenDiarioData | null>(null);
+  const [resumenModalAbierto, setResumenModalAbierto] = useState(false);
+
+  const tieneAlertasResumen = (data: ResumenDiarioData | null) =>
+    Boolean(data && Object.values(data.totales).some((valor) => typeof valor === 'number' && valor > 0));
+
+  // Carga inicial del resumen del día
+  useEffect(() => {
+    fetch('/api/interno/resumen-diario', { credentials: 'include' })
+      .then((res) => {
+        if (!res.ok) throw new Error('No fue posible cargar el resumen.');
+        return res.json();
+      })
+      .then((data) => {
+        setResumenData(data);
+        if (data.mostrar) {
+          setResumenModalAbierto(true);
+        }
+      })
+      .catch((err) => console.error('Error al cargar resumen diario:', err));
+  }, []);
+
+  const marcarResumenVisto = async () => {
+    if (!resumenData) return;
+    try {
+      const response = await fetch('/api/interno/resumen-diario/visto', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify({
+          fecha: resumenData.fecha,
+          cantidadAlertas: Object.values(resumenData.totales).reduce((a, b) => a + b, 0),
+        }),
+      });
+      if (response.ok) {
+        setResumenData(prev => prev ? { ...prev, mostrar: false } : null);
+      }
+    } catch (err) {
+      console.error('Error al marcar resumen como visto:', err);
+    }
+  };
+
+  const reabrirResumen = () => {
+    if (tieneAlertasResumen(resumenData)) {
+      setResumenModalAbierto(true);
+    } else {
+      fetch('/api/interno/resumen-diario', { credentials: 'include' })
+        .then((res) => {
+          if (!res.ok) throw new Error('No fue posible cargar el resumen.');
+          return res.json();
+        })
+        .then((data) => {
+          setResumenData(data);
+          if (tieneAlertasResumen(data)) {
+            setResumenModalAbierto(true);
+          }
+        })
+        .catch((err) => console.error('Error al recargar resumen diario:', err));
+    }
+  };
+
   // Preferencia persistente del usuario para el ancho del panel derecho en escritorio.
   // Móvil siempre ignora este valor (siempre full-screen como drawer).
   const [panelDerechoModo, setPanelDerechoModo] = useState<PanelDerechoModo>('normal');
@@ -3168,6 +3259,7 @@ function DashboardInterior({ usuario, cerrarSesion }: { usuario: UsuarioAutentic
         pendientesBandeja={radicadosPendientes.length}
         pendientesAlertas={pendientesAlertas}
         pendientesNotificacionFallida={pendientesNotificacionFallida}
+        onAbrirResumen={reabrirResumen}
       />
 
       {/* ── COLUMNA 2: Cuerpo central ──
@@ -3179,6 +3271,7 @@ function DashboardInterior({ usuario, cerrarSesion }: { usuario: UsuarioAutentic
           usuario={usuario}
           vistaActual={vistaActual}
           onAbrirMenu={() => setMenuMovilAbierto(true)}
+          onAbrirResumen={reabrirResumen}
         />
 
         {vistaActual === 'ANALYTICS' ? (
@@ -3364,8 +3457,21 @@ function DashboardInterior({ usuario, cerrarSesion }: { usuario: UsuarioAutentic
             pendientesBandeja={radicadosPendientes.length}
             pendientesAlertas={pendientesAlertas}
             pendientesNotificacionFallida={pendientesNotificacionFallida}
+            onAbrirResumen={reabrirResumen}
           />
         </div>
+      )}
+
+      {resumenModalAbierto && resumenData && (
+        <ResumenDiarioModal
+          data={resumenData}
+          userName={usuario.nombre}
+          userRol={usuario.rol}
+          onCerrar={() => setResumenModalAbierto(false)}
+          onFiltroMIPG={(f) => dispatch({ type: 'SET_FILTRO_MIPG', filtro: f })}
+          onVistaChange={(v) => dispatch({ type: 'SET_VISTA', vista: v })}
+          onCerrarDefinitivo={marcarResumenVisto}
+        />
       )}
     </div>
   );
