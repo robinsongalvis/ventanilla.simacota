@@ -3380,7 +3380,7 @@ function DashboardInterior({ usuario, cerrarSesion }: { usuario: UsuarioAutentic
           <JefeAprobacionesPanel usuarioRol={usuario.rol} />
         ) : vistaActual === 'ADMINISTRACION' ? (
           <div className="flex-1 flex overflow-hidden min-h-0">
-            <div className="flex-1 overflow-hidden min-h-0"><VistaAdministracion /></div>
+            <div className="min-w-0 flex-1 overflow-hidden min-h-0"><VistaAdministracion /></div>
             {esAdmin && (
               <div className="hidden xl:flex flex-col w-[420px] shrink-0 border-l" style={{ borderColor: '#D9E2D9' }}>
                 <SimiGobernanzaPanel usuario={usuario} />
