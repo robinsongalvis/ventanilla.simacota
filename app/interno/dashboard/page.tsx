@@ -2,7 +2,8 @@
 
 export const dynamic = 'force-dynamic';
 
-import { useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useRouter, useSearchParams } from 'next/navigation';
 import { collection, getDocs } from 'firebase/firestore';
 import { signInWithEmailAndPassword }     from 'firebase/auth';
 import { getFirebaseAuth, getDb }         from '@/lib/firebase';
@@ -3094,9 +3095,12 @@ type PanelDerechoModo = 'normal' | 'amplio';
 const PANEL_MODO_KEY = 'panelDerechoModo';
 
 function DashboardInterior({ usuario, cerrarSesion }: { usuario: UsuarioAutenticado; cerrarSesion: () => Promise<void> }) {
+  const router = useRouter();
+  const searchParams = useSearchParams();
   const [menuMovilAbierto, setMenuMovilAbierto] = useState(false);
   const [resumenData, setResumenData] = useState<ResumenDiarioData | null>(null);
   const [resumenModalAbierto, setResumenModalAbierto] = useState(false);
+  const [errorAbrirRadicado, setErrorAbrirRadicado] = useState<string | null>(null);
 
   const tieneAlertasResumen = (data: ResumenDiarioData | null) =>
     Boolean(data && Object.values(data.totales).some((valor) => typeof valor === 'number' && valor > 0));
@@ -3195,12 +3199,51 @@ function DashboardInterior({ usuario, cerrarSesion }: { usuario: UsuarioAutentic
   const { radicados: todosLosRadicados, cargando, error } =
     useVentanillaRadicados(usuario, tenantFiltro);
 
+  const abrirRadicadoPorId = useCallback((radicadoId: string | null | undefined, actualizarUrl = true): boolean => {
+    const id = radicadoId?.trim();
+    if (!id) {
+      setErrorAbrirRadicado('No fue posible abrir el radicado.');
+      console.warn('[dashboard] No fue posible abrir radicado: ID ausente.');
+      return false;
+    }
+
+    const radicado = todosLosRadicados.find((r) => r.radicadoId === id);
+    if (!radicado) {
+      setErrorAbrirRadicado('No fue posible abrir el radicado.');
+      console.warn('[dashboard] No fue posible abrir radicado dentro del alcance del usuario.', { radicadoId: id });
+      return false;
+    }
+
+    setErrorAbrirRadicado(null);
+    if (actualizarUrl) {
+      router.push(`/interno/dashboard?radicadoId=${encodeURIComponent(id)}`, { scroll: false });
+    }
+    dispatch({ type: 'SET_VISTA', vista: 'TABLERO' });
+    dispatch({ type: 'SELECCIONAR_RADICADO', radicado });
+    setMenuMovilAbierto(false);
+    return true;
+  }, [dispatch, router, todosLosRadicados]);
+
   /* Sincronizar radicado seleccionado con datos en tiempo real */
   useEffect(() => {
     if (todosLosRadicados.length > 0) {
       dispatch({ type: 'SYNC_RADICADO_SELECCIONADO', radicados: todosLosRadicados });
     }
   }, [todosLosRadicados, dispatch]);
+
+  useEffect(() => {
+    if (cargando) return;
+    const radicadoId = searchParams.get('radicadoId');
+    if (!radicadoId) return;
+    if (radicadoSeleccionado?.radicadoId === radicadoId && panelDerechoAbierto) return;
+    abrirRadicadoPorId(radicadoId, false);
+  }, [
+    abrirRadicadoPorId,
+    cargando,
+    panelDerechoAbierto,
+    radicadoSeleccionado?.radicadoId,
+    searchParams,
+  ]);
 
   useEffect(() => {
     if (!puedeAccederVista(usuario, vistaActual)) {
@@ -3285,7 +3328,7 @@ function DashboardInterior({ usuario, cerrarSesion }: { usuario: UsuarioAutentic
             radicados={todosLosRadicados}
             esAdmin={esAdmin}
             tenantIdUsuario={usuario.tenantId}
-            onVerRadicado={(r) => dispatch({ type: 'SELECCIONAR_RADICADO', radicado: r })}
+            onVerRadicado={(r) => abrirRadicadoPorId(r.radicadoId)}
           />
         ) : vistaActual === 'REPORTES' ? (
           <VistaReportes metricas={metricas} total={todosLosRadicados.length} radicados={todosLosRadicados} />
@@ -3384,6 +3427,16 @@ function DashboardInterior({ usuario, cerrarSesion }: { usuario: UsuarioAutentic
           </>
         )}
       </div>
+
+      {errorAbrirRadicado && (
+        <div
+          role="alert"
+          className="fixed left-1/2 top-4 z-[70] w-[calc(100%-2rem)] max-w-md -translate-x-1/2 rounded-xl border px-4 py-3 text-sm font-semibold shadow-lg"
+          style={{ background: '#FEF2F2', borderColor: '#FECACA', color: '#991B1B' }}
+        >
+          {errorAbrirRadicado}
+        </div>
+      )}
 
       {/* ── COLUMNA 3: Panel derecho — oculto en vistas de pantalla completa ── */}
       {vistaActual !== 'BANDEJA' && vistaActual !== 'DEPENDENCIAS'
