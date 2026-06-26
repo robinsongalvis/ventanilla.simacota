@@ -237,9 +237,9 @@ export function VistaAdministracion() {
   const totalPruebas = usuarios.filter((u) => u.tipoUsuario !== 'INSTITUCIONAL' && !u.archivado).length;
 
   return (
-    <div className="flex-1 overflow-y-auto" style={{ background: '#F8FAF7' }}>
+    <div className="flex h-full min-h-0 flex-1 flex-col overflow-hidden" style={{ background: '#F8FAF7' }}>
       {/* Header */}
-      <div className="px-4 sm:px-6 py-4 sm:py-6 bg-white" style={{ borderBottom: '1px solid #D9E2D9' }}>
+      <div className="shrink-0 px-4 sm:px-6 py-4 sm:py-6 bg-white" style={{ borderBottom: '1px solid #D9E2D9' }}>
         <div className="flex items-start justify-between gap-3">
           <div>
             <p className="text-[10px] font-bold uppercase tracking-widest mb-1" style={{ color: '#14532D' }}>
@@ -336,12 +336,12 @@ export function VistaAdministracion() {
 
       {/* Mensajes globales */}
       {error && (
-        <div className="mx-4 sm:mx-6 mt-4 px-4 py-3 rounded-lg text-sm" style={{ background: '#FEF2F2', border: '1px solid #FECACA', color: '#DC2626' }}>
+        <div className="mx-4 sm:mx-6 mt-4 shrink-0 px-4 py-3 rounded-lg text-sm" style={{ background: '#FEF2F2', border: '1px solid #FECACA', color: '#DC2626' }}>
           {error}
         </div>
       )}
       {msgGlobal && (
-        <div className="mx-4 sm:mx-6 mt-4 px-4 py-3 rounded-lg text-sm flex items-center justify-between"
+        <div className="mx-4 sm:mx-6 mt-4 shrink-0 px-4 py-3 rounded-lg text-sm flex items-center justify-between"
              style={msgGlobal.tipo === 'ok'
                ? { background: '#F0FDF4', border: '1px solid #BBF7D0', color: '#166534' }
                : { background: '#FEF2F2', border: '1px solid #FECACA', color: '#DC2626' }}>
@@ -353,7 +353,7 @@ export function VistaAdministracion() {
       )}
 
       {/* Tabla */}
-      <div className="px-4 sm:px-6 py-4">
+      <div className="min-h-0 flex-1 overflow-y-auto px-4 sm:px-6 py-4">
         {cargando ? (
           <div className="flex items-center justify-center gap-3 py-16" style={{ color: '#667085' }}>
             <span className="w-5 h-5 border-2 rounded-full animate-spin" style={{ borderColor: '#D9E2D9', borderTopColor: '#14532D' }} />
@@ -374,7 +374,7 @@ export function VistaAdministracion() {
         ) : (
           <div className="overflow-x-auto rounded-xl bg-white" style={{ border: '1px solid #D9E2D9', boxShadow: '0 1px 3px rgba(20,83,45,0.06)' }}>
             <table className="w-full text-left">
-              <thead>
+              <thead className="sticky top-0 z-10">
                 <tr style={{ background: '#EEF4EE', borderBottom: '1px solid #D9E2D9' }}>
                   {['', 'Nombre', 'Email', 'Cargo', 'Rol', 'Dependencia', 'Tipo', 'Último acceso', 'Estado', 'Acciones'].map((h) => (
                     <th key={h} className="px-4 py-3 text-[10px] font-bold uppercase tracking-widest" style={{ color: '#14532D' }}>
