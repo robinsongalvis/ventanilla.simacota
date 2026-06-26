@@ -142,6 +142,7 @@ function aplicarFiltroMIPG(
   else if (filtro === 'EN_TERMINO')              lista = lista.filter((r) => estaActivo(r) && calcDiasRestantes(r) > 2);
   else if (filtro === 'POR_VENCER')              lista = lista.filter((r) => { const d = calcDiasRestantes(r); return estaActivo(r) && d >= 0 && d <= 2; });
   else if (filtro === 'VENCIDAS')                lista = lista.filter((r) => estaActivo(r) && calcDiasRestantes(r) < 0);
+  else if (filtro === 'CORREOS_FALLIDOS')        lista = lista.filter((r) => r.alertaNotificacionFallida === true);
   else if (filtro === 'DEVUELTAS_PRORROGA')      lista = lista.filter((r) => ['DEVUELTO', 'PRORROGA'].includes(r.estadoActual));
   else if (filtro === 'RESUELTOS_FUERA_TERMINO') lista = lista.filter((r) => r.cumplioTermino === false);
 
@@ -428,6 +429,7 @@ function SidebarNav({
   pendientesBandeja,
   pendientesAlertas,
   pendientesNotificacionFallida,
+  onVerCorreosFallidos,
   onAbrirResumen,
   className = '',
 }: {
@@ -439,6 +441,7 @@ function SidebarNav({
   pendientesBandeja: number;
   pendientesAlertas: number;
   pendientesNotificacionFallida: number;
+  onVerCorreosFallidos: () => void;
   onAbrirResumen: () => void;
   className?: string;
 }) {
@@ -545,7 +548,9 @@ function SidebarNav({
       {/* Alerta operativa: correos institucionales fallidos sin gestionar */}
       {pendientesNotificacionFallida > 0 && (
         <div className="px-3 pt-1 pb-2">
-          <div
+          <button
+            type="button"
+            onClick={onVerCorreosFallidos}
             className="w-full flex items-center gap-2 px-3 py-2 rounded-xl text-[11px] font-semibold"
             style={{
               background: 'rgba(220,38,38,0.18)',
@@ -561,7 +566,7 @@ function SidebarNav({
             <span className="shrink-0 min-w-[20px] h-[18px] rounded-full bg-red-600 text-white text-[10px] font-black flex items-center justify-center px-1">
               {pendientesNotificacionFallida > 99 ? '99+' : pendientesNotificacionFallida}
             </span>
-          </div>
+          </button>
         </div>
       )}
 
@@ -844,7 +849,7 @@ function TarjetasMIPG({
             title={modoCompacto ? 'Mostrar Bandeja Operativa y Siguiente Atención' : 'Ocultar paneles operativos y ampliar la lista de radicados'}
             aria-pressed={modoCompacto}
           >
-            {modoCompacto ? 'Mostrar paneles' : 'Vista amplia'}
+            {modoCompacto ? 'Mostrar paneles' : 'Ocultar paneles'}
           </button>
         )}
 
@@ -3306,6 +3311,13 @@ function DashboardInterior({ usuario, cerrarSesion }: { usuario: UsuarioAutentic
     setMenuMovilAbierto(false);
   }
 
+  function verCorreosFallidos() {
+    dispatch({ type: 'SET_VISTA', vista: 'TABLERO' });
+    dispatch({ type: 'SET_FILTRO_MIPG', filtro: 'CORREOS_FALLIDOS' });
+    dispatch({ type: 'SET_BUSQUEDA', busqueda: '' });
+    setMenuMovilAbierto(false);
+  }
+
   return (
     <div className="flex h-[100dvh] overflow-hidden" style={{ background: '#F8FAF7' }}>
       {/* ── COLUMNA 1: Sidebar de navegación ── */}
@@ -3321,6 +3333,7 @@ function DashboardInterior({ usuario, cerrarSesion }: { usuario: UsuarioAutentic
         pendientesBandeja={radicadosPendientes.length}
         pendientesAlertas={pendientesAlertas}
         pendientesNotificacionFallida={pendientesNotificacionFallida}
+        onVerCorreosFallidos={verCorreosFallidos}
         onAbrirResumen={reabrirResumen}
       />
 
@@ -3530,6 +3543,7 @@ function DashboardInterior({ usuario, cerrarSesion }: { usuario: UsuarioAutentic
             pendientesBandeja={radicadosPendientes.length}
             pendientesAlertas={pendientesAlertas}
             pendientesNotificacionFallida={pendientesNotificacionFallida}
+            onVerCorreosFallidos={verCorreosFallidos}
             onAbrirResumen={reabrirResumen}
           />
         </div>
