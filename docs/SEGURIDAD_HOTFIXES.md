@@ -4,6 +4,38 @@ Este documento registra las correcciones aplicadas a los hallazgos del informe
 [Auditoría integral](AUDITORIA_SEGURIDAD_DATOS_ESCALABILIDAD.md). Sirve como
 historial vivo del avance hacia el go-live.
 
+## Estado general (actualizado tras PRs #30, #31, #32)
+
+Tabla de avance real al momento de esta actualización. **Implementado
+técnicamente** significa que el código está en `main` y verificado por tests
+automatizados; **no equivale a aprobación institucional** ni cierra el go-live
+por sí solo.
+
+| Hallazgo | Código en `main` | Validación humana | Estado bitácora |
+|---|:-:|---|---|
+| H-01 | ✅ PR #16 | ✅ aceptado en auditoría | ✅ Corregido |
+| H-02 | ✅ PR #18 | ⏳ matriz publicada, sin ejecutar | 🟡 Pendiente UAT |
+| H-03 | ✅ PR #17 | ⏳ matriz publicada, sin ejecutar | 🟡 Pendiente UAT |
+| H-04 | ✅ PR #19 | ⏳ matriz publicada, sin ejecutar | 🟡 Pendiente UAT |
+| H-05 | ✅ PR #19 | ⏳ matriz publicada, sin ejecutar | 🟡 Pendiente UAT |
+| H-07 | ✅ PR #19 (CSP Report-Only) | ⏳ matriz + observación 7 días | 🟡 Pendiente UAT + Enforce |
+| H-08 | ✅ PR #32 | ⏳ tests automatizados; sin UAT manual | 🟠 Implementado técnicamente |
+| H-10 | ✅ PR #30 | ✅ tests automatizados | 🟠 Implementado técnicamente |
+| H-11 | ✅ PR #31 (v1 + v2.2) | ✅ tests automatizados | 🟠 Implementado técnicamente; pendiente DPA institucional |
+
+> **Nota institucional.** La plataforma está lista para uso interno y UAT en
+> Preview, pero **NO queda autorizada aún para go-live ciudadano masivo** hasta
+> cerrar:
+>
+> - UAT firmadas por los tres roles (Seguridad técnico, Ventanilla Única,
+>   Responsable UAT) de las matrices H-02, H-03 y H-04/H-05/H-07.
+> - Verificación de **SPF / DKIM / DMARC** del dominio
+>   `simacota-santander.gov.co` con mxtoolbox.
+> - Publicación de la **Política de Tratamiento de Datos** declarando uso de
+>   IA (Gemini) y nube (Firebase, Vercel), enlazada desde `/radicacion`.
+> - **Observación CSP Report-Only ≥ 7 días sin violaciones** y promoción a
+>   `Content-Security-Policy` (Enforce).
+
 ---
 
 ## H-04, H-05 y H-07 — Hardening de producción
@@ -370,3 +402,222 @@ hallazgo solo debe pasar a ✅ Corregido después de aprobarla.
   dato de verificación no aparece en URL ni en logs del navegador.
 - Búsqueda de secretos: solo variables/placeholders documentales ya existentes;
   no se añadieron credenciales.
+
+---
+
+## H-08 — Validación de adjuntos por firma real
+
+**Estado:** 🟠 Implementado técnicamente en `main` — pendiente UAT manual.
+**Severidad original:** P2 — Medio.
+**Referencia:** PR #32 (commit `e304c81`), rama `fix/seguridad-h08-magic-bytes`.
+**Archivos:**
+- `lib/seguridad/magic-bytes.ts` *(nuevo, helper puro)*
+- `__tests__/magic-bytes.test.ts` *(nuevo, 15 tests)*
+- `app/api/radicacion/route.ts` *(integración del verificador y allowlist ampliada)*
+- `app/radicacion/page.tsx` *(selector permite `.docx` y `.xlsx`)*
+
+### Qué se hizo
+
+Se reforzó la validación de archivos en la radicación pública. El control
+anterior dependía únicamente del `Content-Type` declarado por el navegador,
+trivialmente falsificable.
+
+Controles agregados:
+
+1. **PDF / JPG / PNG** se validan por firma de prefijo:
+   `%PDF-`, `FFD8FF`, `89504E470D0A1A0A`.
+2. **DOCX / XLSX** se validan por estructura interna del contenedor ZIP:
+   - Firma `PK\x03\x04` al inicio.
+   - Entrada `[Content_Types].xml` presente.
+   - Al menos una entrada bajo `word/` (DOCX) o `xl/` (XLSX).
+   - **Ausencia** de `vbaProject.bin` (rechaza DOCM/XLSM disfrazados).
+3. Lista de tipos permitidos ampliada explícitamente a 5 MIMEs concretos.
+4. Selector `<input accept="...">` actualizado para permitir `.docx,.xlsx`.
+
+### Tipos rechazados
+
+`DOC`, `XLS` (formatos OLE legacy), `DOCM`, `XLSM` (macros), `ZIP` genérico,
+`RAR`, `EXE`, `HTML`, `JS`, cualquier binario con `Content-Type` falsificado.
+
+### Decisiones de scope
+
+- **Sin antivirus** todavía. Solo magic bytes y estructura.
+- **Sin dependencias externas** (no se agregó `jszip` ni `adm-zip`). Parseo
+  manual de local headers, acotado a 500 entradas escaneadas por archivo.
+- Solo radicación pública. Endpoints internos de respuesta (subidas por
+  funcionarios autenticados) quedan **fuera del scope inicial**.
+- Sin cambios en `storage.rules`. El flujo público va por Admin SDK que ignora
+  reglas; las reglas son defensa-en-profundidad para uploads cliente→Storage
+  directos que hoy no existen.
+
+### Tests
+
+15 tests automatizados (`__tests__/magic-bytes.test.ts`):
+
+- 7 de formatos simples: PDF/JPG/PNG válidos, mismatch tipo vs. contenido,
+  buffer vacío, tipos no soportados.
+- 8 de DOCX/XLSX: válidos sintéticos, rechazo de `vbaProject.bin`, ZIP sin
+  estructura Office, ZIP sin `[Content_Types].xml`, no-ZIP declarado como
+  DOCX, lista de 5 tipos permitidos.
+
+Helper de fixtures ZIP (`buildZipConFiles`) sin dependencias externas.
+
+### Pendiente
+
+Este hallazgo solo debe pasar a ✅ Corregido después de:
+
+- UAT manual del flujo de radicación pública con archivos reales:
+  - PDF, JPG, PNG legítimos → aceptados.
+  - DOCX, XLSX legítimos → aceptados.
+  - Archivos disfrazados (binario renombrado, DOCM disfrazado de DOCX) →
+    rechazados con mensaje uniforme.
+- Decisión institucional sobre fase 2 (antivirus, endpoints internos de
+  respuesta, actualización de `storage.rules` si se habilita upload directo
+  cliente→Storage).
+
+---
+
+## H-10 — Reglas Firestore: Jefe de Dependencia restringido por tenant
+
+**Estado:** 🟠 Implementado técnicamente en `main` — cubierto por tests
+unitarios. Pendiente registro formal post-revisión.
+**Severidad original:** P2 — Medio.
+**Referencia:** PR #30 (commit `724bd16`), rama `fix/seguridad-h10-jefe-tenant`.
+**Archivos:**
+- `firestore.rules` (3 líneas modificadas + comentario preventivo)
+- `lib/control-interno/permisos.ts` *(función nueva `puedeLeerRegistroControlInternoEnTenant`)*
+- `__tests__/control-interno-riesgos.test.ts` *(5 tests nuevos)*
+
+### Qué se hizo
+
+Se cerró la brecha de lectura cross-tenant en las colecciones
+`control_interno_hallazgos` y `control_interno_planes_mejora`. La regla
+anterior permitía a cualquier `JEFE_DEPENDENCIA` leer registros de **todas**
+las dependencias mediante SDK directo, aunque las APIs server-side sí
+filtraban correctamente.
+
+Reglas nuevas:
+
+| Rol | `control_interno_hallazgos` | `control_interno_planes_mejora` |
+|---|---|---|
+| `ADMIN` | Global | Global |
+| `CONTROL_INTERNO` | Global | Global |
+| `JEFE_DEPENDENCIA` | Solo si `resource.data.tenantId == userTenant()` | Solo si `resource.data.tenantId == userTenant()` |
+| `FUNCIONARIO` | (sin acceso) | Solo si `tenantId == userTenant()` |
+| Otros / no autenticados | Denegado | Denegado |
+
+Escrituras siguen cerradas (`allow create, update, delete: if false`). Las
+mutaciones reales pasan por Admin SDK server-side que valida rol y tenant.
+
+### Comentario preventivo en la regla
+
+Se agregó en `firestore.rules` una advertencia: si en el futuro alguien
+consulta estas colecciones desde cliente como `JEFE_DEPENDENCIA` o
+`FUNCIONARIO`, la query debe incluir `.where('tenantId', '==', userTenant)`,
+porque Firestore evalúa `list` por documento y rechaza la consulta entera si
+no se prueba la condición.
+
+### Tests
+
+5 tests nuevos en `__tests__/control-interno-riesgos.test.ts`:
+
+1. ADMIN y CONTROL_INTERNO mantienen lectura global (regression guard).
+2. JEFE_DEPENDENCIA: positivo en su tenant, negativo cross-tenant.
+3. FUNCIONARIO: positivo en su tenant, negativo cross-tenant.
+4. Defensivo: `null/undefined` en tenant → niega.
+5. RECEPCIONISTA no lee estas colecciones.
+
+Los tests prueban la **función de aplicación** que espeja la regla. Para
+probar las reglas directamente se requeriría infraestructura
+`@firebase/rules-unit-testing` + Firebase emulator que el proyecto no tiene
+todavía. Esa infraestructura queda como **deuda separada**, no bloqueante.
+
+### Riesgo de regresión
+
+Verificado con `grep`: ninguna capa cliente lee estas colecciones
+directamente desde Firestore. Todas las lecturas pasan por Admin SDK
+server-side. Cambio más restrictivo, no más permisivo. Cero regresión
+esperada.
+
+### Pendiente
+
+- Para promoción a ✅ Corregido se sugiere observación 1-2 semanas en
+  producción sin reporte de falsos negativos por parte de jefes legítimos.
+- Implementación futura de `@firebase/rules-unit-testing` para test directo
+  de la regla (deuda separada).
+
+---
+
+## H-11 — Minimización de PII enviada a SIMI/Gemini
+
+**Estado:** 🟠 Implementado técnicamente en `main` (v1 + v2.2) — pendiente
+complemento institucional DPA con Google y Política de Tratamiento de Datos.
+**Severidad original:** P2 — Medio.
+**Referencia:** PR #31 (commit `95d15a1`), rama `fix/seguridad-h11-pii-simi`.
+**Archivos:**
+- `lib/seguridad/sanitizar-pii.ts` *(nuevo, helper puro)*
+- `__tests__/sanitizar-pii.test.ts` *(nuevo, 10 tests)*
+- `lib/simi/contexto-radicado.ts` *(ediciones quirúrgicas en 4 puntos)*
+- `__tests__/simi-confiable.test.ts` *(3 tests nuevos + 1 modificado)*
+
+### Qué se hizo
+
+**v1 — Omitir identidad directa del solicitante** (auditoría Parte 7).
+Para radicados identificados, el `bloqueTexto` que va al prompt de Gemini ya
+**no** incluye `solicitante.nombreCompleto` ni `solicitante.email`. En su
+lugar indica que existe una persona identificada y, si hay correo, declara
+"Canal de respuesta: correo electrónico registrado." sin exponer el valor.
+
+**v2.2 — Sanitización de PII en textos libres.** Se agregó
+`sanitizarPiiTextoSimi` que reemplaza patrones de alta confianza por
+placeholders neutros antes de enviarlos a Gemini:
+
+| Patrón | Reemplazo | Aplicado a |
+|---|---|---|
+| Correos electrónicos | `[CORREO]` | `asunto`, `descripcion`, `respuestaOficial.nota`, `trazabilidad.nota` |
+| Móviles colombianos (10 dígitos por 3, ±`+57`) | `[TELEFONO]` | igual |
+| Documentos con prefijo (CC, TI, NIT, cédula, ...) + dígitos | `<prefijo> [DOCUMENTO]` | igual |
+
+### Lo que NO se sanitiza (decisión consciente)
+
+- Números sin prefijo (riesgo de comer años, montos, códigos de radicado).
+- Teléfonos fijos (formato ambiguo).
+- Nombres propios y direcciones (requiere NER, fuera de scope).
+
+Trade-off: preferimos falsos negativos (algo de PII se cuela) sobre falsos
+positivos (texto del ciudadano destruido).
+
+### Lo que NO cambia
+
+- `meta.asunto`, `meta.descripcionResumen` y `trazabilidadResumida` siguen
+  conteniendo el texto **original sin sanitizar** — la UI interna y la
+  auditoría preservan los datos completos para que el funcionario pueda ver
+  lo que realmente escribió el ciudadano.
+- Casos anónimos y reservados: el placeholder genérico existente se mantiene
+  (tests previos siguen verdes).
+
+### Tests
+
+13 tests nuevos:
+
+- 10 unitarios del helper (`__tests__/sanitizar-pii.test.ts`): correos
+  comunes, no toca `@usuario` sin TLD, móviles con separadores y `+57`,
+  no toca radicados ni años ni montos, documentos con prefijo, no toca
+  números bare sin prefijo, combinaciones multi-PII, idempotencia,
+  null/undefined/vacío.
+- 3 de integración (`__tests__/simi-confiable.test.ts`): sanitización en
+  descripción, sanitización en respuesta oficial + trazabilidad, `meta`
+  no está sanitizada.
+
+### Pendiente institucional
+
+- **DPA con Google** que cubra el procesamiento de PII residual vía Gemini.
+  La sanitización reduce el riesgo pero no lo elimina: el texto del
+  ciudadano (descripción del PQRSD) sigue viajando al modelo y puede
+  contener datos personales que la sanitización no detecta (nombres
+  propios, direcciones, contextos específicos).
+- **Declaración explícita** en la Política de Tratamiento de Datos del uso
+  de IA y procesamiento por terceros.
+
+Hasta que estos dos puntos institucionales se cierren, este hallazgo se
+considera **implementado técnicamente** pero **no cerrado**.
