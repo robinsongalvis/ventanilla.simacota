@@ -10,6 +10,7 @@ import { generarAlertas, resumirAlertasPorNivel } from '@/lib/control-interno/al
 import {
   puedeAccederControlInterno,
   puedeCrearHallazgo,
+  puedeLeerRegistroControlInternoEnTenant,
   puedeReportarAvancePlan,
 } from '@/lib/control-interno/permisos';
 import { describirNivelRiesgo, generarRecomendacionesDia } from '@/lib/control-interno/recomendaciones';
@@ -178,6 +179,53 @@ describe('Permisos Control Interno', () => {
     expect(puedeReportarAvancePlan('FUNCIONARIO')).toBe(true);
     expect(puedeReportarAvancePlan('JEFE_DEPENDENCIA')).toBe(true);
     expect(puedeReportarAvancePlan('CONTROL_INTERNO')).toBe(false);
+  });
+
+  /* 14 — H-10: ADMIN y CONTROL_INTERNO mantienen lectura global */
+  it('ADMIN y CONTROL_INTERNO ven registros de cualquier dependencia', () => {
+    expect(puedeLeerRegistroControlInternoEnTenant({
+      rol: 'ADMIN', registroTenantId: 'SEC_GOBIERNO', userTenantId: 'SEC_PLANEACION',
+    })).toBe(true);
+    expect(puedeLeerRegistroControlInternoEnTenant({
+      rol: 'CONTROL_INTERNO', registroTenantId: 'SEC_GOBIERNO', userTenantId: 'VENTANILLA_UNICA',
+    })).toBe(true);
+  });
+
+  /* 15 — H-10: JEFE_DEPENDENCIA queda restringido a su tenant */
+  it('JEFE_DEPENDENCIA solo ve registros de su propia dependencia', () => {
+    expect(puedeLeerRegistroControlInternoEnTenant({
+      rol: 'JEFE_DEPENDENCIA', registroTenantId: 'SEC_GOBIERNO', userTenantId: 'SEC_GOBIERNO',
+    })).toBe(true);
+    expect(puedeLeerRegistroControlInternoEnTenant({
+      rol: 'JEFE_DEPENDENCIA', registroTenantId: 'SEC_PLANEACION', userTenantId: 'SEC_GOBIERNO',
+    })).toBe(false);
+  });
+
+  /* 16 — H-10: FUNCIONARIO sigue restringido a su tenant */
+  it('FUNCIONARIO solo ve registros de su propia dependencia', () => {
+    expect(puedeLeerRegistroControlInternoEnTenant({
+      rol: 'FUNCIONARIO', registroTenantId: 'SEC_GOBIERNO', userTenantId: 'SEC_GOBIERNO',
+    })).toBe(true);
+    expect(puedeLeerRegistroControlInternoEnTenant({
+      rol: 'FUNCIONARIO', registroTenantId: 'SEC_PLANEACION', userTenantId: 'SEC_GOBIERNO',
+    })).toBe(false);
+  });
+
+  /* 17 — H-10: defensivo contra null/undefined en tenant */
+  it('niega lectura si el tenant del registro o del usuario es null', () => {
+    expect(puedeLeerRegistroControlInternoEnTenant({
+      rol: 'JEFE_DEPENDENCIA', registroTenantId: null, userTenantId: 'SEC_GOBIERNO',
+    })).toBe(false);
+    expect(puedeLeerRegistroControlInternoEnTenant({
+      rol: 'JEFE_DEPENDENCIA', registroTenantId: 'SEC_GOBIERNO', userTenantId: null,
+    })).toBe(false);
+  });
+
+  /* 18 — H-10: RECEPCIONISTA no lee hallazgos ni planes */
+  it('RECEPCIONISTA no puede leer registros de Control Interno', () => {
+    expect(puedeLeerRegistroControlInternoEnTenant({
+      rol: 'RECEPCIONISTA', registroTenantId: 'SEC_GOBIERNO', userTenantId: 'SEC_GOBIERNO',
+    })).toBe(false);
   });
 });
 

@@ -320,18 +320,26 @@ service cloud.firestore {
     // ── Control Interno: hallazgos, planes de mejora, alertas y eventos ─
     // Todas las escrituras pasan por APIs server-side con Admin SDK que
     // validan rol, tenantId y dejan trazabilidad. Las reglas blindan
-    // el acceso de lectura (Control Interno y Admin ven todo).
+    // el acceso de lectura (Admin y Control Interno ven todo; Jefe y
+    // Funcionario solo su dependencia — H-10).
+    //
+    // ADVERTENCIA sobre 'list': Firestore evalúa la regla por documento,
+    // pero si el cliente lanza una query 'list' que NO filtra por
+    // tenantId, la consulta entera falla aunque algunos docs cumplan la
+    // regla. Si en el futuro se consulta desde cliente como
+    // JEFE_DEPENDENCIA o FUNCIONARIO, la query DEBE incluir
+    // .where('tenantId', '==', userTenant).
 
     match /control_interno_hallazgos/{hallazgoId} {
-      allow get, list: if isAdmin() || isControlInterno() || isJefeDependencia();
+      allow get, list: if isAdmin() || isControlInterno()
+        || (isJefeDependencia() && resource.data.tenantId == userTenant());
       allow create, update, delete: if false;
     }
 
     match /control_interno_planes_mejora/{planId} {
-      // Jefe de dependencia debe poder ver planes asignados a su tenant
-      // para reportar avances (la escritura pasa por API server-side).
-      allow get, list: if isAdmin() || isControlInterno() || isJefeDependencia()
-        || (isFuncionario() && resource.data.tenantId == userTenant());
+      allow get, list: if isAdmin() || isControlInterno()
+        || ((isJefeDependencia() || isFuncionario())
+            && resource.data.tenantId == userTenant());
       allow create, update, delete: if false;
     }
 

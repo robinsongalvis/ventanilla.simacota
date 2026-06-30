@@ -44,3 +44,22 @@ export function puedeExportarReporteControlInterno(rol: RolInterno): boolean {
 export function esRolSoloAuditoria(rol: RolInterno): boolean {
   return rol === 'CONTROL_INTERNO';
 }
+
+/**
+ * Refleja la regla Firestore de lectura para hallazgos y planes del
+ * Control Interno (H-10). Útil si alguna capa cliente valida antes de
+ * lanzar la query — la regla server siempre manda.
+ */
+export function puedeLeerRegistroControlInternoEnTenant(params: {
+  rol: RolInterno;
+  registroTenantId: string | null;
+  userTenantId: string | null;
+}): boolean {
+  if (params.rol === 'ADMIN' || params.rol === 'CONTROL_INTERNO') return true;
+  if (params.rol === 'JEFE_DEPENDENCIA' || params.rol === 'FUNCIONARIO') {
+    return params.registroTenantId != null
+      && params.userTenantId != null
+      && params.registroTenantId === params.userTenantId;
+  }
+  return false;
+}
