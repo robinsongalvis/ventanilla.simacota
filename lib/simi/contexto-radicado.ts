@@ -7,6 +7,7 @@ import type { RolInterno } from '@/lib/hooks/useAuth';
 import { NOMBRES_TENANT } from '@/src/types/reglas-negocio';
 import { diasRestantesHabiles } from '@/lib/tiempos-radicado';
 import { getTipoSolicitudById } from '@/lib/catalogos/tipos-solicitud';
+import { sanitizarPiiTextoSimi } from '@/lib/seguridad/sanitizar-pii';
 import { obtenerCompetencia } from './competencias-dependencias';
 import { evaluarCompetenciaRadicado, type EvaluacionCompetencia } from './evaluar-competencia';
 
@@ -138,8 +139,8 @@ export function construirContextoSimi(params: {
     ...(heredadoSistema || requiereValidacion
       ? ['- ADVERTENCIA: Este tipo fue heredado del sistema actual y requiere validación jurídica/institucional antes de usarse como criterio definitivo.']
       : []),
-    `- Asunto: ${r.detalle.asunto}`,
-    `- Descripción: ${r.detalle.descripcion}`,
+    `- Asunto: ${sanitizarPiiTextoSimi(r.detalle.asunto)}`,
+    `- Descripción: ${sanitizarPiiTextoSimi(r.detalle.descripcion)}`,
     `- Estado actual: ${r.estadoActual}`,
     `- Fecha de radicación: ${r.control.fechaRadicado}`,
     `- Fecha límite: ${r.termino.fechaVencimiento}`,
@@ -153,11 +154,18 @@ export function construirContextoSimi(params: {
     `- Tiene respuesta oficial registrada: ${r.respuestaOficial ? 'Sí' : 'No'}`,
   ];
 
-  if (!ocultarIdentidad) {
-    lineasContexto.push(`- Solicitante: ${r.solicitante.nombreCompleto}`);
-    if (r.solicitante.email) lineasContexto.push(`- Correo: ${r.solicitante.email}`);
-  } else {
+  if (ocultarIdentidad) {
     lineasContexto.push('- Solicitante: ANÓNIMO / RESERVADO — no menciones identidad, no inventes datos personales.');
+  } else {
+    // H-11: ciudadano identificado, pero NO se envían nombre ni correo al modelo.
+    // SIMI sólo necesita saber que hay una persona identificada (para diferenciarlo
+    // del caso anónimo) y, si aplica, que existe un canal de correo registrado.
+    lineasContexto.push(
+      '- Solicitante: persona ciudadana identificada (datos personales omitidos por privacidad — no inventes nombre ni correo).',
+    );
+    if (r.solicitante.email) {
+      lineasContexto.push('- Canal de respuesta: correo electrónico registrado.');
+    }
   }
 
   if (r.clasificacion.funcionarioResponsableNombre) {
@@ -167,7 +175,7 @@ export function construirContextoSimi(params: {
   }
 
   if (r.respuestaOficial?.nota) {
-    lineasContexto.push('', 'RESPUESTA OFICIAL PREVIA:', r.respuestaOficial.nota);
+    lineasContexto.push('', 'RESPUESTA OFICIAL PREVIA:', sanitizarPiiTextoSimi(r.respuestaOficial.nota));
   }
 
   const lineasCompetencia = [
@@ -188,7 +196,7 @@ export function construirContextoSimi(params: {
   const lineasTrazabilidad = [
     '',
     `TRAZABILIDAD RECIENTE (últimos ${trazaResumida.length} eventos)`,
-    ...trazaResumida.map((t) => `- ${t.fecha} · ${t.accion} · ${t.actorNombre} · ${t.nota}`),
+    ...trazaResumida.map((t) => `- ${t.fecha} · ${t.accion} · ${t.actorNombre} · ${sanitizarPiiTextoSimi(t.nota)}`),
   ];
 
   const lineasUsuario = [

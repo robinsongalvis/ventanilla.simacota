@@ -155,9 +155,23 @@ describe('construirContextoSimi — privacidad', () => {
 
   const usuarioBase = { rol: 'FUNCIONARIO' as const, tenantId: 'SEC_GOBIERNO' as const, nombre: 'Test User' };
 
-  it('incluye el nombre del solicitante cuando no es anónimo ni reservado', () => {
+  it('NO envía nombre ni correo del solicitante a Gemini, incluso si está identificado (H-11)', () => {
     const ctx = construirContextoSimi({ radicado: radicadoBase(), trazabilidad: [], usuario: usuarioBase });
-    expect(ctx.bloqueTexto).toContain('Juan García');
+    expect(ctx.bloqueTexto).not.toContain('Juan García');
+    expect(ctx.bloqueTexto).not.toContain('juan@example.com');
+  });
+
+  it('señala que el solicitante está identificado sin revelar datos personales (H-11)', () => {
+    const ctx = construirContextoSimi({ radicado: radicadoBase(), trazabilidad: [], usuario: usuarioBase });
+    expect(ctx.bloqueTexto).toMatch(/identificad/i);
+    expect(ctx.bloqueTexto).not.toContain('Juan García');
+    expect(ctx.bloqueTexto).not.toContain('juan@example.com');
+  });
+
+  it('declara canal "correo electrónico registrado" sin incluir el correo crudo (H-11)', () => {
+    const ctx = construirContextoSimi({ radicado: radicadoBase(), trazabilidad: [], usuario: usuarioBase });
+    expect(ctx.bloqueTexto).toContain('correo electrónico registrado');
+    expect(ctx.bloqueTexto).not.toContain('@example.com');
   });
 
   it('oculta el nombre del solicitante cuando esAnonimo es true', () => {
@@ -206,6 +220,53 @@ describe('construirContextoSimi — privacidad', () => {
     const ctx = construirContextoSimi({ radicado: radicadoVencido, trazabilidad: [], usuario: usuarioBase });
     expect(ctx.meta.estadoTermino).toBe('VENCIDO');
     expect(ctx.meta.diasRestantes).toBeLessThan(0);
+  });
+
+  it('sanitiza correo y móvil presentes en descripción antes de ir al bloqueTexto (H-11.2)', () => {
+    const ctx = construirContextoSimi({
+      radicado: radicadoBase({
+        detalle: {
+          asunto: 'Tema con email juan@example.com',
+          descripcion: 'Llámenme al 3001234567 o escriban a otro@dom.co',
+        },
+      }),
+      trazabilidad: [],
+      usuario: usuarioBase,
+    });
+    expect(ctx.bloqueTexto).not.toContain('juan@example.com');
+    expect(ctx.bloqueTexto).not.toContain('otro@dom.co');
+    expect(ctx.bloqueTexto).not.toContain('3001234567');
+    expect(ctx.bloqueTexto).toContain('[CORREO]');
+    expect(ctx.bloqueTexto).toContain('[TELEFONO]');
+  });
+
+  it('sanitiza también la trazabilidad y la respuesta oficial (H-11.2)', () => {
+    const ctx = construirContextoSimi({
+      radicado: radicadoBase({
+        respuestaOficial: { nota: 'Contactarse al 3009876543', fecha: '2026-06-29' },
+      }),
+      trazabilidad: [
+        { fecha: '2026-06-01T08:00:00Z', accion: 'RADICACION', actorNombre: 'Sistema', nota: 'CC 12345678 anexada' },
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      ] as any,
+      usuario: usuarioBase,
+    });
+    expect(ctx.bloqueTexto).not.toContain('3009876543');
+    expect(ctx.bloqueTexto).not.toContain('12345678');
+    expect(ctx.bloqueTexto).toContain('[TELEFONO]');
+    expect(ctx.bloqueTexto).toContain('[DOCUMENTO]');
+  });
+
+  it('meta NO está sanitizada (UI interna preserva texto original) (H-11.2)', () => {
+    const ctx = construirContextoSimi({
+      radicado: radicadoBase({
+        detalle: { asunto: 'Email original: x@y.com', descripcion: 'desc' },
+      }),
+      trazabilidad: [],
+      usuario: usuarioBase,
+    });
+    expect(ctx.meta.asunto).toContain('x@y.com');
+    expect(ctx.meta.asunto).not.toContain('[CORREO]');
   });
 });
 
