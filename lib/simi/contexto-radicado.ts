@@ -28,6 +28,23 @@ import { evaluarCompetenciaRadicado, type EvaluacionCompetencia } from './evalua
 const TRAZA_MAX_EVENTOS = 8;
 const TRAZA_NOTA_MAX    = 80;
 
+// H-16: delimitadores para marcar contenido no confiable (texto escrito por
+// ciudadano o funcionario). El system prompt reitera que estos bloques son
+// DATO, no instrucciones. Si el contenido los menciona literalmente, se
+// escapan a `<<` / `>>` para evitar fugas.
+const MARK_OPEN_CIUDADANO    = '<<<TEXTO_CIUDADANO_NO_CONFIABLE>>>';
+const MARK_CLOSE_CIUDADANO   = '<<<FIN_TEXTO_CIUDADANO>>>';
+const MARK_OPEN_FUNCIONARIO  = '<<<TEXTO_FUNCIONARIO_NO_CONFIABLE>>>';
+const MARK_CLOSE_FUNCIONARIO = '<<<FIN_TEXTO_FUNCIONARIO>>>';
+
+function escaparDelimitadores(texto: string): string {
+  return texto.replace(/<{3,}/g, '<<').replace(/>{3,}/g, '>>');
+}
+
+function prepararContenidoNoConfiable(texto: string): string {
+  return escaparDelimitadores(sanitizarPiiTextoSimi(texto));
+}
+
 export interface UsuarioSimi {
   rol:      RolInterno;
   tenantId: TenantId;
@@ -139,8 +156,14 @@ export function construirContextoSimi(params: {
     ...(heredadoSistema || requiereValidacion
       ? ['- ADVERTENCIA: Este tipo fue heredado del sistema actual y requiere validación jurídica/institucional antes de usarse como criterio definitivo.']
       : []),
-    `- Asunto: ${sanitizarPiiTextoSimi(r.detalle.asunto)}`,
-    `- Descripción: ${sanitizarPiiTextoSimi(r.detalle.descripcion)}`,
+    `- Asunto (contenido escrito por el ciudadano):`,
+    MARK_OPEN_CIUDADANO,
+    prepararContenidoNoConfiable(r.detalle.asunto),
+    MARK_CLOSE_CIUDADANO,
+    `- Descripción (contenido escrito por el ciudadano):`,
+    MARK_OPEN_CIUDADANO,
+    prepararContenidoNoConfiable(r.detalle.descripcion),
+    MARK_CLOSE_CIUDADANO,
     `- Estado actual: ${r.estadoActual}`,
     `- Fecha de radicación: ${r.control.fechaRadicado}`,
     `- Fecha límite: ${r.termino.fechaVencimiento}`,
@@ -175,7 +198,13 @@ export function construirContextoSimi(params: {
   }
 
   if (r.respuestaOficial?.nota) {
-    lineasContexto.push('', 'RESPUESTA OFICIAL PREVIA:', sanitizarPiiTextoSimi(r.respuestaOficial.nota));
+    lineasContexto.push(
+      '',
+      'RESPUESTA OFICIAL PREVIA (contenido escrito por un funcionario):',
+      MARK_OPEN_FUNCIONARIO,
+      prepararContenidoNoConfiable(r.respuestaOficial.nota),
+      MARK_CLOSE_FUNCIONARIO,
+    );
   }
 
   const lineasCompetencia = [
@@ -196,7 +225,12 @@ export function construirContextoSimi(params: {
   const lineasTrazabilidad = [
     '',
     `TRAZABILIDAD RECIENTE (últimos ${trazaResumida.length} eventos)`,
-    ...trazaResumida.map((t) => `- ${t.fecha} · ${t.accion} · ${t.actorNombre} · ${sanitizarPiiTextoSimi(t.nota)}`),
+    ...trazaResumida.flatMap((t) => [
+      `- ${t.fecha} · ${t.accion} · ${t.actorNombre} · nota (contenido escrito por un funcionario):`,
+      MARK_OPEN_FUNCIONARIO,
+      prepararContenidoNoConfiable(t.nota),
+      MARK_CLOSE_FUNCIONARIO,
+    ]),
   ];
 
   const lineasUsuario = [
