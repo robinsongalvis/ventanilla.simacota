@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import { checkRateLimit } from '@/lib/ai/rate-limit';
+import { verificarMagicBytes } from '@/lib/seguridad/magic-bytes';
 import { getFirebaseAdminDb, getFirebaseAdminStorage } from '@/lib/firebase-admin';
 import { removeUndefinedDeep } from '@/lib/firestore/removeUndefined';
 import {
@@ -35,7 +36,13 @@ export const runtime = 'nodejs';
 
 const MAX_FILES = 3;
 const MAX_FILE_SIZE = 5 * 1024 * 1024;
-const ALLOWED_FILE_TYPES = new Set(['application/pdf', 'image/jpeg', 'image/png']);
+const ALLOWED_FILE_TYPES = new Set([
+  'application/pdf',
+  'image/jpeg',
+  'image/png',
+  'application/vnd.openxmlformats-officedocument.wordprocessingml.document', // DOCX
+  'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',       // XLSX
+]);
 const CANALES_RESPUESTA = new Set<CanalRespuesta>([
   'CORREO',
   'PRESENCIAL',
@@ -147,7 +154,7 @@ function validarArchivos(files: File[]): string[] {
 
   files.forEach((file) => {
     if (!ALLOWED_FILE_TYPES.has(file.type)) {
-      errores.push(`El archivo ${file.name} debe ser PDF, JPG o PNG.`);
+      errores.push(`El archivo ${file.name} debe ser PDF, JPG, PNG, DOCX o XLSX.`);
     }
 
     if (file.size > MAX_FILE_SIZE) {
@@ -300,6 +307,23 @@ export async function POST(request: Request) {
 
     if (errores.length > 0) {
       return badRequest('La solicitud tiene datos pendientes por corregir.', errores);
+    }
+
+    // H-08: verificar firma binaria / estructura del buffer real.
+    // El Content-Type y la extensión son falsificables; PDF/JPG/PNG se validan
+    // por firma, DOCX/XLSX por presencia de [Content_Types].xml + carpeta
+    // esperada y ausencia de vbaProject.bin (macro disfrazada).
+    const erroresMagicBytes: string[] = [];
+    for (const file of files) {
+      const buffer = Buffer.from(await file.arrayBuffer());
+      if (!verificarMagicBytes(buffer, file.type)) {
+        erroresMagicBytes.push(
+          `El archivo ${file.name} no tiene una firma válida para su tipo declarado.`,
+        );
+      }
+    }
+    if (erroresMagicBytes.length > 0) {
+      return badRequest('La solicitud tiene datos pendientes por corregir.', erroresMagicBytes);
     }
 
     const ahora = new Date();

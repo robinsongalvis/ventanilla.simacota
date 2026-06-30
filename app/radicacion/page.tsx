@@ -784,7 +784,7 @@ export default function PortalCiudadano() {
                       ref={fileInputRef}
                       type="file"
                       className="sr-only"
-                      accept=".pdf,.jpg,.jpeg,.png"
+                      accept=".pdf,.jpg,.jpeg,.png,.docx,.xlsx"
                       multiple
                       onChange={(e) => procesarArchivos(e.target.files)}
                       disabled={estado === 'enviando'}

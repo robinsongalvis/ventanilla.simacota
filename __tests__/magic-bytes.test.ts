@@ -1,0 +1,112 @@
+import { describe, expect, it } from 'vitest';
+import { verificarMagicBytes, tiposPermitidosMagicBytes } from '@/lib/seguridad/magic-bytes';
+
+const DOCX_MIME = 'application/vnd.openxmlformats-officedocument.wordprocessingml.document';
+const XLSX_MIME = 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet';
+
+const PDF_VALIDO = Buffer.from([0x25, 0x50, 0x44, 0x46, 0x2D, 0x31, 0x2E, 0x34, 0x0A]);
+const JPG_VALIDO = Buffer.from([0xFF, 0xD8, 0xFF, 0xE0, 0x00, 0x10, 0x4A, 0x46]);
+const PNG_VALIDO = Buffer.from([0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A, 0x00, 0x00]);
+const TEXTO      = Buffer.from('hola mundo', 'utf8');
+
+/**
+ * Construye un buffer ZIP mínimo con las entradas dadas (sin datos comprimidos).
+ * Cada entrada es: local file header (30 bytes) + filename. compSize = 0.
+ */
+function buildZipConFiles(filenames: string[]): Buffer {
+  const partes: Buffer[] = [];
+  for (const name of filenames) {
+    const nameBuf = Buffer.from(name, 'utf8');
+    const header  = Buffer.alloc(30);
+    header.writeUInt32LE(0x04034b50, 0);          // signature PK\x03\x04
+    header.writeUInt16LE(10, 4);                   // version needed
+    header.writeUInt16LE(0, 6);                    // general purpose flag
+    header.writeUInt16LE(0, 8);                    // compression = store
+    header.writeUInt32LE(0, 14);                   // CRC-32 = 0
+    header.writeUInt32LE(0, 18);                   // compressed size = 0
+    header.writeUInt32LE(0, 22);                   // uncompressed size = 0
+    header.writeUInt16LE(nameBuf.length, 26);      // filename length
+    header.writeUInt16LE(0, 28);                   // extra length
+    partes.push(header, nameBuf);
+  }
+  return Buffer.concat(partes);
+}
+
+describe('verificarMagicBytes — formatos simples (H-08)', () => {
+  it('acepta PDF con firma %PDF-', () => {
+    expect(verificarMagicBytes(PDF_VALIDO, 'application/pdf')).toBe(true);
+  });
+
+  it('acepta JPEG con firma FFD8FF', () => {
+    expect(verificarMagicBytes(JPG_VALIDO, 'image/jpeg')).toBe(true);
+  });
+
+  it('acepta PNG con firma de 8 bytes', () => {
+    expect(verificarMagicBytes(PNG_VALIDO, 'image/png')).toBe(true);
+  });
+
+  it('rechaza texto plano declarado como JPG', () => {
+    expect(verificarMagicBytes(TEXTO, 'image/jpeg')).toBe(false);
+  });
+
+  it('rechaza PDF declarado pero contenido PNG', () => {
+    expect(verificarMagicBytes(PNG_VALIDO, 'application/pdf')).toBe(false);
+  });
+
+  it('rechaza buffer vacío', () => {
+    expect(verificarMagicBytes(Buffer.alloc(0), 'application/pdf')).toBe(false);
+  });
+
+  it('rechaza tipos no soportados', () => {
+    expect(verificarMagicBytes(PDF_VALIDO, 'application/zip')).toBe(false);
+    expect(verificarMagicBytes(PDF_VALIDO, '')).toBe(false);
+  });
+});
+
+describe('verificarMagicBytes — DOCX/XLSX (H-08)', () => {
+  it('acepta DOCX con [Content_Types].xml y carpeta word/', () => {
+    const zip = buildZipConFiles(['[Content_Types].xml', 'word/document.xml', 'word/_rels/document.xml.rels']);
+    expect(verificarMagicBytes(zip, DOCX_MIME)).toBe(true);
+  });
+
+  it('acepta XLSX con [Content_Types].xml y carpeta xl/', () => {
+    const zip = buildZipConFiles(['[Content_Types].xml', 'xl/workbook.xml', 'xl/worksheets/sheet1.xml']);
+    expect(verificarMagicBytes(zip, XLSX_MIME)).toBe(true);
+  });
+
+  it('rechaza DOCX que contiene word/vbaProject.bin (DOCM disfrazado)', () => {
+    const zip = buildZipConFiles(['[Content_Types].xml', 'word/document.xml', 'word/vbaProject.bin']);
+    expect(verificarMagicBytes(zip, DOCX_MIME)).toBe(false);
+  });
+
+  it('rechaza XLSX que contiene xl/vbaProject.bin (XLSM disfrazado)', () => {
+    const zip = buildZipConFiles(['[Content_Types].xml', 'xl/workbook.xml', 'xl/vbaProject.bin']);
+    expect(verificarMagicBytes(zip, XLSX_MIME)).toBe(false);
+  });
+
+  it('rechaza ZIP con [Content_Types].xml pero sin carpeta word/ ni xl/', () => {
+    const zip = buildZipConFiles(['[Content_Types].xml', 'odt/content.xml']);
+    expect(verificarMagicBytes(zip, DOCX_MIME)).toBe(false);
+    expect(verificarMagicBytes(zip, XLSX_MIME)).toBe(false);
+  });
+
+  it('rechaza ZIP con word/ pero sin [Content_Types].xml', () => {
+    const zip = buildZipConFiles(['word/document.xml']);
+    expect(verificarMagicBytes(zip, DOCX_MIME)).toBe(false);
+  });
+
+  it('rechaza buffer no-ZIP declarado como DOCX', () => {
+    expect(verificarMagicBytes(PDF_VALIDO, DOCX_MIME)).toBe(false);
+    expect(verificarMagicBytes(TEXTO,      DOCX_MIME)).toBe(false);
+  });
+
+  it('expone la lista de 5 tipos permitidos', () => {
+    const tipos = tiposPermitidosMagicBytes();
+    expect(tipos).toEqual(
+      expect.arrayContaining([
+        'application/pdf', 'image/jpeg', 'image/png', DOCX_MIME, XLSX_MIME,
+      ]),
+    );
+    expect(tipos).toHaveLength(5);
+  });
+});
