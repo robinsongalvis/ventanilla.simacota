@@ -3,11 +3,26 @@ import { verificarMagicBytes, tiposPermitidosMagicBytes } from '@/lib/seguridad/
 
 const DOCX_MIME = 'application/vnd.openxmlformats-officedocument.wordprocessingml.document';
 const XLSX_MIME = 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet';
+const WEBP_MIME = 'image/webp';
 
 const PDF_VALIDO = Buffer.from([0x25, 0x50, 0x44, 0x46, 0x2D, 0x31, 0x2E, 0x34, 0x0A]);
 const JPG_VALIDO = Buffer.from([0xFF, 0xD8, 0xFF, 0xE0, 0x00, 0x10, 0x4A, 0x46]);
 const PNG_VALIDO = Buffer.from([0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A, 0x00, 0x00]);
 const TEXTO      = Buffer.from('hola mundo', 'utf8');
+// WebP mínimo: RIFF + 4 bytes tamaño + WEBP + 4 bytes chunk placeholder.
+const WEBP_VALIDO = Buffer.from([
+  0x52, 0x49, 0x46, 0x46,  // RIFF
+  0x10, 0x00, 0x00, 0x00,  // size (little-endian)
+  0x57, 0x45, 0x42, 0x50,  // WEBP
+  0x56, 0x50, 0x38, 0x20,  // VP8 chunk header (placeholder)
+]);
+// WAV: mismo RIFF pero con "WAVE" en offset 8.
+const WAV_ES_RIFF_NO_WEBP = Buffer.from([
+  0x52, 0x49, 0x46, 0x46,  // RIFF
+  0x10, 0x00, 0x00, 0x00,
+  0x57, 0x41, 0x56, 0x45,  // WAVE
+  0x66, 0x6D, 0x74, 0x20,
+]);
 
 /**
  * Construye un buffer ZIP mínimo con las entradas dadas (sin datos comprimidos).
@@ -100,13 +115,33 @@ describe('verificarMagicBytes — DOCX/XLSX (H-08)', () => {
     expect(verificarMagicBytes(TEXTO,      DOCX_MIME)).toBe(false);
   });
 
-  it('expone la lista de 5 tipos permitidos', () => {
+  it('expone la lista de 6 tipos permitidos', () => {
     const tipos = tiposPermitidosMagicBytes();
     expect(tipos).toEqual(
       expect.arrayContaining([
-        'application/pdf', 'image/jpeg', 'image/png', DOCX_MIME, XLSX_MIME,
+        'application/pdf', 'image/jpeg', 'image/png', WEBP_MIME, DOCX_MIME, XLSX_MIME,
       ]),
     );
-    expect(tipos).toHaveLength(5);
+    expect(tipos).toHaveLength(6);
+  });
+});
+
+describe('verificarMagicBytes — WebP (H-08 Sprint A)', () => {
+  it('acepta WebP con firma RIFF+WEBP', () => {
+    expect(verificarMagicBytes(WEBP_VALIDO, WEBP_MIME)).toBe(true);
+  });
+
+  it('rechaza RIFF válido pero no WEBP (por ejemplo WAV)', () => {
+    expect(verificarMagicBytes(WAV_ES_RIFF_NO_WEBP, WEBP_MIME)).toBe(false);
+  });
+
+  it('rechaza buffer no-RIFF declarado como WebP', () => {
+    expect(verificarMagicBytes(PNG_VALIDO, WEBP_MIME)).toBe(false);
+    expect(verificarMagicBytes(TEXTO,      WEBP_MIME)).toBe(false);
+  });
+
+  it('rechaza buffer demasiado corto para verificar', () => {
+    const cortito = Buffer.from([0x52, 0x49, 0x46, 0x46, 0x00, 0x00]);
+    expect(verificarMagicBytes(cortito, WEBP_MIME)).toBe(false);
   });
 });

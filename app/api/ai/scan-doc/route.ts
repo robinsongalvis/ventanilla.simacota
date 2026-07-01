@@ -3,6 +3,7 @@ import { SIMI_DATA_EXTRACTION_PROMPT } from '@/lib/ai/prompts/simi';
 import { ejecutarConResiliencia } from '@/lib/ai/resilience';
 import { registrarLogIA } from '@/lib/ai/telemetry';
 import { checkRateLimit, getClientIp, rateLimitHeaders } from '@/lib/ai/rate-limit';
+import { verificarMagicBytes } from '@/lib/seguridad/magic-bytes';
 import type {
   ResultadoExtraccion,
   DatosExtraidos,
@@ -260,8 +261,21 @@ export async function POST(request: Request): Promise<NextResponse<ResultadoExtr
     );
   }
 
-  /* ── 4. Conversión a base64 ── */
+  /* ── 4. Conversión a base64 + verificación de firma real ── */
   const buffer = await archivo.arrayBuffer();
+
+  // H-N02: verificar firma real del contenido antes de enviar a Gemini
+  // (Content-Type es falsificable — evita procesar contenido arbitrario).
+  if (!verificarMagicBytes(Buffer.from(buffer), archivo.type)) {
+    return NextResponse.json(
+      crearFallbackExtraccion(
+        `El archivo "${archivo.name}" no tiene una firma válida para su tipo declarado. ` +
+        'Adjunte una imagen o PDF real.',
+      ),
+      { status: 415 },
+    );
+  }
+
   const base64Data = arrayBufferToBase64(buffer);
 
   /* ── 5. Construcción del payload para Gemini Vision ── */

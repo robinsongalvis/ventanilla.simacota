@@ -1,5 +1,6 @@
 import { getFirebaseAdminDb, getFirebaseAdminStorage } from '@/lib/firebase-admin';
 import { removeUndefinedDeep } from '@/lib/firestore/removeUndefined';
+import { verificarMagicBytes } from '@/lib/seguridad/magic-bytes';
 import type { InternalUserSession } from '@/lib/server/internal-auth';
 import type { ResponsableFuncionario } from '@/lib/actions/asignarRadicado';
 import { NOMBRES_TENANT } from '@/src/types/reglas-negocio';
@@ -101,6 +102,11 @@ export async function uploadRespuestaPdfAdmin(
   const filename = `${Date.now()}_${sanitizeFilename(file.name)}`;
   const path = `respuestas/${radicadoId}/${filename}`;
   const buffer = Buffer.from(await file.arrayBuffer());
+
+  // H-N01: verificar firma real del PDF (Content-Type es falsificable).
+  if (!verificarMagicBytes(buffer, 'application/pdf')) {
+    throw new RadicadoActionError('El oficio de respuesta no es un PDF válido.', 400);
+  }
 
   await getFirebaseAdminStorage()
     .bucket(bucketName)
