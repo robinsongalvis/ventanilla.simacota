@@ -15,6 +15,7 @@
 const PDF_MIME  = 'application/pdf';
 const JPG_MIME  = 'image/jpeg';
 const PNG_MIME  = 'image/png';
+const WEBP_MIME = 'image/webp';
 const DOCX_MIME = 'application/vnd.openxmlformats-officedocument.wordprocessingml.document';
 const XLSX_MIME = 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet';
 
@@ -29,7 +30,7 @@ const MAX_ZIP_ENTRIES_SCAN = 500;
 const ZIP_LOCAL_HEADER_SIZE = 30;
 
 export function tiposPermitidosMagicBytes(): readonly string[] {
-  return [PDF_MIME, JPG_MIME, PNG_MIME, DOCX_MIME, XLSX_MIME];
+  return [PDF_MIME, JPG_MIME, PNG_MIME, WEBP_MIME, DOCX_MIME, XLSX_MIME];
 }
 
 export function verificarMagicBytes(buffer: Buffer, tipoDeclarado: string): boolean {
@@ -39,10 +40,27 @@ export function verificarMagicBytes(buffer: Buffer, tipoDeclarado: string): bool
     return matchPrefijo(buffer, FIRMAS_PREFIJO[tipoDeclarado]);
   }
 
+  if (tipoDeclarado === WEBP_MIME) return verificarWebp(buffer);
   if (tipoDeclarado === DOCX_MIME) return verificarEstructuraOffice(buffer, 'word');
   if (tipoDeclarado === XLSX_MIME) return verificarEstructuraOffice(buffer, 'xl');
 
   return false;
+}
+
+/**
+ * WebP es un contenedor RIFF: bytes 0-3 = "RIFF", 4-7 = tamaño (varía),
+ * 8-11 = "WEBP". Los chunks (VP8/VP8L/VP8X) empiezan en byte 12 y no se
+ * revisan aquí. Rechaza otros RIFF como WAV o AVI.
+ */
+function verificarWebp(buffer: Buffer): boolean {
+  if (buffer.length < 12) return false;
+  // "RIFF" en bytes 0-3
+  if (buffer[0] !== 0x52 || buffer[1] !== 0x49
+   || buffer[2] !== 0x46 || buffer[3] !== 0x46) return false;
+  // "WEBP" en bytes 8-11 (saltamos los 4 bytes de file size)
+  if (buffer[8] !== 0x57 || buffer[9] !== 0x45
+   || buffer[10] !== 0x42 || buffer[11] !== 0x50) return false;
+  return true;
 }
 
 function matchPrefijo(buffer: Buffer, firmas: readonly number[][]): boolean {
