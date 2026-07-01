@@ -218,10 +218,13 @@ async function cargarRadicados(usuario: InternalUserSession): Promise<Ventanilla
   }
 
   const snap = await query.get();
-  return snap.docs.map((doc) => ({
-    ...(doc.data() as VentanillaRadicado),
-    radicadoId: (doc.data() as Partial<VentanillaRadicado>).radicadoId ?? doc.id,
-  }));
+  // Sprint Preoperación B: el resumen diario excluye datos de prueba.
+  return snap.docs
+    .map((doc) => ({
+      ...(doc.data() as VentanillaRadicado & { isTest?: boolean; excludeFromMetrics?: boolean }),
+      radicadoId: (doc.data() as Partial<VentanillaRadicado>).radicadoId ?? doc.id,
+    }))
+    .filter((r) => !r.isTest && !r.excludeFromMetrics);
 }
 
 async function cargarControlInterno(ahora: Date) {

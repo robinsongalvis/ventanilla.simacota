@@ -92,7 +92,10 @@ export async function POST(request: Request): Promise<NextResponse> {
     }
 
     const snap = await query.get();
-    const radicados = snap.docs.map((d) => d.data() as VentanillaRadicado);
+    // Sprint Preoperación B: excluir datos de prueba de la búsqueda normal.
+    const radicados = snap.docs
+      .map((d) => d.data() as VentanillaRadicado & { isTest?: boolean; excludeFromMetrics?: boolean })
+      .filter((r) => !r.isTest && !r.excludeFromMetrics);
 
     const resultado = buscarRadicados(radicados, filtros, paginacion, alcance);
     const items = resultado.items.map(sanitizarRadicado);

@@ -70,7 +70,12 @@ export function useVentanillaRadicados(
     const unsub = onSnapshot(
       q,
       (snap) => {
-        setRadicados(snap.docs.map((d) => d.data() as VentanillaRadicado));
+        // Sprint Preoperación B: excluir radicados marcados como prueba
+        // para que no aparezcan en la bandeja operativa.
+        const filtrados = snap.docs
+          .map((d) => d.data() as VentanillaRadicado & { isTest?: boolean; excludeFromMetrics?: boolean })
+          .filter((r) => !r.isTest && !r.excludeFromMetrics);
+        setRadicados(filtrados);
         setCargando(false);
         setError(null);
       },
