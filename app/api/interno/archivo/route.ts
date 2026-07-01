@@ -26,6 +26,7 @@ import {
   autorizarDescargaArchivo,
   parsearPathArchivo,
 } from '@/lib/seguridad/autorizar-descarga-archivo';
+import { registrarDescargaAuditoria } from '@/lib/seguridad/auditoria-descargas';
 import { logError } from '@/lib/logger';
 import type { VentanillaRadicado } from '@/src/types/ventanilla';
 
@@ -93,6 +94,20 @@ export async function GET(request: Request): Promise<NextResponse> {
       prefijo:    parsed.prefijo,
       timestamp:  new Date().toISOString(),
     }));
+    // H-N04: auditoría persistente en Firestore (fire-and-forget).
+    await registrarDescargaAuditoria({
+      evento:        'ARCHIVO_DESCARGA_DENEGADA',
+      radicadoId:    parsed.radicadoId,
+      archivoNombre: (path.split('/').pop() ?? '').slice(0, 200),
+      tipoArchivo:   null,
+      motivo:        decision.motivo,
+      actorUid:      usuario.uid,
+      actorNombre:   usuario.nombre,
+      actorRol:      usuario.rol,
+      actorTenant:   usuario.tenantId,
+      ip:            request.headers.get('x-forwarded-for'),
+      userAgent:     request.headers.get('user-agent'),
+    });
     return denegado(decision.status, decision.mensaje);
   }
 
@@ -125,6 +140,19 @@ export async function GET(request: Request): Promise<NextResponse> {
       actorTenant: usuario.tenantId,
       timestamp:  new Date().toISOString(),
     }));
+    // H-N04: auditoría persistente en Firestore (fire-and-forget).
+    await registrarDescargaAuditoria({
+      evento:        'ARCHIVO_DESCARGA_AUTORIZADA',
+      radicadoId:    decision.radicadoId,
+      archivoNombre: (path.split('/').pop() ?? '').slice(0, 200),
+      tipoArchivo:   decision.tipoArchivo as 'adjunto' | 'respuestaOficial',
+      actorUid:      usuario.uid,
+      actorNombre:   usuario.nombre,
+      actorRol:      usuario.rol,
+      actorTenant:   usuario.tenantId,
+      ip:            request.headers.get('x-forwarded-for'),
+      userAgent:     request.headers.get('user-agent'),
+    });
 
     return NextResponse.redirect(signedUrl, { status: 302 });
   } catch (err) {
