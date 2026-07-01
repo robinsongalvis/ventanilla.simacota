@@ -59,7 +59,10 @@ export async function POST(request: Request): Promise<NextResponse> {
   try {
     // 1. Cargar radicados completos
     const radSnap = await db.collection('ventanilla_radicados').get();
-    const radicadosTotales = radSnap.docs.map((d) => d.data() as VentanillaRadicado);
+    // Sprint Preoperación B: MIPG oficial excluye datos de prueba.
+    const radicadosTotales = radSnap.docs
+      .map((d) => d.data() as VentanillaRadicado & { isTest?: boolean; excludeFromMetrics?: boolean })
+      .filter((r) => !r.isTest && !r.excludeFromMetrics);
     let visibles = radicadosVisiblesParaRol(radicadosTotales, usuario);
 
     if (hayFiltros) {
