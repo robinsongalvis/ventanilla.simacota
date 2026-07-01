@@ -9,8 +9,10 @@
      radicadoId — contexto de negocio del error
      timestamp  — ISO 8601, siempre UTC
      modulo     — "submodulo/operacion" (ej. "resolver-radicado/trazabilidad")
-     mensaje    — mensaje human-readable del error
+     mensaje    — mensaje human-readable del error, ya saneado de PII (H-N03)
 ══════════════════════════════════════════════════════════════ */
+
+import { sanitizarTextoObservabilidad } from '@/lib/seguridad/sanitizar-observabilidad';
 
 export interface ErrorLog {
   radicadoId: string;
@@ -37,7 +39,9 @@ export function logError(params: {
     radicadoId: params.radicadoId,
     timestamp:  new Date().toISOString(),
     modulo:     params.modulo,
-    mensaje:    params.error instanceof Error ? params.error.message : String(params.error),
+    mensaje:    sanitizarTextoObservabilidad(
+      params.error instanceof Error ? params.error.message : String(params.error),
+    ),
   };
 
   // 1. Log estructurado (siempre)
