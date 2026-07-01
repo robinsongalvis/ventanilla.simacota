@@ -86,7 +86,11 @@ export function TimelineAuditoria({ entradas }: Props) {
       {ordenadas.map((entrada, idx) => {
         const color  = COLOR_ACCION[entrada.accion] ?? COLOR_FALLBACK;
         const label  = LABELS_ACCION[entrada.accion] ?? entrada.accion;
-        const meta   = entrada.metadata as { estadoAnterior?: string; estadoNuevo?: string } | undefined;
+        const meta   = entrada.metadata as {
+          estadoAnterior?: string;
+          estadoNuevo?: string;
+          archivoAdjunto?: null | string | { nombre: string; path: string; tipo?: string };
+        } | undefined;
         const esUltimo = idx === ordenadas.length - 1;
 
         return (
@@ -135,6 +139,33 @@ export function TimelineAuditoria({ entradas }: Props) {
                   {meta.estadoAnterior} → {meta.estadoNuevo}
                 </p>
               )}
+
+              {/* Archivo adjunto del evento (RESPUESTA_FUNCIONARIO). */}
+              {(() => {
+                const adj = meta?.archivoAdjunto;
+                if (!adj) return null;
+                // Backwards-compat: eventos viejos guardaban solo el nombre como string.
+                if (typeof adj === 'string') {
+                  return (
+                    <p className="mt-1 text-xs text-slate-600">
+                      Oficio anexado: <span className="font-mono">{adj}</span>
+                    </p>
+                  );
+                }
+                return (
+                  <p className="mt-1 text-xs text-slate-600 inline-flex items-center gap-2">
+                    Oficio anexado: <span className="font-mono">{adj.nombre}</span>
+                    <a
+                      href={`/api/interno/archivo?path=${encodeURIComponent(adj.path)}`}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="text-indigo-400 hover:text-indigo-300 underline underline-offset-2"
+                    >
+                      Descargar
+                    </a>
+                  </p>
+                );
+              })()}
             </div>
           </li>
         );

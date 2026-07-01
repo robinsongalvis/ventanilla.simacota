@@ -157,7 +157,13 @@ export async function POST(request: Request, context: RouteContext): Promise<Nex
         dependencia: radicado.clasificacion.oficinaDestino,
         cumplioTermino,
         fechaVencimiento: radicado.termino.fechaVencimiento,
-        archivoAdjunto: archivoPdf?.nombre ?? null,
+        archivoAdjunto: archivoPdf
+          ? {
+              nombre: archivoPdf.nombre,
+              path:   archivoPdf.path,
+              tipo:   'RESPUESTA_OFICIAL',
+            }
+          : null,
       },
     });
 
