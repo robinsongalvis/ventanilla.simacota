@@ -6,6 +6,7 @@
  */
 
 import * as Sentry from '@sentry/nextjs';
+import { sanitizarEventoSentry } from '@/lib/seguridad/sanitizar-observabilidad';
 
 const SENTRY_DSN = process.env.SENTRY_DSN;
 
@@ -22,6 +23,12 @@ if (SENTRY_DSN) {
         runtime:  'nodejs',
         project:  'ventanilla-unica-simacota',
       },
+    },
+
+    // H-N03: sanea PII, rutas Storage, URLs firmadas y tokens antes de enviar.
+    beforeSend(event) {
+      sanitizarEventoSentry(event as unknown as Record<string, unknown>);
+      return event;
     },
   });
 }
