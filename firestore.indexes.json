@@ -46,6 +46,14 @@
         { "fieldPath": "tenantId", "order": "ASCENDING" },
         { "fieldPath": "activo",   "order": "ASCENDING" }
       ]
+    },
+    {
+      "collectionGroup": "seguridad_descargas_auditoria",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "radicadoId", "order": "ASCENDING" },
+        { "fieldPath": "fecha",      "order": "DESCENDING" }
+      ]
     }
   ],
   "fieldOverrides": []
