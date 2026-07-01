@@ -2054,6 +2054,37 @@ function PanelDerecho({
                 </div>
               </div>
             )}
+
+            {/* Documento de respuesta / Oficio anexado — visible en el
+                expediente cuando el radicado ya fue respondido con oficio. */}
+            {radicado.respuestaOficial?.archivoPath && (
+              <div className="rounded-xl bg-white p-4" style={{ border: '1px solid #D9E2D9' }}>
+                <p className="text-[10px] font-bold uppercase tracking-widest mb-3" style={{ color: '#14532D' }}>
+                  Documento de respuesta / Oficio anexado
+                </p>
+                <div className="grid grid-cols-2 gap-x-4 gap-y-3">
+                  <FilaInfo label="Archivo"     value={radicado.respuestaOficial.archivoNombre ?? '—'} />
+                  <FilaInfo label="Tipo"        value="Respuesta oficial" />
+                  <FilaInfo label="Fecha"       value={radicado.respuestaOficial.fecha} />
+                  <FilaInfo label="Responsable" value={radicado.respuestaOficial.actorNombre} />
+                  <FilaInfo
+                    label="Dependencia"
+                    value={NOMBRES_TENANT[radicado.clasificacion.oficinaDestino] ?? radicado.clasificacion.oficinaDestino}
+                  />
+                </div>
+                <div className="mt-3 flex justify-end">
+                  <a
+                    href={`/api/interno/archivo?path=${encodeURIComponent(radicado.respuestaOficial.archivoPath)}`}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="text-xs font-semibold underline underline-offset-2"
+                    style={{ color: '#14532D' }}
+                  >
+                    Descargar documento
+                  </a>
+                </div>
+              </div>
+            )}
           </>
         )}
 
