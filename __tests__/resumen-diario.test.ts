@@ -325,9 +325,11 @@ describe('Resumen Diario API & Lógica', () => {
 
     mockDocGet.mockResolvedValueOnce({ exists: false });
 
-    // Dos vencidos de diferentes dependencias
-    const r1 = mockRadicado({ radicadoId: 'R-GOB', clasificacion: { oficinaDestino: 'SEC_GOBIERNO', zonaGeografica: 'CASCO_URBANO' }, termino: { tipoSolicitudId: 'PETICION_GENERAL', tipoSolicitudNombre: 'Petición', diasRespuesta: 15, unidad: 'HABILES', fechaVencimiento: new Date(Date.now() - 5 * 24 * 60 * 60 * 1000).toISOString(), prorrogasAplicadas: 0 } });
-    const r2 = mockRadicado({ radicadoId: 'R-HAC', clasificacion: { oficinaDestino: 'SEC_HACIENDA', zonaGeografica: 'CASCO_URBANO' }, termino: { tipoSolicitudId: 'PETICION_GENERAL', tipoSolicitudNombre: 'Petición', diasRespuesta: 15, unidad: 'HABILES', fechaVencimiento: new Date(Date.now() - 2 * 24 * 60 * 60 * 1000).toISOString(), prorrogasAplicadas: 0 } });
+    // Dos vencidos de diferentes dependencias.
+    // -10 y -8 días naturales garantizan ≥ 5 días hábiles vencidos incluso
+    // si Date.now() cae lunes/martes (evita bit-rot semanal del test).
+    const r1 = mockRadicado({ radicadoId: 'R-GOB', clasificacion: { oficinaDestino: 'SEC_GOBIERNO', zonaGeografica: 'CASCO_URBANO' }, termino: { tipoSolicitudId: 'PETICION_GENERAL', tipoSolicitudNombre: 'Petición', diasRespuesta: 15, unidad: 'HABILES', fechaVencimiento: new Date(Date.now() - 10 * 24 * 60 * 60 * 1000).toISOString(), prorrogasAplicadas: 0 } });
+    const r2 = mockRadicado({ radicadoId: 'R-HAC', clasificacion: { oficinaDestino: 'SEC_HACIENDA', zonaGeografica: 'CASCO_URBANO' }, termino: { tipoSolicitudId: 'PETICION_GENERAL', tipoSolicitudNombre: 'Petición', diasRespuesta: 15, unidad: 'HABILES', fechaVencimiento: new Date(Date.now() -  8 * 24 * 60 * 60 * 1000).toISOString(), prorrogasAplicadas: 0 } });
 
     mockGet.mockResolvedValueOnce({
       docs: [{ data: () => r1 }, { data: () => r2 }],
