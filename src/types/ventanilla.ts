@@ -10,16 +10,60 @@ import type { TipoSolicitudId, UnidadTermino } from '@/lib/tiempos-radicado';
 // type-only import — erased en runtime, seguro desde shared types
 import type { RolInterno } from '@/lib/hooks/useAuth';
 
-export type TipoPersona = 'NATURAL' | 'JURIDICA';
+export type TipoPersona =
+  | 'NATURAL'
+  | 'JURIDICA'
+  | 'ENTIDAD_PUBLICA'
+  | 'COMUNICACION_INSTITUCIONAL'
+  | 'NO_IDENTIFICADO';
+
 export type TipoDocumento = 'CC' | 'CE' | 'NIT' | 'PASAPORTE' | 'OTRO';
 export type MedioRecepcion = 'OFICIO_FISICO' | 'EMAIL' | 'WEB' | 'PRESENCIAL';
 /** Canal por el que el ciudadano prefiere recibir la respuesta */
 export type CanalRespuesta = 'CORREO' | 'PRESENCIAL' | 'TELEFONO' | 'DIRECCION_FISICA';
 
+/**
+ * Sprint Ventanilla Operativa 1 — clasificación operativa del ingreso.
+ * `origenIngreso` describe POR DÓNDE llegó la solicitud; `tipoEntrada`
+ * describe QUÉ es lo que llegó. Ambos son opcionales para compatibilidad
+ * con radicados históricos.
+ */
+export type OrigenIngreso =
+  | 'PQRSD_WEB_OFICIAL'
+  | 'CORREO_INSTITUCIONAL'
+  | 'VENTANILLA_FISICA'
+  | 'ENTREGA_PRESENCIAL'
+  | 'OFICIO_EXTERNO'
+  | 'COMUNICACION_INSTITUCIONAL'
+  | 'OTRO';
+
+export type TipoEntrada =
+  | 'PQRSD'
+  | 'CORRESPONDENCIA_RECIBIDA'
+  | 'OFICIO_INSTITUCIONAL'
+  | 'SOLICITUD_CIUDADANA'
+  | 'COMUNICACION_ENTIDAD_PUBLICA'
+  | 'COMUNICACION_INTERNA'
+  | 'OTRO';
+
+/**
+ * Registra explícitamente qué datos NO aportó el solicitante. Permite
+ * radicar sin inventar información y deja evidencia auditable de las
+ * decisiones de Ventanilla.
+ */
+export interface DatosNoAportados {
+  documento?: boolean;
+  telefono?: boolean;
+  correo?: boolean;
+  direccion?: boolean;
+}
+
 export interface UbicacionSolicitante {
   pais: string;
   departamento: string;
   municipio: string;
+  /** Barrio opcional para radicación de correspondencia y comunicaciones. */
+  barrio?: string | null;
 }
 
 export interface SolicitanteRadicado {
@@ -30,11 +74,24 @@ export interface SolicitanteRadicado {
   razonSocial?: string | null;
   /** Null cuando el solicitante no proveyó el dato (Firestore no acepta undefined) */
   email?: string | null;
-  /** Null cuando el solicitante no proveyó el dato (Firestore no acepta undefined) */
+  /**
+   * @deprecated Usar `telefonoMovil` / `telefonoFijo` en radicados nuevos.
+   * Se mantiene para compatibilidad con radicados históricos.
+   */
   telefono?: string | null;
+  /** Sprint Ventanilla Operativa 1 — teléfono móvil separado. */
+  telefonoMovil?: string | null;
+  /** Sprint Ventanilla Operativa 1 — teléfono fijo separado. */
+  telefonoFijo?: string | null;
   /** Null cuando el solicitante no proveyó el dato (Firestore no acepta undefined) */
   direccion?: string | null;
   ubicacion: UbicacionSolicitante;
+  /**
+   * Sprint Ventanilla Operativa 1 — registra explícitamente qué datos NO
+   * aportó el solicitante. Ausencia = todos aportados (o histórico previo
+   * al sprint).
+   */
+  datosNoAportados?: DatosNoAportados;
 }
 
 export interface ControlRadicacion {
@@ -44,6 +101,10 @@ export interface ControlRadicacion {
   horaRadicado: string;
   medioRecepcion: MedioRecepcion;
   origen: OrigenRadicado;
+  /** Sprint Ventanilla Operativa 1 — origen operativo ampliado. */
+  origenIngreso?: OrigenIngreso;
+  /** Sprint Ventanilla Operativa 1 — clasificación del tipo de entrada. */
+  tipoEntrada?: TipoEntrada;
 }
 
 export interface TerminoLegal {
@@ -170,6 +231,10 @@ export interface VentanillaRadicado {
     numeroFolios: number;
     /** Null cuando no se especificaron anexos (Firestore no acepta undefined) */
     anexosDescripcion?: string | null;
+    /** Sprint Ventanilla Operativa 1 — número de anexos entregados. */
+    numeroAnexos?: number;
+    /** Sprint Ventanilla Operativa 1 — observaciones sobre los anexos. */
+    observacionesAnexos?: string | null;
   };
   archivos: ArchivoRadicado[];
   analisisIa?:       AnalisisIA;

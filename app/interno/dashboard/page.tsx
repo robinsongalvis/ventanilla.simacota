@@ -72,6 +72,43 @@ const LABELS_ESTADO: Record<string, string> = {
   PRORROGA:    'Prórroga',
 };
 
+/* Sprint Ventanilla Operativa 1 — Labels operativos */
+const LABEL_ORIGEN_INGRESO: Record<string, string> = {
+  PQRSD_WEB_OFICIAL:          'Portal web',
+  CORREO_INSTITUCIONAL:       'Correo inst.',
+  VENTANILLA_FISICA:          'Ventanilla',
+  ENTREGA_PRESENCIAL:         'Presencial',
+  OFICIO_EXTERNO:             'Oficio ext.',
+  COMUNICACION_INSTITUCIONAL: 'Com. inst.',
+  OTRO:                       'Otro',
+};
+
+const LABEL_TIPO_ENTRADA: Record<string, string> = {
+  PQRSD:                        'PQRSD',
+  CORRESPONDENCIA_RECIBIDA:     'Correspondencia',
+  OFICIO_INSTITUCIONAL:         'Oficio',
+  SOLICITUD_CIUDADANA:          'Solicitud',
+  COMUNICACION_ENTIDAD_PUBLICA: 'Ent. pública',
+  COMUNICACION_INTERNA:         'Interna',
+  OTRO:                         'Otro',
+};
+
+const LABEL_TIPO_PERSONA: Record<string, string> = {
+  NATURAL:                    'Persona natural',
+  JURIDICA:                   'Persona jurídica',
+  ENTIDAD_PUBLICA:            'Entidad pública',
+  COMUNICACION_INSTITUCIONAL: 'Com. institucional',
+  NO_IDENTIFICADO:            'No identificado',
+};
+
+/** True si el solicitante marcó al menos una casilla de "no aporta". */
+function tieneDatosNoAportados(
+  d?: { documento?: boolean; correo?: boolean; telefono?: boolean; direccion?: boolean } | null,
+): boolean {
+  if (!d) return false;
+  return Boolean(d.documento || d.correo || d.telefono || d.direccion);
+}
+
 const BADGE_ESTADO: Record<string, string> = {
   PENDIENTE:   'bg-yellow-50  text-yellow-800 border-yellow-200',
   EN_REVISION: 'bg-blue-50    text-blue-800   border-blue-200',
@@ -1349,6 +1386,25 @@ function TablaRadicados({
                     <p className="text-[10px] font-mono" style={{ color: '#94A3B8' }}>
                       {r.solicitante.tipoDocumento} {r.solicitante.numeroDocumento}
                     </p>
+                    {/* Sprint Ventanilla Operativa 1 — chip de tipo de entrada / origen */}
+                    <div className="mt-1 flex gap-1 flex-wrap">
+                      <span
+                        className="inline-flex items-center px-1.5 py-[1px] rounded text-[9px] font-semibold uppercase tracking-wide"
+                        style={{ background: '#EEF4EE', color: '#14532D', border: '1px solid #D9E2D9' }}
+                        title={`Origen: ${LABEL_ORIGEN_INGRESO[r.control.origenIngreso ?? 'PQRSD_WEB_OFICIAL']}`}
+                      >
+                        {LABEL_TIPO_ENTRADA[r.control.tipoEntrada ?? 'PQRSD']}
+                      </span>
+                      {tieneDatosNoAportados(r.solicitante.datosNoAportados) && (
+                        <span
+                          className="inline-flex items-center px-1.5 py-[1px] rounded text-[9px] font-semibold uppercase tracking-wide"
+                          style={{ background: '#FEF3C7', color: '#92400E', border: '1px solid #FBBF24' }}
+                          title="El solicitante no aportó todos sus datos"
+                        >
+                          Datos incompletos
+                        </span>
+                      )}
+                    </div>
                   </td>
                   <td className="px-4 py-3 whitespace-nowrap">
                     <p className="text-xs" style={{ color: '#667085' }}>{r.termino.tipoSolicitudNombre}</p>
@@ -1916,6 +1972,45 @@ function PanelDerecho({
                 <FilaInfo label="Tipo"    value={`${radicado.termino.tipoSolicitudNombre} · ${radicado.termino.diasRespuesta}d`} />
               </div>
             </div>
+
+            {/* Sprint Ventanilla Operativa 1: Origen y datos de ingreso */}
+            <div className="rounded-xl bg-white p-4" style={{ border: '1px solid #D9E2D9' }}>
+              <p className="text-[10px] font-bold uppercase tracking-widest mb-3" style={{ color: '#14532D' }}>
+                Origen y datos de ingreso
+              </p>
+              <div className="grid grid-cols-2 gap-x-4 gap-y-3">
+                <FilaInfo
+                  label="Origen"
+                  value={LABEL_ORIGEN_INGRESO[radicado.control.origenIngreso ?? 'PQRSD_WEB_OFICIAL']}
+                />
+                <FilaInfo
+                  label="Tipo entrada"
+                  value={LABEL_TIPO_ENTRADA[radicado.control.tipoEntrada ?? 'PQRSD']}
+                />
+                <FilaInfo label="Remitente" value={LABEL_TIPO_PERSONA[radicado.solicitante.tipoPersona] ?? radicado.solicitante.tipoPersona} />
+                <FilaInfo label="Folios" value={String(radicado.detalle.numeroFolios)} />
+                <FilaInfo label="Anexos" value={String(radicado.detalle.numeroAnexos ?? 0)} />
+                {radicado.detalle.observacionesAnexos && (
+                  <FilaInfo label="Obs. anexos" value={radicado.detalle.observacionesAnexos} />
+                )}
+                <FilaInfo label="Medio respuesta" value={radicado.canalRespuesta ?? '—'} />
+              </div>
+            </div>
+
+            {/* Sprint Ventanilla Operativa 1: Datos no aportados (solo si aplica) */}
+            {tieneDatosNoAportados(radicado.solicitante.datosNoAportados) && (
+              <div className="rounded-xl p-4" style={{ background: '#FEF3C7', border: '1px solid #FBBF24' }}>
+                <p className="text-[10px] font-bold uppercase tracking-widest mb-3" style={{ color: '#92400E' }}>
+                  Datos no aportados por el solicitante
+                </p>
+                <ul className="list-disc pl-5 space-y-1 text-xs" style={{ color: '#92400E' }}>
+                  {radicado.solicitante.datosNoAportados?.documento && <li>Documento de identidad</li>}
+                  {radicado.solicitante.datosNoAportados?.correo && <li>Correo electrónico</li>}
+                  {radicado.solicitante.datosNoAportados?.telefono && <li>Teléfono</li>}
+                  {radicado.solicitante.datosNoAportados?.direccion && <li>Dirección</li>}
+                </ul>
+              </div>
+            )}
 
             {/* ── MIPG-2: Responsable funcional ── */}
             <div className="rounded-xl bg-white p-4" style={{ border: '1px solid #D9E2D9' }}>

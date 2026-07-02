@@ -4,8 +4,12 @@ import { generarRadicadoInstitucional, type CanalRadicadoInstitucional } from '@
 import { TIPOS_SOLICITUD, type TipoSolicitudId } from '@/lib/tiempos-radicado';
 import { subirArchivos } from '@/lib/storage';
 import type {
+  CanalRespuesta,
+  DatosNoAportados,
   MedioRecepcion,
+  OrigenIngreso,
   TipoDocumento,
+  TipoEntrada,
   TipoPersona,
   TrazabilidadRadicado,
   VentanillaRadicado,
@@ -35,6 +39,52 @@ export interface DatosRadicacionInstitucional {
   anexosDescripcion: string;
   archivos:          File[];
   fechaVencimiento:  string;
+  // Sprint Ventanilla Operativa 1 — campos operativos ampliados
+  origenIngreso?:       OrigenIngreso;
+  tipoEntrada?:         TipoEntrada;
+  telefonoMovil?:       string;
+  telefonoFijo?:        string;
+  barrio?:              string;
+  numeroAnexos?:        number;
+  observacionesAnexos?: string;
+  canalRespuesta?:      CanalRespuesta;
+  noAportaDocumento?:   boolean;
+  noAportaCorreo?:      boolean;
+  noAportaTelefono?:    boolean;
+  noAportaDireccion?:   boolean;
+}
+
+/**
+ * Error de validación de negocio para radicación interna. Se lanza cuando
+ * el conjunto de datos infringe una regla operativa (por ejemplo, si el
+ * solicitante no aporta correo pero se elige canal de respuesta CORREO).
+ */
+export class RadicacionValidacionError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = 'RadicacionValidacionError';
+  }
+}
+
+/**
+ * Sprint Ventanilla Operativa 1 — regla server: si el solicitante no
+ * aporta correo, el canal de respuesta no puede ser CORREO.
+ *
+ * Exportada para reutilización en tests y para el endpoint público
+ * `/api/radicacion` cuando reciba `noAportaCorreo` en el payload.
+ */
+export function validarReglaCorreoNoAportado(params: {
+  noAportaCorreo?: boolean;
+  canalRespuesta?: CanalRespuesta;
+}): string | null {
+  if (params.noAportaCorreo === true && params.canalRespuesta === 'CORREO') {
+    return 'Si el solicitante no aporta correo electrónico, el medio de respuesta no puede ser correo.';
+  }
+  return null;
+}
+
+function algunNoAportado(d: DatosNoAportados): boolean {
+  return Boolean(d.documento || d.telefono || d.correo || d.direccion);
 }
 
 export interface ActorRadicacion {
@@ -119,6 +169,15 @@ export async function radicarInstitucionalmente(
   actor:      ActorRadicacion,
   onProgress: (mensaje: string, pct: number) => void = () => {},
 ): Promise<ResultadoRadicacion> {
+  // Sprint Ventanilla Operativa 1 — regla server-side de datos no aportados.
+  const errorRegla = validarReglaCorreoNoAportado({
+    noAportaCorreo: datos.noAportaCorreo,
+    canalRespuesta: datos.canalRespuesta,
+  });
+  if (errorRegla) {
+    throw new RadicacionValidacionError(errorRegla);
+  }
+
   onProgress('Generando número de radicado…', 10);
 
   const canal = mapCanal(datos.medioRecepcion);
@@ -137,11 +196,21 @@ export async function radicarInstitucionalmente(
   // Construimos el documento con `null` explícito en campos opcionales vacíos.
   // Nunca usamos `|| undefined` — Firestore rechaza undefined con una excepción:
   // "Function setDoc() called with invalid data. Unsupported field value: undefined"
+  // Sprint Ventanilla Operativa 1 — objeto de marcas "no aporta".
+  const datosNoAportados: DatosNoAportados = {
+    documento: datos.noAportaDocumento === true,
+    telefono:  datos.noAportaTelefono  === true,
+    correo:    datos.noAportaCorreo    === true,
+    direccion: datos.noAportaDireccion === true,
+  };
+  const hayNoAportados = algunNoAportado(datosNoAportados);
+
   const radicado: VentanillaRadicado = {
     radicadoId,
     estadoActual: 'PENDIENTE',
     ultimaActualizacion: ahora.toISOString(),
     prioridad:    tipo.prioridadSugerida,
+    canalRespuesta: datos.canalRespuesta ?? null,
 
     solicitante: {
       tipoPersona:     datos.tipoPersona,
@@ -151,12 +220,16 @@ export async function radicarInstitucionalmente(
       // Campos opcionales: cadena vacía → null (NUNCA undefined)
       email:    datos.email.trim()     || null,
       telefono: datos.telefono.trim()  || null,
+      telefonoMovil: (datos.telefonoMovil ?? '').trim() || null,
+      telefonoFijo:  (datos.telefonoFijo  ?? '').trim() || null,
       direccion: datos.direccion.trim() || null,
       ubicacion: {
         pais:         datos.pais,
         departamento: datos.departamento,
         municipio:    datos.municipio,
+        barrio:       (datos.barrio ?? '').trim() || null,
       },
+      datosNoAportados: hayNoAportados ? datosNoAportados : undefined,
     },
 
     control: {
@@ -166,6 +239,8 @@ export async function radicarInstitucionalmente(
       horaRadicado:   ahora.toLocaleTimeString('es-CO', { hour: '2-digit', minute: '2-digit' }),
       medioRecepcion: datos.medioRecepcion,
       origen:         datos.medioRecepcion === 'WEB' ? 'WEB' : 'FISICO_ESCANER',
+      origenIngreso:  datos.origenIngreso ?? 'PQRSD_WEB_OFICIAL',
+      tipoEntrada:    datos.tipoEntrada   ?? 'PQRSD',
     },
 
     termino: {
@@ -191,6 +266,8 @@ export async function radicarInstitucionalmente(
       // NUNCA undefined → genera: "Unsupported field value: undefined"
       // en detalle.anexosDescripcion al llamar a setDoc().
       anexosDescripcion: datos.anexosDescripcion.trim() || null,
+      numeroAnexos: datos.numeroAnexos ?? 0,
+      observacionesAnexos: (datos.observacionesAnexos ?? '').trim() || null,
     },
 
     archivos: exitosos.map((a, i) => ({

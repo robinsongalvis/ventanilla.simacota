@@ -42,6 +42,10 @@ export interface FiltrosBusqueda {
   cumplioTermino?: boolean | null;
   conNotificacionFallida?: boolean;
   conRespuestaOficial?: boolean;
+  /** Sprint Ventanilla Operativa 1 — filtros operativos de radicación. */
+  origenIngreso?: string;
+  tipoEntrada?: string;
+  tipoPersona?: string;
 }
 
 export interface Paginacion {
@@ -203,6 +207,16 @@ function pasaFiltros(r: VentanillaRadicado, filtros: FiltrosBusqueda): boolean {
   }
   if (filtros.canalRespuesta) {
     if ((r.canalRespuesta ?? '') !== filtros.canalRespuesta) return false;
+  }
+  // Sprint Ventanilla Operativa 1
+  if (filtros.origenIngreso) {
+    if ((r.control?.origenIngreso ?? '') !== filtros.origenIngreso) return false;
+  }
+  if (filtros.tipoEntrada) {
+    if ((r.control?.tipoEntrada ?? '') !== filtros.tipoEntrada) return false;
+  }
+  if (filtros.tipoPersona) {
+    if ((r.solicitante?.tipoPersona ?? '') !== filtros.tipoPersona) return false;
   }
   if (typeof filtros.anonimo === 'boolean') {
     const es = r.esAnonimo === true || r.tipoPresentacion === 'ANONIMA';
