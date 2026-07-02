@@ -356,4 +356,39 @@ describe('Sprint Ventanilla Operativa 1 — consulta pública no expone campos i
     expect(publico.numeroRadicado).toBe('1-WEB-2026-00000030');
     expect(publico.estadoPublico).toBeDefined();
   });
+
+  /* 13 — Sprint 1.5: endurecimiento de aRadicadoPublico
+     Verifica que el objeto retornado solo contenga claves declaradas en
+     RadicadoPublico. Complementa la barrera compile-time (`satisfies`
+     + variable tipada) con una barrera runtime. */
+  it('aRadicadoPublico solo expone claves declaradas en RadicadoPublico', () => {
+    const rad = radicadoOp({
+      radicadoId: '1-WEB-2026-00000031',
+      fecha: '2026-06-16T08:00:00.000Z',
+    });
+    const publico = aRadicadoPublico({
+      radicado: rad,
+      lineaTiempo: [{ fecha: '2026-06-16T08:00:00.000Z', evento: 'Solicitud recibida' }],
+    });
+
+    const permitidas = new Set([
+      'numeroRadicado',
+      'fechaRadicacion',
+      'estadoPublico',
+      'dependencia',
+      'tipoSolicitud',
+      'fechaVencimiento',
+      'requiereAclaracion',
+      'fueRespondido',
+      'fechaRespuesta',
+      'canalRespuesta',
+      'respuestaDisponible',
+      'respuestaOficial',
+      'lineaTiempo',
+    ]);
+
+    for (const key of Object.keys(publico)) {
+      expect(permitidas.has(key)).toBe(true);
+    }
+  });
 });

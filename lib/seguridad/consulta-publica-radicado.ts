@@ -182,7 +182,11 @@ export function aRadicadoPublico(params: {
     : null;
   const fueRespondido = Boolean(params.fechaRespuestaSimi || respuestaOficial);
 
-  return {
+  // Sprint 1.5 — endurecimiento: literal asignado a variable tipada +
+  // `satisfies RadicadoPublico`. El excess property check de TS aplica
+  // sobre el literal cerrado y rechaza cualquier propiedad extra si un
+  // futuro cambio intenta filtrar campos internos del VentanillaRadicado.
+  const publico: RadicadoPublico = {
     numeroRadicado: radicado.radicadoId,
     fechaRadicacion: radicado.control.fechaRadicado,
     estadoPublico: mapEstadoCiudadano(radicado.estadoActual, fueRespondido),
@@ -198,5 +202,7 @@ export function aRadicadoPublico(params: {
     ...(params.canalRespuestaSimi ? { canalRespuesta: params.canalRespuestaSimi } : {}),
     ...(respuestaOficial ? { respuestaOficial } : {}),
     ...(params.lineaTiempo ? { lineaTiempo: params.lineaTiempo } : {}),
-  };
+  } satisfies RadicadoPublico;
+
+  return publico;
 }
