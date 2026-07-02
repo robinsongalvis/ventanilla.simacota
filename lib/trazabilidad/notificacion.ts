@@ -25,7 +25,9 @@ export type TipoNotificacion =
   | 'ASIGNACION'
   | 'PRORROGA'
   | 'RESPUESTA_OFICIAL'
-  | 'RESET_PASSWORD';
+  | 'RESET_PASSWORD'
+  /** Sprint Ventanilla Operativa 2 — envío manual de la constancia de radicación por correo. */
+  | 'CONSTANCIA';
 
 export type EstadoNotificacion = 'ENVIADA' | 'FALLIDA';
 

@@ -2580,7 +2580,32 @@ function DrawerNuevoRadicado({
   const [progreso,          setProgreso]          = useState('');
   const [progresoPct,       setProgresoPct]       = useState(0);
   const [errorGuardado,     setErrorGuardado]     = useState<string | null>(null);
+  // Sprint Ventanilla Operativa 2 — estado del envío de constancia por correo.
+  const [estadoEnvioConstancia,  setEstadoEnvioConstancia]  = useState<'idle' | 'enviando' | 'enviado' | 'error'>('idle');
+  const [mensajeEnvioConstancia, setMensajeEnvioConstancia] = useState<string | null>(null);
   const FORM_ID = 'rad-rapida-form';
+
+  async function handleEnviarConstancia(): Promise<void> {
+    if (!radicadoGenerado) return;
+    setEstadoEnvioConstancia('enviando');
+    setMensajeEnvioConstancia(null);
+    try {
+      const res = await fetch(
+        `/api/radicados/${encodeURIComponent(radicadoGenerado)}/enviar-constancia`,
+        { method: 'POST' },
+      );
+      if (!res.ok) {
+        const body = await res.json().catch(() => ({ error: 'Error desconocido.' }));
+        setEstadoEnvioConstancia('error');
+        setMensajeEnvioConstancia(body.error ?? 'No fue posible enviar la constancia.');
+        return;
+      }
+      setEstadoEnvioConstancia('enviado');
+    } catch {
+      setEstadoEnvioConstancia('error');
+      setMensajeEnvioConstancia('Error de red al enviar la constancia.');
+    }
+  }
 
   // Sprint UI Radicación Rápida:
   //  - Bloquear scroll del body mientras el modal está abierto.
@@ -2734,11 +2759,17 @@ function DrawerNuevoRadicado({
                 correoSolicitante={datosComprobante.correoSolicitante}
                 telefonoSolicitante={datosComprobante.telefonoSolicitante}
                 canalRespuesta={datosComprobante.canalRespuesta}
+                onEnviarCorreo={handleEnviarConstancia}
+                enviandoCorreo={estadoEnvioConstancia === 'enviando'}
+                estadoEnvio={estadoEnvioConstancia}
+                mensajeEnvioError={mensajeEnvioConstancia}
                 onNuevoRegistro={() => {
                   setRadicadoGenerado(null);
                   setDatosComprobante(null);
                   setProgreso('');
                   setProgresoPct(0);
+                  setEstadoEnvioConstancia('idle');
+                  setMensajeEnvioConstancia(null);
                 }}
               />
 
