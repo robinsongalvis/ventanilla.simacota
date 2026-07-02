@@ -249,7 +249,11 @@ function puedeUsarBandejaAsignacion(usuario: UsuarioAutenticado): boolean {
 }
 
 function puedeVerDependencias(usuario: UsuarioAutenticado): boolean {
-  return usuario.rol === 'ADMIN' || usuario.rol === 'CONTROL_INTERNO';
+  // Panel Op Nivel 2 — misma política que el alcance de datos: si el rol
+  // ve todos los tenants (ADMIN, CONTROL_INTERNO, RECEPCIONISTA), puede
+  // ver el panorama por dependencias. La Ventanilla responde consultas
+  // de todo el municipio y necesita esta vista.
+  return puedeVerTodosLosTenants(usuario.rol);
 }
 
 function puedeVerAnaliticaAvanzada(usuario: UsuarioAutenticado): boolean {
