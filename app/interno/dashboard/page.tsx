@@ -51,6 +51,16 @@ import type { TrazabilidadRadicado, VentanillaRadicado } from '@/src/types/venta
 import type { UsuarioAutenticado }        from '@/lib/hooks/useAuth';
 import { buildOficioInstitucional } from '@/lib/respuesta-oficial/oficio-institucional';
 import { ResumenDiarioModal, type ResumenDiarioData } from '@/app/interno/dashboard/components/ResumenDiarioModal';
+import {
+  filtrarSoloDatosIncompletos,
+  tieneDatosNoAportados,
+} from '@/lib/busqueda/filtros-radicado';
+import {
+  LABEL_ORIGEN_INGRESO,
+  LABEL_TIPO_ENTRADA,
+  LABEL_TIPO_PERSONA,
+  SIN_CLASIFICAR,
+} from '@/lib/labels/labels-operativos';
 
 
 /* ══════════════════════════════════════════════════════════════
@@ -73,41 +83,7 @@ const LABELS_ESTADO: Record<string, string> = {
 };
 
 /* Sprint Ventanilla Operativa 1 — Labels operativos */
-const LABEL_ORIGEN_INGRESO: Record<string, string> = {
-  PQRSD_WEB_OFICIAL:          'Portal web',
-  CORREO_INSTITUCIONAL:       'Correo inst.',
-  VENTANILLA_FISICA:          'Ventanilla',
-  ENTREGA_PRESENCIAL:         'Presencial',
-  OFICIO_EXTERNO:             'Oficio ext.',
-  COMUNICACION_INSTITUCIONAL: 'Com. inst.',
-  OTRO:                       'Otro',
-};
 
-const LABEL_TIPO_ENTRADA: Record<string, string> = {
-  PQRSD:                        'PQRSD',
-  CORRESPONDENCIA_RECIBIDA:     'Correspondencia',
-  OFICIO_INSTITUCIONAL:         'Oficio',
-  SOLICITUD_CIUDADANA:          'Solicitud',
-  COMUNICACION_ENTIDAD_PUBLICA: 'Ent. pública',
-  COMUNICACION_INTERNA:         'Interna',
-  OTRO:                         'Otro',
-};
-
-const LABEL_TIPO_PERSONA: Record<string, string> = {
-  NATURAL:                    'Persona natural',
-  JURIDICA:                   'Persona jurídica',
-  ENTIDAD_PUBLICA:            'Entidad pública',
-  COMUNICACION_INSTITUCIONAL: 'Com. institucional',
-  NO_IDENTIFICADO:            'No identificado',
-};
-
-/** True si el solicitante marcó al menos una casilla de "no aporta". */
-function tieneDatosNoAportados(
-  d?: { documento?: boolean; correo?: boolean; telefono?: boolean; direccion?: boolean } | null,
-): boolean {
-  if (!d) return false;
-  return Boolean(d.documento || d.correo || d.telefono || d.direccion);
-}
 
 const BADGE_ESTADO: Record<string, string> = {
   PENDIENTE:   'bg-yellow-50  text-yellow-800 border-yellow-200',
@@ -784,6 +760,8 @@ function TarjetasMIPG({
   onTenantChange,
   modoCompacto = false,
   onToggleCompacto,
+  soloDatosIncompletos = false,
+  onToggleDatosIncompletos,
 }: {
   metricas:       MetricasMIPGData;
   filtroActivo:   FiltroMIPG;
@@ -793,6 +771,8 @@ function TarjetasMIPG({
   onTenantChange: (t: TenantId | 'TODOS') => void;
   modoCompacto?:  boolean;
   onToggleCompacto?: () => void;
+  soloDatosIncompletos?: boolean;
+  onToggleDatosIncompletos?: () => void;
 }) {
   // Paleta operativa institucional: fondos claros + números y labels en
   // tonos de alto contraste (-700/-800). Cada KPI se identifica por el
@@ -887,6 +867,25 @@ function TarjetasMIPG({
             aria-pressed={modoCompacto}
           >
             {modoCompacto ? 'Mostrar paneles' : 'Minimizar paneles'}
+          </button>
+        )}
+
+        {/* Sprint 1.5 — Toggle "Datos incompletos": filtro operativo
+            secundario que se aplica ENCIMA del filtro MIPG activo. */}
+        {onToggleDatosIncompletos && (
+          <button
+            type="button"
+            onClick={onToggleDatosIncompletos}
+            className="shrink-0 text-[10px] font-bold uppercase tracking-widest px-3 py-2 rounded-lg border focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-500/30"
+            style={{
+              background: soloDatosIncompletos ? '#FBBF24' : 'white',
+              color:      soloDatosIncompletos ? '#78350F' : '#B45309',
+              borderColor: '#FBBF24',
+            }}
+            title="Mostrar solo radicados con datos no aportados por el solicitante"
+            aria-pressed={soloDatosIncompletos}
+          >
+            {soloDatosIncompletos ? '✓ Datos incompletos' : 'Datos incompletos'}
           </button>
         )}
 
@@ -1391,9 +1390,9 @@ function TablaRadicados({
                       <span
                         className="inline-flex items-center px-1.5 py-[1px] rounded text-[9px] font-semibold uppercase tracking-wide"
                         style={{ background: '#EEF4EE', color: '#14532D', border: '1px solid #D9E2D9' }}
-                        title={`Origen: ${LABEL_ORIGEN_INGRESO[r.control.origenIngreso ?? 'PQRSD_WEB_OFICIAL']}`}
+                        title={`Origen: ${LABEL_ORIGEN_INGRESO[r.control.origenIngreso ?? SIN_CLASIFICAR]}`}
                       >
-                        {LABEL_TIPO_ENTRADA[r.control.tipoEntrada ?? 'PQRSD']}
+                        {LABEL_TIPO_ENTRADA[r.control.tipoEntrada ?? SIN_CLASIFICAR]}
                       </span>
                       {tieneDatosNoAportados(r.solicitante.datosNoAportados) && (
                         <span
@@ -1981,11 +1980,11 @@ function PanelDerecho({
               <div className="grid grid-cols-2 gap-x-4 gap-y-3">
                 <FilaInfo
                   label="Origen"
-                  value={LABEL_ORIGEN_INGRESO[radicado.control.origenIngreso ?? 'PQRSD_WEB_OFICIAL']}
+                  value={LABEL_ORIGEN_INGRESO[radicado.control.origenIngreso ?? SIN_CLASIFICAR]}
                 />
                 <FilaInfo
                   label="Tipo entrada"
-                  value={LABEL_TIPO_ENTRADA[radicado.control.tipoEntrada ?? 'PQRSD']}
+                  value={LABEL_TIPO_ENTRADA[radicado.control.tipoEntrada ?? SIN_CLASIFICAR]}
                 />
                 <FilaInfo label="Remitente" value={LABEL_TIPO_PERSONA[radicado.solicitante.tipoPersona] ?? radicado.solicitante.tipoPersona} />
                 <FilaInfo label="Folios" value={String(radicado.detalle.numeroFolios)} />
@@ -3480,10 +3479,15 @@ function DashboardInterior({ usuario, cerrarSesion }: { usuario: UsuarioAutentic
 
   const metricas = useMemo(() => calcularMetricas(todosLosRadicados), [todosLosRadicados]);
 
-  const radicadosFiltrados = useMemo(
-    () => aplicarFiltroMIPG(todosLosRadicados, filtroMIPG, busqueda),
-    [todosLosRadicados, filtroMIPG, busqueda],
-  );
+  // Sprint 1.5 — toggle secundario "Datos incompletos" en la bandeja.
+  // Estado local del componente (no va al store global porque es un
+  // filtro efímero que no debe persistir entre sesiones).
+  const [soloDatosIncompletos, setSoloDatosIncompletos] = useState(false);
+
+  const radicadosFiltrados = useMemo(() => {
+    const base = aplicarFiltroMIPG(todosLosRadicados, filtroMIPG, busqueda);
+    return soloDatosIncompletos ? filtrarSoloDatosIncompletos(base) : base;
+  }, [todosLosRadicados, filtroMIPG, busqueda, soloDatosIncompletos]);
 
   const radicadosPendientes = useMemo(
     () => todosLosRadicados.filter((r) => r.estadoActual === 'PENDIENTE'),
@@ -3634,6 +3638,8 @@ function DashboardInterior({ usuario, cerrarSesion }: { usuario: UsuarioAutentic
               onTenantChange={(t) => dispatch({ type: 'SET_TENANT_FILTRO', tenant: t })}
               modoCompacto={indicadoresCompactos}
               onToggleCompacto={toggleIndicadoresModo}
+              soloDatosIncompletos={soloDatosIncompletos}
+              onToggleDatosIncompletos={() => setSoloDatosIncompletos((v) => !v)}
             />
 
             <PanelOperacionDependencia
