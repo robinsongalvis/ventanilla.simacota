@@ -4,7 +4,7 @@ export const dynamic = 'force-dynamic';
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
-import { collection, getDocs } from 'firebase/firestore';
+import { collection, getDocs, limit, orderBy, query } from 'firebase/firestore';
 import { signInWithEmailAndPassword }     from 'firebase/auth';
 import { getFirebaseAuth, getDb }         from '@/lib/firebase';
 import { useAuth }                        from '@/lib/hooks/useAuth';
@@ -44,6 +44,7 @@ import { ControlInternoDashboard }          from '@/app/interno/dashboard/compon
 import { CentroControlInterno }              from '@/app/interno/dashboard/components/control-interno/CentroControlInterno';
 import { InstitucionalHeader }               from '@/app/components/institucional/InstitucionalHeader';
 import { SelloRadicado }                     from '@/app/components/institucional/SelloRadicado';
+import { ResumenEjecutivoRadicado }          from '@/app/interno/dashboard/components/ResumenEjecutivoRadicado';
 import { useFuncionariosTenant }              from '@/lib/hooks/useFuncionariosTenant';
 import type { FuncionarioTenant }             from '@/lib/hooks/useFuncionariosTenant';
 import type { ResponsableFuncionario }        from '@/lib/actions/asignarRadicado';
@@ -1613,6 +1614,10 @@ function PanelDerecho({
   const [errorLocal,       setErrorLocal]       = useState<string | null>(null);
   const [trazabilidad,         setTrazabilidad]         = useState<TrazabilidadRadicado[]>([]);
   const [cargandoTrazabilidad, setCargandoTrazabilidad] = useState(false);
+  // Panel Op Fase 1 — último evento de trazabilidad para el resumen ejecutivo.
+  // Se carga con limit(1) al abrir el radicado y cuando cambia la marca
+  // `ultimaActualizacion` (para reflejar nuevas actuaciones sin recargar todo).
+  const [ultimoEvento, setUltimoEvento] = useState<TrazabilidadRadicado | null>(null);
   const [archivoPdf,           setArchivoPdf]           = useState<File | null>(null);
   // Estado local para la gestión manual de notificaciones fallidas
   const [mostrarGestionNotif,  setMostrarGestionNotif]  = useState(false);
@@ -1671,6 +1676,29 @@ function PanelDerecho({
       })
       .finally(() => setCargandoTrazabilidad(false));
   }, [tab, radicado.radicadoId]);
+
+  // Panel Op Fase 1 — último evento para el resumen ejecutivo.
+  // 1 lectura Firestore por apertura de radicado (barato). Se refresca
+  // cuando el radicado se actualiza (onSnapshot global cambia
+  // `ultimaActualizacion`).
+  useEffect(() => {
+    setUltimoEvento(null);
+    const q = query(
+      collection(getDb(), 'ventanilla_radicados', radicado.radicadoId, 'trazabilidad'),
+      orderBy('fecha', 'desc'),
+      limit(1),
+    );
+    getDocs(q)
+      .then((snap) => {
+        const doc0 = snap.docs[0];
+        setUltimoEvento(doc0 ? (doc0.data() as TrazabilidadRadicado) : null);
+      })
+      .catch(() => {
+        // Silencioso: si falla la lectura del último evento, el resumen
+        // muestra "—" y el resto de la vista sigue funcionando.
+        setUltimoEvento(null);
+      });
+  }, [radicado.radicadoId, radicado.ultimaActualizacion]);
 
   async function ejecutarAccion(accionFn: () => Promise<void>): Promise<boolean> {
     setGuardando(true);
@@ -2032,6 +2060,12 @@ function PanelDerecho({
         {/* ── TAB 1: Información ── */}
         {tab === 'info' && (
           <>
+            {/* Panel Op Fase 1 — resumen ejecutivo al inicio del tab info. */}
+            <ResumenEjecutivoRadicado
+              radicado={radicado}
+              ultimoEvento={ultimoEvento}
+            />
+
             <SelloRadicado
               variant="compact"
               data={{
