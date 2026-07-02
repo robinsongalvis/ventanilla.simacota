@@ -54,6 +54,11 @@ import {
 import { puedeVerTodosLosTenants } from '@/lib/permisos/alcance-tenants';
 import { BarraFiltrosActivos } from '@/app/interno/dashboard/components/BarraFiltrosActivos';
 import type { EstadoFiltros, DimensionFiltro } from '@/lib/filtros-activos/resumir-filtros-activos';
+import { TarjetaMIPGGrande } from '@/app/interno/dashboard/components/TarjetaMIPGGrande';
+import {
+  radicadoMasCriticoPorFiltro,
+  type FiltroGrande,
+} from '@/lib/kpis-mipg/radicado-mas-critico';
 import { useFuncionariosTenant }              from '@/lib/hooks/useFuncionariosTenant';
 import type { FuncionarioTenant }             from '@/lib/hooks/useFuncionariosTenant';
 import type { ResponsableFuncionario }        from '@/lib/actions/asignarRadicado';
@@ -765,6 +770,15 @@ interface TarjetaMIPGItem {
   icono?:    React.ReactNode;
 }
 
+/** Panel Op Nivel 3B — los 4 KPIs accionables van como tarjetas grandes. */
+const FILTROS_GRANDES: FiltroGrande[] = ['VENCIDAS', 'POR_VENCER', 'RADICADAS', 'ASIGNADAS'];
+const CRITICO_LABEL: Record<FiltroGrande, string> = {
+  VENCIDAS:   'Más crítico',
+  POR_VENCER: 'Más crítico',
+  RADICADAS:  'Más antiguo sin asignar',
+  ASIGNADAS:  'Más próximo a vencer',
+};
+
 function TarjetasMIPG({
   metricas,
   filtroActivo,
@@ -776,6 +790,8 @@ function TarjetasMIPG({
   onToggleCompacto,
   soloDatosIncompletos = false,
   onToggleDatosIncompletos,
+  radicados,
+  onAbrirRadicado,
 }: {
   metricas:       MetricasMIPGData;
   filtroActivo:   FiltroMIPG;
@@ -789,6 +805,10 @@ function TarjetasMIPG({
   onToggleCompacto?: () => void;
   soloDatosIncompletos?: boolean;
   onToggleDatosIncompletos?: () => void;
+  /** Panel Op Nivel 3B — lista completa para calcular el radicado
+   *  crítico de cada tarjeta grande. */
+  radicados:      VentanillaRadicado[];
+  onAbrirRadicado: (id: string) => void;
 }) {
   // Paleta operativa institucional: fondos claros + números y labels en
   // tonos de alto contraste (-700/-800). Cada KPI se identifica por el
@@ -865,113 +885,158 @@ function TarjetasMIPG({
     ? { wrap: 'px-3 sm:px-4 py-1.5', card: 'px-2.5 py-1', num: 'text-base', label: 'text-[9px] mt-0' }
     : { wrap: 'px-3 sm:px-4 py-3',    card: 'px-4 py-3',    num: 'text-2xl', label: 'text-[10px] mt-0.5' };
 
+  // Panel Op Nivel 3B — mapa por filtro para partir en grandes/compactas.
+  const porFiltro = new Map(tarjetas.map((t) => [t.filtro, t]));
+  const tarjetasCompactas = tarjetas.filter(
+    (t) => !(FILTROS_GRANDES as string[]).includes(t.filtro),
+  );
+
+  const controlesTop = (
+    <>
+      {onToggleCompacto && (
+        <button
+          type="button"
+          onClick={onToggleCompacto}
+          className="shrink-0 text-[10px] font-bold uppercase tracking-widest px-3 py-2 rounded-lg border focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-700/30"
+          style={{
+            background: modoCompacto ? '#14532D' : 'white',
+            color: modoCompacto ? 'white' : '#14532D',
+            borderColor: '#14532D',
+          }}
+          title={modoCompacto ? 'Mostrar Bandeja Operativa y Siguiente Atención' : 'Minimizar paneles operativos y ampliar la lista de radicados'}
+          aria-pressed={modoCompacto}
+        >
+          {modoCompacto ? 'Mostrar paneles' : 'Minimizar paneles'}
+        </button>
+      )}
+      {onToggleDatosIncompletos && (
+        <button
+          type="button"
+          onClick={onToggleDatosIncompletos}
+          className="shrink-0 text-[10px] font-bold uppercase tracking-widest px-3 py-2 rounded-lg border focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-500/30"
+          style={{
+            background: soloDatosIncompletos ? '#FBBF24' : 'white',
+            color:      soloDatosIncompletos ? '#78350F' : '#B45309',
+            borderColor: '#FBBF24',
+          }}
+          title="Mostrar solo radicados con datos no aportados por el solicitante"
+          aria-pressed={soloDatosIncompletos}
+        >
+          {soloDatosIncompletos ? '✓ Datos incompletos' : 'Datos incompletos'}
+        </button>
+      )}
+      {veTodosTenants && (
+        <div className="shrink-0 flex items-center ml-auto">
+          <select
+            value={tenantFiltro}
+            onChange={(e) => onTenantChange(e.target.value as TenantId | 'TODOS')}
+            className="select-internal text-xs"
+            aria-label="Filtrar por dependencia"
+          >
+            <option value="TODOS">Todas las dependencias</option>
+            {(Object.keys(DIRECTORIO_TENANTS) as TenantId[]).map((id) => (
+              <option key={id} value={id}>{NOMBRES_TENANT[id]}</option>
+            ))}
+          </select>
+        </div>
+      )}
+    </>
+  );
+
+  const tarjetaTodos = (extraCls: string) => (
+    <button
+      onClick={() => onFiltroChange('TODOS')}
+      className={`micro-card shrink-0 flex flex-col items-start ${extraCls} rounded-xl border-l-4 cursor-pointer focus-visible:outline-none`}
+      style={{
+        background: filtroActivo === 'TODOS' ? '#EEF4EE' : '#F8FAF7',
+        border: `1px solid ${filtroActivo === 'TODOS' ? '#14532D' : '#D9E2D9'}`,
+        borderLeftColor: '#14532D',
+        borderLeftWidth: 4,
+      }}
+    >
+      <span className={`${cls.num} font-black leading-none tabular-nums`} style={{ color: '#14532D' }}>
+        {tarjetas.reduce((s, t) => s + t.valor, 0)}
+      </span>
+      <span className={`${cls.label} font-bold uppercase tracking-widest`} style={{ color: '#667085' }}>Todos</span>
+    </button>
+  );
+
+  const tarjetaPequena = (t: TarjetaMIPGItem) => {
+    const activo = filtroActivo === t.filtro;
+    return (
+      <button
+        key={t.filtro}
+        onClick={() => onFiltroChange(t.filtro)}
+        aria-pressed={activo}
+        className={`micro-card shrink-0 flex flex-col items-start ${cls.card} rounded-xl cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-700/30`}
+        style={{
+          background: activo ? '#EEF4EE' : '#F8FAF7',
+          border: `1px solid ${activo ? '#14532D' : '#D9E2D9'}`,
+          borderLeftColor: t.rielColor,
+          borderLeftWidth: 4,
+        }}
+      >
+        <span className={`${cls.num} font-black leading-none tabular-nums flex items-center gap-1`} style={{ color: t.textoColor }}>
+          {t.icono && <span className="mt-0.5">{t.icono}</span>}
+          {t.valor}
+        </span>
+        <span className={`${cls.label} font-bold uppercase tracking-widest`} style={{ color: t.textoColor }}>
+          {t.label}
+        </span>
+      </button>
+    );
+  };
+
+  // Modo compacto: una sola fila con todas las tarjetas pequeñas
+  // (comportamiento previo intacto para dar altura a la lista).
+  if (modoCompacto) {
+    return (
+      <div className={`${cls.wrap} shrink-0 bg-white`} style={{ borderBottom: '1px solid #D9E2D9' }}>
+        <div className="flex gap-2 overflow-x-auto pb-0.5 items-center">
+          {controlesTop}
+          {tarjetaTodos(cls.card)}
+          {tarjetas.map(tarjetaPequena)}
+        </div>
+      </div>
+    );
+  }
+
+  // Modo expandido (default): 4 tarjetas grandes con radicado crítico +
+  // fila compacta con los KPIs restantes.
   return (
     <div className={`${cls.wrap} shrink-0 bg-white`} style={{ borderBottom: '1px solid #D9E2D9' }}>
-      <div className="flex gap-2 overflow-x-auto pb-0.5 items-center">
-        {/* Toggle Vista amplia de radicados */}
-        {onToggleCompacto && (
-          <button
-            type="button"
-            onClick={onToggleCompacto}
-            className="shrink-0 text-[10px] font-bold uppercase tracking-widest px-3 py-2 rounded-lg border focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-700/30"
-            style={{
-              background: modoCompacto ? '#14532D' : 'white',
-              color: modoCompacto ? 'white' : '#14532D',
-              borderColor: '#14532D',
-            }}
-            title={modoCompacto ? 'Mostrar Bandeja Operativa y Siguiente Atención' : 'Minimizar paneles operativos y ampliar la lista de radicados'}
-            aria-pressed={modoCompacto}
-          >
-            {modoCompacto ? 'Mostrar paneles' : 'Minimizar paneles'}
-          </button>
-        )}
+      <div className="flex gap-2 items-center mb-2">
+        {controlesTop}
+      </div>
 
-        {/* Sprint 1.5 — Toggle "Datos incompletos": filtro operativo
-            secundario que se aplica ENCIMA del filtro MIPG activo. */}
-        {onToggleDatosIncompletos && (
-          <button
-            type="button"
-            onClick={onToggleDatosIncompletos}
-            className="shrink-0 text-[10px] font-bold uppercase tracking-widest px-3 py-2 rounded-lg border focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-500/30"
-            style={{
-              background: soloDatosIncompletos ? '#FBBF24' : 'white',
-              color:      soloDatosIncompletos ? '#78350F' : '#B45309',
-              borderColor: '#FBBF24',
-            }}
-            title="Mostrar solo radicados con datos no aportados por el solicitante"
-            aria-pressed={soloDatosIncompletos}
-          >
-            {soloDatosIncompletos ? '✓ Datos incompletos' : 'Datos incompletos'}
-          </button>
-        )}
-
-        {/* Tarjeta TODOS */}
-        <button
-          onClick={() => onFiltroChange('TODOS')}
-          className={`micro-card shrink-0 flex flex-col items-start ${cls.card} rounded-xl border-l-4 cursor-pointer focus-visible:outline-none`}
-          style={{
-            background: filtroActivo === 'TODOS' ? '#EEF4EE' : '#F8FAF7',
-            border: `1px solid ${filtroActivo === 'TODOS' ? '#14532D' : '#D9E2D9'}`,
-            borderLeftColor: '#14532D',
-            borderLeftWidth: 4,
-          }}
-        >
-          <span className={`${cls.num} font-black leading-none tabular-nums`} style={{ color: '#14532D' }}>
-            {tarjetas.reduce((s, t) => s + t.valor, 0)}
-          </span>
-          <span className={`${cls.label} font-bold uppercase tracking-widest`} style={{ color: '#667085' }}>Todos</span>
-        </button>
-
-        {tarjetas.map((t) => {
-          const activo = filtroActivo === t.filtro;
+      <div className="flex gap-2 overflow-x-auto pb-1 items-stretch">
+        {tarjetaTodos('px-4 py-3 justify-center')}
+        {FILTROS_GRANDES.map((filtro) => {
+          const t = porFiltro.get(filtro);
+          if (!t) return null;
           return (
-            <button
-              key={t.filtro}
-              onClick={() => onFiltroChange(t.filtro)}
-              aria-pressed={activo}
-              className={`micro-card shrink-0 flex flex-col items-start ${cls.card} rounded-xl cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-700/30`}
-              style={{
-                background: activo ? '#EEF4EE' : '#F8FAF7',
-                border: `1px solid ${activo ? '#14532D' : '#D9E2D9'}`,
-                borderLeftColor: t.rielColor,
-                borderLeftWidth: 4,
-              }}
-            >
-              <span
-                className={`${cls.num} font-black leading-none tabular-nums flex items-center gap-1`}
-                style={{ color: t.textoColor }}
-              >
-                {t.icono && <span className="mt-0.5">{t.icono}</span>}
-                {t.valor}
-              </span>
-              <span
-                className={`${cls.label} font-bold uppercase tracking-widest`}
-                style={{ color: t.textoColor }}
-              >
-                {t.label}
-              </span>
-            </button>
+            <TarjetaMIPGGrande
+              key={filtro}
+              label={t.label}
+              valor={t.valor}
+              icono={t.icono ?? null}
+              color={t.rielColor}
+              razonColor={t.textoColor}
+              criticoLabel={CRITICO_LABEL[filtro]}
+              activo={filtroActivo === filtro}
+              critico={radicadoMasCriticoPorFiltro(radicados, filtro)}
+              onFiltrar={() => onFiltroChange(filtro)}
+              onAbrirRadicado={onAbrirRadicado}
+            />
           );
         })}
-
-        {/* Selector de dependencia — roles con visión municipal
-            (ADMIN, CONTROL_INTERNO, RECEPCIONISTA). */}
-        {veTodosTenants && (
-          <div className="shrink-0 flex items-center ml-auto">
-            <select
-              value={tenantFiltro}
-              onChange={(e) => onTenantChange(e.target.value as TenantId | 'TODOS')}
-              className="select-internal text-xs"
-              aria-label="Filtrar por dependencia"
-            >
-              <option value="TODOS">Todas las dependencias</option>
-              {(Object.keys(DIRECTORIO_TENANTS) as TenantId[]).map((id) => (
-                <option key={id} value={id}>{NOMBRES_TENANT[id]}</option>
-              ))}
-            </select>
-          </div>
-        )}
       </div>
+
+      {tarjetasCompactas.length > 0 && (
+        <div className="flex gap-2 overflow-x-auto pt-2 items-center">
+          {tarjetasCompactas.map(tarjetaPequena)}
+        </div>
+      )}
     </div>
   );
 }
@@ -3903,6 +3968,8 @@ function DashboardInterior({ usuario, cerrarSesion }: { usuario: UsuarioAutentic
               onToggleCompacto={toggleIndicadoresModo}
               soloDatosIncompletos={soloDatosIncompletos}
               onToggleDatosIncompletos={() => setSoloDatosIncompletos((v) => !v)}
+              radicados={todosLosRadicados}
+              onAbrirRadicado={(id) => abrirRadicadoPorId(id)}
             />
 
             {/* Panel Op Fase 2 — barra secundaria de KPIs operativos. */}
