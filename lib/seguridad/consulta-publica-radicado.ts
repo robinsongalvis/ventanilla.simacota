@@ -22,6 +22,9 @@ const ACCIONES_PUBLICAS = new Map<string, string>([
   ['CAMBIO_ESTADO', 'Estado actualizado'],
   ['DEVOLUCION', 'Se requiere información adicional'],
   ['RESPUESTA_FUNCIONARIO', 'Respuesta oficial registrada'],
+  // Sprint 1.5: DATOS_NO_APORTADOS_MARCADOS NO se mapea aquí — es un
+  // evento operativo interno, no debe aparecer en la línea de tiempo
+  // pública del ciudadano.
 ]);
 
 export const MENSAJE_CONSULTA_NO_VERIFICADA =

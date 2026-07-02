@@ -1,12 +1,18 @@
 import { describe, expect, it } from 'vitest';
-import type { VentanillaRadicado } from '@/src/types/ventanilla';
+import type { TrazabilidadRadicado, VentanillaRadicado } from '@/src/types/ventanilla';
 import {
   buscarRadicados,
   type AlcanceRol,
   type FiltrosBusqueda,
 } from '@/lib/busqueda/filtros-radicado';
-import { aRadicadoPublico } from '@/lib/seguridad/consulta-publica-radicado';
-import { RadicacionValidacionError } from '@/lib/actions/radicarVentanilla';
+import {
+  aLineaTiempoPublica,
+  aRadicadoPublico,
+} from '@/lib/seguridad/consulta-publica-radicado';
+import {
+  construirNotaDatosNoAportados,
+  RadicacionValidacionError,
+} from '@/lib/actions/radicarVentanilla';
 import {
   validarReglasRadicacion,
   MENSAJE_CORREO_NO_APORTADO_CORREO,
@@ -401,5 +407,64 @@ describe('Sprint Ventanilla Operativa 1 — consulta pública no expone campos i
     for (const key of Object.keys(publico)) {
       expect(permitidas.has(key)).toBe(true);
     }
+  });
+});
+
+/* ══════════════════════════════════════════════════════════════
+   5 · Sprint 1.5 — evento DATOS_NO_APORTADOS_MARCADOS
+══════════════════════════════════════════════════════════════ */
+
+describe('Sprint 1.5 — trazabilidad de datos no aportados', () => {
+  /* 15 */
+  it('construirNotaDatosNoAportados enumera solo las casillas marcadas', () => {
+    expect(construirNotaDatosNoAportados({ correo: true, telefono: true }))
+      .toBe('El solicitante no aportó: correo, teléfono.');
+    expect(construirNotaDatosNoAportados({ documento: true, direccion: true }))
+      .toBe('El solicitante no aportó: documento, dirección.');
+    expect(construirNotaDatosNoAportados({ correo: true }))
+      .toBe('El solicitante no aportó: correo.');
+    expect(construirNotaDatosNoAportados({
+      documento: true, correo: true, telefono: true, direccion: true,
+    })).toBe('El solicitante no aportó: documento, correo, teléfono, dirección.');
+  });
+
+  /* 16 — defensa contra invocación incorrecta.
+     Precondición: el caller (radicarInstitucionalmente) NO debe llamar
+     al helper sin marcas activas. El guard `if (hayNoAportados)` lo
+     garantiza. Si un futuro refactor rompe el guard, este test asegura
+     que la nota resultante sigue siendo legible en Firestore. */
+  it('construirNotaDatosNoAportados retorna nota limpia si por error no hay marcas', () => {
+    expect(construirNotaDatosNoAportados({}))
+      .toBe('El solicitante aportó todos los datos requeridos.');
+    expect(construirNotaDatosNoAportados({
+      documento: false, correo: false, telefono: false, direccion: false,
+    })).toBe('El solicitante aportó todos los datos requeridos.');
+  });
+
+  /* 17 — el evento nunca se muestra al ciudadano.
+     Verifica que `aLineaTiempoPublica` filtra el evento operativo
+     interno y solo deja los del set público conocido. */
+  it('aLineaTiempoPublica excluye DATOS_NO_APORTADOS_MARCADOS', () => {
+    const eventos: TrazabilidadRadicado[] = [
+      {
+        fecha: '2026-06-01T08:00:00.000Z',
+        accion: 'RADICACION',
+        actorUid: 'u',
+        actorNombre: 'Funcionaria',
+        nota: 'Radicación inicial',
+      },
+      {
+        fecha: '2026-06-01T08:00:01.000Z',
+        accion: 'DATOS_NO_APORTADOS_MARCADOS',
+        actorUid: 'u',
+        actorNombre: 'Funcionaria',
+        nota: 'El solicitante no aportó: correo.',
+        metadata: { documento: false, correo: true, telefono: false, direccion: false },
+      },
+    ];
+    const publica = aLineaTiempoPublica(eventos);
+    expect(publica).toHaveLength(1);
+    expect(publica[0].evento).toBe('Solicitud recibida');
+    expect(publica.every((p) => !/aport/i.test(p.evento))).toBe(true);
   });
 });
