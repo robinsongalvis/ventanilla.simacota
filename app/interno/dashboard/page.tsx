@@ -45,6 +45,12 @@ import { CentroControlInterno }              from '@/app/interno/dashboard/compo
 import { InstitucionalHeader }               from '@/app/components/institucional/InstitucionalHeader';
 import { SelloRadicado }                     from '@/app/components/institucional/SelloRadicado';
 import { ResumenEjecutivoRadicado }          from '@/app/interno/dashboard/components/ResumenEjecutivoRadicado';
+import { BarraKpisOperativos }               from '@/app/interno/dashboard/components/BarraKpisOperativos';
+import { calcularKpisOperativos }            from '@/lib/kpis-operativos/calcular-kpis-operativos';
+import {
+  filtrarPorKpiOperativo,
+  type FiltroKpiOperativo,
+} from '@/lib/kpis-operativos/filtrar-por-kpi-operativo';
 import { useFuncionariosTenant }              from '@/lib/hooks/useFuncionariosTenant';
 import type { FuncionarioTenant }             from '@/lib/hooks/useFuncionariosTenant';
 import type { ResponsableFuncionario }        from '@/lib/actions/asignarRadicado';
@@ -3685,10 +3691,17 @@ function DashboardInterior({ usuario, cerrarSesion }: { usuario: UsuarioAutentic
   // filtro efímero que no debe persistir entre sesiones).
   const [soloDatosIncompletos, setSoloDatosIncompletos] = useState(false);
 
+  // Panel Op Fase 2 — KPIs operativos y filtro operativo secundario.
+  // Ambos son efímeros: no persisten entre sesiones. Solo un filtro
+  // operativo activo a la vez, combinable con el filtro MIPG.
+  const kpisOperativos = useMemo(() => calcularKpisOperativos(todosLosRadicados), [todosLosRadicados]);
+  const [filtroOperativo, setFiltroOperativo] = useState<FiltroKpiOperativo>('NINGUNO');
+
   const radicadosFiltrados = useMemo(() => {
-    const base = aplicarFiltroMIPG(todosLosRadicados, filtroMIPG, busqueda);
-    return soloDatosIncompletos ? filtrarSoloDatosIncompletos(base) : base;
-  }, [todosLosRadicados, filtroMIPG, busqueda, soloDatosIncompletos]);
+    const conMipg = aplicarFiltroMIPG(todosLosRadicados, filtroMIPG, busqueda);
+    const conOp   = filtrarPorKpiOperativo(conMipg, filtroOperativo);
+    return soloDatosIncompletos ? filtrarSoloDatosIncompletos(conOp) : conOp;
+  }, [todosLosRadicados, filtroMIPG, busqueda, filtroOperativo, soloDatosIncompletos]);
 
   const radicadosPendientes = useMemo(
     () => todosLosRadicados.filter((r) => r.estadoActual === 'PENDIENTE'),
@@ -3841,6 +3854,13 @@ function DashboardInterior({ usuario, cerrarSesion }: { usuario: UsuarioAutentic
               onToggleCompacto={toggleIndicadoresModo}
               soloDatosIncompletos={soloDatosIncompletos}
               onToggleDatosIncompletos={() => setSoloDatosIncompletos((v) => !v)}
+            />
+
+            {/* Panel Op Fase 2 — barra secundaria de KPIs operativos. */}
+            <BarraKpisOperativos
+              kpis={kpisOperativos}
+              filtroActivo={filtroOperativo}
+              onChange={setFiltroOperativo}
             />
 
             <PanelOperacionDependencia
