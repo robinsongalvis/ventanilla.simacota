@@ -52,6 +52,8 @@ import {
   type FiltroKpiOperativo,
 } from '@/lib/kpis-operativos/filtrar-por-kpi-operativo';
 import { puedeVerTodosLosTenants } from '@/lib/permisos/alcance-tenants';
+import { BarraFiltrosActivos } from '@/app/interno/dashboard/components/BarraFiltrosActivos';
+import type { EstadoFiltros, DimensionFiltro } from '@/lib/filtros-activos/resumir-filtros-activos';
 import { useFuncionariosTenant }              from '@/lib/hooks/useFuncionariosTenant';
 import type { FuncionarioTenant }             from '@/lib/hooks/useFuncionariosTenant';
 import type { ResponsableFuncionario }        from '@/lib/actions/asignarRadicado';
@@ -3719,6 +3721,34 @@ function DashboardInterior({ usuario, cerrarSesion }: { usuario: UsuarioAutentic
     return soloDatosIncompletos ? filtrarSoloDatosIncompletos(conOp) : conOp;
   }, [todosLosRadicados, filtroMIPG, busqueda, filtroOperativo, soloDatosIncompletos]);
 
+  // Panel Op Nivel 3A — estado combinado de las 5 dimensiones de filtro
+  // para la barra de filtros activos. Reúne store + estado local.
+  const estadoFiltros: EstadoFiltros = {
+    filtroMIPG,
+    filtroOperativo,
+    tenantFiltro,
+    soloDatosIncompletos,
+    busqueda,
+  };
+
+  function quitarDimensionFiltro(dimension: DimensionFiltro) {
+    switch (dimension) {
+      case 'MIPG':              dispatch({ type: 'SET_FILTRO_MIPG', filtro: 'TODOS' }); break;
+      case 'OPERATIVO':         setFiltroOperativo('NINGUNO'); break;
+      case 'TENANT':            dispatch({ type: 'SET_TENANT_FILTRO', tenant: 'TODOS' }); break;
+      case 'DATOS_INCOMPLETOS': setSoloDatosIncompletos(false); break;
+      case 'BUSQUEDA':          dispatch({ type: 'SET_BUSQUEDA', busqueda: '' }); break;
+    }
+  }
+
+  function limpiarTodosLosFiltros() {
+    dispatch({ type: 'SET_FILTRO_MIPG', filtro: 'TODOS' });
+    dispatch({ type: 'SET_TENANT_FILTRO', tenant: 'TODOS' });
+    dispatch({ type: 'SET_BUSQUEDA', busqueda: '' });
+    setFiltroOperativo('NINGUNO');
+    setSoloDatosIncompletos(false);
+  }
+
   const radicadosPendientes = useMemo(
     () => todosLosRadicados.filter((r) => r.estadoActual === 'PENDIENTE'),
     [todosLosRadicados],
@@ -3880,6 +3910,13 @@ function DashboardInterior({ usuario, cerrarSesion }: { usuario: UsuarioAutentic
               kpis={kpisOperativos}
               filtroActivo={filtroOperativo}
               onChange={setFiltroOperativo}
+            />
+
+            {/* Panel Op Nivel 3A — barra de filtros activos (solo si hay). */}
+            <BarraFiltrosActivos
+              estado={estadoFiltros}
+              onQuitarDimension={quitarDimensionFiltro}
+              onLimpiarTodo={limpiarTodosLosFiltros}
             />
 
             <PanelOperacionDependencia
