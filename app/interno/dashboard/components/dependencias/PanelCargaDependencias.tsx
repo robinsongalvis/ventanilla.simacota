@@ -3,7 +3,8 @@
 import type { VentanillaRadicado } from '@/src/types/ventanilla';
 import type { TenantId } from '@/src/types/radicado';
 import { useCargaDependencias, type AlertaTono, type CargaDependencia } from './useCargaDependencias';
-import { useVentanilla } from '@/lib/store/ventanillaStore';
+import { filtroMipgParaCelda, type CeldaDependencia } from './filtro-celda';
+import { useVentanilla, type FiltroMIPG } from '@/lib/store/ventanillaStore';
 
 /* ── Paleta institucional clara por tono ──────────────────────── */
 
@@ -55,18 +56,57 @@ const CHIP_CLS_VENC  = 'bg-red-50     text-red-700    border-red-200';
 
 /* ── ChipEstado ─────────────────────────────────────────────── */
 
-function ChipEstado({ valor, label, cls }: { valor: number; label: string; cls: string }) {
+function ChipEstado({
+  valor,
+  label,
+  cls,
+  onClick,
+  ariaLabel,
+}: {
+  valor: number;
+  label: string;
+  cls: string;
+  /** Panel Op Nivel 2 — clic en el chip navega a la bandeja filtrada
+   *  por dependencia + estado (la celda de la matriz es navegable). */
+  onClick?: () => void;
+  ariaLabel?: string;
+}) {
   if (valor === 0) return null;
+  if (!onClick) {
+    return (
+      <span className={`inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-bold tabular-nums border leading-none ${cls}`}>
+        {label}&nbsp;{valor}
+      </span>
+    );
+  }
   return (
-    <span className={`inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-bold tabular-nums border leading-none ${cls}`}>
+    <button
+      type="button"
+      onClick={onClick}
+      aria-label={ariaLabel}
+      title={ariaLabel}
+      className={`inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-bold tabular-nums border leading-none cursor-pointer transition-transform active:scale-95 hover:ring-2 hover:ring-emerald-700/20 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-700/40 ${cls}`}
+    >
       {label}&nbsp;{valor}
-    </span>
+    </button>
   );
 }
 
 /* ── FilaDependencia ────────────────────────────────────────── */
 
-function FilaDependencia({ dep, onVer }: { dep: CargaDependencia; onVer: (id: TenantId) => void }) {
+function FilaDependencia({
+  dep,
+  onVer,
+  onVerCelda,
+}: {
+  dep: CargaDependencia;
+  onVer: (id: TenantId) => void;
+  onVerCelda: (id: TenantId, celda: CeldaDependencia) => void;
+}) {
+  const celda = (c: CeldaDependencia, valor: number) => ({
+    onClick:   () => onVerCelda(dep.tenantId, c),
+    ariaLabel: `Ver ${valor} radicado${valor === 1 ? '' : 's'} (${c}) de ${dep.nombre}`,
+  });
   return (
     <tr
       className={`border-l-4 ${SPINE_CLS[dep.alertaTono]} transition-colors group`}
@@ -92,10 +132,10 @@ function FilaDependencia({ dep, onVer }: { dep: CargaDependencia; onVer: (id: Te
       {/* Chips de estado */}
       <td className="px-4 py-3">
         <div className="flex items-center gap-1 flex-wrap min-w-[160px]">
-          <ChipEstado valor={dep.pendientes} label="PEND" cls={CHIP_CLS_PEND} />
-          <ChipEstado valor={dep.enProceso}  label="PROC" cls={CHIP_CLS_PROC} />
-          <ChipEstado valor={dep.porVencer}  label="PV"   cls={CHIP_CLS_PV}   />
-          <ChipEstado valor={dep.vencidos}   label="VENC" cls={CHIP_CLS_VENC} />
+          <ChipEstado valor={dep.pendientes} label="PEND" cls={CHIP_CLS_PEND} {...celda('pendientes', dep.pendientes)} />
+          <ChipEstado valor={dep.enProceso}  label="PROC" cls={CHIP_CLS_PROC} {...celda('enProceso',  dep.enProceso)}  />
+          <ChipEstado valor={dep.porVencer}  label="PV"   cls={CHIP_CLS_PV}   {...celda('porVencer',  dep.porVencer)}  />
+          <ChipEstado valor={dep.vencidos}   label="VENC" cls={CHIP_CLS_VENC} {...celda('vencidos',   dep.vencidos)}   />
           {dep.total === 0 && (
             <span className="text-[10px] italic" style={{ color: '#94A3B8' }}>sin carga</span>
           )}
@@ -153,6 +193,17 @@ export function PanelCargaDependencias({ radicados }: { radicados: VentanillaRad
     dispatch({ type: 'SET_TENANT_FILTRO', tenant: tenantId });
     dispatch({ type: 'SET_FILTRO_MIPG',   filtro: 'TODOS'   });
     dispatch({ type: 'SET_VISTA',          vista:  'TABLERO' });
+  }
+
+  // Panel Op Nivel 2 — la celda de la matriz es navegable: clic en un
+  // chip abre la bandeja filtrada por esa dependencia Y ese estado.
+  // El conteo del chip coincide exactamente con las filas visibles
+  // (mismos criterios en useCargaDependencias y aplicarFiltroMIPG).
+  function verCelda(tenantId: TenantId, celda: CeldaDependencia) {
+    const filtro: FiltroMIPG = filtroMipgParaCelda(celda);
+    dispatch({ type: 'SET_TENANT_FILTRO', tenant: tenantId });
+    dispatch({ type: 'SET_FILTRO_MIPG',   filtro });
+    dispatch({ type: 'SET_VISTA',          vista: 'TABLERO' });
   }
 
   return (
@@ -215,7 +266,7 @@ export function PanelCargaDependencias({ radicados }: { radicados: VentanillaRad
           </thead>
           <tbody>
             {deps.map((dep) => (
-              <FilaDependencia key={dep.tenantId} dep={dep} onVer={verDependencia} />
+              <FilaDependencia key={dep.tenantId} dep={dep} onVer={verDependencia} onVerCelda={verCelda} />
             ))}
           </tbody>
         </table>
