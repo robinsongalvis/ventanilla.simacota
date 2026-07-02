@@ -10,6 +10,7 @@ import {
   type QueryConstraint,
 } from 'firebase/firestore';
 import { getDb } from '@/lib/firebase';
+import { puedeVerTodosLosTenants } from '@/lib/permisos/alcance-tenants';
 import type { VentanillaRadicado } from '@/src/types/ventanilla';
 import type { TenantId } from '@/src/types/radicado';
 import type { UsuarioAutenticado } from './useAuth';
@@ -52,9 +53,12 @@ export function useVentanillaRadicados(
 
     const constraints: QueryConstraint[] = [];
 
-    // ADMIN y CONTROL_INTERNO ven todos los tenants (o filtran por tenantFiltro).
-    // RECEPCIONISTA, FUNCIONARIO y JEFE_DEPENDENCIA ven solo su dependencia.
-    const puedeVerTodo = usuario.rol === 'ADMIN' || usuario.rol === 'CONTROL_INTERNO';
+    // Panel Op Nivel 1 — ADMIN, CONTROL_INTERNO y RECEPCIONISTA ven todos
+    // los tenants (o filtran por tenantFiltro). La Ventanilla es la cara
+    // del municipio y responde consultas de cualquier dependencia; las
+    // reglas de Firestore y la búsqueda avanzada ya lo permitían.
+    // FUNCIONARIO y JEFE_DEPENDENCIA ven solo su dependencia.
+    const puedeVerTodo = puedeVerTodosLosTenants(usuario.rol);
     const effectiveTenant: TenantId | null = puedeVerTodo
       ? tenantFiltro !== 'TODOS' ? tenantFiltro : null
       : usuario.tenantId;
