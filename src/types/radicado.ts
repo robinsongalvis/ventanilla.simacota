@@ -48,7 +48,9 @@ export type AccionAuditoria =
   | 'NOTIFICACION_OMITIDA_DUPLICADA'
   | 'NOTIFICACION_GESTIONADA_MANUALMENTE'
   /** Sprint 1.5 — el solicitante no aportó uno o más datos básicos (correo, teléfono, documento o dirección). */
-  | 'DATOS_NO_APORTADOS_MARCADOS';
+  | 'DATOS_NO_APORTADOS_MARCADOS'
+  /** Sprint Ventanilla Operativa 2 — la funcionaria envió la constancia de radicación al correo del solicitante. */
+  | 'CONSTANCIA_ENVIADA_CORREO';
 
 export interface AuditoriaEntry {
   fecha:    string;

@@ -2558,6 +2558,13 @@ interface DatosComprobante {
   asunto:            string;
   fechaVencimiento:  string;
   numeroFolios:      number;
+  /** Sprint Ventanilla Operativa 2 — datos de contacto y canal de
+   *  respuesta requeridos por el comprobante nuevo. `correoSolicitante`
+   *  y `telefonoSolicitante` respetan las casillas `noAporta…` — si el
+   *  solicitante no aportó el dato, se pasa null. */
+  correoSolicitante:    string | null;
+  telefonoSolicitante:  string | null;
+  canalRespuesta:       string | null;
 }
 
 function DrawerNuevoRadicado({
@@ -2572,7 +2579,32 @@ function DrawerNuevoRadicado({
   const [progreso,          setProgreso]          = useState('');
   const [progresoPct,       setProgresoPct]       = useState(0);
   const [errorGuardado,     setErrorGuardado]     = useState<string | null>(null);
+  // Sprint Ventanilla Operativa 2 — estado del envío de constancia por correo.
+  const [estadoEnvioConstancia,  setEstadoEnvioConstancia]  = useState<'idle' | 'enviando' | 'enviado' | 'error'>('idle');
+  const [mensajeEnvioConstancia, setMensajeEnvioConstancia] = useState<string | null>(null);
   const FORM_ID = 'rad-rapida-form';
+
+  async function handleEnviarConstancia(): Promise<void> {
+    if (!radicadoGenerado) return;
+    setEstadoEnvioConstancia('enviando');
+    setMensajeEnvioConstancia(null);
+    try {
+      const res = await fetch(
+        `/api/radicados/${encodeURIComponent(radicadoGenerado)}/enviar-constancia`,
+        { method: 'POST' },
+      );
+      if (!res.ok) {
+        const body = await res.json().catch(() => ({ error: 'Error desconocido.' }));
+        setEstadoEnvioConstancia('error');
+        setMensajeEnvioConstancia(body.error ?? 'No fue posible enviar la constancia.');
+        return;
+      }
+      setEstadoEnvioConstancia('enviado');
+    } catch {
+      setEstadoEnvioConstancia('error');
+      setMensajeEnvioConstancia('Error de red al enviar la constancia.');
+    }
+  }
 
   // Sprint UI Radicación Rápida:
   //  - Bloquear scroll del body mientras el modal está abierto.
@@ -2603,6 +2635,13 @@ function DrawerNuevoRadicado({
         (msg, pct) => { setProgreso(msg); setProgresoPct(pct); },
       );
       const tipoConf = resolverTipoSolicitud(payload.tipoSolicitudId);
+      // Sprint Ventanilla Operativa 2 — respetar las casillas "no aportó":
+      //  si el solicitante marcó noAportaCorreo, no mostramos correo aunque el
+      //  campo esté con valor; lo mismo para teléfono. Coherencia con Sprint 1.
+      const emailComprobante = payload.noAportaCorreo ? null : (payload.email?.trim() || null);
+      const telefonoComprobante = payload.noAportaTelefono
+        ? null
+        : (payload.telefonoMovil?.trim() || payload.telefono?.trim() || null);
       setDatosComprobante({
         solicitanteNombre: payload.nombreCompleto,
         numeroDocumento:   payload.numeroDocumento,
@@ -2616,6 +2655,9 @@ function DrawerNuevoRadicado({
         asunto:            payload.asunto,
         fechaVencimiento:  payload.fechaVencimiento,
         numeroFolios:      payload.numeroFolios,
+        correoSolicitante:   emailComprobante,
+        telefonoSolicitante: telefonoComprobante,
+        canalRespuesta:      payload.canalRespuesta ?? null,
       });
       setRadicadoGenerado(radicadoId);
     } catch (err) {
@@ -2713,23 +2755,29 @@ function DrawerNuevoRadicado({
                 funcionarioNombre={usuario.nombre}
                 dependencia={usuario.tenantId}
                 numeroFolios={datosComprobante.numeroFolios}
+                correoSolicitante={datosComprobante.correoSolicitante}
+                telefonoSolicitante={datosComprobante.telefonoSolicitante}
+                canalRespuesta={datosComprobante.canalRespuesta}
+                onEnviarCorreo={handleEnviarConstancia}
+                enviandoCorreo={estadoEnvioConstancia === 'enviando'}
+                estadoEnvio={estadoEnvioConstancia}
+                mensajeEnvioError={mensajeEnvioConstancia}
+                onNuevoRegistro={() => {
+                  setRadicadoGenerado(null);
+                  setDatosComprobante(null);
+                  setProgreso('');
+                  setProgresoPct(0);
+                  setEstadoEnvioConstancia('idle');
+                  setMensajeEnvioConstancia(null);
+                }}
               />
 
-              <div className="flex gap-3">
-                <button
-                  onClick={() => { setRadicadoGenerado(null); setDatosComprobante(null); setProgreso(''); setProgresoPct(0); }}
-                  className="px-5 py-2.5 rounded-xl text-white text-sm font-bold transition-all duration-150 active:scale-95"
-                  style={{ background: '#14532D' }}
-                  onMouseEnter={(e) => { (e.currentTarget as HTMLElement).style.background = '#166534'; }}
-                  onMouseLeave={(e) => { (e.currentTarget as HTMLElement).style.background = '#14532D'; }}
-                >Radicar otro</button>
-                <button onClick={onCerrar}
-                  className="px-5 py-2.5 rounded-xl text-sm transition-all duration-150 active:scale-95"
-                  style={{ border: '1px solid #D9E2D9', color: '#667085' }}
-                  onMouseEnter={(e) => { (e.currentTarget as HTMLElement).style.background = '#EEF4EE'; }}
-                  onMouseLeave={(e) => { (e.currentTarget as HTMLElement).style.background = ''; }}
-                >Cerrar</button>
-              </div>
+              <button onClick={onCerrar}
+                className="px-5 py-2.5 rounded-xl text-sm transition-all duration-150 active:scale-95"
+                style={{ border: '1px solid #D9E2D9', color: '#667085' }}
+                onMouseEnter={(e) => { (e.currentTarget as HTMLElement).style.background = '#EEF4EE'; }}
+                onMouseLeave={(e) => { (e.currentTarget as HTMLElement).style.background = ''; }}
+              >Cerrar modal</button>
             </div>
           )}
 
