@@ -145,7 +145,19 @@ export function aLineaTiempoPublica(
   });
 }
 
-/** Mapper por lista positiva. Nunca propaga campos nuevos del documento fuente. */
+/**
+ * Mapper por lista positiva. Nunca propaga campos nuevos del documento fuente.
+ *
+ * H-03 + Sprint Ventanilla Operativa 1: los siguientes campos internos NO
+ * se exponen a consulta pública, y no deben agregarse aquí:
+ *   - solicitante.telefonoMovil, telefonoFijo, datosNoAportados
+ *   - solicitante.ubicacion.barrio
+ *   - control.origenIngreso, control.tipoEntrada
+ *   - detalle.numeroAnexos, detalle.observacionesAnexos
+ *
+ * Si en el futuro se agrega un campo nuevo al documento, evalúalo aquí
+ * primero: por defecto, NO se expone al ciudadano.
+ */
 export function aRadicadoPublico(params: {
   radicado: VentanillaRadicado;
   lineaTiempo?: LineaTiempoPublica[];

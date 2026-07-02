@@ -292,6 +292,11 @@ export async function POST(request: Request) {
     const analisisIa = parseAnalisisIa(getText(formData, 'analisisIa'));
     const files = formData.getAll('archivos').filter((value): value is File => value instanceof File && value.size > 0);
 
+    // Sprint Ventanilla Operativa 1 — regla server: si no aporta correo, canal no puede ser CORREO.
+    // El flujo público ciudadano normalmente no marca noAportaCorreo, pero defensivo por si
+    // llega via integraciones o formularios internos que reutilicen este endpoint.
+    const noAportaCorreo = getText(formData, 'noAportaCorreo') === 'true';
+
     const errores = [
       ...validarCampos({
         nombre,
@@ -302,6 +307,9 @@ export async function POST(request: Request) {
         tipoPresentacion: tipoPresentacionRaw,
         canalRespuesta: canalRespuestaRaw,
       }),
+      ...(noAportaCorreo && canalRespuestaRaw === 'CORREO'
+        ? ['Si el solicitante no aporta correo electrónico, el medio de respuesta no puede ser correo.']
+        : []),
       ...validarArchivos(files),
     ];
 
