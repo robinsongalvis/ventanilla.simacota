@@ -43,7 +43,11 @@ describe('Panel de Alertas Predictivas — navegación Ver radicado', () => {
 
   it('conserva permisos por rol/dependencia usando el stream filtrado', () => {
     expect(dashboard).toContain('todosLosRadicados.find((r) => r.radicadoId === id)');
-    expect(hookRadicados).toContain("usuario.rol === 'ADMIN' || usuario.rol === 'CONTROL_INTERNO'");
+    // Panel Op Nivel 1: la decisión de alcance vive en el helper puro
+    // puedeVerTodosLosTenants (ADMIN, CONTROL_INTERNO y RECEPCIONISTA
+    // ven todo; FUNCIONARIO y JEFE_DEPENDENCIA solo su tenant). La
+    // política completa se testea en __tests__/alcance-tenants.test.ts.
+    expect(hookRadicados).toContain('puedeVerTodosLosTenants(usuario.rol)');
     expect(hookRadicados).toContain('usuario.tenantId');
     expect(hookRadicados).toContain("where('clasificacion.oficinaDestino', '==', effectiveTenant)");
   });

@@ -51,6 +51,7 @@ import {
   filtrarPorKpiOperativo,
   type FiltroKpiOperativo,
 } from '@/lib/kpis-operativos/filtrar-por-kpi-operativo';
+import { puedeVerTodosLosTenants } from '@/lib/permisos/alcance-tenants';
 import { useFuncionariosTenant }              from '@/lib/hooks/useFuncionariosTenant';
 import type { FuncionarioTenant }             from '@/lib/hooks/useFuncionariosTenant';
 import type { ResponsableFuncionario }        from '@/lib/actions/asignarRadicado';
@@ -762,7 +763,7 @@ function TarjetasMIPG({
   metricas,
   filtroActivo,
   onFiltroChange,
-  esAdmin,
+  veTodosTenants,
   tenantFiltro,
   onTenantChange,
   modoCompacto = false,
@@ -773,7 +774,9 @@ function TarjetasMIPG({
   metricas:       MetricasMIPGData;
   filtroActivo:   FiltroMIPG;
   onFiltroChange: (f: FiltroMIPG) => void;
-  esAdmin:        boolean;
+  /** Panel Op Nivel 1 — gatea el selector de dependencia. ADMIN,
+   *  CONTROL_INTERNO y RECEPCIONISTA lo ven; los demás no. */
+  veTodosTenants: boolean;
   tenantFiltro:   TenantId | 'TODOS';
   onTenantChange: (t: TenantId | 'TODOS') => void;
   modoCompacto?:  boolean;
@@ -945,13 +948,15 @@ function TarjetasMIPG({
           );
         })}
 
-        {/* Selector de dependencia (admin) */}
-        {esAdmin && (
+        {/* Selector de dependencia — roles con visión municipal
+            (ADMIN, CONTROL_INTERNO, RECEPCIONISTA). */}
+        {veTodosTenants && (
           <div className="shrink-0 flex items-center ml-auto">
             <select
               value={tenantFiltro}
               onChange={(e) => onTenantChange(e.target.value as TenantId | 'TODOS')}
               className="select-internal text-xs"
+              aria-label="Filtrar por dependencia"
             >
               <option value="TODOS">Todas las dependencias</option>
               {(Object.keys(DIRECTORIO_TENANTS) as TenantId[]).map((id) => (
@@ -986,8 +991,11 @@ function PanelOperacionDependencia({
 }) {
   const resumen = useMemo(() => calcularResumenBandeja(radicados), [radicados]);
   const siguiente = resumen.siguiente;
-  const nombreAmbito = usuario.rol === 'ADMIN' || usuario.rol === 'CONTROL_INTERNO'
-    ? 'Vista institucional'
+  // Panel Op Nivel 1 — si el rol ve todos los tenants, los números del
+  // widget son municipales y la etiqueta debe decirlo (antes decía
+  // "Ventanilla Única" para la recepcionista, lo cual mentiría ahora).
+  const nombreAmbito = puedeVerTodosLosTenants(usuario.rol)
+    ? usuario.rol === 'RECEPCIONISTA' ? 'Vista municipal' : 'Vista institucional'
     : NOMBRES_TENANT[usuario.tenantId];
   const dias = siguiente ? calcDiasRestantes(siguiente) : null;
 
@@ -3600,6 +3608,10 @@ function DashboardInterior({ usuario, cerrarSesion }: { usuario: UsuarioAutentic
   } = state;
 
   const esAdmin = usuario.rol === 'ADMIN' || usuario.rol === 'CONTROL_INTERNO';
+  // Panel Op Nivel 1 — flag separado de esAdmin: gatea SOLO el selector
+  // de dependencia. RECEPCIONISTA ve todos los tenants pero no hereda
+  // los paneles administrativos (gobernanza SIMI, semáforo PQRSD).
+  const veTodosTenants = puedeVerTodosLosTenants(usuario.rol);
   const tienePermisoRadicar = puedeRadicar(usuario);
   const tienePermisoBandeja = puedeUsarBandejaAsignacion(usuario);
   const [busquedaAvanzadaAbierta, setBusquedaAvanzadaAbierta] = useState(false);
@@ -3708,10 +3720,13 @@ function DashboardInterior({ usuario, cerrarSesion }: { usuario: UsuarioAutentic
     [todosLosRadicados],
   );
 
-  // Fase 2 — badge de alertas por rol
+  // Fase 2 — badge de alertas por rol.
+  // Panel Op Nivel 1: usa veTodosTenants (no esAdmin) para que el badge
+  // sea coherente con el alcance de la bandeja — si la recepcionista ve
+  // el municipio entero, sus alertas también deben ser municipales.
   const pendientesAlertas = useMemo(
-    () => contarAlertasActivas(todosLosRadicados, esAdmin, usuario.tenantId),
-    [todosLosRadicados, esAdmin, usuario.tenantId],
+    () => contarAlertasActivas(todosLosRadicados, veTodosTenants, usuario.tenantId),
+    [todosLosRadicados, veTodosTenants, usuario.tenantId],
   );
 
   // Sprint SMTP — alerta por correos institucionales fallidos sin gestionar.
@@ -3720,12 +3735,12 @@ function DashboardInterior({ usuario, cerrarSesion }: { usuario: UsuarioAutentic
   const pendientesNotificacionFallida = useMemo(() => {
     return todosLosRadicados.reduce((acc, r) => {
       if (r.alertaNotificacionFallida !== true) return acc;
-      // Solo contar los del tenant del usuario (o todos si es admin/control interno)
-      if (esAdmin) return acc + 1;
+      // Roles con visión municipal cuentan todos; los demás, solo su tenant.
+      if (veTodosTenants) return acc + 1;
       if (r.clasificacion.oficinaDestino === usuario.tenantId) return acc + 1;
       return acc;
     }, 0);
-  }, [todosLosRadicados, esAdmin, usuario.tenantId]);
+  }, [todosLosRadicados, veTodosTenants, usuario.tenantId]);
 
   function cambiarVista(vista: VistaActual) {
     dispatch({ type: 'SET_VISTA', vista });
@@ -3847,7 +3862,7 @@ function DashboardInterior({ usuario, cerrarSesion }: { usuario: UsuarioAutentic
               metricas={metricas}
               filtroActivo={filtroMIPG}
               onFiltroChange={(f) => dispatch({ type: 'SET_FILTRO_MIPG', filtro: f })}
-              esAdmin={esAdmin}
+              veTodosTenants={veTodosTenants}
               tenantFiltro={tenantFiltro}
               onTenantChange={(t) => dispatch({ type: 'SET_TENANT_FILTRO', tenant: t })}
               modoCompacto={indicadoresCompactos}
