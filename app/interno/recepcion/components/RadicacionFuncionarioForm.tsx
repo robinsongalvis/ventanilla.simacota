@@ -9,7 +9,14 @@ import {
   getTiposSolicitudInternos,
   getTipoSolicitudById,
 } from '@/lib/catalogos/tipos-solicitud';
-import type { MedioRecepcion, TipoDocumento, TipoPersona } from '@/src/types/ventanilla';
+import type {
+  CanalRespuesta,
+  MedioRecepcion,
+  OrigenIngreso,
+  TipoDocumento,
+  TipoEntrada,
+  TipoPersona,
+} from '@/src/types/ventanilla';
 
 const MUNICIPIOS_SANTANDER = [
   'Simacota',
@@ -25,23 +32,70 @@ const MUNICIPIOS_SANTANDER = [
 ];
 
 interface FormState {
+  // Sprint Ventanilla Operativa 1 — origen y clasificación operativa
+  origenIngreso: OrigenIngreso;
+  tipoEntrada: TipoEntrada;
+
   tipoPersona: TipoPersona;
   tipoDocumento: TipoDocumento;
   numeroDocumento: string;
   nombreCompleto: string;
   email: string;
   telefono: string;
+  // Sprint Ventanilla Operativa 1 — teléfonos separados
+  telefonoMovil: string;
+  telefonoFijo: string;
   direccion: string;
+  // Sprint Ventanilla Operativa 1
+  barrio: string;
   pais: string;
   departamento: string;
   municipio: string;
   medioRecepcion: MedioRecepcion;
+  // Sprint Ventanilla Operativa 1 — canal por el que responderá la Alcaldía
+  canalRespuesta: CanalRespuesta;
   tipoSolicitudId: TipoSolicitudId;
   asunto: string;
   descripcion: string;
   numeroFolios: number;
+  // Sprint Ventanilla Operativa 1
+  numeroAnexos: number;
   anexosDescripcion: string;
+  observacionesAnexos: string;
+  // Sprint Ventanilla Operativa 1 — marcas de datos no aportados
+  noAportaDocumento: boolean;
+  noAportaCorreo: boolean;
+  noAportaTelefono: boolean;
+  noAportaDireccion: boolean;
 }
+
+const ORIGEN_OPCIONES: [OrigenIngreso, string][] = [
+  ['PQRSD_WEB_OFICIAL',           'Portal web oficial'],
+  ['CORREO_INSTITUCIONAL',        'Correo institucional'],
+  ['VENTANILLA_FISICA',           'Ventanilla física'],
+  ['ENTREGA_PRESENCIAL',          'Entrega presencial'],
+  ['OFICIO_EXTERNO',              'Oficio externo'],
+  ['COMUNICACION_INSTITUCIONAL',  'Comunicación institucional'],
+  ['OTRO',                        'Otro'],
+];
+
+const TIPO_ENTRADA_OPCIONES: [TipoEntrada, string][] = [
+  ['PQRSD',                          'PQRSD'],
+  ['CORRESPONDENCIA_RECIBIDA',       'Correspondencia recibida'],
+  ['OFICIO_INSTITUCIONAL',           'Oficio institucional'],
+  ['SOLICITUD_CIUDADANA',            'Solicitud ciudadana'],
+  ['COMUNICACION_ENTIDAD_PUBLICA',   'Comunicación entidad pública'],
+  ['COMUNICACION_INTERNA',           'Comunicación interna'],
+  ['OTRO',                           'Otro'],
+];
+
+const TIPO_PERSONA_OPCIONES: [TipoPersona, string][] = [
+  ['NATURAL',                    'Natural'],
+  ['JURIDICA',                   'Jurídica'],
+  ['ENTIDAD_PUBLICA',            'Entidad pública'],
+  ['COMUNICACION_INSTITUCIONAL', 'Comunicación institucional'],
+  ['NO_IDENTIFICADO',            'No identificado'],
+];
 
 interface Props {
   radicadoPreview: string;
@@ -53,22 +107,34 @@ interface Props {
 }
 
 const INITIAL_FORM: FormState = {
+  origenIngreso: 'PQRSD_WEB_OFICIAL',
+  tipoEntrada: 'PQRSD',
   tipoPersona: 'NATURAL',
   tipoDocumento: 'CC',
   numeroDocumento: '',
   nombreCompleto: '',
   email: '',
   telefono: '',
+  telefonoMovil: '',
+  telefonoFijo: '',
   direccion: '',
+  barrio: '',
   pais: 'COLOMBIA',
   departamento: 'SANTANDER',
   municipio: 'Simacota',
   medioRecepcion: 'OFICIO_FISICO',
+  canalRespuesta: 'CORREO',
   tipoSolicitudId: 'PETICION_INFORMACION',
   asunto: '',
   descripcion: '',
   numeroFolios: 0,
+  numeroAnexos: 0,
   anexosDescripcion: '',
+  observacionesAnexos: '',
+  noAportaDocumento: false,
+  noAportaCorreo: false,
+  noAportaTelefono: false,
+  noAportaDireccion: false,
 };
 
 import { formatFechaHoraColombia } from '@/lib/fecha-colombia';
@@ -133,6 +199,25 @@ export function RadicacionFuncionarioForm({ radicadoPreview, onSubmit, formId, h
       className="space-y-5"
     >
 
+      {/* ── Origen y tipo de entrada (Sprint Ventanilla Operativa 1) ── */}
+      <section className={sectionCls} style={sectionStyle}>
+        <SectionTitle eyebrow="Ingreso" title="Origen y tipo de entrada" />
+        <div className="grid gap-4 grid-cols-1 md:grid-cols-2">
+          <SelectField
+            label="Origen de ingreso"
+            value={form.origenIngreso}
+            onChange={(v) => update('origenIngreso', v as OrigenIngreso)}
+            options={ORIGEN_OPCIONES}
+          />
+          <SelectField
+            label="Tipo de entrada"
+            value={form.tipoEntrada}
+            onChange={(v) => update('tipoEntrada', v as TipoEntrada)}
+            options={TIPO_ENTRADA_OPCIONES}
+          />
+        </div>
+      </section>
+
       {/* ── Bloque radicado ── */}
       <section className={sectionCls} style={sectionStyle}>
         <SectionTitle eyebrow="Radicado" title="Datos de recepción" />
@@ -165,10 +250,7 @@ export function RadicacionFuncionarioForm({ radicadoPreview, onSubmit, formId, h
             label="Tipo persona"
             value={form.tipoPersona}
             onChange={(v) => update('tipoPersona', v as TipoPersona)}
-            options={[
-              ['NATURAL',  'Natural'],
-              ['JURIDICA', 'Jurídica'],
-            ]}
+            options={TIPO_PERSONA_OPCIONES}
           />
           <SelectField
             label="Tipo documento"
@@ -195,9 +277,34 @@ export function RadicacionFuncionarioForm({ radicadoPreview, onSubmit, formId, h
             required
             className="md:col-span-2 xl:col-span-2"
           />
-          <TextField label="Correo electrónico" value={form.email}    onChange={(v) => update('email', v)}    type="email" className="xl:col-span-2" />
-          <TextField label="Teléfono"            value={form.telefono} onChange={(v) => update('telefono', v)} />
-          <TextField label="Dirección"           value={form.direccion} onChange={(v) => update('direccion', v)} className="md:col-span-2 xl:col-span-3" />
+          <TextField
+            label="Correo electrónico"
+            value={form.email}
+            onChange={(v) => update('email', v)}
+            type="email"
+            className="xl:col-span-2"
+          />
+          <TextField
+            label="Teléfono móvil"
+            value={form.telefonoMovil}
+            onChange={(v) => update('telefonoMovil', v)}
+          />
+          <TextField
+            label="Teléfono fijo"
+            value={form.telefonoFijo}
+            onChange={(v) => update('telefonoFijo', v)}
+          />
+          <TextField
+            label="Dirección"
+            value={form.direccion}
+            onChange={(v) => update('direccion', v)}
+            className="md:col-span-2 xl:col-span-2"
+          />
+          <TextField
+            label="Barrio"
+            value={form.barrio}
+            onChange={(v) => update('barrio', v)}
+          />
           <TextField label="País"          value={form.pais}         onChange={(v) => update('pais', v.toUpperCase())} />
           <TextField label="Departamento"  value={form.departamento} onChange={(v) => update('departamento', v.toUpperCase())} />
           <div className="relative md:col-span-2 xl:col-span-2">
@@ -221,6 +328,77 @@ export function RadicacionFuncionarioForm({ radicadoPreview, onSubmit, formId, h
               </div>
             )}
           </div>
+        </div>
+      </section>
+
+      {/* ── Datos no aportados (Sprint Ventanilla Operativa 1) ── */}
+      <section className={sectionCls} style={sectionStyle}>
+        <SectionTitle
+          eyebrow="Verificación"
+          title="Datos no aportados por el solicitante"
+        />
+        <p className="text-xs mb-3" style={{ color: '#667085' }}>
+          Marca solo cuando el documento realmente no aporta el dato.
+          Evita registrar información inventada.
+        </p>
+        <div className="grid gap-3 grid-cols-1 md:grid-cols-2">
+          <CheckboxField
+            label="No aporta documento de identidad"
+            checked={form.noAportaDocumento}
+            onChange={(v) => update('noAportaDocumento', v)}
+          />
+          <CheckboxField
+            label="No aporta correo electrónico"
+            checked={form.noAportaCorreo}
+            onChange={(v) => {
+              update('noAportaCorreo', v);
+              // Regla UX: si no aporta correo, cambiar canal si estaba en CORREO.
+              if (v && form.canalRespuesta === 'CORREO') {
+                update('canalRespuesta', 'PRESENCIAL');
+              }
+            }}
+          />
+          <CheckboxField
+            label="No aporta teléfono"
+            checked={form.noAportaTelefono}
+            onChange={(v) => update('noAportaTelefono', v)}
+          />
+          <CheckboxField
+            label="No aporta dirección"
+            checked={form.noAportaDireccion}
+            onChange={(v) => update('noAportaDireccion', v)}
+          />
+        </div>
+      </section>
+
+      {/* ── Medio de respuesta (Sprint Ventanilla Operativa 1) ── */}
+      <section className={sectionCls} style={sectionStyle}>
+        <SectionTitle
+          eyebrow="Respuesta"
+          title="Medio por el que se responderá al ciudadano"
+        />
+        <div className="grid gap-4 grid-cols-1 md:grid-cols-2">
+          <SelectField
+            label="Medio de respuesta"
+            value={form.canalRespuesta}
+            onChange={(v) => update('canalRespuesta', v as CanalRespuesta)}
+            options={[
+              ['CORREO',           form.noAportaCorreo ? 'Correo electrónico (no disponible — no aporta correo)' : 'Correo electrónico'],
+              ['DIRECCION_FISICA', 'Dirección física'],
+              ['PRESENCIAL',       'Presencial'],
+              ['TELEFONO',         'Teléfono'],
+            ]}
+          />
+          {form.noAportaCorreo && form.canalRespuesta === 'CORREO' && (
+            <div
+              className="rounded-md border px-3 py-2 text-xs"
+              style={{ borderColor: '#EF4444', background: '#FEE2E2', color: '#991B1B' }}
+              role="alert"
+            >
+              Si el solicitante no aporta correo electrónico, el medio de
+              respuesta no puede ser correo.
+            </div>
+          )}
         </div>
       </section>
 
@@ -251,6 +429,23 @@ export function RadicacionFuncionarioForm({ radicadoPreview, onSubmit, formId, h
             value={String(form.numeroFolios)}
             onChange={(v) => update('numeroFolios', Number(v.replace(/\D/g, '') || 0))}
           />
+          <TextField
+            label="Número de anexos"
+            value={String(form.numeroAnexos)}
+            onChange={(v) => update('numeroAnexos', Number(v.replace(/\D/g, '') || 0))}
+          />
+          <div className="md:col-span-2 xl:col-span-4">
+            <label>
+              <span className={labelCls} style={labelStyle}>Observaciones de anexos</span>
+              <textarea
+                value={form.observacionesAnexos}
+                onChange={(e) => update('observacionesAnexos', e.target.value)}
+                rows={2}
+                className="input-internal"
+                placeholder="Ej: CD viene con etiqueta manuscrita, fotos en sobre sellado…"
+              />
+            </label>
+          </div>
           {getTipoSolicitudById(form.tipoSolicitudId)?.requiereValidacionJuridica && (
             <div
               className="md:col-span-2 xl:col-span-4 rounded-md border px-3 py-2 text-xs"
@@ -422,5 +617,30 @@ function ReadOnlyField({ label, value }: { label: string; value: string }) {
         {value}
       </p>
     </div>
+  );
+}
+
+function CheckboxField({
+  label,
+  checked,
+  onChange,
+}: {
+  label: string;
+  checked: boolean;
+  onChange: (value: boolean) => void;
+}) {
+  return (
+    <label
+      className="flex items-center gap-2 rounded-lg px-3 py-2 text-xs cursor-pointer transition-colors"
+      style={{ border: '1px solid #D9E2D9', background: checked ? '#FEF3C7' : '#FFFFFF' }}
+    >
+      <input
+        type="checkbox"
+        checked={checked}
+        onChange={(e) => onChange(e.target.checked)}
+        className="w-4 h-4"
+      />
+      <span style={{ color: '#1F2933' }}>{label}</span>
+    </label>
   );
 }
