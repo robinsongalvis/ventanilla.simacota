@@ -71,6 +71,26 @@ function algunNoAportado(d: DatosNoAportados): boolean {
   return Boolean(d.documento || d.telefono || d.correo || d.direccion);
 }
 
+/**
+ * Sprint 1.5 — construye la nota humana del evento
+ * `DATOS_NO_APORTADOS_MARCADOS`. Es defensiva: si por error se llama con
+ * un objeto sin marcas activas, retorna un mensaje limpio. La garantía
+ * real (que no se emite el evento en ese caso) vive en el guard
+ * `if (hayNoAportados)` del caller, no en este helper.
+ */
+export function construirNotaDatosNoAportados(d: DatosNoAportados): string {
+  const items = [
+    d.documento && 'documento',
+    d.correo    && 'correo',
+    d.telefono  && 'teléfono',
+    d.direccion && 'dirección',
+  ].filter(Boolean) as string[];
+  if (items.length === 0) {
+    return 'El solicitante aportó todos los datos requeridos.';
+  }
+  return `El solicitante no aportó: ${items.join(', ')}.`;
+}
+
 export interface ActorRadicacion {
   uid:      string;
   nombre:   string;
@@ -283,6 +303,29 @@ export async function radicarInstitucionalmente(
       nota: `Radicado por ${actor.nombre} · Canal: ${datos.medioRecepcion}`,
     } satisfies TrazabilidadRadicado,
   );
+
+  // Sprint 1.5 — evento operativo cuando el solicitante no aportó datos.
+  // No se muestra en la línea de tiempo pública (ver ACCIONES_PUBLICAS
+  // en lib/seguridad/consulta-publica-radicado.ts).
+  if (hayNoAportados) {
+    await addDoc(
+      collection(getDb(), 'ventanilla_radicados', radicadoId, 'trazabilidad'),
+      {
+        eventoId: `ev_${radicadoId}_DATOS_NO_APORTADOS`,
+        fecha: ahora.toISOString(),
+        accion: 'DATOS_NO_APORTADOS_MARCADOS',
+        actorUid: actor.uid,
+        actorNombre: actor.nombre,
+        nota: construirNotaDatosNoAportados(datosNoAportados),
+        metadata: {
+          documento: datosNoAportados.documento === true,
+          correo:    datosNoAportados.correo    === true,
+          telefono:  datosNoAportados.telefono  === true,
+          direccion: datosNoAportados.direccion === true,
+        },
+      } satisfies TrazabilidadRadicado,
+    );
+  }
 
   onProgress('Radicado registrado exitosamente.', 100);
   return { radicadoId, consecutivo };

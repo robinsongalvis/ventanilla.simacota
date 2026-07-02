@@ -46,7 +46,9 @@ export type AccionAuditoria =
   | 'NOTIFICACION_CORREO_ENVIADA'
   | 'NOTIFICACION_CORREO_FALLIDA'
   | 'NOTIFICACION_OMITIDA_DUPLICADA'
-  | 'NOTIFICACION_GESTIONADA_MANUALMENTE';
+  | 'NOTIFICACION_GESTIONADA_MANUALMENTE'
+  /** Sprint 1.5 — el solicitante no aportó uno o más datos básicos (correo, teléfono, documento o dirección). */
+  | 'DATOS_NO_APORTADOS_MARCADOS';
 
 export interface AuditoriaEntry {
   fecha:    string;

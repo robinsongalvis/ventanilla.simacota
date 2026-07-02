@@ -429,6 +429,28 @@ export async function POST(request: Request) {
       },
     }));
 
+    // Sprint 1.5 — evento operativo cuando el ciudadano marcó noAportaCorreo
+    // en el endpoint público. Hoy solo entra por esa casilla; el shape del
+    // metadata es igual al del flujo interno para uniformidad de reportes.
+    // No se muestra en la línea de tiempo pública.
+    if (noAportaCorreo) {
+      await db.collection(`ventanilla_radicados/${radicadoId}/trazabilidad`).add(removeUndefinedDeep({
+        eventoId: `ev_${radicadoId}_DATOS_NO_APORTADOS`,
+        fecha: ahora.toISOString(),
+        accion: 'DATOS_NO_APORTADOS_MARCADOS',
+        actorUid: 'portal-ciudadano',
+        actorNombre: 'Portal ciudadano',
+        oficinaDestino: TENANT_RECEPCION,
+        nota: 'El solicitante no aportó: correo.',
+        metadata: {
+          documento: false,
+          correo:    true,
+          telefono:  false,
+          direccion: false,
+        },
+      }));
+    }
+
     // ── Email de confirmación al ciudadano (síncrono, no bloqueante) ──
     // Se espera al envío SMTP antes de responder para garantizar trazabilidad
     // real y compatibilidad con Vercel serverless (las promesas pendientes se
