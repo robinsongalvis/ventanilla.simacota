@@ -1458,6 +1458,129 @@ function FilaInfo({ label, value }: { label: string; value: string }) {
   );
 }
 
+/**
+ * Sprint Ventanilla Operativa 3 — fila de archivo con soporte para
+ * sellar PDF. El estado del sello se mantiene local por fila (idle,
+ * sellando, sellado, error). Cuando la respuesta llega, se refresca el
+ * estado sin recargar el radicado (el `onSnapshot` global también lo
+ * detectará al actualizar Firestore).
+ */
+function FilaArchivoConSello({
+  archivo,
+  radicadoId,
+  soloLectura,
+}: {
+  archivo:     import('@/src/types/ventanilla').ArchivoRadicado;
+  radicadoId:  string;
+  soloLectura: boolean;
+}) {
+  const [estado, setEstado] = useState<'idle' | 'sellando' | 'sellado' | 'error'>(
+    archivo.sellado ? 'sellado' : 'idle',
+  );
+  const [mensajeError, setMensajeError] = useState<string | null>(null);
+  const [selloLocal, setSelloLocal] = useState<
+    import('@/src/types/ventanilla').SelloDocumento | null
+  >(archivo.sellado ?? null);
+
+  const esPdf = archivo.tipo === 'application/pdf';
+
+  async function handleSellar() {
+    setEstado('sellando');
+    setMensajeError(null);
+    try {
+      const res = await fetch(
+        `/api/radicados/${encodeURIComponent(radicadoId)}/sellar-documento`,
+        {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ archivoPath: archivo.path }),
+        },
+      );
+      if (!res.ok) {
+        const body = await res.json().catch(() => ({ error: 'Error desconocido.' }));
+        setEstado('error');
+        setMensajeError(body.error ?? 'No fue posible sellar el documento.');
+        return;
+      }
+      const body = await res.json() as {
+        ok: true;
+        sello: import('@/src/types/ventanilla').SelloDocumento;
+      };
+      setSelloLocal(body.sello);
+      setEstado('sellado');
+    } catch {
+      setEstado('error');
+      setMensajeError('Error de red al sellar el documento.');
+    }
+  }
+
+  return (
+    <li className="py-2 last:border-0" style={{ borderBottom: '1px solid #EEF4EE' }}>
+      <div className="flex items-center justify-between gap-3">
+        <span className="text-xs truncate min-w-0" style={{ color: '#1F2933' }}>
+          {archivo.nombre}
+        </span>
+        <div className="shrink-0 flex items-center gap-3">
+          {archivo.path && (
+            <a
+              href={`/api/interno/archivo?path=${encodeURIComponent(archivo.path)}`}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="text-xs underline underline-offset-2 font-semibold"
+              style={{ color: '#14532D' }}
+            >
+              Ver
+            </a>
+          )}
+          {selloLocal?.path && (
+            <a
+              href={`/api/interno/archivo?path=${encodeURIComponent(selloLocal.path)}`}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="text-xs underline underline-offset-2 font-semibold"
+              style={{ color: '#166534' }}
+              title="Ver copia sellada"
+            >
+              Copia sellada
+            </a>
+          )}
+          {esPdf && !soloLectura && (
+            <button
+              type="button"
+              onClick={handleSellar}
+              disabled={estado === 'sellando' || estado === 'sellado'}
+              className="text-[10px] font-bold uppercase tracking-widest px-2 py-1 rounded-md border transition-all disabled:cursor-not-allowed disabled:opacity-60"
+              style={{
+                borderColor: estado === 'sellado' ? '#166534' : '#14532D',
+                color:       estado === 'sellado' ? '#166534' : '#14532D',
+                background:  estado === 'sellado' ? '#F0FDF4' : 'white',
+              }}
+              title={
+                estado === 'sellado'
+                  ? 'El documento ya tiene copia sellada'
+                  : 'Generar copia sellada del PDF'
+              }
+            >
+              {estado === 'sellando' && 'Sellando…'}
+              {estado === 'sellado'  && '✓ Sellado'}
+              {(estado === 'idle' || estado === 'error') && 'Sellar'}
+            </button>
+          )}
+        </div>
+      </div>
+      {estado === 'error' && mensajeError && (
+        <p
+          role="alert"
+          className="mt-1.5 text-[11px]"
+          style={{ color: '#B91C1C' }}
+        >
+          {mensajeError}
+        </p>
+      )}
+    </li>
+  );
+}
+
 function PanelDerecho({
   radicado,
   usuario,
@@ -2063,16 +2186,12 @@ function PanelDerecho({
                 </p>
                 <ul className="space-y-2">
                   {radicado.archivos.map((arch, i) => (
-                    <li key={i} className="flex items-center justify-between gap-3 py-2 last:border-0"
-                        style={{ borderBottom: '1px solid #EEF4EE' }}>
-                      <span className="text-xs truncate min-w-0" style={{ color: '#1F2933' }}>{arch.nombre}</span>
-                      {arch.path && (
-                        <a href={`/api/interno/archivo?path=${encodeURIComponent(arch.path)}`} target="_blank" rel="noopener noreferrer"
-                          className="shrink-0 text-xs underline underline-offset-2 font-semibold" style={{ color: '#14532D' }}>
-                          Ver
-                        </a>
-                      )}
-                    </li>
+                    <FilaArchivoConSello
+                      key={arch.path ?? i}
+                      archivo={arch}
+                      radicadoId={radicado.radicadoId}
+                      soloLectura={soloLectura}
+                    />
                   ))}
                 </ul>
               </div>

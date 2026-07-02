@@ -41,6 +41,14 @@ service firebase.storage {
       allow update, delete: if false;
     }
 
+    // Sprint Ventanilla Operativa 3 — copias selladas.
+    // Escritura SOLO por Admin SDK desde /api/radicados/{id}/sellar-documento.
+    // Los clientes nunca escriben aquí; el original queda en /radicados/ intacto.
+    // Lectura solo via Admin SDK en /api/interno/archivo — nunca directa.
+    match /sellados/{radicadoId}/{archivo} {
+      allow read, write: if false;
+    }
+
     match /{path=**} {
       allow read, write: if false;
     }

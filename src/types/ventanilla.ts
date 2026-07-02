@@ -116,6 +116,28 @@ export interface TerminoLegal {
   prorrogasAplicadas: number;
 }
 
+/**
+ * Sprint Ventanilla Operativa 3 — copia sellada de un archivo del
+ * radicado. El archivo original NUNCA se modifica; esta estructura
+ * apunta a la copia estampada guardada en `sellados/{radicadoId}/`.
+ */
+export interface SelloDocumento {
+  /** Path en Storage de la copia sellada. */
+  path: string;
+  /** Nombre del archivo sellado (con prefijo/timestamp). */
+  nombre: string;
+  tamanioKB: number;
+  /** Fecha ISO del sellado. */
+  fecha: string;
+  /** UID del funcionario que disparó el sellado. */
+  actorUid: string;
+  /** SHA-256 hex del archivo original (cadena de custodia). */
+  hashOriginal: string;
+  /** SHA-256 hex de la copia sellada (cadena de custodia). */
+  hashSellado: string;
+  paginasEstampadas: number;
+}
+
 export interface ArchivoRadicado {
   nombre: string;
   url?: string | null;
@@ -123,6 +145,8 @@ export interface ArchivoRadicado {
   tipo: string;
   tamanioKB: number;
   orden: number;
+  /** Sprint Ventanilla Operativa 3 — copia sellada, si existe. */
+  sellado?: SelloDocumento | null;
 }
 
 export interface TrazabilidadRadicado {

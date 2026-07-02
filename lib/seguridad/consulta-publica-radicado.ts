@@ -25,6 +25,9 @@ const ACCIONES_PUBLICAS = new Map<string, string>([
   // Sprint 1.5: DATOS_NO_APORTADOS_MARCADOS NO se mapea aquí — es un
   // evento operativo interno, no debe aparecer en la línea de tiempo
   // pública del ciudadano.
+  // Sprint Ventanilla Operativa 3: DOCUMENTO_SELLADO NO se mapea aquí
+  // por la misma razón — es evidencia operativa interna del sello,
+  // no información pertinente al ciudadano.
 ]);
 
 export const MENSAJE_CONSULTA_NO_VERIFICADA =
