@@ -6,10 +6,11 @@ import {
   type FiltrosBusqueda,
 } from '@/lib/busqueda/filtros-radicado';
 import { aRadicadoPublico } from '@/lib/seguridad/consulta-publica-radicado';
+import { RadicacionValidacionError } from '@/lib/actions/radicarVentanilla';
 import {
-  validarReglaCorreoNoAportado,
-  RadicacionValidacionError,
-} from '@/lib/actions/radicarVentanilla';
+  validarReglasRadicacion,
+  MENSAJE_CORREO_NO_APORTADO_CORREO,
+} from '@/lib/seguridad/reglas-radicacion';
 
 /* ══════════════════════════════════════════════════════════════
    Sprint Ventanilla Operativa 1
@@ -201,20 +202,30 @@ describe('Sprint Ventanilla Operativa 1 — forma del documento', () => {
 describe('Sprint Ventanilla Operativa 1 — regla de correo no aportado', () => {
   /* 7 */
   it('rechaza canal CORREO cuando el solicitante no aporta correo', () => {
-    const mensaje = validarReglaCorreoNoAportado({ noAportaCorreo: true, canalRespuesta: 'CORREO' });
+    const mensaje = validarReglasRadicacion({ noAportaCorreo: true, canalRespuesta: 'CORREO' });
     expect(mensaje).toMatch(/correo/i);
 
     expect(() => {
-      const err = validarReglaCorreoNoAportado({ noAportaCorreo: true, canalRespuesta: 'CORREO' });
+      const err = validarReglasRadicacion({ noAportaCorreo: true, canalRespuesta: 'CORREO' });
       if (err) throw new RadicacionValidacionError(err);
     }).toThrow(RadicacionValidacionError);
   });
 
   /* 8 */
   it('permite canal PRESENCIAL cuando el solicitante no aporta correo', () => {
-    expect(validarReglaCorreoNoAportado({ noAportaCorreo: true, canalRespuesta: 'PRESENCIAL' })).toBeNull();
-    expect(validarReglaCorreoNoAportado({ noAportaCorreo: false, canalRespuesta: 'CORREO' })).toBeNull();
-    expect(validarReglaCorreoNoAportado({})).toBeNull();
+    expect(validarReglasRadicacion({ noAportaCorreo: true, canalRespuesta: 'PRESENCIAL' })).toBeNull();
+    expect(validarReglasRadicacion({ noAportaCorreo: false, canalRespuesta: 'CORREO' })).toBeNull();
+    expect(validarReglasRadicacion({})).toBeNull();
+  });
+
+  /* 14 — Sprint 1.5: consistencia del mensaje.
+     El endpoint público /api/radicacion y el flujo interno
+     radicarInstitucionalmente ahora consumen la MISMA función. Este
+     test garantiza que el mensaje visible al usuario nunca diverge
+     entre ambos caminos. */
+  it('validarReglasRadicacion retorna la constante compartida MENSAJE_CORREO_NO_APORTADO_CORREO', () => {
+    const mensaje = validarReglasRadicacion({ noAportaCorreo: true, canalRespuesta: 'CORREO' });
+    expect(mensaje).toBe(MENSAJE_CORREO_NO_APORTADO_CORREO);
   });
 });
 
@@ -355,5 +366,40 @@ describe('Sprint Ventanilla Operativa 1 — consulta pública no expone campos i
     // Los campos públicos esperados sí están:
     expect(publico.numeroRadicado).toBe('1-WEB-2026-00000030');
     expect(publico.estadoPublico).toBeDefined();
+  });
+
+  /* 13 — Sprint 1.5: endurecimiento de aRadicadoPublico
+     Verifica que el objeto retornado solo contenga claves declaradas en
+     RadicadoPublico. Complementa la barrera compile-time (`satisfies`
+     + variable tipada) con una barrera runtime. */
+  it('aRadicadoPublico solo expone claves declaradas en RadicadoPublico', () => {
+    const rad = radicadoOp({
+      radicadoId: '1-WEB-2026-00000031',
+      fecha: '2026-06-16T08:00:00.000Z',
+    });
+    const publico = aRadicadoPublico({
+      radicado: rad,
+      lineaTiempo: [{ fecha: '2026-06-16T08:00:00.000Z', evento: 'Solicitud recibida' }],
+    });
+
+    const permitidas = new Set([
+      'numeroRadicado',
+      'fechaRadicacion',
+      'estadoPublico',
+      'dependencia',
+      'tipoSolicitud',
+      'fechaVencimiento',
+      'requiereAclaracion',
+      'fueRespondido',
+      'fechaRespuesta',
+      'canalRespuesta',
+      'respuestaDisponible',
+      'respuestaOficial',
+      'lineaTiempo',
+    ]);
+
+    for (const key of Object.keys(publico)) {
+      expect(permitidas.has(key)).toBe(true);
+    }
   });
 });

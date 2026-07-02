@@ -3,6 +3,7 @@ import { getDb } from '@/lib/firebase';
 import { generarRadicadoInstitucional, type CanalRadicadoInstitucional } from '@/lib/radicado-institucional';
 import { TIPOS_SOLICITUD, type TipoSolicitudId } from '@/lib/tiempos-radicado';
 import { subirArchivos } from '@/lib/storage';
+import { validarReglasRadicacion } from '@/lib/seguridad/reglas-radicacion';
 import type {
   CanalRespuesta,
   DatosNoAportados,
@@ -64,23 +65,6 @@ export class RadicacionValidacionError extends Error {
     super(message);
     this.name = 'RadicacionValidacionError';
   }
-}
-
-/**
- * Sprint Ventanilla Operativa 1 — regla server: si el solicitante no
- * aporta correo, el canal de respuesta no puede ser CORREO.
- *
- * Exportada para reutilización en tests y para el endpoint público
- * `/api/radicacion` cuando reciba `noAportaCorreo` en el payload.
- */
-export function validarReglaCorreoNoAportado(params: {
-  noAportaCorreo?: boolean;
-  canalRespuesta?: CanalRespuesta;
-}): string | null {
-  if (params.noAportaCorreo === true && params.canalRespuesta === 'CORREO') {
-    return 'Si el solicitante no aporta correo electrónico, el medio de respuesta no puede ser correo.';
-  }
-  return null;
 }
 
 function algunNoAportado(d: DatosNoAportados): boolean {
@@ -169,8 +153,8 @@ export async function radicarInstitucionalmente(
   actor:      ActorRadicacion,
   onProgress: (mensaje: string, pct: number) => void = () => {},
 ): Promise<ResultadoRadicacion> {
-  // Sprint Ventanilla Operativa 1 — regla server-side de datos no aportados.
-  const errorRegla = validarReglaCorreoNoAportado({
+  // Sprint 1.5 — reglas de negocio delegadas a lib/seguridad/reglas-radicacion.
+  const errorRegla = validarReglasRadicacion({
     noAportaCorreo: datos.noAportaCorreo,
     canalRespuesta: datos.canalRespuesta,
   });

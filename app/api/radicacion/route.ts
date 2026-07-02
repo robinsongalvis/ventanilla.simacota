@@ -21,6 +21,7 @@ import {
   generarTokenConsulta,
   hashTokenConsulta,
 } from '@/lib/seguridad/consulta-publica-radicado';
+import { validarReglasRadicacion } from '@/lib/seguridad/reglas-radicacion';
 import type { Prioridad, TenantId, TipoPresentacionPqrsd, ZonaGeografica } from '@/src/types/radicado';
 import type {
   AnalisisIA,
@@ -292,10 +293,15 @@ export async function POST(request: Request) {
     const analisisIa = parseAnalisisIa(getText(formData, 'analisisIa'));
     const files = formData.getAll('archivos').filter((value): value is File => value instanceof File && value.size > 0);
 
-    // Sprint Ventanilla Operativa 1 — regla server: si no aporta correo, canal no puede ser CORREO.
-    // El flujo público ciudadano normalmente no marca noAportaCorreo, pero defensivo por si
-    // llega via integraciones o formularios internos que reutilicen este endpoint.
+    // Sprint 1.5 — reglas de negocio delegadas a lib/seguridad/reglas-radicacion.
+    // El flujo público ciudadano normalmente no marca noAportaCorreo, pero
+    // validamos defensivamente por si llega vía integraciones o formularios
+    // internos que reutilicen este endpoint.
     const noAportaCorreo = getText(formData, 'noAportaCorreo') === 'true';
+    const errorReglas = validarReglasRadicacion({
+      noAportaCorreo,
+      canalRespuesta: canalRespuestaRaw,
+    });
 
     const errores = [
       ...validarCampos({
@@ -307,9 +313,7 @@ export async function POST(request: Request) {
         tipoPresentacion: tipoPresentacionRaw,
         canalRespuesta: canalRespuestaRaw,
       }),
-      ...(noAportaCorreo && canalRespuestaRaw === 'CORREO'
-        ? ['Si el solicitante no aporta correo electrónico, el medio de respuesta no puede ser correo.']
-        : []),
+      ...(errorReglas ? [errorReglas] : []),
       ...validarArchivos(files),
     ];
 
