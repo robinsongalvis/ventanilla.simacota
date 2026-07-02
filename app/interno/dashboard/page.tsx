@@ -74,23 +74,23 @@ const LABELS_ESTADO: Record<string, string> = {
 
 /* Sprint Ventanilla Operativa 1 — Labels operativos */
 const LABEL_ORIGEN_INGRESO: Record<string, string> = {
-  PQRSD_WEB_OFICIAL:      'Portal web',
-  CORREO_INSTITUCIONAL:   'Correo inst.',
-  VENTANILLA_FISICA:      'Ventanilla',
-  PRESENCIAL:             'Presencial',
-  OFICIO_EXTERNO:         'Oficio ext.',
+  PQRSD_WEB_OFICIAL:          'Portal web',
+  CORREO_INSTITUCIONAL:       'Correo inst.',
+  VENTANILLA_FISICA:          'Ventanilla',
+  ENTREGA_PRESENCIAL:         'Presencial',
+  OFICIO_EXTERNO:             'Oficio ext.',
   COMUNICACION_INSTITUCIONAL: 'Com. inst.',
-  OTRO:                   'Otro',
+  OTRO:                       'Otro',
 };
 
 const LABEL_TIPO_ENTRADA: Record<string, string> = {
-  PQRSD:            'PQRSD',
-  CORRESPONDENCIA:  'Correspondencia',
-  OFICIO:           'Oficio',
-  SOLICITUD:        'Solicitud',
-  ENTIDAD_PUBLICA:  'Ent. pública',
-  INTERNA:          'Interna',
-  OTRO:             'Otro',
+  PQRSD:                        'PQRSD',
+  CORRESPONDENCIA_RECIBIDA:     'Correspondencia',
+  OFICIO_INSTITUCIONAL:         'Oficio',
+  SOLICITUD_CIUDADANA:          'Solicitud',
+  COMUNICACION_ENTIDAD_PUBLICA: 'Ent. pública',
+  COMUNICACION_INTERNA:         'Interna',
+  OTRO:                         'Otro',
 };
 
 const LABEL_TIPO_PERSONA: Record<string, string> = {
