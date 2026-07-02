@@ -10,6 +10,12 @@ export const INSTITUCION = {
   pais: 'Colombia',
   logo: '/brand/logo-alcaldia-simacota.png',
   consultaUrl: 'https://ventanilla-simacota.vercel.app/consulta',
+  /** Sprint Ventanilla Operativa 2 — contacto institucional consumido
+   *  por comprobantes impresos, correos oficiales y plantillas.
+   *  Corrige un typo pre-existente (`simacota-boyaca` → `simacota-santander`).
+   */
+  telefono: 'PBX 7267100',
+  correo: 'ventanilla@simacota-santander.gov.co',
 } as const;
 
 export const CANAL_RESPUESTA_LABEL: Record<string, string> = {

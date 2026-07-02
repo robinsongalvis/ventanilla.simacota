@@ -2559,6 +2559,13 @@ interface DatosComprobante {
   asunto:            string;
   fechaVencimiento:  string;
   numeroFolios:      number;
+  /** Sprint Ventanilla Operativa 2 — datos de contacto y canal de
+   *  respuesta requeridos por el comprobante nuevo. `correoSolicitante`
+   *  y `telefonoSolicitante` respetan las casillas `noAporta…` — si el
+   *  solicitante no aportó el dato, se pasa null. */
+  correoSolicitante:    string | null;
+  telefonoSolicitante:  string | null;
+  canalRespuesta:       string | null;
 }
 
 function DrawerNuevoRadicado({
@@ -2604,6 +2611,13 @@ function DrawerNuevoRadicado({
         (msg, pct) => { setProgreso(msg); setProgresoPct(pct); },
       );
       const tipoConf = resolverTipoSolicitud(payload.tipoSolicitudId);
+      // Sprint Ventanilla Operativa 2 — respetar las casillas "no aportó":
+      //  si el solicitante marcó noAportaCorreo, no mostramos correo aunque el
+      //  campo esté con valor; lo mismo para teléfono. Coherencia con Sprint 1.
+      const emailComprobante = payload.noAportaCorreo ? null : (payload.email?.trim() || null);
+      const telefonoComprobante = payload.noAportaTelefono
+        ? null
+        : (payload.telefonoMovil?.trim() || payload.telefono?.trim() || null);
       setDatosComprobante({
         solicitanteNombre: payload.nombreCompleto,
         numeroDocumento:   payload.numeroDocumento,
@@ -2617,6 +2631,9 @@ function DrawerNuevoRadicado({
         asunto:            payload.asunto,
         fechaVencimiento:  payload.fechaVencimiento,
         numeroFolios:      payload.numeroFolios,
+        correoSolicitante:   emailComprobante,
+        telefonoSolicitante: telefonoComprobante,
+        canalRespuesta:      payload.canalRespuesta ?? null,
       });
       setRadicadoGenerado(radicadoId);
     } catch (err) {
@@ -2714,23 +2731,23 @@ function DrawerNuevoRadicado({
                 funcionarioNombre={usuario.nombre}
                 dependencia={usuario.tenantId}
                 numeroFolios={datosComprobante.numeroFolios}
+                correoSolicitante={datosComprobante.correoSolicitante}
+                telefonoSolicitante={datosComprobante.telefonoSolicitante}
+                canalRespuesta={datosComprobante.canalRespuesta}
+                onNuevoRegistro={() => {
+                  setRadicadoGenerado(null);
+                  setDatosComprobante(null);
+                  setProgreso('');
+                  setProgresoPct(0);
+                }}
               />
 
-              <div className="flex gap-3">
-                <button
-                  onClick={() => { setRadicadoGenerado(null); setDatosComprobante(null); setProgreso(''); setProgresoPct(0); }}
-                  className="px-5 py-2.5 rounded-xl text-white text-sm font-bold transition-all duration-150 active:scale-95"
-                  style={{ background: '#14532D' }}
-                  onMouseEnter={(e) => { (e.currentTarget as HTMLElement).style.background = '#166534'; }}
-                  onMouseLeave={(e) => { (e.currentTarget as HTMLElement).style.background = '#14532D'; }}
-                >Radicar otro</button>
-                <button onClick={onCerrar}
-                  className="px-5 py-2.5 rounded-xl text-sm transition-all duration-150 active:scale-95"
-                  style={{ border: '1px solid #D9E2D9', color: '#667085' }}
-                  onMouseEnter={(e) => { (e.currentTarget as HTMLElement).style.background = '#EEF4EE'; }}
-                  onMouseLeave={(e) => { (e.currentTarget as HTMLElement).style.background = ''; }}
-                >Cerrar</button>
-              </div>
+              <button onClick={onCerrar}
+                className="px-5 py-2.5 rounded-xl text-sm transition-all duration-150 active:scale-95"
+                style={{ border: '1px solid #D9E2D9', color: '#667085' }}
+                onMouseEnter={(e) => { (e.currentTarget as HTMLElement).style.background = '#EEF4EE'; }}
+                onMouseLeave={(e) => { (e.currentTarget as HTMLElement).style.background = ''; }}
+              >Cerrar modal</button>
             </div>
           )}
 
