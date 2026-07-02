@@ -87,6 +87,30 @@ function ocultarIdentidad(r: VentanillaRadicado): boolean {
     || r.identidadReservada === true;
 }
 
+/**
+ * Sprint 1.5 — True si el solicitante marcó al menos una casilla de
+ * "no aporta" (documento, correo, teléfono o dirección). Radicados
+ * históricos sin `datosNoAportados` retornan false.
+ */
+export function tieneDatosNoAportados(
+  d?: { documento?: boolean; correo?: boolean; telefono?: boolean; direccion?: boolean } | null,
+): boolean {
+  if (!d) return false;
+  return Boolean(d.documento || d.correo || d.telefono || d.direccion);
+}
+
+/**
+ * Sprint 1.5 — filtro puro para el toggle "Datos incompletos" de la
+ * bandeja. Devuelve solo los radicados donde el solicitante dejó al
+ * menos una casilla de datos no aportados en true. Los radicados
+ * históricos sin `datosNoAportados` quedan excluidos.
+ */
+export function filtrarSoloDatosIncompletos(
+  lista: VentanillaRadicado[],
+): VentanillaRadicado[] {
+  return lista.filter((r) => tieneDatosNoAportados(r.solicitante.datosNoAportados));
+}
+
 /* ──────────────────────────────────────────────
    Filtro de visibilidad por rol
 
