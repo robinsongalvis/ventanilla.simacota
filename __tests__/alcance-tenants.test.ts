@@ -1,3 +1,4 @@
+import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
 import { puedeVerTodosLosTenants } from '@/lib/permisos/alcance-tenants';
 
@@ -35,5 +36,24 @@ describe('Panel Op Nivel 1 — puedeVerTodosLosTenants', () => {
   /* 5 */
   it('JEFE_DEPENDENCIA solo ve su dependencia', () => {
     expect(puedeVerTodosLosTenants('JEFE_DEPENDENCIA')).toBe(false);
+  });
+});
+
+/* ══════════════════════════════════════════════════════════════
+   Panel Op Nivel 2 — la vista "Dependencias" (panorama municipal)
+   usa la MISMA política que el alcance de datos. Guard de fuente:
+   si alguien vuelve a hardcodear roles en puedeVerDependencias,
+   este test lo detecta.
+══════════════════════════════════════════════════════════════ */
+
+describe('Panel Op Nivel 2 — acceso a vista Dependencias', () => {
+  it('puedeVerDependencias delega en puedeVerTodosLosTenants', () => {
+    const dashboard = readFileSync('app/interno/dashboard/page.tsx', 'utf8');
+    const fn = dashboard.slice(
+      dashboard.indexOf('function puedeVerDependencias'),
+      dashboard.indexOf('function puedeVerAnaliticaAvanzada'),
+    );
+    expect(fn).toContain('puedeVerTodosLosTenants(usuario.rol)');
+    expect(fn).not.toContain("usuario.rol === 'ADMIN' || usuario.rol === 'CONTROL_INTERNO'");
   });
 });
