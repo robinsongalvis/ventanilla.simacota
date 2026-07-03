@@ -9,6 +9,11 @@ import {
   getTiposSolicitudInternos,
   getTipoSolicitudById,
 } from '@/lib/catalogos/tipos-solicitud';
+import {
+  MEDIOS_ANEXOS,
+  componerDescripcionAnexos,
+  toggleMedio,
+} from '@/lib/recepcion/medios-anexos';
 import type {
   CanalRespuesta,
   MedioRecepcion,
@@ -152,6 +157,9 @@ const labelStyle = { color: '#667085' };
 export function RadicacionFuncionarioForm({ radicadoPreview, onSubmit, formId, hideSubmitButton = false }: Props) {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [form, setForm] = useState<FormState>(INITIAL_FORM);
+  // Sprint Recepción fluida — chips de medios físicos entregados (CD, USB…).
+  // La selección compone detalle.anexosDescripcion, campo ya existente.
+  const [mediosAnexos, setMediosAnexos] = useState<string[]>([]);
   const [archivos, setArchivos] = useState<File[]>([]);
   const [dragging, setDragging] = useState(false);
   const [guardando, setGuardando] = useState(false);
@@ -443,6 +451,32 @@ export function RadicacionFuncionarioForm({ radicadoPreview, onSubmit, formId, h
             value={String(form.numeroAnexos)}
             onChange={(v) => update('numeroAnexos', Number(v.replace(/\D/g, '') || 0))}
           />
+          <div className="md:col-span-2 xl:col-span-4">
+            <span className={labelCls} style={labelStyle}>Medios entregados (si aplica)</span>
+            <div className="flex flex-wrap gap-2">
+              {MEDIOS_ANEXOS.map((medio) => {
+                const activo = mediosAnexos.includes(medio);
+                return (
+                  <button
+                    key={medio}
+                    type="button"
+                    aria-pressed={activo}
+                    onClick={() => {
+                      const siguiente = toggleMedio(mediosAnexos, medio);
+                      setMediosAnexos(siguiente);
+                      update('anexosDescripcion', componerDescripcionAnexos(siguiente));
+                    }}
+                    className="text-xs font-semibold px-3 py-1.5 rounded-full transition-colors"
+                    style={activo
+                      ? { background: '#EEF4EE', border: '1px solid #14532D', color: '#14532D' }
+                      : { background: '#FFFFFF', border: '1px solid #D9E2D9', color: '#667085' }}
+                  >
+                    {medio}
+                  </button>
+                );
+              })}
+            </div>
+          </div>
           <div className="md:col-span-2 xl:col-span-4">
             <label>
               <span className={labelCls} style={labelStyle}>Observaciones de anexos</span>

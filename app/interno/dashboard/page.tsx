@@ -2824,6 +2824,9 @@ interface DatosComprobante {
   asunto:            string;
   fechaVencimiento:  string;
   numeroFolios:      number;
+  /** Sprint Recepción fluida — anexos físicos y medios entregados. */
+  numeroAnexos:      number;
+  mediosAnexos:      string | null;
   /** Sprint Ventanilla Operativa 2 — datos de contacto y canal de
    *  respuesta requeridos por el comprobante nuevo. `correoSolicitante`
    *  y `telefonoSolicitante` respetan las casillas `noAporta…` — si el
@@ -2923,6 +2926,8 @@ function DrawerNuevoRadicado({
         asunto:            payload.asunto,
         fechaVencimiento:  payload.fechaVencimiento,
         numeroFolios:      payload.numeroFolios,
+        numeroAnexos:      payload.numeroAnexos,
+        mediosAnexos:      payload.anexosDescripcion?.trim() || null,
         correoSolicitante:   emailComprobante,
         telefonoSolicitante: telefonoComprobante,
         canalRespuesta:      payload.canalRespuesta ?? null,
@@ -3039,6 +3044,8 @@ function DrawerNuevoRadicado({
                   horaRadicado={datosComprobante.horaRadicado}
                   dependencia={NOMBRES_TENANT[usuario.tenantId] ?? 'Ventanilla Única'}
                   numeroFolios={datosComprobante.numeroFolios}
+                  numeroAnexos={datosComprobante.numeroAnexos}
+                  mediosAnexos={datosComprobante.mediosAnexos}
                 />
               )}
 
@@ -3059,6 +3066,8 @@ function DrawerNuevoRadicado({
                 funcionarioNombre={usuario.nombre}
                 dependencia={usuario.tenantId}
                 numeroFolios={datosComprobante.numeroFolios}
+                numeroAnexos={datosComprobante.numeroAnexos}
+                mediosAnexos={datosComprobante.mediosAnexos}
                 correoSolicitante={datosComprobante.correoSolicitante}
                 telefonoSolicitante={datosComprobante.telefonoSolicitante}
                 canalRespuesta={datosComprobante.canalRespuesta}
