@@ -2,11 +2,12 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 import { cleanup, render, screen, fireEvent } from '@testing-library/react';
 import { TarjetaMIPGGrande } from '@/app/interno/dashboard/components/TarjetaMIPGGrande';
 import type { RadicadoCritico } from '@/lib/kpis-mipg/radicado-mas-critico';
+import { tokensEstadoKpi } from '@/lib/kpis-mipg/tokens-estado-kpi';
 
 afterEach(() => cleanup());
 
 /* ══════════════════════════════════════════════════════════════
-   Panel Operativo Nivel 3B — render de la tarjeta grande.
+   Panel Operativo — render de la tarjeta grande (rediseño 3B.2).
 ══════════════════════════════════════════════════════════════ */
 
 const CRITICO: RadicadoCritico = {
@@ -21,8 +22,7 @@ function props(overrides = {}) {
     label:        'Vencidas',
     valor:        4,
     icono:        null,
-    color:        '#DC2626',
-    razonColor:   '#B91C1C',
+    tokens:       tokensEstadoKpi('VENCIDAS'),
     criticoLabel: 'Más crítico',
     activo:       false,
     critico:      CRITICO,

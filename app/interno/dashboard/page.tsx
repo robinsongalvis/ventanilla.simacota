@@ -59,6 +59,7 @@ import {
   radicadoMasCriticoPorFiltro,
   type FiltroGrande,
 } from '@/lib/kpis-mipg/radicado-mas-critico';
+import { tokensEstadoKpi } from '@/lib/kpis-mipg/tokens-estado-kpi';
 import { useFuncionariosTenant }              from '@/lib/hooks/useFuncionariosTenant';
 import type { FuncionarioTenant }             from '@/lib/hooks/useFuncionariosTenant';
 import type { ResponsableFuncionario }        from '@/lib/actions/asignarRadicado';
@@ -1020,8 +1021,7 @@ function TarjetasMIPG({
               label={t.label}
               valor={t.valor}
               icono={t.icono ?? null}
-              color={t.rielColor}
-              razonColor={t.textoColor}
+              tokens={tokensEstadoKpi(filtro)}
               criticoLabel={CRITICO_LABEL[filtro]}
               activo={filtroActivo === filtro}
               critico={radicadoMasCriticoPorFiltro(radicados, filtro)}
