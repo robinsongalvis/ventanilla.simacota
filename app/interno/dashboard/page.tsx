@@ -59,6 +59,7 @@ import {
   radicadoMasCriticoPorFiltro,
   type FiltroGrande,
 } from '@/lib/kpis-mipg/radicado-mas-critico';
+import { tokensEstadoKpi } from '@/lib/kpis-mipg/tokens-estado-kpi';
 import { useFuncionariosTenant }              from '@/lib/hooks/useFuncionariosTenant';
 import type { FuncionarioTenant }             from '@/lib/hooks/useFuncionariosTenant';
 import type { ResponsableFuncionario }        from '@/lib/actions/asignarRadicado';
@@ -1020,8 +1021,7 @@ function TarjetasMIPG({
               label={t.label}
               valor={t.valor}
               icono={t.icono ?? null}
-              color={t.rielColor}
-              razonColor={t.textoColor}
+              tokens={tokensEstadoKpi(filtro)}
               criticoLabel={CRITICO_LABEL[filtro]}
               activo={filtroActivo === filtro}
               critico={radicadoMasCriticoPorFiltro(radicados, filtro)}
@@ -1177,21 +1177,35 @@ function PanelOperacionDependencia({
             </button>
           </div>
         ) : (
-        <div className="micro-card-read rounded-xl px-4 py-3 bg-white" style={{ border: '1px solid #D9E2D9', boxShadow: '0 1px 3px rgba(20,83,45,0.06)' }}>
+        <div
+          className="micro-card-read rounded-[14px] px-4 py-3 bg-white"
+          style={{ border: '1px solid #E3EAE3', borderLeft: '3px solid #14532D', boxShadow: '0 1px 3px rgba(20,50,30,0.06)' }}
+        >
           <div className="flex items-start justify-between gap-3">
-            <div className="min-w-0">
-              <p className="text-[10px] font-black uppercase tracking-widest" style={{ color: '#667085' }}>
-                Siguiente atención sugerida
-              </p>
-              <p className={`mt-1 text-sm font-bold ${
-                dias !== null && dias < 0
-                  ? 'text-rose-600'
-                  : dias !== null && dias <= 2
-                    ? 'text-orange-600'
-                    : ''
-              }`} style={dias === null || dias > 2 ? { color: '#1F2933' } : {}}>
-                {mensajeSiguienteAccion(siguiente)}
-              </p>
+            <div className="min-w-0 flex items-start gap-2.5">
+              <span
+                className="shrink-0 w-8 h-8 rounded-[10px] flex items-center justify-center"
+                style={{ background: '#EEF4EE', color: '#14532D' }}
+                aria-hidden="true"
+              >
+                <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2}>
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M12 2c1 3-1 4-1 6a3 3 0 006 0c0-1 2 2 2 5a7 7 0 11-14 0c0-4 4-6 4-9 1 1 2 2 3 -2z" />
+                </svg>
+              </span>
+              <div className="min-w-0">
+                <p className="text-[10px] font-bold uppercase tracking-widest" style={{ color: '#5F8A6E' }}>
+                  Siguiente atención sugerida
+                </p>
+                <p className={`mt-1 text-sm font-bold ${
+                  dias !== null && dias < 0
+                    ? 'text-rose-600'
+                    : dias !== null && dias <= 2
+                      ? 'text-orange-600'
+                      : ''
+                }`} style={dias === null || dias > 2 ? { color: '#12261A' } : {}}>
+                  {mensajeSiguienteAccion(siguiente)}
+                </p>
+              </div>
             </div>
             <div className="shrink-0 flex items-center gap-2">
               <button
@@ -1207,10 +1221,13 @@ function PanelOperacionDependencia({
               <button
                 type="button"
                 onClick={() => onSeleccionar(siguiente)}
-                className="micro-btn-primary shrink-0 rounded-lg px-3 py-2 text-xs font-bold text-white focus-visible:outline-none"
-                style={{ background: '#14532D' }}
+                className="shrink-0 inline-flex items-center gap-1.5 rounded-lg px-3.5 py-2 text-xs font-bold focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-500/40 active:scale-95 transition-transform"
+                style={{ background: '#D4A017', color: '#3D2C00' }}
               >
-                Abrir
+                Atender
+                <svg className="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2.5}>
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M5 12h14M13 6l6 6-6 6" />
+                </svg>
               </button>
             )}
             </div>
@@ -1445,6 +1462,15 @@ function TablaRadicados({
               const seleccionado = radicadoSeleccionadoId === r.radicadoId;
               const semaforoData = calcularSemaforo(r);
               const diasColor = semaforoData.textoClass;
+              // Rediseño 3B.2 — riel de color por estado del término,
+              // siempre visible. La selección lo intensifica a verde.
+              const rielEstado = semaforoData.estado === 'VENCIDO'
+                ? '#DC2626'
+                : semaforoData.estado === 'POR_VENCER'
+                  ? '#D97706'
+                  : semaforoData.estado === 'RESUELTO'
+                    ? '#CBD5D1'
+                    : '#14532D';
 
               return (
                 <tr
@@ -1455,7 +1481,7 @@ function TablaRadicados({
                   style={{
                     borderBottom: '1px solid #EEF4EE',
                     background: seleccionado ? '#EEF4EE' : undefined,
-                    borderLeft: seleccionado ? '4px solid #14532D' : '4px solid transparent',
+                    borderLeft: seleccionado ? '4px solid #14532D' : `3px solid ${rielEstado}`,
                     boxShadow: seleccionado ? 'inset 0 0 0 1px rgba(20,83,45,0.08)' : undefined,
                   }}
                 >
@@ -3941,6 +3967,27 @@ function DashboardInterior({ usuario, cerrarSesion }: { usuario: UsuarioAutentic
           </div>
         ) : (
           <>
+            {/* Rediseño 3B.2 — encabezado de sala de operaciones (solo
+                desktop; el móvil ya tiene su propio header). */}
+            {vistaActual === 'TABLERO' && (
+              <div className="hidden md:flex items-center justify-between gap-3 px-4 pt-3 pb-1 bg-white shrink-0">
+                <div>
+                  <div className="flex items-center gap-2">
+                    <span className="text-[10px] font-bold uppercase tracking-[0.12em]" style={{ color: '#5F8A6E' }}>
+                      Sala de operaciones
+                    </span>
+                    <span className="w-1.5 h-1.5 rounded-full" style={{ background: '#3B9E5F' }} />
+                    <span className="text-[10px]" style={{ color: '#7A8B7F' }}>tiempo real</span>
+                  </div>
+                  <p className="text-lg font-black leading-tight mt-0.5" style={{ color: '#12261A' }}>
+                    Tablero · {veTodosTenants
+                      ? (tenantFiltro === 'TODOS' ? 'Vista municipal' : (NOMBRES_TENANT[tenantFiltro] ?? 'Vista municipal'))
+                      : NOMBRES_TENANT[usuario.tenantId]}
+                  </p>
+                </div>
+              </div>
+            )}
+
             {/* Dashboard PQRSD compacto — vencimientos y riesgo.
                 En modo "compacto" se oculta para dar más altura al listado. */}
             {esAdmin && (
