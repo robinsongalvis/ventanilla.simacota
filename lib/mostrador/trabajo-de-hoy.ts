@@ -21,7 +21,11 @@ import { tieneDatosNoAportados } from '@/lib/busqueda/filtros-radicado';
  * Función pura: sin React, sin Firestore.
  */
 
-export type PendienteMostrador = 'SELLAR_PDF' | 'DATOS_INCOMPLETOS' | 'CORREO_FALLIDO';
+export type PendienteMostrador =
+  | 'SELLAR_PDF'
+  | 'DATOS_INCOMPLETOS'
+  | 'CORREO_FALLIDO'
+  | 'CONSTANCIA_SIN_ENVIAR';
 
 export type FiltroTrabajoHoy = PendienteMostrador | 'TODOS';
 
@@ -42,6 +46,7 @@ export interface ConteosTrabajoHoy {
   sellarPdf: number;
   datosIncompletos: number;
   correoFallido: number;
+  constanciaSinEnviar: number;
 }
 
 export interface TrabajoDeHoy {
@@ -54,6 +59,14 @@ function pendientesDe(r: VentanillaRadicado): PendienteMostrador[] {
   if (esActivo(r) && tienePdfSinSellar(r)) pendientes.push('SELLAR_PDF');
   if (tieneDatosNoAportados(r.solicitante?.datosNoAportados)) pendientes.push('DATOS_INCOMPLETOS');
   if (r.alertaNotificacionFallida === true) pendientes.push('CORREO_FALLIDO');
+  // Constancia: solo cuenta como pendiente cuando HAY correo al cual
+  // enviarla y aún no se ha enviado. Mide envío por correo — si la
+  // funcionaria solo la imprime, el chip persiste (caveat aceptado).
+  const tieneCorreo = Boolean(r.solicitante?.email?.trim())
+    && r.solicitante?.datosNoAportados?.correo !== true;
+  if (tieneCorreo && r.constanciaEnviadaCorreo !== true) {
+    pendientes.push('CONSTANCIA_SIN_ENVIAR');
+  }
   return pendientes;
 }
 
@@ -82,11 +95,14 @@ export function trabajoDeHoy(
     }))
     .sort((a, b) => new Date(a.fechaRadicado).getTime() - new Date(b.fechaRadicado).getTime());
 
-  const conteos: ConteosTrabajoHoy = { sellarPdf: 0, datosIncompletos: 0, correoFallido: 0 };
+  const conteos: ConteosTrabajoHoy = {
+    sellarPdf: 0, datosIncompletos: 0, correoFallido: 0, constanciaSinEnviar: 0,
+  };
   for (const f of filas) {
-    if (f.pendientes.includes('SELLAR_PDF'))       conteos.sellarPdf += 1;
-    if (f.pendientes.includes('DATOS_INCOMPLETOS')) conteos.datosIncompletos += 1;
-    if (f.pendientes.includes('CORREO_FALLIDO'))    conteos.correoFallido += 1;
+    if (f.pendientes.includes('SELLAR_PDF'))            conteos.sellarPdf += 1;
+    if (f.pendientes.includes('DATOS_INCOMPLETOS'))     conteos.datosIncompletos += 1;
+    if (f.pendientes.includes('CORREO_FALLIDO'))        conteos.correoFallido += 1;
+    if (f.pendientes.includes('CONSTANCIA_SIN_ENVIAR')) conteos.constanciaSinEnviar += 1;
   }
 
   return { filas, conteos };

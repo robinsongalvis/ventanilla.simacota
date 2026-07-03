@@ -30,9 +30,10 @@ const MAX_RESULTADOS = 8;
 
 /** Trío visual de cada chip de pendiente (color = estado, nunca decora). */
 const CHIP_PENDIENTE: Record<PendienteMostrador, { label: string; bg: string; texto: string }> = {
-  SELLAR_PDF:        { label: 'PDF sin sellar',    bg: '#FAEEDA', texto: '#7A4F0A' },
-  DATOS_INCOMPLETOS: { label: 'Datos incompletos', bg: '#FAEEDA', texto: '#7A4F0A' },
-  CORREO_FALLIDO:    { label: 'Correo fallido',    bg: '#FCEBEB', texto: '#911111' },
+  SELLAR_PDF:            { label: 'PDF sin sellar',        bg: '#FAEEDA', texto: '#7A4F0A' },
+  DATOS_INCOMPLETOS:     { label: 'Datos incompletos',     bg: '#FAEEDA', texto: '#7A4F0A' },
+  CORREO_FALLIDO:        { label: 'Correo fallido',        bg: '#FCEBEB', texto: '#911111' },
+  CONSTANCIA_SIN_ENVIAR: { label: 'Constancia sin enviar', bg: '#FAEEDA', texto: '#7A4F0A' },
 };
 
 /** Riel izquierdo de la fila según su pendiente más urgente. */
@@ -285,6 +286,15 @@ export function VistaVentanilla({
                     activo={filtroHoy === 'CORREO_FALLIDO'}
                     color="#A32D2D"
                     onClick={() => setFiltroHoy(filtroHoy === 'CORREO_FALLIDO' ? 'TODOS' : 'CORREO_FALLIDO')}
+                  />
+                )}
+                {hoy.conteos.constanciaSinEnviar > 0 && (
+                  <ChipFiltroHoy
+                    label="Constancia sin enviar"
+                    conteo={hoy.conteos.constanciaSinEnviar}
+                    activo={filtroHoy === 'CONSTANCIA_SIN_ENVIAR'}
+                    color="#854F0B"
+                    onClick={() => setFiltroHoy(filtroHoy === 'CONSTANCIA_SIN_ENVIAR' ? 'TODOS' : 'CONSTANCIA_SIN_ENVIAR')}
                   />
                 )}
               </div>

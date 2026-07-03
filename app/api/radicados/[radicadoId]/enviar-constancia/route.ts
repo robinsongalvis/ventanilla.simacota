@@ -8,6 +8,7 @@ import {
   getRadicadoOrFail,
   RadicadoActionError,
 } from '@/lib/server/radicados-security';
+import { getFirebaseAdminDb } from '@/lib/firebase-admin';
 import { enviarEmail } from '@/lib/email/mailer';
 import {
   buildConstanciaRadicacionHtml,
@@ -127,6 +128,18 @@ export async function POST(
         { error: 'No fue posible enviar la constancia. Intente nuevamente en unos minutos.' },
         { status: 502 },
       );
+    }
+
+    // Sprint Cierre del mostrador — bandera raíz para el pendiente
+    // "Constancia sin enviar" de Trabajo de hoy. Best-effort: si falla,
+    // el envío ya ocurrió y no se revierte.
+    try {
+      await getFirebaseAdminDb().doc(`ventanilla_radicados/${radicadoId}`).update({
+        constanciaEnviadaCorreo: true,
+        ultimaActualizacion:     new Date().toISOString(),
+      });
+    } catch (err) {
+      logError({ radicadoId, modulo: 'constancia/bandera-enviada', error: err });
     }
 
     // Evento de éxito.

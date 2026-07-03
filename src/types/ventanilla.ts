@@ -272,6 +272,13 @@ export interface VentanillaRadicado {
    * funcionario marca explícitamente la notificación como gestionada.
    */
   alertaNotificacionFallida?: boolean;
+  /**
+   * Sprint Cierre del mostrador — true cuando la constancia de radicación
+   * ya fue enviada al correo del solicitante. La escribe el endpoint
+   * enviar-constancia tras el envío exitoso; ausente = no enviada.
+   * Alimenta el pendiente "Constancia sin enviar" del mostrador.
+   */
+  constanciaEnviadaCorreo?: boolean;
 }
 
 
