@@ -39,11 +39,13 @@ export function fechaYmdColombia(value: string | Date): string {
   return d.toLocaleDateString('en-CA', { timeZone: TIMEZONE_COLOMBIA });
 }
 
-function esActivo(r: VentanillaRadicado): boolean {
+/** True si el radicado está en un estado activo (no resuelto/rechazado). */
+export function esActivo(r: VentanillaRadicado): boolean {
   return ESTADOS_ACTIVOS.has(r.estadoActual);
 }
 
-function tienePdfSinSellar(r: VentanillaRadicado): boolean {
+/** True si el radicado tiene al menos un PDF sin copia sellada. */
+export function tienePdfSinSellar(r: VentanillaRadicado): boolean {
   return r.archivos.some((a) => a.tipo === 'application/pdf' && !a.sellado);
 }
 
