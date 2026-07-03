@@ -15,6 +15,13 @@ import {
   toggleMedio,
 } from '@/lib/recepcion/medios-anexos';
 import { sugerirDependencia } from '@/lib/recepcion/sugerir-dependencia';
+import {
+  buscarSolicitantes,
+  construirDirectorio,
+  type SolicitanteConocido,
+} from '@/lib/recepcion/sugerencias-solicitante';
+import { SugerenciasSolicitante } from '@/app/interno/recepcion/components/SugerenciasSolicitante';
+import type { VentanillaRadicado } from '@/src/types/ventanilla';
 import type {
   CanalRespuesta,
   MedioRecepcion,
@@ -116,7 +123,12 @@ interface Props {
   formId?: string;
   /** Sprint UI Radicación Rápida: ocultar el botón Submit interno cuando el contenedor pone su propio footer. */
   hideSubmitButton?: boolean;
+  /** Sprint Solicitante frecuente — radicados en memoria de los que se
+   *  deriva el autocompletar. Opcional: sin ellos el form funciona igual. */
+  radicados?: VentanillaRadicado[];
 }
+
+const SIN_RADICADOS: VentanillaRadicado[] = [];
 
 /* Ventanilla Única primero (default de triage); las demás dependencias
    en el orden del directorio institucional. */
@@ -171,9 +183,12 @@ const sectionStyle = { border: '1px solid #D9E2D9', boxShadow: '0 1px 2px rgba(2
 const labelCls = 'mb-1 block text-[10px] font-bold uppercase tracking-widest';
 const labelStyle = { color: '#667085' };
 
-export function RadicacionFuncionarioForm({ radicadoPreview, onSubmit, formId, hideSubmitButton = false }: Props) {
+export function RadicacionFuncionarioForm({ radicadoPreview, onSubmit, formId, hideSubmitButton = false, radicados = SIN_RADICADOS }: Props) {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [form, setForm] = useState<FormState>(INITIAL_FORM);
+  // Sprint Solicitante frecuente — autocompletar con confirmación humana.
+  const [campoSugerencias, setCampoSugerencias] = useState<'nombre' | 'documento' | null>(null);
+  const [notaPrecargado, setNotaPrecargado] = useState(false);
   // Sprint Recepción fluida — chips de medios físicos entregados (CD, USB…).
   // La selección compone detalle.anexosDescripcion, campo ya existente.
   const [mediosAnexos, setMediosAnexos] = useState<string[]>([]);
@@ -197,6 +212,40 @@ export function RadicacionFuncionarioForm({ radicadoPreview, onSubmit, formId, h
     }),
     [form.tipoSolicitudId, form.asunto, form.descripcion],
   );
+
+  /* Sprint Solicitante frecuente — directorio derivado del pool en
+     memoria y coincidencias para el campo con foco. Nunca sugiere en
+     presentación anónima (los campos están bloqueados). */
+  const directorio = useMemo(() => construirDirectorio(radicados), [radicados]);
+  const consultaSolicitante = campoSugerencias === 'nombre'
+    ? form.nombreCompleto
+    : campoSugerencias === 'documento' ? form.numeroDocumento : '';
+  const sugerenciasSolicitante = useMemo(() => {
+    if (!campoSugerencias || form.tipoPresentacion === 'ANONIMA') return [];
+    return buscarSolicitantes(directorio, consultaSolicitante);
+  }, [campoSugerencias, consultaSolicitante, directorio, form.tipoPresentacion]);
+
+  function seleccionarSolicitante(s: SolicitanteConocido) {
+    setForm((prev) => ({
+      ...prev,
+      nombreCompleto:  s.nombreCompleto,
+      tipoDocumento:   s.tipoDocumento,
+      numeroDocumento: s.numeroDocumento,
+      email:           s.email ?? '',
+      telefonoMovil:   s.telefonoMovil ?? '',
+      telefonoFijo:    s.telefonoFijo ?? '',
+      direccion:       s.direccion ?? '',
+    }));
+    setNotaPrecargado(true);
+    setCampoSugerencias(null);
+  }
+
+  /* Editar cualquier dato precargado retira la nota de verificación:
+     lo que queda ya pasó por las manos de la funcionaria. */
+  function updateVerificado<K extends keyof FormState>(key: K, value: FormState[K]) {
+    update(key, value);
+    if (notaPrecargado) setNotaPrecargado(false);
+  }
 
   const municipiosFiltrados = MUNICIPIOS_SANTANDER.filter((m) =>
     m.toLowerCase().includes(form.municipio.toLowerCase()),
@@ -308,6 +357,15 @@ export function RadicacionFuncionarioForm({ radicadoPreview, onSubmit, formId, h
       {/* ── Datos solicitante ── */}
       <section className={sectionCls} style={sectionStyle}>
         <SectionTitle eyebrow="Solicitante" title="Datos del solicitante" />
+        {notaPrecargado && (
+          <p
+            role="status"
+            className="mb-3 rounded-lg px-3 py-2 text-xs"
+            style={{ background: '#FDF9EE', border: '1px solid #E7D9A8', color: '#7A5B0B' }}
+          >
+            Datos cargados de una radicación anterior — verifícalos con el ciudadano.
+          </p>
+        )}
         <div className="grid gap-4 grid-cols-1 md:grid-cols-2 xl:grid-cols-4">
           {/* Sprint Radicación dirigida — presentación (Ley 1755/2015). */}
           <div>
@@ -350,7 +408,7 @@ export function RadicacionFuncionarioForm({ radicadoPreview, onSubmit, formId, h
           <SelectField
             label="Tipo documento"
             value={form.tipoDocumento}
-            onChange={(v) => update('tipoDocumento', v as TipoDocumento)}
+            onChange={(v) => updateVerificado('tipoDocumento', v as TipoDocumento)}
             options={[
               ['CC',         'Cédula'],
               ['CE',         'Cédula extranjeríca'],
@@ -359,45 +417,69 @@ export function RadicacionFuncionarioForm({ radicadoPreview, onSubmit, formId, h
               ['OTRO',       'Otro'],
             ]}
           />
-          <TextField
-            label="Identificación"
-            value={form.numeroDocumento}
-            onChange={(v) => update('numeroDocumento', v)}
-            /* Fix recepción: si el ciudadano no aporta documento (o la
-               presentación es anónima), el campo deja de ser obligatorio y
-               se bloquea para que nunca queden cédula y marca al tiempo. */
-            required={!form.noAportaDocumento && form.tipoPresentacion !== 'ANONIMA'}
-            disabled={form.noAportaDocumento || form.tipoPresentacion === 'ANONIMA'}
-          />
-          <TextField
-            label="Nombre / razón social"
-            value={form.nombreCompleto}
-            onChange={(v) => update('nombreCompleto', v)}
-            required={form.tipoPresentacion !== 'ANONIMA'}
-            disabled={form.tipoPresentacion === 'ANONIMA'}
-            className="md:col-span-2 xl:col-span-2"
-          />
+          {/* Sprint Solicitante frecuente — Identificación y Nombre sugieren
+              ciudadanos que ya radicaron. Tab/blur cierran el dropdown;
+              Escape también; la selección es siempre un clic de Laura. */}
+          <div className="relative">
+            <TextField
+              label="Identificación"
+              value={form.numeroDocumento}
+              onChange={(v) => updateVerificado('numeroDocumento', v)}
+              onFocus={() => setCampoSugerencias('documento')}
+              onBlur={() => setCampoSugerencias(null)}
+              onKeyDown={(e) => { if (e.key === 'Escape') setCampoSugerencias(null); }}
+              /* Fix recepción: si el ciudadano no aporta documento (o la
+                 presentación es anónima), el campo deja de ser obligatorio y
+                 se bloquea para que nunca queden cédula y marca al tiempo. */
+              required={!form.noAportaDocumento && form.tipoPresentacion !== 'ANONIMA'}
+              disabled={form.noAportaDocumento || form.tipoPresentacion === 'ANONIMA'}
+            />
+            {campoSugerencias === 'documento' && (
+              <SugerenciasSolicitante
+                sugerencias={sugerenciasSolicitante}
+                onSeleccionar={seleccionarSolicitante}
+              />
+            )}
+          </div>
+          <div className="relative md:col-span-2 xl:col-span-2">
+            <TextField
+              label="Nombre / razón social"
+              value={form.nombreCompleto}
+              onChange={(v) => updateVerificado('nombreCompleto', v)}
+              onFocus={() => setCampoSugerencias('nombre')}
+              onBlur={() => setCampoSugerencias(null)}
+              onKeyDown={(e) => { if (e.key === 'Escape') setCampoSugerencias(null); }}
+              required={form.tipoPresentacion !== 'ANONIMA'}
+              disabled={form.tipoPresentacion === 'ANONIMA'}
+            />
+            {campoSugerencias === 'nombre' && (
+              <SugerenciasSolicitante
+                sugerencias={sugerenciasSolicitante}
+                onSeleccionar={seleccionarSolicitante}
+              />
+            )}
+          </div>
           <TextField
             label="Correo electrónico"
             value={form.email}
-            onChange={(v) => update('email', v)}
+            onChange={(v) => updateVerificado('email', v)}
             type="email"
             className="xl:col-span-2"
           />
           <TextField
             label="Teléfono móvil"
             value={form.telefonoMovil}
-            onChange={(v) => update('telefonoMovil', v)}
+            onChange={(v) => updateVerificado('telefonoMovil', v)}
           />
           <TextField
             label="Teléfono fijo"
             value={form.telefonoFijo}
-            onChange={(v) => update('telefonoFijo', v)}
+            onChange={(v) => updateVerificado('telefonoFijo', v)}
           />
           <TextField
             label="Dirección"
             value={form.direccion}
-            onChange={(v) => update('direccion', v)}
+            onChange={(v) => updateVerificado('direccion', v)}
             className="md:col-span-2 xl:col-span-2"
           />
           <TextField
@@ -697,9 +779,12 @@ function SectionTitle({ eyebrow, title }: { eyebrow: string; title: string }) {
 
 function TextField({
   label, value, onChange, type = 'text', required, disabled, className = '',
+  onFocus, onBlur, onKeyDown,
 }: {
   label: string; value: string; onChange: (value: string) => void;
   type?: string; required?: boolean; disabled?: boolean; className?: string;
+  onFocus?: () => void; onBlur?: () => void;
+  onKeyDown?: (e: React.KeyboardEvent<HTMLInputElement>) => void;
 }) {
   return (
     <label className={className}>
@@ -708,6 +793,9 @@ function TextField({
         type={type}
         value={value}
         onChange={(e) => onChange(e.target.value)}
+        onFocus={onFocus}
+        onBlur={onBlur}
+        onKeyDown={onKeyDown}
         required={required}
         disabled={disabled}
         className="input-internal disabled:opacity-50 disabled:cursor-not-allowed"
