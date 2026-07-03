@@ -17,6 +17,7 @@ import { radicarInstitucionalmente }       from '@/lib/actions/radicarVentanilla
 import { asignarRadicado, asignarMasivo }  from '@/lib/actions/asignarRadicado';
 import { ComprobanteRadicado }             from '@/app/interno/dashboard/components/ComprobanteRadicado';
 import { BusquedaAvanzadaPanel }           from '@/app/interno/dashboard/components/BusquedaAvanzadaPanel';
+import { VistaVentanilla }                 from '@/app/interno/dashboard/components/ventanilla/VistaVentanilla';
 import { useIndicadoresModo }              from '@/lib/hooks/useIndicadoresModo';
 import {
   formatFechaColombia,
@@ -3965,6 +3966,17 @@ function DashboardInterior({ usuario, cerrarSesion }: { usuario: UsuarioAutentic
               </div>
             )}
           </div>
+        ) : vistaActual === 'VENTANILLA' ? (
+          /* Ventanilla · módulo de mostrador — vista propia, ya NO hereda
+             el Tablero. Búsqueda con estado propio y radicación como
+             acción primaria. */
+          <VistaVentanilla
+            radicados={todosLosRadicados}
+            puedeRadicar={tienePermisoRadicar}
+            onNuevaRadicacion={() => dispatch({ type: 'TOGGLE_DRAWER_NUEVO' })}
+            onAbrirBusquedaAvanzada={() => setBusquedaAvanzadaAbierta(true)}
+            onAbrirRadicado={(id) => abrirRadicadoPorId(id)}
+          />
         ) : (
           <>
             {/* Rediseño 3B.2 — encabezado de sala de operaciones (solo
