@@ -2839,9 +2839,12 @@ interface DatosComprobante {
 function DrawerNuevoRadicado({
   usuario,
   onCerrar,
+  radicados,
 }: {
   usuario:  UsuarioAutenticado;
   onCerrar: () => void;
+  /** Sprint Solicitante frecuente — pool en memoria para autocompletar. */
+  radicados: VentanillaRadicado[];
 }) {
   const [radicadoGenerado,  setRadicadoGenerado]  = useState<string | null>(null);
   const [datosComprobante,  setDatosComprobante]  = useState<DatosComprobante | null>(null);
@@ -3123,6 +3126,7 @@ function DrawerNuevoRadicado({
               onSubmit={handleSubmit}
               formId={FORM_ID}
               hideSubmitButton
+              radicados={radicados}
             />
           )}
         </div>
@@ -4168,6 +4172,7 @@ function DashboardInterior({ usuario, cerrarSesion }: { usuario: UsuarioAutentic
         <DrawerNuevoRadicado
           usuario={usuario}
           onCerrar={() => dispatch({ type: 'CERRAR_DRAWER_NUEVO' })}
+          radicados={todosLosRadicados}
         />
       )}
 
