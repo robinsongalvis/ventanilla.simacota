@@ -1,0 +1,171 @@
+'use client';
+
+/* eslint-disable @next/next/no-img-element */
+
+import {
+  INSTITUCION,
+  formatFechaInstitucional,
+  formatHoraInstitucional,
+} from '@/lib/institucion';
+
+/* ══════════════════════════════════════════════════════════════
+   Sprint Recepción fluida — sello digital de recibido.
+
+   Flujo real: el ciudadano trae su copia física, Laura la pone en la
+   impresora y el sistema imprime SOLO el sello en la esquina superior
+   izquierda de la hoja — la misma esquina del sello digital PDF. Nada
+   de hoja completa: el sello marca la copia que el ciudadano se lleva.
+
+   La vista previa muestra un croquis de la hoja con el sello ya
+   ubicado, para que la funcionaria sepa exactamente dónde caerá.
+══════════════════════════════════════════════════════════════ */
+
+const VERDE_INST = '#14532D';
+
+const PRINT_STYLES_SELLO = `
+@media print {
+  body * { visibility: hidden !important; }
+  #sello-recibido-print,
+  #sello-recibido-print * { visibility: visible !important; }
+  #sello-recibido-print {
+    position: fixed !important;
+    top: 0 !important;
+    left: 0 !important;
+    width: 88mm !important;
+    background: white !important;
+    z-index: 99999 !important;
+  }
+  @page {
+    size: letter portrait;
+    margin: 8mm;
+  }
+}
+`;
+
+export interface SelloRecibidoProps {
+  radicadoId:    string;
+  fechaRadicado: string;
+  horaRadicado:  string;
+  /** Nombre legible de la dependencia (default: Ventanilla Única). */
+  dependencia?:  string;
+  numeroFolios?: number;
+  numeroAnexos?: number;
+  /** Texto corto de medios entregados ("CD, USB"), si aplica. */
+  mediosAnexos?: string | null;
+}
+
+export function SelloRecibido({
+  radicadoId,
+  fechaRadicado,
+  horaRadicado,
+  dependencia = 'Ventanilla Única',
+  numeroFolios = 0,
+  numeroAnexos = 0,
+  mediosAnexos = null,
+}: SelloRecibidoProps) {
+  const consultaCorta = INSTITUCION.consultaUrl.replace(/^https?:\/\//, '');
+  const hayFisico = numeroFolios > 0 || numeroAnexos > 0;
+
+  function handleImprimir() {
+    /* El comprobante completo usa su propia hoja (@page half-letter);
+       se desactiva su stylesheet durante esta impresión para que el
+       sello controle la página (letter + esquina), y se restaura al
+       cerrar el diálogo. */
+    const stylesComprobante =
+      document.getElementById('comprobante-print-styles') as HTMLStyleElement | null;
+    if (stylesComprobante) stylesComprobante.disabled = true;
+
+    const tag = document.createElement('style');
+    tag.id = 'sello-recibido-print-styles';
+    tag.textContent = PRINT_STYLES_SELLO;
+    document.head.appendChild(tag);
+
+    window.print();
+
+    tag.remove();
+    if (stylesComprobante) stylesComprobante.disabled = false;
+  }
+
+  return (
+    <div className="w-full max-w-[460px] space-y-3">
+      {/* Acción + instrucción del flujo físico */}
+      <div className="flex flex-col items-center gap-2">
+        <button
+          type="button"
+          onClick={handleImprimir}
+          className="flex items-center gap-2 rounded-lg px-4 py-2 text-sm font-bold text-white transition-all active:scale-95"
+          style={{ background: VERDE_INST }}
+        >
+          <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
+              d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z" />
+          </svg>
+          Imprimir sello de recibido
+        </button>
+        <p className="text-[11px] text-center max-w-[380px]" style={{ color: '#7A8B7F' }}>
+          Coloque la copia física del ciudadano en la impresora: solo se imprime
+          el sello sobre la esquina superior izquierda de la hoja.
+        </p>
+      </div>
+
+      {/* Croquis de la hoja con el sello ya ubicado */}
+      <div
+        className="relative mx-auto w-full aspect-[17/22] rounded-md bg-white"
+        style={{ border: '2px dashed #CBD5D1' }}
+        aria-label="Vista previa: posición del sello en la hoja"
+      >
+        {/* El sello — único contenido visible al imprimir */}
+        <div id="sello-recibido-print" className="absolute top-3 left-3 w-[62%] min-w-[230px]">
+          <div
+            className="bg-white"
+            style={{ border: `1.5px solid ${VERDE_INST}`, borderRadius: 6, padding: '8px 10px' }}
+          >
+            <div className="flex items-center gap-2">
+              <img
+                src={INSTITUCION.logo}
+                alt={`Escudo de la ${INSTITUCION.nombre}`}
+                style={{ width: 30, height: 30, objectFit: 'contain' }}
+              />
+              <div className="min-w-0">
+                <p className="text-[9px] font-black uppercase leading-tight" style={{ color: VERDE_INST }}>
+                  {INSTITUCION.nombre}
+                </p>
+                <p className="text-[8px] uppercase tracking-[0.14em]" style={{ color: '#667085' }}>
+                  {INSTITUCION.sistema} · Recibido
+                </p>
+              </div>
+            </div>
+
+            <p className="font-mono font-black mt-1.5 leading-none" style={{ fontSize: 15, color: '#12261A' }}>
+              {radicadoId}
+            </p>
+
+            <div className="mt-1 space-y-px" style={{ color: '#3A4551' }}>
+              <p className="text-[9px]">
+                Fecha: {formatFechaInstitucional(fechaRadicado)} · Hora: {formatHoraInstitucional(horaRadicado)}
+              </p>
+              <p className="text-[9px]">Dependencia: {dependencia}</p>
+              {hayFisico && (
+                <p className="text-[9px]">
+                  Folios: {numeroFolios} · Anexos: {numeroAnexos}
+                  {mediosAnexos ? ` (${mediosAnexos})` : ''}
+                </p>
+              )}
+            </div>
+
+            <p className="text-[8px] mt-1" style={{ color: '#94A3B8' }}>
+              Consulte: {consultaCorta}
+            </p>
+          </div>
+        </div>
+
+        <p
+          className="absolute inset-x-0 bottom-6 text-center text-[11px] italic"
+          style={{ color: '#CBD5D1' }}
+        >
+          Copia física del ciudadano
+        </p>
+      </div>
+    </div>
+  );
+}

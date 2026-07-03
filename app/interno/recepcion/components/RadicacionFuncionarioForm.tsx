@@ -9,6 +9,11 @@ import {
   getTiposSolicitudInternos,
   getTipoSolicitudById,
 } from '@/lib/catalogos/tipos-solicitud';
+import {
+  MEDIOS_ANEXOS,
+  componerDescripcionAnexos,
+  toggleMedio,
+} from '@/lib/recepcion/medios-anexos';
 import type {
   CanalRespuesta,
   MedioRecepcion,
@@ -152,6 +157,9 @@ const labelStyle = { color: '#667085' };
 export function RadicacionFuncionarioForm({ radicadoPreview, onSubmit, formId, hideSubmitButton = false }: Props) {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [form, setForm] = useState<FormState>(INITIAL_FORM);
+  // Sprint Recepción fluida — chips de medios físicos entregados (CD, USB…).
+  // La selección compone detalle.anexosDescripcion, campo ya existente.
+  const [mediosAnexos, setMediosAnexos] = useState<string[]>([]);
   const [archivos, setArchivos] = useState<File[]>([]);
   const [dragging, setDragging] = useState(false);
   const [guardando, setGuardando] = useState(false);
@@ -268,7 +276,11 @@ export function RadicacionFuncionarioForm({ radicadoPreview, onSubmit, formId, h
             label="Identificación"
             value={form.numeroDocumento}
             onChange={(v) => update('numeroDocumento', v)}
-            required
+            /* Fix recepción: si el ciudadano no aporta documento, el campo
+               deja de ser obligatorio y se bloquea para que nunca queden
+               cédula y marca "no aporta" al mismo tiempo. */
+            required={!form.noAportaDocumento}
+            disabled={form.noAportaDocumento}
           />
           <TextField
             label="Nombre / razón social"
@@ -345,7 +357,12 @@ export function RadicacionFuncionarioForm({ radicadoPreview, onSubmit, formId, h
           <CheckboxField
             label="No aporta documento de identidad"
             checked={form.noAportaDocumento}
-            onChange={(v) => update('noAportaDocumento', v)}
+            onChange={(v) => {
+              update('noAportaDocumento', v);
+              // Al marcar, se limpia la identificación tecleada para no
+              // guardar un número junto a la marca de "no aporta".
+              if (v) update('numeroDocumento', '');
+            }}
           />
           <CheckboxField
             label="No aporta correo electrónico"
@@ -434,6 +451,32 @@ export function RadicacionFuncionarioForm({ radicadoPreview, onSubmit, formId, h
             value={String(form.numeroAnexos)}
             onChange={(v) => update('numeroAnexos', Number(v.replace(/\D/g, '') || 0))}
           />
+          <div className="md:col-span-2 xl:col-span-4">
+            <span className={labelCls} style={labelStyle}>Medios entregados (si aplica)</span>
+            <div className="flex flex-wrap gap-2">
+              {MEDIOS_ANEXOS.map((medio) => {
+                const activo = mediosAnexos.includes(medio);
+                return (
+                  <button
+                    key={medio}
+                    type="button"
+                    aria-pressed={activo}
+                    onClick={() => {
+                      const siguiente = toggleMedio(mediosAnexos, medio);
+                      setMediosAnexos(siguiente);
+                      update('anexosDescripcion', componerDescripcionAnexos(siguiente));
+                    }}
+                    className="text-xs font-semibold px-3 py-1.5 rounded-full transition-colors"
+                    style={activo
+                      ? { background: '#EEF4EE', border: '1px solid #14532D', color: '#14532D' }
+                      : { background: '#FFFFFF', border: '1px solid #D9E2D9', color: '#667085' }}
+                  >
+                    {medio}
+                  </button>
+                );
+              })}
+            </div>
+          </div>
           <div className="md:col-span-2 xl:col-span-4">
             <label>
               <span className={labelCls} style={labelStyle}>Observaciones de anexos</span>
@@ -565,10 +608,10 @@ function SectionTitle({ eyebrow, title }: { eyebrow: string; title: string }) {
 }
 
 function TextField({
-  label, value, onChange, type = 'text', required, className = '',
+  label, value, onChange, type = 'text', required, disabled, className = '',
 }: {
   label: string; value: string; onChange: (value: string) => void;
-  type?: string; required?: boolean; className?: string;
+  type?: string; required?: boolean; disabled?: boolean; className?: string;
 }) {
   return (
     <label className={className}>
@@ -578,7 +621,8 @@ function TextField({
         value={value}
         onChange={(e) => onChange(e.target.value)}
         required={required}
-        className="input-internal"
+        disabled={disabled}
+        className="input-internal disabled:opacity-50 disabled:cursor-not-allowed"
       />
     </label>
   );

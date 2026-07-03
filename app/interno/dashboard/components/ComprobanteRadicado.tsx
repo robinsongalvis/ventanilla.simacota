@@ -24,6 +24,10 @@ export interface ComprobanteProps {
   funcionarioNombre: string;
   dependencia: string;
   numeroFolios?: number;
+  /** Sprint Recepción fluida — anexos físicos entregados. */
+  numeroAnexos?: number;
+  /** Sprint Recepción fluida — medios entregados ("CD, USB"), si aplica. */
+  mediosAnexos?: string | null;
   /** Sprint Ventanilla Operativa 2 — dato del solicitante para
    *  imprimir en la constancia. Solo se muestra si viene con valor
    *  no vacío. Si `noAportaCorreo === true`, el caller debe pasar
@@ -135,6 +139,8 @@ export function ComprobanteRadicado({
   funcionarioNombre,
   dependencia,
   numeroFolios = 0,
+  numeroAnexos = 0,
+  mediosAnexos = null,
   correoSolicitante = null,
   telefonoSolicitante = null,
   canalRespuesta = null,
@@ -276,6 +282,12 @@ export function ComprobanteRadicado({
             <Row label="Canal" value={MEDIO_LABEL[medioRecepcion] ?? medioRecepcion} />
             <Row label="Tipo de trámite" value={tipoTramite} />
             <Row label="Folios" value={String(numeroFolios)} />
+            {numeroAnexos > 0 && (
+              <Row
+                label="Anexos"
+                value={`${numeroAnexos}${mediosAnexos ? ` (${mediosAnexos})` : ''}`}
+              />
+            )}
             {canalRespuesta && (
               <Row
                 label="Medio de respuesta"
