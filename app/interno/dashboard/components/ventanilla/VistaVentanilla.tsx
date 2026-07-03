@@ -3,6 +3,13 @@
 import { useMemo, useState } from 'react';
 import { NOMBRES_TENANT } from '@/src/types/reglas-negocio';
 import type { VentanillaRadicado } from '@/src/types/ventanilla';
+import {
+  filtrarTrabajoHoy,
+  trabajoDeHoy,
+  type FilaTrabajoHoy,
+  type FiltroTrabajoHoy,
+  type PendienteMostrador,
+} from '@/lib/mostrador/trabajo-de-hoy';
 
 /* ══════════════════════════════════════════════════════════════
    Ventanilla · módulo de mostrador — "Atención al ciudadano".
@@ -21,12 +28,28 @@ const DORADO     = '#D4A017';
 
 const MAX_RESULTADOS = 8;
 
+/** Trío visual de cada chip de pendiente (color = estado, nunca decora). */
+const CHIP_PENDIENTE: Record<PendienteMostrador, { label: string; bg: string; texto: string }> = {
+  SELLAR_PDF:        { label: 'PDF sin sellar',    bg: '#FAEEDA', texto: '#7A4F0A' },
+  DATOS_INCOMPLETOS: { label: 'Datos incompletos', bg: '#FAEEDA', texto: '#7A4F0A' },
+  CORREO_FALLIDO:    { label: 'Correo fallido',    bg: '#FCEBEB', texto: '#911111' },
+};
+
+/** Riel izquierdo de la fila según su pendiente más urgente. */
+function rielFila(f: FilaTrabajoHoy): string {
+  if (f.pendientes.includes('CORREO_FALLIDO')) return '#DC2626';
+  if (f.pendientes.length > 0)                 return '#D97706';
+  return VERDE_INST;
+}
+
 export interface VistaVentanillaProps {
   radicados: VentanillaRadicado[];
   puedeRadicar: boolean;
   onNuevaRadicacion: () => void;
   onAbrirBusquedaAvanzada: () => void;
   onAbrirRadicado: (radicadoId: string) => void;
+  /** Referencia temporal inyectable para tests deterministas. */
+  ahora?: Date;
 }
 
 /**
@@ -52,9 +75,24 @@ export function VistaVentanilla({
   onNuevaRadicacion,
   onAbrirBusquedaAvanzada,
   onAbrirRadicado,
+  ahora,
 }: VistaVentanillaProps) {
   const [consulta, setConsulta] = useState('');
+  const [filtroHoy, setFiltroHoy] = useState<FiltroTrabajoHoy>('TODOS');
   const q = consulta.toLowerCase().trim();
+
+  const hoy = useMemo(
+    () => trabajoDeHoy(radicados, ahora ?? new Date()),
+    [radicados, ahora],
+  );
+  const filasVisibles = useMemo(
+    () => filtrarTrabajoHoy(hoy.filas, filtroHoy),
+    [hoy.filas, filtroHoy],
+  );
+
+  const fechaLegible = (ahora ?? new Date()).toLocaleDateString('es-CO', {
+    weekday: 'long', day: 'numeric', month: 'long', timeZone: 'America/Bogota',
+  });
 
   const resultados = useMemo(() => {
     if (!q) return [];
@@ -201,10 +239,182 @@ export function VistaVentanilla({
         </div>
       )}
 
+      {/* ── Trabajo de hoy (oculto mientras se busca) ── */}
+      {!q && (
+        <div className="px-4 md:px-6 py-4">
+          <div className="flex items-baseline justify-between gap-3 flex-wrap">
+            <div className="flex items-baseline gap-2 min-w-0">
+              <span className="text-[13px] font-bold" style={{ color: '#12261A' }}>
+                Trabajo de hoy
+              </span>
+              <span className="text-[11px] truncate" style={{ color: '#7A8B7F' }}>
+                {fechaLegible} · {hoy.filas.length} radicado{hoy.filas.length === 1 ? '' : 's'}
+              </span>
+            </div>
+            {hoy.filas.length > 0 && (
+              <div className="flex gap-1.5 flex-wrap">
+                <ChipFiltroHoy
+                  label="Todos"
+                  conteo={hoy.filas.length}
+                  activo={filtroHoy === 'TODOS'}
+                  color={VERDE_INST}
+                  onClick={() => setFiltroHoy('TODOS')}
+                />
+                {hoy.conteos.sellarPdf > 0 && (
+                  <ChipFiltroHoy
+                    label="PDF sin sellar"
+                    conteo={hoy.conteos.sellarPdf}
+                    activo={filtroHoy === 'SELLAR_PDF'}
+                    color="#854F0B"
+                    onClick={() => setFiltroHoy(filtroHoy === 'SELLAR_PDF' ? 'TODOS' : 'SELLAR_PDF')}
+                  />
+                )}
+                {hoy.conteos.datosIncompletos > 0 && (
+                  <ChipFiltroHoy
+                    label="Datos incompletos"
+                    conteo={hoy.conteos.datosIncompletos}
+                    activo={filtroHoy === 'DATOS_INCOMPLETOS'}
+                    color="#854F0B"
+                    onClick={() => setFiltroHoy(filtroHoy === 'DATOS_INCOMPLETOS' ? 'TODOS' : 'DATOS_INCOMPLETOS')}
+                  />
+                )}
+                {hoy.conteos.correoFallido > 0 && (
+                  <ChipFiltroHoy
+                    label="Correo fallido"
+                    conteo={hoy.conteos.correoFallido}
+                    activo={filtroHoy === 'CORREO_FALLIDO'}
+                    color="#A32D2D"
+                    onClick={() => setFiltroHoy(filtroHoy === 'CORREO_FALLIDO' ? 'TODOS' : 'CORREO_FALLIDO')}
+                  />
+                )}
+              </div>
+            )}
+          </div>
+
+          {hoy.filas.length === 0 ? (
+            <p className="mt-3 text-xs" style={{ color: '#7A8B7F' }}>
+              Hoy no se han radicado documentos. El primero del día aparecerá aquí
+              con sus pendientes de recepción.
+            </p>
+          ) : (
+            <div className="mt-2.5 rounded-xl bg-white overflow-hidden" style={{ border: '1px solid #E3EAE3' }}>
+              {filasVisibles.map((f, i) => (
+                <FilaTrabajoHoyItem
+                  key={f.radicadoId}
+                  fila={f}
+                  primera={i === 0}
+                  onAbrir={() => onAbrirRadicado(f.radicadoId)}
+                />
+              ))}
+              {filasVisibles.length === 0 && (
+                <p className="px-4 py-3 text-xs italic" style={{ color: '#94A3B8' }}>
+                  Ninguna fila coincide con el filtro elegido.
+                </p>
+              )}
+            </div>
+          )}
+        </div>
+      )}
+
       {/* ── Recordatorio de límites del módulo ── */}
       <p className="px-4 md:px-6 py-3 text-[11px]" style={{ color: '#7A8B7F' }}>
         ¿Panorama del municipio y prioridades? Eso vive en el Tablero.
       </p>
     </div>
+  );
+}
+
+function ChipFiltroHoy({
+  label,
+  conteo,
+  activo,
+  color,
+  onClick,
+}: {
+  label: string;
+  conteo: number;
+  activo: boolean;
+  color: string;
+  onClick: () => void;
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      aria-pressed={activo}
+      aria-label={`Filtrar trabajo de hoy: ${label} (${conteo})`}
+      className="text-[11px] font-semibold px-2.5 py-1 rounded-full transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-700/30"
+      style={activo
+        ? { background: '#EEF4EE', border: `1px solid ${VERDE_INST}`, color: VERDE_INST }
+        : { background: '#FFFFFF', border: '1px solid #E3EAE3', color }}
+    >
+      {label} · {conteo}
+    </button>
+  );
+}
+
+function FilaTrabajoHoyItem({
+  fila,
+  primera,
+  onAbrir,
+}: {
+  fila: FilaTrabajoHoy;
+  primera: boolean;
+  onAbrir: () => void;
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onAbrir}
+      aria-label={`Abrir radicado ${fila.radicadoId}`}
+      className="w-full flex items-center gap-3 pr-4 text-left hover:bg-[#F4F8F4] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-700/30"
+      style={primera ? undefined : { borderTop: '1px solid #EEF2EE' }}
+    >
+      <span className="w-[3px] self-stretch shrink-0" style={{ background: rielFila(fila) }} />
+      <span className="text-[11px] w-10 shrink-0 py-3 tabular-nums" style={{ color: '#7A8B7F' }}>
+        {fila.horaRadicado}
+      </span>
+      <span className="flex-1 min-w-0 py-2.5">
+        <span className="block font-mono text-[13px] font-bold truncate" style={{ color: '#12261A' }}>
+          {fila.radicadoId}
+        </span>
+        <span className="block text-[11px] truncate" style={{ color: '#5F6F64' }}>
+          {fila.tipoSolicitudNombre} · {NOMBRES_TENANT[fila.oficinaDestino] ?? fila.oficinaDestino}
+        </span>
+      </span>
+      <span className="flex items-center gap-1.5 flex-wrap justify-end shrink-0">
+        {fila.identidadReservada && (
+          <span
+            className="text-[10.5px] font-semibold px-2 py-0.5 rounded-full"
+            style={{ background: '#EEF2F5', color: '#3A4551' }}
+          >
+            Identidad reservada
+          </span>
+        )}
+        {fila.pendientes.map((p) => (
+          <span
+            key={p}
+            className="text-[10.5px] font-semibold px-2 py-0.5 rounded-full"
+            style={{ background: CHIP_PENDIENTE[p].bg, color: CHIP_PENDIENTE[p].texto }}
+          >
+            {CHIP_PENDIENTE[p].label}
+          </span>
+        ))}
+        {fila.pendientes.length === 0 && (
+          <span
+            className="text-[10.5px] font-semibold px-2 py-0.5 rounded-full"
+            style={{ background: '#EEF4EE', color: VERDE_INST }}
+          >
+            Al día
+          </span>
+        )}
+      </span>
+      <span className="inline-flex items-center gap-1 text-[11.5px] font-semibold shrink-0" style={{ color: VERDE_INST }}>
+        Abrir
+        <svg className="w-3 h-3" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2.5}>
+          <path strokeLinecap="round" strokeLinejoin="round" d="M5 12h14M13 6l6 6-6 6" />
+        </svg>
+      </span>
+    </button>
   );
 }
