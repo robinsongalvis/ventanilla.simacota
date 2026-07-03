@@ -16,6 +16,7 @@ import { RadicacionFuncionarioForm }       from '@/app/interno/recepcion/compone
 import { radicarInstitucionalmente }       from '@/lib/actions/radicarVentanilla';
 import { asignarRadicado, asignarMasivo }  from '@/lib/actions/asignarRadicado';
 import { ComprobanteRadicado }             from '@/app/interno/dashboard/components/ComprobanteRadicado';
+import { SelloRecibido }                   from '@/app/interno/dashboard/components/SelloRecibido';
 import { BusquedaAvanzadaPanel }           from '@/app/interno/dashboard/components/BusquedaAvanzadaPanel';
 import { VistaVentanilla }                 from '@/app/interno/dashboard/components/ventanilla/VistaVentanilla';
 import { useIndicadoresModo }              from '@/lib/hooks/useIndicadoresModo';
@@ -2847,6 +2848,8 @@ function DrawerNuevoRadicado({
   // Sprint Ventanilla Operativa 2 — estado del envío de constancia por correo.
   const [estadoEnvioConstancia,  setEstadoEnvioConstancia]  = useState<'idle' | 'enviando' | 'enviado' | 'error'>('idle');
   const [mensajeEnvioConstancia, setMensajeEnvioConstancia] = useState<string | null>(null);
+  // Sprint Recepción fluida — constancia completa o sello sobre la copia física.
+  const [vistaExito, setVistaExito] = useState<'constancia' | 'sello'>('constancia');
   const FORM_ID = 'rad-rapida-form';
 
   async function handleEnviarConstancia(): Promise<void> {
@@ -3006,6 +3009,40 @@ function DrawerNuevoRadicado({
                 <p className="text-xs mt-1" style={{ color: '#94A3B8' }}>Informe este número al ciudadano para seguimiento.</p>
               </div>
 
+              {/* Sprint Recepción fluida — elegir entre la constancia
+                  completa y el sello sobre la copia física del ciudadano. */}
+              <div className="flex gap-1 p-1 rounded-full" style={{ background: '#EEF4EE' }} role="tablist" aria-label="Formato de impresión">
+                {([
+                  ['constancia', 'Constancia completa'],
+                  ['sello',      'Sello de recibido'],
+                ] as const).map(([id, etiqueta]) => (
+                  <button
+                    key={id}
+                    type="button"
+                    role="tab"
+                    aria-selected={vistaExito === id}
+                    onClick={() => setVistaExito(id)}
+                    className="px-4 py-1.5 rounded-full text-xs font-bold transition-colors"
+                    style={vistaExito === id
+                      ? { background: '#14532D', color: '#FFFFFF' }
+                      : { color: '#14532D' }}
+                  >
+                    {etiqueta}
+                  </button>
+                ))}
+              </div>
+
+              {vistaExito === 'sello' && (
+                <SelloRecibido
+                  radicadoId={radicadoGenerado}
+                  fechaRadicado={datosComprobante.fechaRadicado}
+                  horaRadicado={datosComprobante.horaRadicado}
+                  dependencia={NOMBRES_TENANT[usuario.tenantId] ?? 'Ventanilla Única'}
+                  numeroFolios={datosComprobante.numeroFolios}
+                />
+              )}
+
+              {vistaExito === 'constancia' && (
               <ComprobanteRadicado
                 radicadoId={radicadoGenerado}
                 solicitanteNombre={datosComprobante.solicitanteNombre}
@@ -3036,8 +3073,10 @@ function DrawerNuevoRadicado({
                   setProgresoPct(0);
                   setEstadoEnvioConstancia('idle');
                   setMensajeEnvioConstancia(null);
+                  setVistaExito('constancia');
                 }}
               />
+              )}
 
               <button onClick={onCerrar}
                 className="px-5 py-2.5 rounded-xl text-sm transition-all duration-150 active:scale-95"
