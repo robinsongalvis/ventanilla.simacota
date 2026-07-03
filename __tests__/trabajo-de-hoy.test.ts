@@ -117,7 +117,9 @@ describe('Mostrador — trabajoDeHoy', () => {
     expect(filas[0].pendientes).toEqual(['SELLAR_PDF']);
     expect(filas[1].pendientes).toEqual(['DATOS_INCOMPLETOS']);
     expect(filas[2].pendientes).toEqual(['CORREO_FALLIDO']);
-    expect(conteos).toEqual({ sellarPdf: 1, datosIncompletos: 1, correoFallido: 1 });
+    expect(conteos).toEqual({
+      sellarPdf: 1, datosIncompletos: 1, correoFallido: 1, constanciaSinEnviar: 0,
+    });
   });
 
   /* 3 · una fila puede acumular varios pendientes */
@@ -129,7 +131,9 @@ describe('Mostrador — trabajoDeHoy', () => {
 
     const { filas, conteos } = trabajoDeHoy([combinado], AHORA);
     expect(filas[0].pendientes).toEqual(['SELLAR_PDF', 'DATOS_INCOMPLETOS']);
-    expect(conteos).toEqual({ sellarPdf: 1, datosIncompletos: 1, correoFallido: 0 });
+    expect(conteos).toEqual({
+      sellarPdf: 1, datosIncompletos: 1, correoFallido: 0, constanciaSinEnviar: 0,
+    });
   });
 
   /* 4 · sin pendientes = al día; resueltos no piden sello */
@@ -176,6 +180,43 @@ describe('Mostrador — trabajoDeHoy', () => {
     expect(JSON.stringify(resultado)).not.toContain('Juan Pérez');
     expect(resultado.filas[0].identidadReservada).toBe(true);
     expect(resultado.filas[1].identidadReservada).toBe(true);
+  });
+
+  /* 7b · constancia sin enviar: solo cuando hay correo y no se ha enviado */
+  it('marca CONSTANCIA_SIN_ENVIAR solo con correo aportado y sin envío previo', () => {
+    const conCorreo = radicadoBase();
+    conCorreo.solicitante.email = 'ciudadano@example.com';
+
+    const yaEnviada = radicadoBase({
+      radicadoId: '1-WEB-2026-00000050',
+      control:    conControl(AHORA.toISOString(), '10:40', '1-WEB-2026-00000050'),
+      constanciaEnviadaCorreo: true,
+    });
+    yaEnviada.solicitante.email = 'otro@example.com';
+
+    const sinCorreo = radicadoBase({
+      radicadoId: '1-WEB-2026-00000051',
+      control:    conControl(AHORA.toISOString(), '10:50', '1-WEB-2026-00000051'),
+    });
+
+    const noAportaCorreo = radicadoBase({
+      radicadoId:  '1-WEB-2026-00000052',
+      control:     conControl(AHORA.toISOString(), '10:55', '1-WEB-2026-00000052'),
+      solicitante: {
+        ...radicadoBase().solicitante,
+        email: 'residual@example.com',
+        datosNoAportados: { correo: true },
+      },
+    });
+
+    const { filas, conteos } = trabajoDeHoy(
+      [conCorreo, yaEnviada, sinCorreo, noAportaCorreo], AHORA,
+    );
+    expect(filas[0].pendientes).toContain('CONSTANCIA_SIN_ENVIAR');
+    expect(filas[1].pendientes).not.toContain('CONSTANCIA_SIN_ENVIAR');
+    expect(filas[2].pendientes).not.toContain('CONSTANCIA_SIN_ENVIAR');
+    expect(filas[3].pendientes).not.toContain('CONSTANCIA_SIN_ENVIAR');
+    expect(conteos.constanciaSinEnviar).toBe(1);
   });
 
   /* 7 · filtro de chips */
