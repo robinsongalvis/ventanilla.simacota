@@ -37,17 +37,19 @@ function estaActivo(r: VentanillaRadicado): boolean {
   return !ESTADOS_RESUELTOS.has(r.estadoActual);
 }
 
-function dias(r: VentanillaRadicado): number {
-  return diasRestantesHabiles(r.termino.fechaVencimiento);
+function dias(r: VentanillaRadicado, ahora: Date): number {
+  // `ahora` debe llegar hasta el cálculo de hábiles: sin él, la función
+  // usaría el reloj real e ignoraría la referencia inyectada.
+  return diasRestantesHabiles(r.termino.fechaVencimiento, ahora);
 }
 
 /** Grupo de radicados que corresponde a cada KPI grande (mismos criterios que aplicarFiltroMIPG). */
-function grupo(radicados: VentanillaRadicado[], filtro: FiltroGrande): VentanillaRadicado[] {
+function grupo(radicados: VentanillaRadicado[], filtro: FiltroGrande, ahora: Date): VentanillaRadicado[] {
   switch (filtro) {
     case 'VENCIDAS':
-      return radicados.filter((r) => estaActivo(r) && dias(r) < 0);
+      return radicados.filter((r) => estaActivo(r) && dias(r, ahora) < 0);
     case 'POR_VENCER':
-      return radicados.filter((r) => { const d = dias(r); return estaActivo(r) && d >= 0 && d <= 2; });
+      return radicados.filter((r) => { const d = dias(r, ahora); return estaActivo(r) && d >= 0 && d <= 2; });
     case 'RADICADAS':
       return radicados.filter((r) => r.estadoActual === 'PENDIENTE');
     case 'ASIGNADAS':
@@ -82,7 +84,7 @@ export function radicadoMasCriticoPorFiltro(
   filtro:    FiltroGrande,
   ahora:     Date = new Date(),
 ): RadicadoCritico | null {
-  const items = grupo(radicados, filtro);
+  const items = grupo(radicados, filtro, ahora);
   if (items.length === 0) return null;
 
   let elegido: VentanillaRadicado;
@@ -94,13 +96,13 @@ export function radicadoMasCriticoPorFiltro(
       radicadoId:     elegido.radicadoId,
       oficinaDestino: elegido.clasificacion.oficinaDestino,
       razon:          razonPorAntiguedad(elegido, ahora),
-      diasRestantes:  dias(elegido),
+      diasRestantes:  dias(elegido, ahora),
     };
   }
 
   // VENCIDAS / POR_VENCER / ASIGNADAS: menor días restantes (más urgente).
-  elegido = items.reduce((a, b) => (dias(a) <= dias(b) ? a : b));
-  const d = dias(elegido);
+  elegido = items.reduce((a, b) => (dias(a, ahora) <= dias(b, ahora) ? a : b));
+  const d = dias(elegido, ahora);
   return {
     radicadoId:     elegido.radicadoId,
     oficinaDestino: elegido.clasificacion.oficinaDestino,
