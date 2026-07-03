@@ -52,7 +52,9 @@ export type AccionAuditoria =
   /** Sprint Ventanilla Operativa 2 — la funcionaria envió la constancia de radicación al correo del solicitante. */
   | 'CONSTANCIA_ENVIADA_CORREO'
   /** Sprint Ventanilla Operativa 3 — la funcionaria generó una copia sellada de un documento PDF del radicado. */
-  | 'DOCUMENTO_SELLADO';
+  | 'DOCUMENTO_SELLADO'
+  /** Sprint Cierre del mostrador — el ciudadano aportó posteriormente datos de contacto que faltaban. */
+  | 'DATOS_COMPLETADOS';
 
 export interface AuditoriaEntry {
   fecha:    string;
