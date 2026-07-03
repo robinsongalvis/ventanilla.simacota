@@ -18,6 +18,7 @@ import { asignarRadicado, asignarMasivo }  from '@/lib/actions/asignarRadicado';
 import { ComprobanteRadicado }             from '@/app/interno/dashboard/components/ComprobanteRadicado';
 import { SelloRecibido }                   from '@/app/interno/dashboard/components/SelloRecibido';
 import { CompletarDatosSolicitante }       from '@/app/interno/dashboard/components/CompletarDatosSolicitante';
+import { datosConstanciaDesdeRadicado }    from '@/lib/mostrador/constancia-desde-radicado';
 import { BusquedaAvanzadaPanel }           from '@/app/interno/dashboard/components/BusquedaAvanzadaPanel';
 import { VistaVentanilla }                 from '@/app/interno/dashboard/components/ventanilla/VistaVentanilla';
 import { useIndicadoresModo }              from '@/lib/hooks/useIndicadoresModo';
@@ -1715,6 +1716,10 @@ function PanelDerecho({
   onToggleModo?: () => void;
 }) {
   const [tab,              setTab]              = useState<TabPanelId>('info');
+  // Sprint Cierre del mostrador — constancia reimprimible desde el detalle.
+  const [mostrarConstancia, setMostrarConstancia] = useState(false);
+  const [estadoConstancia,  setEstadoConstancia]  = useState<'idle' | 'enviando' | 'enviado' | 'error'>('idle');
+  const [mensajeConstancia, setMensajeConstancia] = useState<string | null>(null);
   const [tenantDestino,    setTenantDestino]    = useState<TenantId>(radicado.clasificacion.oficinaDestino);
   // MIPG-2: reemplaza el free-text de UID por un selector con snapshot completo
   const [responsableSelec, setResponsableSelec] = useState<FuncionarioTenant | null>(null);
@@ -1739,6 +1744,29 @@ function PanelDerecho({
   const [gestionandoNotif,     setGestionandoNotif]     = useState(false);
   // Vista previa institucional de la respuesta oficial
   const [vistaPreviaActiva,    setVistaPreviaActiva]    = useState(false);
+
+  /** Sprint Cierre del mostrador — reenviar la constancia por correo
+   *  desde el detalle (mismo endpoint de la pantalla de éxito). */
+  async function handleEnviarConstanciaDetalle(): Promise<void> {
+    setEstadoConstancia('enviando');
+    setMensajeConstancia(null);
+    try {
+      const res = await fetch(
+        `/api/radicados/${encodeURIComponent(radicado.radicadoId)}/enviar-constancia`,
+        { method: 'POST' },
+      );
+      if (!res.ok) {
+        const body = await res.json().catch(() => ({ error: 'Error desconocido.' }));
+        setEstadoConstancia('error');
+        setMensajeConstancia(body.error ?? 'No fue posible enviar la constancia.');
+        return;
+      }
+      setEstadoConstancia('enviado');
+    } catch {
+      setEstadoConstancia('error');
+      setMensajeConstancia('Error de red al enviar la constancia.');
+    }
+  }
 
   /** Genera el oficio formal y lo deja en el textarea para que el funcionario edite. */
   function generarPlantillaOficio() {
@@ -2198,6 +2226,37 @@ function PanelDerecho({
                 identidadReservada: radicado.identidadReservada,
               }}
             />
+
+            {/* Sprint Cierre del mostrador — constancia reimprimible: el
+                ciudadano que vuelve otro día por su constancia ya tiene
+                botón. Misma pieza de la pantalla de éxito, armada desde
+                el documento. */}
+            <div className="rounded-xl bg-white p-4" style={{ border: '1px solid #D9E2D9' }}>
+              <div className="flex items-center justify-between gap-2 flex-wrap">
+                <p className="text-[10px] font-bold uppercase tracking-widest" style={{ color: '#14532D' }}>
+                  Constancia de radicación
+                </p>
+                <button
+                  type="button"
+                  onClick={() => setMostrarConstancia((v) => !v)}
+                  className="text-xs font-bold px-3 py-1.5 rounded-lg transition-all active:scale-95"
+                  style={{ border: '1px solid #14532D', color: '#14532D', background: 'white' }}
+                >
+                  {mostrarConstancia ? 'Ocultar constancia' : 'Ver constancia'}
+                </button>
+              </div>
+              {mostrarConstancia && (
+                <div className="mt-3 flex justify-center">
+                  <ComprobanteRadicado
+                    {...datosConstanciaDesdeRadicado(radicado)}
+                    onEnviarCorreo={handleEnviarConstanciaDetalle}
+                    enviandoCorreo={estadoConstancia === 'enviando'}
+                    estadoEnvio={estadoConstancia}
+                    mensajeEnvioError={mensajeConstancia}
+                  />
+                </div>
+              )}
+            </div>
 
             <div className="rounded-xl bg-white p-4" style={{ border: '1px solid #D9E2D9' }}>
               <p className="text-[10px] font-bold uppercase tracking-widest mb-3" style={{ color: '#14532D' }}>Solicitante</p>
