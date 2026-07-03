@@ -3967,6 +3967,27 @@ function DashboardInterior({ usuario, cerrarSesion }: { usuario: UsuarioAutentic
           </div>
         ) : (
           <>
+            {/* Rediseño 3B.2 — encabezado de sala de operaciones (solo
+                desktop; el móvil ya tiene su propio header). */}
+            {vistaActual === 'TABLERO' && (
+              <div className="hidden md:flex items-center justify-between gap-3 px-4 pt-3 pb-1 bg-white shrink-0">
+                <div>
+                  <div className="flex items-center gap-2">
+                    <span className="text-[10px] font-bold uppercase tracking-[0.12em]" style={{ color: '#5F8A6E' }}>
+                      Sala de operaciones
+                    </span>
+                    <span className="w-1.5 h-1.5 rounded-full" style={{ background: '#3B9E5F' }} />
+                    <span className="text-[10px]" style={{ color: '#7A8B7F' }}>tiempo real</span>
+                  </div>
+                  <p className="text-lg font-black leading-tight mt-0.5" style={{ color: '#12261A' }}>
+                    Tablero · {veTodosTenants
+                      ? (tenantFiltro === 'TODOS' ? 'Vista municipal' : (NOMBRES_TENANT[tenantFiltro] ?? 'Vista municipal'))
+                      : NOMBRES_TENANT[usuario.tenantId]}
+                  </p>
+                </div>
+              </div>
+            )}
+
             {/* Dashboard PQRSD compacto — vencimientos y riesgo.
                 En modo "compacto" se oculta para dar más altura al listado. */}
             {esAdmin && (
