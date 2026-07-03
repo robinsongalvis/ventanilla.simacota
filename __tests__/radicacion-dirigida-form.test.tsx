@@ -53,3 +53,40 @@ describe('Radicación dirigida — selector de dependencia destino', () => {
     expect(screen.queryByRole('button', { name: /Aplicar sugerencia/i })).toBeNull();
   });
 });
+
+describe('Radicación dirigida — presentación anónima / identidad reservada', () => {
+  /* 5 · el select existe y arranca en Identificada */
+  it('muestra "Presentación" con Identificada por defecto', () => {
+    render(<RadicacionFuncionarioForm radicadoPreview="1-OFICIO-2026-00000099" />);
+    const select = screen.getByLabelText('Presentación') as HTMLSelectElement;
+    expect(select.value).toBe('IDENTIFICADA');
+  });
+
+  /* 6 · anónima: no se registran nombre ni documento */
+  it('Anónima limpia y bloquea nombre e identificación', () => {
+    render(<RadicacionFuncionarioForm radicadoPreview="1-OFICIO-2026-00000099" />);
+    const nombre = screen.getByLabelText('Nombre / razón social') as HTMLInputElement;
+    const documento = screen.getByLabelText('Identificación') as HTMLInputElement;
+    fireEvent.change(nombre, { target: { value: 'Juan Pérez' } });
+    fireEvent.change(documento, { target: { value: '1101321226' } });
+
+    fireEvent.change(screen.getByLabelText('Presentación'), { target: { value: 'ANONIMA' } });
+    expect(nombre.value).toBe('');
+    expect(nombre.required).toBe(false);
+    expect(nombre.disabled).toBe(true);
+    expect(documento.value).toBe('');
+    expect(documento.required).toBe(false);
+    expect(documento.disabled).toBe(true);
+    expect(screen.getByText(/No se registran nombre ni documento/i)).toBeTruthy();
+  });
+
+  /* 7 · reservada: los datos se capturan, la protección es en las vistas */
+  it('Identidad reservada mantiene los campos y avisa la protección', () => {
+    render(<RadicacionFuncionarioForm radicadoPreview="1-OFICIO-2026-00000099" />);
+    fireEvent.change(screen.getByLabelText('Presentación'), { target: { value: 'RESERVADA' } });
+    const nombre = screen.getByLabelText('Nombre / razón social') as HTMLInputElement;
+    expect(nombre.required).toBe(true);
+    expect(nombre.disabled).toBe(false);
+    expect(screen.getByText(/quedan protegidos en las vistas/i)).toBeTruthy();
+  });
+});

@@ -45,6 +45,8 @@ interface FormState {
   tipoEntrada: TipoEntrada;
   // Sprint Radicación dirigida — dependencia a la que va dirigido.
   oficinaDestino: TenantId;
+  // Sprint Radicación dirigida — presentación del solicitante.
+  tipoPresentacion: 'IDENTIFICADA' | 'ANONIMA' | 'RESERVADA';
 
   tipoPersona: TipoPersona;
   tipoDocumento: TipoDocumento;
@@ -128,6 +130,7 @@ const INITIAL_FORM: FormState = {
   origenIngreso: 'PQRSD_WEB_OFICIAL',
   tipoEntrada: 'PQRSD',
   oficinaDestino: 'VENTANILLA_UNICA',
+  tipoPresentacion: 'IDENTIFICADA',
   tipoPersona: 'NATURAL',
   tipoDocumento: 'CC',
   numeroDocumento: '',
@@ -306,6 +309,38 @@ export function RadicacionFuncionarioForm({ radicadoPreview, onSubmit, formId, h
       <section className={sectionCls} style={sectionStyle}>
         <SectionTitle eyebrow="Solicitante" title="Datos del solicitante" />
         <div className="grid gap-4 grid-cols-1 md:grid-cols-2 xl:grid-cols-4">
+          {/* Sprint Radicación dirigida — presentación (Ley 1755/2015). */}
+          <div>
+            <SelectField
+              label="Presentación"
+              value={form.tipoPresentacion}
+              onChange={(v) => {
+                const tipo = v as FormState['tipoPresentacion'];
+                update('tipoPresentacion', tipo);
+                // Anónimo: se limpian identidad tecleada — no se registran
+                // nombre ni documento.
+                if (tipo === 'ANONIMA') {
+                  update('nombreCompleto', '');
+                  update('numeroDocumento', '');
+                }
+              }}
+              options={[
+                ['IDENTIFICADA', 'Identificada'],
+                ['ANONIMA',      'Anónima'],
+                ['RESERVADA',    'Identidad reservada'],
+              ]}
+            />
+            {form.tipoPresentacion === 'ANONIMA' && (
+              <p className="mt-1 text-[10px]" style={{ color: '#92400E' }}>
+                No se registran nombre ni documento.
+              </p>
+            )}
+            {form.tipoPresentacion === 'RESERVADA' && (
+              <p className="mt-1 text-[10px]" style={{ color: '#92400E' }}>
+                Los datos se registran pero quedan protegidos en las vistas.
+              </p>
+            )}
+          </div>
           <SelectField
             label="Tipo persona"
             value={form.tipoPersona}
@@ -328,17 +363,18 @@ export function RadicacionFuncionarioForm({ radicadoPreview, onSubmit, formId, h
             label="Identificación"
             value={form.numeroDocumento}
             onChange={(v) => update('numeroDocumento', v)}
-            /* Fix recepción: si el ciudadano no aporta documento, el campo
-               deja de ser obligatorio y se bloquea para que nunca queden
-               cédula y marca "no aporta" al mismo tiempo. */
-            required={!form.noAportaDocumento}
-            disabled={form.noAportaDocumento}
+            /* Fix recepción: si el ciudadano no aporta documento (o la
+               presentación es anónima), el campo deja de ser obligatorio y
+               se bloquea para que nunca queden cédula y marca al tiempo. */
+            required={!form.noAportaDocumento && form.tipoPresentacion !== 'ANONIMA'}
+            disabled={form.noAportaDocumento || form.tipoPresentacion === 'ANONIMA'}
           />
           <TextField
             label="Nombre / razón social"
             value={form.nombreCompleto}
             onChange={(v) => update('nombreCompleto', v)}
-            required
+            required={form.tipoPresentacion !== 'ANONIMA'}
+            disabled={form.tipoPresentacion === 'ANONIMA'}
             className="md:col-span-2 xl:col-span-2"
           />
           <TextField

@@ -61,6 +61,9 @@ export interface DatosRadicacionInstitucional {
    *  radicado desde su nacimiento. Ausente = VENTANILLA_UNICA (triage
    *  central, comportamiento histórico). */
   oficinaDestino?:      TenantId;
+  /** Sprint Radicación dirigida — presentación del solicitante (Ley
+   *  1755/2015 art. 14). Ausente = IDENTIFICADA. */
+  tipoPresentacion?:    'IDENTIFICADA' | 'ANONIMA' | 'RESERVADA';
 }
 
 /**
@@ -217,18 +220,29 @@ export async function radicarInstitucionalmente(
   };
   const hayNoAportados = algunNoAportado(datosNoAportados);
 
+  /* Sprint Radicación dirigida — presentación del solicitante, con la
+     misma derivación del flujo público (lib/radicacion.ts). */
+  const tipoPresentacion = datos.tipoPresentacion ?? 'IDENTIFICADA';
+  const esAnonimo = tipoPresentacion === 'ANONIMA';
+  const identidadReservada = tipoPresentacion === 'RESERVADA';
+
   const radicado: VentanillaRadicado = {
     radicadoId,
     estadoActual: 'PENDIENTE',
     ultimaActualizacion: ahora.toISOString(),
     prioridad:    tipo.prioridadSugerida,
     canalRespuesta: datos.canalRespuesta ?? null,
+    tipoPresentacion,
+    esAnonimo,
+    identidadReservada,
 
     solicitante: {
       tipoPersona:     datos.tipoPersona,
       tipoDocumento:   datos.tipoDocumento,
       numeroDocumento: datos.numeroDocumento.trim(),
-      nombreCompleto:  datos.nombreCompleto.trim(),
+      // Anónimo sin nombre → mismo placeholder del flujo público.
+      nombreCompleto:  datos.nombreCompleto.trim()
+        || (esAnonimo ? 'Ciudadano anonimo' : ''),
       // Campos opcionales: cadena vacía → null (NUNCA undefined)
       email:    datos.email.trim()     || null,
       telefono: datos.telefono.trim()  || null,
