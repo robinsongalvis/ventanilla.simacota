@@ -248,14 +248,20 @@ export function ComprobanteRadicado({
         {/* Encabezado con logo institucional */}
         <div className="mb-4 border-b border-dashed border-gray-300 pb-3">
           <div className="flex items-center justify-center gap-3">
-            <Image
-              src={INSTITUCION.logo}
-              alt={`Escudo de la ${INSTITUCION.nombre}`}
-              width={44}
-              height={44}
-              className="shrink-0"
-              priority
-            />
+            {/* El asset es un lockup horizontal 1574×382 (escudo a la
+                izquierda); se recorta por CSS para mostrar solo el escudo
+                sin necesidad de un archivo nuevo. */}
+            <div className="shrink-0 overflow-hidden" style={{ width: 44, height: 44 }}>
+              <Image
+                src={INSTITUCION.logo}
+                alt={`Escudo de la ${INSTITUCION.nombre}`}
+                width={181}
+                height={44}
+                className="max-w-none"
+                style={{ height: 44, width: 'auto', objectPosition: 'left' }}
+                priority
+              />
+            </div>
             <div className="text-center">
               <p className="text-[10px] font-bold uppercase tracking-widest" style={{ color: '#14532D' }}>
                 {INSTITUCION.nombre}
