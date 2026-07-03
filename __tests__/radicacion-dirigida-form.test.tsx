@@ -1,0 +1,92 @@
+import { afterEach, describe, expect, it } from 'vitest';
+import { cleanup, render, screen, fireEvent } from '@testing-library/react';
+import { RadicacionFuncionarioForm } from '@/app/interno/recepcion/components/RadicacionFuncionarioForm';
+
+afterEach(() => cleanup());
+
+/* ══════════════════════════════════════════════════════════════
+   Sprint Radicación dirigida — selector de dependencia destino en
+   el formulario de Radicación Rápida.
+══════════════════════════════════════════════════════════════ */
+
+describe('Radicación dirigida — selector de dependencia destino', () => {
+  /* 1 · el selector existe y arranca en Ventanilla Única */
+  it('muestra "Dependencia destino" con Ventanilla Única por defecto', () => {
+    render(<RadicacionFuncionarioForm radicadoPreview="1-OFICIO-2026-00000099" />);
+    const select = screen.getByLabelText('Dependencia destino') as HTMLSelectElement;
+    expect(select.value).toBe('VENTANILLA_UNICA');
+  });
+
+  /* 2 · ofrece las dependencias del directorio institucional */
+  it('incluye Planeación, Hacienda y Comisaría entre las opciones', () => {
+    render(<RadicacionFuncionarioForm radicadoPreview="1-OFICIO-2026-00000099" />);
+    const select = screen.getByLabelText('Dependencia destino') as HTMLSelectElement;
+    const valores = Array.from(select.options).map((o) => o.value);
+    expect(valores).toContain('SEC_PLANEACION');
+    expect(valores).toContain('SEC_HACIENDA');
+    expect(valores).toContain('SUB_COMISARIA');
+  });
+
+  /* 3 · Laura puede dirigirlo a otra dependencia */
+  it('permite cambiar el destino a otra dependencia', () => {
+    render(<RadicacionFuncionarioForm radicadoPreview="1-OFICIO-2026-00000099" />);
+    const select = screen.getByLabelText('Dependencia destino') as HTMLSelectElement;
+    fireEvent.change(select, { target: { value: 'SEC_PLANEACION' } });
+    expect(select.value).toBe('SEC_PLANEACION');
+  });
+
+  /* 4 · el chip sugiere pero nunca aplica solo */
+  it('escribir el asunto muestra el chip y Aplicar cambia el destino', () => {
+    render(<RadicacionFuncionarioForm radicadoPreview="1-OFICIO-2026-00000099" />);
+    const select = screen.getByLabelText('Dependencia destino') as HTMLSelectElement;
+    fireEvent.change(screen.getByLabelText('Asunto'), {
+      target: { value: 'Licencia de construcción para vivienda' },
+    });
+    // La sugerencia aparece pero el select NO cambió solo.
+    expect(select.value).toBe('VENTANILLA_UNICA');
+    const aplicar = screen.getByRole('button', {
+      name: /Aplicar sugerencia: dirigir a Secretaría de Planeación/i,
+    });
+    fireEvent.click(aplicar);
+    expect(select.value).toBe('SEC_PLANEACION');
+    // Aplicada la sugerencia, el chip desaparece (ya coincide con el destino).
+    expect(screen.queryByRole('button', { name: /Aplicar sugerencia/i })).toBeNull();
+  });
+});
+
+describe('Radicación dirigida — presentación anónima / identidad reservada', () => {
+  /* 5 · el select existe y arranca en Identificada */
+  it('muestra "Presentación" con Identificada por defecto', () => {
+    render(<RadicacionFuncionarioForm radicadoPreview="1-OFICIO-2026-00000099" />);
+    const select = screen.getByLabelText('Presentación') as HTMLSelectElement;
+    expect(select.value).toBe('IDENTIFICADA');
+  });
+
+  /* 6 · anónima: no se registran nombre ni documento */
+  it('Anónima limpia y bloquea nombre e identificación', () => {
+    render(<RadicacionFuncionarioForm radicadoPreview="1-OFICIO-2026-00000099" />);
+    const nombre = screen.getByLabelText('Nombre / razón social') as HTMLInputElement;
+    const documento = screen.getByLabelText('Identificación') as HTMLInputElement;
+    fireEvent.change(nombre, { target: { value: 'Juan Pérez' } });
+    fireEvent.change(documento, { target: { value: '1101321226' } });
+
+    fireEvent.change(screen.getByLabelText('Presentación'), { target: { value: 'ANONIMA' } });
+    expect(nombre.value).toBe('');
+    expect(nombre.required).toBe(false);
+    expect(nombre.disabled).toBe(true);
+    expect(documento.value).toBe('');
+    expect(documento.required).toBe(false);
+    expect(documento.disabled).toBe(true);
+    expect(screen.getByText(/No se registran nombre ni documento/i)).toBeTruthy();
+  });
+
+  /* 7 · reservada: los datos se capturan, la protección es en las vistas */
+  it('Identidad reservada mantiene los campos y avisa la protección', () => {
+    render(<RadicacionFuncionarioForm radicadoPreview="1-OFICIO-2026-00000099" />);
+    fireEvent.change(screen.getByLabelText('Presentación'), { target: { value: 'RESERVADA' } });
+    const nombre = screen.getByLabelText('Nombre / razón social') as HTMLInputElement;
+    expect(nombre.required).toBe(true);
+    expect(nombre.disabled).toBe(false);
+    expect(screen.getByText(/quedan protegidos en las vistas/i)).toBeTruthy();
+  });
+});

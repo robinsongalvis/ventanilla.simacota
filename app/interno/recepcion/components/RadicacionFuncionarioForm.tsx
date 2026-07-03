@@ -14,6 +14,7 @@ import {
   componerDescripcionAnexos,
   toggleMedio,
 } from '@/lib/recepcion/medios-anexos';
+import { sugerirDependencia } from '@/lib/recepcion/sugerir-dependencia';
 import type {
   CanalRespuesta,
   MedioRecepcion,
@@ -22,6 +23,8 @@ import type {
   TipoEntrada,
   TipoPersona,
 } from '@/src/types/ventanilla';
+import type { TenantId } from '@/src/types/radicado';
+import { NOMBRES_TENANT } from '@/src/types/reglas-negocio';
 
 const MUNICIPIOS_SANTANDER = [
   'Simacota',
@@ -40,6 +43,10 @@ interface FormState {
   // Sprint Ventanilla Operativa 1 — origen y clasificación operativa
   origenIngreso: OrigenIngreso;
   tipoEntrada: TipoEntrada;
+  // Sprint Radicación dirigida — dependencia a la que va dirigido.
+  oficinaDestino: TenantId;
+  // Sprint Radicación dirigida — presentación del solicitante.
+  tipoPresentacion: 'IDENTIFICADA' | 'ANONIMA' | 'RESERVADA';
 
   tipoPersona: TipoPersona;
   tipoDocumento: TipoDocumento;
@@ -111,9 +118,19 @@ interface Props {
   hideSubmitButton?: boolean;
 }
 
+/* Ventanilla Única primero (default de triage); las demás dependencias
+   en el orden del directorio institucional. */
+const OPCIONES_DEPENDENCIA: [string, string][] = [
+  ['VENTANILLA_UNICA', NOMBRES_TENANT.VENTANILLA_UNICA],
+  ...(Object.entries(NOMBRES_TENANT) as [TenantId, string][])
+    .filter(([id]) => id !== 'VENTANILLA_UNICA'),
+];
+
 const INITIAL_FORM: FormState = {
   origenIngreso: 'PQRSD_WEB_OFICIAL',
   tipoEntrada: 'PQRSD',
+  oficinaDestino: 'VENTANILLA_UNICA',
+  tipoPresentacion: 'IDENTIFICADA',
   tipoPersona: 'NATURAL',
   tipoDocumento: 'CC',
   numeroDocumento: '',
@@ -168,6 +185,17 @@ export function RadicacionFuncionarioForm({ radicadoPreview, onSubmit, formId, h
   const vencimiento = useMemo(
     () => calcularFechaVencimiento(fechaRadicado, form.tipoSolicitudId),
     [fechaRadicado, form.tipoSolicitudId],
+  );
+
+  /* Sprint Radicación dirigida — sugerencia determinista de destino.
+     Solo se muestra si difiere del destino elegido; nunca se aplica sola. */
+  const sugerencia = useMemo(
+    () => sugerirDependencia({
+      tipoSolicitudId: form.tipoSolicitudId,
+      asunto:          form.asunto,
+      descripcion:     form.descripcion,
+    }),
+    [form.tipoSolicitudId, form.asunto, form.descripcion],
   );
 
   const municipiosFiltrados = MUNICIPIOS_SANTANDER.filter((m) =>
@@ -243,6 +271,33 @@ export function RadicacionFuncionarioForm({ radicadoPreview, onSubmit, formId, h
               ['PRESENCIAL', 'Presencial'],
             ]}
           />
+          {/* Sprint Radicación dirigida — el radicado nace dirigido a una
+              dependencia; la trazabilidad empieza aquí, no en el traslado. */}
+          <SelectField
+            label="Dependencia destino"
+            value={form.oficinaDestino}
+            onChange={(v) => update('oficinaDestino', v as TenantId)}
+            options={OPCIONES_DEPENDENCIA}
+          />
+          {sugerencia && sugerencia.oficina !== form.oficinaDestino && (
+            <div
+              className="md:col-span-2 xl:col-span-4 flex items-center gap-2 flex-wrap rounded-lg px-3 py-2"
+              style={{ background: '#FDF9EE', border: '1px solid #E7D9A8' }}
+            >
+              <span className="text-xs" style={{ color: '#7A5B0B' }}>
+                Sugerido: <strong>{sugerencia.nombre}</strong> · {sugerencia.razon}
+              </span>
+              <button
+                type="button"
+                onClick={() => update('oficinaDestino', sugerencia.oficina)}
+                aria-label={`Aplicar sugerencia: dirigir a ${sugerencia.nombre}`}
+                className="text-xs font-bold px-3 py-1 rounded-full transition-opacity hover:opacity-90"
+                style={{ background: '#14532D', color: '#FFFFFF' }}
+              >
+                Aplicar
+              </button>
+            </div>
+          )}
           <ReadOnlyField
             label="Fecha vencimiento"
             value={formatFechaHoraColombia(vencimiento.fechaVencimiento, { fallback: '—' })}
@@ -254,6 +309,38 @@ export function RadicacionFuncionarioForm({ radicadoPreview, onSubmit, formId, h
       <section className={sectionCls} style={sectionStyle}>
         <SectionTitle eyebrow="Solicitante" title="Datos del solicitante" />
         <div className="grid gap-4 grid-cols-1 md:grid-cols-2 xl:grid-cols-4">
+          {/* Sprint Radicación dirigida — presentación (Ley 1755/2015). */}
+          <div>
+            <SelectField
+              label="Presentación"
+              value={form.tipoPresentacion}
+              onChange={(v) => {
+                const tipo = v as FormState['tipoPresentacion'];
+                update('tipoPresentacion', tipo);
+                // Anónimo: se limpian identidad tecleada — no se registran
+                // nombre ni documento.
+                if (tipo === 'ANONIMA') {
+                  update('nombreCompleto', '');
+                  update('numeroDocumento', '');
+                }
+              }}
+              options={[
+                ['IDENTIFICADA', 'Identificada'],
+                ['ANONIMA',      'Anónima'],
+                ['RESERVADA',    'Identidad reservada'],
+              ]}
+            />
+            {form.tipoPresentacion === 'ANONIMA' && (
+              <p className="mt-1 text-[10px]" style={{ color: '#92400E' }}>
+                No se registran nombre ni documento.
+              </p>
+            )}
+            {form.tipoPresentacion === 'RESERVADA' && (
+              <p className="mt-1 text-[10px]" style={{ color: '#92400E' }}>
+                Los datos se registran pero quedan protegidos en las vistas.
+              </p>
+            )}
+          </div>
           <SelectField
             label="Tipo persona"
             value={form.tipoPersona}
@@ -276,17 +363,18 @@ export function RadicacionFuncionarioForm({ radicadoPreview, onSubmit, formId, h
             label="Identificación"
             value={form.numeroDocumento}
             onChange={(v) => update('numeroDocumento', v)}
-            /* Fix recepción: si el ciudadano no aporta documento, el campo
-               deja de ser obligatorio y se bloquea para que nunca queden
-               cédula y marca "no aporta" al mismo tiempo. */
-            required={!form.noAportaDocumento}
-            disabled={form.noAportaDocumento}
+            /* Fix recepción: si el ciudadano no aporta documento (o la
+               presentación es anónima), el campo deja de ser obligatorio y
+               se bloquea para que nunca queden cédula y marca al tiempo. */
+            required={!form.noAportaDocumento && form.tipoPresentacion !== 'ANONIMA'}
+            disabled={form.noAportaDocumento || form.tipoPresentacion === 'ANONIMA'}
           />
           <TextField
             label="Nombre / razón social"
             value={form.nombreCompleto}
             onChange={(v) => update('nombreCompleto', v)}
-            required
+            required={form.tipoPresentacion !== 'ANONIMA'}
+            disabled={form.tipoPresentacion === 'ANONIMA'}
             className="md:col-span-2 xl:col-span-2"
           />
           <TextField
