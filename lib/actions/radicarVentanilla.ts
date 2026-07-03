@@ -4,7 +4,10 @@ import { generarRadicadoInstitucional, type CanalRadicadoInstitucional } from '@
 import { TIPOS_SOLICITUD, type TipoSolicitudId } from '@/lib/tiempos-radicado';
 import { subirArchivos } from '@/lib/storage';
 import { validarReglasRadicacion } from '@/lib/seguridad/reglas-radicacion';
-import { construirClasificacionInicial } from '@/lib/recepcion/clasificacion-inicial';
+import {
+  construirClasificacionInicial,
+  construirNotaRadicacion,
+} from '@/lib/recepcion/clasificacion-inicial';
 import type {
   CanalRespuesta,
   DatosNoAportados,
@@ -307,7 +310,14 @@ export async function radicarInstitucionalmente(
       accion: 'RADICACION',
       actorUid: actor.uid,
       actorNombre: actor.nombre,
-      nota: `Radicado por ${actor.nombre} · Canal: ${datos.medioRecepcion}`,
+      /* Sprint Radicación dirigida — la trazabilidad registra el destino
+         desde el nacimiento del radicado, no desde el primer traslado. */
+      oficinaDestino: datos.oficinaDestino ?? 'VENTANILLA_UNICA',
+      nota: construirNotaRadicacion(
+        actor.nombre,
+        datos.medioRecepcion,
+        datos.oficinaDestino ?? 'VENTANILLA_UNICA',
+      ),
     } satisfies TrazabilidadRadicado,
   );
 

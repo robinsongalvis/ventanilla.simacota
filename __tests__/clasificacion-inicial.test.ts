@@ -1,5 +1,8 @@
 import { describe, expect, it } from 'vitest';
-import { construirClasificacionInicial } from '@/lib/recepcion/clasificacion-inicial';
+import {
+  construirClasificacionInicial,
+  construirNotaRadicacion,
+} from '@/lib/recepcion/clasificacion-inicial';
 
 /* ══════════════════════════════════════════════════════════════
    Sprint Radicación dirigida — clasificación de nacimiento.
@@ -31,5 +34,19 @@ describe('Radicación dirigida — construirClasificacionInicial', () => {
   it('Comisaría de Familia también nace sin responsable', () => {
     const c = construirClasificacionInicial('SUB_COMISARIA', 'uid-laura');
     expect('funcionarioResponsableUid' in c).toBe(false);
+  });
+});
+
+describe('Radicación dirigida — construirNotaRadicacion', () => {
+  /* 4 · el formato aprobado, con destino desde el nacimiento */
+  it('arma la nota con actor, canal legible y destino', () => {
+    expect(construirNotaRadicacion('Laura', 'OFICIO_FISICO', 'SEC_PLANEACION'))
+      .toBe('Radicado por Laura · Canal: Oficio físico · Dirigido a: Secretaría de Planeación');
+  });
+
+  /* 5 · el default de triage también queda trazado explícito */
+  it('con destino Ventanilla Única la nota lo dice igual', () => {
+    expect(construirNotaRadicacion('Laura', 'PRESENCIAL', 'VENTANILLA_UNICA'))
+      .toContain('Dirigido a: Ventanilla Única');
   });
 });

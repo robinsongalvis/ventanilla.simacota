@@ -1,4 +1,6 @@
 import type { TenantId } from '@/src/types/radicado';
+import { NOMBRES_TENANT } from '@/src/types/reglas-negocio';
+import { labelMedioRecepcion } from '@/lib/institucion';
 
 /**
  * Sprint Radicación dirigida — clasificación con la que NACE el radicado
@@ -38,4 +40,20 @@ export function construirClasificacionInicial(
     oficinaDestino,
     zonaGeografica: 'CASCO_URBANO',
   };
+}
+
+/**
+ * Nota humana del evento RADICACION — la trazabilidad cuenta el destino
+ * desde el nacimiento, no desde el primer traslado:
+ *
+ *   "Radicado por Laura · Canal: Oficio físico · Dirigido a: Secretaría de Planeación"
+ */
+export function construirNotaRadicacion(
+  actorNombre: string,
+  medioRecepcion: string,
+  oficinaDestino: TenantId,
+): string {
+  const canal = labelMedioRecepcion(medioRecepcion);
+  const destino = NOMBRES_TENANT[oficinaDestino] ?? oficinaDestino;
+  return `Radicado por ${actorNombre} · Canal: ${canal} · Dirigido a: ${destino}`;
 }
