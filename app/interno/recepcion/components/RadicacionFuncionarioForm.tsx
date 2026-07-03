@@ -22,6 +22,8 @@ import type {
   TipoEntrada,
   TipoPersona,
 } from '@/src/types/ventanilla';
+import type { TenantId } from '@/src/types/radicado';
+import { NOMBRES_TENANT } from '@/src/types/reglas-negocio';
 
 const MUNICIPIOS_SANTANDER = [
   'Simacota',
@@ -40,6 +42,8 @@ interface FormState {
   // Sprint Ventanilla Operativa 1 — origen y clasificación operativa
   origenIngreso: OrigenIngreso;
   tipoEntrada: TipoEntrada;
+  // Sprint Radicación dirigida — dependencia a la que va dirigido.
+  oficinaDestino: TenantId;
 
   tipoPersona: TipoPersona;
   tipoDocumento: TipoDocumento;
@@ -111,9 +115,18 @@ interface Props {
   hideSubmitButton?: boolean;
 }
 
+/* Ventanilla Única primero (default de triage); las demás dependencias
+   en el orden del directorio institucional. */
+const OPCIONES_DEPENDENCIA: [string, string][] = [
+  ['VENTANILLA_UNICA', NOMBRES_TENANT.VENTANILLA_UNICA],
+  ...(Object.entries(NOMBRES_TENANT) as [TenantId, string][])
+    .filter(([id]) => id !== 'VENTANILLA_UNICA'),
+];
+
 const INITIAL_FORM: FormState = {
   origenIngreso: 'PQRSD_WEB_OFICIAL',
   tipoEntrada: 'PQRSD',
+  oficinaDestino: 'VENTANILLA_UNICA',
   tipoPersona: 'NATURAL',
   tipoDocumento: 'CC',
   numeroDocumento: '',
@@ -242,6 +255,14 @@ export function RadicacionFuncionarioForm({ radicadoPreview, onSubmit, formId, h
               ['WEB', 'Web'],
               ['PRESENCIAL', 'Presencial'],
             ]}
+          />
+          {/* Sprint Radicación dirigida — el radicado nace dirigido a una
+              dependencia; la trazabilidad empieza aquí, no en el traslado. */}
+          <SelectField
+            label="Dependencia destino"
+            value={form.oficinaDestino}
+            onChange={(v) => update('oficinaDestino', v as TenantId)}
+            options={OPCIONES_DEPENDENCIA}
           />
           <ReadOnlyField
             label="Fecha vencimiento"
