@@ -17,6 +17,7 @@ import { radicarInstitucionalmente }       from '@/lib/actions/radicarVentanilla
 import { asignarRadicado, asignarMasivo }  from '@/lib/actions/asignarRadicado';
 import { ComprobanteRadicado }             from '@/app/interno/dashboard/components/ComprobanteRadicado';
 import { SelloRecibido }                   from '@/app/interno/dashboard/components/SelloRecibido';
+import { CompletarDatosSolicitante }       from '@/app/interno/dashboard/components/CompletarDatosSolicitante';
 import { BusquedaAvanzadaPanel }           from '@/app/interno/dashboard/components/BusquedaAvanzadaPanel';
 import { VistaVentanilla }                 from '@/app/interno/dashboard/components/ventanilla/VistaVentanilla';
 import { useIndicadoresModo }              from '@/lib/hooks/useIndicadoresModo';
@@ -2266,20 +2267,10 @@ function PanelDerecho({
               </div>
             </div>
 
-            {/* Sprint Ventanilla Operativa 1: Datos no aportados (solo si aplica) */}
-            {tieneDatosNoAportados(radicado.solicitante.datosNoAportados) && (
-              <div className="rounded-xl p-4" style={{ background: '#FEF3C7', border: '1px solid #FBBF24' }}>
-                <p className="text-[10px] font-bold uppercase tracking-widest mb-3" style={{ color: '#92400E' }}>
-                  Datos no aportados por el solicitante
-                </p>
-                <ul className="list-disc pl-5 space-y-1 text-xs" style={{ color: '#92400E' }}>
-                  {radicado.solicitante.datosNoAportados?.documento && <li>Documento de identidad</li>}
-                  {radicado.solicitante.datosNoAportados?.correo && <li>Correo electrónico</li>}
-                  {radicado.solicitante.datosNoAportados?.telefono && <li>Teléfono</li>}
-                  {radicado.solicitante.datosNoAportados?.direccion && <li>Dirección</li>}
-                </ul>
-              </div>
-            )}
+            {/* Sprint Cierre del mostrador: el bloque de datos no aportados
+                ya no es solo lectura — permite completarlos cuando el
+                ciudadano vuelve con ellos. */}
+            <CompletarDatosSolicitante radicado={radicado} />
 
             {/* ── MIPG-2: Responsable funcional ── */}
             <div className="rounded-xl bg-white p-4" style={{ border: '1px solid #D9E2D9' }}>
