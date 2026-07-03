@@ -268,7 +268,11 @@ export function RadicacionFuncionarioForm({ radicadoPreview, onSubmit, formId, h
             label="Identificación"
             value={form.numeroDocumento}
             onChange={(v) => update('numeroDocumento', v)}
-            required
+            /* Fix recepción: si el ciudadano no aporta documento, el campo
+               deja de ser obligatorio y se bloquea para que nunca queden
+               cédula y marca "no aporta" al mismo tiempo. */
+            required={!form.noAportaDocumento}
+            disabled={form.noAportaDocumento}
           />
           <TextField
             label="Nombre / razón social"
@@ -345,7 +349,12 @@ export function RadicacionFuncionarioForm({ radicadoPreview, onSubmit, formId, h
           <CheckboxField
             label="No aporta documento de identidad"
             checked={form.noAportaDocumento}
-            onChange={(v) => update('noAportaDocumento', v)}
+            onChange={(v) => {
+              update('noAportaDocumento', v);
+              // Al marcar, se limpia la identificación tecleada para no
+              // guardar un número junto a la marca de "no aporta".
+              if (v) update('numeroDocumento', '');
+            }}
           />
           <CheckboxField
             label="No aporta correo electrónico"
@@ -565,10 +574,10 @@ function SectionTitle({ eyebrow, title }: { eyebrow: string; title: string }) {
 }
 
 function TextField({
-  label, value, onChange, type = 'text', required, className = '',
+  label, value, onChange, type = 'text', required, disabled, className = '',
 }: {
   label: string; value: string; onChange: (value: string) => void;
-  type?: string; required?: boolean; className?: string;
+  type?: string; required?: boolean; disabled?: boolean; className?: string;
 }) {
   return (
     <label className={className}>
@@ -578,7 +587,8 @@ function TextField({
         value={value}
         onChange={(e) => onChange(e.target.value)}
         required={required}
-        className="input-internal"
+        disabled={disabled}
+        className="input-internal disabled:opacity-50 disabled:cursor-not-allowed"
       />
     </label>
   );
