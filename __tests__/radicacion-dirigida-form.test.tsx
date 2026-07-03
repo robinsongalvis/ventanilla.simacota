@@ -34,4 +34,22 @@ describe('Radicación dirigida — selector de dependencia destino', () => {
     fireEvent.change(select, { target: { value: 'SEC_PLANEACION' } });
     expect(select.value).toBe('SEC_PLANEACION');
   });
+
+  /* 4 · el chip sugiere pero nunca aplica solo */
+  it('escribir el asunto muestra el chip y Aplicar cambia el destino', () => {
+    render(<RadicacionFuncionarioForm radicadoPreview="1-OFICIO-2026-00000099" />);
+    const select = screen.getByLabelText('Dependencia destino') as HTMLSelectElement;
+    fireEvent.change(screen.getByLabelText('Asunto'), {
+      target: { value: 'Licencia de construcción para vivienda' },
+    });
+    // La sugerencia aparece pero el select NO cambió solo.
+    expect(select.value).toBe('VENTANILLA_UNICA');
+    const aplicar = screen.getByRole('button', {
+      name: /Aplicar sugerencia: dirigir a Secretaría de Planeación/i,
+    });
+    fireEvent.click(aplicar);
+    expect(select.value).toBe('SEC_PLANEACION');
+    // Aplicada la sugerencia, el chip desaparece (ya coincide con el destino).
+    expect(screen.queryByRole('button', { name: /Aplicar sugerencia/i })).toBeNull();
+  });
 });

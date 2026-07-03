@@ -14,6 +14,7 @@ import {
   componerDescripcionAnexos,
   toggleMedio,
 } from '@/lib/recepcion/medios-anexos';
+import { sugerirDependencia } from '@/lib/recepcion/sugerir-dependencia';
 import type {
   CanalRespuesta,
   MedioRecepcion,
@@ -183,6 +184,17 @@ export function RadicacionFuncionarioForm({ radicadoPreview, onSubmit, formId, h
     [fechaRadicado, form.tipoSolicitudId],
   );
 
+  /* Sprint Radicación dirigida — sugerencia determinista de destino.
+     Solo se muestra si difiere del destino elegido; nunca se aplica sola. */
+  const sugerencia = useMemo(
+    () => sugerirDependencia({
+      tipoSolicitudId: form.tipoSolicitudId,
+      asunto:          form.asunto,
+      descripcion:     form.descripcion,
+    }),
+    [form.tipoSolicitudId, form.asunto, form.descripcion],
+  );
+
   const municipiosFiltrados = MUNICIPIOS_SANTANDER.filter((m) =>
     m.toLowerCase().includes(form.municipio.toLowerCase()),
   );
@@ -264,6 +276,25 @@ export function RadicacionFuncionarioForm({ radicadoPreview, onSubmit, formId, h
             onChange={(v) => update('oficinaDestino', v as TenantId)}
             options={OPCIONES_DEPENDENCIA}
           />
+          {sugerencia && sugerencia.oficina !== form.oficinaDestino && (
+            <div
+              className="md:col-span-2 xl:col-span-4 flex items-center gap-2 flex-wrap rounded-lg px-3 py-2"
+              style={{ background: '#FDF9EE', border: '1px solid #E7D9A8' }}
+            >
+              <span className="text-xs" style={{ color: '#7A5B0B' }}>
+                Sugerido: <strong>{sugerencia.nombre}</strong> · {sugerencia.razon}
+              </span>
+              <button
+                type="button"
+                onClick={() => update('oficinaDestino', sugerencia.oficina)}
+                aria-label={`Aplicar sugerencia: dirigir a ${sugerencia.nombre}`}
+                className="text-xs font-bold px-3 py-1 rounded-full transition-opacity hover:opacity-90"
+                style={{ background: '#14532D', color: '#FFFFFF' }}
+              >
+                Aplicar
+              </button>
+            </div>
+          )}
           <ReadOnlyField
             label="Fecha vencimiento"
             value={formatFechaHoraColombia(vencimiento.fechaVencimiento, { fallback: '—' })}
