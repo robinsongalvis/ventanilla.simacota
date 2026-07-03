@@ -31,7 +31,7 @@ const PRINT_STYLES_SELLO = `
     position: fixed !important;
     top: 0 !important;
     left: 0 !important;
-    width: 88mm !important;
+    width: 70mm !important;
     background: white !important;
     z-index: 99999 !important;
   }
@@ -114,18 +114,24 @@ export function SelloRecibido({
         style={{ border: '2px dashed #CBD5D1' }}
         aria-label="Vista previa: posición del sello en la hoja"
       >
-        {/* El sello — único contenido visible al imprimir */}
-        <div id="sello-recibido-print" className="absolute top-3 left-3 w-[62%] min-w-[230px]">
+        {/* El sello — único contenido visible al imprimir. Ocupa ~⅓ del
+            ancho de la hoja carta (70mm), proporción de sello de recibido
+            institucional. */}
+        <div id="sello-recibido-print" className="absolute top-3 left-3 w-[38%] min-w-[190px]">
           <div
             className="bg-white"
-            style={{ border: `1.5px solid ${VERDE_INST}`, borderRadius: 6, padding: '8px 10px' }}
+            style={{ border: `1.5px solid ${VERDE_INST}`, borderRadius: 6, padding: '6px 8px' }}
           >
             <div className="flex items-center gap-2">
-              <img
-                src={INSTITUCION.logo}
-                alt={`Escudo de la ${INSTITUCION.nombre}`}
-                style={{ width: 30, height: 30, objectFit: 'contain' }}
-              />
+              {/* Lockup 1574×382 recortado por CSS: solo el escudo. */}
+              <div className="shrink-0 overflow-hidden" style={{ width: 26, height: 26 }}>
+                <img
+                  src={INSTITUCION.logo}
+                  alt={`Escudo de la ${INSTITUCION.nombre}`}
+                  className="max-w-none"
+                  style={{ height: 26, width: 'auto', objectPosition: 'left' }}
+                />
+              </div>
               <div className="min-w-0">
                 <p className="text-[9px] font-black uppercase leading-tight" style={{ color: VERDE_INST }}>
                   {INSTITUCION.nombre}
@@ -136,7 +142,7 @@ export function SelloRecibido({
               </div>
             </div>
 
-            <p className="font-mono font-black mt-1.5 leading-none" style={{ fontSize: 15, color: '#12261A' }}>
+            <p className="font-mono font-black mt-1.5 leading-none" style={{ fontSize: 13, color: '#12261A' }}>
               {radicadoId}
             </p>
 
