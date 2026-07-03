@@ -2940,12 +2940,14 @@ function DrawerNuevoRadicado({
       aria-labelledby="rad-rapida-title"
       aria-describedby="rad-rapida-subtitle"
     >
-      {/* Overlay con blur institucional */}
+      {/* Overlay sólido — sin backdrop-blur: el blur re-rasterizaba todo el
+          dashboard vivo detrás en cada frame y causaba scroll lento dentro
+          del formulario en equipos modestos. */}
       <button
         type="button"
         aria-label="Cerrar"
         onClick={onCerrar}
-        className="absolute inset-0 bg-black/45 backdrop-blur-md animate-modal-overlay"
+        className="absolute inset-0 bg-black/55 animate-modal-overlay"
       />
 
       {/* Panel centrado */}
