@@ -28,6 +28,9 @@ import {
 } from '@/lib/reportes/filtrar-por-preset';
 import { INSTITUCION } from '@/lib/institucion';
 import { puedeVerReportes } from '@/lib/permisos/acceso-reportes';
+import { RegistrarSalidaModal, type EntradaAmarre } from '@/app/interno/dashboard/components/salidas/RegistrarSalidaModal';
+import { VistaSalidas }                    from '@/app/interno/dashboard/components/salidas/VistaSalidas';
+import { useSalidas }                      from '@/lib/hooks/useSalidas';
 import { BusquedaAvanzadaPanel }           from '@/app/interno/dashboard/components/BusquedaAvanzadaPanel';
 import { VistaVentanilla }                 from '@/app/interno/dashboard/components/ventanilla/VistaVentanilla';
 import { useIndicadoresModo }              from '@/lib/hooks/useIndicadoresModo';
@@ -296,6 +299,12 @@ function puedeAccederVista(usuario: UsuarioAutenticado, vista: VistaActual): boo
   // Sprint 3C — Reportes se abre también a RECEPCIONISTA: ella responde
   // "¿qué llegó este mes?" con los mismos datos que ya ve en el Tablero.
   if (vista === 'REPORTES') return puedeVerReportes(usuario.rol);
+  // Sprint Radicación de salida — el libro completo lo ven quienes por
+  // reglas leen todas las salidas (registro: solo Admin/Recepción).
+  if (vista === 'SALIDAS') {
+    return usuario.rol === 'ADMIN' || usuario.rol === 'RECEPCIONISTA'
+      || usuario.rol === 'CONTROL_INTERNO';
+  }
   return true;
 }
 
@@ -427,6 +436,15 @@ const NAV_ITEMS: { vista: VistaActual; label: string; icono: React.ReactNode }[]
     icono: (
       <svg className="w-[18px] h-[18px]" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.8}>
         <path strokeLinecap="round" strokeLinejoin="round" d="M3.75 21h16.5M4.5 3h15M5.25 3v18m13.5-18v18M9 6.75h1.5m-1.5 3h1.5m-1.5 3h1.5m3-6H15m-1.5 3H15m-1.5 3H15M9 21v-3.375c0-.621.504-1.125 1.125-1.125h3.75c.621 0 1.125.504 1.125 1.125V21" />
+      </svg>
+    ),
+  },
+  {
+    vista: 'SALIDAS',
+    label: 'Salidas',
+    icono: (
+      <svg className="w-[18px] h-[18px]" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.8}>
+        <path strokeLinecap="round" strokeLinejoin="round" d="M6 12L3.269 3.126A59.768 59.768 0 0121.485 12 59.77 59.77 0 013.27 20.876L5.999 12zm0 0h7.5" />
       </svg>
     ),
   },
@@ -1728,6 +1746,8 @@ function PanelDerecho({
   onToggleModo?: () => void;
 }) {
   const [tab,              setTab]              = useState<TabPanelId>('info');
+  // Sprint Radicación de salida — registrar despacho amarrado a esta entrada.
+  const [salidaDetalleAbierta, setSalidaDetalleAbierta] = useState(false);
   // Sprint Cierre del mostrador — constancia reimprimible desde el detalle.
   const [mostrarConstancia, setMostrarConstancia] = useState(false);
   const [estadoConstancia,  setEstadoConstancia]  = useState<'idle' | 'enviando' | 'enviado' | 'error'>('idle');
@@ -2269,6 +2289,45 @@ function PanelDerecho({
                 </div>
               )}
             </div>
+
+            {/* Sprint Radicación de salida — despachar respuesta con
+                número 2-SAL amarrado a esta entrada. */}
+            {!soloLectura && (usuario.rol === 'ADMIN' || usuario.rol === 'RECEPCIONISTA') && (
+              <div className="rounded-xl bg-white p-4" style={{ border: '1px solid #D9E2D9' }}>
+                <div className="flex items-center justify-between gap-2 flex-wrap">
+                  <div>
+                    <p className="text-[10px] font-bold uppercase tracking-widest" style={{ color: '#8A6A12' }}>
+                      Correspondencia de salida
+                    </p>
+                    <p className="text-xs mt-0.5" style={{ color: '#667085' }}>
+                      El oficio que se despacha recibe su número 2-SAL y queda en la trazabilidad.
+                    </p>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => setSalidaDetalleAbierta(true)}
+                    className="text-xs font-bold px-3 py-1.5 rounded-lg transition-all active:scale-95"
+                    style={{ border: '1px solid #14532D', color: '#14532D', background: 'white' }}
+                  >
+                    Registrar salida
+                  </button>
+                </div>
+              </div>
+            )}
+            {salidaDetalleAbierta && (
+              <RegistrarSalidaModal
+                usuario={usuario}
+                entrada={{
+                  radicadoId: radicado.radicadoId,
+                  // Identidad reservada/anónima: no se prellena el nombre.
+                  solicitanteNombre: (radicado.esAnonimo || radicado.identidadReservada)
+                    ? undefined
+                    : radicado.solicitante.nombreCompleto,
+                  dependencia: radicado.clasificacion.oficinaDestino,
+                }}
+                onCerrar={() => setSalidaDetalleAbierta(false)}
+              />
+            )}
 
             <div className="rounded-xl bg-white p-4" style={{ border: '1px solid #D9E2D9' }}>
               <p className="text-[10px] font-bold uppercase tracking-widest mb-3" style={{ color: '#14532D' }}>Solicitante</p>
@@ -3984,6 +4043,10 @@ function DashboardInterior({ usuario, cerrarSesion }: { usuario: UsuarioAutentic
   const tienePermisoRadicar = puedeRadicar(usuario);
   const tienePermisoBandeja = puedeUsarBandejaAsignacion(usuario);
   const [busquedaAvanzadaAbierta, setBusquedaAvanzadaAbierta] = useState(false);
+  // Sprint Radicación de salida — modal (null = cerrado; entrada = amarre).
+  const [salidaModal, setSalidaModal] = useState<{ entrada: EntradaAmarre | null } | null>(null);
+  const salidasLibro = useSalidas(vistaActual === 'SALIDAS');
+  const puedeRegistrarSalida = usuario.rol === 'ADMIN' || usuario.rol === 'RECEPCIONISTA';
   const {
     modo: indicadoresModo,
     toggle: toggleIndicadoresModo,
@@ -4197,6 +4260,17 @@ function DashboardInterior({ usuario, cerrarSesion }: { usuario: UsuarioAutentic
           />
         ) : vistaActual === 'REPORTES' ? (
           <VistaReportes total={todosLosRadicados.length} radicados={todosLosRadicados} />
+        ) : vistaActual === 'SALIDAS' ? (
+          /* Sprint Radicación de salida — libro de correspondencia despachada. */
+          <VistaSalidas
+            salidas={salidasLibro.salidas}
+            cargando={salidasLibro.cargando}
+            error={salidasLibro.error}
+            onAbrirEntrada={(id) => abrirRadicadoPorId(id)}
+            onNuevaSalida={() => {
+              if (puedeRegistrarSalida) setSalidaModal({ entrada: null });
+            }}
+          />
         ) : vistaActual === 'BANDEJA' && tienePermisoBandeja ? (
           <BandejaAsignacion
             radicados={radicadosPendientes}
@@ -4247,6 +4321,9 @@ function DashboardInterior({ usuario, cerrarSesion }: { usuario: UsuarioAutentic
             onNuevaRadicacion={() => dispatch({ type: 'TOGGLE_DRAWER_NUEVO' })}
             onAbrirBusquedaAvanzada={() => setBusquedaAvanzadaAbierta(true)}
             onAbrirRadicado={(id) => abrirRadicadoPorId(id)}
+            onRegistrarSalida={puedeRegistrarSalida
+              ? () => setSalidaModal({ entrada: null })
+              : undefined}
           />
         ) : (
           <>
@@ -4390,6 +4467,15 @@ function DashboardInterior({ usuario, cerrarSesion }: { usuario: UsuarioAutentic
           usuario={usuario}
           onCerrar={() => dispatch({ type: 'CERRAR_DRAWER_NUEVO' })}
           radicados={todosLosRadicados}
+        />
+      )}
+
+      {/* Sprint Radicación de salida — registro de despacho. */}
+      {salidaModal && puedeRegistrarSalida && (
+        <RegistrarSalidaModal
+          usuario={usuario}
+          entrada={salidaModal.entrada}
+          onCerrar={() => setSalidaModal(null)}
         />
       )}
 

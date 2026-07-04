@@ -31,6 +31,7 @@ export type VistaActual =
   | 'TABLERO'
   | 'RADICACION'
   | 'VENTANILLA'
+  | 'SALIDAS'      // Radicación de salida — libro de correspondencia despachada
   | 'BANDEJA'
   | 'DEPENDENCIAS'
   | 'REPORTES'
