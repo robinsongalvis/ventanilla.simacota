@@ -15,6 +15,7 @@ import {
   toggleMedio,
 } from '@/lib/recepcion/medios-anexos';
 import { sugerirDependencia } from '@/lib/recepcion/sugerir-dependencia';
+import { agruparDestinosPorDependencia } from '@/lib/catalogos/areas';
 import {
   buscarSolicitantes,
   construirDirectorio,
@@ -130,13 +131,13 @@ interface Props {
 
 const SIN_RADICADOS: VentanillaRadicado[] = [];
 
-/* Ventanilla Única primero (default de triage); las demás dependencias
-   en el orden del directorio institucional. */
-const OPCIONES_DEPENDENCIA: [string, string][] = [
-  ['VENTANILLA_UNICA', NOMBRES_TENANT.VENTANILLA_UNICA],
-  ...(Object.entries(NOMBRES_TENANT) as [TenantId, string][])
-    .filter(([id]) => id !== 'VENTANILLA_UNICA'),
-];
+/* Idea de Laura (Registro exprés, Commit 4): el selector de destino se
+   agrupa por dependencia — "marco Gobierno y se despliegan las de
+   Gobierno". Ventanilla Única primero (default de triage). */
+const GRUPOS_DESTINO = agruparDestinosPorDependencia([
+  'VENTANILLA_UNICA',
+  ...(Object.keys(NOMBRES_TENANT) as TenantId[]).filter((id) => id !== 'VENTANILLA_UNICA'),
+]);
 
 const INITIAL_FORM: FormState = {
   origenIngreso: 'PQRSD_WEB_OFICIAL',
@@ -321,13 +322,29 @@ export function RadicacionFuncionarioForm({ radicadoPreview, onSubmit, formId, h
             ]}
           />
           {/* Sprint Radicación dirigida — el radicado nace dirigido a una
-              dependencia; la trazabilidad empieza aquí, no en el traslado. */}
-          <SelectField
-            label="Dependencia destino"
-            value={form.oficinaDestino}
-            onChange={(v) => update('oficinaDestino', v as TenantId)}
-            options={OPCIONES_DEPENDENCIA}
-          />
+              dependencia; la trazabilidad empieza aquí, no en el traslado.
+              Agrupado por dependencia (idea de Laura). */}
+          <label>
+            <span className={labelCls} style={labelStyle}>Dependencia destino</span>
+            <select
+              value={form.oficinaDestino}
+              onChange={(e) => update('oficinaDestino', e.target.value as TenantId)}
+              className="select-internal w-full"
+            >
+              {GRUPOS_DESTINO.map((g) => g.oficinas.length > 0 ? (
+                <optgroup key={g.dependencia} label={NOMBRES_TENANT[g.dependencia]}>
+                  <option value={g.dependencia}>{NOMBRES_TENANT[g.dependencia]}</option>
+                  {g.oficinas.map((o) => (
+                    <option key={o.tenant} value={o.tenant}>{o.nombre}</option>
+                  ))}
+                </optgroup>
+              ) : (
+                <option key={g.dependencia} value={g.dependencia}>
+                  {NOMBRES_TENANT[g.dependencia]}
+                </option>
+              ))}
+            </select>
+          </label>
           {sugerencia && sugerencia.oficina !== form.oficinaDestino && (
             <div
               className="md:col-span-2 xl:col-span-4 flex items-center gap-2 flex-wrap rounded-lg px-3 py-2"

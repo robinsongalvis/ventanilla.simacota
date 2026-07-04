@@ -28,7 +28,7 @@ import {
 } from '@/lib/reportes/filtrar-por-preset';
 import { INSTITUCION } from '@/lib/institucion';
 import { puedeVerReportes } from '@/lib/permisos/acceso-reportes';
-import { areasParaDependencia, getNombreArea } from '@/lib/catalogos/areas';
+import { agruparDestinosPorDependencia, areasParaDependencia, getNombreArea } from '@/lib/catalogos/areas';
 import { RegistroExpresModal } from '@/app/interno/dashboard/components/RegistroExpresModal';
 import { RegistrarSalidaModal, type EntradaAmarre } from '@/app/interno/dashboard/components/salidas/RegistrarSalidaModal';
 import { VistaSalidas }                    from '@/app/interno/dashboard/components/salidas/VistaSalidas';
@@ -2612,8 +2612,16 @@ function PanelDerecho({
                 }}
                 className="select-internal w-full"
               >
-                {(Object.keys(DIRECTORIO_TENANTS) as TenantId[]).map((id) => (
-                  <option key={id} value={id}>{NOMBRES_TENANT[id]}</option>
+                {/* Agrupado por dependencia (idea de Laura). */}
+                {agruparDestinosPorDependencia(Object.keys(DIRECTORIO_TENANTS) as TenantId[]).map((g) => g.oficinas.length > 0 ? (
+                  <optgroup key={g.dependencia} label={NOMBRES_TENANT[g.dependencia]}>
+                    <option value={g.dependencia}>{NOMBRES_TENANT[g.dependencia]}</option>
+                    {g.oficinas.map((o) => (
+                      <option key={o.tenant} value={o.tenant}>{o.nombre}</option>
+                    ))}
+                  </optgroup>
+                ) : (
+                  <option key={g.dependencia} value={g.dependencia}>{NOMBRES_TENANT[g.dependencia]}</option>
                 ))}
               </select>
             </div>
