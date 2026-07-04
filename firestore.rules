@@ -68,149 +68,16 @@ service cloud.firestore {
       return role in ['ADMIN', 'FUNCIONARIO', 'RECEPCIONISTA', 'JEFE_DEPENDENCIA', 'CONTROL_INTERNO'];
     }
 
-    function validEstado(estado) {
-      return estado in [
-        'PENDIENTE',
-        'EN_REVISION',
-        'EN_PROCESO',
-        'RESUELTO',
-        'DEVUELTO',
-        'RECHAZADO'
-      ];
-    }
-
-    function validRadicadoCreate() {
-      return request.resource.data.keys().hasAll([
-        'radicadoId',
-        'origen',
-        'fechaCreacion',
-        'estadoActual',
-        'prioridad',
-        'ciudadano',
-        'clasificacionIA',
-        'archivos',
-        'auditoria'
-      ])
-      && request.resource.data.keys().hasOnly([
-        'radicadoId',
-        'origen',
-        'fechaCreacion',
-        'estadoActual',
-        'prioridad',
-        'ciudadano',
-        'clasificacionIA',
-        'archivos',
-        'auditoria',
-        'notasInternas',
-        'tipoSolicitudId',
-        'tipoSolicitudNombre',
-        'tipoPresentacion',
-        'esAnonimo',
-        'identidadReservada',
-        'canalRespuesta'
-      ])
-      && request.resource.data.radicadoId is string
-      && request.resource.data.origen in ['WEB', 'FISICO_ESCANER']
-      && (
-        request.resource.data.origen == 'WEB'
-        || (request.resource.data.origen == 'FISICO_ESCANER' && (isAdmin() || isRecepcionista()))
-      )
-      && (
-        !request.resource.data.keys().hasAny(['notasInternas'])
-        || isAdmin()
-        || isRecepcionista()
-      )
-      && request.resource.data.estadoActual == 'PENDIENTE'
-      && request.resource.data.prioridad in ['ROJO', 'NARANJA', 'AMARILLO']
-      && request.resource.data.ciudadano.nombre is string
-      && request.resource.data.ciudadano.email is string
-      && request.resource.data.ciudadano.telefono is string
-      && request.resource.data.archivos is list
-      && request.resource.data.auditoria is list
-      && (
-        !request.resource.data.keys().hasAny(['tipoSolicitudId'])
-        || request.resource.data.tipoSolicitudId in [
-          'PETICION',
-          'PETICION_INFORMACION',
-          'PETICION_AUTORIDADES',
-          'QUEJA',
-          'RECLAMO',
-          'SUGERENCIA',
-          'FELICITACION',
-          'DENUNCIA',
-          'HABEAS_DATA',
-          'INFORMATIVO',
-          'LICENCIA_CONSTRUCCION',
-          'ENTES_CONTROL_URGENTE'
-        ]
-      )
-      && (
-        !request.resource.data.keys().hasAny(['tipoPresentacion'])
-        || request.resource.data.tipoPresentacion in ['IDENTIFICADA', 'ANONIMA', 'RESERVADA']
-      )
-      && (
-        !request.resource.data.keys().hasAny(['canalRespuesta'])
-        || request.resource.data.canalRespuesta in ['CORREO', 'PRESENCIAL', 'TELEFONO', 'DIRECCION_FISICA']
-      )
-      && (
-        !request.resource.data.keys().hasAny(['esAnonimo'])
-        || request.resource.data.esAnonimo is bool
-      )
-      && (
-        !request.resource.data.keys().hasAny(['identidadReservada'])
-        || request.resource.data.identidadReservada is bool
-      );
-    }
-
-    function validRadicadoUpdate() {
-      return request.resource.data.diff(resource.data).affectedKeys().hasOnly([
-        'estadoActual',
-        'auditoria'
-      ])
-      && validEstado(request.resource.data.estadoActual)
-      && request.resource.data.auditoria is list;
-    }
+    // NOTA: los validadores de escritura cliente (validRadicadoCreate,
+    // validRadicadoUpdate, validVentanillaUpdate, validVentanillaEstado)
+    // se retiraron: desde "Cierra seguridad go-live" (bf42175) toda mutación
+    // de radicados es server-side vía Admin SDK y los allow quedaron en false.
+    // La validación de estados vive en los endpoints de acción de /api.
 
     function canReadRadicado(data) {
       return isAdmin()
         || (isFuncionario() && assignedTenant(data))
         || (isRecepcionista() && assignedTenant(data));
-    }
-
-    function canUpdateRadicado(data) {
-      return isAdmin()
-        || (isFuncionario() && assignedTenant(data))
-        || (isRecepcionista() && assignedTenant(data));
-    }
-
-    // Estados válidos que el cliente puede escribir en ventanilla_radicados.
-    // POR_VENCER y VENCIDO solo los escribe Admin SDK (Cloud Functions / backend);
-    // quedan fuera de esta lista deliberadamente.
-    function validVentanillaEstado(estado) {
-      return estado in [
-        'PENDIENTE',
-        'EN_REVISION',
-        'EN_PROCESO',
-        'ASIGNADO',
-        'RESUELTO',
-        'DEVUELTO',
-        'RECHAZADO',
-        'PRORROGA'
-      ];
-    }
-
-    function validVentanillaUpdate() {
-      return request.resource.data.diff(resource.data).affectedKeys().hasOnly([
-        'estadoActual',
-        'clasificacion',
-        'feedbackIa',
-        'termino',
-        'ultimaActualizacion',
-        'respuestaOficial',
-        'cumplioTermino'     // MIPG Req 8: evidencia de cumplimiento de término legal
-      ])
-      && request.resource.data.ultimaActualizacion is string
-      && validVentanillaEstado(request.resource.data.estadoActual);
     }
 
     match /users/{uid} {
