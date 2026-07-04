@@ -27,6 +27,7 @@ import {
   type PresetReporte,
 } from '@/lib/reportes/filtrar-por-preset';
 import { INSTITUCION } from '@/lib/institucion';
+import { puedeVerReportes } from '@/lib/permisos/acceso-reportes';
 import { BusquedaAvanzadaPanel }           from '@/app/interno/dashboard/components/BusquedaAvanzadaPanel';
 import { VistaVentanilla }                 from '@/app/interno/dashboard/components/ventanilla/VistaVentanilla';
 import { useIndicadoresModo }              from '@/lib/hooks/useIndicadoresModo';
@@ -291,7 +292,10 @@ function puedeAccederVista(usuario: UsuarioAutenticado, vista: VistaActual): boo
   if (vista === 'SUPERVISION_IA' || vista === 'ANTICIPACION_OPERATIVA') {
     return usuario.rol === 'ADMIN' || usuario.rol === 'CONTROL_INTERNO';
   }
-  if (vista === 'ANALYTICS' || vista === 'REPORTES') return puedeVerAnaliticaAvanzada(usuario);
+  if (vista === 'ANALYTICS') return puedeVerAnaliticaAvanzada(usuario);
+  // Sprint 3C — Reportes se abre también a RECEPCIONISTA: ella responde
+  // "¿qué llegó este mes?" con los mismos datos que ya ve en el Tablero.
+  if (vista === 'REPORTES') return puedeVerReportes(usuario.rol);
   return true;
 }
 
