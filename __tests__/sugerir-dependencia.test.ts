@@ -41,6 +41,12 @@ describe('Radicación dirigida — sugerirDependencia', () => {
     expect(s?.razon).toBe('por el tipo de trámite');
   });
 
+  /* 4b · lo ambiental va a Planeación (Fase 2 — el ingeniero está allí) */
+  it("'contaminación ambiental' sugiere Planeación", () => {
+    const s = sugerirDependencia({ asunto: 'Queja por contaminación ambiental en la quebrada' });
+    expect(s?.oficina).toBe('SEC_PLANEACION');
+  });
+
   /* 5 · texto genérico no inventa sugerencia */
   it('devuelve null cuando no hay señal clara', () => {
     expect(sugerirDependencia({ asunto: 'Petición general del ciudadano' })).toBeNull();

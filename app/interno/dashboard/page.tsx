@@ -2426,6 +2426,10 @@ function PanelDerecho({
                       <FilaInfo label="Cargo" value={radicado.clasificacion.funcionarioResponsableCargo} />
                     )}
                     <FilaInfo label="Dependencia" value={NOMBRES_TENANT[radicado.clasificacion.oficinaDestino]} />
+                    {/* Fase 2 · Áreas — nivel 2 del modelo, si está fijado. */}
+                    {radicado.clasificacion.areaResponsable && (
+                      <FilaInfo label="Área responsable" value={getNombreArea(radicado.clasificacion.areaResponsable)} />
+                    )}
                     {radicado.clasificacion.funcionarioResponsableEmail && (
                       <FilaInfo label="Email" value={radicado.clasificacion.funcionarioResponsableEmail} />
                     )}

@@ -37,7 +37,9 @@ const TIPO_A_DEPENDENCIA: Partial<Record<string, TenantId>> = {
 const REGLAS_PALABRAS: { oficina: TenantId; palabras: string[] }[] = [
   { oficina: 'SUB_COMISARIA',  palabras: ['violencia', 'maltrato', 'custodia', 'menor', 'familia'] },
   { oficina: 'SEC_HACIENDA',   palabras: ['predial', 'impuesto', 'paz y salvo'] },
-  { oficina: 'SEC_PLANEACION', palabras: ['licencia', 'construccion', 'urbanismo', 'uso de suelo'] },
+  /* Ambiental pertenece a Planeación (el ingeniero ambiental trabaja
+     allí — confirmado por el equipo, Fase 2). */
+  { oficina: 'SEC_PLANEACION', palabras: ['licencia', 'construccion', 'urbanismo', 'uso de suelo', 'ambiental', 'medio ambiente', 'contaminacion'] },
   { oficina: 'SEC_GOBIERNO',   palabras: ['contratacion'] },
 ];
 
