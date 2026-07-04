@@ -203,6 +203,13 @@ export interface RespuestaOficial {
 export interface ClasificacionRadicado {
   oficinaDestino:   TenantId;
   zonaGeografica:   ZonaGeografica;
+  /**
+   * Fase 2 · Dependencia + Área — nivel 2 del modelo: el área u
+   * oficina que trabaja el caso operativamente (id del catálogo en
+   * lib/catalogos/areas.ts). Opcional: se fija al asignar/trasladar y
+   * se limpia si el radicado cambia de destino sin área nueva.
+   */
+  areaResponsable?: string | null;
 
   /** UID técnico de Firebase Auth — referencia permanente */
   funcionarioResponsableUid?:     string;

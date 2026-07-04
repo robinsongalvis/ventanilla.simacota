@@ -28,6 +28,7 @@ import {
 } from '@/lib/reportes/filtrar-por-preset';
 import { INSTITUCION } from '@/lib/institucion';
 import { puedeVerReportes } from '@/lib/permisos/acceso-reportes';
+import { areasParaDependencia, getNombreArea } from '@/lib/catalogos/areas';
 import { RegistrarSalidaModal, type EntradaAmarre } from '@/app/interno/dashboard/components/salidas/RegistrarSalidaModal';
 import { VistaSalidas }                    from '@/app/interno/dashboard/components/salidas/VistaSalidas';
 import { useSalidas }                      from '@/lib/hooks/useSalidas';
@@ -1753,6 +1754,8 @@ function PanelDerecho({
   const [estadoConstancia,  setEstadoConstancia]  = useState<'idle' | 'enviando' | 'enviado' | 'error'>('idle');
   const [mensajeConstancia, setMensajeConstancia] = useState<string | null>(null);
   const [tenantDestino,    setTenantDestino]    = useState<TenantId>(radicado.clasificacion.oficinaDestino);
+  // Fase 2 · Áreas — nivel 2: área que trabajará el caso (opcional).
+  const [areaSeleccionada, setAreaSeleccionada] = useState<string>(radicado.clasificacion.areaResponsable ?? '');
   // MIPG-2: reemplaza el free-text de UID por un selector con snapshot completo
   const [responsableSelec, setResponsableSelec] = useState<FuncionarioTenant | null>(null);
   // Backward compat: si el radicado ya tenía un UID libre, lo inicializamos
@@ -1931,7 +1934,7 @@ function PanelDerecho({
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         credentials: 'include',
-        body: JSON.stringify({ tenantDestino, responsable }),
+        body: JSON.stringify({ tenantDestino, responsable, areaId: areaSeleccionada || null }),
       });
       const data = await response.json().catch(() => null) as { error?: string } | null;
       if (!response.ok) throw new Error(data?.error ?? 'Error al asignar el radicado.');
@@ -2423,6 +2426,10 @@ function PanelDerecho({
                       <FilaInfo label="Cargo" value={radicado.clasificacion.funcionarioResponsableCargo} />
                     )}
                     <FilaInfo label="Dependencia" value={NOMBRES_TENANT[radicado.clasificacion.oficinaDestino]} />
+                    {/* Fase 2 · Áreas — nivel 2 del modelo, si está fijado. */}
+                    {radicado.clasificacion.areaResponsable && (
+                      <FilaInfo label="Área responsable" value={getNombreArea(radicado.clasificacion.areaResponsable)} />
+                    )}
                     {radicado.clasificacion.funcionarioResponsableEmail && (
                       <FilaInfo label="Email" value={radicado.clasificacion.funcionarioResponsableEmail} />
                     )}
@@ -2576,11 +2583,36 @@ function PanelDerecho({
               <p className="text-[10px] font-bold uppercase tracking-widest mb-1.5" style={{ color: '#667085' }}>Dependencia destino</p>
               <select
                 value={tenantDestino}
-                onChange={(e) => setTenantDestino(e.target.value as TenantId)}
+                onChange={(e) => {
+                  setTenantDestino(e.target.value as TenantId);
+                  // El área depende del destino: al cambiarlo se limpia.
+                  setAreaSeleccionada('');
+                }}
                 className="select-internal w-full"
               >
                 {(Object.keys(DIRECTORIO_TENANTS) as TenantId[]).map((id) => (
                   <option key={id} value={id}>{NOMBRES_TENANT[id]}</option>
+                ))}
+              </select>
+            </div>
+
+            {/* Fase 2 · Áreas — nivel 2 del modelo: propias del destino
+                + transversales (Almacén y Archivo, Sistemas). */}
+            <div>
+              <p className="text-[10px] font-bold uppercase tracking-widest mb-1.5" style={{ color: '#667085' }}>
+                Área responsable <span className="normal-case font-normal" style={{ color: '#94A3B8' }}>(opcional)</span>
+              </p>
+              <select
+                value={areaSeleccionada}
+                onChange={(e) => setAreaSeleccionada(e.target.value)}
+                aria-label="Área responsable"
+                className="select-internal w-full"
+              >
+                <option value="">— Sin área específica —</option>
+                {areasParaDependencia(tenantDestino).map((a) => (
+                  <option key={a.areaId} value={a.areaId}>
+                    {a.nombre}{a.transversal ? ' (transversal)' : ''}
+                  </option>
                 ))}
               </select>
             </div>
