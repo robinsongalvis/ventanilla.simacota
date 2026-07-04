@@ -1,6 +1,8 @@
 import { NextResponse } from 'next/server';
+import { FieldValue } from 'firebase-admin/firestore';
 import { getFirebaseAdminDb } from '@/lib/firebase-admin';
 import { removeUndefinedDeep } from '@/lib/firestore/removeUndefined';
+import { getNombreArea, validarAreaParaDestino } from '@/lib/catalogos/areas';
 import {
   canAssignRadicado,
   InternalAuthError,
@@ -40,6 +42,8 @@ interface RouteContext {
 interface Payload {
   tenantDestino?: TenantId;
   responsable?: ResponsableFuncionario | null;
+  /** Fase 2 — área responsable (id del catálogo), opcional. */
+  areaId?: string | null;
 }
 
 function jsonError(error: unknown) {
@@ -67,10 +71,22 @@ export async function POST(request: Request, context: RouteContext): Promise<Nex
       return NextResponse.json({ error: 'Tu rol no permite asignar este radicado.' }, { status: 403 });
     }
 
+    /* Fase 2 — área responsable (nivel 2). Validada contra el catálogo:
+       propia del destino o transversal. Sin área nueva, se limpia la
+       anterior — el destino cambió y el área vieja quedaría inconsistente. */
+    const areaId = payload?.areaId?.trim() || null;
+    if (areaId) {
+      const errorArea = validarAreaParaDestino(areaId, tenantDestino);
+      if (errorArea) {
+        return NextResponse.json({ error: errorArea }, { status: 400 });
+      }
+    }
+
     const ahora = new Date().toISOString();
     const responsable = payload.responsable ?? null;
     const update = removeUndefinedDeep({
       'clasificacion.oficinaDestino': tenantDestino,
+      'clasificacion.areaResponsable': areaId ?? FieldValue.delete(),
       ...buildResponsableSnapshot(responsable),
       estadoActual: 'ASIGNADO',
       ultimaActualizacion: ahora,
@@ -93,11 +109,12 @@ export async function POST(request: Request, context: RouteContext): Promise<Nex
       actorNombre: usuario.nombre,
       oficinaOrigen: radicado.clasificacion.oficinaDestino,
       oficinaDestino: tenantDestino,
-      nota: `Trasladado a ${nombreTenant(tenantDestino)} por ${usuario.nombre}`,
+      nota: `Trasladado a ${nombreTenant(tenantDestino)}${areaId ? ` · área ${getNombreArea(areaId)}` : ''} por ${usuario.nombre}`,
       metadata: {
         dependenciaOrigen: radicado.clasificacion.oficinaDestino,
         dependenciaDestino: tenantDestino,
         actorRol: usuario.rol,
+        ...(areaId ? { areaResponsable: areaId } : {}),
         ...buildResponsableMetadata(responsable),
       },
     });

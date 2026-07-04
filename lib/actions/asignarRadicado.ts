@@ -39,6 +39,8 @@ export async function asignarRadicado(
   responsable?:  ResponsableFuncionario | null,
   /** Tenant de origen (para trazabilidad) */
   tenantOrigen?: TenantId,
+  /** Fase 2 — área responsable (id del catálogo), opcional. */
+  areaId?:       string | null,
 ): Promise<void> {
   void actor;
   void tenantOrigen;
@@ -46,7 +48,7 @@ export async function asignarRadicado(
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     credentials: 'include',
-    body: JSON.stringify({ tenantDestino, responsable: responsable ?? null }),
+    body: JSON.stringify({ tenantDestino, responsable: responsable ?? null, areaId: areaId ?? null }),
   });
   const data = await response.json().catch(() => null) as { error?: string } | null;
   if (!response.ok) {
