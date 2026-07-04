@@ -26,6 +26,7 @@ import {
   resumenPorDependencia,
   type PresetReporte,
 } from '@/lib/reportes/filtrar-por-preset';
+import { INSTITUCION } from '@/lib/institucion';
 import { BusquedaAvanzadaPanel }           from '@/app/interno/dashboard/components/BusquedaAvanzadaPanel';
 import { VistaVentanilla }                 from '@/app/interno/dashboard/components/ventanilla/VistaVentanilla';
 import { useIndicadoresModo }              from '@/lib/hooks/useIndicadoresModo';
@@ -3360,6 +3361,31 @@ async function descargarExcelMipg(filtros?: Record<string, unknown>): Promise<{ 
   }
 }
 
+/* Sprint 3C — impresión del reporte: solo el bloque #reporte-mipg-print
+   es visible al imprimir (mismo patrón de constancia y sello). */
+const PRINT_STYLES_REPORTE = `
+@media print {
+  body * { visibility: hidden !important; }
+  #reporte-mipg-print,
+  #reporte-mipg-print * { visibility: visible !important; }
+  #reporte-mipg-print {
+    position: fixed !important;
+    top: 0 !important;
+    left: 0 !important;
+    width: 100% !important;
+    height: auto !important;
+    overflow: visible !important;
+    background: white !important;
+    padding: 0 !important;
+    z-index: 99999 !important;
+  }
+  @page {
+    size: letter portrait;
+    margin: 14mm 12mm;
+  }
+}
+`;
+
 function VistaReportes({
   total,
   radicados,
@@ -3390,6 +3416,26 @@ function VistaReportes({
   const filasDependencia = useMemo(() => resumenPorDependencia(subconjunto), [subconjunto]);
   const pctCumplimiento = ind.pctCumplimiento;
 
+  /* Sprint 3C — imprimir o "Guardar como PDF" del navegador. Se
+     desactiva la hoja de estilos del comprobante durante la impresión
+     para que no compita por la @page, y el tag propio se retira al
+     cerrar el diálogo (mismo manejo del sello de recibido). */
+  function handleImprimirReporte() {
+    const stylesComprobante =
+      document.getElementById('comprobante-print-styles') as HTMLStyleElement | null;
+    if (stylesComprobante) stylesComprobante.disabled = true;
+
+    const tag = document.createElement('style');
+    tag.id = 'reporte-mipg-print-styles';
+    tag.textContent = PRINT_STYLES_REPORTE;
+    document.head.appendChild(tag);
+
+    window.print();
+
+    tag.remove();
+    if (stylesComprobante) stylesComprobante.disabled = false;
+  }
+
   const items = [
     { label: 'Total radicados',           valor: ind.total,     color: '#12261A', desc: ETIQUETA_PRESET[preset] },
     { label: 'Tasa resolución (%)',        valor: ind.total > 0 ? Math.round((ind.resueltos / ind.total) * 100) : 0, color: '#14532D', desc: 'Resueltos / Total' },
@@ -3404,13 +3450,51 @@ function VistaReportes({
   ];
 
   return (
-    <div className="flex-1 overflow-y-auto px-4 sm:px-6 py-6 sm:py-8" style={{ background: '#F8FAF7' }}>
-      <div className="flex items-start justify-between gap-4 mb-6">
+    <div id="reporte-mipg-print" className="flex-1 overflow-y-auto px-4 sm:px-6 py-6 sm:py-8" style={{ background: '#F8FAF7' }}>
+      {/* Encabezado institucional — solo visible al imprimir. */}
+      <div className="hidden print:block mb-6" style={{ borderBottom: '2px solid #14532D', paddingBottom: 12 }}>
+        <div className="flex items-center gap-3">
+          <div className="shrink-0 overflow-hidden" style={{ width: 40, height: 40 }}>
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img
+              src={INSTITUCION.logo}
+              alt=""
+              className="max-w-none"
+              style={{ height: 40, width: 'auto', objectPosition: 'left' }}
+            />
+          </div>
+          <div>
+            <p className="text-sm font-black uppercase" style={{ color: '#14532D' }}>{INSTITUCION.nombre}</p>
+            <p className="text-xs" style={{ color: '#667085' }}>
+              Reporte de indicadores MIPG · {ETIQUETA_PRESET[preset]}
+              {depFiltro !== 'TODAS' ? ` · ${NOMBRES_TENANT[depFiltro] ?? depFiltro}` : ' · Todas las dependencias'}
+            </p>
+            <p className="text-[10px]" style={{ color: '#94A3B8' }}>
+              Generado: {formatFechaHoraColombia(new Date())} · {subconjunto.length} radicado{subconjunto.length !== 1 ? 's' : ''} en el período
+            </p>
+          </div>
+        </div>
+      </div>
+
+      <div className="flex items-start justify-between gap-4 mb-6 print:hidden">
         <div>
           <p className="text-[10px] font-bold uppercase tracking-widest mb-1" style={{ color: '#667085' }}>MIPG · Rendición de Cuentas</p>
           <h2 className="text-xl font-black" style={{ color: '#1F2933' }}>Indicadores de Eficiencia</h2>
         </div>
         <div className="shrink-0 flex items-center gap-2">
+          <button
+            type="button"
+            onClick={handleImprimirReporte}
+            className="flex items-center gap-2 px-4 py-2 rounded-lg text-xs font-bold transition-colors"
+            style={{ background: '#FFFFFF', color: '#14532D', border: '1px solid #14532D' }}
+            title="Imprimir el reporte del período o guardarlo como PDF desde el navegador"
+          >
+            <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+              <path strokeLinecap="round" strokeLinejoin="round"
+                d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z" />
+            </svg>
+            Imprimir / PDF
+          </button>
           <button
             type="button"
             onClick={onExportarExcel}
@@ -3447,7 +3531,7 @@ function VistaReportes({
       )}
 
       {/* Sprint 3C — presets de período + dependencia. */}
-      <div className="flex items-center gap-2 flex-wrap mb-5">
+      <div className="flex items-center gap-2 flex-wrap mb-5 print:hidden">
         {(Object.entries(ETIQUETA_PRESET) as [PresetReporte, string][]).map(([id, etiqueta]) => (
           <button
             key={id}
@@ -3534,7 +3618,7 @@ function VistaReportes({
         </div>
       )}
 
-      <p className="text-xs" style={{ color: '#94A3B8' }}>
+      <p className="text-xs print:hidden" style={{ color: '#94A3B8' }}>
         Datos en tiempo real · colección <span className="font-mono">ventanilla_radicados</span> ·
         {' '}{subconjunto.length} de {total} documento{total !== 1 ? 's' : ''} en el período ·
         el CSV exporta lo filtrado; el Excel MIPG, el histórico completo.
