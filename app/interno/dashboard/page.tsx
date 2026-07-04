@@ -19,6 +19,15 @@ import { ComprobanteRadicado }             from '@/app/interno/dashboard/compone
 import { SelloRecibido }                   from '@/app/interno/dashboard/components/SelloRecibido';
 import { CompletarDatosSolicitante }       from '@/app/interno/dashboard/components/CompletarDatosSolicitante';
 import { datosConstanciaDesdeRadicado }    from '@/lib/mostrador/constancia-desde-radicado';
+import {
+  ETIQUETA_PRESET,
+  filtrarPorPreset,
+  indicadoresDeReporte,
+  resumenPorDependencia,
+  type PresetReporte,
+} from '@/lib/reportes/filtrar-por-preset';
+import { INSTITUCION } from '@/lib/institucion';
+import { puedeVerReportes } from '@/lib/permisos/acceso-reportes';
 import { BusquedaAvanzadaPanel }           from '@/app/interno/dashboard/components/BusquedaAvanzadaPanel';
 import { VistaVentanilla }                 from '@/app/interno/dashboard/components/ventanilla/VistaVentanilla';
 import { useIndicadoresModo }              from '@/lib/hooks/useIndicadoresModo';
@@ -283,7 +292,10 @@ function puedeAccederVista(usuario: UsuarioAutenticado, vista: VistaActual): boo
   if (vista === 'SUPERVISION_IA' || vista === 'ANTICIPACION_OPERATIVA') {
     return usuario.rol === 'ADMIN' || usuario.rol === 'CONTROL_INTERNO';
   }
-  if (vista === 'ANALYTICS' || vista === 'REPORTES') return puedeVerAnaliticaAvanzada(usuario);
+  if (vista === 'ANALYTICS') return puedeVerAnaliticaAvanzada(usuario);
+  // Sprint 3C — Reportes se abre también a RECEPCIONISTA: ella responde
+  // "¿qué llegó este mes?" con los mismos datos que ya ve en el Tablero.
+  if (vista === 'REPORTES') return puedeVerReportes(usuario.rol);
   return true;
 }
 
@@ -3353,17 +3365,43 @@ async function descargarExcelMipg(filtros?: Record<string, unknown>): Promise<{ 
   }
 }
 
+/* Sprint 3C — impresión del reporte: solo el bloque #reporte-mipg-print
+   es visible al imprimir (mismo patrón de constancia y sello). */
+const PRINT_STYLES_REPORTE = `
+@media print {
+  body * { visibility: hidden !important; }
+  #reporte-mipg-print,
+  #reporte-mipg-print * { visibility: visible !important; }
+  #reporte-mipg-print {
+    position: fixed !important;
+    top: 0 !important;
+    left: 0 !important;
+    width: 100% !important;
+    height: auto !important;
+    overflow: visible !important;
+    background: white !important;
+    padding: 0 !important;
+    z-index: 99999 !important;
+  }
+  @page {
+    size: letter portrait;
+    margin: 14mm 12mm;
+  }
+}
+`;
+
 function VistaReportes({
-  metricas,
   total,
   radicados,
 }: {
-  metricas:  MetricasMIPGData;
   total:     number;
   radicados: VentanillaRadicado[];
 }) {
   const [descargandoExcel, setDescargandoExcel] = useState(false);
   const [errorExcel, setErrorExcel] = useState<string | null>(null);
+  // Sprint 3C — preset de período y dependencia del reporte.
+  const [preset, setPreset] = useState<PresetReporte>('ESTE_MES');
+  const [depFiltro, setDepFiltro] = useState<TenantId | 'TODAS'>('TODAS');
   async function onExportarExcel() {
     setDescargandoExcel(true);
     setErrorExcel(null);
@@ -3371,36 +3409,96 @@ function VistaReportes({
     if (!res.ok) setErrorExcel(res.error ?? 'No se pudo generar el reporte Excel.');
     setDescargandoExcel(false);
   }
-  // KPI de cumplimiento de términos — calculado sobre datos reales de Firestore
-  const resueltosConDato = radicados.filter(
-    (r) => r.cumplioTermino !== undefined && r.cumplioTermino !== null,
+
+  /* Sprint 3C — el reporte se calcula sobre el subconjunto del período
+     elegido, con los mismos cortes calendario de los KPIs operativos. */
+  const subconjunto = useMemo(
+    () => filtrarPorPreset(radicados, preset, depFiltro),
+    [radicados, preset, depFiltro],
   );
-  const aTiempo = radicados.filter((r) => r.cumplioTermino === true).length;
-  const pctCumplimiento = resueltosConDato.length > 0
-    ? Math.round((aTiempo / resueltosConDato.length) * 100)
-    : null;  // null = sin datos suficientes (antes de MIPG-1)
+  const ind = useMemo(() => indicadoresDeReporte(subconjunto), [subconjunto]);
+  const filasDependencia = useMemo(() => resumenPorDependencia(subconjunto), [subconjunto]);
+  const pctCumplimiento = ind.pctCumplimiento;
+
+  /* Sprint 3C — imprimir o "Guardar como PDF" del navegador. Se
+     desactiva la hoja de estilos del comprobante durante la impresión
+     para que no compita por la @page, y el tag propio se retira al
+     cerrar el diálogo (mismo manejo del sello de recibido). */
+  function handleImprimirReporte() {
+    const stylesComprobante =
+      document.getElementById('comprobante-print-styles') as HTMLStyleElement | null;
+    if (stylesComprobante) stylesComprobante.disabled = true;
+
+    const tag = document.createElement('style');
+    tag.id = 'reporte-mipg-print-styles';
+    tag.textContent = PRINT_STYLES_REPORTE;
+    document.head.appendChild(tag);
+
+    window.print();
+
+    tag.remove();
+    if (stylesComprobante) stylesComprobante.disabled = false;
+  }
 
   const items = [
-    { label: 'Total radicados',           valor: total,                    color: 'text-slate-200',  desc: '' },
-    { label: 'Tasa resolución (%)',        valor: total > 0 ? Math.round(((total - metricas.radicadas - metricas.asignadas) / total) * 100) : 0, color: 'text-emerald-300', desc: 'Resueltos / Total' },
-    { label: 'Cumplimiento términos (%)',  valor: pctCumplimiento !== null ? pctCumplimiento : '—', color: pctCumplimiento !== null ? (pctCumplimiento >= 80 ? 'text-emerald-300' : pctCumplimiento >= 60 ? 'text-amber-300' : 'text-rose-400') : 'text-slate-600', desc: 'MIPG Req. 8 — Respondidos a tiempo' },
-    { label: 'Respondidos a tiempo',       valor: aTiempo,                  color: 'text-teal-300',   desc: 'Con dato de cumplimiento' },
-    { label: 'Radicadas (pendientes)',     valor: metricas.radicadas,        color: 'text-indigo-300', desc: '' },
-    { label: 'Prioridad MIPG activos',    valor: metricas.prioridadMIPG,   color: 'text-red-300',    desc: 'Prioridad ROJO activa' },
-    { label: 'En trámite (asignadas)',     valor: metricas.asignadas,        color: 'text-sky-300',    desc: '' },
-    { label: 'Por vencer (≤ 2 días)',      valor: metricas.porVencer,        color: 'text-orange-300', desc: '' },
-    { label: 'Vencidas sin respuesta',     valor: metricas.vencidas,         color: 'text-rose-300',   desc: '' },
-    { label: 'Devueltas / Prórroga',       valor: metricas.devueltasProrroga,color: 'text-amber-300',  desc: '' },
+    { label: 'Total radicados',           valor: ind.total,     color: '#12261A', desc: ETIQUETA_PRESET[preset] },
+    { label: 'Tasa resolución (%)',        valor: ind.total > 0 ? Math.round((ind.resueltos / ind.total) * 100) : 0, color: '#14532D', desc: 'Resueltos / Total' },
+    { label: 'Cumplimiento términos (%)',  valor: pctCumplimiento !== null ? pctCumplimiento : '—', color: pctCumplimiento !== null ? (pctCumplimiento >= 80 ? '#14532D' : pctCumplimiento >= 60 ? '#B45309' : '#DC2626') : '#94A3B8', desc: 'MIPG Req. 8 — Respondidos a tiempo' },
+    { label: 'Respondidos a tiempo',       valor: ind.aTiempo,   color: '#0F766E', desc: 'Con dato de cumplimiento' },
+    { label: 'Radicadas (pendientes)',     valor: ind.radicadas, color: '#475569', desc: '' },
+    { label: 'Prioridad MIPG activos',    valor: ind.prioridadMipg, color: '#DC2626', desc: 'Prioridad ROJO activa' },
+    { label: 'En trámite (asignadas)',     valor: ind.asignadas, color: '#1D4ED8', desc: '' },
+    { label: 'Por vencer (≤ 2 días)',      valor: ind.porVencer, color: '#D97706', desc: '' },
+    { label: 'Vencidas sin respuesta',     valor: ind.vencidas,  color: '#DC2626', desc: '' },
+    { label: 'Devueltas / Prórroga',       valor: ind.devueltasProrroga, color: '#B45309', desc: '' },
   ];
 
   return (
-    <div className="flex-1 overflow-y-auto px-4 sm:px-6 py-6 sm:py-8" style={{ background: '#F8FAF7' }}>
-      <div className="flex items-start justify-between gap-4 mb-6">
+    <div id="reporte-mipg-print" className="flex-1 overflow-y-auto px-4 sm:px-6 py-6 sm:py-8" style={{ background: '#F8FAF7' }}>
+      {/* Encabezado institucional — solo visible al imprimir. */}
+      <div className="hidden print:block mb-6" style={{ borderBottom: '2px solid #14532D', paddingBottom: 12 }}>
+        <div className="flex items-center gap-3">
+          <div className="shrink-0 overflow-hidden" style={{ width: 40, height: 40 }}>
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img
+              src={INSTITUCION.logo}
+              alt=""
+              className="max-w-none"
+              style={{ height: 40, width: 'auto', objectPosition: 'left' }}
+            />
+          </div>
+          <div>
+            <p className="text-sm font-black uppercase" style={{ color: '#14532D' }}>{INSTITUCION.nombre}</p>
+            <p className="text-xs" style={{ color: '#667085' }}>
+              Reporte de indicadores MIPG · {ETIQUETA_PRESET[preset]}
+              {depFiltro !== 'TODAS' ? ` · ${NOMBRES_TENANT[depFiltro] ?? depFiltro}` : ' · Todas las dependencias'}
+            </p>
+            <p className="text-[10px]" style={{ color: '#94A3B8' }}>
+              Generado: {formatFechaHoraColombia(new Date())} · {subconjunto.length} radicado{subconjunto.length !== 1 ? 's' : ''} en el período
+            </p>
+          </div>
+        </div>
+      </div>
+
+      <div className="flex items-start justify-between gap-4 mb-6 print:hidden">
         <div>
           <p className="text-[10px] font-bold uppercase tracking-widest mb-1" style={{ color: '#667085' }}>MIPG · Rendición de Cuentas</p>
           <h2 className="text-xl font-black" style={{ color: '#1F2933' }}>Indicadores de Eficiencia</h2>
         </div>
         <div className="shrink-0 flex items-center gap-2">
+          <button
+            type="button"
+            onClick={handleImprimirReporte}
+            className="flex items-center gap-2 px-4 py-2 rounded-lg text-xs font-bold transition-colors"
+            style={{ background: '#FFFFFF', color: '#14532D', border: '1px solid #14532D' }}
+            title="Imprimir el reporte del período o guardarlo como PDF desde el navegador"
+          >
+            <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+              <path strokeLinecap="round" strokeLinejoin="round"
+                d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z" />
+            </svg>
+            Imprimir / PDF
+          </button>
           <button
             type="button"
             onClick={onExportarExcel}
@@ -3418,7 +3516,7 @@ function VistaReportes({
           </button>
           <button
             type="button"
-            onClick={() => exportarCSVMIPG(radicados)}
+            onClick={() => exportarCSVMIPG(subconjunto)}
             className="flex items-center gap-2 px-3 py-2 rounded-lg text-xs font-bold transition-colors"
             style={{ background: '#EEF4EE', border: '1px solid #D9E2D9', color: '#475569' }}
             onMouseEnter={(e) => { (e.currentTarget as HTMLElement).style.background = '#D9E2D9'; }}
@@ -3436,15 +3534,83 @@ function VistaReportes({
         </div>
       )}
 
+      {/* Sprint 3C — presets de período + dependencia. */}
+      <div className="flex items-center gap-2 flex-wrap mb-5 print:hidden">
+        {(Object.entries(ETIQUETA_PRESET) as [PresetReporte, string][]).map(([id, etiqueta]) => (
+          <button
+            key={id}
+            type="button"
+            aria-pressed={preset === id}
+            onClick={() => setPreset(id)}
+            className="text-xs font-semibold px-3 py-1.5 rounded-full transition-colors"
+            style={preset === id
+              ? { background: '#14532D', color: '#FFFFFF', border: '1px solid #14532D' }
+              : { background: '#FFFFFF', color: '#475569', border: '1px solid #D9E2D9' }}
+          >
+            {etiqueta}
+          </button>
+        ))}
+        <select
+          value={depFiltro}
+          onChange={(e) => setDepFiltro(e.target.value as TenantId | 'TODAS')}
+          aria-label="Filtrar reporte por dependencia"
+          className="select-internal text-xs ml-auto"
+          style={{ maxWidth: 260 }}
+        >
+          <option value="TODAS">Todas las dependencias</option>
+          {(Object.entries(NOMBRES_TENANT) as [TenantId, string][]).map(([id, nombre]) => (
+            <option key={id} value={id}>{nombre}</option>
+          ))}
+        </select>
+      </div>
+
       <div className="grid grid-cols-2 xl:grid-cols-5 gap-4 mb-6">
         {items.map((item) => (
           <div key={item.label} className="rounded-xl p-5 bg-white" style={{ border: '1px solid #D9E2D9', boxShadow: '0 1px 3px rgba(20,83,45,0.06)' }}>
-            <p className={`text-3xl font-black tabular-nums ${item.color}`}>{item.valor}</p>
+            <p className="text-3xl font-black tabular-nums" style={{ color: item.color }}>{item.valor}</p>
             <p className="text-xs mt-2 leading-tight font-medium" style={{ color: '#667085' }}>{item.label}</p>
             {item.desc && <p className="text-[10px] mt-0.5 leading-tight" style={{ color: '#94A3B8' }}>{item.desc}</p>}
           </div>
         ))}
       </div>
+
+      {/* Sprint 3C — corte por dependencia del período. */}
+      {filasDependencia.length > 0 && (
+        <div className="rounded-xl bg-white p-4 mb-6" style={{ border: '1px solid #D9E2D9' }}>
+          <p className="text-[10px] font-bold uppercase tracking-widest mb-3" style={{ color: '#14532D' }}>
+            Por dependencia · {ETIQUETA_PRESET[preset]}
+          </p>
+          <div className="overflow-x-auto">
+            <table className="w-full text-xs">
+              <thead>
+                <tr className="text-left" style={{ color: '#667085' }}>
+                  <th className="py-1.5 pr-3 font-semibold">Dependencia</th>
+                  <th className="py-1.5 px-3 font-semibold text-right">Total</th>
+                  <th className="py-1.5 px-3 font-semibold text-right">Pendientes</th>
+                  <th className="py-1.5 px-3 font-semibold text-right">En trámite</th>
+                  <th className="py-1.5 px-3 font-semibold text-right">Resueltos</th>
+                  <th className="py-1.5 pl-3 font-semibold text-right">Vencidas</th>
+                </tr>
+              </thead>
+              <tbody>
+                {filasDependencia.map((f) => (
+                  <tr key={f.oficina} style={{ borderTop: '1px solid #EEF2EE', color: '#1F2933' }}>
+                    <td className="py-2 pr-3 font-medium">{NOMBRES_TENANT[f.oficina] ?? f.oficina}</td>
+                    <td className="py-2 px-3 text-right font-bold tabular-nums">{f.total}</td>
+                    <td className="py-2 px-3 text-right tabular-nums">{f.pendientes}</td>
+                    <td className="py-2 px-3 text-right tabular-nums">{f.enTramite}</td>
+                    <td className="py-2 px-3 text-right tabular-nums">{f.resueltos}</td>
+                    <td className="py-2 pl-3 text-right tabular-nums font-bold"
+                        style={{ color: f.vencidas > 0 ? '#DC2626' : '#94A3B8' }}>
+                      {f.vencidas}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      )}
 
       {pctCumplimiento === null && (
         <div className="rounded-lg px-4 py-3 mb-4" style={{ background: '#FFFBEB', border: '1px solid #FDE68A' }}>
@@ -3456,9 +3622,10 @@ function VistaReportes({
         </div>
       )}
 
-      <p className="text-xs" style={{ color: '#94A3B8' }}>
+      <p className="text-xs print:hidden" style={{ color: '#94A3B8' }}>
         Datos en tiempo real · colección <span className="font-mono">ventanilla_radicados</span> ·
-        {' '}{total} documento{total !== 1 ? 's' : ''} visibles para tu rol.
+        {' '}{subconjunto.length} de {total} documento{total !== 1 ? 's' : ''} en el período ·
+        el CSV exporta lo filtrado; el Excel MIPG, el histórico completo.
       </p>
     </div>
   );
@@ -4029,7 +4196,7 @@ function DashboardInterior({ usuario, cerrarSesion }: { usuario: UsuarioAutentic
             onVerRadicado={(r) => abrirRadicadoPorId(r.radicadoId)}
           />
         ) : vistaActual === 'REPORTES' ? (
-          <VistaReportes metricas={metricas} total={todosLosRadicados.length} radicados={todosLosRadicados} />
+          <VistaReportes total={todosLosRadicados.length} radicados={todosLosRadicados} />
         ) : vistaActual === 'BANDEJA' && tienePermisoBandeja ? (
           <BandejaAsignacion
             radicados={radicadosPendientes}
