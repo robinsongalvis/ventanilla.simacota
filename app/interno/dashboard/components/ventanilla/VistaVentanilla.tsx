@@ -49,6 +49,9 @@ export interface VistaVentanillaProps {
   onNuevaRadicacion: () => void;
   onAbrirBusquedaAvanzada: () => void;
   onAbrirRadicado: (radicadoId: string) => void;
+  /** Sprint Radicación de salida — presente solo para roles que
+   *  registran despachos; abre el modal de oficio independiente. */
+  onRegistrarSalida?: () => void;
   /** Referencia temporal inyectable para tests deterministas. */
   ahora?: Date;
 }
@@ -76,6 +79,7 @@ export function VistaVentanilla({
   onNuevaRadicacion,
   onAbrirBusquedaAvanzada,
   onAbrirRadicado,
+  onRegistrarSalida,
   ahora,
 }: VistaVentanillaProps) {
   const [consulta, setConsulta] = useState('');
@@ -127,6 +131,17 @@ export function VistaVentanilla({
             Ventanilla · Atención al ciudadano
           </p>
         </div>
+        <div className="flex items-center gap-2 shrink-0">
+        {onRegistrarSalida && (
+          <button
+            type="button"
+            onClick={onRegistrarSalida}
+            className="inline-flex items-center gap-1.5 text-[13px] font-bold px-4 py-2.5 rounded-[10px] transition-colors hover:bg-[#EEF4EE]"
+            style={{ border: '1px solid #14532D', color: '#14532D', background: 'white' }}
+          >
+            Registrar salida
+          </button>
+        )}
         {puedeRadicar && (
           <button
             type="button"
@@ -140,6 +155,7 @@ export function VistaVentanilla({
             Nueva radicación
           </button>
         )}
+        </div>
       </div>
 
       {/* ── Búsqueda protagonista ── */}

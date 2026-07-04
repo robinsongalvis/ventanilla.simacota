@@ -54,7 +54,9 @@ export type AccionAuditoria =
   /** Sprint Ventanilla Operativa 3 — la funcionaria generó una copia sellada de un documento PDF del radicado. */
   | 'DOCUMENTO_SELLADO'
   /** Sprint Cierre del mostrador — el ciudadano aportó posteriormente datos de contacto que faltaban. */
-  | 'DATOS_COMPLETADOS';
+  | 'DATOS_COMPLETADOS'
+  /** Sprint Radicación de salida — se despachó un oficio de salida amarrado a este radicado. */
+  | 'OFICIO_SALIDA_REGISTRADO';
 
 export interface AuditoriaEntry {
   fecha:    string;
