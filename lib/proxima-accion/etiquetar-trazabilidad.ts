@@ -24,6 +24,7 @@ const LABELS_ULTIMA_ACTUACION: Record<string, string> = {
   NOTIFICACION_GESTIONADA_MANUALMENTE: 'Notificación gestionada manualmente',
   DATOS_NO_APORTADOS_MARCADOS:         'Datos no aportados registrados',
   DATOS_COMPLETADOS:                   'Datos del solicitante completados',
+  OFICIO_SALIDA_REGISTRADO:            'Oficio de salida despachado',
   CONSTANCIA_ENVIADA_CORREO:           'Constancia enviada por correo',
   DOCUMENTO_SELLADO:                   'Documento sellado',
   TRASLADO:                            'Trasladado a otra dependencia',

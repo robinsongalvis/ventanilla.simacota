@@ -299,6 +299,23 @@ service cloud.firestore {
       allow update, delete: if false;
     }
 
+    // ── Sprint Radicación de salida: correspondencia despachada ───────────
+    // Serie propia 2-SAL-{año}. El registro es inmutable: una corrección
+    // se hace con una salida nueva — el libro de salidas nunca se edita.
+    match /ventanilla_salidas/{salidaId} {
+      // Admin, Recepcionista y Control Interno leen el libro completo;
+      // Funcionario y Jefe solo las salidas despachadas por su dependencia.
+      allow get, list: if isAdmin() || isRecepcionista() || isControlInterno()
+        || ((isFuncionario() || isJefeDependencia())
+            && resource.data.dependenciaOrigen == userTenant());
+
+      // Solo recepción/admin registran salidas (ventanilla única de salida).
+      allow create: if (isAdmin() || isRecepcionista())
+        && request.resource.data.salidaId == salidaId;
+
+      allow update, delete: if false;
+    }
+
     // ── Contadores de consecutivo anual ────────────────────────────────────
     match /counters/{document} {
       // Lectura y escritura transaccional para generar el número de radicado.
