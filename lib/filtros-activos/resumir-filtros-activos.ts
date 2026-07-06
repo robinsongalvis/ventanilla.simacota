@@ -23,6 +23,7 @@ export type DimensionFiltro =
   | 'OPERATIVO'
   | 'TENANT'
   | 'DATOS_INCOMPLETOS'
+  | 'SOLO_MIOS'
   | 'BUSQUEDA';
 
 export interface ChipFiltroActivo {
@@ -35,6 +36,8 @@ export interface EstadoFiltros {
   filtroOperativo:     FiltroKpiOperativo;
   tenantFiltro:        TenantId | 'TODOS';
   soloDatosIncompletos: boolean;
+  /** Sprint Cola personal — solo lo asignado al usuario de la sesión. */
+  soloMios:            boolean;
   busqueda:            string;
 }
 
@@ -62,8 +65,8 @@ const LABEL_OPERATIVO: Record<Exclude<FiltroKpiOperativo, 'NINGUNO'>, string> = 
 
 /**
  * Devuelve la lista de chips de filtros activos, en orden estable
- * (MIPG → operativo → tenant → datos incompletos → búsqueda). Vacío si
- * no hay ninguno activo.
+ * (MIPG → operativo → tenant → datos incompletos → solo míos →
+ * búsqueda). Vacío si no hay ninguno activo.
  */
 export function resumirFiltrosActivos(estado: EstadoFiltros): ChipFiltroActivo[] {
   const chips: ChipFiltroActivo[] = [];
@@ -85,6 +88,10 @@ export function resumirFiltrosActivos(estado: EstadoFiltros): ChipFiltroActivo[]
 
   if (estado.soloDatosIncompletos) {
     chips.push({ dimension: 'DATOS_INCOMPLETOS', label: 'Datos incompletos' });
+  }
+
+  if (estado.soloMios) {
+    chips.push({ dimension: 'SOLO_MIOS', label: 'Solo los míos' });
   }
 
   const q = estado.busqueda.trim();
