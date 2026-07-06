@@ -21,9 +21,10 @@
 import type { RolInterno } from '@/lib/hooks/useAuth';
 import type { TenantId } from '@/src/types/radicado';
 import type { VentanillaRadicado } from '@/src/types/ventanilla';
+import type { SalidaOficial } from '@/src/types/salida';
 
 /** Prefijos de Storage aceptados por este endpoint. */
-export const PREFIJOS_PERMITIDOS = ['radicados', 'respuestas'] as const;
+export const PREFIJOS_PERMITIDOS = ['radicados', 'respuestas', 'salidas'] as const;
 export type PrefijoArchivo = typeof PREFIJOS_PERMITIDOS[number];
 
 export interface UsuarioParaDescarga {
@@ -46,6 +47,8 @@ export type MotivoDenegacion =
   | 'SESION_INVALIDA'
   | 'RADICADO_NO_ENCONTRADO'
   | 'ARCHIVO_NO_PERTENECE_AL_RADICADO'
+  | 'SALIDA_NO_ENCONTRADA'
+  | 'ARCHIVO_NO_PERTENECE_A_LA_SALIDA'
   | 'SIN_PERMISO_DE_DEPENDENCIA';
 
 export interface ResultadoAutorizacionDenegada {
@@ -59,9 +62,10 @@ export interface ResultadoAutorizacionDenegada {
 export interface ResultadoAutorizacionConcedida {
   ok:           true;
   prefijo:      PrefijoArchivo;
+  /** Id del documento dueño (radicadoId o salidaId, según el prefijo). */
   radicadoId:   string;
   /** Tipo de archivo concedido — útil para el log de auditoría. */
-  tipoArchivo:  'ADJUNTO_CIUDADANO' | 'RESPUESTA_OFICIAL';
+  tipoArchivo:  'ADJUNTO_CIUDADANO' | 'RESPUESTA_OFICIAL' | 'OFICIO_SALIDA';
 }
 
 export type ResultadoAutorizacion =
@@ -81,10 +85,11 @@ export type ResultadoAutorizacion =
  * Esta expresión es deliberadamente restrictiva: no admite `..`, ni `/`
  * extra, ni caracteres de control.
  */
-const PATH_REGEX = /^(radicados|respuestas)\/[A-Za-z0-9._-]+\/[A-Za-z0-9._\- ]+$/;
+const PATH_REGEX = /^(radicados|respuestas|salidas)\/[A-Za-z0-9._-]+\/[A-Za-z0-9._\- ]+$/;
 
 export interface PathParseado {
   prefijo:    PrefijoArchivo;
+  /** Id del documento dueño: radicadoId para radicados/respuestas, salidaId para salidas. */
   radicadoId: string;
   nombre:     string;
 }
@@ -135,6 +140,9 @@ function pertenece(path: string, radicado: RadicadoParaDescarga, prefijo: Prefij
   if (prefijo === 'radicados') {
     return radicado.adjuntosPaths.includes(path);
   }
+  // Un path de salidas nunca pertenece a un radicado: esa autorización
+  // vive en autorizarDescargaSalida (defensa en profundidad).
+  if (prefijo === 'salidas') return false;
   return radicado.respuestaOficialPath !== null && radicado.respuestaOficialPath === path;
 }
 
@@ -240,5 +248,89 @@ export function aRadicadoParaDescarga(doc: VentanillaRadicado | null): RadicadoP
     tenantId: doc.clasificacion.oficinaDestino,
     adjuntosPaths: adjuntos,
     respuestaOficialPath: typeof respuestaPath === 'string' ? respuestaPath : null,
+  };
+}
+
+/* ══════════════════════════════════════════════════════════════
+   OFICIOS DE SALIDA — Fase B (PDF adjunto)
+
+   El archivo pertenece a una salida 2-SAL, no a un radicado. El
+   permiso es el espejo exacto de las reglas de lectura del libro
+   (firestore.rules → ventanilla_salidas): Admin, Recepción y Control
+   Interno global; funcionario y jefe solo si la salida la despachó su
+   dependencia. Mismas garantías anti-IDOR y de mensaje uniforme.
+══════════════════════════════════════════════════════════════ */
+
+export interface SalidaParaDescarga {
+  /** `dependenciaOrigen` de la salida. */
+  dependenciaOrigen: TenantId;
+  /** Ruta de Storage del oficio despachado (si existe). */
+  archivoPath: string | null;
+}
+
+export function autorizarDescargaSalida(args: {
+  path: string;
+  usuario: UsuarioParaDescarga | null;
+  salida: SalidaParaDescarga | null;
+}): ResultadoAutorizacion {
+  const parsed = parsearPathArchivo(args.path);
+  if (!parsed || parsed.prefijo !== 'salidas') {
+    return {
+      ok: false,
+      status: 400,
+      motivo: 'PATH_INVALIDO',
+      mensaje: 'La ruta del archivo no es válida.',
+    };
+  }
+
+  if (!args.usuario) {
+    return {
+      ok: false,
+      status: 401,
+      motivo: 'SESION_INVALIDA',
+      mensaje: 'Debe iniciar sesión nuevamente.',
+    };
+  }
+
+  // Sin salida o sin pertenencia: respuesta uniforme para no revelar existencia.
+  if (!args.salida
+    || args.salida.archivoPath === null
+    || args.salida.archivoPath !== args.path) {
+    return {
+      ok: false,
+      status: 404,
+      motivo: args.salida ? 'ARCHIVO_NO_PERTENECE_A_LA_SALIDA' : 'SALIDA_NO_ENCONTRADA',
+      mensaje: 'Archivo no encontrado.',
+    };
+  }
+
+  const { rol, tenantId } = args.usuario;
+  const concedido: ResultadoAutorizacionConcedida = {
+    ok: true,
+    prefijo: 'salidas',
+    radicadoId: parsed.radicadoId,
+    tipoArchivo: 'OFICIO_SALIDA',
+  };
+
+  if (ROLES_GLOBALES.has(rol)) return concedido;
+
+  if (ROLES_POR_DEPENDENCIA.has(rol) && args.salida.dependenciaOrigen === tenantId) {
+    return concedido;
+  }
+
+  return {
+    ok: false,
+    status: 403,
+    motivo: 'SIN_PERMISO_DE_DEPENDENCIA',
+    mensaje: 'No tiene permiso para descargar este archivo.',
+  };
+}
+
+/** Datos mínimos para autorizar la descarga desde el doc de `ventanilla_salidas`. */
+export function aSalidaParaDescarga(doc: SalidaOficial | null): SalidaParaDescarga | null {
+  if (!doc) return null;
+  return {
+    dependenciaOrigen: doc.dependenciaOrigen,
+    archivoPath: typeof doc.archivoPath === 'string' ? doc.archivoPath : null,
   };
 }
