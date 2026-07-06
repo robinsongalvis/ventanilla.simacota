@@ -35,12 +35,19 @@ export interface BarraKpisOperativosProps {
   kpis:          KpisOperativos;
   filtroActivo:  FiltroKpiOperativo;
   onChange:      (filtro: FiltroKpiOperativo) => void;
+  /** Sprint Cola personal — activos asignados al usuario de la sesión. */
+  misAsignados?:     number;
+  soloMios?:         boolean;
+  onToggleSoloMios?: () => void;
 }
 
 export function BarraKpisOperativos({
   kpis,
   filtroActivo,
   onChange,
+  misAsignados = 0,
+  soloMios = false,
+  onToggleSoloMios,
 }: BarraKpisOperativosProps) {
   const pastillas: PastillaConfig[] = [
     { id: 'HOY',            label: 'Hoy',              valor: kpis.hoy,            tono: 'neutral',
@@ -98,6 +105,28 @@ export function BarraKpisOperativos({
             </button>
           );
         })}
+
+        {/* Sprint Cola personal — filtro de identidad, no un KPI: recorta
+            la bandeja a lo asignado al usuario. Va al final, separado. */}
+        {onToggleSoloMios && (
+          <button
+            type="button"
+            onClick={onToggleSoloMios}
+            className="shrink-0 ml-auto flex items-center gap-1.5 px-2.5 py-1 rounded-full border text-[10px] font-semibold uppercase tracking-wide transition-all"
+            style={soloMios
+              ? { background: '#14532D', color: '#FFFFFF', borderColor: '#14532D' }
+              : { background: 'white', color: '#14532D', borderColor: '#97C459' }}
+            aria-pressed={soloMios}
+            aria-label={`Solo los míos (${misAsignados} activos)`}
+            title="Muestra solo los radicados asignados a ti; combinable con los demás filtros."
+          >
+            <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.2}>
+              <path strokeLinecap="round" strokeLinejoin="round" d="M15.75 6a3.75 3.75 0 11-7.5 0 3.75 3.75 0 017.5 0zM4.501 20.118a7.5 7.5 0 0114.998 0A17.933 17.933 0 0112 21.75c-2.676 0-5.216-.584-7.499-1.632z" />
+            </svg>
+            <span className="tabular-nums font-bold">{misAsignados}</span>
+            <span>Solo los míos</span>
+          </button>
+        )}
       </div>
     </div>
   );

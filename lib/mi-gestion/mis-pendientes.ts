@@ -74,5 +74,8 @@ export function misPendientes(
   conTermino.sort((a, b) => a.orden - b.orden);
   sinTermino.sort((a, b) => a.orden - b.orden);
 
-  return [...conTermino, ...sinTermino].map(({ orden: _orden, ...p }) => p);
+  return [...conTermino, ...sinTermino].map(
+    ({ radicadoId, estado, asunto, diasRestantes, etiqueta, nivel }) =>
+      ({ radicadoId, estado, asunto, diasRestantes, etiqueta, nivel }),
+  );
 }

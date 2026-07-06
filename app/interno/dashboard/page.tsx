@@ -4305,11 +4305,25 @@ function DashboardInterior({ usuario, cerrarSesion }: { usuario: UsuarioAutentic
   const kpisOperativos = useMemo(() => calcularKpisOperativos(todosLosRadicados), [todosLosRadicados]);
   const [filtroOperativo, setFiltroOperativo] = useState<FiltroKpiOperativo>('NINGUNO');
 
+  // Sprint Cola personal — "Solo los míos": filtro de identidad efímero,
+  // combinable con las demás dimensiones.
+  const [soloMios, setSoloMios] = useState(false);
+  const misActivos = useMemo(
+    () => todosLosRadicados.filter(
+      (r) => r.clasificacion?.funcionarioResponsableUid === usuario.uid
+        && r.estadoActual !== 'RESUELTO' && r.estadoActual !== 'RECHAZADO',
+    ).length,
+    [todosLosRadicados, usuario.uid],
+  );
+
   const radicadosFiltrados = useMemo(() => {
     const conMipg = aplicarFiltroMIPG(todosLosRadicados, filtroMIPG, busqueda);
     const conOp   = filtrarPorKpiOperativo(conMipg, filtroOperativo);
-    return soloDatosIncompletos ? filtrarSoloDatosIncompletos(conOp) : conOp;
-  }, [todosLosRadicados, filtroMIPG, busqueda, filtroOperativo, soloDatosIncompletos]);
+    const conMios = soloMios
+      ? conOp.filter((r) => r.clasificacion?.funcionarioResponsableUid === usuario.uid)
+      : conOp;
+    return soloDatosIncompletos ? filtrarSoloDatosIncompletos(conMios) : conMios;
+  }, [todosLosRadicados, filtroMIPG, busqueda, filtroOperativo, soloMios, usuario.uid, soloDatosIncompletos]);
 
   // Panel Op Nivel 3A — estado combinado de las 5 dimensiones de filtro
   // para la barra de filtros activos. Reúne store + estado local.
@@ -4318,6 +4332,7 @@ function DashboardInterior({ usuario, cerrarSesion }: { usuario: UsuarioAutentic
     filtroOperativo,
     tenantFiltro,
     soloDatosIncompletos,
+    soloMios,
     busqueda,
   };
 
@@ -4327,6 +4342,7 @@ function DashboardInterior({ usuario, cerrarSesion }: { usuario: UsuarioAutentic
       case 'OPERATIVO':         setFiltroOperativo('NINGUNO'); break;
       case 'TENANT':            dispatch({ type: 'SET_TENANT_FILTRO', tenant: 'TODOS' }); break;
       case 'DATOS_INCOMPLETOS': setSoloDatosIncompletos(false); break;
+      case 'SOLO_MIOS':         setSoloMios(false); break;
       case 'BUSQUEDA':          dispatch({ type: 'SET_BUSQUEDA', busqueda: '' }); break;
     }
   }
@@ -4337,6 +4353,7 @@ function DashboardInterior({ usuario, cerrarSesion }: { usuario: UsuarioAutentic
     dispatch({ type: 'SET_BUSQUEDA', busqueda: '' });
     setFiltroOperativo('NINGUNO');
     setSoloDatosIncompletos(false);
+    setSoloMios(false);
   }
 
   const radicadosPendientes = useMemo(
@@ -4561,6 +4578,9 @@ function DashboardInterior({ usuario, cerrarSesion }: { usuario: UsuarioAutentic
               kpis={kpisOperativos}
               filtroActivo={filtroOperativo}
               onChange={setFiltroOperativo}
+              misAsignados={misActivos}
+              soloMios={soloMios}
+              onToggleSoloMios={() => setSoloMios((v) => !v)}
             />
 
             {/* Panel Op Nivel 3A — barra de filtros activos (solo si hay). */}

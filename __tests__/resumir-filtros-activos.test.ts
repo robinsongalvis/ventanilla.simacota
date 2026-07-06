@@ -18,6 +18,7 @@ const SIN_FILTROS: EstadoFiltros = {
   filtroOperativo:      'NINGUNO',
   tenantFiltro:         'TODOS',
   soloDatosIncompletos: false,
+  soloMios:             false,
   busqueda:             '',
 };
 
@@ -68,17 +69,24 @@ describe('Panel Op Nivel 3A — resumirFiltrosActivos', () => {
     expect(resumirFiltrosActivos({ ...SIN_FILTROS, busqueda: '   ' })).toEqual([]);
   });
 
-  /* 6 — orden estable: MIPG → operativo → tenant → datos → búsqueda */
+  /* 6 — orden estable: MIPG → operativo → tenant → datos → míos → búsqueda */
   it('mantiene orden estable con todas las dimensiones activas', () => {
     const chips = resumirFiltrosActivos({
       filtroMIPG:           'POR_VENCER',
       filtroOperativo:      'SIN_ASIGNAR',
       tenantFiltro:         'SEC_PLANEACION',
       soloDatosIncompletos: true,
+      soloMios:             true,
       busqueda:             'perez',
     });
     expect(chips.map((c) => c.dimension)).toEqual([
-      'MIPG', 'OPERATIVO', 'TENANT', 'DATOS_INCOMPLETOS', 'BUSQUEDA',
+      'MIPG', 'OPERATIVO', 'TENANT', 'DATOS_INCOMPLETOS', 'SOLO_MIOS', 'BUSQUEDA',
     ]);
+  });
+
+  /* 7 — Sprint Cola personal: el chip "Solo los míos" */
+  it('incluye el chip Solo los míos cuando está activo', () => {
+    const chips = resumirFiltrosActivos({ ...SIN_FILTROS, soloMios: true });
+    expect(chips).toEqual([{ dimension: 'SOLO_MIOS', label: 'Solo los míos' }]);
   });
 });

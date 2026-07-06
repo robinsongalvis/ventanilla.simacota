@@ -14,6 +14,7 @@ const SIN_FILTROS: EstadoFiltros = {
   filtroOperativo:      'NINGUNO',
   tenantFiltro:         'TODOS',
   soloDatosIncompletos: false,
+  soloMios:             false,
   busqueda:             '',
 };
 
