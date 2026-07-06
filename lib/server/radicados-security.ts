@@ -72,7 +72,7 @@ export function buildResponsableMetadata(responsable?: ResponsableFuncionario | 
   };
 }
 
-function sanitizeFilename(filename: string): string {
+export function sanitizeFilename(filename: string): string {
   return filename
     .normalize('NFD')
     .replace(/[\u0300-\u036f]/g, '')
