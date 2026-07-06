@@ -8,6 +8,7 @@ import {
   type EntradaSalida,
 } from '@/lib/salidas/construir-salida';
 import type { TrazabilidadRadicado } from '@/src/types/ventanilla';
+import type { SalidaOficial } from '@/src/types/salida';
 
 /**
  * Sprint Radicación de salida — registrar un despacho.
@@ -30,7 +31,7 @@ export class SalidaValidacionError extends Error {
 export async function registrarSalida(
   datos: EntradaSalida,
   actor: { uid: string; nombre: string },
-): Promise<{ salidaId: string; consecutivo: number }> {
+): Promise<{ salidaId: string; consecutivo: number; salida: SalidaOficial }> {
   const error = validarSalida(datos);
   if (error) throw new SalidaValidacionError(error);
 
@@ -60,5 +61,6 @@ export async function registrarSalida(
     );
   }
 
-  return { salidaId, consecutivo };
+  // El documento completo alimenta la constancia de despacho (Fase B).
+  return { salidaId, consecutivo, salida };
 }

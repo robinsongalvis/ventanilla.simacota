@@ -51,11 +51,28 @@ describe('Radicación de salida — RegistrarSalidaModal', () => {
     vi.mocked(registrarSalida).mockResolvedValue({
       salidaId: '2-SAL-2026-00000012',
       consecutivo: 12,
+      salida: {
+        salidaId:      '2-SAL-2026-00000012',
+        consecutivo:   12,
+        fechaSalida:   '2026-07-01T14:30:00.000Z',
+        tipoSalida:    'RESPUESTA',
+        radicadoEntradaId: '1-WEB-2026-00000045',
+        destinatario:  { nombre: 'María Rincón', entidad: null, email: null, direccion: null },
+        asunto:        'Respuesta al radicado 1-WEB-2026-00000045',
+        dependenciaOrigen: 'SEC_HACIENDA',
+        firmante:      { uid: 'uid-laura', nombre: 'Laura' },
+        medioEnvio:    'CORREO',
+        registradoPor: { uid: 'uid-laura', nombre: 'Laura' },
+        archivoPath:   null,
+      },
     });
     render(<RegistrarSalidaModal usuario={USUARIO} entrada={ENTRADA} onCerrar={vi.fn()} />);
     fireEvent.click(screen.getByRole('button', { name: /^Registrar salida$/i }));
 
-    await waitFor(() => expect(screen.getByText('2-SAL-2026-00000012')).toBeTruthy());
+    // El número sale dos veces: grande en el encabezado y dentro del
+    // sello de la constancia de despacho (Fase B).
+    await waitFor(() =>
+      expect(screen.getAllByText('2-SAL-2026-00000012').length).toBeGreaterThanOrEqual(1));
     expect(vi.mocked(registrarSalida)).toHaveBeenCalledWith(
       expect.objectContaining({
         tipoSalida:        'RESPUESTA',

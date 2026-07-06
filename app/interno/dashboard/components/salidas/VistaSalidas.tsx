@@ -4,6 +4,7 @@ import { useMemo, useState } from 'react';
 import { NOMBRES_TENANT } from '@/src/types/reglas-negocio';
 import type { SalidaOficial } from '@/src/types/salida';
 import { formatFechaCortaColombia } from '@/lib/fecha-colombia';
+import { SelloDespacho } from './SelloDespacho';
 
 /* ══════════════════════════════════════════════════════════════
    Sprint Radicación de salida — libro de correspondencia despachada.
@@ -43,6 +44,8 @@ export function VistaSalidas({
   onNuevaSalida,
 }: VistaSalidasProps) {
   const [busqueda, setBusqueda] = useState('');
+  // Fase B — constancia de despacho reimprimible desde el libro.
+  const [constanciaDe, setConstanciaDe] = useState<SalidaOficial | null>(null);
 
   const visibles = useMemo(() => {
     const q = normalizar(busqueda.trim());
@@ -137,6 +140,15 @@ export function VistaSalidas({
                   Despacha: {NOMBRES_TENANT[s.dependenciaOrigen] ?? s.dependenciaOrigen} · Firma: {s.firmante.nombre}
                 </p>
               </div>
+              <button
+                type="button"
+                onClick={() => setConstanciaDe(s)}
+                aria-label={`Imprimir constancia de despacho de ${s.salidaId}`}
+                className="text-[11.5px] font-semibold shrink-0 px-2.5 py-1 rounded-lg"
+                style={{ border: '1px solid #D9E2D9', color: '#475569', background: 'white' }}
+              >
+                Constancia
+              </button>
               {s.radicadoEntradaId && (
                 <button
                   type="button"
@@ -160,6 +172,46 @@ export function VistaSalidas({
         {visibles.length} salida{visibles.length !== 1 ? 's' : ''} · el libro es inmutable:
         una corrección se registra como salida nueva.
       </p>
+
+      {/* Fase B — modal ligero de la constancia de despacho. */}
+      {constanciaDe && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center px-3 py-3"
+          role="dialog"
+          aria-modal="true"
+          aria-label={`Constancia de despacho de ${constanciaDe.salidaId}`}
+        >
+          {/* Velo sólido — sin blur (lección de rendimiento). */}
+          <button
+            type="button"
+            aria-label="Cerrar"
+            onClick={() => setConstanciaDe(null)}
+            className="absolute inset-0 bg-black/55"
+          />
+          <div
+            className="relative w-full max-w-lg bg-white rounded-2xl shadow-2xl overflow-y-auto flex flex-col items-center gap-4 px-6 py-6"
+            style={{ border: '1px solid #D9E2D9', maxHeight: 'calc(100dvh - 24px)' }}
+          >
+            <div className="text-center">
+              <p className="text-[10px] font-bold uppercase tracking-[0.12em]" style={{ color: '#8A6A12' }}>
+                Constancia de despacho
+              </p>
+              <p className="text-lg font-black font-mono" style={{ color: VERDE_INST }}>
+                {constanciaDe.salidaId}
+              </p>
+            </div>
+            <SelloDespacho salida={constanciaDe} />
+            <button
+              type="button"
+              onClick={() => setConstanciaDe(null)}
+              className="px-5 py-2 rounded-xl text-sm font-bold"
+              style={{ border: '1px solid #D9E2D9', color: '#475569' }}
+            >
+              Cerrar
+            </button>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
