@@ -28,9 +28,11 @@ export type EventoDescarga =
 
 export interface RegistroDescargaParams {
   evento:        EventoDescarga;
+  /** Id del documento dueño: radicadoId o salidaId (oficios 2-SAL). */
   radicadoId:    string;
+  /** Valor del `tipoArchivo` que concedió la autorización (o null si se denegó). */
+  tipoArchivo:   string | null;
   archivoNombre: string;
-  tipoArchivo:   'adjunto' | 'respuestaOficial' | null;
   motivo?:       string;
   actorUid:      string;
   actorNombre:   string;

@@ -140,6 +140,24 @@ export function VistaSalidas({
                   Despacha: {NOMBRES_TENANT[s.dependenciaOrigen] ?? s.dependenciaOrigen} · Firma: {s.firmante.nombre}
                 </p>
               </div>
+              {/* Fase B — el oficio despachado, servido por la descarga
+                  segura (H-01): URL firmada corta tras autorización. */}
+              {s.archivoPath && (
+                <a
+                  href={`/api/interno/archivo?path=${encodeURIComponent(s.archivoPath)}`}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  aria-label={`Ver oficio despachado de ${s.salidaId}`}
+                  title={s.archivoNombre ?? 'Oficio despachado (PDF)'}
+                  className="inline-flex items-center gap-1 text-[11.5px] font-semibold shrink-0 px-2.5 py-1 rounded-lg"
+                  style={{ border: '1px solid #14532D', color: VERDE_INST, background: 'white' }}
+                >
+                  <svg className="w-3 h-3" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2}>
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M19.5 14.25v-2.625a3.375 3.375 0 00-3.375-3.375h-1.5A1.125 1.125 0 0113.5 7.125v-1.5a3.375 3.375 0 00-3.375-3.375H8.25m6.75 12l-3 3m0 0l-3-3m3 3v-6m-1.5-9H5.625c-.621 0-1.125.504-1.125 1.125v17.25c0 .621.504 1.125 1.125 1.125h12.75c.621 0 1.125-.504 1.125-1.125V11.25a9 9 0 00-9-9z" />
+                  </svg>
+                  Ver oficio
+                </a>
+              )}
               <button
                 type="button"
                 onClick={() => setConstanciaDe(s)}
