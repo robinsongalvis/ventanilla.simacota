@@ -3,8 +3,9 @@
 import { useState } from 'react';
 import type { TenantId } from '@/src/types/radicado';
 import { NOMBRES_TENANT } from '@/src/types/reglas-negocio';
-import type { MedioEnvioSalida } from '@/src/types/salida';
+import type { MedioEnvioSalida, SalidaOficial } from '@/src/types/salida';
 import { registrarSalida } from '@/lib/actions/registrarSalida';
+import { SelloDespacho } from './SelloDespacho';
 
 /* ══════════════════════════════════════════════════════════════
    Sprint Radicación de salida — modal de registro de despacho.
@@ -59,14 +60,14 @@ export function RegistrarSalidaModal({ usuario, entrada, onCerrar }: RegistrarSa
 
   const [guardando, setGuardando] = useState(false);
   const [errorLocal, setErrorLocal] = useState<string | null>(null);
-  const [salidaGenerada, setSalidaGenerada] = useState<string | null>(null);
+  const [salidaGenerada, setSalidaGenerada] = useState<SalidaOficial | null>(null);
 
   async function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
     setGuardando(true);
     setErrorLocal(null);
     try {
-      const { salidaId } = await registrarSalida(
+      const { salida } = await registrarSalida(
         {
           tipoSalida:        esRespuesta ? 'RESPUESTA' : 'OFICIO_INDEPENDIENTE',
           radicadoEntradaId: entrada?.radicadoId ?? null,
@@ -83,7 +84,7 @@ export function RegistrarSalidaModal({ usuario, entrada, onCerrar }: RegistrarSa
         },
         { uid: usuario.uid, nombre: usuario.nombre },
       );
-      setSalidaGenerada(salidaId);
+      setSalidaGenerada(salida);
     } catch (err) {
       setErrorLocal(err instanceof Error ? err.message : 'No fue posible registrar la salida.');
     } finally {
@@ -128,12 +129,12 @@ export function RegistrarSalidaModal({ usuario, entrada, onCerrar }: RegistrarSa
         </header>
 
         {salidaGenerada ? (
-          <div className="flex flex-col items-center gap-4 px-6 py-10 text-center">
+          <div className="flex-1 min-h-0 overflow-y-auto flex flex-col items-center gap-4 px-6 py-6 text-center">
             <p className="text-xs font-bold uppercase tracking-widest" style={{ color: '#16A34A' }}>
               Salida registrada
             </p>
             <p className="text-2xl font-black font-mono" style={{ color: VERDE_INST }}>
-              {salidaGenerada}
+              {salidaGenerada.salidaId}
             </p>
             <p className="text-xs max-w-sm" style={{ color: '#667085' }}>
               Escriba este número en el oficio que se despacha
@@ -141,6 +142,10 @@ export function RegistrarSalidaModal({ usuario, entrada, onCerrar }: RegistrarSa
                 ? ` junto a la referencia del radicado ${entrada.radicadoId}. El despacho ya quedó en la trazabilidad.`
                 : '. El despacho quedó registrado en el libro de salidas.'}
             </p>
+
+            {/* Fase B — la copia del archivo se sella aquí mismo. */}
+            <SelloDespacho salida={salidaGenerada} />
+
             <button
               type="button"
               onClick={onCerrar}

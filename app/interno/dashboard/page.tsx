@@ -34,6 +34,8 @@ import { RegistrarSalidaModal, type EntradaAmarre } from '@/app/interno/dashboar
 import { VistaSalidas }                    from '@/app/interno/dashboard/components/salidas/VistaSalidas';
 import { VistaMiGestion }                  from '@/app/interno/dashboard/components/mi-gestion/VistaMiGestion';
 import { useSalidas }                      from '@/lib/hooks/useSalidas';
+import { filtrarSalidasPorPreset, resumenSalidas } from '@/lib/salidas/reporte-salidas';
+import type { SalidaOficial }              from '@/src/types/salida';
 import { BusquedaAvanzadaPanel }           from '@/app/interno/dashboard/components/BusquedaAvanzadaPanel';
 import { VistaVentanilla }                 from '@/app/interno/dashboard/components/ventanilla/VistaVentanilla';
 import { useIndicadoresModo }              from '@/lib/hooks/useIndicadoresModo';
@@ -1782,6 +1784,10 @@ function PanelDerecho({
   const [tab,              setTab]              = useState<TabPanelId>('info');
   // Sprint Radicación de salida — registrar despacho amarrado a esta entrada.
   const [salidaDetalleAbierta, setSalidaDetalleAbierta] = useState(false);
+  // Fase B — tras resolver, ofrecer registrar la salida 2-SAL de una vez.
+  const [ofrecerDespacho, setOfrecerDespacho] = useState(false);
+  const puedeDespachar = !soloLectura
+    && (usuario.rol === 'ADMIN' || usuario.rol === 'RECEPCIONISTA');
   // Sprint Cierre del mostrador — constancia reimprimible desde el detalle.
   const [mostrarConstancia, setMostrarConstancia] = useState(false);
   const [estadoConstancia,  setEstadoConstancia]  = useState<'idle' | 'enviando' | 'enviado' | 'error'>('idle');
@@ -2092,6 +2098,8 @@ function PanelDerecho({
       setMensajeOk('Operación guardada correctamente.');
       setRespuesta('');
       setArchivoPdf(null);
+      // Fase B — el ciclo cierra aquí mismo: resolver y despachar.
+      if (puedeDespachar) setOfrecerDespacho(true);
     } catch (error) {
       setErrorLocal(`Error al guardar: ${error instanceof Error ? error.message : String(error)}`);
     } finally {
@@ -2261,6 +2269,19 @@ function PanelDerecho({
                ? { background: '#F0FDF4', border: '1px solid #BBF7D0', color: '#166534' }
                : { background: '#FEF2F2', border: '1px solid #FECACA', color: '#DC2626' }}>
           {mensajeOk ?? errorLocal}
+          {/* Fase B — despacho al resolver: la respuesta que sale recibe
+              su 2-SAL sin cambiar de pantalla. Solo roles que por reglas
+              pueden crear salidas. */}
+          {mensajeOk && ofrecerDespacho && (
+            <button
+              type="button"
+              onClick={() => { setSalidaDetalleAbierta(true); setOfrecerDespacho(false); }}
+              className="block mt-1.5 text-xs font-bold underline underline-offset-2"
+              style={{ color: '#14532D' }}
+            >
+              Registrar la salida 2-SAL de esta respuesta ahora
+            </button>
+          )}
         </div>
       )}
 
@@ -2350,21 +2371,6 @@ function PanelDerecho({
                 </div>
               </div>
             )}
-            {salidaDetalleAbierta && (
-              <RegistrarSalidaModal
-                usuario={usuario}
-                entrada={{
-                  radicadoId: radicado.radicadoId,
-                  // Identidad reservada/anónima: no se prellena el nombre.
-                  solicitanteNombre: (radicado.esAnonimo || radicado.identidadReservada)
-                    ? undefined
-                    : radicado.solicitante.nombreCompleto,
-                  dependencia: radicado.clasificacion.oficinaDestino,
-                }}
-                onCerrar={() => setSalidaDetalleAbierta(false)}
-              />
-            )}
-
             <div className="rounded-xl bg-white p-4" style={{ border: '1px solid #D9E2D9' }}>
               <p className="text-[10px] font-bold uppercase tracking-widest mb-3" style={{ color: '#14532D' }}>Solicitante</p>
               <div className="grid grid-cols-2 gap-x-4 gap-y-3">
@@ -2997,6 +3003,23 @@ function PanelDerecho({
           />
         )}
       </div>
+
+      {/* Sprint Radicación de salida — a nivel del panel (no de un tab)
+          para poder abrirlo también desde el despacho al resolver. */}
+      {salidaDetalleAbierta && (
+        <RegistrarSalidaModal
+          usuario={usuario}
+          entrada={{
+            radicadoId: radicado.radicadoId,
+            // Identidad reservada/anónima: no se prellena el nombre.
+            solicitanteNombre: (radicado.esAnonimo || radicado.identidadReservada)
+              ? undefined
+              : radicado.solicitante.nombreCompleto,
+            dependencia: radicado.clasificacion.oficinaDestino,
+          }}
+          onCerrar={() => setSalidaDetalleAbierta(false)}
+        />
+      )}
     </div>
   );
 }
@@ -3522,12 +3545,22 @@ const PRINT_STYLES_REPORTE = `
 }
 `;
 
+const MEDIO_SALIDA_LABEL: Record<string, string> = {
+  CORREO:     'Correo electrónico',
+  FISICO:     'Correo físico',
+  MENSAJERO:  'Mensajero',
+  PRESENCIAL: 'Entrega presencial',
+};
+
 function VistaReportes({
   total,
   radicados,
+  salidas,
 }: {
   total:     number;
   radicados: VentanillaRadicado[];
+  /** Fase B — libro de salidas; null = el rol no lee el libro completo. */
+  salidas:   SalidaOficial[] | null;
 }) {
   const [descargandoExcel, setDescargandoExcel] = useState(false);
   const [errorExcel, setErrorExcel] = useState<string | null>(null);
@@ -3551,6 +3584,11 @@ function VistaReportes({
   const ind = useMemo(() => indicadoresDeReporte(subconjunto), [subconjunto]);
   const filasDependencia = useMemo(() => resumenPorDependencia(subconjunto), [subconjunto]);
   const pctCumplimiento = ind.pctCumplimiento;
+  /* Fase B — la serie 2-SAL del mismo período y dependencia. */
+  const resumenSal = useMemo(
+    () => (salidas ? resumenSalidas(filtrarSalidasPorPreset(salidas, preset, depFiltro)) : null),
+    [salidas, preset, depFiltro],
+  );
 
   /* Sprint 3C — imprimir o "Guardar como PDF" del navegador. Se
      desactiva la hoja de estilos del comprobante durante la impresión
@@ -3741,6 +3779,49 @@ function VistaReportes({
               </tbody>
             </table>
           </div>
+        </div>
+      )}
+
+      {/* Fase B — lo que la administración despachó en el mismo período. */}
+      {resumenSal && (
+        <div className="rounded-xl bg-white p-4 mb-6" style={{ border: '1px solid #D9E2D9' }}>
+          <p className="text-[10px] font-bold uppercase tracking-widest mb-3" style={{ color: '#8A6A12' }}>
+            Correspondencia de salida · {ETIQUETA_PRESET[preset]}
+          </p>
+          {resumenSal.total === 0 ? (
+            <p className="text-xs" style={{ color: '#7A8B7F' }}>
+              Sin salidas 2-SAL registradas en el período
+              {depFiltro !== 'TODAS' ? ' para esta dependencia' : ''}.
+            </p>
+          ) : (
+            <div className="flex items-center gap-6 flex-wrap">
+              <div>
+                <p className="text-3xl font-black tabular-nums" style={{ color: '#12261A' }}>{resumenSal.total}</p>
+                <p className="text-xs mt-1 font-medium" style={{ color: '#667085' }}>Salidas despachadas</p>
+              </div>
+              <div>
+                <p className="text-3xl font-black tabular-nums" style={{ color: '#185FA5' }}>{resumenSal.respuestas}</p>
+                <p className="text-xs mt-1 font-medium" style={{ color: '#667085' }}>Respuestas a radicados</p>
+              </div>
+              <div>
+                <p className="text-3xl font-black tabular-nums" style={{ color: '#3A4551' }}>{resumenSal.oficios}</p>
+                <p className="text-xs mt-1 font-medium" style={{ color: '#667085' }}>Oficios independientes</p>
+              </div>
+              {resumenSal.porMedio.length > 0 && (
+                <div className="flex items-center gap-1.5 flex-wrap ml-auto">
+                  {resumenSal.porMedio.map((m) => (
+                    <span
+                      key={m.medio}
+                      className="text-[10.5px] font-semibold px-2 py-0.5 rounded-full"
+                      style={{ background: '#EEF4EE', border: '1px solid #D9E2D9', color: '#475569' }}
+                    >
+                      {MEDIO_SALIDA_LABEL[m.medio] ?? m.medio}: {m.cantidad}
+                    </span>
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
         </div>
       )}
 
@@ -4118,7 +4199,14 @@ function DashboardInterior({ usuario, cerrarSesion }: { usuario: UsuarioAutentic
   const [busquedaAvanzadaAbierta, setBusquedaAvanzadaAbierta] = useState(false);
   // Sprint Radicación de salida — modal (null = cerrado; entrada = amarre).
   const [salidaModal, setSalidaModal] = useState<{ entrada: EntradaAmarre | null } | null>(null);
-  const salidasLibro = useSalidas(vistaActual === 'SALIDAS');
+  // Fase B — el libro completo lo leen los mismos roles de la vista
+  // Salidas; el hook sin recorte por tenant solo se activa para ellos.
+  const puedeVerLibroSalidas = usuario.rol === 'ADMIN'
+    || usuario.rol === 'RECEPCIONISTA' || usuario.rol === 'CONTROL_INTERNO';
+  const salidasLibro = useSalidas(
+    vistaActual === 'SALIDAS'
+    || (vistaActual === 'REPORTES' && puedeVerLibroSalidas),
+  );
   // Sprint Registro exprés — modal para roles operativos.
   const [registroExpresAbierto, setRegistroExpresAbierto] = useState(false);
   const puedeRegistroExpres = usuario.rol !== 'CONTROL_INTERNO';
@@ -4336,7 +4424,11 @@ function DashboardInterior({ usuario, cerrarSesion }: { usuario: UsuarioAutentic
             onVerRadicado={(r) => abrirRadicadoPorId(r.radicadoId)}
           />
         ) : vistaActual === 'REPORTES' ? (
-          <VistaReportes total={todosLosRadicados.length} radicados={todosLosRadicados} />
+          <VistaReportes
+            total={todosLosRadicados.length}
+            radicados={todosLosRadicados}
+            salidas={puedeVerLibroSalidas ? salidasLibro.salidas : null}
+          />
         ) : vistaActual === 'SALIDAS' ? (
           /* Sprint Radicación de salida — libro de correspondencia despachada. */
           <VistaSalidas
