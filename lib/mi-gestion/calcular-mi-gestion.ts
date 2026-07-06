@@ -66,13 +66,13 @@ function etiquetaVencimiento(d: number): { etiqueta: string; nivel: 'ROJO' | 'AM
 }
 
 /** Lunes (YMD Colombia) de la semana que contiene `ymd`. */
-function lunesDe(ymd: string): string {
+export function lunesDe(ymd: string): string {
   const d = new Date(`${ymd}T12:00:00Z`);
   d.setUTCDate(d.getUTCDate() - ((d.getUTCDay() + 6) % 7));
   return d.toISOString().slice(0, 10);
 }
 
-function sumarDiasYmd(ymd: string, dias: number): string {
+export function sumarDiasYmd(ymd: string, dias: number): string {
   const d = new Date(`${ymd}T12:00:00Z`);
   d.setUTCDate(d.getUTCDate() + dias);
   return d.toISOString().slice(0, 10);
