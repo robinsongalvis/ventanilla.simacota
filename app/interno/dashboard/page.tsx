@@ -511,6 +511,7 @@ function SidebarNav({
   onCerrarSesion,
   pendientesBandeja,
   pendientesAlertas,
+  miCarga,
   pendientesNotificacionFallida,
   onVerCorreosFallidos,
   onAbrirResumen,
@@ -525,6 +526,8 @@ function SidebarNav({
   onCerrarSesion: () => void;
   pendientesBandeja: number;
   pendientesAlertas: number;
+  /** Sprint Semana + badge — activos del usuario y su peor nivel de término. */
+  miCarga?: { activos: number; nivel: 'ROJO' | 'AMBAR' | 'NEUTRO' };
   pendientesNotificacionFallida: number;
   onVerCorreosFallidos: () => void;
   onAbrirResumen: () => void;
@@ -708,6 +711,19 @@ function SidebarNav({
               {vista === 'ALERTAS' && pendientesAlertas > 0 && (
                 <span className="shrink-0 min-w-[18px] h-[18px] rounded-full bg-red-600 text-white text-[9px] font-black flex items-center justify-center px-1 animate-pulse">
                   {pendientesAlertas > 99 ? '99+' : pendientesAlertas}
+                </span>
+              )}
+              {/* Sprint Semana + badge — la carga personal, con el color
+                  del peor término: rojo vencidos, ámbar por vencer. */}
+              {vista === 'MI_GESTION' && miCarga && miCarga.activos > 0 && (
+                <span
+                  className={`shrink-0 min-w-[18px] h-[18px] rounded-full text-white text-[9px] font-black flex items-center justify-center px-1${miCarga.nivel === 'ROJO' ? ' animate-pulse' : ''}`}
+                  style={{
+                    background: miCarga.nivel === 'ROJO' ? '#DC2626'
+                      : miCarga.nivel === 'AMBAR' ? '#D97706' : '#166534',
+                  }}
+                >
+                  {miCarga.activos > 99 ? '99+' : miCarga.activos}
                 </span>
               )}
             </button>
@@ -4308,13 +4324,28 @@ function DashboardInterior({ usuario, cerrarSesion }: { usuario: UsuarioAutentic
   // Sprint Cola personal — "Solo los míos": filtro de identidad efímero,
   // combinable con las demás dimensiones.
   const [soloMios, setSoloMios] = useState(false);
-  const misActivos = useMemo(
-    () => todosLosRadicados.filter(
-      (r) => r.clasificacion?.funcionarioResponsableUid === usuario.uid
-        && r.estadoActual !== 'RESUELTO' && r.estadoActual !== 'RECHAZADO',
-    ).length,
-    [todosLosRadicados, usuario.uid],
-  );
+  // Sprint Semana + badge — un solo memo alimenta el chip del Tablero y
+  // el numerito del sidebar: activos míos + el peor nivel de término.
+  const miCarga = useMemo(() => {
+    const ahora = new Date();
+    let activos = 0;
+    let vencidos = 0;
+    let porVencer = 0;
+    for (const r of todosLosRadicados) {
+      if (r.clasificacion?.funcionarioResponsableUid !== usuario.uid) continue;
+      if (r.estadoActual === 'RESUELTO' || r.estadoActual === 'RECHAZADO') continue;
+      activos += 1;
+      if (r.termino?.fechaVencimiento) {
+        const d = diasRestantesHabiles(r.termino.fechaVencimiento, ahora);
+        if (d < 0) vencidos += 1;
+        else if (d <= 2) porVencer += 1;
+      }
+    }
+    const nivel: 'ROJO' | 'AMBAR' | 'NEUTRO' =
+      vencidos > 0 ? 'ROJO' : porVencer > 0 ? 'AMBAR' : 'NEUTRO';
+    return { activos, nivel };
+  }, [todosLosRadicados, usuario.uid]);
+  const misActivos = miCarga.activos;
 
   const radicadosFiltrados = useMemo(() => {
     const conMipg = aplicarFiltroMIPG(todosLosRadicados, filtroMIPG, busqueda);
@@ -4410,6 +4441,7 @@ function DashboardInterior({ usuario, cerrarSesion }: { usuario: UsuarioAutentic
         onCerrarSesion={cerrarSesion}
         pendientesBandeja={radicadosPendientes.length}
         pendientesAlertas={pendientesAlertas}
+        miCarga={miCarga}
         pendientesNotificacionFallida={pendientesNotificacionFallida}
         onVerCorreosFallidos={verCorreosFallidos}
         onAbrirResumen={reabrirResumen}
@@ -4720,6 +4752,7 @@ function DashboardInterior({ usuario, cerrarSesion }: { usuario: UsuarioAutentic
             onCerrarSesion={cerrarSesion}
             pendientesBandeja={radicadosPendientes.length}
             pendientesAlertas={pendientesAlertas}
+            miCarga={miCarga}
             pendientesNotificacionFallida={pendientesNotificacionFallida}
             onVerCorreosFallidos={verCorreosFallidos}
             onAbrirResumen={reabrirResumen}
