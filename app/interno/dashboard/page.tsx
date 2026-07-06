@@ -1771,6 +1771,10 @@ function PanelDerecho({
   const [tab,              setTab]              = useState<TabPanelId>('info');
   // Sprint Radicación de salida — registrar despacho amarrado a esta entrada.
   const [salidaDetalleAbierta, setSalidaDetalleAbierta] = useState(false);
+  // Fase B — tras resolver, ofrecer registrar la salida 2-SAL de una vez.
+  const [ofrecerDespacho, setOfrecerDespacho] = useState(false);
+  const puedeDespachar = !soloLectura
+    && (usuario.rol === 'ADMIN' || usuario.rol === 'RECEPCIONISTA');
   // Sprint Cierre del mostrador — constancia reimprimible desde el detalle.
   const [mostrarConstancia, setMostrarConstancia] = useState(false);
   const [estadoConstancia,  setEstadoConstancia]  = useState<'idle' | 'enviando' | 'enviado' | 'error'>('idle');
@@ -2081,6 +2085,8 @@ function PanelDerecho({
       setMensajeOk('Operación guardada correctamente.');
       setRespuesta('');
       setArchivoPdf(null);
+      // Fase B — el ciclo cierra aquí mismo: resolver y despachar.
+      if (puedeDespachar) setOfrecerDespacho(true);
     } catch (error) {
       setErrorLocal(`Error al guardar: ${error instanceof Error ? error.message : String(error)}`);
     } finally {
@@ -2250,6 +2256,19 @@ function PanelDerecho({
                ? { background: '#F0FDF4', border: '1px solid #BBF7D0', color: '#166534' }
                : { background: '#FEF2F2', border: '1px solid #FECACA', color: '#DC2626' }}>
           {mensajeOk ?? errorLocal}
+          {/* Fase B — despacho al resolver: la respuesta que sale recibe
+              su 2-SAL sin cambiar de pantalla. Solo roles que por reglas
+              pueden crear salidas. */}
+          {mensajeOk && ofrecerDespacho && (
+            <button
+              type="button"
+              onClick={() => { setSalidaDetalleAbierta(true); setOfrecerDespacho(false); }}
+              className="block mt-1.5 text-xs font-bold underline underline-offset-2"
+              style={{ color: '#14532D' }}
+            >
+              Registrar la salida 2-SAL de esta respuesta ahora
+            </button>
+          )}
         </div>
       )}
 
@@ -2339,21 +2358,6 @@ function PanelDerecho({
                 </div>
               </div>
             )}
-            {salidaDetalleAbierta && (
-              <RegistrarSalidaModal
-                usuario={usuario}
-                entrada={{
-                  radicadoId: radicado.radicadoId,
-                  // Identidad reservada/anónima: no se prellena el nombre.
-                  solicitanteNombre: (radicado.esAnonimo || radicado.identidadReservada)
-                    ? undefined
-                    : radicado.solicitante.nombreCompleto,
-                  dependencia: radicado.clasificacion.oficinaDestino,
-                }}
-                onCerrar={() => setSalidaDetalleAbierta(false)}
-              />
-            )}
-
             <div className="rounded-xl bg-white p-4" style={{ border: '1px solid #D9E2D9' }}>
               <p className="text-[10px] font-bold uppercase tracking-widest mb-3" style={{ color: '#14532D' }}>Solicitante</p>
               <div className="grid grid-cols-2 gap-x-4 gap-y-3">
@@ -2986,6 +2990,23 @@ function PanelDerecho({
           />
         )}
       </div>
+
+      {/* Sprint Radicación de salida — a nivel del panel (no de un tab)
+          para poder abrirlo también desde el despacho al resolver. */}
+      {salidaDetalleAbierta && (
+        <RegistrarSalidaModal
+          usuario={usuario}
+          entrada={{
+            radicadoId: radicado.radicadoId,
+            // Identidad reservada/anónima: no se prellena el nombre.
+            solicitanteNombre: (radicado.esAnonimo || radicado.identidadReservada)
+              ? undefined
+              : radicado.solicitante.nombreCompleto,
+            dependencia: radicado.clasificacion.oficinaDestino,
+          }}
+          onCerrar={() => setSalidaDetalleAbierta(false)}
+        />
+      )}
     </div>
   );
 }
