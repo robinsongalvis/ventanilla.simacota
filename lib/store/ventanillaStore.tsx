@@ -34,6 +34,7 @@ export type VistaActual =
   | 'SALIDAS'      // Radicación de salida — libro de correspondencia despachada
   | 'BANDEJA'
   | 'DEPENDENCIAS'
+  | 'MI_GESTION'   // Dashboard personal de desempeño del funcionario
   | 'REPORTES'
   | 'ANALYTICS'    // Centro de Inteligencia Operativa — Fase 2
   | 'ALERTAS'      // Panel de Alertas Predictivas — Fase 2
