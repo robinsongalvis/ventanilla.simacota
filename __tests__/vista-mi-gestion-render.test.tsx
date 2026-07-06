@@ -74,8 +74,10 @@ describe('Mi gestión — VistaMiGestion', () => {
     });
     render(<VistaMiGestion radicados={[vencido]} usuario={USUARIO} onAbrirRadicado={onAbrir} ahora={AHORA} />);
     expect(screen.getByText('Atrasado')).toBeTruthy();
-    expect(screen.getByText(/venció hace/i)).toBeTruthy();
-    fireEvent.click(screen.getByRole('button', { name: new RegExp(`Abrir radicado ${vencido.radicadoId}`) }));
+    // La etiqueta sale en "Atiende primero" y en la cola de Mis pendientes.
+    expect(screen.getAllByText(/venció hace/i).length).toBeGreaterThanOrEqual(1);
+    const filas = screen.getAllByRole('button', { name: new RegExp(`Abrir radicado ${vencido.radicadoId}`) });
+    fireEvent.click(filas[0]);
     expect(onAbrir).toHaveBeenCalledWith(vencido.radicadoId);
   });
 
@@ -99,5 +101,31 @@ describe('Mi gestión — VistaMiGestion', () => {
     for (const s of ['S-3', 'S-2', 'S-1', 'Esta']) {
       expect(screen.getByText(s)).toBeTruthy();
     }
+  });
+
+  /* 7 · Cola personal: la lista completa con asunto, estado y término */
+  it('lista Mis pendientes con conteo y fila clicable', () => {
+    const onAbrir = vi.fn();
+    const holgado = radicado();
+    const vencido = radicado({
+      termino: { ...radicado().termino, fechaVencimiento: '2026-06-26T09:00:00.000Z' },
+      detalle: { asunto: 'Certificado urgente', descripcion: 'D', numeroFolios: 1 },
+    });
+    render(<VistaMiGestion radicados={[holgado, vencido]} usuario={USUARIO} onAbrirRadicado={onAbrir} ahora={AHORA} />);
+    expect(screen.getByText('Mis pendientes')).toBeTruthy();
+    expect(screen.getByText('2 radicados')).toBeTruthy();
+    expect(screen.getByText('Certificado urgente')).toBeTruthy();
+    // El vencido va de primero en la cola.
+    const filas = screen.getAllByRole('button', { name: /^Abrir radicado 1-WEB/ });
+    expect(filas[0].getAttribute('aria-label')).toContain(vencido.radicadoId);
+    fireEvent.click(filas[0]);
+    expect(onAbrir).toHaveBeenCalledWith(vencido.radicadoId);
+  });
+
+  /* 8 · Cola personal vacía: bandeja limpia */
+  it('sin pendientes muestra el estado de bandeja limpia', () => {
+    const resuelto = radicado({ estadoActual: 'RESUELTO' });
+    render(<VistaMiGestion radicados={[resuelto]} usuario={USUARIO} onAbrirRadicado={vi.fn()} ahora={AHORA} />);
+    expect(screen.getByText(/bandeja limpia/i)).toBeTruthy();
   });
 });
