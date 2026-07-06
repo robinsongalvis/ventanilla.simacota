@@ -128,4 +128,24 @@ describe('Mi gestión — VistaMiGestion', () => {
     render(<VistaMiGestion radicados={[resuelto]} usuario={USUARIO} onAbrirRadicado={vi.fn()} ahora={AHORA} />);
     expect(screen.getByText(/bandeja limpia/i)).toBeTruthy();
   });
+
+  /* 9 · Tu semana: celdas con hoy marcado y el conteo del día */
+  it('muestra Tu semana con el vencimiento en su día', () => {
+    // AHORA es jueves 2 jul 2026; este radicado vence el viernes 3.
+    const venceViernes = radicado({
+      termino: { ...radicado().termino, fechaVencimiento: '2026-07-03T09:00:00.000Z' },
+    });
+    render(<VistaMiGestion radicados={[venceViernes]} usuario={USUARIO} onAbrirRadicado={vi.fn()} ahora={AHORA} />);
+    expect(screen.getByText('Tu semana')).toBeTruthy();
+    expect(screen.getByText('Jue 2')).toBeTruthy();
+    expect(screen.getByText('Vie 3')).toBeTruthy();
+  });
+
+  /* 10 · Tu semana sin vencimientos: mensaje tranquilo */
+  it('sin vencimientos en la semana dice que nada vence', () => {
+    // Vence el 20 jul — fuera de la semana actual.
+    render(<VistaMiGestion radicados={[radicado()]} usuario={USUARIO} onAbrirRadicado={vi.fn()} ahora={AHORA} />);
+    expect(screen.getByText(/Nada te vence esta semana/i)).toBeTruthy();
+    expect(screen.getByText(/\+1 después de esta semana/)).toBeTruthy();
+  });
 });

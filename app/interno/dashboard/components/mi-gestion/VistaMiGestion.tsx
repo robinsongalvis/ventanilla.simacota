@@ -9,6 +9,7 @@ import {
   type SemaforoGestion,
 } from '@/lib/mi-gestion/calcular-mi-gestion';
 import { misPendientes, type NivelPendiente } from '@/lib/mi-gestion/mis-pendientes';
+import { planDeSemana } from '@/lib/mi-gestion/plan-semana';
 
 /* ══════════════════════════════════════════════════════════════
    Sprint Mi gestión — dashboard personal del funcionario.
@@ -71,6 +72,11 @@ export function VistaMiGestion({ radicados, usuario, onAbrirRadicado, ahora }: V
   // Sprint Cola personal — la lista completa de trabajo, no solo lo urgente.
   const pendientes = useMemo(
     () => misPendientes(radicados, usuario.uid, ahora ?? new Date()),
+    [radicados, usuario.uid, ahora],
+  );
+  // Sprint Semana + badge — cómo se distribuye la semana.
+  const semana = useMemo(
+    () => planDeSemana(radicados, usuario.uid, ahora ?? new Date()),
     [radicados, usuario.uid, ahora],
   );
   const chip = CHIP_SEMAFORO[g.semaforo];
@@ -227,6 +233,64 @@ export function VistaMiGestion({ radicados, usuario, onAbrirRadicado, ahora }: V
               </span>
             ))}
           </div>
+        </div>
+      </div>
+
+      {/* ── Tu semana: cómo se distribuyen los vencimientos ── */}
+      <div className="px-4 md:px-6 pb-3">
+        <div className="rounded-xl bg-white px-3.5 py-3" style={{ border: '1px solid #E3EAE3' }}>
+          <div className="flex items-center justify-between gap-2 flex-wrap mb-2">
+            <p className="text-[10.5px] font-bold uppercase tracking-widest" style={{ color: '#5F8A6E' }}>
+              Tu semana
+            </p>
+            <div className="flex items-center gap-2">
+              {semana.vencidos > 0 && (
+                <span
+                  className="text-[10.5px] font-semibold px-2 py-0.5 rounded-full"
+                  style={{ background: '#FCEBEB', color: '#791F1F' }}
+                >
+                  {semana.vencidos} ya vencido{semana.vencidos !== 1 ? 's' : ''}
+                </span>
+              )}
+              {semana.despues > 0 && (
+                <span className="text-[10.5px]" style={{ color: '#7A8B7F' }}>
+                  +{semana.despues} después de esta semana
+                </span>
+              )}
+            </div>
+          </div>
+          {semana.totalSemana === 0 && semana.vencidos === 0 ? (
+            <p className="text-xs py-1" style={{ color: '#7A8B7F' }}>
+              Nada te vence esta semana.
+            </p>
+          ) : (
+            <div className="grid grid-cols-7 gap-1.5">
+              {semana.dias.map((d) => (
+                <div
+                  key={d.ymd}
+                  className="rounded-lg px-1 py-1.5 text-center"
+                  style={d.esHoy
+                    ? { background: '#F4F8F4', border: '1.5px solid #14532D' }
+                    : { border: '1px solid #EEF2EE' }}
+                >
+                  <p
+                    className="font-black tabular-nums leading-none"
+                    style={{ fontSize: 18, color: d.vencen > 0 ? '#12261A' : '#CBD5D1' }}
+                  >
+                    {d.vencen}
+                  </p>
+                  <p
+                    className="text-[9.5px] mt-1"
+                    style={d.esHoy
+                      ? { color: '#14532D', fontWeight: 700 }
+                      : { color: '#94A3B8' }}
+                  >
+                    {d.etiqueta}
+                  </p>
+                </div>
+              ))}
+            </div>
+          )}
         </div>
       </div>
 
