@@ -1,10 +1,12 @@
 import { describe, expect, it } from 'vitest';
 import {
+  agruparDestinosPorDependencia,
   areasParaDependencia,
   CATALOGO_AREAS,
   getNombreArea,
   validarAreaParaDestino,
 } from '@/lib/catalogos/areas';
+import type { TenantId } from '@/src/types/radicado';
 
 /* ══════════════════════════════════════════════════════════════
    Fase 2 · Áreas — catálogo curado de Simacota.
@@ -65,5 +67,24 @@ describe('Fase 2 — catálogo de áreas', () => {
     expect(getNombreArea('ALMACEN_ARCHIVO')).toBe('Almacén y Archivo');
     expect(getNombreArea('X_RARO')).toBe('X_RARO');
     expect(getNombreArea(null)).toBe('');
+  });
+
+  /* 6 · el selector agrupado (idea de Laura): Gobierno despliega las suyas */
+  it('agruparDestinosPorDependencia cuelga las oficinas bajo su dependencia', () => {
+    const tenants: TenantId[] = [
+      'VENTANILLA_UNICA', 'SEC_GOBIERNO', 'SUB_COMISARIA',
+      'SUB_INSPECCION_POLICIA_URBANA', 'SEC_AGRICULTURA_UMATA', 'SUB_SISBEN', 'SEC_PLANEACION',
+    ];
+    const grupos = agruparDestinosPorDependencia(tenants);
+    const gobierno = grupos.find((g) => g.dependencia === 'SEC_GOBIERNO');
+    expect(gobierno?.oficinas.map((o) => o.tenant))
+      .toEqual(expect.arrayContaining(['SUB_COMISARIA', 'SUB_INSPECCION_POLICIA_URBANA']));
+    // Las oficinas NO aparecen como grupos raíz.
+    expect(grupos.map((g) => g.dependencia)).not.toContain('SUB_COMISARIA');
+    expect(grupos.map((g) => g.dependencia)).not.toContain('SUB_SISBEN');
+    // Sisbén cuelga de Planeación; UMATA queda como opción simple.
+    expect(grupos.find((g) => g.dependencia === 'SEC_PLANEACION')?.oficinas.map((o) => o.tenant))
+      .toContain('SUB_SISBEN');
+    expect(grupos.find((g) => g.dependencia === 'SEC_AGRICULTURA_UMATA')?.oficinas).toHaveLength(0);
   });
 });

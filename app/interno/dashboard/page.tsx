@@ -28,7 +28,8 @@ import {
 } from '@/lib/reportes/filtrar-por-preset';
 import { INSTITUCION } from '@/lib/institucion';
 import { puedeVerReportes } from '@/lib/permisos/acceso-reportes';
-import { areasParaDependencia, getNombreArea } from '@/lib/catalogos/areas';
+import { agruparDestinosPorDependencia, areasParaDependencia, getNombreArea } from '@/lib/catalogos/areas';
+import { RegistroExpresModal } from '@/app/interno/dashboard/components/RegistroExpresModal';
 import { RegistrarSalidaModal, type EntradaAmarre } from '@/app/interno/dashboard/components/salidas/RegistrarSalidaModal';
 import { VistaSalidas }                    from '@/app/interno/dashboard/components/salidas/VistaSalidas';
 import { useSalidas }                      from '@/lib/hooks/useSalidas';
@@ -492,6 +493,7 @@ function SidebarNav({
   vistaActual,
   onVistaChange,
   onNuevoRadicado,
+  onRegistroExpres,
   usuario,
   onCerrarSesion,
   pendientesBandeja,
@@ -504,6 +506,8 @@ function SidebarNav({
   vistaActual: VistaActual;
   onVistaChange: (v: VistaActual) => void;
   onNuevoRadicado: () => void;
+  /** Sprint Registro exprés — presente solo para roles operativos. */
+  onRegistroExpres?: () => void;
   usuario: UsuarioAutenticado;
   onCerrarSesion: () => void;
   pendientesBandeja: number;
@@ -609,6 +613,24 @@ function SidebarNav({
               <path strokeLinecap="round" strokeLinejoin="round" d="M12 4v16m8-8H4" />
             </svg>
             Radicación Rápida
+          </button>
+        </div>
+      )}
+
+      {/* Sprint Registro exprés — correspondencia respondida desde el
+          correo institucional de la dependencia. */}
+      {onRegistroExpres && (
+        <div className="px-3 pb-2">
+          <button
+            type="button"
+            onClick={onRegistroExpres}
+            className="w-full flex items-center gap-2 px-3 py-2 rounded-xl text-[11px] font-semibold focus-visible:outline-none focus-visible:ring-2"
+            style={{ background: 'rgba(255,255,255,0.08)', color: '#D6E4D9', border: '1px solid rgba(255,255,255,0.14)' }}
+          >
+            <svg className="w-3.5 h-3.5 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+              <path strokeLinecap="round" strokeLinejoin="round" d="M13 10V3L4 14h7v7l9-11h-7z" />
+            </svg>
+            Registro exprés
           </button>
         </div>
       )}
@@ -2590,8 +2612,16 @@ function PanelDerecho({
                 }}
                 className="select-internal w-full"
               >
-                {(Object.keys(DIRECTORIO_TENANTS) as TenantId[]).map((id) => (
-                  <option key={id} value={id}>{NOMBRES_TENANT[id]}</option>
+                {/* Agrupado por dependencia (idea de Laura). */}
+                {agruparDestinosPorDependencia(Object.keys(DIRECTORIO_TENANTS) as TenantId[]).map((g) => g.oficinas.length > 0 ? (
+                  <optgroup key={g.dependencia} label={NOMBRES_TENANT[g.dependencia]}>
+                    <option value={g.dependencia}>{NOMBRES_TENANT[g.dependencia]}</option>
+                    {g.oficinas.map((o) => (
+                      <option key={o.tenant} value={o.tenant}>{o.nombre}</option>
+                    ))}
+                  </optgroup>
+                ) : (
+                  <option key={g.dependencia} value={g.dependencia}>{NOMBRES_TENANT[g.dependencia]}</option>
                 ))}
               </select>
             </div>
@@ -4078,6 +4108,9 @@ function DashboardInterior({ usuario, cerrarSesion }: { usuario: UsuarioAutentic
   // Sprint Radicación de salida — modal (null = cerrado; entrada = amarre).
   const [salidaModal, setSalidaModal] = useState<{ entrada: EntradaAmarre | null } | null>(null);
   const salidasLibro = useSalidas(vistaActual === 'SALIDAS');
+  // Sprint Registro exprés — modal para roles operativos.
+  const [registroExpresAbierto, setRegistroExpresAbierto] = useState(false);
+  const puedeRegistroExpres = usuario.rol !== 'CONTROL_INTERNO';
   const puedeRegistrarSalida = usuario.rol === 'ADMIN' || usuario.rol === 'RECEPCIONISTA';
   const {
     modo: indicadoresModo,
@@ -4256,6 +4289,7 @@ function DashboardInterior({ usuario, cerrarSesion }: { usuario: UsuarioAutentic
         onNuevoRadicado={() => {
           if (tienePermisoRadicar) dispatch({ type: 'TOGGLE_DRAWER_NUEVO' });
         }}
+        onRegistroExpres={puedeRegistroExpres ? () => setRegistroExpresAbierto(true) : undefined}
         usuario={usuario}
         onCerrarSesion={cerrarSesion}
         pendientesBandeja={radicadosPendientes.length}
@@ -4502,6 +4536,14 @@ function DashboardInterior({ usuario, cerrarSesion }: { usuario: UsuarioAutentic
         />
       )}
 
+      {/* Sprint Registro exprés — correspondencia respondida directo. */}
+      {registroExpresAbierto && puedeRegistroExpres && (
+        <RegistroExpresModal
+          usuario={usuario}
+          onCerrar={() => setRegistroExpresAbierto(false)}
+        />
+      )}
+
       {/* Sprint Radicación de salida — registro de despacho. */}
       {salidaModal && puedeRegistrarSalida && (
         <RegistrarSalidaModal
@@ -4542,6 +4584,7 @@ function DashboardInterior({ usuario, cerrarSesion }: { usuario: UsuarioAutentic
                 setMenuMovilAbierto(false);
               }
             }}
+            onRegistroExpres={puedeRegistroExpres ? () => { setRegistroExpresAbierto(true); setMenuMovilAbierto(false); } : undefined}
             usuario={usuario}
             onCerrarSesion={cerrarSesion}
             pendientesBandeja={radicadosPendientes.length}

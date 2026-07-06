@@ -158,6 +158,44 @@ export function areasParaDependencia(tenant: TenantId): AreaResponsable[] {
     || (a.dependencia === tenant && !a.tenantPropio));
 }
 
+export interface GrupoDependencia {
+  /** Dependencia principal (encabezado del grupo). */
+  dependencia: TenantId;
+  /** Tenants de las oficinas con destino propio bajo esa dependencia. */
+  oficinas:    { tenant: TenantId; nombre: string }[];
+}
+
+/**
+ * Idea de Laura: "marco Gobierno y se despliegan las de Gobierno".
+ * Agrupa los destinos del selector por dependencia, usando el mapeo
+ * tenantPropio→dependencia del catálogo. Las dependencias sin oficinas
+ * con tenant propio quedan como grupo de una sola opción.
+ */
+export function agruparDestinosPorDependencia(
+  tenants: TenantId[],
+): GrupoDependencia[] {
+  const oficinasPorDependencia = new Map<TenantId, { tenant: TenantId; nombre: string }[]>();
+  for (const area of Object.values(CATALOGO_AREAS)) {
+    if (!area.tenantPropio || !area.dependencia) continue;
+    const lista = oficinasPorDependencia.get(area.dependencia) ?? [];
+    lista.push({ tenant: area.tenantPropio, nombre: area.nombre });
+    oficinasPorDependencia.set(area.dependencia, lista);
+  }
+
+  const tenantsQueSonOficina = new Set(
+    [...oficinasPorDependencia.values()].flat().map((o) => o.tenant),
+  );
+
+  // Los grupos "raíz" son los tenants que no son oficina de otra dependencia.
+  return tenants
+    .filter((t) => !tenantsQueSonOficina.has(t))
+    .map((dependencia) => ({
+      dependencia,
+      oficinas: (oficinasPorDependencia.get(dependencia) ?? [])
+        .filter((o) => tenants.includes(o.tenant)),
+    }));
+}
+
 /**
  * Validación del endpoint: el área debe existir y ser transversal o
  * propia del destino. Devuelve el mensaje de error o null si es válida.
