@@ -2,7 +2,7 @@ import { NextResponse } from 'next/server';
 import { SIMI_DATA_EXTRACTION_PROMPT } from '@/lib/ai/prompts/simi';
 import { ejecutarConResiliencia } from '@/lib/ai/resilience';
 import { registrarLogIA } from '@/lib/ai/telemetry';
-import { checkRateLimit, getClientIp, rateLimitHeaders } from '@/lib/ai/rate-limit';
+import { evaluarAccesoIA } from '@/lib/ai/guard-publico-ia';
 import { verificarMagicBytes } from '@/lib/seguridad/magic-bytes';
 import type {
   ResultadoExtraccion,
@@ -180,19 +180,20 @@ function crearFallbackExtraccion(motivo: string): ResultadoExtraccion {
 export async function POST(request: Request): Promise<NextResponse<ResultadoExtraccion>> {
   const inicio = Date.now();
   const apiKey = process.env.GEMINI_API_KEY;
-  const limite = { maxRequests: 5, windowMs: 60_000 };
-  const ip = getClientIp(request);
-  const bloqueado = checkRateLimit(`ai:scan-doc:${ip}`, limite);
 
-  if (bloqueado) {
+  // C-1: guard compartido (origen + rate limit en Firestore).
+  const acceso = await evaluarAccesoIA(request, 'scan-doc');
+  if (!acceso.permitido) {
     return NextResponse.json<ResultadoExtraccion>(
       crearFallbackExtraccion(
-        'El escáner recibió muchas solicitudes seguidas desde esta conexión. ' +
-        'Espere un momento e intente nuevamente.',
+        acceso.motivo === 'ORIGEN'
+          ? 'No fue posible procesar el documento desde este origen.'
+          : 'El escáner recibió muchas solicitudes seguidas desde esta conexión. ' +
+            'Espere un momento e intente nuevamente.',
       ),
       {
-        status: 429,
-        headers: rateLimitHeaders(limite.maxRequests, bloqueado.retryAfterSeconds),
+        status: acceso.status ?? 429,
+        headers: acceso.retryAfterSeconds ? { 'Retry-After': String(acceso.retryAfterSeconds) } : {},
       },
     );
   }
