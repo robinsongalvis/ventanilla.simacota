@@ -1810,7 +1810,11 @@ function PanelDerecho({
   const [mensajeConstancia, setMensajeConstancia] = useState<string | null>(null);
   const [tenantDestino,    setTenantDestino]    = useState<TenantId>(radicado.clasificacion.oficinaDestino);
   // Fase 2 · Áreas — nivel 2: área que trabajará el caso (opcional).
-  const [areaSeleccionada, setAreaSeleccionada] = useState<string>(radicado.clasificacion.areaResponsable ?? '');
+  const [areaSeleccionada, setAreaSeleccionada] = useState<string>(
+    typeof radicado.clasificacion.areaResponsable === 'string'
+      ? radicado.clasificacion.areaResponsable
+      : '',
+  );
   // MIPG-2: reemplaza el free-text de UID por un selector con snapshot completo
   const [responsableSelec, setResponsableSelec] = useState<FuncionarioTenant | null>(null);
   // Backward compat: si el radicado ya tenía un UID libre, lo inicializamos
@@ -2481,8 +2485,10 @@ function PanelDerecho({
                       <FilaInfo label="Cargo" value={radicado.clasificacion.funcionarioResponsableCargo} />
                     )}
                     <FilaInfo label="Dependencia" value={NOMBRES_TENANT[radicado.clasificacion.oficinaDestino]} />
-                    {/* Fase 2 · Áreas — nivel 2 del modelo, si está fijado. */}
-                    {radicado.clasificacion.areaResponsable && (
+                    {/* Fase 2 · Áreas — nivel 2 del modelo, si está fijado.
+                        typeof string: datos malformados no tumban el render. */}
+                    {typeof radicado.clasificacion.areaResponsable === 'string'
+                      && radicado.clasificacion.areaResponsable && (
                       <FilaInfo label="Área responsable" value={getNombreArea(radicado.clasificacion.areaResponsable)} />
                     )}
                     {radicado.clasificacion.funcionarioResponsableEmail && (

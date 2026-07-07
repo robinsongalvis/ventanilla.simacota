@@ -144,7 +144,10 @@ export function getArea(areaId: string | null | undefined): AreaResponsable | un
 }
 
 export function getNombreArea(areaId: string | null | undefined): string {
-  return getArea(areaId)?.nombre ?? (areaId ?? '');
+  // Blindaje: documentos con datos malformados (p. ej. un objeto vacío
+  // escrito donde iba el id) no deben tumbar el render.
+  if (typeof areaId !== 'string' || !areaId) return '';
+  return getArea(areaId)?.nombre ?? areaId;
 }
 
 /**
