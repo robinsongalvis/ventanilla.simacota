@@ -2,6 +2,7 @@
 
 /* eslint-disable @next/next/no-img-element */
 
+import { useState } from 'react';
 import {
   INSTITUCION,
   formatFechaInstitucional,
@@ -12,9 +13,10 @@ import {
    Sprint Recepción fluida — sello digital de recibido.
 
    Flujo real: el ciudadano trae su copia física, Laura la pone en la
-   impresora y el sistema imprime SOLO el sello en la esquina superior
-   izquierda de la hoja — la misma esquina del sello digital PDF. Nada
-   de hoja completa: el sello marca la copia que el ciudadano se lleva.
+   impresora y el sistema imprime SOLO el sello en la esquina que ella
+   elija — mira la carta, ve dónde hay espacio libre y toca esa
+   esquina. Default: superior derecha, la esquina del sello de
+   radicado tradicional (el membrete de las cartas va a la izquierda).
 
    La vista previa muestra un croquis de la hoja con el sello ya
    ubicado, para que la funcionaria sepa exactamente dónde caerá.
@@ -22,15 +24,40 @@ import {
 
 const VERDE_INST = '#14532D';
 
-const PRINT_STYLES_SELLO = `
+type EsquinaSello = 'SUP_IZQ' | 'SUP_DER' | 'INF_IZQ' | 'INF_DER';
+
+const ESQUINAS: { id: EsquinaSello; label: string }[] = [
+  { id: 'SUP_IZQ', label: '↖ Sup. izquierda' },
+  { id: 'SUP_DER', label: '↗ Sup. derecha' },
+  { id: 'INF_IZQ', label: '↙ Inf. izquierda' },
+  { id: 'INF_DER', label: '↘ Inf. derecha' },
+];
+
+/** Posición del sello en la impresión real (position: fixed). */
+const POSICION_PRINT: Record<EsquinaSello, string> = {
+  SUP_IZQ: 'top: 0 !important; left: 0 !important;',
+  SUP_DER: 'top: 0 !important; right: 0 !important;',
+  INF_IZQ: 'bottom: 0 !important; left: 0 !important;',
+  INF_DER: 'bottom: 0 !important; right: 0 !important;',
+};
+
+/** Posición del sello dentro del croquis de la vista previa. */
+const POSICION_CROQUIS: Record<EsquinaSello, string> = {
+  SUP_IZQ: 'top-3 left-3',
+  SUP_DER: 'top-3 right-3',
+  INF_IZQ: 'bottom-3 left-3',
+  INF_DER: 'bottom-3 right-3',
+};
+
+function buildPrintStyles(esquina: EsquinaSello): string {
+  return `
 @media print {
   body * { visibility: hidden !important; }
   #sello-recibido-print,
   #sello-recibido-print * { visibility: visible !important; }
   #sello-recibido-print {
     position: fixed !important;
-    top: 0 !important;
-    left: 0 !important;
+    ${POSICION_PRINT[esquina]}
     width: 70mm !important;
     background: white !important;
     z-index: 99999 !important;
@@ -41,13 +68,12 @@ const PRINT_STYLES_SELLO = `
   }
 }
 `;
+}
 
 export interface SelloRecibidoProps {
   radicadoId:    string;
   fechaRadicado: string;
   horaRadicado:  string;
-  /** Nombre legible de la dependencia (default: Ventanilla Única). */
-  dependencia?:  string;
   numeroFolios?: number;
   numeroAnexos?: number;
   /** Texto corto de medios entregados ("CD, USB"), si aplica. */
@@ -58,13 +84,15 @@ export function SelloRecibido({
   radicadoId,
   fechaRadicado,
   horaRadicado,
-  dependencia = 'Ventanilla Única',
   numeroFolios = 0,
   numeroAnexos = 0,
   mediosAnexos = null,
 }: SelloRecibidoProps) {
   const consultaCorta = INSTITUCION.consultaUrl.replace(/^https?:\/\//, '');
   const hayFisico = numeroFolios > 0 || numeroAnexos > 0;
+  // La funcionaria elige dónde caerá el sello según el espacio libre
+  // de cada carta. Default: superior derecha (sello tradicional).
+  const [esquina, setEsquina] = useState<EsquinaSello>('SUP_DER');
 
   function handleImprimir() {
     /* El comprobante completo usa su propia hoja (@page half-letter);
@@ -77,7 +105,7 @@ export function SelloRecibido({
 
     const tag = document.createElement('style');
     tag.id = 'sello-recibido-print-styles';
-    tag.textContent = PRINT_STYLES_SELLO;
+    tag.textContent = buildPrintStyles(esquina);
     document.head.appendChild(tag);
 
     window.print();
@@ -103,9 +131,31 @@ export function SelloRecibido({
           Imprimir sello de recibido
         </button>
         <p className="text-[11px] text-center max-w-[380px]" style={{ color: '#7A8B7F' }}>
-          Coloque la copia física del ciudadano en la impresora: solo se imprime
-          el sello sobre la esquina superior izquierda de la hoja.
+          Coloque la copia física del ciudadano en la impresora: solo se
+          imprime el sello, en la esquina que elija abajo.
         </p>
+      </div>
+
+      {/* Selector de esquina — según el espacio libre de cada carta. */}
+      <div
+        className="flex items-center justify-center gap-1.5 flex-wrap"
+        role="group"
+        aria-label="Posición del sello en la hoja"
+      >
+        {ESQUINAS.map((e) => (
+          <button
+            key={e.id}
+            type="button"
+            onClick={() => setEsquina(e.id)}
+            aria-pressed={esquina === e.id}
+            className="text-[10.5px] font-semibold px-2.5 py-1 rounded-full transition-colors"
+            style={esquina === e.id
+              ? { background: VERDE_INST, color: '#FFFFFF', border: `1px solid ${VERDE_INST}` }
+              : { background: 'white', color: '#475569', border: '1px solid #D9E2D9' }}
+          >
+            {e.label}
+          </button>
+        ))}
       </div>
 
       {/* Croquis de la hoja con el sello ya ubicado */}
@@ -117,7 +167,7 @@ export function SelloRecibido({
         {/* El sello — único contenido visible al imprimir. Ocupa ~⅓ del
             ancho de la hoja carta (70mm), proporción de sello de recibido
             institucional. */}
-        <div id="sello-recibido-print" className="absolute top-3 left-3 w-[38%] min-w-[190px]">
+        <div id="sello-recibido-print" className={`absolute ${POSICION_CROQUIS[esquina]} w-[38%] min-w-[190px]`}>
           <div
             className="bg-white"
             style={{ border: `1.5px solid ${VERDE_INST}`, borderRadius: 6, padding: '6px 8px' }}
@@ -146,11 +196,14 @@ export function SelloRecibido({
               {radicadoId}
             </p>
 
+            {/* El sello es un documento PÚBLICO: certifica solo lo que
+                siempre es verdad (la Alcaldía recibió, cuándo y qué). El
+                direccionamiento interno vive en el sistema, donde un
+                traslado es un evento normal, no un error impreso. */}
             <div className="mt-1 space-y-px" style={{ color: '#3A4551' }}>
               <p className="text-[9px]">
                 Fecha: {formatFechaInstitucional(fechaRadicado)} · Hora: {formatHoraInstitucional(horaRadicado)}
               </p>
-              <p className="text-[9px]">Dependencia: {dependencia}</p>
               {hayFisico && (
                 <p className="text-[9px]">
                   Folios: {numeroFolios} · Anexos: {numeroAnexos}
@@ -166,7 +219,7 @@ export function SelloRecibido({
         </div>
 
         <p
-          className="absolute inset-x-0 bottom-6 text-center text-[11px] italic"
+          className="absolute inset-x-0 top-1/2 -translate-y-1/2 text-center text-[11px] italic"
           style={{ color: '#CBD5D1' }}
         >
           Copia física del ciudadano
