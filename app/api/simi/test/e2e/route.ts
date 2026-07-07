@@ -56,7 +56,7 @@ async function verificarSesion(): Promise<UsuarioE2E | null> {
   if (!sc) return null;
 
   try {
-    const decoded = await getFirebaseAdminAuth().verifySessionCookie(sc, false);
+    const decoded = await getFirebaseAdminAuth().verifySessionCookie(sc, true);
     const snap = await getFirebaseAdminDb().doc(`users/${decoded.uid}`).get();
     if (!snap.exists) return null;
     const d = snap.data()!;

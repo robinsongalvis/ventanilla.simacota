@@ -20,7 +20,7 @@ export async function GET(request: Request): Promise<NextResponse> {
   if (!sc) return NextResponse.json({ error: 'No autorizado.' }, { status: 401 });
 
   try {
-    const decoded  = await getFirebaseAdminAuth().verifySessionCookie(sc, false);
+    const decoded  = await getFirebaseAdminAuth().verifySessionCookie(sc, true);
     const snap     = await getFirebaseAdminDb().doc(`users/${decoded.uid}`).get();
     if (!snap.exists) return NextResponse.json({ error: 'Usuario no encontrado.' }, { status: 404 });
     const d        = snap.data()!;

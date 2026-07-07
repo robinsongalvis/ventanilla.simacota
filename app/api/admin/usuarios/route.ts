@@ -38,7 +38,7 @@ async function verificarAdmin(): Promise<{ uid: string; nombre: string; rol: str
   try {
     // checkRevoked=false: la cookie httpOnly ya es suficiente garantía.
     // El check de revocación causa falsos 401 tras revokeRefreshTokens en logout.
-    const decoded = await getFirebaseAdminAuth().verifySessionCookie(sessionCookie, false);
+    const decoded = await getFirebaseAdminAuth().verifySessionCookie(sessionCookie, true);
     const uid = decoded.uid;
 
     const userSnap = await getFirebaseAdminDb().doc(`users/${uid}`).get();

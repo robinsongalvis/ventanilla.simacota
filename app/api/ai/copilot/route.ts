@@ -20,7 +20,7 @@ async function verificarSesionInterna(request: Request): Promise<DecodedIdToken 
   if (!sessionCookie) return null;
 
   try {
-    const decoded = await getFirebaseAdminAuth().verifySessionCookie(sessionCookie, false);
+    const decoded = await getFirebaseAdminAuth().verifySessionCookie(sessionCookie, true);
     const snap = await getFirebaseAdminDb().doc(`users/${decoded.uid}`).get();
     const data = snap.data();
     if (!snap.exists || data?.activo === false || data?.archivado === true) return null;

@@ -23,7 +23,7 @@ async function verificarSesion() {
   const sc = cookieStore.get(SESSION_COOKIE_NAME)?.value;
   if (!sc) return null;
   try {
-    const decoded = await getFirebaseAdminAuth().verifySessionCookie(sc, false);
+    const decoded = await getFirebaseAdminAuth().verifySessionCookie(sc, true);
     const snap = await getFirebaseAdminDb().doc(`users/${decoded.uid}`).get();
     if (!snap.exists) return null;
     const d = snap.data()!;
