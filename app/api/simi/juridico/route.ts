@@ -13,6 +13,7 @@ import { SESSION_COOKIE_NAME }    from '@/lib/auth-cookie';
 import { getFirebaseAdminAuth, getFirebaseAdminDb } from '@/lib/firebase-admin';
 import { checkRateLimit, getClientIp, rateLimitHeaders } from '@/lib/ai/rate-limit';
 import { callGeminiJuridico }        from '@/lib/simi-juridico/callGemini';
+import { esErrorDeCuota }            from '@/lib/ai/gemini-keys';
 import { createAuditLog }            from '@/lib/simi-juridico/createAuditLog';
 import { generateWithRagContext }    from '@/lib/simi-juridico/generateWithRagContext';
 import { createApprovalFlow }            from '@/lib/simi-juridico/createApprovalFlow';
@@ -452,19 +453,25 @@ SIMI ha detectado que este caso requiere análisis jurídico especializado. No g
     }
   } catch (err) {
     const msg = err instanceof Error ? err.message : String(err);
+    // El detalle técnico queda solo en el log del servidor, nunca en pantalla.
     console.error(`[simi-juridico/${modo}] Error:`, msg);
-    const code: SimiApiErrorCode = msg.includes('GEMINI_API_KEY_MISSING')
-      ? 'GEMINI_API_KEY_MISSING'
-      : msg.includes('GEMINI_ERROR') || msg.includes('Gemini')
-        ? 'GEMINI_ERROR'
-        : 'INTERNAL_ERROR';
-    const status = code === 'GEMINI_API_KEY_MISSING' ? 503 : 500;
+
+    if (msg.includes('GEMINI_API_KEY_MISSING')) {
+      return jsonError('GEMINI_API_KEY_MISSING', 'SIMI no está configurado en este momento. Avise al administrador.', 503);
+    }
+    // Cuota agotada (429): mensaje humano, no el error crudo de Google.
+    if (esErrorDeCuota(msg)) {
+      return jsonError(
+        'GEMINI_ERROR',
+        'SIMI no está disponible en este momento porque se alcanzó el límite de uso de la IA. ' +
+        'Puede responder manualmente; intente con SIMI más tarde.',
+        503,
+      );
+    }
     return jsonError(
-      code,
-      code === 'GEMINI_API_KEY_MISSING'
-        ? 'Falta configurar GEMINI_API_KEY en Vercel.'
-        : `Error al procesar la consulta jurídica: ${msg.replace(process.env.GEMINI_API_KEY ?? '', '[redacted]')}`,
-      status,
+      'GEMINI_ERROR',
+      'SIMI no pudo procesar la consulta jurídica. Intente de nuevo o responda manualmente.',
+      500,
     );
   }
 
