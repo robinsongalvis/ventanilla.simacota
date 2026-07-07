@@ -67,6 +67,9 @@ describe('Fase 2 — catálogo de áreas', () => {
     expect(getNombreArea('ALMACEN_ARCHIVO')).toBe('Almacén y Archivo');
     expect(getNombreArea('X_RARO')).toBe('X_RARO');
     expect(getNombreArea(null)).toBe('');
+    // Fix React #31: un dato malformado (objeto donde iba el id) no
+    // debe salir del helper como objeto — jamás tumba el render.
+    expect(getNombreArea({} as unknown as string)).toBe('');
   });
 
   /* 6 · el selector agrupado (idea de Laura): Gobierno despliega las suyas */
