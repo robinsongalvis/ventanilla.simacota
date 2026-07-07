@@ -36,6 +36,7 @@ import { VistaMiGestion }                  from '@/app/interno/dashboard/compone
 import { useSalidas }                      from '@/lib/hooks/useSalidas';
 import { filtrarSalidasPorPreset, resumenSalidas } from '@/lib/salidas/reporte-salidas';
 import { construirHistoria, type FiltroHistoria, type TonoEvento } from '@/lib/trazabilidad/humanizar-evento';
+import { resumirCambio } from '@/lib/traslado/resumir-cambio';
 import type { SalidaOficial }              from '@/src/types/salida';
 import { BusquedaAvanzadaPanel }           from '@/app/interno/dashboard/components/BusquedaAvanzadaPanel';
 import { VistaVentanilla }                 from '@/app/interno/dashboard/components/ventanilla/VistaVentanilla';
@@ -2052,6 +2053,32 @@ function PanelDerecho({
     });
   }
 
+  /* Sprint Traslado claro — el gesto natural del funcionario: "eso ya
+     es mío". Un clic y queda como responsable del caso de su propia
+     dependencia (mismo endpoint y permiso que ya tiene por reglas). */
+  async function tomarCaso() {
+    await ejecutarAccion(async () => {
+      const response = await fetch(`/api/radicados/${encodeURIComponent(radicado.radicadoId)}/asignar`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify({
+          tenantDestino: radicado.clasificacion.oficinaDestino,
+          responsable: {
+            uid:    usuario.uid,
+            nombre: usuario.nombre,
+            email:  usuario.email,
+            rol:    usuario.rol,
+          },
+          areaId: (typeof radicado.clasificacion.areaResponsable === 'string'
+            && radicado.clasificacion.areaResponsable) || null,
+        }),
+      });
+      const data = await response.json().catch(() => null) as { error?: string } | null;
+      if (!response.ok) throw new Error(data?.error ?? 'No fue posible tomar el caso.');
+    });
+  }
+
   async function enviarFeedbackIA(puntuacion: 'POSITIVO' | 'NEGATIVO' | 'CORREGIDO', motivoCorreccion?: string) {
     if (!radicado.analisisIa) return;
     
@@ -2705,10 +2732,77 @@ function PanelDerecho({
         )}
 
         {/* ── TAB 2: Traslado / Asignación ── */}
-        {tab === 'traslado' && (
+        {/* Sprint Traslado claro — primero el estado, después el cambio;
+            el botón dice lo que va a hacer y las consecuencias se
+            anuncian antes del clic. */}
+        {tab === 'traslado' && (() => {
+          const respActualUid = radicado.clasificacion.funcionarioResponsableUid ?? null;
+          const areaActualId = typeof radicado.clasificacion.areaResponsable === 'string'
+            ? radicado.clasificacion.areaResponsable : '';
+          const resumen = resumirCambio({
+            dependenciaActual: radicado.clasificacion.oficinaDestino,
+            dependenciaNueva:  tenantDestino,
+            responsableActual: radicado.clasificacion.funcionarioResponsableNombre ?? null,
+            responsableNuevo:  responsableSelec?.nombre
+              ?? (funcionarioUid && funcionarioUid !== respActualUid && !responsableSelec ? `UID ${funcionarioUid}` : null),
+            responsableCambia: responsableSelec
+              ? responsableSelec.uid !== respActualUid
+              : Boolean(funcionarioUid && funcionarioUid !== respActualUid),
+            areaNueva:  areaSeleccionada ? getNombreArea(areaSeleccionada) : null,
+            areaCambia: areaSeleccionada !== areaActualId,
+          });
+          const puedeTomarCaso = usuario.rol === 'FUNCIONARIO'
+            && usuario.tenantId === radicado.clasificacion.oficinaDestino
+            && !respActualUid
+            && !soloLectura;
+          const cajaEstilo = resumen.tono === 'AMBAR'
+            ? { caja: { background: '#FAEEDA', border: '1px solid #FAC775' }, titulo: '#854F0B', texto: '#633806' }
+            : { caja: { background: '#EAF3DE', border: '1px solid #C0DD97' }, titulo: '#27500A', texto: '#3B6D11' };
+          return (
           <div className="space-y-4">
+            {/* ── El caso hoy: dónde está y quién lo tiene ── */}
+            <div className="rounded-xl p-3.5 flex items-center gap-3" style={{ background: '#FFFFFF', border: '1px solid #D9E2D9' }}>
+              <span className="shrink-0 w-9 h-9 rounded-full flex items-center justify-center" style={{ background: '#EAF3DE' }} aria-hidden="true">
+                <svg className="w-[18px] h-[18px]" fill="none" viewBox="0 0 24 24" stroke="#3B6D11" strokeWidth={1.8}>
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M15 10.5a3 3 0 11-6 0 3 3 0 016 0z" />
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M19.5 10.5c0 7.142-7.5 11.25-7.5 11.25S4.5 17.642 4.5 10.5a7.5 7.5 0 1115 0z" />
+                </svg>
+              </span>
+              <div className="min-w-0">
+                <p className="text-[10px] font-bold uppercase tracking-widest" style={{ color: '#5F8A6E' }}>El caso está hoy en</p>
+                <p className="text-sm font-semibold mt-0.5" style={{ color: '#12261A' }}>
+                  {NOMBRES_TENANT[radicado.clasificacion.oficinaDestino]}
+                  {radicado.clasificacion.funcionarioResponsableNombre
+                    ? ` · responsable: ${radicado.clasificacion.funcionarioResponsableNombre}`
+                    : ' · sin persona asignada'}
+                </p>
+                <p className="text-[11px] mt-0.5" style={{ color: '#7A8B7F' }}>
+                  {areaActualId ? `Área: ${getNombreArea(areaActualId)}` : ''}
+                  {areaActualId && radicado.clasificacion.fechaAsignacionResponsable ? ' · ' : ''}
+                  {radicado.clasificacion.fechaAsignacionResponsable
+                    ? `Asignado el ${formatFechaColombia(radicado.clasificacion.fechaAsignacionResponsable)}`
+                    : ''}
+                </p>
+              </div>
+            </div>
+
+            {/* ── Tomar este caso: el gesto del funcionario ── */}
+            {puedeTomarCaso && (
+              <div className="rounded-xl px-3.5 py-3 flex items-center justify-between gap-3 flex-wrap" style={{ background: '#EAF3DE', border: '1px solid #C0DD97' }}>
+                <p className="text-xs" style={{ color: '#3B6D11' }}>
+                  Este caso es de tu dependencia y no tiene persona asignada.
+                </p>
+                <button type="button" onClick={tomarCaso} disabled={guardando}
+                  className="shrink-0 text-xs font-bold px-4 py-2 rounded-lg transition-all active:scale-95 disabled:opacity-60"
+                  style={{ border: '1px solid #14532D', color: '#14532D', background: 'white' }}>
+                  Tomar este caso
+                </button>
+              </div>
+            )}
+
+            {/* ── Mover o asignar ── */}
             <div>
-              <p className="text-[10px] font-bold uppercase tracking-widest mb-1.5" style={{ color: '#667085' }}>Dependencia destino</p>
+              <p className="text-[10px] font-bold uppercase tracking-widest mb-1.5" style={{ color: '#667085' }}>Dependencia</p>
               <select
                 value={tenantDestino}
                 onChange={(e) => {
@@ -2732,31 +2826,10 @@ function PanelDerecho({
               </select>
             </div>
 
-            {/* Fase 2 · Áreas — nivel 2 del modelo: propias del destino
-                + transversales (Almacén y Archivo, Sistemas). */}
+            {/* Selector MIPG-2 — persona responsable */}
             <div>
               <p className="text-[10px] font-bold uppercase tracking-widest mb-1.5" style={{ color: '#667085' }}>
-                Área responsable <span className="normal-case font-normal" style={{ color: '#94A3B8' }}>(opcional)</span>
-              </p>
-              <select
-                value={areaSeleccionada}
-                onChange={(e) => setAreaSeleccionada(e.target.value)}
-                aria-label="Área responsable"
-                className="select-internal w-full"
-              >
-                <option value="">— Sin área específica —</option>
-                {areasParaDependencia(tenantDestino).map((a) => (
-                  <option key={a.areaId} value={a.areaId}>
-                    {a.nombre}{a.transversal ? ' (transversal)' : ''}
-                  </option>
-                ))}
-              </select>
-            </div>
-
-            {/* Selector MIPG-2 — responsable funcional */}
-            <div>
-              <p className="text-[10px] font-bold uppercase tracking-widest mb-1.5" style={{ color: '#667085' }}>
-                Responsable funcional <span className="normal-case font-normal" style={{ color: '#94A3B8' }}>(opcional)</span>
+                Persona responsable <span className="normal-case font-normal" style={{ color: '#94A3B8' }}>(opcional)</span>
               </p>
               {cargandoFuncionarios ? (
                 <div className="flex items-center gap-2 text-xs py-2" style={{ color: '#94A3B8' }}>
@@ -2773,7 +2846,11 @@ function PanelDerecho({
                   }}
                   className="select-internal w-full"
                 >
-                  <option value="">— Sin responsable asignado —</option>
+                  <option value="">
+                    {tenantDestino !== radicado.clasificacion.oficinaDestino
+                      ? `La asignará ${NOMBRES_TENANT[tenantDestino]} al recibirlo`
+                      : '— Sin persona asignada —'}
+                  </option>
                   {funcionariosTenant.map((f) => (
                     <option key={f.uid} value={f.uid}>
                       {f.nombre}{f.cargo ? ` · ${f.cargo}` : ''} ({f.rol})
@@ -2796,52 +2873,54 @@ function PanelDerecho({
               )}
             </div>
 
-            {/* Responsable actual del radicado */}
-            <div className="pt-3" style={{ borderTop: '1px solid #D9E2D9' }}>
-              <p className="text-[10px] font-bold uppercase tracking-widest mb-2" style={{ color: '#667085' }}>
-                Responsable registrado actualmente
+            {/* Fase 2 · Áreas — nivel 2 del modelo: propias del destino
+                + transversales (Almacén y Archivo, Sistemas). */}
+            <div>
+              <p className="text-[10px] font-bold uppercase tracking-widest mb-1.5" style={{ color: '#667085' }}>
+                Área <span className="normal-case font-normal" style={{ color: '#94A3B8' }}>(opcional)</span>
               </p>
-              {radicado.clasificacion.funcionarioResponsableNombre ? (
-                <div className="rounded-lg p-3 space-y-1" style={{ background: '#EEF4EE', border: '1px solid #D9E2D9' }}>
-                  <p className="text-sm font-semibold" style={{ color: '#1F2933' }}>{radicado.clasificacion.funcionarioResponsableNombre}</p>
-                  {radicado.clasificacion.funcionarioResponsableCargo && (
-                    <p className="text-xs" style={{ color: '#667085' }}>{radicado.clasificacion.funcionarioResponsableCargo}</p>
-                  )}
-                  {radicado.clasificacion.funcionarioResponsableEmail && (
-                    <p className="text-xs" style={{ color: '#667085' }}>📧 {radicado.clasificacion.funcionarioResponsableEmail}</p>
-                  )}
-                  {radicado.clasificacion.fechaAsignacionResponsable && (
-                    <p className="text-[10px] mt-1" style={{ color: '#94A3B8' }}>
-                      Asignado: {formatFechaColombia(radicado.clasificacion.fechaAsignacionResponsable)}
-                    </p>
-                  )}
-                </div>
-              ) : radicado.clasificacion.funcionarioResponsableUid ? (
-                <p className="text-xs" style={{ color: '#94A3B8' }}>
-                  UID: {radicado.clasificacion.funcionarioResponsableUid}
-                  <span className="ml-2" style={{ color: '#94A3B8' }}>(radicado anterior — nombre no registrado)</span>
-                </p>
-              ) : (
-                <p className="text-xs italic" style={{ color: '#94A3B8' }}>Sin responsable asignado</p>
-              )}
+              <select
+                value={areaSeleccionada}
+                onChange={(e) => setAreaSeleccionada(e.target.value)}
+                aria-label="Área responsable"
+                className="select-internal w-full"
+              >
+                <option value="">— Sin área específica —</option>
+                {areasParaDependencia(tenantDestino).map((a) => (
+                  <option key={a.areaId} value={a.areaId}>
+                    {a.nombre}{a.transversal ? ' (transversal)' : ''}
+                  </option>
+                ))}
+              </select>
             </div>
 
-            <button type="button" onClick={asignar} disabled={guardando || soloLectura}
+            {/* ── Qué va a pasar: cero sorpresas ── */}
+            {resumen.tituloCaja && (
+              <div className="rounded-xl px-3.5 py-3" style={cajaEstilo.caja}>
+                <p className="text-[10px] font-bold uppercase tracking-widest mb-1.5" style={{ color: cajaEstilo.titulo }}>
+                  {resumen.tituloCaja}
+                </p>
+                <div className="space-y-1">
+                  {resumen.consecuencias.map((c, i) => (
+                    <p key={i} className="text-[12px] leading-relaxed" style={{ color: cajaEstilo.texto }}>· {c}</p>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            <button type="button" onClick={asignar}
+              disabled={guardando || soloLectura || !resumen.puedeConfirmar}
               title={soloLectura ? 'Tu rol no permite realizar acciones sobre radicados.' : undefined}
               className="w-full py-2.5 rounded-lg text-white text-sm font-bold transition-all duration-150 disabled:opacity-60 flex items-center justify-center gap-2"
-              style={{ background: '#14532D' }}
-              onMouseEnter={(e) => { if (!guardando && !soloLectura) (e.currentTarget as HTMLElement).style.background = '#166534'; }}
-              onMouseLeave={(e) => { (e.currentTarget as HTMLElement).style.background = '#14532D'; }}>
+              style={{ background: resumen.puedeConfirmar ? '#14532D' : '#94A3B8' }}
+              onMouseEnter={(e) => { if (!guardando && !soloLectura && resumen.puedeConfirmar) (e.currentTarget as HTMLElement).style.background = '#166534'; }}
+              onMouseLeave={(e) => { (e.currentTarget as HTMLElement).style.background = resumen.puedeConfirmar ? '#14532D' : '#94A3B8'; }}>
               {guardando && <span className="w-3.5 h-3.5 border-2 border-white/30 border-t-white rounded-full animate-spin" />}
-              Confirmar traslado
+              {resumen.botonLabel}
             </button>
-
-            <div className="pt-4" style={{ borderTop: '1px solid #D9E2D9' }}>
-              <p className="text-[10px] font-bold uppercase tracking-widest mb-2" style={{ color: '#94A3B8' }}>Destino actual</p>
-              <p className="text-sm font-medium" style={{ color: '#1F2933' }}>{NOMBRES_TENANT[radicado.clasificacion.oficinaDestino]}</p>
-            </div>
           </div>
-        )}
+          );
+        })()}
 
         {/* ── TAB 3: Trazabilidad MIPG ── */}
         {/* Sprint Panel claro — la Historia del caso, contada en humano.
