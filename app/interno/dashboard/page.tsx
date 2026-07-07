@@ -1637,13 +1637,18 @@ function TablaRadicados({
    SUB-COMPONENTE: PanelDerecho (5 tabs)
 ══════════════════════════════════════════════════════════════ */
 
-type TabPanelId = 'info' | 'traslado' | 'trazabilidad' | 'respuesta' | 'copiloto';
+type TabPanelId = 'info' | 'responder' | 'trazabilidad' | 'traslado' | 'prorroga' | 'copiloto';
 
+/* Sprint Panel claro — Responder deja de compartir pestaña con la
+   prórroga: es LA acción del día a día y merece su propio lugar,
+   resaltado. La trazabilidad pasa a llamarse "Historia" (mismo id
+   interno para no tocar efectos ni carga). */
 const TABS_PANEL: { id: TabPanelId; label: string }[] = [
   { id: 'info',         label: 'Información' },
+  { id: 'responder',    label: 'Responder' },
+  { id: 'trazabilidad', label: 'Historia' },
   { id: 'traslado',     label: 'Traslado' },
-  { id: 'trazabilidad', label: 'Trazabilidad' },
-  { id: 'respuesta',    label: 'Prórroga / Resp.' },
+  { id: 'prorroga',     label: 'Prórroga' },
   { id: 'copiloto',     label: 'SIMI ✦' },
 ];
 
@@ -1798,6 +1803,24 @@ function PanelDerecho({
   onToggleModo?: () => void;
 }) {
   const [tab,              setTab]              = useState<TabPanelId>('info');
+  // Sprint Panel claro — Responder se abre con espacio: el panel entra
+  // a modo amplio solo y vuelve al ancho normal al salir (a menos que
+  // la persona lo haya ajustado a mano mientras tanto).
+  const amplioAutomatico = useRef(false);
+  const cambiarTab = (id: TabPanelId) => {
+    if (onToggleModo) {
+      if (id === 'responder' && !modoAmplio) {
+        amplioAutomatico.current = true;
+        onToggleModo();
+      } else if (id !== 'responder' && tab === 'responder' && amplioAutomatico.current) {
+        amplioAutomatico.current = false;
+        if (modoAmplio) onToggleModo();
+      }
+    }
+    setTab(id);
+    setMensajeOk(null);
+    setErrorLocal(null);
+  };
   // Sprint Radicación de salida — registrar despacho amarrado a esta entrada.
   const [salidaDetalleAbierta, setSalidaDetalleAbierta] = useState(false);
   // Fase B — tras resolver, ofrecer registrar la salida 2-SAL de una vez.
@@ -2260,7 +2283,7 @@ function PanelDerecho({
             <button key={t.id}
               role="tab"
               aria-selected={activo}
-              onClick={() => { setTab(t.id); setMensajeOk(null); setErrorLocal(null); }}
+              onClick={() => cambiarTab(t.id)}
               className="shrink-0 px-3 py-1.5 rounded-lg text-[11px] font-bold uppercase tracking-wider whitespace-nowrap focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-700/30 transition-all duration-150"
               style={activo
                 ? {
@@ -2269,13 +2292,28 @@ function PanelDerecho({
                     border: '1px solid #14532D',
                     boxShadow: '0 1px 3px rgba(20,83,45,0.30)',
                   }
+                : t.id === 'responder'
+                ? {
+                    // Panel claro — la acción principal salta a la vista.
+                    color: '#14532D',
+                    background: '#EAF3DE',
+                    border: '1px solid #97C459',
+                  }
                 : {
                     color: '#475569',
                     background: '#F8FAF7',
                     border: '1px solid #D9E2D9',
                   }}
               onMouseEnter={(e) => { if (!activo) { (e.currentTarget as HTMLElement).style.color = '#14532D'; (e.currentTarget as HTMLElement).style.background = '#EEF4EE'; (e.currentTarget as HTMLElement).style.borderColor = '#14532D'; } }}
-              onMouseLeave={(e) => { if (!activo) { (e.currentTarget as HTMLElement).style.color = '#475569'; (e.currentTarget as HTMLElement).style.background = '#F8FAF7'; (e.currentTarget as HTMLElement).style.borderColor = '#D9E2D9'; } }}>
+              onMouseLeave={(e) => {
+                if (activo) return;
+                const el = e.currentTarget as HTMLElement;
+                if (t.id === 'responder') {
+                  el.style.color = '#14532D'; el.style.background = '#EAF3DE'; el.style.borderColor = '#97C459';
+                } else {
+                  el.style.color = '#475569'; el.style.background = '#F8FAF7'; el.style.borderColor = '#D9E2D9';
+                }
+              }}>
               {t.label}
             </button>
           );
@@ -2825,7 +2863,8 @@ function PanelDerecho({
         )}
 
         {/* ── TAB 4: Prórroga / Respuesta ── */}
-        {tab === 'respuesta' && (
+        {/* ── TAB: Prórroga y devolución ── */}
+        {tab === 'prorroga' && (
           <div className="space-y-4">
             {/* Devolver */}
             <div className="rounded-xl p-4 space-y-3" style={{ background: '#FEF2F2', border: '1px solid #FECACA' }}>
@@ -2871,10 +2910,41 @@ function PanelDerecho({
               </button>
             </div>
 
-            {/* Respuesta final */}
-            <div className="rounded-xl p-4 space-y-3" style={{ background: '#F0FDF4', border: '1px solid #BBF7D0' }}>
-              <p className="text-xs font-bold uppercase tracking-widest text-green-700">Cargar respuesta / resolver</p>
+            {guardando && (
+              <div className="flex items-center justify-center gap-2 text-xs" style={{ color: '#94A3B8' }}>
+                <span className="w-3.5 h-3.5 border-2 rounded-full animate-spin"
+                      style={{ borderColor: '#D9E2D9', borderTopColor: '#14532D' }} />
+                Guardando en Firestore…
+              </div>
+            )}
+          </div>
+        )}
 
+        {/* ── TAB: Responder — la acción del día a día, guiada en 3 pasos ── */}
+        {tab === 'responder' && (
+          <div className="space-y-4">
+            {/* Los 3 pasos, siempre visibles: orientan sin estorbar. */}
+            {radicado.estadoActual !== 'RESUELTO' && (
+              <div className="flex items-center gap-3 flex-wrap px-1">
+                {([['1', 'Escribe'], ['2', 'Adjunta (opcional)'], ['3', 'Marca resuelto']] as const).map(([n, texto], i) => (
+                  <div key={n} className="flex items-center gap-1.5">
+                    <span
+                      className="w-5 h-5 rounded-full text-[11px] font-bold flex items-center justify-center shrink-0"
+                      style={i === 0
+                        ? { background: '#14532D', color: '#FFFFFF' }
+                        : { background: '#FFFFFF', border: '1.5px solid #97C459', color: '#3B6D11' }}
+                    >
+                      {n}
+                    </span>
+                    <span className="text-xs" style={{ color: i === 0 ? '#12261A' : '#5F6F64', fontWeight: i === 0 ? 600 : 400 }}>
+                      {texto}
+                    </span>
+                  </div>
+                ))}
+              </div>
+            )}
+
+            <div className="rounded-xl p-4 space-y-3" style={{ background: '#F0FDF4', border: '1px solid #BBF7D0' }}>
               {radicado.respuestaOficial && (
                 <div className="rounded-lg p-3 space-y-1 bg-white" style={{ border: '1px solid #D9E2D9' }}>
                   <p className="text-[10px] font-bold uppercase tracking-widest" style={{ color: '#667085' }}>
@@ -2897,7 +2967,7 @@ function PanelDerecho({
               <div>
                 <div className="flex items-center justify-between mb-1.5 gap-2">
                   <p className="text-[10px] font-bold uppercase tracking-widest" style={{ color: '#667085' }}>
-                    Respuesta oficial (oficio)
+                    1 · La respuesta que recibirá el ciudadano
                   </p>
                   {radicado.estadoActual !== 'RESUELTO' && !soloLectura && (
                     <div className="flex items-center gap-1.5">
@@ -2962,7 +3032,7 @@ function PanelDerecho({
               {radicado.estadoActual !== 'RESUELTO' && (
                 <div>
                   <p className="text-[10px] font-bold uppercase tracking-widest mb-1.5" style={{ color: '#667085' }}>
-                    PDF firmado <span className="normal-case font-normal" style={{ color: '#94A3B8' }}>(opcional)</span>
+                    2 · Oficio firmado <span className="normal-case font-normal" style={{ color: '#94A3B8' }}>(PDF, opcional)</span>
                   </p>
                   {archivoPdf ? (
                     <div className="flex items-center justify-between gap-2 px-3 py-2 rounded-lg"
@@ -2995,6 +3065,20 @@ function PanelDerecho({
                 </div>
               )}
 
+              {/* Panel claro — nadie tiene que adivinar qué hace el botón. */}
+              {radicado.estadoActual !== 'RESUELTO' && !soloLectura && (
+                <div className="rounded-lg px-3 py-2.5" style={{ background: '#EAF3DE', border: '1px solid #C0DD97' }}>
+                  <p className="text-[10px] font-bold uppercase tracking-widest mb-1.5" style={{ color: '#27500A' }}>
+                    3 · Al marcar como resuelto
+                  </p>
+                  <div className="space-y-1 text-[11.5px]" style={{ color: '#3B6D11' }}>
+                    <p>✓ El ciudadano recibe la respuesta por correo automáticamente (si dejó uno)</p>
+                    <p>✓ Queda registrado si respondiste dentro del término</p>
+                    <p>✓ Se podrá registrar la salida 2-SAL del oficio despachado</p>
+                  </div>
+                </div>
+              )}
+
               <button type="button" onClick={responderCaso}
                 disabled={guardando || radicado.estadoActual === 'RESUELTO' || soloLectura}
                 title={soloLectura ? 'Tu rol no permite realizar acciones sobre radicados.' : undefined}
@@ -3021,7 +3105,7 @@ function PanelDerecho({
           <PanelSimi
             radicado={radicado}
             usuario={usuario}
-            onAdoptarRespuesta={(texto) => { setRespuesta(texto); setTab('respuesta'); }}
+            onAdoptarRespuesta={(texto) => { setRespuesta(texto); cambiarTab('responder'); }}
           />
         )}
       </div>
