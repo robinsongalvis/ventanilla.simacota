@@ -4,6 +4,7 @@
  */
 
 import { ejecutarConResiliencia } from '@/lib/ai/resilience';
+import { obtenerClavesGemini, esErrorDeCuota } from '@/lib/ai/gemini-keys';
 
 interface GeminiJuridicoOptions {
   systemPrompt: string;
@@ -22,8 +23,8 @@ interface GeminiJuridicoOptions {
 export async function callGeminiJuridico<T = string>(
   opts: GeminiJuridicoOptions,
 ): Promise<T> {
-  const apiKey = process.env.GEMINI_API_KEY;
-  if (!apiKey) throw new Error('GEMINI_API_KEY_MISSING: Falta configurar GEMINI_API_KEY en Vercel.');
+  const claves = obtenerClavesGemini();
+  if (claves.length === 0) throw new Error('GEMINI_API_KEY_MISSING: Falta configurar GEMINI_API_KEY en Vercel.');
 
   const payload = {
     system_instruction: { parts: [{ text: opts.systemPrompt }] },
@@ -43,7 +44,8 @@ export async function callGeminiJuridico<T = string>(
     ],
   };
 
-  const result = await ejecutarConResiliencia(
+  // Una llamada a Gemini con una clave concreta.
+  const llamarConClave = (apiKey: string) => ejecutarConResiliencia(
     'gemini-juridico',
     async () => {
       const response = await fetch(
@@ -66,11 +68,28 @@ export async function callGeminiJuridico<T = string>(
       if (!text) throw new Error('GEMINI_ERROR: Gemini devolvió respuesta vacía.');
       return text;
     },
-  ).catch((error) => {
-    const message = error instanceof Error ? error.message : String(error);
-    if (message.includes('GEMINI_ERROR')) throw new Error(message);
-    throw new Error(`GEMINI_ERROR: No fue posible conectar con Gemini. ${message}`);
-  });
+  );
+
+  // Rotación: si una clave agotó su cuota (429), se prueba la siguiente.
+  let result: string | undefined;
+  let ultimoError = '';
+  for (let i = 0; i < claves.length; i += 1) {
+    try {
+      result = await llamarConClave(claves[i]);
+      break;
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      ultimoError = message;
+      // Solo la cuota agotada se resuelve rotando; otros errores no.
+      if (esErrorDeCuota(message) && i < claves.length - 1) continue;
+      throw new Error(message.includes('GEMINI_ERROR')
+        ? message
+        : `GEMINI_ERROR: No fue posible conectar con Gemini. ${message}`);
+    }
+  }
+  if (result === undefined) {
+    throw new Error(ultimoError || 'GEMINI_ERROR: No fue posible conectar con Gemini.');
+  }
 
   if (opts.expectJson) {
     try {
