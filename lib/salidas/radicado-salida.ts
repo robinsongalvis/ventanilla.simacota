@@ -1,6 +1,3 @@
-import { doc, runTransaction } from 'firebase/firestore';
-import { getDb } from '@/lib/firebase';
-
 /**
  * Sprint Radicación de salida — serie propia de correspondencia
  * DESPACHADA por la administración.
@@ -13,6 +10,10 @@ import { getDb } from '@/lib/firebase';
  * continua auditable — sin huecos ni duplicados — y el amarre
  * entrada↔salida vive en el documento y la trazabilidad, no en el
  * número.
+ *
+ * Fase B: el consecutivo se genera SIEMPRE server-side (Admin SDK, en
+ * /api/salidas/registrar y /api/dependencias/registro-expres); aquí
+ * solo vive el formato de la serie.
  */
 
 export function formatearRadicadoSalida(
@@ -21,33 +22,4 @@ export function formatearRadicadoSalida(
 ): string {
   const year = fecha.getFullYear();
   return `2-SAL-${year}-${String(consecutivo).padStart(8, '0')}`;
-}
-
-export async function generarRadicadoSalida(
-  fecha = new Date(),
-): Promise<{ consecutivo: number; salidaId: string }> {
-  const db = getDb();
-  const year = fecha.getFullYear();
-  const counterRef = doc(db, 'counters', `salidas-${year}`);
-
-  return runTransaction(db, async (transaction) => {
-    const snap = await transaction.get(counterRef);
-    const actual = snap.exists() ? Number(snap.data().ultimo ?? 0) : 0;
-    const siguiente = actual + 1;
-
-    transaction.set(
-      counterRef,
-      {
-        ultimo: siguiente,
-        anio: year,
-        actualizadoEn: new Date().toISOString(),
-      },
-      { merge: true },
-    );
-
-    return {
-      consecutivo: siguiente,
-      salidaId: formatearRadicadoSalida(siguiente, fecha),
-    };
-  });
 }

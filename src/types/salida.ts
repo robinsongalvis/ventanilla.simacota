@@ -50,6 +50,8 @@ export interface SalidaOficial {
     uid:    string;
     nombre: string;
   };
-  /** Fase B: path del PDF del oficio en Storage. */
+  /** Fase B: path del PDF del oficio en Storage (`salidas/{salidaId}/...`). */
   archivoPath?:  string | null;
+  /** Fase B: nombre original del PDF, para mostrarlo en el libro. */
+  archivoNombre?: string | null;
 }

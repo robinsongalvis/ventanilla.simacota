@@ -49,6 +49,14 @@ service firebase.storage {
       allow read, write: if false;
     }
 
+    // Fase B · PDF adjunto — oficios de salida 2-SAL.
+    // Escritura SOLO por Admin SDK desde /api/salidas/registrar; el libro
+    // es inmutable y su archivo también. Lectura solo via Admin SDK en
+    // /api/interno/archivo (autorizarDescargaSalida) — nunca directa.
+    match /salidas/{salidaId}/{archivo} {
+      allow read, write: if false;
+    }
+
     match /{path=**} {
       allow read, write: if false;
     }

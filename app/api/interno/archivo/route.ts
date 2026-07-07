@@ -23,12 +23,16 @@ import {
 import { getFirebaseAdminDb, getFirebaseAdminStorage } from '@/lib/firebase-admin';
 import {
   aRadicadoParaDescarga,
+  aSalidaParaDescarga,
   autorizarDescargaArchivo,
+  autorizarDescargaSalida,
   parsearPathArchivo,
+  type ResultadoAutorizacion,
 } from '@/lib/seguridad/autorizar-descarga-archivo';
 import { registrarDescargaAuditoria } from '@/lib/seguridad/auditoria-descargas';
 import { logError } from '@/lib/logger';
 import type { VentanillaRadicado } from '@/src/types/ventanilla';
+import type { SalidaOficial } from '@/src/types/salida';
 
 export const runtime = 'nodejs';
 
@@ -60,28 +64,41 @@ export async function GET(request: Request): Promise<NextResponse> {
     return denegado(400, 'La ruta del archivo no es válida.');
   }
 
-  // 3. Cargar el radicado al que pertenece el archivo según el path.
-  let radicado: VentanillaRadicado | null = null;
+  // 3-4. Cargar el documento dueño según el prefijo y decidir la
+  // autorización (pertenencia anti-IDOR + rol + dependencia). Los
+  // oficios de salida (Fase B) pertenecen a `ventanilla_salidas`; todo
+  // lo demás sigue girando alrededor del radicado.
+  let decision: ResultadoAutorizacion;
   try {
-    const snap = await getFirebaseAdminDb()
-      .doc(`ventanilla_radicados/${parsed.radicadoId}`)
-      .get();
-    radicado = snap.exists ? (snap.data() as VentanillaRadicado) : null;
+    if (parsed.prefijo === 'salidas') {
+      const snap = await getFirebaseAdminDb()
+        .doc(`ventanilla_salidas/${parsed.radicadoId}`)
+        .get();
+      const salida = snap.exists ? (snap.data() as SalidaOficial) : null;
+      decision = autorizarDescargaSalida({
+        path,
+        usuario,
+        salida: aSalidaParaDescarga(salida),
+      });
+    } else {
+      const snap = await getFirebaseAdminDb()
+        .doc(`ventanilla_radicados/${parsed.radicadoId}`)
+        .get();
+      const radicado = snap.exists ? (snap.data() as VentanillaRadicado) : null;
+      decision = autorizarDescargaArchivo({
+        path,
+        usuario,
+        radicado: aRadicadoParaDescarga(radicado),
+      });
+    }
   } catch (err) {
     logError({
       radicadoId: parsed.radicadoId,
-      modulo: 'interno/archivo/leer-radicado',
+      modulo: 'interno/archivo/leer-documento',
       error: err,
     });
     return denegado(500, 'No fue posible generar la descarga. Intente nuevamente.');
   }
-
-  // 4. Decisión de autorización (pertenencia + rol + dependencia).
-  const decision = autorizarDescargaArchivo({
-    path,
-    usuario,
-    radicado: aRadicadoParaDescarga(radicado),
-  });
 
   if (!decision.ok) {
     // Auditoría de denegación: información mínima de seguridad, sin path completo.
@@ -145,7 +162,7 @@ export async function GET(request: Request): Promise<NextResponse> {
       evento:        'ARCHIVO_DESCARGA_AUTORIZADA',
       radicadoId:    decision.radicadoId,
       archivoNombre: (path.split('/').pop() ?? '').slice(0, 200),
-      tipoArchivo:   decision.tipoArchivo as 'adjunto' | 'respuestaOficial',
+      tipoArchivo:   decision.tipoArchivo,
       actorUid:      usuario.uid,
       actorNombre:   usuario.nombre,
       actorRol:      usuario.rol,
