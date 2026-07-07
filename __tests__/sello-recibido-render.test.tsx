@@ -16,19 +16,24 @@ function props(overrides = {}) {
     radicadoId:    '1-OFICIO-2026-00000019',
     fechaRadicado: '2026-07-02T15:31:00.000Z',
     horaRadicado:  '10:31',
-    dependencia:   'Ventanilla Única',
     ...overrides,
   };
 }
 
 describe('Recepción — SelloRecibido', () => {
   /* 1 · contenido oficial del sello */
-  it('muestra alcaldía, radicado, dependencia y el botón de imprimir', () => {
+  it('muestra alcaldía, radicado y el botón de imprimir', () => {
     render(<SelloRecibido {...props()} />);
     expect(screen.getByText(/Alcaldía Municipal de Simacota/i)).toBeTruthy();
     expect(screen.getByText('1-OFICIO-2026-00000019')).toBeTruthy();
-    expect(screen.getByText(/Dependencia: Ventanilla Única/i)).toBeTruthy();
     expect(screen.getByRole('button', { name: /Imprimir sello de recibido/i })).toBeTruthy();
+  });
+
+  /* 1b · documento público: el sello NO imprime direccionamiento interno */
+  it('no muestra ninguna línea de dependencia', () => {
+    render(<SelloRecibido {...props()} />);
+    expect(screen.queryByText(/Dependencia:/i)).toBeNull();
+    expect(screen.queryByText(/Dirigido a:/i)).toBeNull();
   });
 
   /* 2 · el logo institucional es el mismo asset del sistema */

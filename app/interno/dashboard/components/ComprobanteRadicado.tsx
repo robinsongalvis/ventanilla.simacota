@@ -333,7 +333,9 @@ export function ComprobanteRadicado({
               value={`${diasRespuesta} días ${unidad === 'HABILES' ? 'hábiles' : 'calendario'}`}
             />
             <Row label="Fecha límite" value={formatFecha(fechaVencimiento)} />
-            <Row label="Dependencia" value={TENANT_LABEL[dependencia] ?? dependencia} />
+            {/* Documento público: "Radicado en" siempre es verdad; el
+                direccionamiento interno no se imprime. */}
+            <Row label="Radicado en" value={TENANT_LABEL[dependencia] ?? dependencia} />
             <Row label="Funcionario" value={funcionarioNombre} />
           </tbody>
         </table>

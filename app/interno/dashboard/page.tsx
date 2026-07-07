@@ -3278,7 +3278,6 @@ function DrawerNuevoRadicado({
                   radicadoId={radicadoGenerado}
                   fechaRadicado={datosComprobante.fechaRadicado}
                   horaRadicado={datosComprobante.horaRadicado}
-                  dependencia={NOMBRES_TENANT[usuario.tenantId] ?? 'Ventanilla Única'}
                   numeroFolios={datosComprobante.numeroFolios}
                   numeroAnexos={datosComprobante.numeroAnexos}
                   mediosAnexos={datosComprobante.mediosAnexos}

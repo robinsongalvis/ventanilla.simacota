@@ -46,8 +46,6 @@ export interface SelloRecibidoProps {
   radicadoId:    string;
   fechaRadicado: string;
   horaRadicado:  string;
-  /** Nombre legible de la dependencia (default: Ventanilla Única). */
-  dependencia?:  string;
   numeroFolios?: number;
   numeroAnexos?: number;
   /** Texto corto de medios entregados ("CD, USB"), si aplica. */
@@ -58,7 +56,6 @@ export function SelloRecibido({
   radicadoId,
   fechaRadicado,
   horaRadicado,
-  dependencia = 'Ventanilla Única',
   numeroFolios = 0,
   numeroAnexos = 0,
   mediosAnexos = null,
@@ -146,11 +143,14 @@ export function SelloRecibido({
               {radicadoId}
             </p>
 
+            {/* El sello es un documento PÚBLICO: certifica solo lo que
+                siempre es verdad (la Alcaldía recibió, cuándo y qué). El
+                direccionamiento interno vive en el sistema, donde un
+                traslado es un evento normal, no un error impreso. */}
             <div className="mt-1 space-y-px" style={{ color: '#3A4551' }}>
               <p className="text-[9px]">
                 Fecha: {formatFechaInstitucional(fechaRadicado)} · Hora: {formatHoraInstitucional(horaRadicado)}
               </p>
-              <p className="text-[9px]">Dependencia: {dependencia}</p>
               {hayFisico && (
                 <p className="text-[9px]">
                   Folios: {numeroFolios} · Anexos: {numeroAnexos}
