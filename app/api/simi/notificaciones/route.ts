@@ -18,7 +18,7 @@ async function verificarSesion() {
   const sc = cookieStore.get(SESSION_COOKIE_NAME)?.value;
   if (!sc) return null;
   try {
-    const decoded = await getFirebaseAdminAuth().verifySessionCookie(sc, false);
+    const decoded = await getFirebaseAdminAuth().verifySessionCookie(sc, true);
     const snap = await getFirebaseAdminDb().doc(`users/${decoded.uid}`).get();
     if (!snap.exists) return null;
     const d = snap.data()!;
@@ -57,7 +57,8 @@ export async function GET(request: Request): Promise<NextResponse> {
 
     return NextResponse.json({ ok: true, notificaciones: notifs, sinLeer });
   } catch (err) {
-    return NextResponse.json({ error: String(err) }, { status: 500 });
+    console.error('[api]', err);
+    return NextResponse.json({ error: 'Ocurrió un error interno. Intente de nuevo.' }, { status: 500 });
   }
 }
 
