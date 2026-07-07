@@ -35,6 +35,7 @@ import { VistaSalidas }                    from '@/app/interno/dashboard/compone
 import { VistaMiGestion }                  from '@/app/interno/dashboard/components/mi-gestion/VistaMiGestion';
 import { useSalidas }                      from '@/lib/hooks/useSalidas';
 import { filtrarSalidasPorPreset, resumenSalidas } from '@/lib/salidas/reporte-salidas';
+import { construirHistoria, type FiltroHistoria, type TonoEvento } from '@/lib/trazabilidad/humanizar-evento';
 import type { SalidaOficial }              from '@/src/types/salida';
 import { BusquedaAvanzadaPanel }           from '@/app/interno/dashboard/components/BusquedaAvanzadaPanel';
 import { VistaVentanilla }                 from '@/app/interno/dashboard/components/ventanilla/VistaVentanilla';
@@ -1652,6 +1653,28 @@ const TABS_PANEL: { id: TabPanelId; label: string }[] = [
   { id: 'copiloto',     label: 'SIMI ✦' },
 ];
 
+/* Sprint Panel claro — paleta e íconos de la Historia por tono. */
+const TONO_HISTORIA: Record<TonoEvento, { bg: string; fg: string }> = {
+  VERDE:  { bg: '#EAF3DE', fg: '#3B6D11' },
+  AZUL:   { bg: '#E6F1FB', fg: '#185FA5' },
+  AMBAR:  { bg: '#FAEEDA', fg: '#854F0B' },
+  ROJO:   { bg: '#FCEBEB', fg: '#A32D2D' },
+  GRIS:   { bg: '#EEF2F5', fg: '#5F6F64' },
+  DORADO: { bg: '#F7EFD8', fg: '#8A6A12' },
+};
+
+const ICONO_HISTORIA: Record<TonoEvento, string> = {
+  // Paths de Heroicons outline, elegidos por significado del tono:
+  // verde nace/avanza, azul se mueve, ámbar advierte, rojo falla,
+  // gris es sistema, dorado despacha.
+  VERDE:  'M9 12.75L11.25 15 15 9.75M21 12a9 9 0 11-18 0 9 9 0 0118 0z',
+  AZUL:   'M13.5 4.5L21 12m0 0l-7.5 7.5M21 12H3',
+  AMBAR:  'M12 9v3.75m-9.303 3.376c-.866 1.5.217 3.374 1.948 3.374h14.71c1.73 0 2.813-1.874 1.948-3.374L13.949 3.378c-.866-1.5-3.032-1.5-3.898 0L2.697 16.126zM12 15.75h.007v.008H12v-.008z',
+  ROJO:   'M12 9v3.75m0 3.75h.008v.008H12v-.008zM21 12a9 9 0 11-18 0 9 9 0 0118 0z',
+  GRIS:   'M21.75 6.75v10.5a2.25 2.25 0 01-2.25 2.25h-15a2.25 2.25 0 01-2.25-2.25V6.75m19.5 0A2.25 2.25 0 0019.5 4.5h-15a2.25 2.25 0 00-2.25 2.25m19.5 0v.243a2.25 2.25 0 01-1.07 1.916l-7.5 4.615a2.25 2.25 0 01-2.36 0L3.32 8.91a2.25 2.25 0 01-1.07-1.916V6.75',
+  DORADO: 'M6 12L3.269 3.126A59.768 59.768 0 0121.485 12 59.77 59.77 0 013.27 20.876L5.999 12zm0 0h7.5',
+};
+
 function FilaInfo({ label, value }: { label: string; value: string }) {
   return (
     <div>
@@ -1849,6 +1872,12 @@ function PanelDerecho({
   const [mensajeOk,        setMensajeOk]        = useState<string | null>(null);
   const [errorLocal,       setErrorLocal]       = useState<string | null>(null);
   const [trazabilidad,         setTrazabilidad]         = useState<TrazabilidadRadicado[]>([]);
+  // Sprint Panel claro — la Historia humanizada y su filtro.
+  const [filtroHistoria, setFiltroHistoria] = useState<FiltroHistoria>('TODO');
+  const historia = useMemo(
+    () => construirHistoria(trazabilidad, new Date(), filtroHistoria),
+    [trazabilidad, filtroHistoria],
+  );
   const [cargandoTrazabilidad, setCargandoTrazabilidad] = useState(false);
   // Panel Op Fase 1 — último evento de trazabilidad para el resumen ejecutivo.
   // Se carga con limit(1) al abrir el radicado y cuando cambia la marca
@@ -2815,49 +2844,88 @@ function PanelDerecho({
         )}
 
         {/* ── TAB 3: Trazabilidad MIPG ── */}
+        {/* Sprint Panel claro — la Historia del caso, contada en humano.
+            Los códigos siguen intactos en Firestore; aquí solo se
+            traducen, se pliegan los correos y se agrupan los días. */}
         {tab === 'trazabilidad' && (
           <div>
             {cargandoTrazabilidad ? (
               <div className="flex items-center gap-2 text-sm" style={{ color: '#94A3B8' }}>
                 <span className="w-4 h-4 border-2 rounded-full animate-spin"
                       style={{ borderColor: '#D9E2D9', borderTopColor: '#14532D' }} />
-                Cargando trazabilidad...
+                Cargando la historia…
               </div>
             ) : trazabilidad.length === 0 ? (
-              <p className="text-sm italic" style={{ color: '#94A3B8' }}>Sin eventos de trazabilidad.</p>
+              <p className="text-sm italic" style={{ color: '#94A3B8' }}>Este radicado aún no tiene historia registrada.</p>
             ) : (
-              <ol className="relative flex flex-col gap-0">
-                {[...trazabilidad]
-                  .sort((a, b) => new Date(b.fecha).getTime() - new Date(a.fecha).getTime())
-                  .map((evento, idx, arr) => (
-                    <li key={`${evento.fecha}-${idx}`} className="relative flex gap-3 pb-5 last:pb-0">
-                      {idx < arr.length - 1 && (
-                        <div className="absolute left-[9px] top-5 bottom-0 w-px" style={{ background: '#D9E2D9' }} />
-                      )}
-                      <div className="shrink-0 w-[18px] h-[18px] mt-0.5 rounded-full flex items-center justify-center z-10"
-                           style={{ background: '#EEF4EE', border: '2px solid #14532D' }}>
-                        <span className="w-1.5 h-1.5 rounded-full" style={{ background: '#14532D' }} />
-                      </div>
-                      <div className="flex-1 min-w-0">
-                        <div className="flex items-baseline justify-between gap-2 flex-wrap mb-0.5">
-                          <span className="text-xs font-semibold" style={{ color: '#1F2933' }}>{evento.accion}</span>
-                          <time className="shrink-0 text-[10px] font-mono" style={{ color: '#94A3B8' }}>
-                            {fmtFechaLarga(evento.fecha)}
-                          </time>
-                        </div>
-                        <p className="text-xs" style={{ color: '#667085' }}>{evento.actorNombre}</p>
-                        <p className="text-xs mt-0.5 leading-relaxed" style={{ color: '#94A3B8' }}>{evento.nota}</p>
-                        {(evento.oficinaOrigen || evento.oficinaDestino) && (
-                          <p className="text-[10px] font-mono mt-0.5" style={{ color: '#94A3B8' }}>
-                            {evento.oficinaOrigen && NOMBRES_TENANT[evento.oficinaOrigen]}
-                            {evento.oficinaOrigen && evento.oficinaDestino && ' → '}
-                            {evento.oficinaDestino && NOMBRES_TENANT[evento.oficinaDestino]}
-                          </p>
-                        )}
-                      </div>
-                    </li>
+              <div className="space-y-4">
+                <div className="flex gap-1.5 flex-wrap">
+                  {([['TODO', 'Todo'], ['ACTUACIONES', 'Solo actuaciones'], ['CORREOS', 'Correos']] as [FiltroHistoria, string][]).map(([id, etiqueta]) => (
+                    <button
+                      key={id}
+                      type="button"
+                      onClick={() => setFiltroHistoria(id)}
+                      aria-pressed={filtroHistoria === id}
+                      className="text-[11px] font-semibold px-3 py-1 rounded-full transition-colors"
+                      style={filtroHistoria === id
+                        ? { background: '#14532D', color: '#FFFFFF', border: '1px solid #14532D' }
+                        : { background: '#FFFFFF', color: '#475569', border: '1px solid #D9E2D9' }}
+                    >
+                      {etiqueta}
+                    </button>
                   ))}
-              </ol>
+                </div>
+
+                {historia.length === 0 && (
+                  <p className="text-xs italic" style={{ color: '#94A3B8' }}>Nada que mostrar con este filtro.</p>
+                )}
+
+                {historia.map((dia) => (
+                  <div key={dia.ymd}>
+                    <p className="text-[10px] font-bold uppercase tracking-widest mb-2" style={{ color: '#7A8B7F' }}>
+                      {dia.etiqueta}
+                    </p>
+                    <div className="space-y-2">
+                      {dia.eventos.map((e) => {
+                        const tono = TONO_HISTORIA[e.tono];
+                        return (
+                          <div key={e.id} className="flex gap-2.5 rounded-xl bg-white px-3 py-2.5" style={{ border: '1px solid #E3EAE3' }}>
+                            <span
+                              className="shrink-0 w-[30px] h-[30px] rounded-full flex items-center justify-center"
+                              style={{ background: tono.bg }}
+                              aria-hidden="true"
+                            >
+                              <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke={tono.fg} strokeWidth={1.8}>
+                                <path strokeLinecap="round" strokeLinejoin="round" d={ICONO_HISTORIA[e.tono]} />
+                              </svg>
+                            </span>
+                            <div className="flex-1 min-w-0">
+                              <div className="flex items-baseline justify-between gap-2">
+                                <p className="text-[12.5px] font-semibold leading-snug" style={{ color: '#12261A' }}>{e.titulo}</p>
+                                <time className="shrink-0 text-[10px]" style={{ color: '#94A3B8' }}>{e.hora}</time>
+                              </div>
+                              {e.actor && (
+                                <p className="text-[11px] mt-0.5" style={{ color: '#667085' }}>Por {e.actor}</p>
+                              )}
+                              {e.detalle && (
+                                <p className="text-[11.5px] mt-0.5 leading-relaxed" style={{ color: '#5F6F64' }}>{e.detalle}</p>
+                              )}
+                              {e.correos.map((c, i) => (
+                                <p key={i} className="text-[10.5px] mt-1 flex items-center gap-1" style={{ color: '#94A3B8' }}>
+                                  <svg className="w-3 h-3 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.8}>
+                                    <path strokeLinecap="round" strokeLinejoin="round" d={ICONO_HISTORIA.GRIS} />
+                                  </svg>
+                                  {c.texto}
+                                </p>
+                              ))}
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </div>
+                ))}
+              </div>
             )}
           </div>
         )}
