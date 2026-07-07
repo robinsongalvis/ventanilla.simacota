@@ -8,7 +8,8 @@ afterEach(() => cleanup());
    Sprint Recepción fluida — sello digital de recibido.
 
    El sello marca la copia física del ciudadano: pequeño, oficial,
-   esquina superior izquierda. Nunca una hoja completa.
+   en la esquina que la funcionaria elija (default: superior derecha).
+   Nunca una hoja completa.
 ══════════════════════════════════════════════════════════════ */
 
 function props(overrides = {}) {
@@ -58,6 +59,33 @@ describe('Recepción — SelloRecibido', () => {
   it('clic en imprimir llama window.print', () => {
     const printSpy = vi.spyOn(window, 'print').mockImplementation(() => {});
     render(<SelloRecibido {...props()} />);
+    fireEvent.click(screen.getByRole('button', { name: /Imprimir sello de recibido/i }));
+    expect(printSpy).toHaveBeenCalledOnce();
+    printSpy.mockRestore();
+  });
+
+  /* 5 · selector de esquina: default superior derecha, cambiable */
+  it('arranca en superior derecha y permite elegir otra esquina', () => {
+    render(<SelloRecibido {...props()} />);
+    const supDer = screen.getByRole('button', { name: /Sup\. derecha/i });
+    const infIzq = screen.getByRole('button', { name: /Inf\. izquierda/i });
+    expect(supDer.getAttribute('aria-pressed')).toBe('true');
+    expect(infIzq.getAttribute('aria-pressed')).toBe('false');
+
+    fireEvent.click(infIzq);
+    expect(infIzq.getAttribute('aria-pressed')).toBe('true');
+    expect(supDer.getAttribute('aria-pressed')).toBe('false');
+  });
+
+  /* 6 · la esquina elegida manda en los estilos de impresión */
+  it('imprime con la posición de la esquina elegida', () => {
+    const printSpy = vi.spyOn(window, 'print').mockImplementation(() => {
+      const tag = document.getElementById('sello-recibido-print-styles');
+      expect(tag?.textContent).toContain('bottom: 0');
+      expect(tag?.textContent).toContain('right: 0');
+    });
+    render(<SelloRecibido {...props()} />);
+    fireEvent.click(screen.getByRole('button', { name: /Inf\. derecha/i }));
     fireEvent.click(screen.getByRole('button', { name: /Imprimir sello de recibido/i }));
     expect(printSpy).toHaveBeenCalledOnce();
     printSpy.mockRestore();
