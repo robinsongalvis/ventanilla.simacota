@@ -2,7 +2,7 @@ import { NextResponse } from 'next/server';
 import { CLASSIFIER_PROMPT, CLASSIFIER_SCHEMA } from '@/lib/ai/prompts/classifier';
 import { registrarLogIA } from '@/lib/ai/telemetry';
 import { ejecutarConResiliencia } from '@/lib/ai/resilience';
-import { checkRateLimit, getClientIp, rateLimitHeaders } from '@/lib/ai/rate-limit';
+import { evaluarAccesoIA } from '@/lib/ai/guard-publico-ia';
 
 function ejecutarClasificacionLocal(asunto: string, descripcion: string, isFallbackError = false) {
   const text = `${asunto || ''} ${descripcion}`.toLowerCase();
@@ -54,21 +54,21 @@ export async function POST(request: Request) {
   const apiKey = process.env.GEMINI_API_KEY;
   let asunto = '';
   let descripcion = '';
-  const limite = { maxRequests: 15, windowMs: 60_000 };
-  const ip = getClientIp(request);
-  const bloqueado = checkRateLimit(`ai:classify:${ip}`, limite);
 
-  if (bloqueado) {
+  // C-1: guard compartido (origen + rate limit en Firestore).
+  const acceso = await evaluarAccesoIA(request, 'classify');
+  if (!acceso.permitido) {
     return NextResponse.json(
       {
         ...ejecutarClasificacionLocal('', '', true),
-        resumenEjecutivo:
-          'SIMI recibió muchas solicitudes de clasificación seguidas. ' +
-          'Espere un momento e intente nuevamente.',
+        resumenEjecutivo: acceso.motivo === 'ORIGEN'
+          ? 'No fue posible procesar la clasificación desde este origen.'
+          : 'SIMI recibió muchas solicitudes de clasificación seguidas. ' +
+            'Espere un momento e intente nuevamente.',
       },
       {
-        status: 429,
-        headers: rateLimitHeaders(limite.maxRequests, bloqueado.retryAfterSeconds),
+        status: acceso.status ?? 429,
+        headers: acceso.retryAfterSeconds ? { 'Retry-After': String(acceso.retryAfterSeconds) } : {},
       },
     );
   }

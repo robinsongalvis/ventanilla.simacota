@@ -2,7 +2,7 @@ import { NextResponse } from 'next/server';
 import { SIMI_SYSTEM_PROMPT } from '@/lib/ai/prompts/simi';
 import { registrarLogIA } from '@/lib/ai/telemetry';
 import { ejecutarConResiliencia } from '@/lib/ai/resilience';
-import { checkRateLimit, getClientIp, rateLimitHeaders } from '@/lib/ai/rate-limit';
+import { evaluarAccesoIA } from '@/lib/ai/guard-publico-ia';
 import type { DatosExtraidos } from '@/src/types/simi';
 
 /* ══════════════════════════════════════════════════════════════
@@ -82,21 +82,21 @@ export async function POST(request: Request): Promise<NextResponse<RespuestaChat
   const inicio = Date.now();
   const apiKey = process.env.GEMINI_API_KEY;
   let body: ChatRequestBody = { messages: [] };
-  const limite = { maxRequests: 10, windowMs: 60_000 };
-  const ip = getClientIp(request);
-  const bloqueado = checkRateLimit(`ai:chat:${ip}`, limite);
 
-  if (bloqueado) {
+  // C-1: guard compartido (origen + rate limit en Firestore).
+  const acceso = await evaluarAccesoIA(request, 'chat');
+  if (!acceso.permitido) {
     return NextResponse.json(
       {
         role: 'assistant',
-        content:
-          'SIMI recibió muchas solicitudes seguidas desde esta conexión. ' +
-          'Espere un momento e intente nuevamente para continuar con la atención.',
+        content: acceso.motivo === 'ORIGEN'
+          ? 'No fue posible procesar la solicitud desde este origen.'
+          : 'SIMI recibió muchas solicitudes seguidas desde esta conexión. ' +
+            'Espere un momento e intente nuevamente para continuar con la atención.',
       },
       {
-        status: 429,
-        headers: rateLimitHeaders(limite.maxRequests, bloqueado.retryAfterSeconds),
+        status: acceso.status ?? 429,
+        headers: acceso.retryAfterSeconds ? { 'Retry-After': String(acceso.retryAfterSeconds) } : {},
       },
     );
   }
