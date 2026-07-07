@@ -35,6 +35,7 @@ export async function GET(): Promise<NextResponse> {
     const metricas = await calculateQualityMetrics(tenantId);
     return NextResponse.json({ ok: true, metricas });
   } catch (err) {
-    return NextResponse.json({ error: String(err) }, { status: 500 });
+    console.error('[api]', err);
+    return NextResponse.json({ error: 'Ocurrió un error interno. Intente de nuevo.' }, { status: 500 });
   }
 }
