@@ -35,6 +35,7 @@ import { VistaSalidas }                    from '@/app/interno/dashboard/compone
 import { VistaMiGestion }                  from '@/app/interno/dashboard/components/mi-gestion/VistaMiGestion';
 import { useSalidas }                      from '@/lib/hooks/useSalidas';
 import { filtrarSalidasPorPreset, resumenSalidas } from '@/lib/salidas/reporte-salidas';
+import { construirHistoria, type FiltroHistoria, type TonoEvento } from '@/lib/trazabilidad/humanizar-evento';
 import type { SalidaOficial }              from '@/src/types/salida';
 import { BusquedaAvanzadaPanel }           from '@/app/interno/dashboard/components/BusquedaAvanzadaPanel';
 import { VistaVentanilla }                 from '@/app/interno/dashboard/components/ventanilla/VistaVentanilla';
@@ -1637,15 +1638,42 @@ function TablaRadicados({
    SUB-COMPONENTE: PanelDerecho (5 tabs)
 ══════════════════════════════════════════════════════════════ */
 
-type TabPanelId = 'info' | 'traslado' | 'trazabilidad' | 'respuesta' | 'copiloto';
+type TabPanelId = 'info' | 'responder' | 'trazabilidad' | 'traslado' | 'prorroga' | 'copiloto';
 
+/* Sprint Panel claro — Responder deja de compartir pestaña con la
+   prórroga: es LA acción del día a día y merece su propio lugar,
+   resaltado. La trazabilidad pasa a llamarse "Historia" (mismo id
+   interno para no tocar efectos ni carga). */
 const TABS_PANEL: { id: TabPanelId; label: string }[] = [
   { id: 'info',         label: 'Información' },
+  { id: 'responder',    label: 'Responder' },
+  { id: 'trazabilidad', label: 'Historia' },
   { id: 'traslado',     label: 'Traslado' },
-  { id: 'trazabilidad', label: 'Trazabilidad' },
-  { id: 'respuesta',    label: 'Prórroga / Resp.' },
+  { id: 'prorroga',     label: 'Prórroga' },
   { id: 'copiloto',     label: 'SIMI ✦' },
 ];
+
+/* Sprint Panel claro — paleta e íconos de la Historia por tono. */
+const TONO_HISTORIA: Record<TonoEvento, { bg: string; fg: string }> = {
+  VERDE:  { bg: '#EAF3DE', fg: '#3B6D11' },
+  AZUL:   { bg: '#E6F1FB', fg: '#185FA5' },
+  AMBAR:  { bg: '#FAEEDA', fg: '#854F0B' },
+  ROJO:   { bg: '#FCEBEB', fg: '#A32D2D' },
+  GRIS:   { bg: '#EEF2F5', fg: '#5F6F64' },
+  DORADO: { bg: '#F7EFD8', fg: '#8A6A12' },
+};
+
+const ICONO_HISTORIA: Record<TonoEvento, string> = {
+  // Paths de Heroicons outline, elegidos por significado del tono:
+  // verde nace/avanza, azul se mueve, ámbar advierte, rojo falla,
+  // gris es sistema, dorado despacha.
+  VERDE:  'M9 12.75L11.25 15 15 9.75M21 12a9 9 0 11-18 0 9 9 0 0118 0z',
+  AZUL:   'M13.5 4.5L21 12m0 0l-7.5 7.5M21 12H3',
+  AMBAR:  'M12 9v3.75m-9.303 3.376c-.866 1.5.217 3.374 1.948 3.374h14.71c1.73 0 2.813-1.874 1.948-3.374L13.949 3.378c-.866-1.5-3.032-1.5-3.898 0L2.697 16.126zM12 15.75h.007v.008H12v-.008z',
+  ROJO:   'M12 9v3.75m0 3.75h.008v.008H12v-.008zM21 12a9 9 0 11-18 0 9 9 0 0118 0z',
+  GRIS:   'M21.75 6.75v10.5a2.25 2.25 0 01-2.25 2.25h-15a2.25 2.25 0 01-2.25-2.25V6.75m19.5 0A2.25 2.25 0 0019.5 4.5h-15a2.25 2.25 0 00-2.25 2.25m19.5 0v.243a2.25 2.25 0 01-1.07 1.916l-7.5 4.615a2.25 2.25 0 01-2.36 0L3.32 8.91a2.25 2.25 0 01-1.07-1.916V6.75',
+  DORADO: 'M6 12L3.269 3.126A59.768 59.768 0 0121.485 12 59.77 59.77 0 013.27 20.876L5.999 12zm0 0h7.5',
+};
 
 function FilaInfo({ label, value }: { label: string; value: string }) {
   return (
@@ -1798,6 +1826,24 @@ function PanelDerecho({
   onToggleModo?: () => void;
 }) {
   const [tab,              setTab]              = useState<TabPanelId>('info');
+  // Sprint Panel claro — Responder se abre con espacio: el panel entra
+  // a modo amplio solo y vuelve al ancho normal al salir (a menos que
+  // la persona lo haya ajustado a mano mientras tanto).
+  const amplioAutomatico = useRef(false);
+  const cambiarTab = (id: TabPanelId) => {
+    if (onToggleModo) {
+      if (id === 'responder' && !modoAmplio) {
+        amplioAutomatico.current = true;
+        onToggleModo();
+      } else if (id !== 'responder' && tab === 'responder' && amplioAutomatico.current) {
+        amplioAutomatico.current = false;
+        if (modoAmplio) onToggleModo();
+      }
+    }
+    setTab(id);
+    setMensajeOk(null);
+    setErrorLocal(null);
+  };
   // Sprint Radicación de salida — registrar despacho amarrado a esta entrada.
   const [salidaDetalleAbierta, setSalidaDetalleAbierta] = useState(false);
   // Fase B — tras resolver, ofrecer registrar la salida 2-SAL de una vez.
@@ -1826,6 +1872,12 @@ function PanelDerecho({
   const [mensajeOk,        setMensajeOk]        = useState<string | null>(null);
   const [errorLocal,       setErrorLocal]       = useState<string | null>(null);
   const [trazabilidad,         setTrazabilidad]         = useState<TrazabilidadRadicado[]>([]);
+  // Sprint Panel claro — la Historia humanizada y su filtro.
+  const [filtroHistoria, setFiltroHistoria] = useState<FiltroHistoria>('TODO');
+  const historia = useMemo(
+    () => construirHistoria(trazabilidad, new Date(), filtroHistoria),
+    [trazabilidad, filtroHistoria],
+  );
   const [cargandoTrazabilidad, setCargandoTrazabilidad] = useState(false);
   // Panel Op Fase 1 — último evento de trazabilidad para el resumen ejecutivo.
   // Se carga con limit(1) al abrir el radicado y cuando cambia la marca
@@ -2260,7 +2312,7 @@ function PanelDerecho({
             <button key={t.id}
               role="tab"
               aria-selected={activo}
-              onClick={() => { setTab(t.id); setMensajeOk(null); setErrorLocal(null); }}
+              onClick={() => cambiarTab(t.id)}
               className="shrink-0 px-3 py-1.5 rounded-lg text-[11px] font-bold uppercase tracking-wider whitespace-nowrap focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-700/30 transition-all duration-150"
               style={activo
                 ? {
@@ -2269,13 +2321,28 @@ function PanelDerecho({
                     border: '1px solid #14532D',
                     boxShadow: '0 1px 3px rgba(20,83,45,0.30)',
                   }
+                : t.id === 'responder'
+                ? {
+                    // Panel claro — la acción principal salta a la vista.
+                    color: '#14532D',
+                    background: '#EAF3DE',
+                    border: '1px solid #97C459',
+                  }
                 : {
                     color: '#475569',
                     background: '#F8FAF7',
                     border: '1px solid #D9E2D9',
                   }}
               onMouseEnter={(e) => { if (!activo) { (e.currentTarget as HTMLElement).style.color = '#14532D'; (e.currentTarget as HTMLElement).style.background = '#EEF4EE'; (e.currentTarget as HTMLElement).style.borderColor = '#14532D'; } }}
-              onMouseLeave={(e) => { if (!activo) { (e.currentTarget as HTMLElement).style.color = '#475569'; (e.currentTarget as HTMLElement).style.background = '#F8FAF7'; (e.currentTarget as HTMLElement).style.borderColor = '#D9E2D9'; } }}>
+              onMouseLeave={(e) => {
+                if (activo) return;
+                const el = e.currentTarget as HTMLElement;
+                if (t.id === 'responder') {
+                  el.style.color = '#14532D'; el.style.background = '#EAF3DE'; el.style.borderColor = '#97C459';
+                } else {
+                  el.style.color = '#475569'; el.style.background = '#F8FAF7'; el.style.borderColor = '#D9E2D9';
+                }
+              }}>
               {t.label}
             </button>
           );
@@ -2777,55 +2844,95 @@ function PanelDerecho({
         )}
 
         {/* ── TAB 3: Trazabilidad MIPG ── */}
+        {/* Sprint Panel claro — la Historia del caso, contada en humano.
+            Los códigos siguen intactos en Firestore; aquí solo se
+            traducen, se pliegan los correos y se agrupan los días. */}
         {tab === 'trazabilidad' && (
           <div>
             {cargandoTrazabilidad ? (
               <div className="flex items-center gap-2 text-sm" style={{ color: '#94A3B8' }}>
                 <span className="w-4 h-4 border-2 rounded-full animate-spin"
                       style={{ borderColor: '#D9E2D9', borderTopColor: '#14532D' }} />
-                Cargando trazabilidad...
+                Cargando la historia…
               </div>
             ) : trazabilidad.length === 0 ? (
-              <p className="text-sm italic" style={{ color: '#94A3B8' }}>Sin eventos de trazabilidad.</p>
+              <p className="text-sm italic" style={{ color: '#94A3B8' }}>Este radicado aún no tiene historia registrada.</p>
             ) : (
-              <ol className="relative flex flex-col gap-0">
-                {[...trazabilidad]
-                  .sort((a, b) => new Date(b.fecha).getTime() - new Date(a.fecha).getTime())
-                  .map((evento, idx, arr) => (
-                    <li key={`${evento.fecha}-${idx}`} className="relative flex gap-3 pb-5 last:pb-0">
-                      {idx < arr.length - 1 && (
-                        <div className="absolute left-[9px] top-5 bottom-0 w-px" style={{ background: '#D9E2D9' }} />
-                      )}
-                      <div className="shrink-0 w-[18px] h-[18px] mt-0.5 rounded-full flex items-center justify-center z-10"
-                           style={{ background: '#EEF4EE', border: '2px solid #14532D' }}>
-                        <span className="w-1.5 h-1.5 rounded-full" style={{ background: '#14532D' }} />
-                      </div>
-                      <div className="flex-1 min-w-0">
-                        <div className="flex items-baseline justify-between gap-2 flex-wrap mb-0.5">
-                          <span className="text-xs font-semibold" style={{ color: '#1F2933' }}>{evento.accion}</span>
-                          <time className="shrink-0 text-[10px] font-mono" style={{ color: '#94A3B8' }}>
-                            {fmtFechaLarga(evento.fecha)}
-                          </time>
-                        </div>
-                        <p className="text-xs" style={{ color: '#667085' }}>{evento.actorNombre}</p>
-                        <p className="text-xs mt-0.5 leading-relaxed" style={{ color: '#94A3B8' }}>{evento.nota}</p>
-                        {(evento.oficinaOrigen || evento.oficinaDestino) && (
-                          <p className="text-[10px] font-mono mt-0.5" style={{ color: '#94A3B8' }}>
-                            {evento.oficinaOrigen && NOMBRES_TENANT[evento.oficinaOrigen]}
-                            {evento.oficinaOrigen && evento.oficinaDestino && ' → '}
-                            {evento.oficinaDestino && NOMBRES_TENANT[evento.oficinaDestino]}
-                          </p>
-                        )}
-                      </div>
-                    </li>
+              <div className="space-y-4">
+                <div className="flex gap-1.5 flex-wrap">
+                  {([['TODO', 'Todo'], ['ACTUACIONES', 'Solo actuaciones'], ['CORREOS', 'Correos']] as [FiltroHistoria, string][]).map(([id, etiqueta]) => (
+                    <button
+                      key={id}
+                      type="button"
+                      onClick={() => setFiltroHistoria(id)}
+                      aria-pressed={filtroHistoria === id}
+                      className="text-[11px] font-semibold px-3 py-1 rounded-full transition-colors"
+                      style={filtroHistoria === id
+                        ? { background: '#14532D', color: '#FFFFFF', border: '1px solid #14532D' }
+                        : { background: '#FFFFFF', color: '#475569', border: '1px solid #D9E2D9' }}
+                    >
+                      {etiqueta}
+                    </button>
                   ))}
-              </ol>
+                </div>
+
+                {historia.length === 0 && (
+                  <p className="text-xs italic" style={{ color: '#94A3B8' }}>Nada que mostrar con este filtro.</p>
+                )}
+
+                {historia.map((dia) => (
+                  <div key={dia.ymd}>
+                    <p className="text-[10px] font-bold uppercase tracking-widest mb-2" style={{ color: '#7A8B7F' }}>
+                      {dia.etiqueta}
+                    </p>
+                    <div className="space-y-2">
+                      {dia.eventos.map((e) => {
+                        const tono = TONO_HISTORIA[e.tono];
+                        return (
+                          <div key={e.id} className="flex gap-2.5 rounded-xl bg-white px-3 py-2.5" style={{ border: '1px solid #E3EAE3' }}>
+                            <span
+                              className="shrink-0 w-[30px] h-[30px] rounded-full flex items-center justify-center"
+                              style={{ background: tono.bg }}
+                              aria-hidden="true"
+                            >
+                              <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke={tono.fg} strokeWidth={1.8}>
+                                <path strokeLinecap="round" strokeLinejoin="round" d={ICONO_HISTORIA[e.tono]} />
+                              </svg>
+                            </span>
+                            <div className="flex-1 min-w-0">
+                              <div className="flex items-baseline justify-between gap-2">
+                                <p className="text-[12.5px] font-semibold leading-snug" style={{ color: '#12261A' }}>{e.titulo}</p>
+                                <time className="shrink-0 text-[10px]" style={{ color: '#94A3B8' }}>{e.hora}</time>
+                              </div>
+                              {e.actor && (
+                                <p className="text-[11px] mt-0.5" style={{ color: '#667085' }}>Por {e.actor}</p>
+                              )}
+                              {e.detalle && (
+                                <p className="text-[11.5px] mt-0.5 leading-relaxed" style={{ color: '#5F6F64' }}>{e.detalle}</p>
+                              )}
+                              {e.correos.map((c, i) => (
+                                <p key={i} className="text-[10.5px] mt-1 flex items-center gap-1" style={{ color: '#94A3B8' }}>
+                                  <svg className="w-3 h-3 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.8}>
+                                    <path strokeLinecap="round" strokeLinejoin="round" d={ICONO_HISTORIA.GRIS} />
+                                  </svg>
+                                  {c.texto}
+                                </p>
+                              ))}
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </div>
+                ))}
+              </div>
             )}
           </div>
         )}
 
         {/* ── TAB 4: Prórroga / Respuesta ── */}
-        {tab === 'respuesta' && (
+        {/* ── TAB: Prórroga y devolución ── */}
+        {tab === 'prorroga' && (
           <div className="space-y-4">
             {/* Devolver */}
             <div className="rounded-xl p-4 space-y-3" style={{ background: '#FEF2F2', border: '1px solid #FECACA' }}>
@@ -2871,10 +2978,41 @@ function PanelDerecho({
               </button>
             </div>
 
-            {/* Respuesta final */}
-            <div className="rounded-xl p-4 space-y-3" style={{ background: '#F0FDF4', border: '1px solid #BBF7D0' }}>
-              <p className="text-xs font-bold uppercase tracking-widest text-green-700">Cargar respuesta / resolver</p>
+            {guardando && (
+              <div className="flex items-center justify-center gap-2 text-xs" style={{ color: '#94A3B8' }}>
+                <span className="w-3.5 h-3.5 border-2 rounded-full animate-spin"
+                      style={{ borderColor: '#D9E2D9', borderTopColor: '#14532D' }} />
+                Guardando en Firestore…
+              </div>
+            )}
+          </div>
+        )}
 
+        {/* ── TAB: Responder — la acción del día a día, guiada en 3 pasos ── */}
+        {tab === 'responder' && (
+          <div className="space-y-4">
+            {/* Los 3 pasos, siempre visibles: orientan sin estorbar. */}
+            {radicado.estadoActual !== 'RESUELTO' && (
+              <div className="flex items-center gap-3 flex-wrap px-1">
+                {([['1', 'Escribe'], ['2', 'Adjunta (opcional)'], ['3', 'Marca resuelto']] as const).map(([n, texto], i) => (
+                  <div key={n} className="flex items-center gap-1.5">
+                    <span
+                      className="w-5 h-5 rounded-full text-[11px] font-bold flex items-center justify-center shrink-0"
+                      style={i === 0
+                        ? { background: '#14532D', color: '#FFFFFF' }
+                        : { background: '#FFFFFF', border: '1.5px solid #97C459', color: '#3B6D11' }}
+                    >
+                      {n}
+                    </span>
+                    <span className="text-xs" style={{ color: i === 0 ? '#12261A' : '#5F6F64', fontWeight: i === 0 ? 600 : 400 }}>
+                      {texto}
+                    </span>
+                  </div>
+                ))}
+              </div>
+            )}
+
+            <div className="rounded-xl p-4 space-y-3" style={{ background: '#F0FDF4', border: '1px solid #BBF7D0' }}>
               {radicado.respuestaOficial && (
                 <div className="rounded-lg p-3 space-y-1 bg-white" style={{ border: '1px solid #D9E2D9' }}>
                   <p className="text-[10px] font-bold uppercase tracking-widest" style={{ color: '#667085' }}>
@@ -2897,7 +3035,7 @@ function PanelDerecho({
               <div>
                 <div className="flex items-center justify-between mb-1.5 gap-2">
                   <p className="text-[10px] font-bold uppercase tracking-widest" style={{ color: '#667085' }}>
-                    Respuesta oficial (oficio)
+                    1 · La respuesta que recibirá el ciudadano
                   </p>
                   {radicado.estadoActual !== 'RESUELTO' && !soloLectura && (
                     <div className="flex items-center gap-1.5">
@@ -2962,7 +3100,7 @@ function PanelDerecho({
               {radicado.estadoActual !== 'RESUELTO' && (
                 <div>
                   <p className="text-[10px] font-bold uppercase tracking-widest mb-1.5" style={{ color: '#667085' }}>
-                    PDF firmado <span className="normal-case font-normal" style={{ color: '#94A3B8' }}>(opcional)</span>
+                    2 · Oficio firmado <span className="normal-case font-normal" style={{ color: '#94A3B8' }}>(PDF, opcional)</span>
                   </p>
                   {archivoPdf ? (
                     <div className="flex items-center justify-between gap-2 px-3 py-2 rounded-lg"
@@ -2995,6 +3133,20 @@ function PanelDerecho({
                 </div>
               )}
 
+              {/* Panel claro — nadie tiene que adivinar qué hace el botón. */}
+              {radicado.estadoActual !== 'RESUELTO' && !soloLectura && (
+                <div className="rounded-lg px-3 py-2.5" style={{ background: '#EAF3DE', border: '1px solid #C0DD97' }}>
+                  <p className="text-[10px] font-bold uppercase tracking-widest mb-1.5" style={{ color: '#27500A' }}>
+                    3 · Al marcar como resuelto
+                  </p>
+                  <div className="space-y-1 text-[11.5px]" style={{ color: '#3B6D11' }}>
+                    <p>✓ El ciudadano recibe la respuesta por correo automáticamente (si dejó uno)</p>
+                    <p>✓ Queda registrado si respondiste dentro del término</p>
+                    <p>✓ Se podrá registrar la salida 2-SAL del oficio despachado</p>
+                  </div>
+                </div>
+              )}
+
               <button type="button" onClick={responderCaso}
                 disabled={guardando || radicado.estadoActual === 'RESUELTO' || soloLectura}
                 title={soloLectura ? 'Tu rol no permite realizar acciones sobre radicados.' : undefined}
@@ -3021,7 +3173,7 @@ function PanelDerecho({
           <PanelSimi
             radicado={radicado}
             usuario={usuario}
-            onAdoptarRespuesta={(texto) => { setRespuesta(texto); setTab('respuesta'); }}
+            onAdoptarRespuesta={(texto) => { setRespuesta(texto); cambiarTab('responder'); }}
           />
         )}
       </div>
