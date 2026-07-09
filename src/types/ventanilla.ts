@@ -18,7 +18,19 @@ export type TipoPersona =
   | 'NO_IDENTIFICADO';
 
 export type TipoDocumento = 'CC' | 'CE' | 'NIT' | 'PASAPORTE' | 'OTRO';
-export type MedioRecepcion = 'OFICIO_FISICO' | 'EMAIL' | 'WEB' | 'PRESENCIAL';
+/**
+ * PQRSD verbal (P-GSC-8200-170-014 / Ley 1755 art. 15): la petición
+ * presentada de palabra — en el mostrador o por teléfono — se radica
+ * marcando explícitamente que fue verbal. No genera documento físico,
+ * por lo que NO entra a la planilla de reparto.
+ */
+export type MedioRecepcion =
+  | 'OFICIO_FISICO'
+  | 'EMAIL'
+  | 'WEB'
+  | 'PRESENCIAL'
+  | 'VERBAL_PRESENCIAL'
+  | 'VERBAL_TELEFONICO';
 /** Canal por el que el ciudadano prefiere recibir la respuesta */
 export type CanalRespuesta = 'CORREO' | 'PRESENCIAL' | 'TELEFONO' | 'DIRECCION_FISICA';
 

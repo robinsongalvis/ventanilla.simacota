@@ -96,6 +96,19 @@ describe('pendientes de reparto', () => {
     expect(esPendienteDeReparto(radicadoBase(), new Set())).toBe(true);
   });
 
+  it('lo verbal no entra al reparto: no hay documento físico que entregar', () => {
+    const verbalTel = radicadoBase({
+      radicadoId: '1-PRESENCIAL-2026-00000030',
+      control: { ...radicadoBase().control, medioRecepcion: 'VERBAL_TELEFONICO' },
+    });
+    const verbalPres = radicadoBase({
+      radicadoId: '1-PRESENCIAL-2026-00000031',
+      control: { ...radicadoBase().control, medioRecepcion: 'VERBAL_PRESENCIAL' },
+    });
+    expect(esPendienteDeReparto(verbalTel, new Set())).toBe(false);
+    expect(esPendienteDeReparto(verbalPres, new Set())).toBe(false);
+  });
+
   it('excluye los ya entregados y los que viajan en planilla abierta', () => {
     const entregado = radicadoBase({
       radicadoId: '1-FIS-2026-00000012',

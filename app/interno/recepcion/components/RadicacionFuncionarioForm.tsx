@@ -319,6 +319,8 @@ export function RadicacionFuncionarioForm({ radicadoPreview, onSubmit, formId, h
               ['EMAIL', 'Email'],
               ['WEB', 'Web'],
               ['PRESENCIAL', 'Presencial'],
+              ['VERBAL_PRESENCIAL', 'Verbal presencial'],
+              ['VERBAL_TELEFONICO', 'Verbal telefónica'],
             ]}
           />
           {/* Sprint Radicación dirigida — el radicado nace dirigido a una

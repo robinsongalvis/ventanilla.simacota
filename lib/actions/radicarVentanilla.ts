@@ -162,7 +162,10 @@ export function sanitizeFirestoreData(
 function mapCanal(medio: MedioRecepcion): CanalRadicadoInstitucional {
   if (medio === 'WEB')        return 'WEB';
   if (medio === 'EMAIL')      return 'EMAIL';
-  if (medio === 'PRESENCIAL') return 'PRESENCIAL';
+  // PQRSD verbal (P-014): comparte la serie PRESENCIAL — lo verbal
+  // queda explícito en medioRecepcion, no en el número de radicado.
+  if (medio === 'PRESENCIAL' || medio === 'VERBAL_PRESENCIAL'
+    || medio === 'VERBAL_TELEFONICO') return 'PRESENCIAL';
   return 'OFICIO';
 }
 
