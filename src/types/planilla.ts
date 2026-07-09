@@ -36,6 +36,12 @@ export interface EntregaFila {
 export interface FilaPlanilla {
   radicadoId: string;
   dependenciaDestino: TenantId;
+  /**
+   * Área operativa dentro de la dependencia (modelo Dependencia + Área),
+   * si estaba asignada al generar. La planilla real del sistema GSC que
+   * usa hoy la funcionaria trae esta columna ("Área Asignada").
+   */
+  areaAsignada: string | null;
   asunto: string;
   /**
    * Nombre del solicitante o 'Identidad reservada' cuando el radicado

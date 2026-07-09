@@ -71,6 +71,10 @@ export function filaDesdeRadicado(radicado: VentanillaRadicado): FilaPlanilla {
   return {
     radicadoId: radicado.radicadoId,
     dependenciaDestino: radicado.clasificacion.oficinaDestino,
+    areaAsignada: typeof radicado.clasificacion.areaResponsable === 'string'
+      && radicado.clasificacion.areaResponsable
+      ? radicado.clasificacion.areaResponsable
+      : null,
     asunto: radicado.detalle?.asunto?.trim() || 'Sin asunto',
     solicitanteNombre: nombreParaPlanilla(radicado),
     numeroFolios: radicado.detalle?.numeroFolios ?? 0,

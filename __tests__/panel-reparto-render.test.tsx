@@ -27,6 +27,7 @@ const PLANILLA_ABIERTA: PlanillaReparto = {
     {
       radicadoId: '1-FIS-2026-00000010',
       dependenciaDestino: 'SEC_GOBIERNO',
+      areaAsignada: null,
       asunto: 'Solicitud de certificado',
       solicitanteNombre: 'Juan Pérez',
       numeroFolios: 2,
@@ -39,6 +40,7 @@ const PLANILLA_ABIERTA: PlanillaReparto = {
     {
       radicadoId: '1-FIS-2026-00000011',
       dependenciaDestino: 'SEC_PLANEACION',
+      areaAsignada: null,
       asunto: 'Licencia',
       solicitanteNombre: 'Identidad reservada',
       numeroFolios: 1,

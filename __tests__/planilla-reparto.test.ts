@@ -164,6 +164,7 @@ describe('construirPlanilla', () => {
     expect(fila).toMatchObject({
       radicadoId: '1-FIS-2026-00000010',
       dependenciaDestino: 'SEC_GOBIERNO',
+      areaAsignada: null,
       asunto: 'Solicitud de certificado',
       numeroFolios: 2,
       anexosDescripcion: 'CD con planos',
@@ -171,6 +172,17 @@ describe('construirPlanilla', () => {
       estado: 'PENDIENTE',
       entrega: null,
     });
+  });
+
+  it('la fila conserva el área asignada cuando existe (columna del formato GSC)', () => {
+    const conArea = radicadoBase({
+      clasificacion: {
+        oficinaDestino: 'SEC_GOBIERNO',
+        zonaGeografica: 'CASCO_URBANO',
+        areaResponsable: 'JURIDICA',
+      },
+    });
+    expect(filaDesdeRadicado(conArea).areaAsignada).toBe('JURIDICA');
   });
 });
 

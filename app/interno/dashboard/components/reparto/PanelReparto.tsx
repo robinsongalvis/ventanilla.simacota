@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { NOMBRES_TENANT } from '@/src/types/reglas-negocio';
+import { getNombreArea } from '@/lib/catalogos/areas';
 import { INSTITUCION } from '@/lib/institucion';
 import type { PlanillaReparto } from '@/src/types/planilla';
 import { puedeAnular, resumenPlanilla } from '@/lib/planillas/entregas';
@@ -596,7 +597,7 @@ function PlanillaImprimible({ planilla }: { planilla: PlanillaReparto }) {
       <table style={{ width: '100%', borderCollapse: 'collapse' }}>
         <thead>
           <tr>
-            {['No.', 'Radicado', 'Fecha / Hora', 'Dependencia destino', 'Solicitante', 'Asunto', 'Folios', 'Anexos', 'Recibido por (nombre y firma)', 'Fecha / Hora recibido'].map((h) => (
+            {['No.', 'Fecha de radicado', 'Hora rad.', 'Número de radicado', 'Dependencia asignada', 'Área asignada', 'Solicitante', 'Asunto', 'Nro. fol.', 'Anexos', 'Fecha / Hora de recibido', 'Devuelta SÍ / NO', 'Nombre y firma'].map((h) => (
               <th key={h} style={{ border: '1px solid #111', padding: '4px 6px', background: '#EFEFEF', textAlign: 'left', fontSize: 10 }}>
                 {h}
               </th>
@@ -607,25 +608,45 @@ function PlanillaImprimible({ planilla }: { planilla: PlanillaReparto }) {
           {planilla.filas.map((fila, i) => (
             <tr key={fila.radicadoId}>
               <td style={{ border: '1px solid #111', padding: '4px 6px' }}>{i + 1}</td>
+              <td style={{ border: '1px solid #111', padding: '4px 6px' }}>{fechaCorta(fila.fechaRadicado)}</td>
+              <td style={{ border: '1px solid #111', padding: '4px 6px' }}>{fila.horaRadicado}</td>
               <td style={{ border: '1px solid #111', padding: '4px 6px', fontFamily: 'monospace' }}>{fila.radicadoId}</td>
-              <td style={{ border: '1px solid #111', padding: '4px 6px' }}>
-                {fechaCorta(fila.fechaRadicado)} {fila.horaRadicado}
-              </td>
               <td style={{ border: '1px solid #111', padding: '4px 6px' }}>{nombreDependencia(fila.dependenciaDestino)}</td>
+              <td style={{ border: '1px solid #111', padding: '4px 6px' }}>{getNombreArea(fila.areaAsignada) || '—'}</td>
               <td style={{ border: '1px solid #111', padding: '4px 6px' }}>{fila.solicitanteNombre}</td>
               <td style={{ border: '1px solid #111', padding: '4px 6px' }}>{fila.asunto}</td>
               <td style={{ border: '1px solid #111', padding: '4px 6px', textAlign: 'center' }}>{fila.numeroFolios}</td>
               <td style={{ border: '1px solid #111', padding: '4px 6px' }}>{fila.anexosDescripcion ?? '—'}</td>
-              <td style={{ border: '1px solid #111', padding: '4px 6px', minWidth: 150 }}>&nbsp;</td>
-              <td style={{ border: '1px solid #111', padding: '4px 6px', minWidth: 90 }}>&nbsp;</td>
+              <td style={{ border: '1px solid #111', padding: '4px 6px', minWidth: 80 }}>
+                Día __ Mes __ Año __ Hora __:__
+              </td>
+              <td style={{ border: '1px solid #111', padding: '4px 6px', minWidth: 80 }}>
+                Devuelta SÍ__ NO__ Reasignada a: ______
+              </td>
+              <td style={{ border: '1px solid #111', padding: '4px 6px', minWidth: 130 }}>&nbsp;</td>
             </tr>
           ))}
         </tbody>
       </table>
 
-      <p style={{ marginTop: 10, fontSize: 9.5 }}>
+      <table style={{ width: '100%', borderCollapse: 'collapse', marginTop: 8 }}>
+        <tbody>
+          <tr>
+            <td style={{ border: '1px solid #111', padding: '5px 8px', fontSize: 9.5, width: '55%' }}>
+              Información de impresión: {new Date(planilla.fechaGeneracion).toLocaleString('es-CO', { timeZone: 'America/Bogota' })}
+              {' · '}Generada por: {planilla.generadaPor.nombre}
+            </td>
+            <td style={{ border: '1px solid #111', padding: '5px 8px', fontSize: 10 }}>
+              <strong>NOMBRE COMPLETO DE QUIEN ENTREGA:</strong> ______________________________
+            </td>
+          </tr>
+        </tbody>
+      </table>
+
+      <p style={{ marginTop: 8, fontSize: 9.5 }}>
         {INSTITUCION.sistema} · {INSTITUCION.municipio}, {INSTITUCION.departamento} ·
         Documento de control de entrega — la hoja firmada se digitaliza y se adjunta a la planilla en el sistema.
+        Una devolución marcada en papel se registra en el sistema como traslado del radicado.
       </p>
     </div>
   );
