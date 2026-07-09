@@ -223,6 +223,18 @@ export interface ClasificacionRadicado {
    */
   areaResponsable?: string | null;
 
+  /**
+   * Sprint Serie documental (TRD) — foto de la serie asignada al nacer:
+   * código `D.CS[.SUB]`, nombre y fuente (versión de la TRD usada).
+   * Inmutable: si la TRD cambia, los radicados históricos conservan la
+   * clasificación con la que nacieron.
+   */
+  serieDocumental?: {
+    codigo: string;
+    nombre: string;
+    fuente: string;
+  } | null;
+
   /** UID técnico de Firebase Auth — referencia permanente */
   funcionarioResponsableUid?:     string;
   /** Nombre completo al momento de la asignación */
