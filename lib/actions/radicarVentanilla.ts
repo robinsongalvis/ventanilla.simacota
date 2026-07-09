@@ -8,6 +8,7 @@ import {
   construirClasificacionInicial,
   construirNotaRadicacion,
 } from '@/lib/recepcion/clasificacion-inicial';
+import { sugerirSerieDocumental } from '@/lib/catalogos/series-documentales';
 import type {
   CanalRespuesta,
   DatosNoAportados,
@@ -298,6 +299,15 @@ export async function radicarInstitucionalmente(
       ...(datos.areaResponsable?.trim()
         ? { areaResponsable: datos.areaResponsable.trim() }
         : {}),
+      // Sprint Serie documental — el radicado nace clasificado en su
+      // serie TRD (foto inmutable: código + nombre + versión de la TRD).
+      ...(() => {
+        const serie = sugerirSerieDocumental(
+          datos.tipoSolicitudId,
+          datos.oficinaDestino ?? 'VENTANILLA_UNICA',
+        );
+        return serie ? { serieDocumental: serie } : {};
+      })(),
     },
 
     detalle: {

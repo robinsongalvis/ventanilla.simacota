@@ -16,6 +16,7 @@ import {
 } from '@/lib/recepcion/medios-anexos';
 import { sugerirDependencia } from '@/lib/recepcion/sugerir-dependencia';
 import { agruparDestinosPorDependencia, areasParaDependencia } from '@/lib/catalogos/areas';
+import { labelSerieDocumental, sugerirSerieDocumental } from '@/lib/catalogos/series-documentales';
 import {
   buscarSolicitantes,
   construirDirectorio,
@@ -207,6 +208,13 @@ export function RadicacionFuncionarioForm({ radicadoPreview, onSubmit, formId, h
     [fechaRadicado, form.tipoSolicitudId],
   );
 
+  /* Sprint Serie documental — la clasificación TRD se deriva sola del
+     tipo y el destino; se muestra para que la funcionaria la conozca. */
+  const serieSugerida = useMemo(
+    () => sugerirSerieDocumental(form.tipoSolicitudId, form.oficinaDestino),
+    [form.tipoSolicitudId, form.oficinaDestino],
+  );
+
   /* Sprint Radicación dirigida — sugerencia determinista de destino.
      Solo se muestra si difiere del destino elegido; nunca se aplica sola. */
   const sugerencia = useMemo(
@@ -395,6 +403,12 @@ export function RadicacionFuncionarioForm({ radicadoPreview, onSubmit, formId, h
           <ReadOnlyField
             label="Fecha vencimiento"
             value={formatFechaHoraColombia(vencimiento.fechaVencimiento, { fallback: '—' })}
+          />
+          {/* Sprint Serie documental — clasificación TRD derivada del tipo
+              y el destino. Informativa: la funcionaria no la digita. */}
+          <ReadOnlyField
+            label="Serie documental (TRD)"
+            value={labelSerieDocumental(serieSugerida)}
           />
         </div>
       </section>
