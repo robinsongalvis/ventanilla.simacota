@@ -40,6 +40,17 @@ describe('Radicación Rápida — selector de área', () => {
   it('cambiar de dependencia limpia el área elegida', () => {
     expect(form).toContain("update('areaResponsable', '')");
   });
+
+  it('el desplegable de destino también lista las áreas de cada dependencia', () => {
+    // Pedido del usuario (jul 2026): un solo desplegable donde cada
+    // secretaría muestre sus áreas/programas; elegir una fija destino
+    // + área en un solo gesto. Las transversales no se repiten por
+    // grupo: viven solo en el selector de área.
+    expect(form).toContain("v.startsWith('AREA::')");
+    expect(form).toContain('`AREA::${g.dependencia}::${a.areaId}`');
+    expect(form).toContain('.filter((a) => !a.transversal)');
+    expect(form).toContain('areaPropiaDelDestino');
+  });
 });
 
 describe('acción de radicar — el área viaja a la clasificación', () => {
