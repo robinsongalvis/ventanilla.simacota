@@ -49,10 +49,13 @@ function estaActivo(estadoActual: string): boolean {
  * Las reglas se evalúan en orden estricto de precedencia:
  * las señales críticas (correo fallido, vencido, por vencer) ganan
  * sobre las derivadas de estado normal.
+ *
+ * `ahora` es inyectable para tests deterministas; por defecto usa el
+ * reloj real.
  */
-export function calcularProximaAccion(radicado: VentanillaRadicado): ProximaAccion {
+export function calcularProximaAccion(radicado: VentanillaRadicado, ahora?: Date): ProximaAccion {
   const dias = radicado.termino?.fechaVencimiento
-    ? diasRestantesHabiles(radicado.termino.fechaVencimiento)
+    ? diasRestantesHabiles(radicado.termino.fechaVencimiento, ahora)
     : 0;
   const activo = estaActivo(radicado.estadoActual);
 

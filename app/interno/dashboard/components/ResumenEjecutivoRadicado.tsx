@@ -52,7 +52,7 @@ export function ResumenEjecutivoRadicado({
   ahora,
 }: ResumenEjecutivoRadicadoProps) {
   const semaforo    = calcularSemaforo(radicado);
-  const proxima     = calcularProximaAccion(radicado);
+  const proxima     = calcularProximaAccion(radicado, ahora);
   const ultima      = ultimoEvento ? etiquetarUltimaActuacion(ultimoEvento, ahora) : null;
   const datosIncompletos = tieneDatosNoAportados(radicado.solicitante.datosNoAportados);
 
