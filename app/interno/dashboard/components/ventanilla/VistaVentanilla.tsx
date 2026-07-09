@@ -52,6 +52,9 @@ export interface VistaVentanillaProps {
   /** Sprint Radicación de salida — presente solo para roles que
    *  registran despachos; abre el modal de oficio independiente. */
   onRegistrarSalida?: () => void;
+  /** Sprint Planilla de reparto — presente solo para Recepción/Admin;
+   *  abre el panel de entrega de documentos físicos. */
+  onAbrirReparto?: () => void;
   /** Referencia temporal inyectable para tests deterministas. */
   ahora?: Date;
 }
@@ -80,6 +83,7 @@ export function VistaVentanilla({
   onAbrirBusquedaAvanzada,
   onAbrirRadicado,
   onRegistrarSalida,
+  onAbrirReparto,
   ahora,
 }: VistaVentanillaProps) {
   const [consulta, setConsulta] = useState('');
@@ -132,6 +136,16 @@ export function VistaVentanilla({
           </p>
         </div>
         <div className="flex items-center gap-2 shrink-0">
+        {onAbrirReparto && (
+          <button
+            type="button"
+            onClick={onAbrirReparto}
+            className="inline-flex items-center gap-1.5 text-[13px] font-bold px-4 py-2.5 rounded-[10px] transition-colors hover:bg-[#EEF4EE]"
+            style={{ border: '1px solid #14532D', color: '#14532D', background: 'white' }}
+          >
+            Reparto del día
+          </button>
+        )}
         {onRegistrarSalida && (
           <button
             type="button"

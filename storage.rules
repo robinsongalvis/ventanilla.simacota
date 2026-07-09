@@ -57,6 +57,13 @@ service firebase.storage {
       allow read, write: if false;
     }
 
+    // Planilla de reparto — escaneo de la hoja firmada.
+    // Escritura SOLO por Admin SDK desde /api/planillas/entregas; la
+    // evidencia de firmas es inmutable. Lectura via Admin SDK.
+    match /planillas/{planillaId}/{archivo} {
+      allow read, write: if false;
+    }
+
     match /{path=**} {
       allow read, write: if false;
     }

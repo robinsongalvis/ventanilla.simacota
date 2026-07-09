@@ -183,6 +183,15 @@ service cloud.firestore {
       allow update, delete: if false;
     }
 
+    // ── Planilla de reparto: control de entrega del documento físico ──────
+    // Toda escritura pasa por /api/planillas/* con Admin SDK (consecutivo
+    // transaccional, entregas todo-o-nada, anulación solo sin firmas).
+    // Lectura para quienes operan o auditan la cadena de custodia.
+    match /ventanilla_planillas/{planillaId} {
+      allow get, list: if isAdmin() || isRecepcionista() || isControlInterno();
+      allow create, update, delete: if false;
+    }
+
     // ── Contadores de consecutivo anual ────────────────────────────────────
     match /counters/{document} {
       // Lectura y escritura transaccional para generar el número de radicado.

@@ -286,6 +286,18 @@ export interface VentanillaRadicado {
    * Alimenta el pendiente "Constancia sin enviar" del mostrador.
    */
   constanciaEnviadaCorreo?: boolean;
+  /**
+   * Sprint Planilla de reparto — constancia de que el documento físico
+   * ya fue entregado en la dependencia destino. La escribe únicamente
+   * el endpoint de entregas (Admin SDK) al registrar la planilla;
+   * ausente/null = el papel sigue en ventanilla. Zanja el "eso nunca
+   * me llegó": queda quién recibió, cuándo y en qué planilla.
+   */
+  entregaFisica?: {
+    planillaId: string;
+    fecha: string;
+    recibidoPor: string;
+  } | null;
 }
 
 
