@@ -215,6 +215,15 @@ export function RadicacionFuncionarioForm({ radicadoPreview, onSubmit, formId, h
     [form.tipoSolicitudId, form.oficinaDestino],
   );
 
+  /* Sprint Destino con áreas — true cuando el área elegida es propia de
+     la dependencia destino (no transversal): solo entonces el desplegable
+     combinado puede representarla como opción seleccionada. */
+  const areaPropiaDelDestino = useMemo(
+    () => areasParaDependencia(form.oficinaDestino)
+      .some((a) => !a.transversal && a.areaId === form.areaResponsable),
+    [form.oficinaDestino, form.areaResponsable],
+  );
+
   /* Sprint Radicación dirigida — sugerencia determinista de destino.
      Solo se muestra si difiere del destino elegido; nunca se aplica sola. */
   const sugerencia = useMemo(
@@ -335,37 +344,60 @@ export function RadicacionFuncionarioForm({ radicadoPreview, onSubmit, formId, h
               ['VERBAL_TELEFONICO', 'Verbal telefónica'],
             ]}
           />
-          {/* Sprint Radicación dirigida — el radicado nace dirigido a una
-              dependencia; la trazabilidad empieza aquí, no en el traslado.
-              Agrupado por dependencia (idea de Laura). */}
+          {/* Sprint Radicación dirigida + Destino con áreas — UN solo
+              desplegable: cada dependencia lista sus oficinas con destino
+              propio Y sus áreas/programas (Familias en Acción, Jurídica…).
+              Elegir un área fija destino + área en un solo gesto; las
+              transversales viven en el selector de área de abajo. */}
           <label>
             <span className={labelCls} style={labelStyle}>Dependencia destino</span>
             <select
-              value={form.oficinaDestino}
+              value={form.areaResponsable && areaPropiaDelDestino
+                ? `AREA::${form.oficinaDestino}::${form.areaResponsable}`
+                : form.oficinaDestino}
               onChange={(e) => {
-                update('oficinaDestino', e.target.value as TenantId);
-                // El área pertenece al destino: cambiar de dependencia la limpia.
-                update('areaResponsable', '');
+                const v = e.target.value;
+                if (v.startsWith('AREA::')) {
+                  const [, tenant, areaId] = v.split('::');
+                  update('oficinaDestino', tenant as TenantId);
+                  update('areaResponsable', areaId);
+                } else {
+                  update('oficinaDestino', v as TenantId);
+                  // El área pertenece al destino: cambiar de dependencia la limpia.
+                  update('areaResponsable', '');
+                }
               }}
               className="select-internal w-full"
             >
-              {GRUPOS_DESTINO.map((g) => g.oficinas.length > 0 ? (
-                <optgroup key={g.dependencia} label={NOMBRES_TENANT[g.dependencia]}>
-                  <option value={g.dependencia}>{NOMBRES_TENANT[g.dependencia]}</option>
-                  {g.oficinas.map((o) => (
-                    <option key={o.tenant} value={o.tenant}>{o.nombre}</option>
-                  ))}
-                </optgroup>
-              ) : (
-                <option key={g.dependencia} value={g.dependencia}>
-                  {NOMBRES_TENANT[g.dependencia]}
-                </option>
-              ))}
+              {GRUPOS_DESTINO.map((g) => {
+                const areasPropias = areasParaDependencia(g.dependencia)
+                  .filter((a) => !a.transversal);
+                return g.oficinas.length > 0 || areasPropias.length > 0 ? (
+                  <optgroup key={g.dependencia} label={NOMBRES_TENANT[g.dependencia]}>
+                    <option value={g.dependencia}>{NOMBRES_TENANT[g.dependencia]}</option>
+                    {g.oficinas.map((o) => (
+                      <option key={o.tenant} value={o.tenant}>{o.nombre}</option>
+                    ))}
+                    {areasPropias.map((a) => (
+                      <option
+                        key={`AREA::${g.dependencia}::${a.areaId}`}
+                        value={`AREA::${g.dependencia}::${a.areaId}`}
+                      >
+                        {'—'} {a.nombre}
+                      </option>
+                    ))}
+                  </optgroup>
+                ) : (
+                  <option key={g.dependencia} value={g.dependencia}>
+                    {NOMBRES_TENANT[g.dependencia]}
+                  </option>
+                );
+              })}
             </select>
           </label>
-          {/* Sprint Área al radicar — sub-oficina o programa del destino
-              (Familias en Acción, Adulto Mayor, Sisbén…). Opcional: si no
-              se elige, la dependencia asigna el área después. */}
+          {/* Sprint Área al radicar — el mismo dato, editable aparte: aquí
+              también aparecen las transversales (Almacén y Archivo,
+              Sistemas). Opcional: '' = la dependencia asigna después. */}
           {areasParaDependencia(form.oficinaDestino).length > 0 && (
             <label>
               <span className={labelCls} style={labelStyle}>Área o programa (opcional)</span>
