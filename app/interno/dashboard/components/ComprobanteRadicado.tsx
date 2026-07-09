@@ -62,6 +62,8 @@ function formatFecha(iso: string): string {
 
 const MEDIO_LABEL: Record<string, string> = {
   PRESENCIAL: 'Presencial',
+  VERBAL_PRESENCIAL: 'Verbal presencial',
+  VERBAL_TELEFONICO: 'Verbal telefónica',
   EMAIL: 'Correo Electrónico',
   WEB: 'Portal Web',
   OFICIO_FISICO: 'Oficio Físico',

@@ -28,6 +28,8 @@ export function esPendienteDeReparto(
   idsEnPlanillasAbiertas: ReadonlySet<string>,
 ): boolean {
   if (radicado.control?.origen !== 'FISICO_ESCANER') return false;
+  // PQRSD verbal (P-014): no existe documento físico que repartir.
+  if (radicado.control?.medioRecepcion?.startsWith('VERBAL')) return false;
   if (radicado.entregaFisica) return false;
   return !idsEnPlanillasAbiertas.has(radicado.radicadoId);
 }

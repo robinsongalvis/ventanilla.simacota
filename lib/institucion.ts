@@ -31,6 +31,8 @@ export const MEDIO_RECEPCION_LABEL: Record<string, string> = {
   OFICIO: 'Oficio físico',
   OFICIO_FISICO: 'Oficio físico',
   PRESENCIAL: 'Presencial',
+  VERBAL_PRESENCIAL: 'Verbal presencial',
+  VERBAL_TELEFONICO: 'Verbal telefónica',
   FISICO_ESCANER: 'Ventanilla física',
 };
 

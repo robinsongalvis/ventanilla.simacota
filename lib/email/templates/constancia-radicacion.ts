@@ -42,11 +42,13 @@ const CANAL_RESPUESTA_LABEL: Record<string, string> = {
 };
 
 const MEDIO_RECEPCION_LABEL: Record<string, string> = {
-  PRESENCIAL:    'Presencial',
-  EMAIL:         'Correo electrónico',
-  WEB:           'Portal web',
-  OFICIO_FISICO: 'Oficio físico',
-  OFICIO:        'Oficio',
+  PRESENCIAL:         'Presencial',
+  VERBAL_PRESENCIAL:  'Verbal presencial',
+  VERBAL_TELEFONICO:  'Verbal telefónica',
+  EMAIL:              'Correo electrónico',
+  WEB:                'Portal web',
+  OFICIO_FISICO:      'Oficio físico',
+  OFICIO:             'Oficio',
 };
 
 function escapeHtml(str: string): string {
