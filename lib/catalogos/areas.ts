@@ -102,6 +102,21 @@ export const CATALOGO_AREAS: Record<string, AreaResponsable> = {
   },
 
   /* ── Secretaría de Desarrollo Social ────────────────────────── */
+  // Programas confirmados por el usuario (jul 2026): hacen parte de
+  // Desarrollo Social en la estructura vigente (la TRD 2025 que los
+  // ubicaba en "Salud" es un borrador no aprobado).
+  FAMILIAS_EN_ACCION: {
+    areaId: 'FAMILIAS_EN_ACCION', nombre: 'Familias en Acción',
+    dependencia: 'SEC_DESARROLLO_SOCIAL',
+  },
+  ADULTO_MAYOR: {
+    areaId: 'ADULTO_MAYOR', nombre: 'Adulto Mayor',
+    dependencia: 'SEC_DESARROLLO_SOCIAL',
+  },
+  DISCAPACIDAD: {
+    areaId: 'DISCAPACIDAD', nombre: 'Discapacidad',
+    dependencia: 'SEC_DESARROLLO_SOCIAL',
+  },
   CULTURA: {
     areaId: 'CULTURA', nombre: 'Cultura',
     dependencia: 'SEC_DESARROLLO_SOCIAL',

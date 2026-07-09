@@ -15,7 +15,7 @@ import {
   toggleMedio,
 } from '@/lib/recepcion/medios-anexos';
 import { sugerirDependencia } from '@/lib/recepcion/sugerir-dependencia';
-import { agruparDestinosPorDependencia } from '@/lib/catalogos/areas';
+import { agruparDestinosPorDependencia, areasParaDependencia } from '@/lib/catalogos/areas';
 import {
   buscarSolicitantes,
   construirDirectorio,
@@ -53,6 +53,9 @@ interface FormState {
   tipoEntrada: TipoEntrada;
   // Sprint Radicación dirigida — dependencia a la que va dirigido.
   oficinaDestino: TenantId;
+  // Sprint Área al radicar — sub-oficina o programa del destino
+  // (opcional; '' = la dependencia asigna después).
+  areaResponsable: string;
   // Sprint Radicación dirigida — presentación del solicitante.
   tipoPresentacion: 'IDENTIFICADA' | 'ANONIMA' | 'RESERVADA';
 
@@ -143,6 +146,7 @@ const INITIAL_FORM: FormState = {
   origenIngreso: 'PQRSD_WEB_OFICIAL',
   tipoEntrada: 'PQRSD',
   oficinaDestino: 'VENTANILLA_UNICA',
+  areaResponsable: '',
   tipoPresentacion: 'IDENTIFICADA',
   tipoPersona: 'NATURAL',
   tipoDocumento: 'CC',
@@ -330,7 +334,11 @@ export function RadicacionFuncionarioForm({ radicadoPreview, onSubmit, formId, h
             <span className={labelCls} style={labelStyle}>Dependencia destino</span>
             <select
               value={form.oficinaDestino}
-              onChange={(e) => update('oficinaDestino', e.target.value as TenantId)}
+              onChange={(e) => {
+                update('oficinaDestino', e.target.value as TenantId);
+                // El área pertenece al destino: cambiar de dependencia la limpia.
+                update('areaResponsable', '');
+              }}
               className="select-internal w-full"
             >
               {GRUPOS_DESTINO.map((g) => g.oficinas.length > 0 ? (
@@ -347,6 +355,24 @@ export function RadicacionFuncionarioForm({ radicadoPreview, onSubmit, formId, h
               ))}
             </select>
           </label>
+          {/* Sprint Área al radicar — sub-oficina o programa del destino
+              (Familias en Acción, Adulto Mayor, Sisbén…). Opcional: si no
+              se elige, la dependencia asigna el área después. */}
+          {areasParaDependencia(form.oficinaDestino).length > 0 && (
+            <label>
+              <span className={labelCls} style={labelStyle}>Área o programa (opcional)</span>
+              <select
+                value={form.areaResponsable}
+                onChange={(e) => update('areaResponsable', e.target.value)}
+                className="select-internal w-full"
+              >
+                <option value="">La dependencia asigna después</option>
+                {areasParaDependencia(form.oficinaDestino).map((a) => (
+                  <option key={a.areaId} value={a.areaId}>{a.nombre}</option>
+                ))}
+              </select>
+            </label>
+          )}
           {sugerencia && sugerencia.oficina !== form.oficinaDestino && (
             <div
               className="md:col-span-2 xl:col-span-4 flex items-center gap-2 flex-wrap rounded-lg px-3 py-2"

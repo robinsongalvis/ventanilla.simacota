@@ -1,0 +1,51 @@
+import { readFileSync } from 'fs';
+import { describe, expect, it } from 'vitest';
+import { areasParaDependencia, getNombreArea } from '@/lib/catalogos/areas';
+
+/* ══════════════════════════════════════════════════════════════
+   Sprint Área al radicar — el radicado puede nacer con la
+   sub-oficina o programa del destino (opcional, nunca obligatorio:
+   el modelo Dependencia + Área no es un árbol rígido).
+
+   Estructura confirmada por el usuario (jul 2026): Familias en
+   Acción, Adulto Mayor y Discapacidad pertenecen a la Secretaría
+   de Desarrollo Social (la TRD 2025 que los ubicaba en "Salud" es
+   un borrador no aprobado).
+══════════════════════════════════════════════════════════════ */
+
+describe('catálogo — programas de Desarrollo Social', () => {
+  it('los tres programas confirmados existen bajo SEC_DESARROLLO_SOCIAL', () => {
+    const ids = areasParaDependencia('SEC_DESARROLLO_SOCIAL').map((a) => a.areaId);
+    expect(ids).toContain('FAMILIAS_EN_ACCION');
+    expect(ids).toContain('ADULTO_MAYOR');
+    expect(ids).toContain('DISCAPACIDAD');
+  });
+
+  it('con nombres en lenguaje ciudadano', () => {
+    expect(getNombreArea('FAMILIAS_EN_ACCION')).toBe('Familias en Acción');
+    expect(getNombreArea('ADULTO_MAYOR')).toBe('Adulto Mayor');
+    expect(getNombreArea('DISCAPACIDAD')).toBe('Discapacidad');
+  });
+});
+
+describe('Radicación Rápida — selector de área', () => {
+  const form = readFileSync('app/interno/recepcion/components/RadicacionFuncionarioForm.tsx', 'utf8');
+
+  it('ofrece el área del destino como opcional, nunca obligatoria', () => {
+    expect(form).toContain('Área o programa (opcional)');
+    expect(form).toContain('La dependencia asigna después');
+    expect(form).toContain('areasParaDependencia(form.oficinaDestino)');
+  });
+
+  it('cambiar de dependencia limpia el área elegida', () => {
+    expect(form).toContain("update('areaResponsable', '')");
+  });
+});
+
+describe('acción de radicar — el área viaja a la clasificación', () => {
+  it('clasificacion.areaResponsable se escribe solo si viene con valor', () => {
+    const accion = readFileSync('lib/actions/radicarVentanilla.ts', 'utf8');
+    expect(accion).toContain('datos.areaResponsable?.trim()');
+    expect(accion).toContain('{ areaResponsable: datos.areaResponsable.trim() }');
+  });
+});

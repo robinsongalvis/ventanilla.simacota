@@ -64,6 +64,10 @@ export interface DatosRadicacionInstitucional {
   /** Sprint Radicación dirigida — presentación del solicitante (Ley
    *  1755/2015 art. 14). Ausente = IDENTIFICADA. */
   tipoPresentacion?:    'IDENTIFICADA' | 'ANONIMA' | 'RESERVADA';
+  /** Sprint Área al radicar — sub-oficina o programa del destino
+   *  (id del catálogo lib/catalogos/areas.ts). Ausente/'' = la
+   *  dependencia asigna el área después. */
+  areaResponsable?:     string;
 }
 
 /**
@@ -284,10 +288,17 @@ export async function radicarInstitucionalmente(
     /* Sprint Radicación dirigida: el radicado nace dirigido a la
        dependencia elegida en recepción. Si va a otra dependencia, nace
        sin funcionario responsable ("sin asignar" allá). */
-    clasificacion: construirClasificacionInicial(
-      datos.oficinaDestino ?? 'VENTANILLA_UNICA',
-      actor.uid,
-    ),
+    clasificacion: {
+      ...construirClasificacionInicial(
+        datos.oficinaDestino ?? 'VENTANILLA_UNICA',
+        actor.uid,
+      ),
+      // Sprint Área al radicar — el área nace con el radicado cuando la
+      // recepción la conoce; si no, la fija la dependencia al asignar.
+      ...(datos.areaResponsable?.trim()
+        ? { areaResponsable: datos.areaResponsable.trim() }
+        : {}),
+    },
 
     detalle: {
       asunto:       datos.asunto.trim(),
