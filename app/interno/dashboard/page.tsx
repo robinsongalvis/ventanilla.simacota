@@ -31,6 +31,7 @@ import { puedeVerReportes } from '@/lib/permisos/acceso-reportes';
 import { agruparDestinosPorDependencia, areasParaDependencia, getNombreArea } from '@/lib/catalogos/areas';
 import { RegistroExpresModal } from '@/app/interno/dashboard/components/RegistroExpresModal';
 import { RegistrarSalidaModal, type EntradaAmarre } from '@/app/interno/dashboard/components/salidas/RegistrarSalidaModal';
+import { PanelReparto }                    from '@/app/interno/dashboard/components/reparto/PanelReparto';
 import { VistaSalidas }                    from '@/app/interno/dashboard/components/salidas/VistaSalidas';
 import { VistaMiGestion }                  from '@/app/interno/dashboard/components/mi-gestion/VistaMiGestion';
 import { useSalidas }                      from '@/lib/hooks/useSalidas';
@@ -4451,6 +4452,8 @@ function DashboardInterior({ usuario, cerrarSesion }: { usuario: UsuarioAutentic
   const [busquedaAvanzadaAbierta, setBusquedaAvanzadaAbierta] = useState(false);
   // Sprint Radicación de salida — modal (null = cerrado; entrada = amarre).
   const [salidaModal, setSalidaModal] = useState<{ entrada: EntradaAmarre | null } | null>(null);
+  // Sprint Planilla de reparto — panel de entrega de documentos físicos.
+  const [repartoAbierto, setRepartoAbierto] = useState(false);
   // Fase B — el libro completo lo leen los mismos roles de la vista
   // Salidas; el hook sin recorte por tenant solo se activa para ellos.
   const puedeVerLibroSalidas = usuario.rol === 'ADMIN'
@@ -4786,6 +4789,9 @@ function DashboardInterior({ usuario, cerrarSesion }: { usuario: UsuarioAutentic
             onRegistrarSalida={puedeRegistrarSalida
               ? () => setSalidaModal({ entrada: null })
               : undefined}
+            onAbrirReparto={puedeRegistrarSalida
+              ? () => setRepartoAbierto(true)
+              : undefined}
           />
         ) : (
           <>
@@ -4950,6 +4956,11 @@ function DashboardInterior({ usuario, cerrarSesion }: { usuario: UsuarioAutentic
           entrada={salidaModal.entrada}
           onCerrar={() => setSalidaModal(null)}
         />
+      )}
+
+      {/* Sprint Planilla de reparto — entrega de documentos físicos. */}
+      {repartoAbierto && puedeRegistrarSalida && (
+        <PanelReparto onCerrar={() => setRepartoAbierto(false)} />
       )}
 
       {/* ── Sprint 2: Búsqueda Histórica Avanzada ── */}
