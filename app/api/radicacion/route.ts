@@ -9,6 +9,7 @@ import {
   TIPOS_SOLICITUD,
   type TipoSolicitudId,
 } from '@/lib/tiempos-radicado';
+import { formatearRadicadoInstitucional } from '@/lib/radicado-institucional';
 import { enviarEmail } from '@/lib/email/mailer';
 import {
   buildConfirmacionRadicacionHtml,
@@ -188,7 +189,9 @@ async function generarRadicadoInstitucionalAdmin(fecha: Date): Promise<{
 
     return {
       consecutivo,
-      radicadoId: `1-${CANAL_RADICADO}-${year}-${String(consecutivo).padStart(8, '0')}`,
+      // Mismo formateador canónico de toda entrada: 1-110-{año}-{####}
+      // (110 = oficina radicadora; el canal WEB queda en medioRecepcion).
+      radicadoId: formatearRadicadoInstitucional(consecutivo, fecha),
     };
   });
 }

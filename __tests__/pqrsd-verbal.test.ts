@@ -39,9 +39,11 @@ describe('PQRSD verbal — medio explícito', () => {
     }
   });
 
-  it('lo verbal comparte la serie PRESENCIAL del consecutivo', () => {
+  it('el medio verbal queda en el radicado, no en el número (serie única 1-110)', () => {
+    // Desde el Sprint Número con oficina radicadora, el canal ya no
+    // viaja en el ID: lo verbal queda explícito en control.medioRecepcion.
     const accion = readFileSync('lib/actions/radicarVentanilla.ts', 'utf8');
-    expect(accion).toContain("medio === 'VERBAL_PRESENCIAL'");
-    expect(accion).toContain("|| medio === 'VERBAL_TELEFONICO') return 'PRESENCIAL';");
+    expect(accion).toContain('medioRecepcion: datos.medioRecepcion');
+    expect(accion).not.toContain('mapCanal');
   });
 });

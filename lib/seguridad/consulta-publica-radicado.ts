@@ -14,7 +14,9 @@ import type { TrazabilidadRadicado, VentanillaRadicado } from '@/src/types/venta
 import { buildRespuestaPublicaCiudadano } from '@/lib/server/respuesta-publica';
 
 const LEGACY_RADICADO_RE = /^EXT-\d{4}-\d{2}-\d{2}-\d{6}-[A-Z2-9]{4}$/;
-const INSTITUCIONAL_RADICADO_RE = /^1-(WEB|OFICIO|EMAIL|PRESENCIAL)-\d{4}-\d{8}$/;
+// Acepta el formato vigente (1-110-… con código de oficina radicadora)
+// y los históricos por canal: los números nunca se reescriben (AGN 060/2001).
+const INSTITUCIONAL_RADICADO_RE = /^1-(110|WEB|OFICIO|EMAIL|PRESENCIAL)-\d{4}-\d{8}$/;
 
 const ACCIONES_PUBLICAS = new Map<string, string>([
   ['RADICACION', 'Solicitud recibida'],

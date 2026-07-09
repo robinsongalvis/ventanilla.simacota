@@ -120,7 +120,7 @@ export async function POST(request: Request): Promise<NextResponse> {
       return {
         consecutivoEntrada,
         consecutivoSalida,
-        radicadoId: formatearRadicadoInstitucional(consecutivoEntrada, 'EMAIL', ahora),
+        radicadoId: formatearRadicadoInstitucional(consecutivoEntrada, ahora),
         salidaId:   formatearRadicadoSalida(consecutivoSalida, ahora),
       };
     });

@@ -1,6 +1,6 @@
 import { addDoc, collection, doc, setDoc } from 'firebase/firestore';
 import { getDb } from '@/lib/firebase';
-import { generarRadicadoInstitucional, type CanalRadicadoInstitucional } from '@/lib/radicado-institucional';
+import { generarRadicadoInstitucional } from '@/lib/radicado-institucional';
 import { TIPOS_SOLICITUD, type TipoSolicitudId } from '@/lib/tiempos-radicado';
 import { subirArchivos } from '@/lib/storage';
 import { validarReglasRadicacion } from '@/lib/seguridad/reglas-radicacion';
@@ -160,19 +160,10 @@ export function sanitizeFirestoreData(
   return sanitized;
 }
 
-/* ══════════════════════════════════════════════════════════════
-   MAPEO DE CANAL
-══════════════════════════════════════════════════════════════ */
-
-function mapCanal(medio: MedioRecepcion): CanalRadicadoInstitucional {
-  if (medio === 'WEB')        return 'WEB';
-  if (medio === 'EMAIL')      return 'EMAIL';
-  // PQRSD verbal (P-014): comparte la serie PRESENCIAL — lo verbal
-  // queda explícito en medioRecepcion, no en el número de radicado.
-  if (medio === 'PRESENCIAL' || medio === 'VERBAL_PRESENCIAL'
-    || medio === 'VERBAL_TELEFONICO') return 'PRESENCIAL';
-  return 'OFICIO';
-}
+/* El canal ya no viaja en el número de radicado: desde el Sprint
+   Número con oficina radicadora, todos los radicados de entrada llevan
+   el código 110 (la ventanilla). El medio de recepción — incluidos los
+   verbales de P-014 — queda en control.medioRecepcion. */
 
 /* ══════════════════════════════════════════════════════════════
    ACCIÓN PRINCIPAL
@@ -203,8 +194,7 @@ export async function radicarInstitucionalmente(
 
   onProgress('Generando número de radicado…', 10);
 
-  const canal = mapCanal(datos.medioRecepcion);
-  const { radicadoId, consecutivo } = await generarRadicadoInstitucional(canal);
+  const { radicadoId, consecutivo } = await generarRadicadoInstitucional();
 
   onProgress('Subiendo archivos adjuntos…', 30);
   const { exitosos } = datos.archivos.length > 0
