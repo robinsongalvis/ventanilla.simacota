@@ -8,7 +8,8 @@
     "start": "next start",
     "lint": "eslint",
     "test": "vitest run",
-    "test:watch": "vitest"
+    "test:watch": "vitest",
+    "dev:stage": "node scripts/laboratorio/dev-stage.mjs"
   },
   "dependencies": {
     "@fontsource/dm-sans": "^5.2.8",
