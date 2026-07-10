@@ -542,7 +542,7 @@ export default function PortalCiudadano() {
                   })}
                 </select>
                 <p className="mt-2 text-xs text-slate-500">
-                  El termino legal se calcula segun el tipo seleccionado.
+                  El término legal se calcula según el tipo seleccionado.
                 </p>
               </div>
 
@@ -550,7 +550,7 @@ export default function PortalCiudadano() {
               <div className="grid sm:grid-cols-2 gap-6 field-animate" style={{ animationDelay: `${STAGGER[1]}ms` }}>
                 <div>
                   <label htmlFor="tipoPresentacion" className="block text-xs font-bold uppercase tracking-widest text-slate-400 mb-2">
-                    Forma de presentacion *
+                    Forma de presentación *
                   </label>
                   <select
                     id="tipoPresentacion"
@@ -560,11 +560,11 @@ export default function PortalCiudadano() {
                     disabled={estado === 'enviando'}
                   >
                     <option value="IDENTIFICADA">Identificada</option>
-                    <option value="ANONIMA">Anonima</option>
+                    <option value="ANONIMA">Anónima</option>
                     <option value="RESERVADA">Identidad reservada</option>
                   </select>
                   <p className="mt-2 text-xs text-slate-500">
-                    La opcion anonima no exige datos personales. La reservada protege la identidad en el tramite interno.
+                    La opción anónima no exige datos personales. La reservada protege la identidad en el trámite interno.
                   </p>
                 </div>
 
@@ -579,13 +579,13 @@ export default function PortalCiudadano() {
                     onChange={(e) => handleChange('canalRespuesta', e.target.value)}
                     disabled={estado === 'enviando'}
                   >
-                    <option value="CORREO">Correo electronico</option>
-                    <option value="TELEFONO">Telefono</option>
+                    <option value="CORREO">Correo electrónico</option>
+                    <option value="TELEFONO">Teléfono</option>
                     <option value="PRESENCIAL">Presencial</option>
-                    <option value="DIRECCION_FISICA">Direccion fisica</option>
+                    <option value="DIRECCION_FISICA">Dirección física</option>
                   </select>
                   <p className="mt-2 text-xs text-slate-500">
-                    Si elige correo, telefono o direccion fisica, ese dato sera obligatorio salvo que la solicitud sea anonima.
+                    Si elige correo, teléfono o dirección física, ese dato será obligatorio salvo que la solicitud sea anónima.
                   </p>
                 </div>
               </div>
@@ -661,7 +661,7 @@ export default function PortalCiudadano() {
               {form.tipoPresentacion !== 'ANONIMA' && (
                 <div className="field-animate" style={{ animationDelay: `${STAGGER[4]}ms` }}>
                   <label htmlFor="direccion" className="block text-xs font-bold uppercase tracking-widest text-slate-400 mb-2">
-                    Direccion fisica {form.canalRespuesta === 'DIRECCION_FISICA' ? '*' : '(opcional)'}
+                    Dirección física {form.canalRespuesta === 'DIRECCION_FISICA' ? '*' : '(opcional)'}
                   </label>
                   <input
                     id="direccion"
@@ -953,7 +953,7 @@ export default function PortalCiudadano() {
                 </div>
                 <div>
                   <p className="text-xs font-bold uppercase tracking-widest text-amber-400 mb-1">Tiempo de respuesta</p>
-                  <p className="text-slate-400 text-xs leading-relaxed">Máximo 15 días hábiles según la Ley 1437 de 2011 (CPACA).</p>
+                  <p className="text-slate-400 text-xs leading-relaxed">El término depende del tipo de solicitud: 10, 15 o 30 días hábiles según la Ley 1755 de 2015.</p>
                 </div>
               </div>
 
