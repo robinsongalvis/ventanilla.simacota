@@ -30,6 +30,7 @@ import {
   type ResultadoAutorizacion,
 } from '@/lib/seguridad/autorizar-descarga-archivo';
 import { registrarDescargaAuditoria } from '@/lib/seguridad/auditoria-descargas';
+import { getClientIp } from '@/lib/ai/rate-limit';
 import { logError } from '@/lib/logger';
 import type { VentanillaRadicado } from '@/src/types/ventanilla';
 import type { SalidaOficial } from '@/src/types/salida';
@@ -122,7 +123,10 @@ export async function GET(request: Request): Promise<NextResponse> {
       actorNombre:   usuario.nombre,
       actorRol:      usuario.rol,
       actorTenant:   usuario.tenantId,
-      ip:            request.headers.get('x-forwarded-for'),
+      // IP normalizada a una sola dirección (getClientIp) en vez del header
+      // `x-forwarded-for` crudo, que puede ser multivalor. registrarDescargaAuditoria
+      // la hashea (HMAC-SHA256) antes de persistir; nunca se guarda en claro.
+      ip:            getClientIp(request),
       userAgent:     request.headers.get('user-agent'),
     });
     return denegado(decision.status, decision.mensaje);
@@ -167,7 +171,9 @@ export async function GET(request: Request): Promise<NextResponse> {
       actorNombre:   usuario.nombre,
       actorRol:      usuario.rol,
       actorTenant:   usuario.tenantId,
-      ip:            request.headers.get('x-forwarded-for'),
+      // Ver nota en la rama de denegación: IP normalizada; el hash lo aplica
+      // registrarDescargaAuditoria internamente.
+      ip:            getClientIp(request),
       userAgent:     request.headers.get('user-agent'),
     });
 
