@@ -1,9 +1,10 @@
 import Link from 'next/link';
 import { InstitucionalHeader } from '@/app/components/institucional/InstitucionalHeader';
 import { INSTITUCION } from '@/lib/institucion';
+import { DIRECTORIO_TENANTS } from '@/src/types/reglas-negocio';
 
 const STATS = [
-  { value: '16', label: 'Dependencias conectadas' },
+  { value: String(Object.keys(DIRECTORIO_TENANTS).length), label: 'Dependencias conectadas' },
   { value: '24/7', label: 'Disponibilidad digital' },
   { value: '100%', label: 'Trazabilidad de casos' },
 ];

@@ -22,7 +22,12 @@ import * as fs    from 'fs';
 
 const PROD_URL       = 'https://ventanilla-simacota.vercel.app';
 const EMAIL_CIUDADANO = 'davidgalvis1519@gmail.com';
-const PASSWORD_TEST   = 'UatSimacota2026!';
+// La contraseña de los usuarios UAT viene del entorno: nunca en el repositorio.
+const PASSWORD_TEST = process.env.UAT_PASSWORD ?? '';
+if (!PASSWORD_TEST) {
+  console.error('Falta UAT_PASSWORD en el entorno. Exporta la variable antes de ejecutar la UAT.');
+  process.exit(1);
+}
 
 interface TestUser {
   email:    string;
