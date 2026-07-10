@@ -9,6 +9,21 @@ export const PREFIJO_E2E = '[E2E-AUTO]';
  *  Ley 1755/2015), verificado en lib/seguridad/consulta-publica-radicado.ts. */
 export const RE_NUMERO_RADICADO = /^1-110-\d{4}-\d{8}$/;
 
+/**
+ * Formato institucional amplio (incluye los códigos de oficina radicadora
+ * históricos/por canal, `INSTITUCIONAL_RADICADO_RE` en
+ * lib/seguridad/consulta-publica-radicado.ts:19). Usado en
+ * 11-registro-expres.spec.ts porque el comentario de
+ * lib/dependencias/registro-expres.ts dice "1-EMAIL-..." pero
+ * `formatearRadicadoInstitucional` usa `CODIGO_OFICINA_RADICADORA = '110'`
+ * sin excepción (lib/radicado-institucional.ts:23) — se verifica cuál es
+ * la realidad en vez de asumir cualquiera de las dos fuentes.
+ */
+export const RE_NUMERO_RADICADO_AMPLIO = /^1-(110|WEB|OFICIO|EMAIL|PRESENCIAL)-\d{4}-\d{8}$/;
+
+/** `2-SAL-{año}-{########}` — lib/salidas/radicado-salida.ts:24. */
+export const RE_NUMERO_SALIDA = /^2-SAL-\d{4}-\d{8}$/;
+
 export function asuntoUnico(etiqueta: string): string {
   return `${PREFIJO_E2E} ${etiqueta} ${Date.now()}`;
 }
@@ -92,4 +107,30 @@ export async function cerrarModalRadicacion(page: Page): Promise<void> {
 export async function irABandeja(page: Page): Promise<void> {
   await page.getByRole('navigation').getByRole('button', { name: 'Bandeja' }).click();
   await expect(page.getByRole('heading', { name: 'Bandeja de Asignación' })).toBeVisible();
+}
+
+/**
+ * Va a la vista "Ventanilla" (mostrador de atención) desde el nav lateral.
+ * Mismo motivo de escopar a `navigation` que `irABandeja`.
+ */
+export async function irAVentanilla(page: Page): Promise<void> {
+  await page.getByRole('navigation').getByRole('button', { name: 'Ventanilla', exact: true }).click();
+  await expect(page.getByPlaceholder('Radicado, cédula o nombre del ciudadano…')).toBeVisible();
+}
+
+/**
+ * Abre el panel de detalle de un radicado por URL (`?radicadoId=`) y
+ * confirma que abrió. El panel NO es un modal a pantalla completa — el
+ * Tablero/Bandeja detrás sigue visible y puede repetir el mismo texto
+ * (radicadoId, badges de estado), así que un `getByText(radicadoId)` sin
+ * escopar es ambiguo. La pestaña "Responder" solo existe DENTRO del panel.
+ */
+export async function abrirPanelRadicado(page: Page, radicadoId: string): Promise<void> {
+  await page.goto(`/interno/dashboard?radicadoId=${encodeURIComponent(radicadoId)}`);
+  await expect(page.getByRole('tab', { name: 'Responder' })).toBeVisible({ timeout: 20_000 });
+}
+
+/** Cambia de pestaña dentro del panel de detalle ya abierto. */
+export async function irATabRadicado(page: Page, nombreTab: string): Promise<void> {
+  await page.getByRole('tab', { name: nombreTab, exact: true }).click();
 }

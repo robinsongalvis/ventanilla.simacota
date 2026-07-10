@@ -40,8 +40,36 @@ const METADATA_LABORATORIO = {
  * nunca que el radicado haya llegado a crearse.
  */
 export async function marcarRadicadoDePrueba(radicadoId: string): Promise<void> {
+  await marcarDocumentoDePrueba('ventanilla_radicados', radicadoId);
+}
+
+/**
+ * Batch A (escenario 11, Registro exprés): ese flujo crea DOS documentos
+ * en colecciones distintas en la misma llamada — el radicado de entrada
+ * (`ventanilla_radicados`) Y una salida amarrada (`ventanilla_salidas`,
+ * `lib/dependencias/registro-expres.ts`). La salida necesita su propio
+ * marcado — es una colección aparte, `marcarRadicadoDePrueba` no la toca.
+ * Nota (hallazgo menor, ver bitácora): a diferencia de `ventanilla_radicados`,
+ * ningún hook cliente (`useVentanillaSalidas` o equivalente) filtra
+ * `isTest` hoy sobre `ventanilla_salidas` — se marca por higiene de datos
+ * y por si `--limpiar` de la Alcaldía Sintética la adopta más adelante,
+ * pero no oculta la salida de "Salidas" en el dashboard todavía.
+ */
+export async function marcarDocumentoDePrueba(coleccion: string, id: string): Promise<void> {
   const db = getAdminDb();
-  await db.doc(`ventanilla_radicados/${radicadoId}`).set(METADATA_LABORATORIO, { merge: true });
+  await db.doc(`${coleccion}/${id}`).set(METADATA_LABORATORIO, { merge: true });
+}
+
+/**
+ * Lectura de solo lectura para verificación de aserciones que no se
+ * pueden confirmar solo con la respuesta HTTP del endpoint (p. ej.
+ * `termino.prorrogasAplicadas`, que el endpoint de prórroga no devuelve
+ * en su respuesta JSON). NUNCA escribe nada.
+ */
+export async function leerRadicado(radicadoId: string): Promise<FirebaseFirestore.DocumentData | undefined> {
+  const db = getAdminDb();
+  const snap = await db.doc(`ventanilla_radicados/${radicadoId}`).get();
+  return snap.data();
 }
 
 /**
