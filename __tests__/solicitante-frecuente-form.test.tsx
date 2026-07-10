@@ -1,7 +1,11 @@
-import { afterEach, describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 import { cleanup, render, screen, fireEvent } from '@testing-library/react';
 import { RadicacionFuncionarioForm } from '@/app/interno/recepcion/components/RadicacionFuncionarioForm';
 import type { VentanillaRadicado } from '@/src/types/ventanilla';
+
+// El primer render del formulario completo en jsdom puede superar los
+// 5 s por defecto cuando la máquina está bajo carga.
+vi.setConfig({ testTimeout: 15_000 });
 
 afterEach(() => cleanup());
 
