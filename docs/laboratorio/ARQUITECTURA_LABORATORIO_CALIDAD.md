@@ -173,6 +173,21 @@ sin big-bang). Las fases 4–5 se confirman con evidencia de uso de las anterior
 - Los datos sintéticos jamás contienen información de personas reales; los scripts del
   laboratorio se niegan a ejecutar contra el proyecto de producción.
 
+## 7b. Indicadores de cierre de Fase 2 (fijados por el propietario, 2026-07-10)
+
+Definidos ANTES de conocer los resultados, con su línea base, para que la medición
+no nazca contaminada (Principio 13):
+
+| Indicador | Cómo se mide | Línea base (inicio de Fase 2) |
+|---|---|---|
+| **Valor por subagente** | Entregables aceptados por rol + hallazgos propios documentados en `FASE2_BITACORA.md` + retrabajos causados | 0 tareas delegadas ejecutadas (Fases 0–1 fueron del coordinador) |
+| **Hallazgos de revisión cruzada** | Defectos detectados por el rol revisor que el productor no vio, con evidencia archivo:línea | Sin datos — primera medición real |
+| **% del flujo institucional automatizado** | Etapas del ciclo (16 de la auditoría) cubiertas por escenarios Playwright que corren solos vs. a mano | 0 % automatizado (14/16 etapas validadas, pero manualmente) |
+| **Cercanía al "municipio en minutos"** | Pasos del aprovisionamiento de un municipio nuevo: automatizados vs. manuales, con tiempo estimado de los manuales | Automatizado por API: proyecto, APIs, Firestore+región, reglas, service account, usuarios semilla. Manual aún: habilitar Auth en consola (~3 clics), Vercel/hosting, SMTP, clave Gemini, dominio, datos institucionales propios (dependencias/TRD del municipio) |
+
+El cierre de Fase 2 incluye estos cuatro indicadores con datos reales; si la
+especialización no demuestra valor, se propone ajuste del modelo por ADR.
+
 ## 8. Riesgos de la propuesta (declarados)
 
 1. **Mantenimiento E2E:** las suites de navegador se degradan si crecen sin control.

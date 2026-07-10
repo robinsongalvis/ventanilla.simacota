@@ -13,6 +13,12 @@
 # testing
 /coverage
 
+# Playwright (auditor funcional E2E, ADR-0002 Fase 2)
+/playwright-report/
+/test-results/
+/blob-report/
+/playwright/.cache/
+
 # next.js
 /.next/
 /out/

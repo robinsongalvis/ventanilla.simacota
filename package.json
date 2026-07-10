@@ -9,6 +9,7 @@
     "lint": "eslint",
     "test": "vitest run",
     "test:watch": "vitest",
+    "test:e2e": "playwright test",
     "dev:stage": "node scripts/laboratorio/dev-stage.mjs"
   },
   "dependencies": {
@@ -24,6 +25,7 @@
     "react-dom": "^19.2.6"
   },
   "devDependencies": {
+    "@playwright/test": "^1.61.1",
     "@sentry/nextjs": "^10.55.0",
     "@tailwindcss/postcss": "^4.2.2",
     "@testing-library/dom": "^10.4.1",

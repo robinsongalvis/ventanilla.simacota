@@ -19,6 +19,14 @@ const eslintConfig = defineConfig([
       'react-hooks/set-state-in-effect': 'off',
     },
   },
+  {
+    // Los fixtures de Playwright reciben un parámetro `use` que la regla de
+    // hooks de React confunde con un hook. En `e2e/` no hay React.
+    files: ['e2e/**'],
+    rules: {
+      'react-hooks/rules-of-hooks': 'off',
+    },
+  },
 ]);
 
 export default eslintConfig;
