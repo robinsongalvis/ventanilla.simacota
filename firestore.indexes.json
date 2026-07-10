@@ -4,55 +4,84 @@
       "collectionGroup": "ventanilla_radicados",
       "queryScope": "COLLECTION",
       "fields": [
-        { "fieldPath": "control.fechaRadicado", "order": "DESCENDING" }
+        {
+          "fieldPath": "clasificacion.oficinaDestino",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "control.fechaRadicado",
+          "order": "DESCENDING"
+        }
       ]
     },
     {
       "collectionGroup": "ventanilla_radicados",
       "queryScope": "COLLECTION",
       "fields": [
-        { "fieldPath": "clasificacion.oficinaDestino", "order": "ASCENDING" },
-        { "fieldPath": "control.fechaRadicado",        "order": "DESCENDING" }
+        {
+          "fieldPath": "estadoActual",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "control.fechaRadicado",
+          "order": "DESCENDING"
+        }
       ]
     },
     {
       "collectionGroup": "ventanilla_radicados",
       "queryScope": "COLLECTION",
       "fields": [
-        { "fieldPath": "estadoActual",          "order": "ASCENDING" },
-        { "fieldPath": "control.fechaRadicado", "order": "DESCENDING" }
+        {
+          "fieldPath": "termino.tipoSolicitudId",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "control.fechaRadicado",
+          "order": "DESCENDING"
+        }
       ]
     },
     {
       "collectionGroup": "ventanilla_radicados",
       "queryScope": "COLLECTION",
       "fields": [
-        { "fieldPath": "termino.tipoSolicitudId", "order": "ASCENDING" },
-        { "fieldPath": "control.fechaRadicado",   "order": "DESCENDING" }
-      ]
-    },
-    {
-      "collectionGroup": "ventanilla_radicados",
-      "queryScope": "COLLECTION",
-      "fields": [
-        { "fieldPath": "cumplioTermino",        "order": "ASCENDING" },
-        { "fieldPath": "control.fechaRadicado", "order": "DESCENDING" }
+        {
+          "fieldPath": "cumplioTermino",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "control.fechaRadicado",
+          "order": "DESCENDING"
+        }
       ]
     },
     {
       "collectionGroup": "users",
       "queryScope": "COLLECTION",
       "fields": [
-        { "fieldPath": "tenantId", "order": "ASCENDING" },
-        { "fieldPath": "activo",   "order": "ASCENDING" }
+        {
+          "fieldPath": "tenantId",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "activo",
+          "order": "ASCENDING"
+        }
       ]
     },
     {
       "collectionGroup": "seguridad_descargas_auditoria",
       "queryScope": "COLLECTION",
       "fields": [
-        { "fieldPath": "radicadoId", "order": "ASCENDING" },
-        { "fieldPath": "fecha",      "order": "DESCENDING" }
+        {
+          "fieldPath": "radicadoId",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "fecha",
+          "order": "DESCENDING"
+        }
       ]
     }
   ],
