@@ -2,9 +2,21 @@
   "version": "0.0.1",
   "configurations": [
     {
+      "name": "ventanilla-stage",
+      "runtimeExecutable": "npm",
+      "runtimeArgs": [
+        "run",
+        "dev:stage"
+      ],
+      "port": 3000
+    },
+    {
       "name": "ventanilla-dev",
       "runtimeExecutable": "npm",
-      "runtimeArgs": ["run", "dev"],
+      "runtimeArgs": [
+        "run",
+        "dev"
+      ],
       "port": 3000
     }
   ]
