@@ -1,5 +1,5 @@
 import { test as base, expect } from '@playwright/test';
-import { marcarRadicadoDePrueba } from './lab-admin';
+import { marcarDocumentoDePrueba, marcarRadicadoDePrueba } from './lab-admin';
 
 /**
  * Fixture de teardown para el marcado `isTest` (hallazgo de
@@ -19,6 +19,10 @@ import { marcarRadicadoDePrueba } from './lab-admin';
  */
 type FixturesLaboratorio = {
   registrarRadicadoDePrueba: (radicadoId: string) => void;
+  /** Batch A (escenario 11) — Registro exprés crea también una salida en
+   *  `ventanilla_salidas`, colección aparte que `registrarRadicadoDePrueba`
+   *  no toca. Uso: `registrarDocumentoDePrueba('ventanilla_salidas', id)`. */
+  registrarDocumentoDePrueba: (coleccion: string, id: string) => void;
 };
 
 export const test = base.extend<FixturesLaboratorio>({
@@ -35,6 +39,20 @@ export const test = base.extend<FixturesLaboratorio>({
         // el log del runner para que quede evidencia del radicado huérfano
         // (candidato a barrido retroactivo, ver e2e/marcar-retroactivo.mjs).
         console.error(`[lab-admin] No se pudo marcar isTest en ${id}:`, err);
+      }
+    }
+  },
+
+  registrarDocumentoDePrueba: async ({}, use) => {
+    const docsCreados: { coleccion: string; id: string }[] = [];
+    await use((coleccion: string, id: string) => { docsCreados.push({ coleccion, id }); });
+
+    for (const { coleccion, id } of docsCreados) {
+      try {
+        await marcarDocumentoDePrueba(coleccion, id);
+        console.log(`[lab-admin] Marcado isTest=true en ${coleccion}/${id}`);
+      } catch (err) {
+        console.error(`[lab-admin] No se pudo marcar isTest en ${coleccion}/${id}:`, err);
       }
     }
   },

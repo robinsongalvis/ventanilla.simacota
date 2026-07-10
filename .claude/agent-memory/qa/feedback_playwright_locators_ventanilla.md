@@ -7,7 +7,7 @@ metadata:
 
 Patrones que causaron falsos negativos al escribir `e2e/` (auditor
 funcional Playwright, ADR-0002 Fase 2) contra `app/interno/dashboard/page.tsx`.
-Reutilizar al escribir escenarios nuevos de los 9 restantes del presupuesto.
+Reutilizar al escribir los 4 escenarios restantes del presupuesto.
 
 **`getByLabel`/`getByRole` hacen match por substring por defecto.** En este
 dashboard eso es ambiguo con frecuencia: "Correo electrónico" matchea
@@ -44,3 +44,26 @@ tiempo real son carrera potencial.** Si una fila muestra un feedback local
 vía un listener de Firestore, el checkmark puede no llegar a verse nunca.
 Preferir aserciones sobre el efecto persistente (la fila desaparece de la
 lista filtrada) en vez del feedback transitorio.
+
+**Si el modal de éxito de "Radicación Rápida" queda abierto, bloquea
+cualquier `.click()` posterior en la página** (su overlay `role="dialog"
+z-50` intercepta el clic aunque el elemento objetivo sea "visible, enabled y
+stable" — Playwright reintenta ~60 veces y expira). `page.goto(...)`
+(navegación completa) sortea el problema porque destruye el DOM entero,
+pero un `.click()` de nav lateral (p. ej. `irAVentanilla`) NO. Regla:
+siempre `cerrarModalRadicacion(page)` inmediatamente después de
+`enviarRadicacionRapida(page)` si el siguiente paso usa `.click()` en vez
+de `page.goto()`.
+
+**Selects sin `<label>` real (solo `<p>` + `<select>` hermanos, sin
+`htmlFor`/`id`) no funcionan con `getByLabel`.** Ejemplo: el select
+"Dependencia" de la pestaña Traslado
+(`app/interno/dashboard/page.tsx` ~2806-2814) y el input "Días" de Prórroga
+(~3044-3048) son `<p>Etiqueta</p><select>/<input>` sin envoltura `<label>`.
+Locator que funciona: combinador adyacente CSS de Playwright,
+`page.locator('p:text-is("Dependencia") + select')` — `:text-is()` es
+exacto (evita que "Dependencia" matchee "Dependencia destino" del form de
+Radicación Rápida en otra parte del árbol). Cuando el campo SÍ está
+envuelto en `<label>` (la mayoría de los campos de estos formularios,
+incluida la "Radicación Rápida" completa), usar `getByLabel` normalmente —
+este truco es solo para las excepciones sin envoltura real.

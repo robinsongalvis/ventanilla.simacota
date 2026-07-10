@@ -396,11 +396,13 @@ sintéticos reales contra el recálculo con la función de producción.
 
 ## Auditor funcional Playwright (qa)
 
-**Entregable:** `playwright.config.ts` + `e2e/` — 6 escenarios E2E contra
-STAGE (de un presupuesto duro de 15, ADR-0002 §4.1), más el mecanismo de
-marcado `isTest` que corrige el hallazgo de firestore-datos de más arriba.
-Corrida verificada el 2026-07-10 (4 corridas completas consecutivas, todas
-en verde salvo el fixme documentado).
+**Entregable:** `playwright.config.ts` + `e2e/` — 11 escenarios E2E contra
+STAGE (de un presupuesto duro de 15, ADR-0002 §4.1: 6 de la primera entrega
++ 5 del Batch A), más el mecanismo de marcado `isTest` que corrige el
+hallazgo de firestore-datos de más arriba. Corrida verificada el
+2026-07-10 (6 corridas completas consecutivas de la suite entera —4 de la
+primera entrega, 2 del Batch A con los 11 escenarios juntos—, todas en
+verde salvo el fixme documentado).
 
 ### Qué cubren los 6 escenarios
 
@@ -424,19 +426,42 @@ elegir cualquier "Dependencia destino" al radicar— para crear un radicado
 dirigido exactamente ahí. Todos los asuntos llevan el prefijo `[E2E-AUTO]`
 para poder re-correr la suite contra stage indefinidamente sin ambigüedad.
 
-### Qué queda para los 9 restantes del presupuesto (propuesta, no implementado)
+### Batch A — 5 escenarios nuevos (07-11)
 
-Priorizados por lo que un incidente real necesitaría ver primero:
-identidad **reservada** (tercera variante de `tipoPresentacion`, no cubierta
-aún); traslado entre dependencias con evento de historial; devolución por
-datos incompletos; prórroga única con notificación; numeración consecutiva
-sin huecos bajo concurrencia (relevante: ver hallazgo de huecos más abajo);
-comparación de expediente completo inicio→cierre (nada se pierde entre
-etapas); sello de documento PDF; registro de salida con constancia de
-despacho; Registro exprés (correspondencia ya respondida). El propio ADR
-pide variantes negativas (anónimo, reservado, traslado, prórroga,
-devolución) — de las 5, esta entrega cubre 1 (anónimo); reservado y las
-otras tres quedan priorizadas arriba.
+| Archivo | Escenario | Verifica |
+|---|---|---|
+| `07-identidad-reservada.spec.ts` | Presentación RESERVADA | a diferencia de ANÓNIMA, nombre/documento SÍ se capturan (quedan habilitados y con el valor tecleado); aviso "Los datos se registran pero quedan protegidos en las vistas." visible; protección real verificada (no asumida) en dos puntos concretos — el mostrador de Ventanilla muestra "Identidad protegida" en vez del nombre, y la consulta pública omite la clave `dependencia` del JSON |
+| `08-traslado-dependencias.spec.ts` | Traslado entre dependencias | pestaña "Traslado" mueve el radicado de Secretaría de Gobierno a Secretaría de Planeación; evento de Historia "Trasladado a X" / "Desde Y" con origen y destino; el cambio persiste de verdad (confirmado recargando el panel desde cero, no solo el estado optimista de React) |
+| `09-prorroga-con-notificacion.spec.ts` | Prórroga con notificación | `termino.prorrogasAplicadas` incrementa (verificado leyendo el documento real, la respuesta HTTP no lo expone), `fechaVencimiento` se recalcula exactamente `+N` días calendario, evento de Historia con el motivo — y expone el hallazgo normativo #5 (abajo) aplicando una segunda prórroga a propósito |
+| `10-devolucion-datos-incompletos.spec.ts` | Devolución | el flujo SÍ existe (se confirmó antes de escribir el test); motivo obligatorio (≥10 caracteres), `estadoActual` pasa a `DEVUELTO`, evento de Historia con el motivo |
+| `11-registro-expres.spec.ts` | Registro exprés | crea DOS documentos en una llamada (entrada YA resuelta + salida amarrada `2-SAL-...`); default de tipo `PETICION_GENERAL` confirmado (distinto del default de Radicación Rápida); término real de 15 días hábiles aplicado igual que cualquier otra vía; expone el hallazgo de documentación #7 (abajo) |
+
+Decisiones de diseño de estos 5:
+- **08, 09, 10 usan ADMIN**, no recepcionista/funcionario — `canOperateTenant`
+  (`lib/server/internal-auth.ts:82-86`) da vía libre a ADMIN sobre cualquier
+  tenant, así que el test puede radicar directo al origen que necesita sin
+  tener que pasar por la Bandeja primero. Es una decisión deliberada de
+  acotar la variable bajo prueba (el flujo de traslado/prórroga/devolución
+  en sí, no la matriz de permisos por rol — eso ya lo cubre el escenario 05
+  y es candidato explícito para los 4 restantes del presupuesto).
+- **09 y 10 comparten pestaña ("Prórroga") y el mismo estado `motivo`** en
+  el componente (`app/interno/dashboard/page.tsx` ~3013-3059) — cada test
+  llena su propio campo por `placeholder` (no por el label compartido) para
+  no arrastrar el texto del otro control.
+- **11 necesitó un segundo fixture de marcado** (`registrarDocumentoDePrueba`,
+  `e2e/fixtures.ts`) porque Registro exprés crea el documento de salida en
+  `ventanilla_salidas`, una colección que el fixture original
+  (`registrarRadicadoDePrueba`, acotado a `ventanilla_radicados`) no cubre.
+
+### Qué queda para los 4 restantes del presupuesto (propuesta, no implementado)
+
+Numeración consecutiva sin huecos bajo concurrencia (relevante: ver
+hallazgo de huecos, #2 abajo); comparación de expediente completo
+inicio→cierre (nada se pierde entre etapas); sello de documento PDF;
+registro de salida con constancia de despacho (distinto del de Registro
+exprés — el flujo manual desde el detalle, `RegistrarSalidaModal`). El
+propio ADR pide variantes negativas (anónimo, reservado, traslado,
+prórroga, devolución) — con este batch quedan las 5 cubiertas.
 
 ### Hallazgos
 
@@ -501,6 +526,51 @@ otras tres quedan priorizadas arriba.
    considera que vale la pena resolver la carrera (p. ej. no auto-abrir el
    modal si el usuario ya interactuó con algo en los últimos N segundos, o
    pedir el resumen ANTES de pintar el dashboard interactivo).
+5. **[MEDIA, normativo] La prórroga no tiene límite de unicidad.** Ley
+   1755/2015 exige que la prórroga sea ÚNICA. `POST
+   /api/radicados/[radicadoId]/prorroga` no tiene ningún guard que lo
+   impida: `assertNotClosed` (`lib/server/radicados-security.ts:44-48`)
+   solo bloquea `RESUELTO`/`RECHAZADO`, y el estado que deja una prórroga es
+   `PRORROGA` — no está en esa lista. Verificado aplicando una segunda
+   prórroga a propósito en `e2e/09-prorroga-con-notificacion.spec.ts`:
+   `termino.prorrogasAplicadas` llega a 2 sin ningún error. El motivo SÍ se
+   captura (queda "motivada") y la notificación al ciudadano SÍ se intenta
+   cuando hay correo (queda "notificada" si hay canal) — la brecha real es
+   específicamente la ausencia del límite de unicidad. **Rol que corrige:
+   `gobierno-digital`** para confirmar la interpretación normativa exacta
+   (¿la segunda prórroga debería rechazarse siempre, o permitirse con
+   causal calificada?) y **`dev-backend`** para implementar el guard una
+   vez decidido.
+6. **[BAJA, interno] La protección de "identidad reservada" es inconsistente
+   entre vistas internas.** Verificado en `e2e/07-identidad-reservada.spec.ts`:
+   el mostrador de Ventanilla SÍ protege (`VistaVentanilla.identidadProtegida`,
+   "Identidad protegida" en vez del nombre), pero la Bandeja de Asignación
+   (`BandejaAsignacion`, columna Solicitante) y el panel de detalle completo
+   —pestaña Información, `app/interno/dashboard/page.tsx` ~2494— muestran
+   nombre y documento en texto plano sin ninguna condición sobre
+   `identidadReservada`. Puede ser intencional (quien gestiona el caso
+   necesita el dato) o un descuido — no lo asumo. **Rol que corrige:
+   `gobierno-digital`** para decidir si es conforme, **`dev-frontend`** para
+   implementar si no lo es.
+7. **[BAJA, documentación] Comentario desactualizado en Registro exprés.**
+   `lib/dependencias/registro-expres.ts` (comentario de cabecera) dice que
+   la entrada nace como "1-EMAIL-...", pero `formatearRadicadoInstitucional`
+   usa `CODIGO_OFICINA_RADICADORA = '110'` fijo, sin excepción
+   (`lib/radicado-institucional.ts:23) — el id real es `1-110-...`,
+   confirmado empíricamente en `e2e/11-registro-expres.spec.ts`. No es un
+   bug funcional (el consecutivo es correcto y comparte counter con
+   radicación normal), solo el comentario quedó desactualizado. **Rol que
+   corrige: `dev-backend`** (fix trivial de comentario).
+8. **[BAJA, informativo] `ventanilla_salidas` no tiene higiene `isTest` del
+   lado cliente.** A diferencia de `ventanilla_radicados`
+   (`useVentanillaRadicados` filtra `isTest`), ningún hook consume ese campo
+   sobre `ventanilla_salidas` hoy — confirmado al implementar el marcado de
+   la salida que crea Registro exprés (`e2e/lab-admin.ts:marcarDocumentoDePrueba`,
+   necesario para el escenario 11). Se marca por higiene y por si
+   `--limpiar` de la Alcaldía Sintética la adopta más adelante, pero
+   actualmente no oculta nada de "Salidas" en el dashboard. **Rol:
+   `firestore-datos`/`dev-frontend`**, si se decide dar a las salidas la
+   misma disciplina que a los radicados.
 
 ### Mecanismo de marcado `isTest` (hallazgo de firestore-datos, atendido)
 
@@ -563,13 +633,25 @@ para que quede resuelto sin intervención manual.
   radicado sintético tiene adjuntos (mismo síntoma, ahora con causa raíz).
 - **dev-backend:** hallazgo 2 (huecos de numeración) es candidato a ticket
   propio; también dueño de decidir si el hallazgo 2 aplica a producción.
+  Hallazgo 7 (comentario desactualizado) es un fix trivial cuando toque ese
+  archivo.
 - **dev-frontend / ux-ui:** hallazgos 3 y 4 son de experiencia, no de datos;
-  ninguno bloquea el ciclo dorado.
+  ninguno bloquea el ciclo dorado. Hallazgo 6 (protección de identidad
+  reservada inconsistente) necesita decisión normativa antes de tocar código.
+- **gobierno-digital:** hallazgo 5 (prórroga sin límite de unicidad) es el
+  más importante de este batch — pide interpretación normativa antes de que
+  `dev-backend` implemente el guard. Hallazgo 6 (protección de identidad
+  reservada) también necesita su lectura: ¿es correcto que quien gestiona
+  el caso vea la identidad completa, o debería protegerse también ahí?
 - **firestore-datos:** su hallazgo sobre radicados QA sin marcar queda
   atendido por el mecanismo de esta sección; los 3 documentos ya
   identificados por ambos (32, 42) más el 73 quedan con barrido listo para
-  ejecutar, pendiente de autorización.
+  ejecutar, pendiente de autorización. Hallazgo 8 (salidas sin higiene
+  `isTest`) es candidato a evaluar junto con el resto de la disciplina de
+  datos sintéticos.
 - **Propietario del proyecto:** decisión pendiente sobre el barrido
   retroactivo (ver arriba) — es la única acción de esta entrega que no se
   pudo completar por diseño del sistema de permisos, no por falta de
-  tiempo o de código.
+  tiempo o de código. Sigue pendiente tras el Batch A (no creció: el nuevo
+  mecanismo marcó automáticamente los 11 radicados y 1 salida de este
+  batch, confirmado por los logs `[lab-admin]` en la evidencia).
