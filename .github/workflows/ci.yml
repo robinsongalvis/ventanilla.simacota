@@ -71,3 +71,6 @@ jobs:
 
       - name: Emulador + reglas + sonda canario
         run: npx firebase-tools emulators:exec --only firestore --project demo-ventanilla-lab "node scripts/laboratorio/probar-emulador.mjs"
+
+      - name: Matriz de aislamiento por tenant (ADR-0007)
+        run: npx firebase-tools emulators:exec --only firestore --project demo-ventanilla-lab "npm run test:rules"
