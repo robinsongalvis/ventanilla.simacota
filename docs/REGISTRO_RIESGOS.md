@@ -40,6 +40,11 @@ implementan durante la ejecución (Principio de la Regla Suprema).
 
 ## Regla de operación
 
+- **Ciclo obligatorio de todo hallazgo (principio permanente, 2026-07-10):**
+  Riesgo → Decisión de arquitectura (ADR) → Implementación → Pruebas →
+  Revisión cruzada → Evidencia → Cierre trazable. **Ninguna corrección se
+  acepta sin un control automatizado capaz de detectar su regresión.**
+  Ejemplar de referencia: H1 (ADR-0003).
 - El propietario revisa este registro en cada cierre de fase.
 - Un hallazgo **ALTA** no se cierra por olvido ni por vencimiento de sprint:
   solo por resolución técnica verificada o por aceptación formal del riesgo
