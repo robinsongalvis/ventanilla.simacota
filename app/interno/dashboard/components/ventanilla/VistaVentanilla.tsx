@@ -10,6 +10,7 @@ import {
   type FiltroTrabajoHoy,
   type PendienteMostrador,
 } from '@/lib/mostrador/trabajo-de-hoy';
+import { nombreSolicitanteVisible } from '@/lib/seguridad/identidad-protegida';
 
 /* ══════════════════════════════════════════════════════════════
    Ventanilla · módulo de mostrador — "Atención al ciudadano".
@@ -70,10 +71,6 @@ function coincideMostrador(r: VentanillaRadicado, q: string): boolean {
     r.solicitante.nombreCompleto.toLowerCase().includes(q) ||
     r.solicitante.numeroDocumento.includes(q)
   );
-}
-
-function identidadProtegida(r: VentanillaRadicado): boolean {
-  return r.identidadReservada === true || r.esAnonimo === true;
 }
 
 export function VistaVentanilla({
@@ -246,7 +243,7 @@ export function VistaVentanilla({
                       {r.radicadoId}
                     </p>
                     <p className="text-[11px] truncate" style={{ color: '#5F6F64' }}>
-                      {identidadProtegida(r) ? 'Identidad protegida' : r.solicitante.nombreCompleto}
+                      {nombreSolicitanteVisible(r, r.solicitante.nombreCompleto)}
                       {' · '}
                       {NOMBRES_TENANT[r.clasificacion.oficinaDestino] ?? r.clasificacion.oficinaDestino}
                     </p>

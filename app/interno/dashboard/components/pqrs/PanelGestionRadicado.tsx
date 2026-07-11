@@ -4,6 +4,7 @@ import { useState } from 'react';
 import { DIRECTORIO_TENANTS, NOMBRES_TENANT } from '@/src/types/reglas-negocio';
 import type { TenantId } from '@/src/types/radicado';
 import type { TrazabilidadRadicado, VentanillaRadicado } from '@/src/types/ventanilla';
+import { nombreSolicitanteVisible } from '@/lib/seguridad/identidad-protegida';
 
 type TabId = 'info' | 'trazabilidad' | 'asignar' | 'devolver';
 
@@ -49,7 +50,7 @@ export function PanelGestionRadicado({ radicado, trazabilidad, onAsignar, onDevo
         {tab === 'info' && (
           <div className="grid gap-3 md:grid-cols-3">
             <Info label="Radicado" value={radicado.radicadoId} />
-            <Info label="Solicitante" value={radicado.solicitante.nombreCompleto} />
+            <Info label="Solicitante" value={nombreSolicitanteVisible(radicado, radicado.solicitante.nombreCompleto)} />
             <Info label="Estado" value={radicado.estadoActual} />
             <Info label="Asunto" value={radicado.detalle.asunto} className="md:col-span-3" />
             <Info label="Dependencia" value={NOMBRES_TENANT[radicado.clasificacion.oficinaDestino]} />
