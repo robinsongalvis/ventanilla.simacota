@@ -24,6 +24,7 @@ import {
   registrarTrazabilidadNotificacion,
 } from '@/lib/trazabilidad/notificacion';
 import { logError } from '@/lib/logger';
+import { registrarEventoNegocio } from '@/lib/observabilidad/eventos-negocio';
 import { DIRECTORIO_TENANTS } from '@/src/types/reglas-negocio';
 
 export const runtime = 'nodejs';
@@ -40,9 +41,16 @@ function jsonError(error: unknown) {
 }
 
 export async function POST(request: Request, context: RouteContext): Promise<NextResponse> {
+  const inicioOperacion = Date.now();
+  let actorRolActual = 'DESCONOCIDO';
+  let tenantActual = 'DESCONOCIDO';
+  let radicadoIdActual: string | null = null;
   try {
     const usuario = await requireActiveInternalUser();
+    actorRolActual = usuario.rol;
+    tenantActual = usuario.tenantId;
     const { radicadoId } = await context.params;
+    radicadoIdActual = radicadoId;
     const body = await request.json().catch(() => null) as { motivo?: string; diasProrroga?: number } | null;
     const motivo = body?.motivo?.trim() ?? '';
     const diasProrroga = Number(body?.diasProrroga ?? 0);
@@ -56,6 +64,7 @@ export async function POST(request: Request, context: RouteContext): Promise<Nex
     }
 
     const radicado = await getRadicadoOrFail(radicadoId);
+    tenantActual = radicado.clasificacion.oficinaDestino;
     assertNotClosed(radicado);
 
     if (!canOperateTenant(usuario, radicado.clasificacion.oficinaDestino)) {
@@ -172,6 +181,15 @@ export async function POST(request: Request, context: RouteContext): Promise<Nex
       }
     }
 
+    registrarEventoNegocio({
+      operacion: 'prorroga',
+      resultado: 'ok',
+      latenciaMs: Date.now() - inicioOperacion,
+      radicadoId: radicadoIdActual,
+      actorRol: actorRolActual,
+      tenant: tenantActual,
+    });
+
     return NextResponse.json({
       ok: true,
       estadoActual: 'PRORROGA',
@@ -181,6 +199,15 @@ export async function POST(request: Request, context: RouteContext): Promise<Nex
       ...(emailError ? { emailError } : {}),
     });
   } catch (error) {
+    registrarEventoNegocio({
+      operacion: 'prorroga',
+      resultado: 'error',
+      latenciaMs: Date.now() - inicioOperacion,
+      radicadoId: radicadoIdActual,
+      actorRol: actorRolActual,
+      tenant: tenantActual,
+      error,
+    });
     console.error('[radicados/prorroga]', error);
     return jsonError(error);
   }

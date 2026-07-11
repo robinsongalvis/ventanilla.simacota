@@ -29,6 +29,7 @@ import {
   registrarTrazabilidadNotificacion,
 } from '@/lib/trazabilidad/notificacion';
 import { logError } from '@/lib/logger';
+import { registrarEventoNegocio } from '@/lib/observabilidad/eventos-negocio';
 import type { ResponsableFuncionario } from '@/lib/actions/asignarRadicado';
 import type { TenantId } from '@/src/types/radicado';
 import { DIRECTORIO_TENANTS } from '@/src/types/reglas-negocio';
@@ -54,15 +55,23 @@ function jsonError(error: unknown) {
 }
 
 export async function POST(request: Request, context: RouteContext): Promise<NextResponse> {
+  const inicioOperacion = Date.now();
+  let actorRolActual = 'DESCONOCIDO';
+  let tenantActual = 'DESCONOCIDO';
+  let radicadoIdActual: string | null = null;
   try {
     const usuario = await requireActiveInternalUser();
+    actorRolActual = usuario.rol;
+    tenantActual = usuario.tenantId;
     const { radicadoId } = await context.params;
+    radicadoIdActual = radicadoId;
     const payload = await request.json().catch(() => null) as Payload | null;
     const tenantDestino = payload?.tenantDestino;
 
     if (!tenantDestino || !DIRECTORIO_TENANTS[tenantDestino]) {
       return NextResponse.json({ error: 'Dependencia destino inválida.' }, { status: 400 });
     }
+    tenantActual = tenantDestino;
 
     const radicado = await getRadicadoOrFail(radicadoId);
     assertNotClosed(radicado);
@@ -183,6 +192,15 @@ export async function POST(request: Request, context: RouteContext): Promise<Nex
       }
     }
 
+    registrarEventoNegocio({
+      operacion: 'asignacion',
+      resultado: 'ok',
+      latenciaMs: Date.now() - inicioOperacion,
+      radicadoId: radicadoIdActual,
+      actorRol: actorRolActual,
+      tenant: tenantActual,
+    });
+
     return NextResponse.json({
       ok: true,
       estadoActual: 'ASIGNADO',
@@ -191,6 +209,15 @@ export async function POST(request: Request, context: RouteContext): Promise<Nex
       ...(emailError ? { emailError } : {}),
     });
   } catch (error) {
+    registrarEventoNegocio({
+      operacion: 'asignacion',
+      resultado: 'error',
+      latenciaMs: Date.now() - inicioOperacion,
+      radicadoId: radicadoIdActual,
+      actorRol: actorRolActual,
+      tenant: tenantActual,
+      error,
+    });
     console.error('[radicados/asignar]', error);
     return jsonError(error);
   }

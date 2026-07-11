@@ -18,6 +18,7 @@ import {
 import { debeNotificarCiudadano } from '@/lib/email/debe-notificar-ciudadano';
 import { registrarTrazabilidadNotificacion } from '@/lib/trazabilidad/notificacion';
 import { logError } from '@/lib/logger';
+import { registrarEventoNegocio } from '@/lib/observabilidad/eventos-negocio';
 import {
   generarTokenConsulta,
   hashTokenConsulta,
@@ -254,6 +255,8 @@ function parseAnalisisIa(value: string): AnalisisIA | undefined {
 }
 
 export async function POST(request: Request) {
+  const inicioOperacion = Date.now();
+  let radicadoIdActual: string | null = null;
   try {
     const ip = getClientIp(request);
     const limited = checkRateLimit(`radicacion:${ip}`, RATE_LIMIT);
@@ -343,6 +346,7 @@ export async function POST(request: Request) {
 
     const ahora = new Date();
     const { radicadoId, consecutivo } = await generarRadicadoInstitucionalAdmin(ahora);
+    radicadoIdActual = radicadoId;
     const termino = calcularFechaVencimiento(ahora, tipoSolicitudIdRaw);
     const archivos = await Promise.all(files.map((file, index) => subirArchivoAdmin(file, radicadoId, index + 1)));
     const tipoSolicitud = TIPOS_SOLICITUD[tipoSolicitudIdRaw];
@@ -508,6 +512,15 @@ export async function POST(request: Request) {
       }
     }
 
+    registrarEventoNegocio({
+      operacion: 'radicacion',
+      resultado: 'ok',
+      latenciaMs: Date.now() - inicioOperacion,
+      radicadoId,
+      actorRol: 'PORTAL_CIUDADANO',
+      tenant: TENANT_RECEPCION,
+    });
+
     return NextResponse.json({
       exito: true,
       radicadoId,
@@ -522,6 +535,15 @@ export async function POST(request: Request) {
       ...(emailError ? { emailError } : {}),
     });
   } catch (error) {
+    registrarEventoNegocio({
+      operacion: 'radicacion',
+      resultado: 'error',
+      latenciaMs: Date.now() - inicioOperacion,
+      radicadoId: radicadoIdActual,
+      actorRol: 'PORTAL_CIUDADANO',
+      tenant: TENANT_RECEPCION,
+      error,
+    });
     const message = error instanceof Error ? error.message : 'No fue posible crear el radicado.';
     console.error('[api/radicacion] Error creando radicado:', message);
     return NextResponse.json({
