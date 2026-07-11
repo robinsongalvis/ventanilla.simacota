@@ -1,4 +1,5 @@
 import { expect, type Page } from '@playwright/test';
+import { PDFDocument } from 'pdf-lib';
 import { LAB_PASSWORD } from './env';
 
 /** Prefijo obligatorio (encargo QA) para poder re-correr la suite contra
@@ -26,6 +27,27 @@ export const RE_NUMERO_SALIDA = /^2-SAL-\d{4}-\d{8}$/;
 
 export function asuntoUnico(etiqueta: string): string {
   return `${PREFIJO_E2E} ${etiqueta} ${Date.now()}`;
+}
+
+/**
+ * PDF real, de una página, generado con `pdf-lib` (ya dependencia del
+ * proyecto — el mismo motor que usa `lib/sello/generar-sello-pdf.ts`).
+ *
+ * Hallazgo de la primera entrega (04-radicacion-adjunto.spec.ts, cuando el
+ * bucket de stage estaba mal aprovisionado): un PDF "a mano" con cabecera
+ * `%PDF-` y bytes inventados pasa la validación de firma binaria
+ * (lib/seguridad/magic-bytes.ts, solo mira los primeros bytes) pero NO es
+ * parseable por `PDFDocument.load()` — el sellado (escenario 14) habría
+ * fallado con `SelloPDFError('CORRUPTO')` por un PDF mal formado, no por
+ * un defecto real del sellado. Generarlo con `pdf-lib` desde el propio
+ * test elimina esa ambigüedad: si algo falla ahora, es el producto.
+ */
+export async function crearPdfValido(texto: string): Promise<Buffer> {
+  const doc = await PDFDocument.create();
+  const pagina = doc.addPage([595, 842]); // A4 en puntos
+  pagina.drawText(texto, { x: 50, y: 780, size: 14 });
+  const bytes = await doc.save();
+  return Buffer.from(bytes);
 }
 
 /** Inicia sesión en /interno/login y espera a que el panel cargue. */
