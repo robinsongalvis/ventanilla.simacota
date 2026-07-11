@@ -27,6 +27,12 @@ import {
   type PresetReporte,
 } from '@/lib/reportes/filtrar-por-preset';
 import { INSTITUCION } from '@/lib/institucion';
+import {
+  documentoSolicitanteVisible,
+  identidadProtegida,
+  nombreSolicitanteVisible,
+  numeroDocumentoVisible,
+} from '@/lib/seguridad/identidad-protegida';
 import { puedeVerReportes } from '@/lib/permisos/acceso-reportes';
 import { agruparDestinosPorDependencia, areasParaDependencia, getNombreArea } from '@/lib/catalogos/areas';
 import { RegistroExpresModal } from '@/app/interno/dashboard/components/RegistroExpresModal';
@@ -1492,7 +1498,7 @@ function TablaRadicados({
                   {LABELS_ESTADO[r.estadoActual] ?? r.estadoActual}
                 </span>
               </div>
-              <p className="text-sm font-medium truncate" style={{ color: '#1F2933' }}>{r.solicitante.nombreCompleto}</p>
+              <p className="text-sm font-medium truncate" style={{ color: '#1F2933' }}>{nombreSolicitanteVisible(r, r.solicitante.nombreCompleto)}</p>
               <div className="mt-1 flex flex-wrap gap-x-3 gap-y-0.5">
                 <span className="text-[10px]" style={{ color: '#667085' }}>{r.termino.tipoSolicitudNombre}</span>
                 <span className="text-[10px] truncate" style={{ color: '#94A3B8' }}>{NOMBRES_TENANT[r.clasificacion.oficinaDestino]}</span>
@@ -1582,9 +1588,9 @@ function TablaRadicados({
                     <p className="text-[10px] mt-0.5" style={{ color: '#94A3B8' }}>{fmtFecha(r.control.fechaRadicado)}</p>
                   </td>
                   <td className="px-4 py-3 max-w-[180px]">
-                    <p className="font-medium truncate" style={{ color: '#1F2933' }}>{r.solicitante.nombreCompleto}</p>
+                    <p className="font-medium truncate" style={{ color: '#1F2933' }}>{nombreSolicitanteVisible(r, r.solicitante.nombreCompleto)}</p>
                     <p className="text-[10px] font-mono" style={{ color: '#94A3B8' }}>
-                      {r.solicitante.tipoDocumento} {r.solicitante.numeroDocumento}
+                      {documentoSolicitanteVisible(r, r.solicitante.tipoDocumento, r.solicitante.numeroDocumento)}
                     </p>
                     {/* Sprint Ventanilla Operativa 1 — chip de tipo de entrada / origen */}
                     <div className="mt-1 flex gap-1 flex-wrap">
@@ -2220,7 +2226,7 @@ function PanelDerecho({
               {esRojo && <span className="w-2 h-2 rounded-full bg-red-500 animate-pulse shrink-0" />}
               <p className="font-mono text-xs font-bold truncate" style={{ color: '#14532D' }}>{radicado.radicadoId}</p>
             </div>
-            <p className="text-sm font-semibold truncate" style={{ color: '#1F2933' }}>{radicado.solicitante.nombreCompleto}</p>
+            <p className="text-sm font-semibold truncate" style={{ color: '#1F2933' }}>{nombreSolicitanteVisible(radicado, radicado.solicitante.nombreCompleto)}</p>
             <div className="flex items-center gap-2 mt-1 flex-wrap">
               <span className={`text-[10px] font-bold uppercase px-2 py-0.5 rounded-full border ${
                 BADGE_ESTADO[radicado.estadoActual] ?? 'bg-gray-100 text-gray-600 border-gray-200'
@@ -2490,14 +2496,18 @@ function PanelDerecho({
               <p className="text-[10px] font-bold uppercase tracking-widest mb-3" style={{ color: '#14532D' }}>Solicitante</p>
               <div className="grid grid-cols-2 gap-x-4 gap-y-3">
                 <FilaInfo label="Tipo persona"    value={radicado.solicitante.tipoPersona} />
-                <FilaInfo label="Documento"       value={`${radicado.solicitante.tipoDocumento} ${radicado.solicitante.numeroDocumento}`} />
-                <FilaInfo label="Nombre completo" value={radicado.solicitante.nombreCompleto} />
+                <FilaInfo label="Documento"       value={documentoSolicitanteVisible(radicado, radicado.solicitante.tipoDocumento, radicado.solicitante.numeroDocumento)} />
+                <FilaInfo label="Nombre completo" value={nombreSolicitanteVisible(radicado, radicado.solicitante.nombreCompleto)} />
                 <FilaInfo label="Presentación" value={radicado.tipoPresentacion ?? (radicado.esAnonimo ? 'ANONIMA' : 'IDENTIFICADA')} />
                 <FilaInfo label="Anónima" value={radicado.esAnonimo ? 'Sí' : 'No'} />
                 {radicado.identidadReservada && <FilaInfo label="Identidad reservada" value="Sí" />}
-                {radicado.solicitante.email    && <FilaInfo label="Correo"    value={radicado.solicitante.email} />}
-                {radicado.solicitante.telefono && <FilaInfo label="Teléfono"  value={radicado.solicitante.telefono} />}
-                {radicado.solicitante.direccion && <FilaInfo label="Dirección" value={radicado.solicitante.direccion} />}
+                {/* H2 (ADR-0006): identidad reservada — el correo, teléfono y
+                    dirección tampoco se muestran en claro (permitirían
+                    reidentificar al solicitante aunque el nombre esté
+                    enmascarado). */}
+                {!identidadProtegida(radicado) && radicado.solicitante.email    && <FilaInfo label="Correo"    value={radicado.solicitante.email} />}
+                {!identidadProtegida(radicado) && radicado.solicitante.telefono && <FilaInfo label="Teléfono"  value={radicado.solicitante.telefono} />}
+                {!identidadProtegida(radicado) && radicado.solicitante.direccion && <FilaInfo label="Dirección" value={radicado.solicitante.direccion} />}
                 <FilaInfo label="Municipio" value={`${radicado.solicitante.ubicacion.municipio}, ${radicado.solicitante.ubicacion.departamento}`} />
               </div>
             </div>
@@ -3684,8 +3694,8 @@ function exportarCSVMIPG(radicados: VentanillaRadicado[]): void {
     r.control.fechaRadicado,
     r.control.horaRadicado,
     r.control.medioRecepcion,
-    r.solicitante.nombreCompleto,
-    r.solicitante.numeroDocumento,
+    nombreSolicitanteVisible(r, r.solicitante.nombreCompleto),
+    numeroDocumentoVisible(r, r.solicitante.numeroDocumento),
     r.termino.tipoSolicitudNombre,
     r.tipoPresentacion ?? (r.esAnonimo ? 'ANONIMA' : 'IDENTIFICADA'),
     r.esAnonimo ? 'Sí' : 'No',
@@ -4287,9 +4297,9 @@ function BandejaAsignacion({
                   </td>
 
                   <td className="px-4 py-3 max-w-[160px]">
-                    <p className="text-xs font-medium truncate" style={{ color: '#1F2933' }}>{r.solicitante.nombreCompleto}</p>
+                    <p className="text-xs font-medium truncate" style={{ color: '#1F2933' }}>{nombreSolicitanteVisible(r, r.solicitante.nombreCompleto)}</p>
                     <p className="text-[10px] font-mono" style={{ color: '#94A3B8' }}>
-                      {r.solicitante.tipoDocumento} {r.solicitante.numeroDocumento}
+                      {documentoSolicitanteVisible(r, r.solicitante.tipoDocumento, r.solicitante.numeroDocumento)}
                     </p>
                   </td>
 

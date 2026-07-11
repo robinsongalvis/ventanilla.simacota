@@ -24,6 +24,7 @@ import {
   type FiltrosBusqueda,
   type PresetFecha,
 } from '@/lib/busqueda/filtros-radicado';
+import { nombreSolicitanteVisible } from '@/lib/seguridad/identidad-protegida';
 
 const ESTADOS = [
   'PENDIENTE',
@@ -342,7 +343,7 @@ export function BusquedaAvanzadaPanel({
                             {r.radicadoId} · {r.detalle?.asunto?.slice(0, 80) || 'Sin asunto'}
                           </p>
                           <p className="text-[11px]" style={{ color: '#667085' }}>
-                            {r.solicitante?.nombreCompleto ?? '—'} ·{' '}
+                            {r.solicitante?.nombreCompleto ? nombreSolicitanteVisible(r, r.solicitante.nombreCompleto) : '—'} ·{' '}
                             {NOMBRES_TENANT[r.clasificacion?.oficinaDestino] ?? r.clasificacion?.oficinaDestino} ·{' '}
                             {r.termino?.tipoSolicitudNombre}
                           </p>

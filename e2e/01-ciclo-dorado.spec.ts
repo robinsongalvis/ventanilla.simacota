@@ -15,6 +15,13 @@ import { USUARIOS_LAB } from './env';
  * distintas.
  */
 test('ciclo dorado: radicar → asignar → responder → consulta pública', async ({ browser, request, registrarRadicadoDePrueba }) => {
+  // Escenario más largo de la suite (4 etapas, 3 contextos + consulta pública).
+  // El timeout global de 60s (playwright.config.ts) se queda corto cuando STAGE
+  // acumula datos de muchas corridas y el dashboard se ralentiza al montar
+  // (carga la colección completa — deuda de rendimiento registrada, no defecto
+  // de este test). Mismo patrón que e2e/07. No se debilita ninguna aserción:
+  // solo se da margen realista sobre un entorno compartido y acumulativo.
+  test.setTimeout(120_000);
   const asunto = asuntoUnico('Ciclo dorado');
   const emailSolicitante = `e2e.ciclo.${Date.now()}@example.com`;
 

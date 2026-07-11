@@ -231,3 +231,67 @@ alcance normativo; no lo certifico aquí.)*
 demostrada por pruebas. H1 puede marcarse **RESUELTO** en `docs/REGISTRO_RIESGOS.md`. Las dos
 observaciones residuales son ítems nuevos y de menor severidad; no justifican mantener H1 abierto.
 Referencia de decisión: **ADR-0003** (`docs/adr/0003-control-de-prorroga-ley-1755.md`).
+
+---
+
+## H2 — Remediación verificada (2026-07-11)
+
+**Rol:** revisión cruzada de conformidad normativa (gobierno-digital). dev-frontend implementó la
+variante A (enmascarar por defecto); esta sección es la validación independiente. Solo lectura de
+código, sin cambios.
+
+### Veredicto de conformidad: **CUMPLE** (sube desde CUMPLE PARCIALMENTE)
+
+La reserva de identidad ya se aplica de forma **transversal** a todas las superficies internas de
+visualización y a la exportación. Se satisface el principio de acceso restringido y confidencialidad
+del art. 4 (lit. f, g, h) de la Ley 1581/2012 para el alcance del hallazgo (nombre y documento
+visibles en claro en vistas internas). El estado de H2 pasa de **CUMPLE PARCIALMENTE** a **CUMPLE**.
+
+### Verificación en el código (leído, no asumido)
+| Superficie | Verificación | Resultado |
+|---|---|---|
+| Helper `lib/seguridad/identidad-protegida.ts` | Criterio único `identidadProtegida` (anónimo, `identidadReservada`, `tipoPresentacion ∈ {ANONIMA,RESERVADA}`), coherente con `consulta-publica-radicado.ts` y `reportes-mipg/sanitizar.ts`. Marcador de reemplazo **completo** ("Identidad protegida"/"Documento protegido"), sin revelación parcial. | Correcto |
+| `page.tsx` tabla/tarjeta (1501, 1591-1593), header detalle (2229) | `nombreSolicitanteVisible` / `documentoSolicitanteVisible`. | Enmascarado |
+| `page.tsx` bloque Solicitante (2499-2500) | Nombre y documento enmascarados; **correo/teléfono/dirección** (2508-2510) ocultos con `!identidadProtegida(radicado)`. | Enmascarado |
+| `page.tsx` bandeja de asignación (4300-4302) | Nombre y documento enmascarados. | Enmascarado |
+| `page.tsx` exportación CSV (3697-3698) | `nombreSolicitanteVisible` / `numeroDocumentoVisible`; no hay columnas de correo/teléfono/dirección del solicitante (el único email exportado es el **institucional del responsable**, no dato del ciudadano). | Enmascarado |
+| `ResumenEjecutivoRadicado.tsx` (100), `BusquedaAvanzadaPanel.tsx` (346), `PanelGestionRadicado.tsx` (53), `VistaAlertas.tsx` (124), `VistaVentanilla.tsx` (246) | Todas usan `nombreSolicitanteVisible`. | Enmascarado |
+| Pass-through seguros: `SelloRadicado` (2431) | Recibe `esAnonimo`/`identidadReservada` y enmascara **internamente** solicitante (48-50), documento (81) y correo (82) — los `nombreCompleto`/documento crudos de 2432-2434 no se muestran. | Seguro |
+| Pass-through seguros: `RegistrarSalidaModal` (3279-3281) | Recibe `solicitanteNombre: undefined` cuando hay reserva. | Seguro |
+| Oficio/constancia (1936-1937) | Envía correo/dirección **al propio ciudadano titular** (reenvío de su constancia), no exposición a terceros funcionarios — uso conforme al titular (art. 4 lit. c/f). | Seguro |
+
+### Análisis normativo de la remediación
+| Norma | Estado tras la remediación |
+|---|---|
+| **Ley 1581/2012 art. 4 lit. f (acceso y circulación restringida)** | Conforme: la identidad reservada ya no está disponible en claro para el conjunto de funcionarios en ninguna vista de gestión ni en la exportación. |
+| **Ley 1581/2012 art. 4 lit. g (seguridad)** | Conforme: enmascaramiento por defecto en el punto de render, criterio centralizado y con regresión automatizada. |
+| **Ley 1581/2012 art. 4 lit. h (confidencialidad)** | Conforme para el canal de visualización. |
+
+### Control de regresión (criterio de cierre por pruebas): **SATISFECHO**
+Confirmé la existencia de `__tests__/identidad-protegida.test.ts` (14 casos del helper),
+`vista-alertas-render`, `panel-gestion-radicado-render` y `e2e/07` extendido (mostrador + detalle +
+bandeja + export + búsqueda avanzada), probados rompiendo deliberadamente el masking. La conformidad
+del enmascaramiento queda protegida contra regresión.
+
+### Brechas residuales (fuera del alcance del hallazgo H2; NO bloquean su cierre)
+1. **Predicado de búsqueda como canal de inferencia (oracle).** La búsqueda (`page.tsx` 213-214 y
+   `VistaVentanilla.tsx` 71-72) sigue filtrando por `nombreCompleto`/`numeroDocumento` **también en
+   radicados reservados**. Las filas resultantes salen enmascaradas, pero un funcionario que teclee
+   un nombre/documento concreto puede **confirmar** que existe un radicado reservado para esa persona.
+   Es un canal de inferencia, no de visualización: no revela una identidad desconocida, solo permite
+   confirmar una hipótesis previa. Severidad **baja-media**. Se resuelve con la **variante B**
+   (revelación/consulta por rol y necesidad de conocer), ya diferida en ADR-0006. Recomiendo
+   registrarlo como ítem propio del backlog. **Rol futuro: dev-backend + PO.**
+2. **Necesidad de conocer del funcionario responsable (tensión operativa, no incumplimiento).** La
+   variante A enmascara para **todos**, incluido el funcionario responsable que legítimamente puede
+   necesitar la identidad para tramitar (p. ej. Comisaría). Esto es conservador y **conforme** a la
+   confidencialidad (errar hacia la protección), pero deja pendiente el acceso legítimo por rol —
+   objeto de la variante B (ADR-0006). Es decisión de producto con base normativa, no una brecha de
+   cumplimiento. **Rol futuro: PO + dev-backend.**
+
+**Conclusión:** la remediación de H2 es **conforme** al art. 4 (f/g/h) de la Ley 1581/2012 en todas
+las vistas internas y en la exportación, con conformidad protegida por pruebas de regresión. H2
+puede marcarse **RESUELTO** en `docs/REGISTRO_RIESGOS.md` y su concepto sube de **CUMPLE PARCIALMENTE**
+a **CUMPLE**. Las dos observaciones residuales son ítems nuevos de menor severidad, cuya solución
+natural es la variante B ya prevista. Referencia de decisión: **ADR-0006**
+(`docs/adr/0006-enmascaramiento-identidad-reservada.md`).
