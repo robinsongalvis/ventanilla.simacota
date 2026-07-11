@@ -47,6 +47,52 @@ export function assertNotClosed(radicado: VentanillaRadicado): void {
   }
 }
 
+/** Motivo de rechazo de una solicitud de prórroga, o `null` si es válida. */
+export interface RechazoProrroga {
+  status: 400 | 409;
+  mensaje: string;
+}
+
+/**
+ * Control ejecutable de prórroga (ADR-0003, hallazgo H1) — Ley 1755/2015
+ * art. 14, parágrafo: admite una única ampliación excepcional cuyo nuevo
+ * plazo no podrá exceder del doble del término inicialmente previsto.
+ *
+ * Se enforce en dos reglas independientes, evaluadas en orden:
+ * 1. Unicidad — ya existe al menos una prórroga aplicada.
+ * 2. Tope — los días solicitados exceden el término base del tipo de
+ *    solicitud (`diasProrroga === diasRespuesta` es la frontera válida).
+ *
+ * Devuelve el primer motivo de rechazo, o `null` si la prórroga es válida.
+ * Función pura: no accede a Firestore ni tiene efectos secundarios — el
+ * endpoint debe invocarla ANTES de cualquier escritura para IMPEDIR (no
+ * solo advertir) el estado inválido.
+ */
+export function validarProrroga(params: {
+  prorrogasAplicadas: number | undefined;
+  diasProrroga: number;
+  diasRespuesta: number;
+}): RechazoProrroga | null {
+  const { diasProrroga, diasRespuesta } = params;
+  const prorrogasAplicadas = params.prorrogasAplicadas ?? 0;
+
+  if (prorrogasAplicadas >= 1) {
+    return {
+      status: 409,
+      mensaje: 'Este radicado ya tiene una prórroga aplicada. La Ley 1755/2015 (art. 14) solo permite una ampliación excepcional del término.',
+    };
+  }
+
+  if (diasProrroga > diasRespuesta) {
+    return {
+      status: 400,
+      mensaje: `Los días de prórroga (${diasProrroga}) superan el tope legal: el nuevo plazo no puede exceder el doble del término inicial (${diasRespuesta} días, Ley 1755/2015 art. 14).`,
+    };
+  }
+
+  return null;
+}
+
 export function buildResponsableSnapshot(responsable?: ResponsableFuncionario | null): Record<string, unknown> {
   if (!responsable) return {};
 
