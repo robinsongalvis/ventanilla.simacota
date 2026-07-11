@@ -14,20 +14,16 @@ import { leerRadicado } from './lab-admin';
  * de solo lectura del documento real (no solo la respuesta HTTP, que no
  * devuelve `prorrogasAplicadas`).
  *
- * ── HALLAZGO NORMATIVO (para gobierno-digital, no bloqueante para este
- * test) ── Ley 1755/2015 exige que la prórroga sea ÚNICA. El endpoint
- * (`app/api/radicados/[radicadoId]/prorroga/route.ts`) NO tiene ningún
- * guard que impida una segunda prórroga sobre el mismo radicado:
- * `assertNotClosed` (lib/server/radicados-security.ts:44-48) solo bloquea
- * RESUELTO/RECHAZADO, y el estado que deja una prórroga es `PRORROGA`, que
- * no está en esa lista. Este test aplica una SEGUNDA prórroga a propósito
- * para verificar el comportamiento real (no asumirlo) — confirmado: el
- * sistema la acepta sin objeción y `prorrogasAplicadas` llega a 2. El
- * motivo SÍ se captura (queda "motivada") y la notificación al ciudadano
- * SÍ se intenta si tiene correo (queda "notificada" cuando hay canal) — la
- * brecha real es específicamente la ausencia del límite de unicidad.
+ * ── CONTROL NORMATIVO (ADR-0003, hallazgo H1, RESUELTO) ── Ley 1755/2015
+ * art. 14 exige que la prórroga sea ÚNICA. Este test aplicaba antes una
+ * SEGUNDA prórroga para documentar que el sistema la aceptaba sin objeción
+ * (brecha confirmada, `prorrogasAplicadas` llegaba a 2). Con el control
+ * ejecutable de `validarProrroga` (`lib/server/radicados-security.ts`),
+ * invocado por el endpoint antes de escribir, la segunda prórroga ahora
+ * debe ser RECHAZADA (409) y el contador debe permanecer en 1. Este test
+ * se invierte para asertar el rechazo, tal como anticipaba este comentario.
  */
-test('prórroga: incrementa el contador, recalcula vencimiento y dispara notificación — y detecta que no hay límite de unicidad', async ({
+test('prórroga: la primera aplica y notifica; la segunda es rechazada por unicidad (Ley 1755 art. 14, ADR-0003)', async ({
   browser,
   registrarRadicadoDePrueba,
 }) => {
@@ -91,18 +87,25 @@ test('prórroga: incrementa el contador, recalcula vencimiento y dispara notific
   // la respuesta HTTP ya confirmó ok:true; el envío real depende de que
   // stage tenga SMTP configurado, fuera del alcance de este test).
 
-  // ── Hallazgo normativo: segunda prórroga, sin bloqueo real ──
+  // ── Control ADR-0003: la segunda prórroga debe ser RECHAZADA ──
   await irATabRadicado(page, 'Prórroga');
-  await page.getByPlaceholder('Fundamento legal de la prórroga').fill('Segunda prórroga — verificando si el sistema la bloquea.');
-  await page.getByRole('button', { name: `Aplicar prórroga (+${diasProrroga} días)` }).click();
-  await expect(page.getByText('Operación guardada correctamente.')).toBeVisible({ timeout: 15_000 });
+  await page.getByPlaceholder('Fundamento legal de la prórroga').fill('Segunda prórroga — debe ser rechazada por el control de unicidad.');
+  const [respuestaSegundaProrroga] = await Promise.all([
+    page.waitForResponse((r) => r.url().includes('/prorroga') && r.request().method() === 'POST'),
+    page.getByRole('button', { name: `Aplicar prórroga (+${diasProrroga} días)` }).click(),
+  ]);
+  expect(respuestaSegundaProrroga.status()).toBe(409);
+  const cuerpoSegundaProrroga = await respuestaSegundaProrroga.json();
+  expect(cuerpoSegundaProrroga.error).toMatch(/una sola|una prórroga|1755/i);
+  await expect(page.getByText(/^Error:/)).toBeVisible({ timeout: 15_000 });
 
   const despuesDos = await leerRadicado(radicadoId);
-  // Si este número alguna vez baja a 1 (con un mensaje de error visible en
-  // su lugar), significa que alguien cerró la brecha normativa — hay que
-  // actualizar este comentario y el hallazgo de la bitácora, no "arreglar"
-  // el test para que seguir pasando.
-  expect(despuesDos?.termino?.prorrogasAplicadas).toBe(2);
+  // Si este número alguna vez sube a 2, significa que el control de
+  // unicidad (ADR-0003, `validarProrroga` en
+  // lib/server/radicados-security.ts) se rompió o fue removido — no
+  // "arreglar" el test para que siga pasando; es una regresión normativa
+  // sobre Ley 1755/2015 art. 14 (hallazgo H1).
+  expect(despuesDos?.termino?.prorrogasAplicadas).toBe(1);
 
   await ctx.close();
 });

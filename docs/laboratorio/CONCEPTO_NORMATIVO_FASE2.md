@@ -173,3 +173,61 @@ Comisaría de Familia e Inspección de Policía.
   (un plazo adicional con tope = doble), no por texto literal "una sola vez".
 - El numeral exacto de la **reserva del denunciante** en la Ley 1474/2011 no se cita como artículo
   específico aquí; se recomienda verificarlo si se requiere en documento vinculante.
+
+---
+
+## H1 — Remediación verificada (2026-07-10)
+
+**Rol:** revisión cruzada de conformidad normativa (gobierno-digital). dev-backend implementó bajo
+excepción controlada al congelamiento (ADR-0003); esta sección es la validación independiente —
+nadie valida su propio trabajo. Solo lectura de código, sin cambios.
+
+### Veredicto de conformidad: **CONFORME** (dentro del alcance H1: unicidad + tope)
+
+El control ejecutable satisface la Ley 1755/2015 art. 14 para las dos reglas que originaron el
+hallazgo. El estado de H1 pasa de **NO CUMPLE** (severidad ALTA) a **CONFORME / remediado**.
+
+### Verificación en el código (leído, no asumido)
+| Artefacto | Qué verifiqué | Resultado |
+|---|---|---|
+| `lib/server/radicados-security.ts` (líneas 50-94) | `validarProrroga` es función pura; unicidad `prorrogasAplicadas >= 1` → 409; tope `diasProrroga > diasRespuesta` → 400; frontera `===` permitida; unicidad evaluada **antes** del tope. | Correcto |
+| `app/api/radicados/[radicadoId]/prorroga/route.ts` (líneas 65-74) | Invoca `validarProrroga` tras `getRadicadoOrFail` y **antes** de la escritura (línea 81); ante rechazo hace `return` con el `status`/`mensaje`. IMPIDE, no advierte. | Correcto |
+| `src/types/ventanilla.ts` (125), `radicarVentanilla.ts` (273), `api/radicacion/route.ts` (397), `registro-expres.ts` (143) | `termino.diasRespuesta` es campo requerido y se **puebla en los tres caminos de creación**. El tope no queda huérfano. | Correcto |
+| `__tests__/prorroga-validacion.test.ts` (6 casos) | Cubre: 1ª válida; `undefined`→0; 2ª rechazada 409; tope excedido 400; frontera `===` válida; precedencia unicidad-sobre-tope. | Cobertura suficiente del validador |
+| `e2e/09-prorroga-con-notificacion.spec.ts` | Invertido: 1ª aplica (200, contador→1, vencimiento recalculado, traza); 2ª **rechazada 409**, mensaje cita la norma, contador **permanece en 1** verificado por lectura del documento real. | Correcto |
+
+### Análisis normativo de la remediación
+| Regla del art. 14 (parágrafo) | Cómo la enforce el control | Conformidad |
+|---|---|---|
+| Ampliación **única** | Rechazo 409 si `prorrogasAplicadas >= 1` | **Conforme** |
+| Nuevo plazo **≤ doble del término inicial** | Con una sola prórroga permitida y `diasProrroga ≤ diasRespuesta`, el término total = base + prórroga ≤ 2× base | **Conforme** |
+| Nota calendario vs. hábiles (ADR-0003 §Interpretación) | `diasProrroga` se suma como días **calendario**; `diasRespuesta` es **hábiles**. N días calendario abarcan ≤ wall-clock que N días hábiles, luego el guard es **más estricto** que el tope legal y nunca lo excede. | Argumento sólido; conservador |
+
+### Mensajes de rechazo (claridad + cita normativa)
+- 409 (unicidad): "Este radicado ya tiene una prórroga aplicada. La Ley 1755/2015 (art. 14) solo
+  permite una ampliación excepcional del término." — **cita correcta y clara** para el funcionario.
+- 400 (tope): "Los días de prórroga (X) superan el tope legal: el nuevo plazo no puede exceder el
+  doble del término inicial (Y días, Ley 1755/2015 art. 14)." — **cita correcta y clara**.
+
+### Criterio de cierre 2 del ADR (conformidad demostrada por pruebas): **SATISFECHO**
+Los 6 unitarios del validador cubren ambas reglas y su precedencia; el E2E 09 demuestra el rechazo
+end-to-end con verificación de solo lectura del documento (`prorrogasAplicadas` permanece en 1). La
+conformidad de unicidad + tope queda demostrada por pruebas automatizadas de regresión.
+*(El criterio de cierre 3 — sin regresión sobre los 15 E2E — es evidencia de QA, fuera de mi
+alcance normativo; no lo certifico aquí.)*
+
+### Brechas residuales (fuera del alcance H1; NO bloquean su cierre)
+1. **Timing "antes del vencimiento" no verificado.** El parágrafo del art. 14 exige informar al
+   interesado *antes del vencimiento del término*. El control valida unicidad y tope, pero **no
+   impide aplicar la prórroga cuando el término original ya venció**. Severidad **media-baja**
+   (la notificación sí se intenta). Es una regla distinta a las que motivaron H1; se recomienda
+   registrarla como ítem propio del backlog, no reabrir H1. **Rol futuro: dev-backend.**
+2. **Robustez ante `diasRespuesta` ausente (legado).** Si un radicado careciera de `diasRespuesta`,
+   `diasProrroga > undefined` es `false` y el tope no dispararía. Hoy el campo es requerido y se
+   puebla en todos los caminos de creación, por lo que el riesgo es **bajo/teórico**; se anota como
+   observación de robustez, no como brecha activa. **Rol futuro: dev-backend.**
+
+**Conclusión:** la remediación de H1 es **conforme** al art. 14 en unicidad y tope, con conformidad
+demostrada por pruebas. H1 puede marcarse **RESUELTO** en `docs/REGISTRO_RIESGOS.md`. Las dos
+observaciones residuales son ítems nuevos y de menor severidad; no justifican mantener H1 abierto.
+Referencia de decisión: **ADR-0003** (`docs/adr/0003-control-de-prorroga-ley-1755.md`).

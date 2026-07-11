@@ -10,6 +10,7 @@ import {
   assertNotClosed,
   getRadicadoOrFail,
   RadicadoActionError,
+  validarProrroga,
 } from '@/lib/server/radicados-security';
 import { enviarEmail } from '@/lib/email/mailer';
 import {
@@ -59,6 +60,17 @@ export async function POST(request: Request, context: RouteContext): Promise<Nex
 
     if (!canOperateTenant(usuario, radicado.clasificacion.oficinaDestino)) {
       return NextResponse.json({ error: 'Tu rol no permite prorrogar este radicado.' }, { status: 403 });
+    }
+
+    // ADR-0003 (hallazgo H1) — control ejecutable de unicidad y tope legal
+    // (Ley 1755/2015 art. 14). Debe evaluarse ANTES de cualquier escritura.
+    const rechazo = validarProrroga({
+      prorrogasAplicadas: radicado.termino.prorrogasAplicadas,
+      diasProrroga,
+      diasRespuesta: radicado.termino.diasRespuesta,
+    });
+    if (rechazo) {
+      return NextResponse.json({ error: rechazo.mensaje }, { status: rechazo.status });
     }
 
     const ahora = new Date().toISOString();
