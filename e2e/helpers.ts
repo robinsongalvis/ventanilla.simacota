@@ -80,11 +80,17 @@ export async function login(page: Page, email: string): Promise<void> {
   await page.getByLabel('Correo institucional').fill(email);
   await page.getByLabel('Contraseña').fill(LAB_PASSWORD);
   await page.getByRole('button', { name: 'Ingresar al Panel' }).click();
-  await page.waitForURL('**/interno/dashboard**', { timeout: 15_000 });
+  // `waitUntil: 'domcontentloaded'` en vez del 'load' por defecto: el dashboard
+  // carga la colección completa al montar (deuda de rendimiento R11), así que el
+  // evento 'load' puede tardar >15s cuando STAGE acumula datos y hacía fallar el
+  // login de forma determinista. La señal correcta de "sesión lista" no es que
+  // termine toda la carga, sino que la URL sea el dashboard y el spinner de
+  // verificación de sesión desaparezca (abajo) — el dashboard ya es interactivo.
+  await page.waitForURL('**/interno/dashboard**', { timeout: 30_000, waitUntil: 'domcontentloaded' });
   // El layout hace una segunda verificación de sesión antes de soltar el
   // spinner "Verificando sesion..."; esperar a que desaparezca evita
   // interactuar con el DOM a medio montar.
-  await expect(page.getByText('Verificando sesion...')).toHaveCount(0, { timeout: 15_000 });
+  await expect(page.getByText('Verificando sesion...')).toHaveCount(0, { timeout: 30_000 });
 }
 
 /**

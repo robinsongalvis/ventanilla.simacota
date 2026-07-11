@@ -205,6 +205,27 @@ const MATRIZ = [
     ejecutar: (db) => setDoc(doc(db, 'ventanilla_radicados/rad-a-1/trazabilidad/evt-cross-tenant'), { evento: 'nota-cruzada' }),
   },
   {
+    // Ancla de la asimetría del fix R8 (ADR-0008): Admin conserva alcance
+    // cross-tenant de ventanilla única también en la ESCRITURA de trazabilidad,
+    // igual que en su `allow read`. admin-a (TENANT_A) escribe sobre rad-b-1
+    // (oficinaDestino TENANT_B). Si un refactor restringe a Admin por tenant por
+    // error, este caso lo detecta.
+    grupo: 'trazabilidad', caso: 'ADMIN crea trazabilidad cross-tenant (ventanilla única, alcance conservado)', actor: 'admin-a', esperado: 'permitido',
+    ejecutar: (db) => setDoc(doc(db, 'ventanilla_radicados/rad-b-1/trazabilidad/evt-admin-cross'), { evento: 'nota-admin' }),
+  },
+  {
+    // CONTROL_INTERNO es SOLO LECTURA: no está en canWriteTrazabilidad(). Si
+    // alguien lo agregara, rompería el invariante de segregación de funciones.
+    grupo: 'trazabilidad', caso: 'CONTROL_INTERNO (solo lectura) NO puede crear trazabilidad', actor: 'control-interno-a', esperado: 'denegado',
+    ejecutar: (db) => setDoc(doc(db, 'ventanilla_radicados/rad-a-1/trazabilidad/evt-ci'), { evento: 'nota-ci' }),
+  },
+  {
+    // Usuario autenticado sin documento en users/ (hasUserProfile() == false):
+    // ningún rol resuelve, la escritura debe quedar cerrada.
+    grupo: 'trazabilidad', caso: 'usuario SIN perfil no puede crear trazabilidad', actor: 'sin-perfil', esperado: 'denegado',
+    ejecutar: (db) => setDoc(doc(db, 'ventanilla_radicados/rad-a-1/trazabilidad/evt-sin-perfil'), { evento: 'nota' }),
+  },
+  {
     grupo: 'trazabilidad', caso: 'update de trazabilidad siempre denegado', actor: 'admin-a', esperado: 'denegado',
     ejecutar: (db) => updateDoc(doc(db, 'ventanilla_radicados/rad-a-1/trazabilidad/evt-1'), { evento: 'editado' }),
   },

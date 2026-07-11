@@ -8,6 +8,7 @@ import {
 import { debeNotificarCiudadano } from '@/lib/email/debe-notificar-ciudadano';
 import { registrarTrazabilidadNotificacion } from '@/lib/trazabilidad/notificacion';
 import { logError } from '@/lib/logger';
+import { registrarEventoNegocio } from '@/lib/observabilidad/eventos-negocio';
 import {
   canOperateTenant,
   InternalAuthError,
@@ -113,9 +114,16 @@ async function notificarCiudadano(params: {
 }
 
 export async function POST(request: Request, context: RouteContext): Promise<NextResponse> {
+  const inicioOperacion = Date.now();
+  let actorRolActual = 'DESCONOCIDO';
+  let tenantActual = 'DESCONOCIDO';
+  let radicadoIdActual: string | null = null;
   try {
     const usuario = await requireActiveInternalUser();
+    actorRolActual = usuario.rol;
+    tenantActual = usuario.tenantId;
     const { radicadoId } = await context.params;
+    radicadoIdActual = radicadoId;
     const formData = await request.formData();
     const nota = typeof formData.get('nota') === 'string' ? String(formData.get('nota')).trim() : '';
     const archivo = formData.get('archivo');
@@ -125,6 +133,7 @@ export async function POST(request: Request, context: RouteContext): Promise<Nex
     }
 
     const radicado = await getRadicadoOrFail(radicadoId);
+    tenantActual = radicado.clasificacion.oficinaDestino;
     if (radicado.estadoActual === 'RESUELTO' || radicado.cumplioTermino !== null && radicado.cumplioTermino !== undefined) {
       return NextResponse.json({ error: 'El radicado ya fue resuelto y no puede recalcular cumplimiento.' }, { status: 409 });
     }
@@ -180,6 +189,15 @@ export async function POST(request: Request, context: RouteContext): Promise<Nex
       tieneArchivo: Boolean(archivoPdf),
     });
 
+    registrarEventoNegocio({
+      operacion: 'respuesta',
+      resultado: 'ok',
+      latenciaMs: Date.now() - inicioOperacion,
+      radicadoId: radicadoIdActual,
+      actorRol: actorRolActual,
+      tenant: tenantActual,
+    });
+
     return NextResponse.json({
       ok: true,
       estadoActual: 'RESUELTO',
@@ -190,6 +208,15 @@ export async function POST(request: Request, context: RouteContext): Promise<Nex
       ...(emailError ? { emailError } : {}),
     });
   } catch (error) {
+    registrarEventoNegocio({
+      operacion: 'respuesta',
+      resultado: 'error',
+      latenciaMs: Date.now() - inicioOperacion,
+      radicadoId: radicadoIdActual,
+      actorRol: actorRolActual,
+      tenant: tenantActual,
+      error,
+    });
     console.error('[radicados/resolver]', error);
     return jsonError(error);
   }
