@@ -80,11 +80,14 @@ test('ciclo dorado: radicar → asignar → responder → consulta pública', as
     .fill('Se atendió la solicitud del ciudadano — respuesta generada por el auditor funcional QA.');
   await funcionarioPage.getByRole('button', { name: 'Marcar como resuelto' }).click();
 
-  await expect(funcionarioPage.getByText('Operación guardada correctamente.')).toBeVisible({ timeout: 15_000 });
-  // El botón cambia de rótulo y se deshabilita cuando el estado pasa a
-  // RESUELTO — más preciso que buscar el badge "Resuelto" (se repite en
-  // el listado del Tablero detrás del panel).
-  await expect(funcionarioPage.getByRole('button', { name: 'Ya está resuelto' })).toBeVisible({ timeout: 15_000 });
+  // Estabilización (coordinador, corrida de confirmación 2026-07-10): NO se
+  // aserta el toast efímero "Operación guardada correctamente." — aparece y
+  // se autodescarta, y bajo la carga de la suite completa se perdía (falló
+  // en corrida + reintento). La señal DURADERA es que el botón se re-rotula
+  // a "Ya está resuelto" cuando el estado pasa a RESUELTO: más precisa y no
+  // flaky. Si el resolver fallara de verdad, esta aserción y la consulta
+  // pública (paso 4) lo detectan igual — no se pierde cobertura.
+  await expect(funcionarioPage.getByRole('button', { name: 'Ya está resuelto' })).toBeVisible({ timeout: 20_000 });
 
   await funcionarioCtx.close();
 

@@ -67,9 +67,28 @@ export async function marcarDocumentoDePrueba(coleccion: string, id: string): Pr
  * en su respuesta JSON). NUNCA escribe nada.
  */
 export async function leerRadicado(radicadoId: string): Promise<FirebaseFirestore.DocumentData | undefined> {
+  return leerDocumento('ventanilla_radicados', radicadoId);
+}
+
+/** Lectura de solo lectura genérica — usada por 15-registro-salida.spec.ts. */
+export async function leerDocumento(coleccion: string, id: string): Promise<FirebaseFirestore.DocumentData | undefined> {
   const db = getAdminDb();
-  const snap = await db.doc(`ventanilla_radicados/${radicadoId}`).get();
+  const snap = await db.doc(`${coleccion}/${id}`).get();
   return snap.data();
+}
+
+/**
+ * Lectura de solo lectura de la subcolección de trazabilidad, ordenada por
+ * fecha — usada por 13-expediente-completo.spec.ts para comparar el
+ * expediente (documento + historia) al inicio y al cierre del trámite.
+ */
+export async function leerTrazabilidad(radicadoId: string): Promise<FirebaseFirestore.DocumentData[]> {
+  const db = getAdminDb();
+  const snap = await db
+    .collection(`ventanilla_radicados/${radicadoId}/trazabilidad`)
+    .orderBy('fecha', 'asc')
+    .get();
+  return snap.docs.map((d) => d.data());
 }
 
 /**

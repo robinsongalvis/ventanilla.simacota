@@ -463,6 +463,47 @@ exprés — el flujo manual desde el detalle, `RegistrarSalidaModal`). El
 propio ADR pide variantes negativas (anónimo, reservado, traslado,
 prórroga, devolución) — con este batch quedan las 5 cubiertas.
 
+### Batch B — cierre del presupuesto (12-15) + adjunto reactivado (04)
+
+Segundo ciclo del auditor, 2026-07-10. Completa el presupuesto de 15
+escenarios del ADR.
+
+- **04 adjunto — REACTIVADO.** El `test.fixme` se retiró: Storage quedó
+  aprovisionado en stage (sesión paralela de `devops` — la causa raíz no era
+  CORS sino que el bucket no existía; plan Blaze + Storage activo + reglas
+  desplegadas + subida verificada 403→200). El test ejercita el flujo real de
+  subida por navegador con un PDF genuinamente válido (`crearPdfValido`,
+  pdf-lib) y verifica que el archivo queda asociado (`Archivos adjuntos (1)`).
+  El hallazgo #1 de Batch A (CORS) queda **superado**: diagnóstico corregido
+  (Storage no aprovisionado) y resuelto.
+- **12 concurrencia de numeración**: radica en paralelo y verifica que los
+  consecutivos AGN salen sin huecos ni duplicados leyendo los documentos
+  reales — mide el comportamiento bajo carrera (relacionado con el hallazgo de
+  huecos de Batch A, que ocurría con adjuntos no atómicos, no bajo concurrencia
+  simple).
+- **13 expediente completo inicio→cierre**: radica → asigna → resuelve y
+  compara el expediente (documento + trazabilidad) al inicio y al cierre —
+  prueba de integridad (etapa 16 de la auditoría manual): nada se pierde.
+- **14 sello de documento (PDF)**: ejercita el sellado ahora que Storage
+  funciona; verifica que el documento se produce y queda asociado.
+- **15 registro de salida con constancia de despacho** (`RegistrarSalidaModal`):
+  registra la salida y verifica su número (`RE_NUMERO_SALIDA`) y constancia.
+
+**Estabilización por el coordinador (corrida de confirmación).** El agente
+`qa` cerró Batch B con una corrida verde pero cayó por un error de conexión de
+API antes de su segunda corrida de confirmación. El coordinador la ejecutó y
+detectó que **01 (ciclo dorado) fallaba de forma intermitente** en el paso de
+resolución: asertaba el toast efímero "Operación guardada correctamente."
+(línea 83), que aparece y se autodescarta y se perdía bajo la carga de la suite
+completa (falló en corrida + reintento). Corregido soltando ese gate y
+confiando en la señal DURADERA que el mismo test ya tenía (el botón se re-rotula
+a "Ya está resuelto" al pasar a RESUELTO), con timeout a 20 s. No se debilitó
+cobertura: si el resolver fallara de verdad, esa aserción y la consulta pública
+del paso 4 lo detectan igual. `01` verificado **3/3** tras el arreglo. Es la
+misma clase de carrera de UI que los hallazgos #3 (confirmación "✓ Asignado") y
+#4 (modal "Resumen del día") — evidencia adicional de que esas carreras son
+reales y afectan la operación, no solo los tests.
+
 ### Hallazgos
 
 1. **[ALTA] CORS no configurado en el bucket de Storage de STAGE — bloquea
