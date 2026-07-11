@@ -193,16 +193,15 @@ const MATRIZ = [
     ejecutar: (db) => setDoc(doc(db, 'ventanilla_radicados/rad-a-1/trazabilidad/evt-nuevo-2'), { evento: 'nota' }),
   },
   {
-    // ⚠ HALLAZGO DE SEGURIDAD (documentado, no corregido aquí — ver reporte QA):
-    // `canWriteTrazabilidad()` (firestore.rules líneas 57-60, usada en el
-    // `allow create` de la línea 165) solo valida ROL, no valida que el
-    // `oficinaDestino` del radicado padre coincida con `userTenant()` — a
-    // diferencia del `allow read` de la misma subcolección (líneas 160-163),
-    // que sí hace ese `get()` sobre el documento padre. Este caso documenta el
-    // comportamiento ACTUAL (permitido) para que la matriz no rompa el build
-    // por un hallazgo fuera del alcance de implementación de QA; si se corrige
-    // la regla, este caso debe cambiar a 'denegado' y así queda registrado.
-    grupo: 'trazabilidad', caso: '[HALLAZGO] FUNCIONARIO de OTRO tenant puede crear trazabilidad cross-tenant (falta chequeo de tenant en canWriteTrazabilidad)', actor: 'funcionario-b', esperado: 'permitido',
+    // Invariante de aislamiento por tenant en la ESCRITURA de trazabilidad
+    // (R8 cerrado — ADR-0008). `canWriteTrazabilidad(radicadoId, database)`
+    // (firestore.rules) ahora refleja el patrón `get()` del `allow read` de la
+    // misma subcolección: un Funcionario solo escribe trazabilidad sobre
+    // radicados cuyo `oficinaDestino` coincide con su propio tenant. Un
+    // Funcionario de OTRO tenant (funcionario-b sobre rad-a-1, de TENANT_A)
+    // debe ser RECHAZADO. Control de regresión: si la regla vuelve a permitir
+    // la escritura cruzada, este caso falla en CI.
+    grupo: 'trazabilidad', caso: 'FUNCIONARIO de OTRO tenant NO puede crear trazabilidad cross-tenant (R8 — aislamiento por tenant en la escritura)', actor: 'funcionario-b', esperado: 'denegado',
     ejecutar: (db) => setDoc(doc(db, 'ventanilla_radicados/rad-a-1/trazabilidad/evt-cross-tenant'), { evento: 'nota-cruzada' }),
   },
   {
