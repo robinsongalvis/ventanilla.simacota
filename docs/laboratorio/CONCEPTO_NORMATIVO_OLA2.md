@@ -267,3 +267,65 @@ punto de decisión de producto que precede a cualquier implementación.
   reservado.
 - R10 **no es incumplimiento**: la variante A vigente es conforme. Es una mejora de acceso legítimo que
   requiere decisión de producto antes de ser convertible a control.
+
+---
+
+## R6 — Remediación verificada (2026-07-11)
+
+**Rol:** revisión cruzada de conformidad normativa (gobierno-digital). dev-backend implementó el
+control R6 que este mismo concepto (Frente 2C) definió; esta sección es la validación independiente —
+nadie valida su propio trabajo (Principio 5). Solo lectura de código y ejecución de tests; sin cambios.
+
+### Veredicto de conformidad: **CONFORME** — R6 → **RESUELTO**
+
+El control satisface la exigencia temporal del art. 14 (parágrafo) de la Ley 1755/2015: impide aplicar
+una ampliación cuando el término original ya venció, haciendo efectivo el mandato de informar la
+ampliación **ANTES del vencimiento**. El estado de R6 pasa de **NO CUMPLE** (brecha activa) a
+**CONFORME / remediado**, con conformidad demostrada por pruebas de regresión.
+
+### Verificación en el código (leído, no asumido)
+
+| Artefacto | Qué verifiqué | Resultado |
+|---|---|---|
+| `lib/server/radicados-security.ts:79-117` (`validarProrroga`) | Función pura. Recibe `fechaVencimiento?: string` y `ahora?: Date \| (() => Date)`. Tercera regla (líneas 105-114): si `vencimiento.getTime() <= ahora.getTime()` → rechazo **409** con mensaje que cita "antes del vencimiento". Reloj inyectable (valor o fábrica). Si se omite `fechaVencimiento`, R6 no aplica (compatibilidad). | Correcto |
+| Orden de evaluación (líneas 91-114) | Unicidad(409) → Tope(400) → Temporalidad(409), exactamente como declara el JSDoc. | Correcto |
+| `app/api/radicados/[radicadoId]/prorroga/route.ts:78-88` | Cablea `radicado.termino.fechaVencimiento` + `ahoraDate = new Date()`; el rechazo retorna (línea 86-88) **antes** de la escritura (línea 92+). Reutiliza `ahoraDate` para el timestamp del evento. IMPIDE, no advierte. | Correcto |
+| `__tests__/prorroga-validacion.test.ts:80-164` (8 casos R6) | Cubre: vencido con reloj fijo; vigente; frontera `=== ahora`; reloj como fábrica; omisión de fecha; regresión (vencido hace un mes); precedencia unicidad-sobre-temporalidad. | Cobertura suficiente |
+| Ejecución `npx vitest run` | **13/13 verdes** (6 H1 + 7 R6). | Evidencia de regresión satisfecha |
+
+### Análisis normativo de la remediación
+
+| Pregunta del coordinador | Análisis | Veredicto |
+|---|---|---|
+| ¿Satisface el art. 14 (informar la ampliación ANTES del vencimiento)? | La regla bloquea toda prórroga sobre un término cuyo `fechaVencimiento` es igual o anterior al instante de la solicitud. La ampliación solo procede mientras el término sigue corriendo → el mandato "antes del vencimiento" queda enforced. | **Sí** |
+| ¿La frontera (vence exactamente ahora = vencido → rechaza) es la interpretación correcta? | "Antes del vencimiento" **excluye** el instante mismo del vencimiento: en `fechaVencimiento === ahora` el término ya arribó a su expiración, informar "en" el vencimiento no es "antes" de él. El uso de `<=` es la lectura conservadora y correcta, coherente con la postura de la casa (H1: impedir, errar hacia la protección del término perentorio). | **Sí, correcta** |
+| ¿El mensaje cita la norma? | "El término original ya venció: la Ley 1755/2015 (art. 14, parágrafo) exige informar la ampliación del término ANTES de su vencimiento, no después." Cita correcta y precisa (norma + artículo + parágrafo), enuncia la regla y es clara para el funcionario. | **Sí** |
+
+### Sobre el orden elegido (desviación menor de mi recomendación, sin efecto en conformidad)
+
+En §R6.4 sugerí evaluar la temporalidad **antes** que unicidad/tope. El dev la ubicó **al final**
+(unicidad → tope → temporalidad), fijándolo en el test de precedencia (línea 153). **No es una brecha
+normativa:** la temporalidad se evalúa siempre que unicidad y tope pasen, de modo que **ningún radicado
+vencido llega a prorrogarse** — si ya tiene prórroga se rechaza por unicidad, y si no, se rechaza por
+temporalidad. El resultado (rechazado, sin escritura) y la conformidad son idénticos; solo cambia cuál
+mensaje se muestra cuando coinciden dos causales, y en ese caso el de unicidad es al menos igual de
+informativo. Mi sugerencia era "sugerida", no mandato. Desviación aceptada.
+
+### Brechas residuales
+
+- **Ninguna que bloquee el cierre de R6.** El cómputo de días hábiles no se recomputa aquí porque
+  `fechaVencimiento` ya lo encapsula (comparación de instantes = correcta).
+- **Observación de robustez (baja/teórica, no brecha activa):** si `fechaVencimiento` llegara como cadena
+  inválida, `new Date(...).getTime()` sería `NaN` y `NaN <= ahora` es `false` → la regla no dispararía
+  (permitiría). Hoy `termino.fechaVencimiento` es campo requerido y siempre poblado en los tres caminos
+  de creación (verificado en la remediación de H1), por lo que el riesgo es teórico. Misma clase que R7;
+  se anota como observación, no como brecha. **Rol futuro si se endurece: dev-backend.**
+
+### Micro-decisión de producto (§R6.5) — resuelta por la implementación
+
+La implementación adoptó la postura **(A) rechazar** la prórroga extemporánea (409), que era la
+recomendada. Queda coherente con H1 ("impedir, no advertir") y con el carácter perentorio del término.
+
+**Conclusión:** la remediación de R6 es **conforme** al art. 14 (parágrafo) de la Ley 1755/2015 en la
+exigencia temporal, con conformidad protegida por 8 pruebas de regresión (13/13 verdes en el archivo).
+R6 puede marcarse **RESUELTO** en `docs/REGISTRO_RIESGOS.md`. Referencia de decisión: **ADR-0012**.

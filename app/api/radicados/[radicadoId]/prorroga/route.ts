@@ -71,18 +71,23 @@ export async function POST(request: Request, context: RouteContext): Promise<Nex
       return NextResponse.json({ error: 'Tu rol no permite prorrogar este radicado.' }, { status: 403 });
     }
 
-    // ADR-0003 (hallazgo H1) — control ejecutable de unicidad y tope legal
-    // (Ley 1755/2015 art. 14). Debe evaluarse ANTES de cualquier escritura.
+    // ADR-0003 (hallazgo H1) + ADR-0012 (hallazgo R6) — control ejecutable de
+    // unicidad, tope legal y temporalidad (Ley 1755/2015 art. 14). Orden:
+    // unicidad → tope → temporalidad. Debe evaluarse ANTES de cualquier
+    // escritura para IMPEDIR (no solo advertir) la prórroga extemporánea.
+    const ahoraDate = new Date();
     const rechazo = validarProrroga({
       prorrogasAplicadas: radicado.termino.prorrogasAplicadas,
       diasProrroga,
       diasRespuesta: radicado.termino.diasRespuesta,
+      fechaVencimiento: radicado.termino.fechaVencimiento,
+      ahora: ahoraDate,
     });
     if (rechazo) {
       return NextResponse.json({ error: rechazo.mensaje }, { status: rechazo.status });
     }
 
-    const ahora = new Date().toISOString();
+    const ahora = ahoraDate.toISOString();
     const fechaActual = new Date(radicado.termino.fechaVencimiento);
     const nuevaFecha = new Date(fechaActual);
     nuevaFecha.setDate(nuevaFecha.getDate() + diasProrroga);
