@@ -1,6 +1,7 @@
 /* ══════════════════════════════════════════════════════════════
    OBSERVABILIDAD DE FLUJOS CRÍTICOS — Ventanilla Única Simacota
    ADR-0005 (docs/adr/0005-observabilidad-flujos-criticos.md)
+   ADR-0011 (docs/adr/0011-auditor-rendimiento-presupuestos.md) — 2B
 
    Evento de negocio estructurado, emitido UNA VEZ por invocación de
    cada flujo crítico (radicación, asignación, prórroga, respuesta),
@@ -9,6 +10,12 @@
    rendimiento de la Ola 2). Complementa, no reemplaza, a
    `lib/logger.ts` (`logError`, ruta de error) ni a
    `lib/ai/telemetry.ts` (métricas de IA, `ai_logs`).
+
+   ADR-0011 (2B) amplía el vocabulario a la LECTURA: la búsqueda de
+   radicados (`app/api/radicados/busqueda-avanzada/route.ts`) emite el
+   mismo evento con `docsLeidos` — nº de documentos que Firestore
+   devolvió en la consulta —, la señal que habilita medir el patrón
+   O(N) de hoy y demostrar con dato la mejora de 2A (paginación).
 
    Sin infraestructura nueva: emite a stdout como JSON estructurado
    (`console.log`) + el mismo patrón best-effort de Sentry que `logError`
@@ -23,13 +30,26 @@
 
 import { sanitizarTextoObservabilidad } from '@/lib/seguridad/sanitizar-observabilidad';
 
-/** Los 4 flujos críticos cubiertos en la Ola 1 (ADR-0005 §Alcance). */
+/** Los 4 flujos críticos de ESCRITURA cubiertos en la Ola 1 (ADR-0005 §Alcance). */
 export type OperacionCritica = 'radicacion' | 'asignacion' | 'prorroga' | 'respuesta';
+
+/**
+ * Operaciones de LECTURA cubiertas por ADR-0011 (2B). Cobertura inicial:
+ * la Búsqueda Histórica Avanzada (`busqueda-avanzada/route.ts`), el punto
+ * de lectura server-side y medible. El stream operativo del dashboard
+ * (`useVentanillaRadicados.ts`, `onSnapshot` en cliente) queda fuera de
+ * este primitivo server-side — se instrumenta en 2A si aplica (decisión
+ * documentada en el ADR-0011, no forzada aquí).
+ */
+export type OperacionLectura = 'busqueda_radicados';
+
+/** Vocabulario completo de operaciones observables (escritura + lectura). */
+export type Operacion = OperacionCritica | OperacionLectura;
 
 export type ResultadoOperacion = 'ok' | 'error';
 
 export interface EventoNegocio {
-  operacion:   OperacionCritica;
+  operacion:   Operacion;
   resultado:   ResultadoOperacion;
   latenciaMs:  number;
   /** Identificador de correlación: radicadoId + timestamp del evento. */
@@ -42,6 +62,12 @@ export interface EventoNegocio {
   timestamp:   string;
   /** Solo presente cuando `resultado === 'error'`; ya saneado de PII. */
   mensaje?:    string;
+  /**
+   * Solo presente en operaciones de LECTURA (ADR-0011): nº de documentos
+   * que Firestore devolvió en la consulta. Es el número que expone el
+   * patrón O(N) hoy y que 2A debe reducir a ~pageSize.
+   */
+  docsLeidos?: number;
 }
 
 /**
@@ -57,7 +83,7 @@ export interface EventoNegocio {
  * la respuesta al cliente.
  */
 export function registrarEventoNegocio(params: {
-  operacion:  OperacionCritica;
+  operacion:  Operacion;
   resultado:  ResultadoOperacion;
   latenciaMs: number;
   radicadoId: string | null;
@@ -65,6 +91,8 @@ export function registrarEventoNegocio(params: {
   tenant:     string;
   /** Solo se usa (y se sanea) cuando `resultado === 'error'`. */
   error?:     unknown;
+  /** Solo para operaciones de LECTURA (ADR-0011): nº de documentos leídos. */
+  docsLeidos?: number;
 }): EventoNegocio {
   const timestamp = new Date().toISOString();
   const radicadoId = params.radicadoId;
@@ -85,6 +113,7 @@ export function registrarEventoNegocio(params: {
           ),
         }
       : {}),
+    ...(typeof params.docsLeidos === 'number' ? { docsLeidos: params.docsLeidos } : {}),
   };
 
   // 1. Log estructurado (siempre)
@@ -104,6 +133,7 @@ export function registrarEventoNegocio(params: {
           correlacion: evento.correlacion,
           tenant:      evento.tenant,
           actorRol:    evento.actorRol,
+          ...(typeof evento.docsLeidos === 'number' ? { docsLeidos: evento.docsLeidos } : {}),
         },
       });
     }
