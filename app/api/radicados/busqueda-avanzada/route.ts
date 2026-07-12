@@ -11,6 +11,10 @@
    - Delega filtros finos a `lib/busqueda/filtros-radicado.ts`.
    - Sanitiza identidad (anónimos/reservados) y elimina UID/archivoPath.
    - Pagina y ordena por control.fechaRadicado desc.
+   - Instrumentado (ADR-0011, 2B): emite `registrarEventoNegocio` con
+     latencia + nº de documentos leídos de la consulta (sin `limit` hoy —
+     línea base O(N) capturada en docs/auditorias/rendimiento-base-lectura.md;
+     2A introduce cursor/limit sobre este mismo punto).
 ══════════════════════════════════════════════════════════════ */
 
 import { NextResponse } from 'next/server';
@@ -28,6 +32,7 @@ import {
 } from '@/lib/busqueda/filtros-radicado';
 import type { VentanillaRadicado } from '@/src/types/ventanilla';
 import { logError } from '@/lib/logger';
+import { registrarEventoNegocio } from '@/lib/observabilidad/eventos-negocio';
 
 export const runtime = 'nodejs';
 
@@ -79,6 +84,10 @@ export async function POST(request: Request): Promise<NextResponse> {
     tenantId: usuario.tenantId,
   };
 
+  // Marca el inicio de la operación de LECTURA medida (ADR-0011, 2B): desde
+  // aquí hasta tener `resultado` es exactamente el costo que 2A debe reducir
+  // (hoy O(N) sobre toda la colección, sin `limit`/cursor).
+  const inicioLectura = Date.now();
   try {
     const db = getFirebaseAdminDb();
     // Pre-filtro server-side por tenant para roles restringidos (uso de índice
@@ -98,6 +107,20 @@ export async function POST(request: Request): Promise<NextResponse> {
       .filter((r) => !r.isTest && !r.excludeFromMetrics);
 
     const resultado = buscarRadicados(radicados, filtros, paginacion, alcance);
+
+    // Señal de lectura (ADR-0011): nº de documentos que Firestore devolvió
+    // (snap.size — antes del filtro isTest/paginación en memoria) + latencia
+    // total de la operación. Sin PII: mismo primitivo que las 4 escrituras.
+    registrarEventoNegocio({
+      operacion:  'busqueda_radicados',
+      resultado:  'ok',
+      latenciaMs: Date.now() - inicioLectura,
+      docsLeidos: snap.size,
+      radicadoId: null,
+      actorRol:   usuario.rol,
+      tenant:     usuario.tenantId,
+    });
+
     const items = resultado.items.map(sanitizarRadicado);
 
     return NextResponse.json({
@@ -109,6 +132,15 @@ export async function POST(request: Request): Promise<NextResponse> {
       filtrosAplicados: filtros,
     });
   } catch (err) {
+    registrarEventoNegocio({
+      operacion:  'busqueda_radicados',
+      resultado:  'error',
+      latenciaMs: Date.now() - inicioLectura,
+      radicadoId: null,
+      actorRol:   usuario.rol,
+      tenant:     usuario.tenantId,
+      error:      err,
+    });
     logError({ radicadoId: '-', modulo: 'busqueda-avanzada', error: err });
     return NextResponse.json(
       { error: 'No fue posible ejecutar la búsqueda histórica.' },
