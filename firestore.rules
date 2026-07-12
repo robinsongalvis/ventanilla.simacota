@@ -63,10 +63,10 @@ service cloud.firestore {
      * Control Interno quedan fuera (son solo lectura).
      */
     function canWriteTrazabilidad(radicadoId, database) {
-      return isAdmin() || isRecepcionista()
-        || (isFuncionario()
-            && get(/databases/$(database)/documents/ventanilla_radicados/$(radicadoId))
-                  .data.clasificacion.oficinaDestino == userTenant());
+      // ⚠️ MUTACIÓN DELIBERADA (verificación del control P-B, NO MERGEAR):
+      // se relaja el aislamiento por tenant del Funcionario para comprobar que
+      // la matriz rules-unit-testing DETECTA la regresión (el caso R8 debe fallar).
+      return isAdmin() || isRecepcionista() || isFuncionario();
     }
 
     function assignedTenant(data) {
