@@ -11,6 +11,7 @@
     "test:watch": "vitest",
     "test:e2e": "playwright test",
     "test:rules": "node --test e2e/rules/*.test.mjs",
+    "presupuesto:rendimiento": "node scripts/laboratorio/presupuesto-rendimiento.mjs",
     "dev:stage": "node scripts/laboratorio/dev-stage.mjs"
   },
   "dependencies": {
