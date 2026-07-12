@@ -1,0 +1,269 @@
+# Concepto normativo — Ola 2, Frente 2C (hallazgos → controles ejecutables)
+
+**Rol emisor:** Especialista en Gobierno Digital y normatividad colombiana
+**Fecha:** 2026-07-11
+**Alcance:** convertir los hallazgos abiertos R6, R9 y R10 (`docs/REGISTRO_RIESGOS.md`)
+en **controles ejecutables** siguiendo el modelo validado con H1 (ADR-0003) y R8 (ADR-0008):
+un test automatizado que **falle si la conformidad regresiona**.
+**Restricción de rol:** este documento es concepto normativo. NO propone ni implementa código,
+NO decide arquitectura. Es el insumo para el **ADR-0012** que consolida el coordinador.
+**Método:** cada afirmación fue verificada contra el código real del worktree (archivo:línea),
+no asumida. Los artículos se citan según el análisis ya asentado en
+`docs/laboratorio/CONCEPTO_NORMATIVO_FASE2.md` (H1/H2), verificado en fuente oficial.
+
+---
+
+## Resumen del veredicto
+
+| Hallazgo | ¿Convertible a control en Ola 2? | Requisito previo |
+|---|---|---|
+| **R6** — prórroga sobre término ya vencido | **SÍ** — control directo, sin decisión previa | Ninguno (micro-decisión "rechazar vs. registrar extemporánea": recomiendo rechazar, ver §R6) |
+| **R9** — canal de inferencia en búsqueda del mostrador | **SÍ** — control directo; el patrón correcto ya existe en el servidor y solo hay que replicarlo en el cliente | Ninguno |
+| **R10** — necesidad de conocer (variante B) | **NO todavía** — requiere decisión de producto/arquitectura (¿qué rol revela, con qué traza?) antes de existir una regla que asertar | Decisión del product-owner sobre el alcance de la variante B (ADR-0006) |
+
+---
+
+## HALLAZGO R6 — La prórroga no se impide si el término original ya venció
+
+### 1. Concepto: **NO CUMPLE** (brecha activa) · Convertible a control: **SÍ**
+
+La Ley 1755/2015 art. 14 (parágrafo) exige que la ampliación excepcional del término se informe
+al interesado **antes del vencimiento** del término inicial, con los motivos y el nuevo plazo. Una
+prórroga aplicada cuando el término **ya venció** es extemporánea: su premisa legal (avisar antes
+de que el plazo expire) ya no puede cumplirse, y no sanea la mora ya consumada del derecho de
+petición. El control ejecutable de H1 (`validarProrroga`) enforce **unicidad** y **tope del doble**,
+pero **no verifica el timing**: deja pasar una prórroga sobre un radicado vencido.
+
+### Verificación en el código (leído, no asumido)
+
+| Artefacto | Qué verifiqué | Resultado |
+|---|---|---|
+| `lib/server/radicados-security.ts:71-94` (`validarProrroga`) | Función pura. Solo recibe `prorrogasAplicadas`, `diasProrroga`, `diasRespuesta`. No recibe `fechaVencimiento` ni un reloj; **no existe regla de timing**. | Brecha confirmada: el validador no puede detectar el vencimiento. |
+| `app/api/radicados/[radicadoId]/prorroga/route.ts:85-95` | Calcula `nuevaFecha = fechaVencimiento + diasProrroga` y escribe, **sin comparar `fechaVencimiento` contra la fecha actual**. Un radicado con `fechaVencimiento` en el pasado se prorroga igual. | Brecha confirmada en el punto de escritura. |
+| `__tests__/prorroga-validacion.test.ts` | Cubre unicidad, tope y frontera `===` (H1). **No hay caso de término vencido.** | Cobertura ausente para R6. |
+
+Nota: `termino.fechaVencimiento` se almacena como fecha concreta ya calculada en días hábiles al
+crear/actualizar el radicado. Por eso el control de timing **no necesita recomputar el calendario
+hábil colombiano**: le basta comparar `fechaVencimiento` contra el instante de la solicitud. El
+cómputo hábil ya está encapsulado en el valor almacenado.
+
+### 2. Análisis por norma
+
+| Norma y artículo | Exigencia | Estado en el sistema | Brecha |
+|---|---|---|---|
+| **Ley 1755/2015, art. 14, parágrafo** | La ampliación excepcional se informa al interesado **antes del vencimiento** del término, con motivos y nuevo plazo (≤ doble). | Se permite prorrogar con el término ya vencido; el "antes del vencimiento" no se enforce. | **Activa.** El requisito temporal del parágrafo no se cumple. |
+| **Ley 1437/2011 (CPACA), art. 3 (celeridad; términos perentorios)** | Los términos son perentorios; su ampliación es reglada y **anticipada**, no retroactiva. | Prórroga extemporánea admitida. | Refuerza la anterior. |
+| **Constitución Política, art. 23** | Derecho fundamental de petición → respuesta oportuna. | Una prórroga post-vencimiento oculta una mora ya consumada. | Riesgo de tutela por mora. |
+
+### 3. Aserción exacta del control (la regla hecha test)
+
+> Aplicar una prórroga sobre un radicado cuyo `termino.fechaVencimiento` es **anterior** al instante
+> de la solicitud → **rechazado** (no se escribe). Frontera: si `fechaVencimiento === ahora` o es
+> futura → permitido (sujeto a las reglas de unicidad y tope ya existentes).
+
+Precedencia sugerida: evaluar el **vencimiento antes** que unicidad/tope (un radicado vencido se
+rechaza por extemporáneo con mensaje propio, con independencia de cuántas prórrogas tenga).
+
+### 4. Tipo de control y rol
+
+- **Tipo: test unitario de función pura** — idéntico patrón a H1. Se extiende `validarProrroga` para
+  recibir `fechaVencimiento` y un `ahora` **inyectable** (reloj como parámetro, para determinismo del
+  test), devolviendo un `RechazoProrroga` cuando el término ya venció. La determinística del reloj es
+  lo que hace la aserción reproducible (Principio 13: reproducir antes de corregir).
+- **Casos mínimos del control de regresión:** (a) vencido ayer → rechazado; (b) vence hoy/frontera →
+  permitido; (c) vence mañana → permitido; (d) precedencia: vencido **y** con prórroga previa → gana
+  el rechazo por vencimiento (mensaje de extemporaneidad).
+- **Complemento E2E (opcional, no bloqueante):** invertir/extender `e2e/09-prorroga-con-notificacion.spec.ts`
+  con un radicado sembrado ya vencido → 409/400, contador y fecha intactos por lectura del documento.
+- **Rol técnico: dev-backend** (extiende `validarProrroga` y su invocación en `route.ts`; añade casos
+  a `__tests__/prorroga-validacion.test.ts`).
+
+### 5. Micro-decisión de producto (menor, no bloquea el control)
+
+Existe una elección de postura: **(A) rechazar** la prórroga extemporánea (impedir, como H1) o
+**(B) permitirla registrándola como "extemporánea"** con traza. Recomiendo **(A) rechazar**: es la
+lectura conservadora y conforme, coherente con la casa (H1 "impedir, no advertir") y con el carácter
+perentorio del término. Si el product-owner prefiere (B), el control simplemente asertaría "queda
+marcada como extemporánea + traza", no cambia el rol ni el tipo de test. Por su bajo peso, **no
+degrada R6 a "requiere decisión previa"**: entra en Ola 2 con la postura (A) por defecto.
+
+---
+
+## HALLAZGO R9 — Canal de inferencia en la búsqueda del mostrador
+
+### 1. Concepto: **CUMPLE PARCIALMENTE** (residual de H2) · Convertible a control: **SÍ**
+
+La visualización ya está enmascarada de forma transversal (H2, ADR-0006). El residual es un **canal
+de inferencia**: la búsqueda rápida del **cliente** filtra por `nombreCompleto` y `numeroDocumento`
+**también sobre radicados reservados**. La fila sale enmascarada, pero su sola aparición al teclear un
+nombre/documento concreto **confirma la existencia** de un radicado reservado de esa persona. No revela
+una identidad desconocida; permite **confirmar una hipótesis previa** (oráculo). El punto crítico es el
+**denunciante con identidad reservada** (Comisaría de Familia, Inspección de Policía): confirmar que
+existe su radicado reservado ya es información sensible frente a represalias.
+
+### Verificación en el código (leído, no asumido)
+
+| Artefacto | Qué verifiqué | Resultado |
+|---|---|---|
+| `app/interno/dashboard/page.tsx:210-218` | El filtro rápido del dashboard compara `r.solicitante.nombreCompleto` y `r.solicitante.numeroDocumento` contra el término, **sin guarda de `identidadProtegida`/`ocultarIdentidad`**. Un reservado coincide por nombre/documento. | Canal de inferencia confirmado (cliente). |
+| `app/interno/dashboard/components/ventanilla/VistaVentanilla.tsx:68-72` (`coincideMostrador`, aplicado en `:105`) | Idéntico: matchea `nombreCompleto`/`numeroDocumento` sin guarda de reserva. | Canal de inferencia confirmado (mostrador). |
+| `lib/busqueda/filtros-radicado.ts:155-174` (`matchTextoLibre`) | El texto libre `q` protege nombre/documento/email con `!oculto` (líneas 165-167): un reservado **no** matchea por esos campos. | **Patrón correcto ya existente** (servidor). |
+| `lib/busqueda/filtros-radicado.ts:183-193` (filtros `nombre`/`documento`/`correo`) | Cada uno hace `if (ocultarIdentidad(r)) return false;` antes de comparar: el reservado se **excluye** de la búsqueda por identidad. | **Patrón correcto ya existente** (servidor). |
+| `lib/busqueda/filtros-radicado.ts:83-88` (`ocultarIdentidad`) | Criterio de reserva equivalente a `lib/seguridad/identidad-protegida.ts:37-44`. | La regla ya está codificada; el cliente no la aplica al buscar. |
+
+Conclusión de verificación: la **búsqueda avanzada del servidor ya cierra R9**; la brecha vive solo en
+los **filtros rápidos del cliente** (dashboard y mostrador), que buscan sobre el dato crudo. El arreglo
+es **replicar el criterio ya existente**, no inventarlo (Principio 3: reutilización).
+
+### 2. Análisis por norma
+
+| Norma y artículo | Exigencia | Estado en el sistema | Brecha |
+|---|---|---|---|
+| **Ley 1581/2012, art. 4 lit. f (acceso y circulación restringida)** | El conocimiento del dato reservado debe estar **restringido**; no disponible salvo a autorizados. | La búsqueda del cliente permite confirmar existencia por nombre/documento a cualquier interno. | **Baja-media.** Fuga por inferencia, no por visualización. |
+| **Ley 1581/2012, art. 4 lit. g (seguridad)** | Medidas para evitar **consulta o uso no autorizado**. | El predicado de búsqueda es una consulta que responde sobre el reservado. | **Baja-media.** |
+| **Ley 1474/2011 (reserva de identidad del denunciante)** | La reserva protege al denunciante frente a represalias; el acceso se limita a quien tramita. | Confirmar existencia del radicado reservado erosiona esa reserva. | **Media** en el caso denunciante (numeral exacto a confirmar antes de cita vinculante). |
+
+### 3. Aserción exacta del control (la regla hecha test)
+
+> Dado un radicado con identidad reservada/anónima cuyo `nombreCompleto = "X"` y
+> `numeroDocumento = "N"`, una búsqueda del mostrador/dashboard con término `"X"` o `"N"` **NO** debe
+> devolverlo (no matchea por identidad). El mismo radicado **sí** sigue siendo hallable por su
+> `radicadoId` (que no es dato personal reservado) y por su asunto, igual que hoy hace el servidor.
+
+Es exactamente la invariante que ya cumple `filtros-radicado.ts`; el control la fija también para el
+predicado del cliente.
+
+### 4. Tipo de control y rol
+
+- **Tipo: test unitario de función pura.** Hoy el predicado del cliente está **inline** en
+  `page.tsx:210-218` y en `coincideMostrador` — no es directamente testeable. Para tener un control de
+  regresión, el predicado de búsqueda debe quedar en una **función pura** que aplique el criterio de
+  reserva (idealmente **reutilizando** `matchTextoLibre`/`ocultarIdentidad` de `filtros-radicado.ts` o
+  el helper `identidadProtegida`, en vez de duplicar el criterio). El test asertaría los casos de la §3.
+  La extracción a función pura es el habilitador del control (misma lógica que hizo testeable a H1).
+- **Rol técnico: dev-frontend** (extrae el predicado y lo alinea al criterio de reserva ya existente),
+  con **revisión cruzada de gobierno-digital** sobre la conformidad. Alternativamente, si se decide que
+  el mostrador consuma el mismo predicado del servidor, participa **dev-backend** para exponer la función
+  compartida — esa es decisión técnica del arquitecto, no la fija este concepto.
+
+### 5. Nota de reutilización (Principio 3, sin opinar de arquitectura)
+
+Observo que el criterio de reserva está hoy en **dos** lugares equivalentes
+(`lib/seguridad/identidad-protegida.ts:37-44` y `lib/busqueda/filtros-radicado.ts:83-88`). Lo señalo
+solo porque la norma exige **coherencia** del criterio de reserva entre canales: si divergen, un canal
+podría proteger y otro no. Unificar o no es decisión técnica; la exigencia normativa es que el criterio
+sea **uno solo y consistente**.
+
+---
+
+## HALLAZGO R10 — Necesidad de conocer (variante B)
+
+### 1. Concepto: **CUMPLE** (conservador y conforme) · Convertible a control en Ola 2: **NO todavía**
+
+La variante A (ADR-0006) enmascara la identidad reservada para **todos**, incluido el funcionario
+responsable que legítimamente podría necesitarla para tramitar. Esto **no es un incumplimiento**: errar
+hacia la protección es conforme a la confidencialidad (Ley 1581/2012 art. 4 lit. f/g/h). Lo que queda
+pendiente es habilitar el **acceso legítimo por rol y necesidad de conocer** (variante B).
+
+### Verificación en el código (leído, no asumido)
+
+| Artefacto | Qué verifiqué | Resultado |
+|---|---|---|
+| `lib/seguridad/identidad-protegida.ts:37-44` | `identidadProtegida(r)` decide **solo por atributos del radicado** (anónimo/reservado). **No recibe rol ni contexto del actor**: no existe hoy un concepto de "quién puede revelar". | Confirmado: no hay eje de autorización sobre el que asertar. |
+| ADR-0006 | La revelación controlada por rol/necesidad de conocer (variante B) está **diferida** como candidata; no hay regla definida. | Confirmado: la regla no existe aún. |
+
+### 2. Por qué requiere decisión previa (no se puede forzar un control)
+
+Un control de regresión asevera una **regla**. Para R10 la regla aún no existe: el product-owner debe
+decidir **antes** —y el arquitecto registrar en ADR—:
+
+1. **Quién** revela (¿solo el `funcionarioResponsable` del radicado? ¿el jefe de dependencia? ¿un rol
+   de Comisaría?).
+2. **Bajo qué condición** (¿siempre para el responsable? ¿bajo justificación explícita?).
+3. **Con qué traza** (la Ley 1581 art. 4 lit. g exige registro del acceso: el revelado debe quedar en
+   `trazabilidad` — acceso auditable, no silencioso).
+4. **Alcance del dato revelado** (¿nombre y documento? ¿también correo/teléfono/dirección?).
+
+Sin esas cuatro definiciones no hay aserción posible: cualquier test que escribiéramos hoy estaría
+fijando una política de acceso que nadie ha decidido, lo que violaría el Principio 9 (la IA propone,
+el funcionario/PO decide) y el Principio 1 (nivel 3 → ADR antes de codear).
+
+### 3. Aserción que el control tendría — **una vez decidida** la variante B
+
+> Con identidad reservada: (a) el rol autorizado por la política (p. ej. funcionario responsable del
+> radicado, en su propio tenant) obtiene la identidad en claro **y** queda registrado un evento de
+> acceso en `trazabilidad`; (b) **cualquier otro rol** (incluido funcionario de otro tenant) sigue
+> viendo el marcador protegido. La revelación sin traza está prohibida.
+
+- **Tipo probable de control (cuando exista la regla):** combinación de **test unitario** de la función
+  de autorización (`¿puedeRevelarIdentidad(actor, radicado)?`, pura) **más** una fila de la matriz de
+  **rules-unit-testing** (patrón R8/ADR-0007) si la autorización se apoya además en `firestore.rules`,
+  **más** verificación de que el revelado deja traza. Un E2E de una superficie confirmaría el revelado
+  end-to-end.
+- **Rol técnico: product-owner + gobierno-digital** para definir la política (fase de decisión);
+  **dev-backend + firestore-datos** para la autorización y la traza; **dev-frontend** para el revelado
+  controlado en la vista. Nada de esto entra hasta cerrar la decisión.
+
+---
+
+## Tabla resumen priorizada (por riesgo jurídico)
+
+| # | Hallazgo | Riesgo jurídico | Norma clave | ¿Convertible ya? | Aserción del control | Tipo de control | Rol |
+|---|---|---|---|---|---|---|---|
+| 1 | **R6** prórroga post-vencimiento | **Medio** (der. fundamental de petición, art. 23 CP; mora → tutela) | Ley 1755/2015 art. 14 parágrafo | **SÍ** | prórroga sobre `fechaVencimiento` pasada → rechazada | Unitario (función pura, `validarProrroga` + reloj inyectable); E2E 09 opcional | dev-backend |
+| 2 | **R9** inferencia en búsqueda del cliente | **Bajo-medio** (sube a medio con denunciante) | Ley 1581/2012 art. 4 f/g; Ley 1474/2011 | **SÍ** | reservado no matchea búsqueda por nombre/documento (sí por radicadoId) | Unitario (extraer predicado a función pura, reutilizando criterio existente) | dev-frontend (+ rev. gobierno-digital) |
+| 3 | **R10** necesidad de conocer | **Bajo** (hoy conforme; es mejora, no brecha) | Ley 1581/2012 art. 4 f/g/h | **NO — requiere decisión PO** | (definir tras variante B) revelado solo a rol autorizado + traza; resto enmascarado | Unitario + rules-unit-testing + E2E (a futuro) | PO + gobierno-digital, luego dev-backend/firestore/frontend |
+
+---
+
+## Recomendación de entrada a la Ola 2
+
+**Entran a la Ola 2 como controles ejecutables (cierran con un test de regresión):**
+
+- **R6** — prioridad **alta dentro del frente** por tocar un derecho fundamental. Control unitario de
+  función pura, patrón H1 ya probado, bajo costo, sin dependencias. Recomiendo postura **(A) rechazar**
+  la prórroga extemporánea por defecto; si el PO prefiere registrar-con-marca, el control se ajusta sin
+  cambiar rol ni tipo.
+- **R9** — prioridad **media**. Convertible ya; el patrón correcto **ya existe en el servidor**
+  (`filtros-radicado.ts`) y solo debe replicarse/reutilizarse en el predicado del cliente, extrayéndolo
+  a función pura para poder asertar la invariante. Sin decisión previa pendiente.
+
+**Espera decisión del propietario (no se fuerza control):**
+
+- **R10** — **no convertible aún**. Es la variante B ya diferida en ADR-0006. Requiere que el
+  product-owner (con gobierno-digital) defina **quién revela, bajo qué condición, con qué traza y qué
+  alcance de dato**, y que el arquitecto lo registre en ADR (Principio 1, nivel 3). Solo entonces existe
+  una regla que un control pueda proteger. Recomiendo **declararlo formalmente EN DECISIÓN** en
+  `docs/REGISTRO_RIESGOS.md` (dueño: product-owner), no arrastrarlo como "pendiente técnico". Mientras
+  tanto la variante A vigente **es conforme**; no hay urgencia jurídica.
+
+**Consecuencia para el ADR-0012:** consolidar R6 y R9 como los dos controles ejecutables del Frente 2C
+(uno por dev-backend, uno por dev-frontend con revisión cruzada de gobierno-digital), y dejar R10 como
+punto de decisión de producto que precede a cualquier implementación.
+
+---
+
+## Fuentes
+
+- **Ley 1755 de 2015**, art. 14 y su parágrafo — términos para resolver peticiones (15/10/30 días
+  hábiles) y ampliación excepcional informada **antes del vencimiento**, con nuevo plazo ≤ doble del
+  inicial. Sustenta R6. (Verificada en Función Pública / Secretaría del Senado en el concepto de Fase 2.)
+- **Ley 1437 de 2011 (CPACA)**, art. 3 — celeridad y carácter perentorio de los términos. Refuerza R6.
+- **Constitución Política**, art. 23 — derecho fundamental de petición (riesgo de tutela por mora). R6.
+- **Ley 1581 de 2012**, art. 4 lit. f (acceso y circulación restringida), lit. g (seguridad, evitar
+  consulta/uso no autorizado), lit. h (confidencialidad). Sustenta R9 (canal de inferencia) y R10
+  (necesidad de conocer / traza de acceso).
+- **Ley 1474 de 2011 (Estatuto Anticorrupción)** — reserva de identidad del denunciante; eleva el riesgo
+  de R9 en el caso denunciante. El numeral exacto de la reserva del denunciante **debe confirmarse**
+  antes de usarse como cita literal en un acto vinculante (salvedad ya declarada en el concepto de Fase 2).
+
+### Salvedades de precisión (declaradas, no asumidas)
+
+- La exigencia "**antes del vencimiento**" de R6 es texto expreso del parágrafo del art. 14; la postura
+  de **rechazar** (vs. registrar como extemporánea) es interpretación conservadora recomendada, no
+  mandato literal de la norma — es la micro-decisión de producto señalada en §R6.5.
+- R9 es un canal de **inferencia** (confirma existencia), no de **visualización** (la fila sigue
+  enmascarada por H2). Su severidad es baja-media y solo escala a media en el escenario de denunciante
+  reservado.
+- R10 **no es incumplimiento**: la variante A vigente es conforme. Es una mejora de acceso legítimo que
+  requiere decisión de producto antes de ser convertible a control.
