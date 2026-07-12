@@ -33,6 +33,13 @@ jobs:
       - name: Test Suite (Quality Gate)
         run: npm test
 
+      - name: Presupuesto de Rendimiento (R11 Gate — ADR-0011, 2B)
+        # Control de regresión de escala: falla si una consulta de colección
+        # sobre `ventanilla_radicados` que debe estar acotada pierde su
+        # limit()/cursor (regresión O(N)), o si aparece una lectura ilimitada
+        # nueva sin clasificar. Estático y determinista — no requiere emulador.
+        run: npm run presupuesto:rendimiento
+
       - name: Security Scan (NPM Audit Gate)
         run: npm audit --audit-level=high
 
