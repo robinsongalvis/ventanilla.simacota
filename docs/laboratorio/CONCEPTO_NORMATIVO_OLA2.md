@@ -404,3 +404,30 @@ agravante de denunciante reservado (Ley 1474/2011)— en las dos superficies de 
 con la invariante compartida con el servidor y protegida por 11 pruebas de regresión. R9 puede marcarse
 **RESUELTO** en `docs/REGISTRO_RIESGOS.md`. La duplicación del criterio de reserva queda como deuda
 técnica normativamente sensible (backlog, no bloqueante). Referencia de decisión: **ADR-0012**.
+
+### Preservación tras el cierre de R11 (acotación por cursor) — verificado 2026-07-12
+
+**R9 sigue CONFORME tras el refactor de `busqueda-avanzada` (R11, ADR-0010).** dev-backend reescribió la
+lectura a escaneo por lotes con cursor + techo `MAX_DOCS_ESCANEADOS` (500) y extrajo `filtrarLote`; revisé
+que la exclusión server-side de reservados se conserva **sin cambio de semántica**:
+
+- **Predicado reutilizado verbatim.** `filtrarLote` (`lib/busqueda/filtros-radicado.ts:292-299`) aplica
+  `aplicarAlcanceRol` + `pasaFiltros` a cada radicado del lote; `pasaFiltros` conserva intactos los
+  guardas `if (ocultarIdentidad(r)) return false` para `nombre`/`documento`/`correo` (líneas 184/188/192)
+  y `matchTextoLibre` con `!oculto` (líneas 157,165-167). Un reservado **no** matchea por identidad —
+  misma regla que antes, ahora invocada por lote en `route.ts:178` en vez de una vez sobre todo el
+  dataset. No hay ningún camino nuevo donde un reservado coincida por identidad.
+- **Acotar la lectura no abre brecha (es más restrictivo, no menos).** Un reservado que quede fuera del
+  escaneo (≤500 docs) simplemente **no aparece**; dentro del lote sigue excluido de la coincidencia por
+  identidad; y lo que sí sale se enmascara igualmente en `sanitizarRadicado` (`route.ts:203`). El techo
+  reduce visibilidad, nunca la amplía.
+- **Tenant e `isTest` preservados.** El tenant se empuja a Firestore para FUNCIONARIO/JEFE_DEPENDENCIA
+  (`route.ts:148-149`) **y** se reaplica en memoria vía `aplicarAlcanceRol` dentro de `filtrarLote`
+  (doble refuerzo del aislamiento); `!isTest && !excludeFromMetrics` se filtra por lote antes de
+  `filtrarLote` (`route.ts:174-176`).
+- **Evidencia (Principio 13):** `npx vitest run __tests__/busqueda-avanzada.test.ts` → **19/19 verdes**
+  (la suite incluye casos de exclusión de reservados/identidad); `coincidencia-filtro-rapido` sigue
+  11/11. Sin regresión de R9 por el refactor de R11.
+
+**Veredicto:** el cierre de R11 **no introduce ninguna brecha** en R9. La conformidad al art. 4 f/g se
+mantiene en cliente y servidor.
