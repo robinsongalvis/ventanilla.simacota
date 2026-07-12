@@ -54,26 +54,38 @@ export interface RechazoProrroga {
 }
 
 /**
- * Control ejecutable de prórroga (ADR-0003, hallazgo H1) — Ley 1755/2015
- * art. 14, parágrafo: admite una única ampliación excepcional cuyo nuevo
- * plazo no podrá exceder del doble del término inicialmente previsto.
+ * Control ejecutable de prórroga (ADR-0003 hallazgo H1; ADR-0012 hallazgo R6)
+ * — Ley 1755/2015 art. 14, parágrafo: admite una única ampliación excepcional
+ * cuyo nuevo plazo no podrá exceder del doble del término inicialmente
+ * previsto, y exige informarla ANTES de que venza el término original.
  *
- * Se enforce en dos reglas independientes, evaluadas en orden:
+ * Se enforce en tres reglas independientes, evaluadas en este orden:
  * 1. Unicidad — ya existe al menos una prórroga aplicada.
  * 2. Tope — los días solicitados exceden el término base del tipo de
  *    solicitud (`diasProrroga === diasRespuesta` es la frontera válida).
+ * 3. Temporalidad (R6) — el término original ya venció. Solo se evalúa si
+ *    se recibe `fechaVencimiento`; si se omite, la regla no aplica (permite
+ *    llamadas que no disponen de esa fecha, p. ej. tests de H1 previos a R6).
+ *    Frontera: si `fechaVencimiento` es exactamente igual a `ahora`, se
+ *    considera VENCIDO (rechaza) — "antes del vencimiento" excluye el
+ *    instante mismo del vencimiento (decisión ADR-0012).
  *
  * Devuelve el primer motivo de rechazo, o `null` si la prórroga es válida.
  * Función pura: no accede a Firestore ni tiene efectos secundarios — el
  * endpoint debe invocarla ANTES de cualquier escritura para IMPEDIR (no
- * solo advertir) el estado inválido.
+ * solo advertir) el estado inválido. `ahora` es inyectable (valor o fábrica)
+ * para permitir tests deterministas, siguiendo el patrón de H1.
  */
 export function validarProrroga(params: {
   prorrogasAplicadas: number | undefined;
   diasProrroga: number;
   diasRespuesta: number;
+  /** ISO string del vencimiento vigente del término. Omitir desactiva R6. */
+  fechaVencimiento?: string;
+  /** Reloj inyectable para tests deterministas. Por defecto, `new Date()`. */
+  ahora?: Date | (() => Date);
 }): RechazoProrroga | null {
-  const { diasProrroga, diasRespuesta } = params;
+  const { diasProrroga, diasRespuesta, fechaVencimiento } = params;
   const prorrogasAplicadas = params.prorrogasAplicadas ?? 0;
 
   if (prorrogasAplicadas >= 1) {
@@ -88,6 +100,17 @@ export function validarProrroga(params: {
       status: 400,
       mensaje: `Los días de prórroga (${diasProrroga}) superan el tope legal: el nuevo plazo no puede exceder el doble del término inicial (${diasRespuesta} días, Ley 1755/2015 art. 14).`,
     };
+  }
+
+  if (fechaVencimiento) {
+    const ahora = typeof params.ahora === 'function' ? params.ahora() : (params.ahora ?? new Date());
+    const vencimiento = new Date(fechaVencimiento);
+    if (vencimiento.getTime() <= ahora.getTime()) {
+      return {
+        status: 409,
+        mensaje: 'El término original ya venció: la Ley 1755/2015 (art. 14, parágrafo) exige informar la ampliación del término ANTES de su vencimiento, no después.',
+      };
+    }
   }
 
   return null;
