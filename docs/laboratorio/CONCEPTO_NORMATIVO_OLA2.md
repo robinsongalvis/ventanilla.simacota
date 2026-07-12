@@ -329,3 +329,78 @@ recomendada. Queda coherente con H1 ("impedir, no advertir") y con el carácter 
 **Conclusión:** la remediación de R6 es **conforme** al art. 14 (parágrafo) de la Ley 1755/2015 en la
 exigencia temporal, con conformidad protegida por 8 pruebas de regresión (13/13 verdes en el archivo).
 R6 puede marcarse **RESUELTO** en `docs/REGISTRO_RIESGOS.md`. Referencia de decisión: **ADR-0012**.
+
+---
+
+## R9 — Remediación verificada (2026-07-11)
+
+**Rol:** revisión cruzada de conformidad normativa (gobierno-digital). dev-frontend implementó el
+control R9 que este concepto (Frente 2C) definió; esta sección es la validación independiente
+(Principio 5). Solo lectura de código y ejecución de tests; sin cambios.
+
+### Veredicto de conformidad: **CONFORME** — R9 → **RESUELTO**
+
+El canal de inferencia del cliente queda cerrado: los filtros rápidos del mostrador y del Tablero ya no
+confirman la existencia de un radicado reservado al teclear el nombre o el documento del solicitante. Se
+satisface el principio de acceso y circulación restringida y el deber de seguridad (Ley 1581/2012 art. 4
+lit. f y g), cerrando el residual de H2. El estado de R9 pasa de **CUMPLE PARCIALMENTE** a **CONFORME**.
+
+### Verificación en el código (leído, no asumido)
+
+| Artefacto | Qué verifiqué | Resultado |
+|---|---|---|
+| `lib/busqueda/coincidencia-filtro-rapido.ts:46-56` (`coincideIdentidadFiltroRapido`) | Función pura, única fuente de verdad del predicado. Matchea `radicadoId` primero; si `identidadProtegida(r)` → `return false` (no evalúa nombre/documento); si no está reservado, matchea nombre/documento normalmente. **Reutiliza** `identidadProtegida` (ADR-0006), no duplica el criterio. | Correcto |
+| `app/interno/dashboard/components/ventanilla/VistaVentanilla.tsx:14,74-75,107` | `coincideMostrador` ahora **delega** en `coincideIdentidadFiltroRapido`; ya no lee `nombreCompleto`/`numeroDocumento` crudos. | Enmascarado en búsqueda |
+| `app/interno/dashboard/page.tsx:37,215-221` | El filtro del Tablero usa `coincideIdentidadFiltroRapido(r, q)` para identidad + radicadoId; asunto/oficina/responsable matchean directo aparte. El `radicadoId` crudo ya no se compara por fuera del predicado. | Enmascarado en búsqueda |
+| `grep` de otros filtros de cliente (`app/`, `components/`) que toquen `solicitante.nombreCompleto`/`numeroDocumento` con `.includes` | **Sin resultados** fuera de los helpers `…Visible` y de `coincide…`. No hay otra superficie de cliente que matchee identidad sin guarda. | Cobertura completa |
+| `__tests__/coincidencia-filtro-rapido.test.ts` (11 casos) | Reservado no coincide por nombre/fragmento/documento; sí por radicadoId (completo y fragmento); no-reservado coincide normal; anónimo (solo `esAnonimo`) tampoco coincide por identidad. | Cobertura suficiente |
+| Ejecución `npx vitest run` | **11/11 verdes**. | Evidencia de regresión satisfecha |
+
+### Respuestas a las preguntas del coordinador
+
+| Pregunta | Análisis | Veredicto |
+|---|---|---|
+| ¿Cierra la brecha de inferencia del cliente conforme al art. 4 f/g? | Ambas superficies delegan el match de identidad en un predicado que devuelve `false` sobre nombre/documento de radicados reservados. El servidor ya la cerraba (`filtros-radicado.ts`); ahora el cliente aplica la misma invariante. Teclear un nombre/documento reservado ya **no** hace aparecer la fila → no se confirma la existencia. | **Sí, cierra** |
+| ¿Es correcto dejar asunto/oficina/funcionario sin guarda? | **Sí.** La reserva protege la **identidad del solicitante** (nombre y documento), que son exactamente los dos campos ahora guardados. El **asunto** es el contenido de la petición, no un identificador del ciudadano; la **oficina de destino** es enrutamiento institucional; el **funcionario responsable** es un servidor público (no el ciudadano). Ninguno es dato personal reservado del solicitante. Además es **coherente con el servidor**, que también matchea asunto directo (`matchTextoLibre`, `filtros-radicado.ts:161`, sin guarda). | **Correcto** |
+| ¿El `radicadoId` searchable en reservados es una fuga? | No. El número de radicado no es dato personal reservado, sino la clave institucional de seguimiento; para teclearlo hay que **conocerlo ya**. No se infiere la identidad de una persona a partir de él (art. 4 f protege el dato del titular, no el consecutivo AGN). | **Conforme** |
+
+### Brechas residuales
+
+- **Ninguna que bloquee el cierre de R9.** El canal de inferencia por identidad del solicitante queda
+  cerrado en cliente y servidor con una invariante común, protegida por pruebas.
+- **Observación de higiene de captura (fuera del alcance de R9, no brecha del predicado):** si al radicar
+  se hubiera escrito el nombre del ciudadano **dentro del campo asunto**, ese texto seguiría siendo
+  buscable (asunto no se enmascara, y normativamente no debe enmascararse de forma general). Es un
+  problema de **calidad del dato en la captura**, no del predicado de búsqueda; se menciona para que no
+  se confunda con R9. Mitigación natural: guía de captura / validación en el radicador. **Rol futuro si
+  se aborda: dev-frontend + ux.** No abre R9.
+
+### Sobre la duplicación del criterio de reserva (`ocultarIdentidad` local vs. `identidadProtegida`)
+
+Pregunta expresa del coordinador. Comparé los dos criterios carácter a carácter:
+
+- `lib/seguridad/identidad-protegida.ts:37-44` (`identidadProtegida`): `esAnonimo === true || identidadReservada === true || tipoPresentacion === 'ANONIMA' || tipoPresentacion === 'RESERVADA'`.
+- `lib/busqueda/filtros-radicado.ts:83-88` (`ocultarIdentidad`, local): mismas cuatro disyunciones, **solo cambia el orden**.
+
+**Hoy son lógicamente idénticos: no hay divergencia ni brecha activa.** Por tanto, en el estado actual
+es **solo deuda técnica (DRY)**, no un incumplimiento.
+
+**Pero es deuda técnica normativamente sensible**, y conviene no tratarla como un DRY cosmético: lo que
+está duplicado es la **definición misma de "qué cuenta como identidad reservada"**, que es el predicado
+de cumplimiento del art. 4 f/g. Si mañana se añade una quinta condición de reserva (un nuevo valor de
+`tipoPresentacion`, un flag nuevo) a **una** copia y no a la otra, un canal protegería y el otro filtraría
+→ eso **sí** sería una brecha normativa real (una ruta de búsqueda dejaría de enmascarar). Probabilidad
+baja, pero impacto-si-ocurre = brecha de cumplimiento, y el modo de fallo es **silencioso** (no rompe
+ningún test existente). Por eso el criterio de reserva debe ser **fuente única**.
+
+Recomendación (no bloquea R9; es backlog): hacer que `ocultarIdentidad` **importe** `identidadProtegida`
+en vez de reimplementarla —el predicado de cliente de R9 ya da el ejemplo correcto—; y/o un test de
+equivalencia que asegure que ambos coinciden sobre una matriz de entradas, de modo que cualquier
+divergencia futura falle en CI. **Rol: dev-backend.** Lo registro como ítem propio del backlog
+(candidato a control preventivo), severidad **baja** (latente, no activa).
+
+**Conclusión:** la remediación de R9 es **conforme** al art. 4 (f/g) de la Ley 1581/2012 —y mitiga el
+agravante de denunciante reservado (Ley 1474/2011)— en las dos superficies de filtro rápido de cliente,
+con la invariante compartida con el servidor y protegida por 11 pruebas de regresión. R9 puede marcarse
+**RESUELTO** en `docs/REGISTRO_RIESGOS.md`. La duplicación del criterio de reserva queda como deuda
+técnica normativamente sensible (backlog, no bloqueante). Referencia de decisión: **ADR-0012**.

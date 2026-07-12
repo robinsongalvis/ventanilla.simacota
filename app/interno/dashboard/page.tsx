@@ -34,6 +34,7 @@ import {
   numeroDocumentoVisible,
 } from '@/lib/seguridad/identidad-protegida';
 import { puedeVerReportes } from '@/lib/permisos/acceso-reportes';
+import { coincideIdentidadFiltroRapido } from '@/lib/busqueda/coincidencia-filtro-rapido';
 import { agruparDestinosPorDependencia, areasParaDependencia, getNombreArea } from '@/lib/catalogos/areas';
 import { RegistroExpresModal } from '@/app/interno/dashboard/components/RegistroExpresModal';
 import { RegistrarSalidaModal, type EntradaAmarre } from '@/app/interno/dashboard/components/salidas/RegistrarSalidaModal';
@@ -207,11 +208,13 @@ function aplicarFiltroMIPG(
 
   if (busqueda.trim()) {
     const q = busqueda.toLowerCase().trim();
+    // Nombre/documento pasan por la guarda anti-inferencia (ADR-0012, R9):
+    // un radicado con identidad reservada no debe coincidir por esos
+    // campos, solo por radicadoId. Asunto, oficina y funcionario no son
+    // identidad del solicitante y siguen coincidiendo directamente.
     lista = lista.filter(
       (r) =>
-        r.radicadoId.toLowerCase().includes(q) ||
-        r.solicitante.nombreCompleto.toLowerCase().includes(q) ||
-        r.solicitante.numeroDocumento.includes(q) ||
+        coincideIdentidadFiltroRapido(r, q) ||
         r.detalle.asunto.toLowerCase().includes(q) ||
         NOMBRES_TENANT[r.clasificacion.oficinaDestino].toLowerCase().includes(q) ||
         (r.clasificacion.funcionarioResponsableNombre ?? '').toLowerCase().includes(q),

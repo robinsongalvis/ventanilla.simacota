@@ -313,11 +313,16 @@ export function VistaAnalytics({ radicados, esAdmin, tenantIdUsuario }: Props) {
     esAdmin ? 'TODOS' : tenantIdUsuario,
   );
 
+  // ADR-0010 (R11): el stream que alimenta esta vista está acotado a una
+  // ventana operativa de 180 días (useVentanillaRadicados). "TODO" ya no
+  // es histórico completo desde el origen — es todo lo visible en esa
+  // ventana. Copy pendiente de revisión de ux-ui (declarado en el
+  // incremento 2A); se deja honesto en vez de mantener el texto anterior.
   const opciones: { valor: PeriodoAnalytics; label: string }[] = [
     { valor: 30,    label: 'Últimos 30 d' },
     { valor: 60,    label: 'Últimos 60 d' },
     { valor: 90,    label: 'Últimos 90 d' },
-    { valor: 'TODO', label: 'Histórico completo' },
+    { valor: 'TODO', label: 'Ventana operativa (180 d)' },
   ];
 
   return (
@@ -328,7 +333,7 @@ export function VistaAnalytics({ radicados, esAdmin, tenantIdUsuario }: Props) {
         <div>
           <h2 className="text-sm font-bold" style={{ color: '#1F2933' }}>Centro de Inteligencia Operativa</h2>
           <p className="text-[11px] mt-0.5" style={{ color: '#667085' }}>
-            {globales.totalPeriodo} radicados analizados · {totalBase} en histórico
+            {globales.totalPeriodo} radicados analizados · {totalBase} en ventana operativa
           </p>
         </div>
 
