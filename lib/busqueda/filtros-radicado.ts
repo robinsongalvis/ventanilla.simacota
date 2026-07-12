@@ -275,19 +275,45 @@ function pasaFiltros(r: VentanillaRadicado, filtros: FiltrosBusqueda): boolean {
    5. Pagina (page 1-based, pageSize 25/50/100).
 ────────────────────────────────────────────── */
 
-const REGEX_RADICADO_COMPLETO = /^\d+-[A-Z_]+-\d{4}-\d{4,}$/i;
+export const REGEX_RADICADO_COMPLETO = /^\d+-[A-Z_]+-\d{4}-\d{4,}$/i;
 
 /**
- * Aplica alcance por rol + filtros + ordenamiento por fecha desc,
- * SIN paginar. Útil para exportación a Excel filtrado.
+ * Aplica alcance por rol + todos los predicados de `pasaFiltros` a un lote
+ * de radicados, SIN ordenar ni paginar.
+ *
+ * ADR-0010 §2.1 (R11): esta función es el punto de reutilización entre el
+ * filtrado en memoria "clásico" (`filtrarRadicados`/`buscarRadicados`, sobre
+ * un array ya completo) y el escaneo acotado por cursor de
+ * `app/api/radicados/busqueda-avanzada/route.ts`, que la invoca UNA VEZ POR
+ * LOTE leído de Firestore (no sobre toda la colección) — así se preserva
+ * exactamente la misma semántica de filtros (incluida la exclusión server-side
+ * de reservados/anónimos por identidad, R9) sin duplicar el predicado.
  */
-export function filtrarRadicados(
-  todos: VentanillaRadicado[],
+export function filtrarLote(
+  radicados: VentanillaRadicado[],
   filtros: FiltrosBusqueda,
   alcance: AlcanceRol,
 ): VentanillaRadicado[] {
-  const enAlcance = aplicarAlcanceRol(todos, alcance);
-  const filtrados = enAlcance.filter((r) => pasaFiltros(r, filtros));
+  const enAlcance = aplicarAlcanceRol(radicados, alcance);
+  return enAlcance.filter((r) => pasaFiltros(r, filtros));
+}
+
+/**
+ * Reordena un conjunto ya filtrado: coincidencia EXACTA de radicado primero
+ * (cuando el usuario escribió un número de radicado completo), luego por
+ * `fechaRadicado` desc. Si no hay coincidencia exacta que priorizar, aplica
+ * solo el orden por fecha desc.
+ *
+ * Nota: cuando el llamador ya entrega los ítems en orden `fechaRadicado desc`
+ * (p. ej. porque vinieron de un `orderBy` de Firestore, como en el escaneo
+ * acotado del endpoint) y no hay coincidencia exacta que priorizar, el
+ * resegundo `sort` es un no-op funcional — se mantiene igual para no bifurcar
+ * el comportamiento entre llamadores y evitar una superficie de bugs sutil.
+ */
+export function priorizarCoincidenciaExacta(
+  filtrados: VentanillaRadicado[],
+  filtros: FiltrosBusqueda,
+): VentanillaRadicado[] {
   const qExacto = (filtros.q ?? filtros.radicadoId ?? '').trim();
   if (qExacto && REGEX_RADICADO_COMPLETO.test(qExacto)) {
     return [...filtrados].sort((a, b) => {
@@ -302,30 +328,35 @@ export function filtrarRadicados(
   );
 }
 
+/**
+ * Aplica alcance por rol + filtros + ordenamiento por fecha desc,
+ * SIN paginar. Útil para exportación a Excel filtrado.
+ */
+export function filtrarRadicados(
+  todos: VentanillaRadicado[],
+  filtros: FiltrosBusqueda,
+  alcance: AlcanceRol,
+): VentanillaRadicado[] {
+  const filtrados = filtrarLote(todos, filtros, alcance);
+  return priorizarCoincidenciaExacta(filtrados, filtros);
+}
+
+/**
+ * Filtra + ordena + pagina un array YA CARGADO EN MEMORIA. Usada por los
+ * tests directos (sin Firestore) y disponible para datasets pequeños ya
+ * resueltos. El endpoint `busqueda-avanzada/route.ts` NO usa esta función
+ * para servir la búsqueda paginada (ADR-0010 §2.1: eso requiere escanear
+ * Firestore por lotes acotados, no cargar todo el dataset primero) — usa
+ * `filtrarLote` + `priorizarCoincidenciaExacta` directamente sobre cada lote.
+ */
 export function buscarRadicados(
   todos: VentanillaRadicado[],
   filtros: FiltrosBusqueda,
   paginacion: Paginacion,
   alcance: AlcanceRol,
 ): ResultadoBusqueda<VentanillaRadicado> {
-  const enAlcance = aplicarAlcanceRol(todos, alcance);
-  const filtrados = enAlcance.filter((r) => pasaFiltros(r, filtros));
-
-  // Prioridad de coincidencia exacta cuando el usuario escribe un radicado completo
-  const qExacto = (filtros.q ?? filtros.radicadoId ?? '').trim();
-  let ordenados: VentanillaRadicado[];
-  if (qExacto && REGEX_RADICADO_COMPLETO.test(qExacto)) {
-    ordenados = [...filtrados].sort((a, b) => {
-      const aExacto = a.radicadoId === qExacto ? 0 : 1;
-      const bExacto = b.radicadoId === qExacto ? 0 : 1;
-      if (aExacto !== bExacto) return aExacto - bExacto;
-      return fechaAMs(b.control?.fechaRadicado) - fechaAMs(a.control?.fechaRadicado);
-    });
-  } else {
-    ordenados = [...filtrados].sort(
-      (a, b) => fechaAMs(b.control?.fechaRadicado) - fechaAMs(a.control?.fechaRadicado),
-    );
-  }
+  const filtrados = filtrarLote(todos, filtros, alcance);
+  const ordenados = priorizarCoincidenciaExacta(filtrados, filtros);
 
   const pageSize = paginacion.pageSize;
   const total = ordenados.length;
