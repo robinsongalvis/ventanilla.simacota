@@ -13,9 +13,16 @@ import { POST as buscarAvanzada } from '@/app/api/radicados/busqueda-avanzada/ro
 import { requireActiveInternalUser } from '@/lib/server/internal-auth';
 import type { VentanillaRadicado } from '@/src/types/ventanilla';
 
+/*
+ * Mock de la cadena Firestore Admin usada por el escaneo acotado por cursor
+ * (ADR-0010 §2.1): collection().orderBy([.where()]).limit([.startAfter()]).get().
+ * Cada nivel expone los métodos que el route puede encadenar a continuación.
+ */
 const mockGet = vi.fn();
-const mockWhere = vi.fn();
-const mockOrderBy = vi.fn(() => ({ get: mockGet, where: mockWhere }));
+const mockStartAfter = vi.fn(() => ({ get: mockGet }));
+const mockLimit = vi.fn(() => ({ get: mockGet, startAfter: mockStartAfter }));
+const mockWhere = vi.fn(() => ({ limit: mockLimit, get: mockGet }));
+const mockOrderBy = vi.fn(() => ({ where: mockWhere, limit: mockLimit, get: mockGet }));
 const mockCollection = vi.fn(() => ({ orderBy: mockOrderBy }));
 
 vi.mock('@/lib/firebase-admin', () => ({
@@ -109,7 +116,9 @@ describe('Señal de lectura — busqueda-avanzada/route.ts (ADR-0011, 2B)', () =
   beforeEach(() => {
     logSpy = vi.spyOn(console, 'log').mockImplementation(() => {});
     mockGet.mockReset();
-    mockWhere.mockReset().mockReturnValue({ get: mockGet });
+    mockStartAfter.mockClear().mockReturnValue({ get: mockGet });
+    mockLimit.mockClear().mockReturnValue({ get: mockGet, startAfter: mockStartAfter });
+    mockWhere.mockReset().mockReturnValue({ limit: mockLimit, get: mockGet });
     mockOrderBy.mockClear();
     mockCollection.mockClear();
     vi.mocked(requireActiveInternalUser).mockReset().mockResolvedValue({

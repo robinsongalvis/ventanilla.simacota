@@ -130,12 +130,14 @@ const REGISTRO = [
   },
   {
     archivo: 'app/api/radicados/busqueda-avanzada/route.ts',
-    estado: 'PENDIENTE_2A',
+    estado: 'ACOTADA',
     clase: 'INTERACTIVA',
-    descripcion: 'Búsqueda Histórica Avanzada — NÚCLEO de R11; ADR-0010 §2.1 exige '
-      + 'cursor + limit server-side (coordinado con task_7f9e8ba3). Aún O(N) en este '
-      + 'árbol: 2A paso 1 no aterrizó. Debe promoverse a ACOTADA (≤ pageSize) al llegar.',
-    ref: 'ADR-0010 §2.1 · R11 · task_7f9e8ba3',
+    descripcion: 'Búsqueda Histórica Avanzada — NÚCLEO de R11, RESUELTO. Escaneo por '
+      + 'lotes con cursor (limit+startAfter), techo duro MAX_DOCS_ESCANEADOS '
+      + 'independiente de N; reemplaza la lectura incondicional de toda la colección.',
+    cotaRegex: /const MAX_DOCS_ESCANEADOS\s*=\s*(\d+)/,
+    cotaMax: 500,
+    ref: 'ADR-0010 §2.1 · R11 RESUELTO',
   },
   {
     archivo: 'app/api/reportes/mipg/excel/route.ts',
