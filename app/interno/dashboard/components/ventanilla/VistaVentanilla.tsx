@@ -11,6 +11,7 @@ import {
   type PendienteMostrador,
 } from '@/lib/mostrador/trabajo-de-hoy';
 import { nombreSolicitanteVisible } from '@/lib/seguridad/identidad-protegida';
+import { coincideIdentidadFiltroRapido } from '@/lib/busqueda/coincidencia-filtro-rapido';
 
 /* ══════════════════════════════════════════════════════════════
    Ventanilla · módulo de mostrador — "Atención al ciudadano".
@@ -64,13 +65,14 @@ export interface VistaVentanillaProps {
  * Coincidencia de mostrador: radicado, cédula o nombre del ciudadano —
  * exactamente lo que promete el placeholder. Para todo lo demás está
  * la búsqueda avanzada.
+ *
+ * Delega el predicado en `coincideIdentidadFiltroRapido` (ADR-0012, R9):
+ * un radicado con identidad reservada NO coincide por nombre ni
+ * documento, solo por `radicadoId` — evita inferir su existencia
+ * tecleando el nombre/documento del ciudadano.
  */
 function coincideMostrador(r: VentanillaRadicado, q: string): boolean {
-  return (
-    r.radicadoId.toLowerCase().includes(q) ||
-    r.solicitante.nombreCompleto.toLowerCase().includes(q) ||
-    r.solicitante.numeroDocumento.includes(q)
-  );
+  return coincideIdentidadFiltroRapido(r, q);
 }
 
 export function VistaVentanilla({

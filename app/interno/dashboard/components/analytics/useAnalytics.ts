@@ -6,6 +6,18 @@
  *
  * NO realiza llamadas a Firestore. Reutiliza el stream de useVentanillaRadicados.
  * Incluye severityScore para alimentar la IA predictiva futura (Fase 3).
+ *
+ * Cambio de semántica (ADR-0010, R11, incremento 2A): desde que
+ * `useVentanillaRadicados` acota su stream a una ventana operativa (180
+ * días calendario, ver esa fuente), el array recibido aquí YA NO es "todo
+ * el histórico" — es esa ventana. Las opciones de período 30/60/90 días
+ * siguen siendo exactas (son subconjuntos de la ventana), pero la opción
+ * `'TODO'` deja de significar "histórico completo desde el origen" y pasa
+ * a significar "todo lo que hay dentro de la ventana operativa del
+ * stream". Una analítica sobre el histórico real completo (más allá de la
+ * ventana) requeriría una consulta agregada propia sobre la búsqueda
+ * paginada — se declara como deuda, no se implementa en este incremento
+ * (excede el alcance del stream operativo).
  */
 
 import { useMemo } from 'react';
@@ -94,7 +106,10 @@ export interface AnalyticsResult {
   alertas:         AlertaPredictiva[];
   tiposFrecuentes: TipoFrecuente[];
   porZona:         MetricaZona[];
-  totalBase:       number;   // total antes del filtro de período
+  /** Total dentro de la ventana operativa del stream, antes del filtro de
+   *  período (NO es el total histórico completo — ver nota de semántica
+   *  al inicio del archivo, ADR-0010). */
+  totalBase:       number;
 }
 
 /* ══════════════════════════════════════════════════════════════
