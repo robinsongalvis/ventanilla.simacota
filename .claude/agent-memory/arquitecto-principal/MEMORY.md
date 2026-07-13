@@ -1,0 +1,1 @@
+- [Consolidación post-Ola 2](project_consolidacion_post_ola2.md) — revisión cruzada 13 jul 2026; branch protection exige los 3 checks por nombre visible; ADR-0014 propuesto pendiente del propietario

@@ -11,6 +11,8 @@ Estados: `ABIERTO` · `EN DECISIÓN` (esperando al propietario) · `EN CURSO` ·
 
 ## Abiertos
 
+> Priorización de los abiertos para el post-congelamiento: `docs/BACKLOG_TECNICO.md` (13 jul 2026).
+
 | ID | Hallazgo | Sev. | Norma / origen | Estado | Dueño técnico | Trazabilidad |
 |----|----------|------|----------------|--------|---------------|--------------|
 | **R3** | Hueco de consecutivo AGN cuando la subida de adjunto no completa (incremento no atómico respecto a la persistencia del radicado) | MEDIA | Acuerdo AGN 060/2001 (consecutivo) | ABIERTO (backlog) | dev-backend | `docs/laboratorio/FASE2_BITACORA.md` (hallazgo QA #2); `lib/radicado-institucional.ts`, `lib/actions/radicarVentanilla.ts` |
