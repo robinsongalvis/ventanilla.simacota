@@ -46,7 +46,7 @@ requiere ADR e infraestructura). Se medirá en retrospectiva al ejecutar.
 | 8 | **R5** — confirmación "✓ Asignado" puede no mostrarse (carrera React ↔ listener) | Elimina una incertidumbre de feedback operativo; patrón de estabilización ya probado en E2E 01 | BAJA | 2 | **S** | Patrón E2E 01 (existe); afinidad con #5 | Riesgo operativo |
 | 9 | **R7** — robustez ante `termino.diasRespuesta` ausente | Elimina un riesgo teórico de robustez (campo hoy requerido y siempre poblado) | BAJA (teórico) | 1 | **S** | Ninguna; afinidad con #4 (mismo dueño backend) | Robustez |
 | — | **R15b** — categoría IA/SIMI en la compuerta | Cobertura del invariante "IA asistiva, nunca automática" en el veredicto | BAJA | 2 | S–M | **BLOQUEADO**: requiere que aterrice P-D (gobernanza de IA). Interim: el informe debe declarar la cobertura pendiente, no callarla | Gobernanza (diferido) |
-| — | **R10** — variante B de enmascaramiento | — | BAJA | — | — | **EN DECISIÓN del propietario** — no priorizable por este backlog (ver §Decisiones) | Producto |
+| — | **R10** — variante B de enmascaramiento | — | BAJA | — | — | **CERRADO — RIESGO ACEPTADO (2026-07-13)**: el propietario decidió mantener la variante A hasta que exista necesidad funcional validada por la funcionaria (ver §Decisiones) | Producto |
 
 ## Detalle por ítem
 
@@ -243,11 +243,21 @@ Formuladas para responderse con sí/no o entre opciones concretas:
      **quién** revela (¿solo el responsable asignado?), **condición**
      (¿necesidad del trámite declarada?), **traza** (¿evento de auditoría
      obligatorio?) y **alcance** (¿solo la vista de detalle?).
+
+   **✅ Respuesta registrada (2026-07-13):** *"Se mantiene la variante A hasta
+   que exista una necesidad funcional validada por la funcionaria."* — Opción 1
+   con condición de reapertura. R10 pasa a RIESGO ACEPTADO en
+   `docs/REGISTRO_RIESGOS.md`.
 2. **Credenciales de stage en CI (habilita el ítem #3).** *"¿Autoriza usted
    almacenar credenciales de stage como secretos de CI para automatizar el
    E2E, previa revisión de seguridad en ADR?"* Sí → el ítem #3 arranca con su
    ADR. No → el ítem #3 sale del backlog y el registro manual del E2E queda
    como deuda aceptada por diseño en ADR-0013.
+
+   **⏸️ Respuesta registrada (2026-07-13):** *"La autorización de credenciales
+   de Stage queda pendiente; no se implementará ni se modificará nada hasta mi
+   aprobación expresa."* — El ítem #3 queda RETENIDO en el backlog: no arranca
+   (ni su ADR) sin la aprobación expresa del propietario.
 3. **Branch protection en `main` (acción administrativa, no de desarrollo).**
    Pieza 1 de ADR-0013 y precondición de 2E; requiere permisos de admin en
    GitHub, por eso es acción del propietario, no ítem de este backlog.
@@ -261,6 +271,12 @@ Formuladas para responderse con sí/no o entre opciones concretas:
    en el input E2E registrado —único caso en que ese job es el único en
    rojo— no bloquearía el merge. Nombres visibles exactos y conciliación con
    el texto literal de ADR-0013 en `docs/GOBERNANZA.md` §3.4.)
+
+   **⏳ Estado (2026-07-13):** pendiente de aplicación por el propietario
+   (acción administrativa; precondición 1 de 2E). Nota operativa: la branch
+   protection se vuelve plenamente efectiva cuando el workflow con el job
+   `informe-despliegue` esté en `main` (hoy la compuerta existe solo en la
+   rama de trabajo — ver PR de integración).
 
 ## Qué NO está en este backlog y por qué
 

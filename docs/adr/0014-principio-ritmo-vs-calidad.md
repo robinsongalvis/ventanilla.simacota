@@ -1,7 +1,7 @@
 # ADR-0014 — Principio permanente: el ritmo de evolución nunca prevalece sobre la calidad de la arquitectura
 
 - **Fecha:** 2026-07-13
-- **Estado:** propuesto — pendiente de aceptación del propietario
+- **Estado:** aceptado (2026-07-13, por el propietario: "Aprobado como principio permanente de gobernanza")
 - **Responsable:** Robinson David Galvis (propietario — el principio es decreto suyo del 2026-07-13; la aceptación formal de este ADR es suya)
 - **Roles consultados:** arquitecto-principal (redacción, durante la revisión cruzada de la consolidación post-Ola 2), documentacion (`docs/GOBERNANZA.md` §1.a), product-owner (`docs/BACKLOG_TECNICO.md`)
 

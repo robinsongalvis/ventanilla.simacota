@@ -26,8 +26,8 @@ de una fase que termina.
 
 Este principio es un decreto directo del propietario incorporado en esta
 consolidación. Está formalizado como decisión de arquitectura en
-[ADR-0014](adr/0014-principio-ritmo-vs-calidad.md) (estado: **propuesto —
-pendiente de aceptación del propietario**), que registra el texto literal,
+[ADR-0014](adr/0014-principio-ritmo-vs-calidad.md) (estado: **aceptado por
+el propietario el 2026-07-13**), que registra el texto literal,
 su rango (equivalente a los 13 principios de ADR-0001) y el criterio de
 verificación: al cierre de cada fase, evidencia objetiva de mejora en las
 cuatro dimensiones —mantenibilidad, auditabilidad, escalabilidad y
@@ -233,7 +233,7 @@ fijó para levantar el congelamiento vigente (§7).
 | [0011](adr/0011-auditor-rendimiento-presupuestos.md) | Auditor de rendimiento y presupuestos en CI sobre la señal de observabilidad (2B) | aceptado | Presupuesto de rendimiento como control de regresión de escala |
 | [0012](adr/0012-controles-normativos-ejecutables.md) | Controles normativos ejecutables: R6 y R9 (2C) | aceptado | Conversión de R6 (temporalidad de prórroga) y R9 (anti-inferencia en filtros) a controles ejecutables |
 | [0013](adr/0013-compuerta-despliegue-gobernanza.md) | Compuerta de despliegue como mecanismo de gobernanza técnica (2D) | aceptado | Informe agregado con semáforo + branch protection como precondición dura de `main` |
-| [0014](adr/0014-principio-ritmo-vs-calidad.md) | Principio permanente: el ritmo de evolución nunca prevalece sobre la calidad de la arquitectura | **propuesto** — pendiente de aceptación del propietario | Criterio de cierre de fase: evidencia objetiva de mejora en mantenibilidad, auditabilidad, escalabilidad y gobernanza (§1.a) |
+| [0014](adr/0014-principio-ritmo-vs-calidad.md) | Principio permanente: el ritmo de evolución nunca prevalece sobre la calidad de la arquitectura | aceptado (2026-07-13) | Criterio de cierre de fase: evidencia objetiva de mejora en mantenibilidad, auditabilidad, escalabilidad y gobernanza (§1.a) |
 
 `docs/adr/0000-plantilla.md` es la plantilla de formato, no un ADR sustantivo
 — no se incluye en el inventario.
@@ -339,8 +339,8 @@ el alcance autorizado en ese plan.
 - **Resuelta (revisión cruzada 2026-07-13):** la duda sobre si el principio
   §1(a) merecía ADR propio fue decidida por el arquitecto-principal en
   sentido afirmativo (Principio 6) —
-  [ADR-0014](adr/0014-principio-ritmo-vs-calidad.md), en estado *propuesto*.
-  Queda pendiente únicamente la aceptación formal del propietario.
+  [ADR-0014](adr/0014-principio-ritmo-vs-calidad.md), **aceptado por el
+  propietario el 2026-07-13**.
 - La verificación puntual de `docs/auditorias/e2e-ultimo.json` (§3.3) muestra
   `resultado: "pendiente"` al momento de escribir este documento — es un
   hecho verificado del archivo, no una interpretación; se deja constancia
