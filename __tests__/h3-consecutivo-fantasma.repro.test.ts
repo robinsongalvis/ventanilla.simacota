@@ -26,6 +26,25 @@
  * reproducción del MECANISMO del defecto (orden + no compensación) en Node, no una
  * corrida de integración contra Firestore. La reproducción canónica de integración
  * contra el emulador (Java 21) se especifica para CI en la evidencia del bloque.
+ *
+ * ── Alcance y salvedades (revisión cruzada 6/6, 2026-07-13) ──
+ *  · Alcance (backend): cubre la ruta INTERNA `radicarInstitucionalmente`
+ *    (SDK cliente). Las rutas Admin SDK — `app/api/radicacion` (con su propia
+ *    `generarRadicadoInstitucionalAdmin`), `registro-expres`, `salidas/registrar`,
+ *    `planillas/generar` — tienen la MISMA clase de defecto con fronteras distintas
+ *    y requieren su propia reproducción. H3 queda REPRODUCIDO solo para la ruta interna.
+ *  · Invariante (firestore/backend/qa): la invariante del SISTEMA es "ningún
+ *    consecutivo confirmado sin su documento" (no-huérfano, por-radicado), NO la
+ *    igualdad de cardinalidad `size===ultimo` (que no generaliza a contador anual
+ *    ni a resets). Este test la asevera en forma por-radicado.
+ *  · Para el FIX (no ahora): además debe (a) asegurar integridad — adjuntos
+ *    presentes o compensación explícita del contador (backend); (b) probar también
+ *    fallo en el propio `setDoc`, no solo en `subirArchivos` (qa); (c) el cierre de
+ *    H3 exige corrida VERDE de este test + verificación de integración contra el
+ *    emulador real (Java 21, `ci.yml` job `laboratorio-emulador`) — devops/qa.
+ *  · Normativa (gobierno-digital): el Acuerdo AGN 060/2001 art. 5 admite DOS
+ *    remedios — atomicidad O constancia automática del número anulado. Este test
+ *    fija la invariante del primero; no descarta el segundo.
  */
 import { describe, it, expect, vi } from 'vitest';
 import { setDoc } from 'firebase/firestore';
@@ -93,12 +112,15 @@ describe('H3 — no atomicidad del consecutivo (reproducción, ADR-0015 #3)', ()
     );
 
     // Mecanismo del defecto:
-    expect(contador.ultimo).toBe(1); // el consecutivo SÍ se consumió (irreversible)
+    const consecutivoConsumido = contador.ultimo;
+    expect(consecutivoConsumido).toBeGreaterThan(0); // el consecutivo SÍ se consumió
     expect(setDoc).not.toHaveBeenCalled(); // el radicado NO se persistió
 
-    // INVARIANTE que el fix atómico debe garantizar; HOY está VIOLADA → rojo.
-    // "Todo consecutivo consumido tiene su radicado": size(0) === contador(1) es FALSO.
-    // El número 1-110-2026-00000001 quedó como consecutivo fantasma.
-    expect(radicadosPersistidos.size).toBe(contador.ultimo);
+    // INVARIANTE DEL SISTEMA (no-huérfano, por-radicado): todo consecutivo
+    // confirmado debe tener su documento persistido. El fix atómico debe
+    // garantizarla. HOY está VIOLADA → rojo: el número 1-110-2026-00000001 se
+    // consumió pero su documento no existe (fantasma).
+    const idEsperado = `1-110-2026-${String(consecutivoConsumido).padStart(8, '0')}`;
+    expect(radicadosPersistidos.has(idEsperado)).toBe(true);
   });
 });
