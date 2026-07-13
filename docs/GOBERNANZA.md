@@ -234,6 +234,7 @@ fijó para levantar el congelamiento vigente (§7).
 | [0012](adr/0012-controles-normativos-ejecutables.md) | Controles normativos ejecutables: R6 y R9 (2C) | aceptado | Conversión de R6 (temporalidad de prórroga) y R9 (anti-inferencia en filtros) a controles ejecutables |
 | [0013](adr/0013-compuerta-despliegue-gobernanza.md) | Compuerta de despliegue como mecanismo de gobernanza técnica (2D) | aceptado | Informe agregado con semáforo + branch protection como precondición dura de `main` |
 | [0014](adr/0014-principio-ritmo-vs-calidad.md) | Principio permanente: el ritmo de evolución nunca prevalece sobre la calidad de la arquitectura | aceptado (2026-07-13) | Criterio de cierre de fase: evidencia objetiva de mejora en mantenibilidad, auditabilidad, escalabilidad y gobernanza (§1.a) |
+| [0015](adr/0015-estandar-de-evidencia.md) | Estándar de evidencia: ninguna afirmación técnica es un hecho sin evidencia reproducible | aceptado (2026-07-13) | Cinco mandatos rectores (evidencia→medición→reproducción→automatización→re-medición); separación hecho/estimación obligatoria |
 
 `docs/adr/0000-plantilla.md` es la plantilla de formato, no un ADR sustantivo
 — no se incluye en el inventario.
