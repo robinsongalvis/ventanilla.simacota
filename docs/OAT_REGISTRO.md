@@ -20,6 +20,7 @@ en su propio momento, con su propio diseño y autorización, respetando la gober
 | [OAT-02](#oat-02) | Consolidar los dos tracks de salida en un agregado "Comunicación" | Alta | C2 | Tras C2 en producción |
 | [OAT-03](#oat-03) | Unificar el vocabulario de "canal de envío" | Media-Baja | C2 | Junto con OAT-02 |
 | [OAT-04](#oat-04) | Unificar la fuente de verdad de la TRD (código subset ↔ dato del Archivo) | Media | C11 | Después de C11-Nivel 1 |
+| [OAT-05](#oat-05) | Centralizar la definición de "estados activos" (≥3 copias del set) | Media | BM-B33 | Antes/junto a BM-B33 |
 
 ---
 
@@ -123,3 +124,24 @@ en su propio momento, con su propio diseño y autorización, respetando la gober
 - **Momento recomendado:** **después** de C11-Nivel 1 (cuando el `trd_catalogo` esté
   poblado y validado por el Archivo).
 - **Relación:** ADR-0019/0020; Blueprints C1 y C11. Detectada en Blueprint C11.
+
+## OAT-05
+**Centralizar la definición de "estados activos" del radicado**
+
+- **Problema:** el set de estados activos está **duplicado** (misma lista literal) en
+  varios módulos; añadir un estado (p. ej. `EN_SUBSANACION` de BM-B33) obliga a tocar
+  cada copia, con riesgo de inconsistencia.
+- **Evidencia:** `ESTADOS_ACTIVOS` repetido en
+  `lib/kpis-operativos/filtrar-por-kpi-operativo.ts:19`,
+  `lib/kpis-operativos/calcular-kpis-operativos.ts:23`,
+  `lib/proxima-accion/calcular-proxima-accion.ts:39`; variantes en
+  `lib/reportes/filtrar-por-preset.ts` y `lib/reportes-mipg/indicadores.ts`.
+  `estadoActual` se consume en ~54 archivos.
+- **Impacto:** cada nuevo estado o cambio de semántica se replica a mano; fuente de bugs.
+- **Capacidades afectadas:** C3 (Trámite/BM-B33), KPIs/reportes, control interno.
+- **Beneficios:** una sola fuente de la máquina de estados (activos/cerrados/derivados);
+  añadir un estado se hace en un lugar; menos regresiones.
+- **Riesgos:** bajo; refactor mecánico con `tsc` de respaldo.
+- **Complejidad:** S. **Prioridad:** Media.
+- **Momento recomendado:** **antes o junto a** BM-B33 (reduce su ripple del estado nuevo).
+- **Relación:** ADR-0020 (simplificación). Detectada en Blueprint BM-B33.
