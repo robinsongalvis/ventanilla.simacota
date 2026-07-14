@@ -1,9 +1,33 @@
 # Blueprint Arquitectónico — BM-B33 · Subsanación y suspensión de términos (Ley 1755, Art. 17)
 
-**Estado:** **v3 — en implementación autorizada (14 jul 2026).** Validado por
-gobierno-digital (v2) y reforzado con QA + Seguridad (v3, abajo). OAT-05 ejecutada
-(estados centralizados, commit `248027a`). **Capacidad del núcleo** (D3/Trámite).
-**Ortogonal a H3.** **Rol:** Chief Software Architect (decisiones centralizadas).
+**Estado:** ✅ **IMPLEMENTADO Y VERIFICADO (14 jul 2026).** Piezas 1–5 completas;
+suite completa **993/993**, tsc 0, lint 0. Revisión cruzada del equipo de agentes
+integrada. **Capacidad del núcleo** (D3/Trámite). **Ortogonal a H3.**
+
+> **Cierre — revisión cruzada de agentes (Principio 5):**
+> - **gobierno-digital:** CONFORME tras 2 ajustes (recurso de reposición con plazo/
+>   autoridad, CPACA 74/76; notificación electrónica del acto condicionada a
+>   consentimiento, CPACA Art. 56). Requerimiento, cron y cómputo con prórroga ya
+>   conformes.
+> - **seguridad:** 1 Alto corregido — `assertNotClosed` omitía `DESISTIDO` (acto firme
+>   reabrible) → migrado a la fuente única `esEstadoCerrado` (OAT-05). Resto verificado
+>   correcto (cron no archiva, ANONIMA doble candado, RESERVADA notificada, reloj
+>   server-side, `canConfirmarDesistimiento` con aislamiento por tenant).
+> - **qa:** suite 993/993 + mutación validada; añadidos tests de **ejecución real** de
+>   rutas (estrictez `suficiente===true`, permiso del desistimiento).
+> - **ia-simi:** borrador asistido del requerimiento **vale la pena** (reutiliza
+>   `solicitud_aclaracion` + prompt acotado); registrado como **mejora opcional**.
+>
+> **Diferidos de bajo riesgo (no bloquean):** (a) confirmación de desistimiento no
+> transaccional (TOCTOU) — mismo patrón que las rutas existentes; (b) migrar el resto
+> de tests de ruta/cron a ejecución real (calidad de test, no defecto de producción);
+> (c) borrador asistido SIMI.
+
+**Implementación (mapa):** 1 `sumarMesCalendario` · 2 estados `EN_SUBSANACION`/
+`DESISTIDO` (+OAT-05) · 3 `TerminoLegal.suspension` + reloj puro · 4 decisiones puras
+(`lib/server/subsanacion`) + 4 rutas + plantilla del requerimiento +
+`canConfirmarDesistimiento` · 5 cron `desistimiento-tacito` (solo propone) +
+notificación del acto + plantilla. **Rol:** Chief Software Architect.
 
 > **Refuerzos v3 — decisiones de arquitectura (QA + Seguridad, escaladas al Arquitecto
 > Principal):**
