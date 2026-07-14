@@ -146,6 +146,11 @@ export interface SuspensionTermino {
     /** `fechaLimiteSubsanacion` + 1 mes calendario. */
     nuevaFechaLimite: string;
   } | null;
+  /**
+   * BM-B33 — el cron ya PROPUSO el desistimiento (idempotencia). No implica
+   * decisión: el desistimiento lo confirma un humano por acto motivado.
+   */
+  desistimientoPropuesto?: boolean | null;
 }
 
 export interface TerminoLegal {

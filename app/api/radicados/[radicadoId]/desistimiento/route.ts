@@ -24,6 +24,13 @@ import {
   RadicadoActionError,
 } from '@/lib/server/radicados-security';
 import { planDesistimiento, esError } from '@/lib/server/subsanacion';
+import { debeNotificarCiudadano } from '@/lib/email/debe-notificar-ciudadano';
+import { enviarEmail } from '@/lib/email/mailer';
+import {
+  buildDesistimientoHtml,
+  buildDesistimientoSubject,
+} from '@/lib/email/templates/desistimiento';
+import { registrarTrazabilidadNotificacion } from '@/lib/trazabilidad/notificacion';
 import { logError } from '@/lib/logger';
 
 export const runtime = 'nodejs';
@@ -69,7 +76,40 @@ export async function POST(request: Request, context: RouteContext): Promise<Nex
       metadata: { ...plan.evento.metadata, dependencia: radicado.clasificacion.oficinaDestino },
     });
 
-    return NextResponse.json({ ok: true, estadoActual: plan.nuevoEstado });
+    // Notificación PERSONAL del acto de desistimiento al ciudadano (Art. 17 +
+    // CPACA): informa el archivo y el recurso de reposición. Best-effort.
+    const emailDestino = radicado.solicitante?.email ?? null;
+    const notificable = debeNotificarCiudadano({
+      esAnonimo: radicado.esAnonimo,
+      tipoPresentacion: radicado.tipoPresentacion,
+      solicitante: { email: emailDestino },
+    }) && !!emailDestino;
+    let emailEnviado = false;
+    if (notificable && emailDestino) {
+      try {
+        await enviarEmail({
+          to: emailDestino,
+          subject: buildDesistimientoSubject(radicadoId),
+          html: buildDesistimientoHtml({
+            radicadoId,
+            ciudadanoNombre: radicado.solicitante?.nombreCompleto ?? 'ciudadano/a',
+            motivo: motivo.trim(),
+          }),
+        });
+        emailEnviado = true;
+        await registrarTrazabilidadNotificacion({
+          radicadoId, tipoNotificacion: 'DESISTIMIENTO', destinatario: emailDestino, estado: 'ENVIADA',
+        });
+      } catch (err) {
+        logError({ radicadoId, modulo: 'desistimiento/email', error: err });
+        await registrarTrazabilidadNotificacion({
+          radicadoId, tipoNotificacion: 'DESISTIMIENTO', destinatario: emailDestino, estado: 'FALLIDA',
+          error: err instanceof Error ? err.message : String(err),
+        });
+      }
+    }
+
+    return NextResponse.json({ ok: true, estadoActual: plan.nuevoEstado, emailEnviado });
   } catch (error) {
     const { radicadoId } = await context.params.catch(() => ({ radicadoId: 'desconocido' }));
     logError({ radicadoId, modulo: 'radicados/desistimiento', error });

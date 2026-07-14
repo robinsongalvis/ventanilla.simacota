@@ -54,6 +54,36 @@ export function fechaLimiteEfectiva(s: SuspensionTermino): string | null {
 }
 
 /**
+ * ¿El cron debe PROPONER desistimiento para este radicado? (no decide, propone).
+ * Requiere: en subsanación activa, aún no propuesto, y plazo vencido (con
+ * prórroga si la hubo). El cron NUNCA cambia el estado.
+ */
+export function debeProponerDesistimiento(radicado: VentanillaRadicado, ahora: Date): boolean {
+  const s = radicado.termino?.suspension;
+  if (!s?.activa || radicado.estadoActual !== 'EN_SUBSANACION') return false;
+  if (s.desistimientoPropuesto) return false;
+  const limite = fechaLimiteEfectiva(s);
+  return !!limite && subsanacionVencida(limite, ahora);
+}
+
+/**
+ * Plan de la PROPUESTA de desistimiento (marca de idempotencia + evento). No
+ * toca `estadoActual` — la decisión sigue siendo humana (Principio 9).
+ */
+export function planPropuestaDesistimiento(radicado: VentanillaRadicado, ahora: Date): PlanSubsanacion {
+  const s = radicado.termino!.suspension!;
+  const limite = fechaLimiteEfectiva(s);
+  return {
+    update: { 'termino.suspension.desistimientoPropuesto': true, ultimaActualizacion: ahora.toISOString() },
+    evento: {
+      accion: 'DESISTIMIENTO_TACITO_PROPUESTO',
+      nota: `El plazo de subsanación venció el ${limite}. Procede confirmar el desistimiento tácito mediante acto administrativo motivado (Ley 1755 Art. 17).`,
+      metadata: { origen: 'cron', fechaLimiteEfectiva: limite },
+    },
+  };
+}
+
+/**
  * Requerir subsanación. `notificable` = el ciudadano puede ser notificado
  * (lo decide la ruta con `debeNotificarCiudadano` + email). Si es notificable,
  * el requerimiento se ancla YA (reloj server-side); si no (p. ej. ANONIMA), se
