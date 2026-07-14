@@ -12,7 +12,69 @@ métrica — Principio 13) · **valor** (Muy Alto | Alto | Medio | Bajo) ·
 **estado** (Identificado | Pendiente de validar | Validado | Aprobado para
 desarrollo | Diferido | Descartado | Implementado) · **decisión** (En evaluación
 | Aprobado | Pospuesto | Rechazado | Requiere validación normativa) · bloque ·
-observaciones.
+observaciones · **(ADR-0018)** **naturaleza** (Norma | Buena práctica | Operativa
+| UX | Innovación) y la **compuerta de dos preguntas** antes de proponer
+desarrollo: **(P1)** ¿existe ya algo equivalente en nuestra plataforma? · **(P2)**
+¿hay una forma más simple sin copiar el software de referencia?
+
+## Análisis del Arquitecto Funcional (ADR-0018) — hacia una plataforma superior
+
+**No replicamos el software de referencia; lo superamos.** Síntesis comparativa
+del corpus analizado (GSC de Bucaramanga = app legada de PQRSD/correspondencia).
+
+**A. Lo que el software actual hace mejor que nosotros (a incorporar/adaptar):**
+módulo de **Comunicaciones Internas** completo (BM-B20/B21/B22), **circuito de
+firma** con corregir/firmar y catálogo de firmantes (BM-B23/B31), **admin de
+planillas** con anular/reimprimir/registrar-entrega (BM-B18), bandejas de
+**Prioridad/Sin-Término/Devueltas** (BM-B25/B24/B26), **correo interno de
+asignación** (BM-B17), radicado **pre-generado externo** (BM-B14), catálogo de
+tipos más amplio (BM-B16), ayuda in-app (BM-B28).
+
+**B. Lo que nosotros hacemos mejor (nuestra ventaja — preservar y explotar):**
+**IA SIMI** (copiloto, alertas predictivas de vencimiento, clasificación,
+patrones de control interno) — el referente no tiene IA; **radicación dirigida**
+(destino desde el nacimiento); **seguridad moderna** (identidad reservada
+enmascarada transversal, consulta pública con token hasheado + timing-safe,
+aislamiento por tenant probado); **integridad del consecutivo** (H3 atómico con
+control de regresión por mutación); **gobernanza técnica** (observabilidad,
+presupuesto de rendimiento, compuerta de despliegue, ADRs); **panel operativo**
+(semáforos MIPG, KPIs). El referente es una app legada; nosotros, plataforma
+moderna multi-tenant.
+
+**C. Oportunidades de simplificar (resolver el problema, no copiar la UI):**
+- Un **único flujo de radicación** (el referente tiene dos: "Radicar" y "Generar
+  Radicado") → evitar esa dualidad.
+- **IA que sugiere la serie TRD y la dependencia** (en vez de selección manual)
+  — *IA sugiere, funcionario decide*. Simplifica BM-B02 + asignación.
+- **Un solo circuito de firma unificado** (SIMI + comunicaciones internas +
+  salidas) en vez de flujos separados → simplifica BM-B23.
+- **Bandejas inteligentes por IA** en vez de 6 alertas manuales fijas.
+- **Formato de radicado consistente y único** (cierra la inconsistencia BM-B01).
+
+**D. Innovaciones que ninguno de los dos tiene (valor agregado propuesto):**
+- **Clasificación TRD asistida por IA + retención/disposición automática** (SGDEA
+  inteligente) — Innovación + Norma.
+- **Detección de patrones** (reincidencia, devoluciones acumuladas) ya iniciada
+  en SIMI → extender a alertas proactivas de riesgo.
+- **Consulta pública en lenguaje claro con asistente IA** para el ciudadano.
+- **Trazabilidad criptográfica** del expediente (hash de cadena de custodia).
+- **Interoperabilidad GOV.CO / Carpeta Ciudadana** (visión referente nacional).
+- **Tablero predictivo de cumplimiento** (proyección de vencimientos y carga).
+
+**Naturaleza de los ítems (obligación vs. valor):**
+- **Norma (obligatorias):** BM-B02 (AGN/SGDEA), BM-B01 (AGN 060 numeración),
+  BM-B05 (Ley 1755 24h), BM-B10 (atención preferencial), BM-B12 (Dcto 396),
+  BM-B16 (tipos Ley 1755), BM-B03 (imagen fiel AGN), BM-D09 (subsanación art.5),
+  BM-D03/D04/D05 (protección de datos / integridad).
+- **Buena práctica:** BM-B18, BM-B23, BM-B31, BM-B06/B07 (custodia), BM-B08/B09.
+- **Operativa (Simacota):** BM-B20, BM-B17, BM-B25, BM-B26, BM-B19, BM-B11.
+- **UX:** BM-B28, BM-B29, BM-B04.
+- **Innovación (nuestra):** las de §D + IA transversal.
+
+**Compuerta de dos preguntas** — se responde en el scoping de cada ítem antes de
+proponerlo a desarrollo (P1 equivalente existente / P2 forma más simple). Se
+registra en el ítem. Ejemplos ya resueltos: BM-B23 (P1: sí, existe firma SIMI →
+unificar, no duplicar); BM-B02 (P2: IA sugiere la serie en vez de captura manual).
 
 ## Índice priorizable (impacto · costo · beneficio)
 

@@ -237,6 +237,7 @@ fijó para levantar el congelamiento vigente (§7).
 | [0015](adr/0015-estandar-de-evidencia.md) | Estándar de evidencia: ninguna afirmación técnica es un hecho sin evidencia reproducible | aceptado (2026-07-13) | Cinco mandatos rectores (evidencia→medición→reproducción→automatización→re-medición); separación hecho/estimación obligatoria |
 | [0016](adr/0016-consecutivo-legal-atomico.md) | Corrección de H3: asignación atómica del consecutivo legal (Bloque 2) | implementación completada — pendiente de validación | Helper de 2 fases + staging→tx→finalize (Admin) + Opción A client-side (interna); invariante no-huérfano; deuda diferida a Bloque 3 |
 | [0017](adr/0017-backlog-maestro-y-cobertura.md) | Backlog Maestro de Hallazgos/Requerimientos + Matriz de Cobertura Funcional | aceptado (2026-07-13) | Proceso permanente de gestión de requerimientos: único inventario oficial de trabajo futuro (`docs/BACKLOG_MAESTRO.md`, `docs/MATRIZ_COBERTURA_FUNCIONAL.md`); no autoriza implementación |
+| [0018](adr/0018-arquitectura-funcional-y-comparativa.md) | Arquitectura funcional: marco comparativo, naturaleza del requerimiento y compuerta de dos preguntas | aceptado (2026-07-13) | Objetivo: plataforma superior, no réplica. Lente ellos-mejor/nosotros-mejor/simplificar/innovar; naturaleza (Norma/Buena práctica/Operativa/UX/Innovación); dos preguntas antes de proponer desarrollo |
 
 `docs/adr/0000-plantilla.md` es la plantilla de formato, no un ADR sustantivo
 — no se incluye en el inventario.
