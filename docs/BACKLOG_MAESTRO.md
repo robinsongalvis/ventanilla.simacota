@@ -270,6 +270,7 @@ demanda real. Cada paso, sujeto a las Cuatro Preguntas y a autorización expresa
 | BM-D08 | N5 — 17 tests `readFileSync` frágiles | Deuda técnica | Baja | Bajo | M | Diferido | Pospuesto | 3 |
 | BM-D09 | Acta de subsanación AGN (si la barrida arroja huecos) | Corrección | Media | Alto | S | Pend. validar | Requiere validación normativa | 2 (cierre) |
 | BM-D10 | Branch protection (los 3 checks) | Riesgo | Alta | Alto | XS | Pend. validar | Aprobado | — (acción propietario) |
+| BM-D11 | Modelo dual `radicado.ts`/`ventanilla.ts` + campo `clasificacionIA` guarda datos deterministas (no IA) | Deuda técnica | Media | Medio | M | Identificado (Blueprint C1 §24) | En evaluación | por definir (D9/D3) |
 
 ---
 
