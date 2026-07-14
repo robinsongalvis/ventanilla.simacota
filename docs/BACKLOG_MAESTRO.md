@@ -236,13 +236,13 @@ demanda real. Cada paso, sujeto a las Cuatro Preguntas y a autorización expresa
 | BM-B23 | Firmante y circuito de firma de comunicaciones internas (revisar/corregir/firmar; físico/electrónico) | Mejora | Media-Alta | Alto | M | Identificado | En evaluación | por definir |
 | BM-B31 | Catálogo de cargos autorizados para firmar comunicaciones (G-GSC-170-003) | Nueva func. | Media | Alto | S | Identificado | Requiere validación normativa | por definir |
 | BM-B32 | Completar retención/disposición de las 4 series catalogadas sin ella (desde TRD) | Corrección datos | Media | Medio | XS | **Implementado parcial** (retención 4/4; disposición 1/4) | Ejecutado — falta B32-a | C1 |
-| BM-B33 | Subsanación Ley 1755 Art. 17: requerimiento al ciudadano + **suspensión del término** + desistimiento tácito (1 mes) | Nueva func. | Media-Alta | Alto | M-L | **Blueprint listo** ([BM-B33](blueprints/BM-B33-subsanacion-suspension-terminos.md)) — bloqueado por validación normativa (gobierno-digital) | Pend. validación → luego autorización | C3 |
+| BM-B33 | Subsanación Ley 1755 Art. 17: requerimiento al ciudadano + **suspensión del término** + desistimiento tácito (1 mes) | Nueva func. | Media-Alta | Alto | M-L | **Blueprint v2 VALIDADO** por gobierno-digital (7 correcciones incorporadas: notificación, prórroga, 10 días, subsanación parcial, recurso) — [BM-B33](blueprints/BM-B33-subsanacion-suspension-terminos.md) | CANDIDATA — pend. autorización (empezar por OAT-05) | C3 |
 | BM-B16 | Catálogo completo de tipos PQRSD (felicitación, denuncia anticorrupción, queja anónima…) | Mejora | Media | Alto | S | **Cubierto** (23 tipos, 10 PQRSD Ley 1755; anonimato como atributo tipoPresentacion) | Reuso — no duplicar | C3 |
 | BM-B18 | Ciclo completo de la planilla (admin: anular, reimprimir, registrar entrega con firma escaneada) | Mejora | Media-Alta | Alto | M | Pend. validar | En evaluación | por definir |
 | BM-B17 | Correo interno "Asignación de solicitud" a la dependencia | Mejora | Media | Alto | S | **Implementado** (correo interno best-effort al asignar) | Ejecutado | C3 |
 | BM-B25 | Alerta/bandeja "Prioridad" (entes de control) | Mejora | Media-Alta | Alto | S-M | **Cubierto en gran parte** (proxima-accion urgencia + Prioridad + tipo PETICION_ENTES_CONTROL) | Reuso — residual gated funcionaria | C3 |
 | BM-B05 | Regla de 24 h para reasignación por no competencia | Nueva func. | Media-Alta | Alto | M | Identificado | Requiere validación normativa | por definir |
-| BM-B10 | Marca de atención prioritaria | Nueva func. | Media | Alto | S-M | Identificado | En evaluación | por definir |
+| BM-B10 | Marca de atención prioritaria | Nueva func. | Media | Alto | S-M | **Parcial** (existe prioridad por VENCIMIENTO/riesgo en mi-gestion/control-interno; NO por población vulnerable —adulto mayor/discapacidad/gestante, Ley 1437 art.13) | Gap residual operativo — requiere validación funcionaria | C4 |
 | BM-B03 | Digitalización de correspondencia física (imagen fiel) | Nueva func. | Media-Alta | Alto | M | **Diferido** (la "imagen fiel" AGN aplica al reemplazo/eliminación del físico → alcance Archivo Institucional, excluido ahora; hoy se conserva origen FISICO_ESCANER + PDF) | Pospuesto — capacidad de Archivo | por definir |
 | BM-B14 | Radicado pre-generado externo (máquina/reloj) opción Rad.Auto | Nueva func. | Media | Medio | S | Identificado | En evaluación | por definir |
 | BM-B15 | Override manual de días hábiles de respuesta | Mejora | Media | Medio | S | Pend. validar | Requiere validación normativa | por definir |
@@ -251,7 +251,7 @@ demanda real. Cada paso, sujeto a las Cuatro Preguntas y a autorización expresa
 | BM-B22 | Envío de copias (CC) a otras dependencias | Mejora | Media | Medio | M | Identificado | En evaluación | por definir |
 | BM-B06 | Cierre del ciclo de la planilla (firma escaneada) | Mejora | Media | Alto | S-M | Pend. validar | En evaluación | por definir |
 | BM-B07 | Alinear columnas de la planilla al formato oficial | Mejora | Media | Medio | S | Pend. validar | En evaluación | por definir |
-| BM-B08 | Radicación diferida por contingencia | Nueva func. | Media | Medio | M | Identificado | En evaluación | por definir |
+| BM-B08 | Radicación diferida por contingencia | Nueva func. | Media | Medio | M | **Confirmado gap** (no existe modo contingencia/offline; grep=0) — pero al regularizar consume consecutivos → **toca H3** | En evaluación — parcialmente H3-gated; requiere Blueprint | C6 |
 | BM-B29 | Pestaña "Observaciones/novedades" en el detalle | Mejora | Media | Medio | S | Identificado | En evaluación | por definir |
 | BM-B12 | Ajuste de términos por Decreto 396/2020 | Corrección | Media | Medio | S | Pend. validar | Requiere validación normativa | por definir |
 | BM-B04 | Rótulo imprimible del radicado para el físico | Mejora | Media | Medio | S | Identificado | En evaluación | por definir |

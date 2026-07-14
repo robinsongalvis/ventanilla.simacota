@@ -1,8 +1,19 @@
 # Blueprint Arquitectónico — BM-B33 · Subsanación y suspensión de términos (Ley 1755, Art. 17)
 
-**Estado:** EN REVISIÓN → requiere **validación normativa** antes de Definition of Ready.
-**No autoriza implementación** (ADR-0023). Capacidad del **núcleo** (D3/Trámite), no un
-dominio nuevo. **Ortogonal a H3.** **Rol:** Chief Software Architect.
+**Estado:** **v2 — validado normativamente (gobierno-digital, 14 jul 2026) con
+correcciones incorporadas.** Definition of Ready alcanzable; pendiente solo autorización
+del propietario. **No autoriza implementación** (ADR-0023). Capacidad del **núcleo**
+(D3/Trámite), no un dominio nuevo. **Ortogonal a H3.** **Rol:** Chief Software Architect.
+
+> **Validación normativa (gobierno-digital):** concepto **"REQUIERE CORRECCIONES"** →
+> incorporadas 7 correcciones (abajo). El diseño acertó en lo esencial (el requerimiento
+> suspende el reloj; reactivación por días hábiles restantes sin reiniciar; desistimiento
+> = acto motivado, decisión humana), pero omitía: **anclaje a la NOTIFICACIÓN** (no a la
+> emisión), **prórroga del ciudadano** (hasta 1 mes más), **ventana de 10 días** para
+> requerir, **notificación personal + recurso de reposición** del acto de desistimiento,
+> **subsanación parcial**, **contenido mínimo del requerimiento**, y **reactivación desde
+> el día siguiente** al aporte. Fundamento: Ley 1755/2015 Art. 17; CPACA (Ley 1437/2011)
+> arts. 67-69; cómputo de "mes" por calendario (Ley 4/1913 / C.C. art. 67).
 
 - **Fuente de verdad:** **Ley 1755/2015 Art. 17** (peticiones incompletas y desistimiento)
   + procedimiento **P-GSC-8200-170-014** (tratamiento de PQRSD).
@@ -39,35 +50,59 @@ humana; la IA/el cron solo detecta y propone).
   gestión de archivo (C11).
 
 ### 4. Entidades y agregados
-Se extiende `TerminoLegal` (`src/types/ventanilla.ts`) con un objeto de suspensión:
+Se extiende `TerminoLegal` (`src/types/ventanilla.ts`) con un objeto de suspensión
+**anclado a la notificación** (corrección normativa #1):
 ```
 suspension?: {
   activa: boolean;
-  fechaRequerimiento: string;        // ISO — cuándo se requirió
-  fechaLimiteSubsanacion: string;    // ISO — +1 mes calendario
-  diasHabilesRestantes: number;      // reloj congelado al suspender
-  motivo: string;                    // qué debe subsanar
+  fechaRequerimiento: string;          // ISO — emisión interna del requerimiento
+  fechaNotificacion?: string;          // ISO — NOTIFICACIÓN al ciudadano = ancla legal
+  fechaLimiteSubsanacion?: string;     // = fechaNotificacion + 1 mes CALENDARIO
+  diasHabilesRestantes?: number;       // saldo del reloj capturado AL NOTIFICAR (no al emitir)
+  motivo: string;                      // contenido mínimo: qué falta + plazo + prórroga + advertencia
   requeridoPor: { uid: string; nombre: string };
+  prorroga?: {                         // Art.17: hasta 1 mes adicional, solicitada ANTES de vencer
+    solicitada: boolean;
+    fechaSolicitud: string;
+    nuevaFechaLimite: string;          // fechaLimiteSubsanacion + hasta 1 mes
+  };
 }
 ```
-Sin colección nueva (vive en el radicado). Invariante: la **foto** del término original no
-se pierde; la suspensión es aditiva y auditable.
+Sin colección nueva (vive en el radicado). Invariantes: la **foto** del término original no
+se pierde; **mientras `fechaNotificacion` sea nula, el término sigue corriendo** (no se
+congela por la sola emisión — evita incumplimiento silencioso, riesgo señalado por
+gobierno-digital). La suspensión es aditiva y auditable.
 
 ### 5. Eventos de negocio
 `RequerimientoSubsanacionEmitido` (suspende) · `SubsanacionRecibida` (reactiva) ·
 `DesistimientoTacitoPropuesto` (cron) · `DesistimientoTacitoConfirmado` (acto del
 funcionario). Todos a trazabilidad (nuevas `AccionAuditoria`).
 
-### 6. Reglas de negocio (Ley 1755 Art. 17)
-1. El requerimiento debe emitirse **dentro** del término y **suspende** el cómputo.
-2. Plazo de subsanación al ciudadano: **1 mes** (calendario).
-3. Si subsana → **se reanuda** el término por los **días hábiles restantes** (no se
-   reinicia).
-4. Si **no** subsana en el mes → **desistimiento tácito**, archivo por **acto
-   administrativo motivado** (Art. 17) — **decisión humana** (Principio 9), nunca
-   automática por el sistema.
-5. La suspensión **no** aplica a la devolución interna ni afecta a otras dependencias.
-6. Aislamiento por `tenantId`.
+### 6. Reglas de negocio (Ley 1755 Art. 17 — validadas por gobierno-digital)
+1. El requerimiento debe emitirse **dentro de los 10 días** siguientes a la radicación
+   (no "dentro del término" a secas) — *corrección #4*.
+2. La suspensión y el plazo de subsanación se **anclan a la NOTIFICACIÓN** del
+   requerimiento al ciudadano, no a su emisión (debido proceso, CPACA 67-69) —
+   *corrección #1*. Mientras no haya notificación, el término **sigue corriendo**.
+3. Plazo del ciudadano para subsanar: **1 mes calendario** desde la notificación —
+   *corrección #2*.
+4. **Prórroga:** el ciudadano puede pedir, **antes de vencer**, una prórroga de **hasta
+   un término igual** (otro mes); el cron **no** propone desistimiento si hay prórroga
+   vigente — *corrección #2 (prórroga), omisión principal*.
+5. Si subsana → el término se **reanuda** por los **días hábiles restantes**, contados
+   **desde el día siguiente** al aporte (no se reinicia, no el mismo día) —
+   *correcciones #3 y #7*.
+6. **Subsanación parcial:** si el aporte no satisface lo requerido, **no** reactiva el
+   término (decisión humana); prohibido encadenar requerimientos para dilatar —
+   *corrección #5*.
+7. **Contenido mínimo del requerimiento:** qué falta + plazo de 1 mes + derecho a
+   prórroga + advertencia de desistimiento — *corrección #6*.
+8. **Desistimiento tácito:** solo si no subsana en el plazo (con prórroga si la hubo);
+   archivo por **acto administrativo motivado**, **notificado personalmente**, contra el
+   que solo procede **recurso de reposición** — **decisión humana** (Principio 9), nunca
+   automática — *correcciones #3 (notif.) y desistimiento*.
+9. La suspensión **no** aplica a la devolución interna ni afecta a otras dependencias.
+10. Aislamiento por `tenantId`.
 
 ### 7. Flujos
 **Principal:** funcionario abre el radicado → "Requerir subsanación" (motivo) → sistema
@@ -81,10 +116,15 @@ funcionario **confirma** desistimiento con acto → estado **DESISTIDO/archivado
   (opcional: sugiere el texto del requerimiento). 
 - **9. Permisos:** requerir subsanación / confirmar desistimiento → mismo alcance que
   responder/devolver (por `tenantId`, `lib/permisos` + `internal-auth`).
-- **10. APIs:** `POST /api/radicados/[id]/requerir-subsanacion` (motivo → suspende +
-  notifica); reactivación **enganchada** a `completar-datos` (ya existe) o
-  `POST /api/radicados/[id]/reactivar`; `POST /api/radicados/[id]/desistimiento` (confirma
-  acto). Nuevo cron `app/api/cron/desistimiento-tacito` (patrón `alertas-vencimiento`).
+- **10. APIs:** `POST /api/radicados/[id]/requerir-subsanacion` (emite el requerimiento con
+  contenido mínimo); `POST /api/radicados/[id]/notificar-requerimiento` (registra la
+  **notificación** → ancla la suspensión y **captura `diasHabilesRestantes` en ese momento**);
+  `POST /api/radicados/[id]/prorroga-subsanacion` (antes de vencer, hasta 1 mes más);
+  reactivación enganchada a `completar-datos` con validación de subsanación **suficiente**
+  (parcial **no** reactiva); `POST /api/radicados/[id]/desistimiento` (confirma acto
+  motivado + notificación personal, con recurso de reposición). Nuevo cron
+  `app/api/cron/desistimiento-tacito` (patrón `alertas-vencimiento`; **no** propone si hay
+  prórroga vigente).
 - **11. Integraciones:** notificación ciudadano (email/WhatsApp existentes). Sin externas.
 - **12. Modelo de datos:** `termino.suspension` (arriba) + **nuevo estado**
   `EN_SUBSANACION` y `DESISTIDO` en `EstadoRadicado`. Sin colección nueva.
@@ -144,17 +184,23 @@ funcionario **confirma** desistimiento con acto → estado **DESISTIDO/archivado
    (p. ej. otra causal de suspensión) es incremental. Envejece bien.
 
 ### 24. Veredicto
-- [ ] **Bloqueado por validación normativa (R3):** el diseño está completo, pero antes de
-  Definition of Ready se requiere el **visto bueno de gobierno-digital** sobre el cómputo
-  exacto (suspensión, mes de subsanación, reactivación en días hábiles). No dispara
-  re-revisión de diseño; es una **compuerta normativa**.
+- [x] **Validación normativa COMPLETADA** (gobierno-digital, 14 jul 2026): concepto
+  "requiere correcciones" → las **7 correcciones incorporadas** (secciones 4 y 6). El
+  cómputo queda anclado a la notificación, con prórroga, ventana de 10 días, subsanación
+  parcial, contenido mínimo, reactivación día-siguiente y desistimiento notificado con
+  recurso. Bucle de re-revisión **no** disparado (fue enriquecimiento legal, no defecto
+  estructural). Compuerta normativa **cerrada**.
 
 ## G. Definition of Ready
-- [x] Blueprint completo. [x] Valor Neto favorable (cumplimiento legal del núcleo,
-  complejidad acotada por reutilización). [ ] **Cuatro Preguntas: P2 pendiente** de la
-  validación normativa (que confirme que es la forma correcta). [ ] Validación
-  gobierno-digital (bloqueante). → **Candidata tras validación normativa**, luego
-  autorización expresa. No autoriza código.
+- [x] Blueprint completo (**v2**, correcciones normativas incorporadas).
+- [x] Valor Neto favorable (cumplimiento legal del núcleo, complejidad acotada por
+  reutilización).
+- [x] **Cuatro Preguntas:** P2 resuelta — validado que suspensión-anclada-a-notificación
+  + prórroga + acto motivado es la forma correcta (Art. 17).
+- [x] **Validación gobierno-digital** completada. → **CANDIDATA a implementación**,
+  pendiente **autorización expresa** del propietario. Recomendado empezar por **OAT-05**
+  (centralizar estados) para que `EN_SUBSANACION`/`DESISTIDO` entren limpios. No autoriza
+  código.
 
 ## H. Hallazgos Arquitectónicos Transversales (OAT)
 | OAT | Título | Prioridad | Momento |
