@@ -140,6 +140,9 @@ export function mapEstadoCiudadano(
     case 'EN_PROCESO': return 'en_proyeccion_respuesta';
     case 'DEVUELTO': return 'requiere_aclaracion';
     case 'PRORROGA': return 'en_proyeccion_respuesta';
+    // BM-B33 — subsanación: el ciudadano debe completar; desistimiento: cierre.
+    case 'EN_SUBSANACION': return 'requiere_aclaracion';
+    case 'DESISTIDO': return 'cerrado';
     default: return 'en_revision';
   }
 }

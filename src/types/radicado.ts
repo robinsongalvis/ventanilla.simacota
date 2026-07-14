@@ -6,7 +6,11 @@ export type EstadoRadicado =
   | 'EN_PROCESO'
   | 'RESUELTO'
   | 'DEVUELTO'
-  | 'RECHAZADO';
+  | 'RECHAZADO'
+  /** BM-B33 — requerimiento de subsanación notificado: activo con el término legal SUSPENDIDO. */
+  | 'EN_SUBSANACION'
+  /** BM-B33 — desistimiento tácito confirmado por acto motivado (cierre). */
+  | 'DESISTIDO';
 
 export type Prioridad = 'ROJO' | 'NARANJA' | 'AMARILLO';
 

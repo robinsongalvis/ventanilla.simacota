@@ -19,13 +19,31 @@ export const ESTADOS_ACTIVOS = new Set<string>([
   'EN_PROCESO',
   'DEVUELTO',
   'PRORROGA',
+  // BM-B33 — activo pero con el término SUSPENDIDO (reloj detenido).
+  'EN_SUBSANACION',
 ]);
 
 /** Estados de cierre del radicado (ya no computan término). */
 export const ESTADOS_CERRADOS = new Set<string>([
   'RESUELTO',
   'RECHAZADO',
+  // BM-B33 — desistimiento tácito confirmado (cierre por acto motivado).
+  'DESISTIDO',
 ]);
+
+/**
+ * Estados activos cuyo término legal está SUSPENDIDO: el semáforo y el cálculo
+ * de vencimiento deben ignorar el reloj para estos (BM-B33). Hoy solo
+ * `EN_SUBSANACION`; se centraliza para no repetir el criterio.
+ */
+export const ESTADOS_TERMINO_SUSPENDIDO = new Set<string>([
+  'EN_SUBSANACION',
+]);
+
+/** ¿El término del radicado está suspendido por su estado? */
+export function tieneTerminoSuspendido(estado: string): boolean {
+  return ESTADOS_TERMINO_SUSPENDIDO.has(estado);
+}
 
 /** ¿El estado corresponde a un radicado activo (en trámite)? */
 export function esEstadoActivo(estado: string): boolean {
