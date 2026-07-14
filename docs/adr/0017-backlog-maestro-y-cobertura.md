@@ -26,7 +26,12 @@ Se adoptan **dos estructuras oficiales y vivas**, actualizadas en cada análisis
    prioridad (Crítica | Alta | Media | Baja), impacto funcional, impacto
    técnico, dependencias, complejidad estimada, estado (Identificado |
    Pendiente de validar | Validado | Aprobado para desarrollo | Diferido |
-   Descartado | Implementado), bloque objetivo (3, 4, 5…) y observaciones.
+   Descartado | Implementado), bloque objetivo (3, 4, 5…), observaciones, y
+   **(ampliación 2026-07-13)**: **valor** para la Alcaldía/usuario (Muy Alto |
+   Alto | Medio | Bajo), **esfuerzo** estimado (XS | S | M | L | XL) y
+   **decisión** —independiente del estado técnico— (En evaluación | Aprobado |
+   Pospuesto | Rechazado | Requiere validación normativa). Valor + esfuerzo +
+   prioridad permiten priorización objetiva por impacto/costo/beneficio.
 2. **`docs/MATRIZ_COBERTURA_FUNCIONAL.md`** — compara cada documento/procedimiento
    analizado contra la solución actual, con estado explícito por aspecto
    funcional: Ya implementado | Implementado parcialmente | No implementado |

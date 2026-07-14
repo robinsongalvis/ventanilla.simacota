@@ -64,13 +64,59 @@ con la Alcaldía**. Cada fila referencia el ítem del Backlog Maestro cuando apl
 | Devuelta SI/NO / Reasignada a | ❌ | **BM-B07** |
 | Nombre y Firma (de quien recibe) + quien entrega | 🟡 / 🔎 | → **BM-B06/B07** |
 
-## Documentos pendientes de lectura (no evaluados aún)
+## M-GSC-8200-170-002 — Manual Ventanilla de Correspondencia (ejercicio inverso)
 
-| Documento | Estado de análisis |
-|---|---|
-| M-GSC-8200-170-002 (Manual Ventanilla) | ⏳ Pendiente (PDF imagen, sin OCR) |
-| M-GSC-8200-170-004 (Manual Comunicaciones int/ext) | ⏳ Pendiente (PDF imagen, sin OCR) |
-| 15 TRD (100 Alcalde … 150 Agricultura) | ⏳ Pendiente (PDF imagen, sin OCR) → alimentan **BM-B02** |
+| Capacidad del software | Estado | Nota / Backlog |
+|---|---|---|
+| Login con usuario de dominio institucional | ✅ | Auth interna |
+| Radicado automático | ✅ | |
+| Radicado pre-generado externo (máquina/reloj) | ❌ | **BM-B14** |
+| Catálogo de tipos (incl. felicitación, denuncia anticorrupción, queja anónima) | 🔎 | **BM-B16** |
+| Días hábiles por tipo + override manual del término | 🟡 | Cálculo ✅; override ❌ → **BM-B15** |
+| Consultar persona por cédula (solicitante frecuente) | ✅ | |
+| "No aporta información" | ✅ | datosNoAportados |
+| Campos (asunto, teléfonos, dirección, email, ubicación, folios, anexos) | ✅ | |
+| Modo de respuesta (correo / dirección / consulta en sitio) | ✅ | |
+| Asignar dependencia + funcionario + comentarios de asignación | 🟡 | Asignación ✅; comentarios 🔎 |
+| Comprobante imprimible (radicado + URL de consulta + usuario) | ✅ | Constancia |
+| Correo interno "Asignación de solicitud" a la dependencia | ❌ | **BM-B17** |
+| Adjuntar la solicitud escaneada al radicado | 🟡 | → **BM-B03** |
+| Correo automático al ciudadano con los datos del registro | ✅ | Notificación |
+| Generar planilla de reparto (PDF, número único, por dependencia/área) | ✅ | |
+| Alerta de radicados sin planilla | ❌ | **BM-B19** |
+| Registrar entrega (fecha/hora/quién recibe) + planilla firmada escaneada | 🟡 | → **BM-B06/B18** |
+| Admin planillas: reimprimir, descargar firmada, **anular** | 🟡 | → **BM-B18** |
+| Consulta de la solicitud por número + imprimir datos (PDF) | ✅ | |
 
-Al leerlos (OCR / `poppler` / versiones texto), sus filas se completan y se
-generan/actualizan los ítems del Backlog Maestro correspondientes, sin duplicar.
+## M-GSC-8200-170-004 — Comunicaciones Internas y Externas (ejercicio inverso)
+
+| Capacidad del software | Estado | Nota / Backlog |
+|---|---|---|
+| Bandeja "Mis solicitudes asignadas" (Asignadas/Por vencer/Vencidas) | ✅ | Mi Gestión + semáforos |
+| Bandeja "Recibidas" con 6 alertas: **Prioridad**, Radicados, **Sin Término**, Por Vencer, Vencidas, **Devueltas** | 🟡 | Semáforos ✅; Prioridad/Sin Término/Devueltas → **BM-B25/B24/B26** |
+| Exportar a Excel la lista de solicitudes | ✅ | Reportes |
+| Detalle: info + digitalizada / trazabilidad / anexos / **observaciones** / responder-devolver / prórroga | 🟡 | Casi todo ✅; pestaña Observaciones → **BM-B29** |
+| Responder (envía al correo + adjunto; cierra la solicitud) | ✅ | |
+| Devolver por no competencia con observación | ✅ | Devolución |
+| Registrar prórroga | ✅ | |
+| **Módulo de Comunicaciones Internas** (solicitud/respuesta/circular/informativo) | ❌ | **BM-B20** (mayor vacío) |
+| Destino Interno (dependencias) / Externo (personas) | 🟡 | Externo ✅; interno inter-dependencias ❌ → **BM-B20** |
+| Consecutivos por dependencia + serie propia de circulares | ❌ | **BM-B21** |
+| Envío de copias (CC) a otras dependencias | ❌ | **BM-B22** |
+| Selección del jefe firmante | 🟡 | Existe para respuestas SIMI → **BM-B23** |
+| Medio de radicado (Oficio/Web/Email/Teléfono) | 🔎 | → **BM-B27** |
+| Ayuda in-app (video tutoriales + infografía) | ❌ | **BM-B28** |
+
+## TRD (10 archivos: 100 Alcalde … 150 Agricultura)
+
+| Aspecto | Estado | Nota / Backlog |
+|---|---|---|
+| Clasificación por serie/subserie documental por dependencia | ❌ | **BM-B02** |
+| Retención (gestión/central) y disposición final (CT/E/M/S) | ❌ | **BM-B02** |
+
+## Estado del análisis
+Todos los documentos compartidos fueron **leídos en su totalidad** (texto
+extraído con `pymupdf`; se resolvió la limitación previa de renderizado). Ningún
+documento quedó por fuera del benchmarking por causas técnicas. El único detalle
+diferido es el desglose serie-por-serie de las TRD, que se hará al scopear
+**BM-B02** (estructura ya confirmada).
