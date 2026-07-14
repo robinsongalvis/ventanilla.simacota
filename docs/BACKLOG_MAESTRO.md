@@ -239,14 +239,14 @@ demanda real. Cada paso, sujeto a las Cuatro Preguntas y a autorización expresa
 | BM-B16 | Catálogo completo de tipos PQRSD (felicitación, denuncia anticorrupción, queja anónima…) | Mejora | Media | Alto | S | Pend. validar | Requiere validación normativa | por definir |
 | BM-B18 | Ciclo completo de la planilla (admin: anular, reimprimir, registrar entrega con firma escaneada) | Mejora | Media-Alta | Alto | M | Pend. validar | En evaluación | por definir |
 | BM-B17 | Correo interno "Asignación de solicitud" a la dependencia | Mejora | Media | Alto | S | Identificado | En evaluación | por definir |
-| BM-B25 | Alerta/bandeja "Prioridad" (entes de control) | Mejora | Media-Alta | Alto | S-M | Identificado | En evaluación | por definir |
+| BM-B25 | Alerta/bandeja "Prioridad" (entes de control) | Mejora | Media-Alta | Alto | S-M | **Cubierto en gran parte** (proxima-accion urgencia + Prioridad + tipo PETICION_ENTES_CONTROL) | Reuso — residual gated funcionaria | C3 |
 | BM-B05 | Regla de 24 h para reasignación por no competencia | Nueva func. | Media-Alta | Alto | M | Identificado | Requiere validación normativa | por definir |
 | BM-B10 | Marca de atención prioritaria | Nueva func. | Media | Alto | S-M | Identificado | En evaluación | por definir |
 | BM-B03 | Digitalización de correspondencia física (imagen fiel) | Nueva func. | Media-Alta | Alto | M | Identificado | En evaluación | por definir |
 | BM-B14 | Radicado pre-generado externo (máquina/reloj) opción Rad.Auto | Nueva func. | Media | Medio | S | Identificado | En evaluación | por definir |
 | BM-B15 | Override manual de días hábiles de respuesta | Mejora | Media | Medio | S | Pend. validar | Requiere validación normativa | por definir |
-| BM-B24 | Categoría "Sin Término" (felicitaciones, invitaciones) | Mejora | Media | Medio | S | Pend. validar | Requiere validación normativa | por definir |
-| BM-B26 | Bandeja de "Devueltas" pendientes de reasignación | Mejora | Media | Medio | S | Identificado | En evaluación | por definir |
+| BM-B24 | Categoría "Sin Término" (felicitaciones, invitaciones) | Mejora | Media | Medio | S | **Lógica ya existe** (mis-pendientes NivelPendiente SIN_TERMINO); residual = filtro en búsqueda avanzada | Reuso — residual gated funcionaria | C3 |
+| BM-B26 | Bandeja de "Devueltas" pendientes de reasignación | Mejora | Media | Medio | S | **Cubierto** (filtro estado=DEVUELTO en búsqueda avanzada + proxima-accion DEVUELTO) | Reuso — no duplicar | C3 |
 | BM-B22 | Envío de copias (CC) a otras dependencias | Mejora | Media | Medio | M | Identificado | En evaluación | por definir |
 | BM-B06 | Cierre del ciclo de la planilla (firma escaneada) | Mejora | Media | Alto | S-M | Pend. validar | En evaluación | por definir |
 | BM-B07 | Alinear columnas de la planilla al formato oficial | Mejora | Media | Medio | S | Pend. validar | En evaluación | por definir |
