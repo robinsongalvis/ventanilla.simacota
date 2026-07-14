@@ -19,6 +19,7 @@ en su propio momento, con su propio diseño y autorización, respetando la gober
 | [OAT-01](#oat-01) | Unificar el modelo del radicado (dual + `clasificacionIA` deshonesto) | Media | C1 | Al abordar D9/D3 |
 | [OAT-02](#oat-02) | Consolidar los dos tracks de salida en un agregado "Comunicación" | Alta | C2 | Tras C2 en producción |
 | [OAT-03](#oat-03) | Unificar el vocabulario de "canal de envío" | Media-Baja | C2 | Junto con OAT-02 |
+| [OAT-04](#oat-04) | Unificar la fuente de verdad de la TRD (código subset ↔ dato del Archivo) | Media | C11 | Después de C11-Nivel 1 |
 
 ---
 
@@ -101,3 +102,24 @@ en su propio momento, con su propio diseño y autorización, respetando la gober
 - **Complejidad:** S-M. **Prioridad:** Media-Baja.
 - **Momento recomendado:** junto con OAT-02 (misma zona del código).
 - **Relación:** ADR-0020 (simplificación/valor neto). Detectada en Blueprint C2.
+
+## OAT-04
+**Unificar la fuente de verdad de la TRD (código subset de la ventanilla ↔ dato completo del Archivo)**
+
+- **Problema:** tras C11-Nivel 1 coexisten dos representaciones de la TRD: el
+  subconjunto en código que usa la ventanilla (`lib/catalogos/series-documentales.ts`,
+  ~6 series) y el catálogo completo en dato que administra el Archivo
+  (`trd_catalogo`, ~56 series).
+- **Evidencia:** `series-documentales.ts` (constante en código, hot-path de
+  radicación) vs. la nueva colección `trd_catalogo` (Blueprint C11).
+- **Impacto:** riesgo de divergencia entre lo que clasifica la ventanilla y lo que
+  el Archivo considera vigente.
+- **Capacidades afectadas:** C1 (D2), C11 (Archivo).
+- **Beneficios:** una sola fuente de verdad; la ventanilla lee la disposición/retención
+  confirmada por el Archivo; menos mantenimiento.
+- **Riesgos:** tocar el hot-path de radicación; requiere caché + fallback para no
+  añadir latencia ni acoplar la radicación a una lectura remota.
+- **Complejidad:** M. **Prioridad:** Media.
+- **Momento recomendado:** **después** de C11-Nivel 1 (cuando el `trd_catalogo` esté
+  poblado y validado por el Archivo).
+- **Relación:** ADR-0019/0020; Blueprints C1 y C11. Detectada en Blueprint C11.
