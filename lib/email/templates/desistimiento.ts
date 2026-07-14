@@ -44,8 +44,10 @@ export function buildDesistimientoHtml(p: TemplateDesistimientoParams): string {
     </div>
     <p style="margin:0 0 14px;font-size:14px;">
       Contra el presente acto administrativo procede el <strong>recurso de reposición</strong>,
-      que podrá interponer dentro de los términos de ley. Podrá presentar una nueva solicitud
-      cuando cuente con la información completa.
+      que podrá interponer dentro de los <strong>diez (10) días hábiles siguientes a la
+      notificación</strong>, ante la misma dependencia que expidió el acto (Ley 1437 de 2011,
+      artículos 74 y 76). Podrá presentar una nueva solicitud cuando cuente con la información
+      completa.
     </p>
     <p style="margin:16px 0 0;font-size:12px;color:#90a4ae;">${escapeHtml(INSTITUCION.nombre)}</p>
   </div>`;

@@ -52,6 +52,12 @@ describe('cableado de las rutas — permisos y reloj server-side', () => {
     expect(s).toContain('planDesistimiento');
   });
 
+  it('desistimiento: notifica el acto solo con consentimiento electrónico (CPACA Art. 56)', () => {
+    const s = R('desistimiento');
+    expect(s).toContain("canalRespuesta === 'CORREO'");
+    expect(s).toContain('requiereNotificacionPersonal');
+  });
+
   it('reactivar-subsanacion: suficiencia explícita (parcial no reactiva)', () => {
     const s = R('reactivar-subsanacion');
     expect(s).toContain('planReactivarSubsanacion');

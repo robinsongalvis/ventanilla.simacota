@@ -76,10 +76,14 @@ export async function POST(request: Request, context: RouteContext): Promise<Nex
       metadata: { ...plan.evento.metadata, dependencia: radicado.clasificacion.oficinaDestino },
     });
 
-    // Notificación PERSONAL del acto de desistimiento al ciudadano (Art. 17 +
-    // CPACA): informa el archivo y el recurso de reposición. Best-effort.
+    // Notificación del acto de desistimiento al ciudadano (Art. 17). El
+    // desistimiento es un ACTO ADMINISTRATIVO: la notificación electrónica solo
+    // procede si el ciudadano ACEPTÓ ese canal (CPACA Art. 56 → canalRespuesta
+    // CORREO). En su defecto, la notificación PERSONAL (Arts. 67-69) la realiza
+    // el funcionario fuera del sistema. Best-effort para el aviso electrónico.
     const emailDestino = radicado.solicitante?.email ?? null;
-    const notificable = debeNotificarCiudadano({
+    const aceptoNotificacionElectronica = radicado.canalRespuesta === 'CORREO';
+    const notificable = aceptoNotificacionElectronica && debeNotificarCiudadano({
       esAnonimo: radicado.esAnonimo,
       tipoPresentacion: radicado.tipoPresentacion,
       solicitante: { email: emailDestino },
@@ -109,7 +113,14 @@ export async function POST(request: Request, context: RouteContext): Promise<Nex
       }
     }
 
-    return NextResponse.json({ ok: true, estadoActual: plan.nuevoEstado, emailEnviado });
+    return NextResponse.json({
+      ok: true,
+      estadoActual: plan.nuevoEstado,
+      emailEnviado,
+      // Si no procedía la notificación electrónica, el funcionario debe
+      // notificar personalmente el acto (CPACA Arts. 67-69).
+      requiereNotificacionPersonal: !notificable,
+    });
   } catch (error) {
     const { radicadoId } = await context.params.catch(() => ({ radicadoId: 'desconocido' }));
     logError({ radicadoId, modulo: 'radicados/desistimiento', error });

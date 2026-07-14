@@ -5,6 +5,7 @@ import type { InternalUserSession } from '@/lib/server/internal-auth';
 import type { ResponsableFuncionario } from '@/lib/actions/asignarRadicado';
 import { NOMBRES_TENANT } from '@/src/types/reglas-negocio';
 import type { TenantId } from '@/src/types/radicado';
+import { esEstadoCerrado } from '@/lib/radicado-estados';
 import type {
   ArchivoRadicado,
   RespuestaOficial,
@@ -42,7 +43,10 @@ export async function appendTrazabilidadAdmin(
 }
 
 export function assertNotClosed(radicado: VentanillaRadicado): void {
-  if (['RESUELTO', 'RECHAZADO'].includes(radicado.estadoActual)) {
+  // Fuente única de estados cerrados (OAT-05): incluye DESISTIDO. Antes se
+  // codificaba ['RESUELTO','RECHAZADO'] y omitía DESISTIDO, dejando reabrible
+  // (p. ej. prorrogable) un acto firme por desistimiento tácito.
+  if (esEstadoCerrado(radicado.estadoActual)) {
     throw new RadicadoActionError('El radicado ya está cerrado y no permite esta acción.', 409);
   }
 }
