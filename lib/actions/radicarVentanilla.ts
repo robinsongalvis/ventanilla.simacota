@@ -1,6 +1,6 @@
-import { addDoc, collection, doc, setDoc } from 'firebase/firestore';
+import { addDoc, collection, doc, getDoc, runTransaction } from 'firebase/firestore';
 import { getDb } from '@/lib/firebase';
-import { generarRadicadoInstitucional } from '@/lib/radicado-institucional';
+import { formatearRadicadoInstitucional } from '@/lib/radicado-institucional';
 import { TIPOS_SOLICITUD, type TipoSolicitudId } from '@/lib/tiempos-radicado';
 import { subirArchivos } from '@/lib/storage';
 import { validarReglasRadicacion } from '@/lib/seguridad/reglas-radicacion';
@@ -194,7 +194,16 @@ export async function radicarInstitucionalmente(
 
   onProgress('Generando número de radicado…', 10);
 
-  const { radicadoId, consecutivo } = await generarRadicadoInstitucional();
+  // H3 (Bloque 2), fix mínimo client-side de la ruta interna: peek del contador
+  // (solo lectura) para conocer el número y la ruta de los adjuntos. NO se
+  // consume aquí → si la subida falla, no queda consecutivo fantasma.
+  const db = getDb();
+  const ahora = new Date();
+  const year = ahora.getFullYear();
+  const counterRef = doc(db, 'counters', `radicados-${year}`);
+  const peek = await getDoc(counterRef);
+  const consecutivo = Number(peek.data()?.ultimo ?? 0) + 1;
+  const radicadoId = formatearRadicadoInstitucional(consecutivo, ahora);
 
   onProgress('Subiendo archivos adjuntos…', 30);
   const { exitosos } = datos.archivos.length > 0
@@ -204,7 +213,6 @@ export async function radicarInstitucionalmente(
   onProgress('Guardando radicado en Firestore…', 75);
 
   const tipo = TIPOS_SOLICITUD[datos.tipoSolicitudId];
-  const ahora = new Date();
 
   // Construimos el documento con `null` explícito en campos opcionales vacíos.
   // Nunca usamos `|| undefined` — Firestore rechaza undefined con una excepción:
@@ -329,7 +337,24 @@ export async function radicarInstitucionalmente(
     radicado as unknown as Record<string, unknown>,
   );
 
-  await setDoc(doc(getDb(), 'ventanilla_radicados', radicadoId), radicadoSeguro);
+  // H3: contador y documento se confirman JUNTOS en una transacción del SDK
+  // cliente. Si el contador cambió entre el peek y la tx (concurrencia; operador
+  // único, raro), se aborta y el usuario reintenta — nunca un consecutivo
+  // fantasma ni un número repetido.
+  await runTransaction(db, async (tx) => {
+    const snap = await tx.get(counterRef);
+    if (Number(snap.data()?.ultimo ?? 0) + 1 !== consecutivo) {
+      throw new RadicacionValidacionError(
+        'La numeración cambió durante el registro; reintente el radicado.',
+      );
+    }
+    tx.set(
+      counterRef,
+      { ultimo: consecutivo, anio: year, actualizadoEn: ahora.toISOString() },
+      { merge: true },
+    );
+    tx.set(doc(db, 'ventanilla_radicados', radicadoId), radicadoSeguro);
+  });
   await addDoc(
     collection(getDb(), 'ventanilla_radicados', radicadoId, 'trazabilidad'),
     {
