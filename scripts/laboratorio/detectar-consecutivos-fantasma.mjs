@@ -9,9 +9,9 @@
  * Uso:
  *   FIREBASE_SERVICE_ACCOUNT='<json>' node scripts/laboratorio/detectar-consecutivos-fantasma.mjs [--anio 2026]
  *
- * Salida: JSON estructurado (evidencia objetiva) — 0 huecos ⇒ cierre limpio;
- * N huecos ⇒ lista exacta para generar las constancias de subsanación (AGN
- * 060/2001 art. 5).
+ * Salida: JSON estructurado (evidencia objetiva) — 0 huecos y 0 duplicados ⇒
+ * cierre limpio; N huecos y/o M duplicados ⇒ lista exacta para las constancias
+ * de subsanación (AGN 060/2001 art. 5, que exige unicidad Y continuidad).
  */
 
 /** Colección de cada serie. */
@@ -35,6 +35,21 @@ export function huecosDe(ultimo, consecutivosPresentes) {
     if (!presentes.has(i)) huecos.push(i);
   }
   return huecos;
+}
+
+/**
+ * Unicidad (AGN 060/2001): dada la LISTA de consecutivos presentes (con posibles
+ * repeticiones), devuelve los que aparecen más de una vez, ascendente. Un mismo
+ * consecutivo en dos documentos es tan grave como un hueco — un `Set` lo oculta,
+ * por eso este chequeo opera sobre la lista completa (hallazgo de seguridad).
+ */
+export function duplicadosDe(consecutivosLista) {
+  const conteo = new Map();
+  for (const c of consecutivosLista) conteo.set(c, (conteo.get(c) ?? 0) + 1);
+  return [...conteo.entries()]
+    .filter(([, n]) => n > 1)
+    .map(([c]) => c)
+    .sort((a, b) => a - b);
 }
 
 /**
@@ -82,23 +97,31 @@ async function main() {
 
     // Lectura de solo los ids del año (nunca escribe).
     const docs = await db.collection(coleccion).get();
-    const presentes = new Set();
+    const presentesLista = [];
     for (const d of docs.docs) {
       if (!d.id.includes(`-${anio}-`)) continue;
       const c = consecutivoDeId(d.id);
-      if (c !== null) presentes.add(c);
+      if (c !== null) presentesLista.push(c);
     }
+    const presentes = new Set(presentesLista);
 
     const huecos = huecosDe(ultimo, presentes);
-    reporte.series[serie] = { coleccion, ultimo, presentes: presentes.size, huecos };
+    const duplicados = duplicadosDe(presentesLista);
+    reporte.series[serie] = {
+      coleccion, ultimo,
+      documentos: presentesLista.length,
+      distintos: presentes.size,
+      huecos, duplicados,
+    };
   }
 
   // JSON a stdout = evidencia objetiva.
   console.log(JSON.stringify(reporte, null, 2));
   const totalHuecos = Object.values(reporte.series).reduce((a, s) => a + s.huecos.length, 0);
-  console.error(totalHuecos === 0
-    ? '[detector] CERO HUECOS — cierre limpio.'
-    : `[detector] ${totalHuecos} hueco(s) — requieren constancia de subsanación (AGN 060/2001 art. 5).`);
+  const totalDuplicados = Object.values(reporte.series).reduce((a, s) => a + s.duplicados.length, 0);
+  console.error(totalHuecos === 0 && totalDuplicados === 0
+    ? '[detector] CERO HUECOS y CERO DUPLICADOS — cierre limpio (AGN 060/2001: unicidad + continuidad).'
+    : `[detector] ${totalHuecos} hueco(s) + ${totalDuplicados} duplicado(s) — requieren constancia de subsanación (AGN 060/2001 art. 5).`);
   process.exit(0);
 }
 

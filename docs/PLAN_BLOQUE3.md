@@ -107,3 +107,36 @@ datos hacia atrás. Objetos de `_pendientes/` → reconciliación o TTL.
 El Bloque 3 **no se abre** hasta: (a) Acta de Cierre Formal del Bloque 2 con H3
 CERRADO; (b) branch protection aplicada (D10). Recomendación: empezar por D1+D2
 (pieza angular), que cierra en cascada D3/D4/D5 y elimina la divergencia.
+
+## 9. Hallazgos de la revisión cruzada de PR-2 (agentes) — a incorporar en Bloque 3
+
+Los tres agentes coincidieron: **el fix de H3 es sólido** (firestore-datos: SÓLIDO;
+seguridad: sin hallazgos altos; qa: fix mutación-probado). Lo aplicado en PR-2: el
+**detector** ahora verifica **unicidad además de continuidad** (AGN 060). El resto
+es deuda diferida, ordenada por prioridad:
+
+- **[Alta · PII] Ruta interna — staging de adjuntos** (seguridad M2): la ruta
+  interna (`radicarVentanilla.ts`) sube archivos a la carpeta final del consecutivo
+  aún no confirmado; si la tx aborta y se reintenta, quedan huérfanos en la carpeta
+  de un id que otro radicado podría tomar → **contaminación cruzada de PII**. Adoptar
+  el mismo `_pendientes/{requestId}` + `move` post-commit de las 4 rutas server.
+- **[Media] Migrar la ruta interna a Admin SDK** (seguridad M1 / firestore N1): hoy
+  el consecutivo interno se genera client-side y `counters` admite `write` de
+  admin/recepcionista desde cliente → un token privilegiado podría alterar el
+  contador. Migrar a endpoint server + cerrar `counters` a `write: if false` (2
+  líneas de reglas, tras el cutover). Es la migración D-* ya prevista.
+- **[Media] Cobertura ÉXITO** (qa P1): los `*-atomicidad.test.ts` solo assertean
+  ROLLBACK; añadir por ruta un caso feliz (`status` 200/201 + contador +1 + documento
+  con `documentoId` coincidente) para resistencia a mutación del camino feliz.
+- **[Media] Concurrencia contra el código real** (qa P2): el test de emulador
+  reimplementa el patrón; conectar al helper real (`leerConsecutivosLegales`/
+  `confirmarConsecutivosLegales`) vía loader TS en `test:rules`, o invocar una ruta
+  POST real N veces en paralelo contra el emulador.
+- **[Baja] `tx.create` en vez de `tx.set`** (seguridad B4): fail-closed ante un
+  contador corrupto que sobreescribiría un documento existente.
+- **[Baja] TTL de staging** (`radicados/_pendientes/**`, `salidas/_pendientes/**`) +
+  conciliación de `move` fallido (N8 declarado en ADR-0016).
+- **[Baja] Detector — consulta por rango** en vez de leer la colección completa
+  (escalabilidad del script forense; ambos agentes).
+- **[Cosmético] repro test** (qa P3): su "rojo" contra baseline es por incompatibilidad
+  de import, no por la aserción del invariante; los otros 4 sí matan el mutante.

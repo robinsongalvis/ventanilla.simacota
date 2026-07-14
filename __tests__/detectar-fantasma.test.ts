@@ -6,6 +6,7 @@
 import { describe, it, expect } from 'vitest';
 import {
   huecosDe,
+  duplicadosDe,
   consecutivoDeId,
 } from '@/scripts/laboratorio/detectar-consecutivos-fantasma.mjs';
 
@@ -29,6 +30,30 @@ describe('detector de fantasmas — huecosDe', () => {
 
   it('contador en 0 no reporta huecos', () => {
     expect(huecosDe(0, [])).toEqual([]);
+  });
+});
+
+describe('detector de fantasmas — duplicadosDe (unicidad AGN 060)', () => {
+  it('sin duplicados cuando todos son únicos', () => {
+    expect(duplicadosDe([1, 2, 3])).toEqual([]);
+  });
+
+  it('detecta un consecutivo repetido (mismo número en dos documentos)', () => {
+    expect(duplicadosDe([1, 2, 2, 3])).toEqual([2]);
+  });
+
+  it('detecta múltiples duplicados en orden ascendente', () => {
+    expect(duplicadosDe([3, 1, 3, 2, 1])).toEqual([1, 3]);
+  });
+
+  it('un Set jamás mostraría el duplicado — por eso operamos sobre la lista', () => {
+    const lista = [5, 5];
+    expect(new Set(lista).size).toBe(1);      // el Set lo oculta
+    expect(duplicadosDe(lista)).toEqual([5]);  // la lista lo revela
+  });
+
+  it('lista vacía no reporta duplicados', () => {
+    expect(duplicadosDe([])).toEqual([]);
   });
 });
 
