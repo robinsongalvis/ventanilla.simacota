@@ -294,3 +294,57 @@ Detectadas durante este análisis (registro canónico en
 
 *Relación con OAT previa: **OAT-01** (unificar modelo del radicado, de C1) también
 toca esta zona, pero su foco es el radicado de entrada, no la comunicación de salida.*
+
+---
+
+## Anexo — Diseño de implementación (commit-ready) · **CONGELADO por H3**
+
+**Estado:** especificación lista para ejecutar, **NO implementar todavía.** C2 crea
+comunicaciones con **consecutivo por dependencia** (H3): toca la numeración legal,
+que es justo el bloqueo vigente del Bloque 2. Se deja preparada; se ejecuta **cuando
+H3 quede formalmente liberado** (CI + barrida). Decisión del propietario: solo se
+implementan capacidades ortogonales a H3.
+
+### I. Por qué C2 no es ortogonal a H3
+El registro de una comunicación consume un **consecutivo legal** vía
+`leerConsecutivosLegales`/`confirmarConsecutivosLegales` (mismo helper que hoy usan
+salidas, `app/api/salidas/registrar/route.ts:12`). Con **serie por dependencia**
+(BM-B21) se añaden nuevos contadores (`counters/comunicaciones-{dep}-{año}`). Eso es
+exactamente el terreno que el congelamiento protege → **no se toca hasta liberar H3.**
+
+*Matiz:* el **catálogo de firmantes (BM-B31)** sí es ortogonal a H3, pero **no aporta
+valor por sí solo** (un catálogo sin el flujo que lo consume). Por "valor completo
+por fase" (ADR-0021) se mantiene dentro de C2, no se adelanta suelto.
+
+### II. Puntos de edición (evidencia)
+| Cambio | Archivo(s) | Naturaleza |
+|---|---|---|
+| Tipo `INTERNA` + `destinatarioInterno` | `src/types/salida.ts` (`TipoSalida`, `SalidaOficial`) | aditivo, retrocompatible |
+| Consecutivo por dependencia (BM-B21) | `lib/server/consecutivo-legal.ts` (serie param ya existe) + builder | **toca H3** |
+| Endpoint registrar comunicación interna | nuevo, **espejo** de `app/api/salidas/registrar/route.ts` (staging→tx→finalize) | **toca H3** |
+| Catálogo de firmantes (BM-B31) | nueva colección `firmantes_autorizados` + tipo + CRUD | ortogonal (pero sin valor solo) |
+| Circuito de firma (BM-B23) | reutiliza `ApprovalFlow`/`RespuestaFirma` (perfil ligero) | reutilización |
+| Notificación/acuse | `lib/email`, `lib/whatsapp` | reutilización |
+
+### III. Cambios (cuando se libere H3)
+1. **Modelo** (`salida.ts`): `TipoSalida |= 'INTERNA'`; `SalidaOficial.destinatarioInterno?: { tenantId: TenantId; dependenciaNombre: string }` como alternativa a `destinatario`. Aditivo → el libro de salidas actual no cambia.
+2. **Firmantes** (BM-B31): `interface FirmanteAutorizado { tenantId; cargo; uid?; puedeFirmar: TipoSalida[] }`; colección `firmantes_autorizados`; CRUD administrativo; verificación en el registro (reutiliza `lib/permisos`). Fuente de cargos: **G-GSC-170-003 (no entregada — R2)** → parametrizable.
+3. **Consecutivo por dependencia** (BM-B21): serie `comunicaciones-{codigoDep}` pasada al helper H3; **misma mecánica transaccional** que salidas (no-huérfano).
+4. **Endpoint** `POST /api/comunicaciones/registrar`: espejo de salidas/registrar (staging PDF → tx H3 + `tx.set` → finalize); emite trazabilidad; entra a la bandeja del destinatario (D3).
+5. **Firma** (BM-B23): perfil **ligero** de `ApprovalRules` (sin revisión jurídica cuando no aplica) reutilizando `simi_respuestas_firma`.
+
+### IV. Pruebas (cuando se ejecute)
+- Numeración por dependencia (H3, serie por dep): unicidad + no-huérfano en emulador.
+- Autorización de firma (cargo permitido / no permitido).
+- Regresión por mutación (ADR-0015): revertir la validación de firmante → rojo; el
+  libro de salidas actual intacto.
+- E2E: comunicación interna A→B visible en la bandeja de B.
+
+### V. Bloqueantes previos a ejecutar
+- **Liberación de H3** (CI + barrida) — bloqueo principal.
+- **G-GSC-170-003** (cargos firmantes) para poblar el catálogo (mitigable: parametrizable).
+- Autorización expresa del propietario.
+- **No** cherry-pick del catálogo de firmantes por sí solo (sin valor; ADR-0021).
+
+*Referencias transversales: OAT-02 (unificar los dos tracks de salida) y OAT-03
+(unificar el vocabulario de canal) siguen registradas y **no** se abordan en C2.*

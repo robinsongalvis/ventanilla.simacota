@@ -258,7 +258,7 @@ demanda real. Cada paso, sujeto a las Cuatro Preguntas y a autorización expresa
 | BM-B28 | Ayuda in-app (video tutoriales + infografía) | Nueva func. | Baja | Medio | M | Identificado | En evaluación | por definir |
 | BM-B19 | Alerta "radicados sin planilla" (contador) | Mejora | Baja | Medio | XS | Identificado | En evaluación | por definir |
 | BM-B27 | Registro del medio de radicado (Oficio/Web/Email/Teléfono) | Mejora | Baja | Bajo | XS | Pend. validar | En evaluación | por definir |
-| BM-B11 | Reclasificación del tipo por la dependencia | Mejora | Baja | Bajo | S | Pend. validar | En evaluación | por definir |
+| BM-B11 | Reclasificación del tipo por la dependencia (re-deriva serie TRD) | Mejora | Baja | Bajo | S | **Implementado** (C1: re-derivación de serie al reclasificar) | Ejecutado | C1 |
 | BM-B13 | Casilleros físicos / digiturno | Fuera de alcance | Baja | Bajo | — | Descartado | Rechazado | — |
 | BM-D01 | Migración cliente→servidor de la ruta interna | Deuda técnica | Alta | Alto | L | Diferido | Pospuesto | 3 |
 | BM-D02 | Refactor del constructor del radicado (triplicado) | Deuda técnica | Alta | Alto | M | Diferido | Pospuesto | 3 |

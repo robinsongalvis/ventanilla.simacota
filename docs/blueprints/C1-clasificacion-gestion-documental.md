@@ -3,8 +3,10 @@
 **Estado:** **IMPLEMENTADO (parcial)** — Cambios A/B/C ejecutados y verificados
 (commits `32a1829`, `7d8890e`; suite 916/916, tsc 0, lint 0). C1 es ortogonal a H3
 (no toca numeración), por eso su implementación no cruzó el bloqueo del Bloque 2.
-**Pendientes:** B32-a (validación archivística de la disposición de 3 series) y
-Cambio V (reclasificación, BM-B11). Rige la gobernanza vigente (ADR-0001, 0014–0023).
+**Cambio V (reclasificación, BM-B11) también implementado** (commit `f0009d6`:
+la reclasificación re-deriva la serie). **Pendiente único:** B32-a (validación
+archivística de la disposición de 3 series — acción externa del Jefe de Archivo).
+Rige la gobernanza vigente (ADR-0001, 0014–0023).
 
 - **Capacidad / dominio:** C1 (D2) — ficha en
   [`PLAN_MAESTRO_EVOLUCION.md`](../PLAN_MAESTRO_EVOLUCION.md).
