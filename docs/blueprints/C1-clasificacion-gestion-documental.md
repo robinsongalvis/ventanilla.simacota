@@ -319,3 +319,81 @@ Detectada durante este análisis (registro canónico en
 
 *(Registrada además como deuda BM-D11; C1 no la aborda por Valor Neto — su coste
 supera el valor dentro de esta capacidad.)*
+
+---
+
+## Anexo — Diseño de implementación (commit-ready)
+
+**Estado:** especificación de cambios lista para ejecutar. **No es código y no
+autoriza implementación** (Bloque 2 congelado; decisión del propietario: diseño
+commit-ready sin código). Cuando se libere, se ejecuta tal cual.
+
+### I. Inventario de rutas de creación de radicado (evidencia)
+Rutas que **crean** un radicado (las demás son `update`/lectura, fuera de alcance):
+
+| Ruta | Modelo | ¿Sella serie hoy? | Acción |
+|---|---|---|---|
+| `lib/actions/radicarVentanilla.ts:291` | `clasificacion` (ventanilla) | ✅ sí (`:303`) | ninguna (referencia) |
+| `app/api/radicacion/route.ts:407` (WEB ciudadano) | `clasificacion` | ❌ no | **sellar** |
+| `app/api/dependencias/registro-expres/route.ts` → `construirPaqueteExpres` | `clasificacion` | ❌ no | **sellar** (en el builder puro) |
+| `lib/radicacion.ts:153` | `clasificacionIA` (modelo legado) | ❌ no | **verificar si es ruta activa**; si lo es, sellar; si es código muerto → OAT-01 |
+
+### II. Cambio A — Completar catálogo (BM-B32)
+En `lib/catalogos/series-documentales.ts`, `SERIES_VENTANILLA`, añadir a cada serie
+sus campos de retención (valores **extraídos de la TRD oficial**, verificados):
+
+| Clave | `retencionGestionAnios` | `retencionCentralAnios` | `disposicionFinal` |
+|---|---|---|---|
+| `LICENCIA_CONSTRUCCION` (120.22.01) | 2 | 10 | *pendiente archivo* |
+| `LICENCIA_SUBDIVISION` (120.22.06) | 2 | 10 | *pendiente archivo* |
+| `PROCESO_VERBAL_ABREVIADO` (112.26.07) | 2 | 18 | `'S'` (texto TRD: "se seleccionará una muestra") |
+| `DECLARACIONES_TRIBUTARIAS` (130.11.01) | 2 | 8 | *pendiente archivo* |
+
+- **Retención:** se carga ya (evidencia firme). **Disposición:** solo
+  `PROCESO_VERBAL_ABREVIADO` se carga (`'S'`, respaldado por el texto de la TRD); las
+  otras 3 quedan **sin** `disposicionFinal` (campo opcional) hasta confirmación del
+  Jefe de Archivo → **sub-tarea bloqueante B32-a** (validación archivística; regla
+  §6.3, riesgo R2). No se inventan valores.
+- **Nota de nombre:** la TRD dice "Licencia de **Subdivisión Rural**" (120.22.06); el
+  catálogo dice "Subdivisión". Ajustar `nombre` a la TRD.
+
+### III. Cambio B — Sellado universal de serie (sin flag, sin helper nuevo)
+`sugerirSerieDocumental(tipo, destino)` (`series-documentales.ts:124`) **ya es** el
+punto único, puro y server-safe. Se **invoca** en los builders no cubiertos, igual
+que ya lo hace `radicarVentanilla.ts:303`:
+- **`app/api/radicacion/route.ts` (~:407):** en el objeto `clasificacion`, añadir
+  `...(sugerirSerieDocumental(tipoSolicitud.id, TENANT_RECEPCION) ? { serieDocumental: ... } : {})`.
+- **`construirPaqueteExpres` (registro-expres):** estampar `serieDocumental` en el
+  radicado que arma (builder puro → cambio trivial y testeable).
+- **Refinamiento sobre el Blueprint (auto-crítica, no inercia):** el Blueprint §14/§23
+  contemplaba un `estamparSerieAlCrear` y un flag `clasificacion_universal`. La
+  evidencia los descarta: el campo es **aditivo y opcional** (no cambia
+  comportamiento; el peor caso es un canal sin serie, como hoy), y la función única ya
+  existe → **ni helper ni flag** (KISS, Valor Neto). Control de rollout: el test de
+  cobertura (IV) + observabilidad de "% creados con serie por canal".
+
+### IV. Cambio C — Pruebas
+- **Unitarias** (`__tests__/series-documentales*.test.ts`): las 4 series con retención
+  esperada; `PROCESO_VERBAL_ABREVIADO` con `disposicionFinal: 'S'`.
+- **Integración por canal:** un test que ejercite **cada** ruta de creación (II) y
+  **falle si alguna crea sin intentar sellar** la serie (cubre R3/OAT-01).
+- **Mutación** (ADR-0015): revertir la invocación en `app/api/radicacion` o en
+  `construirPaqueteExpres` debe poner el test en rojo.
+
+### V. Reclasificación (BM-B11) — seguimiento
+Extender `app/api/radicados/[radicadoId]/reclasificar/route.ts` para **re-derivar**
+la serie cuando cambie tipo/destino (llamando a la misma función pura) y emitir
+`RECLASIFICACION`. Puede ir en el mismo PR o inmediatamente después; no bloquea A–C.
+
+### VI. Plan de commits (cuando se libere el Bloque 2)
+1. `feat(catalogo): retención TRD de 4 series + disposición de proceso verbal (BM-B32)` — Cambio A.
+2. `feat(clasificacion): sellar serie en radicación WEB (app/api/radicacion)` — Cambio B.1 + test.
+3. `feat(clasificacion): sellar serie en registro exprés (construirPaqueteExpres)` — Cambio B.2 + test.
+4. `test(clasificacion): cobertura por canal + mutación` — Cambio C.
+5. (opcional) `feat(clasificacion): re-derivar serie al reclasificar (BM-B11)` — Cambio V.
+
+### VII. Bloqueantes previos a ejecutar
+- **B32-a:** validación archivística de `disposicionFinal` de las 3 series pendientes.
+- **lib/radicacion.ts:** confirmar si es ruta de creación activa (si sí, entra en el
+  Cambio B; si no, es código muerto → OAT-01).
+- **Liberación del Bloque 2** + autorización expresa del propietario.
