@@ -8,6 +8,14 @@ la reclasificación re-deriva la serie). **Pendiente único:** B32-a (validació
 archivística de la disposición de 3 series — acción externa del Jefe de Archivo).
 Rige la gobernanza vigente (ADR-0001, 0014–0023).
 
+> **CERRADA funcionalmente (14 jul 2026, decisión del propietario):** la capacidad
+> TRD que le corresponde a la Ventanilla queda cubierta — el radicado nace
+> clasificado en su serie/subserie, con su retención de la TRD oficial, conservada
+> en el expediente (foto inmutable). El alcance se mantiene: **NO** se incorpora
+> gestión integral de archivo (todas las series, transferencias, eliminación,
+> archivo central) — eso sería un **módulo de Archivo Institucional** independiente,
+> con su propio Blueprint, si algún día se decide. Único pendiente: B32-a (externo).
+
 - **Capacidad / dominio:** C1 (D2) — ficha en
   [`PLAN_MAESTRO_EVOLUCION.md`](../PLAN_MAESTRO_EVOLUCION.md).
 - **Iniciativas BM-\*:** BM-B02 (serie/subserie en el radicado), BM-B32 (completar

@@ -236,13 +236,13 @@ demanda real. Cada paso, sujeto a las Cuatro Preguntas y a autorización expresa
 | BM-B23 | Firmante y circuito de firma de comunicaciones internas (revisar/corregir/firmar; físico/electrónico) | Mejora | Media-Alta | Alto | M | Identificado | En evaluación | por definir |
 | BM-B31 | Catálogo de cargos autorizados para firmar comunicaciones (G-GSC-170-003) | Nueva func. | Media | Alto | S | Identificado | Requiere validación normativa | por definir |
 | BM-B32 | Completar retención/disposición de las 4 series catalogadas sin ella (desde TRD) | Corrección datos | Media | Medio | XS | **Implementado parcial** (retención 4/4; disposición 1/4) | Ejecutado — falta B32-a | C1 |
-| BM-B16 | Catálogo completo de tipos PQRSD (felicitación, denuncia anticorrupción, queja anónima…) | Mejora | Media | Alto | S | Pend. validar | Requiere validación normativa | por definir |
+| BM-B16 | Catálogo completo de tipos PQRSD (felicitación, denuncia anticorrupción, queja anónima…) | Mejora | Media | Alto | S | **Cubierto** (23 tipos, 10 PQRSD Ley 1755; anonimato como atributo tipoPresentacion) | Reuso — no duplicar | C3 |
 | BM-B18 | Ciclo completo de la planilla (admin: anular, reimprimir, registrar entrega con firma escaneada) | Mejora | Media-Alta | Alto | M | Pend. validar | En evaluación | por definir |
 | BM-B17 | Correo interno "Asignación de solicitud" a la dependencia | Mejora | Media | Alto | S | **Implementado** (correo interno best-effort al asignar) | Ejecutado | C3 |
 | BM-B25 | Alerta/bandeja "Prioridad" (entes de control) | Mejora | Media-Alta | Alto | S-M | **Cubierto en gran parte** (proxima-accion urgencia + Prioridad + tipo PETICION_ENTES_CONTROL) | Reuso — residual gated funcionaria | C3 |
 | BM-B05 | Regla de 24 h para reasignación por no competencia | Nueva func. | Media-Alta | Alto | M | Identificado | Requiere validación normativa | por definir |
 | BM-B10 | Marca de atención prioritaria | Nueva func. | Media | Alto | S-M | Identificado | En evaluación | por definir |
-| BM-B03 | Digitalización de correspondencia física (imagen fiel) | Nueva func. | Media-Alta | Alto | M | Identificado | En evaluación | por definir |
+| BM-B03 | Digitalización de correspondencia física (imagen fiel) | Nueva func. | Media-Alta | Alto | M | **Diferido** (la "imagen fiel" AGN aplica al reemplazo/eliminación del físico → alcance Archivo Institucional, excluido ahora; hoy se conserva origen FISICO_ESCANER + PDF) | Pospuesto — capacidad de Archivo | por definir |
 | BM-B14 | Radicado pre-generado externo (máquina/reloj) opción Rad.Auto | Nueva func. | Media | Medio | S | Identificado | En evaluación | por definir |
 | BM-B15 | Override manual de días hábiles de respuesta | Mejora | Media | Medio | S | Pend. validar | Requiere validación normativa | por definir |
 | BM-B24 | Categoría "Sin Término" (felicitaciones, invitaciones) | Mejora | Media | Medio | S | **Lógica ya existe** (mis-pendientes NivelPendiente SIN_TERMINO); residual = filtro en búsqueda avanzada | Reuso — residual gated funcionaria | C3 |
