@@ -43,6 +43,11 @@ en su propio momento, con su propio diseño y autorización, respetando la gober
 - **Momento recomendado:** al abordar D9/D3 (no dentro de C1).
 - **Relación:** BM-D11; candidato a ADR de unificación de modelo. Detectada en
   Blueprint C1 §24.
+- **Actualización (implementación C1, 2026-07-14):** se confirmó que
+  `lib/radicacion.ts` (builder del modelo `clasificacionIA`) **no está importado en
+  ningún módulo** (`grep` de imports → 0) → **código muerto probable**. Por eso C1
+  no lo sella. Candidato a eliminación dentro de esta OAT (verificar que ninguna
+  regla de Firestore ni carga dinámica dependa de él antes de borrar).
 
 ## OAT-02
 **Consolidar los dos "tracks de salida" en un único agregado de dominio "Comunicación"**

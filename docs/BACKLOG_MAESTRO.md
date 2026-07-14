@@ -230,12 +230,12 @@ demanda real. Cada paso, sujeto a las Cuatro Preguntas y a autorización expresa
 | ID | Título | Tipo | Prior. | Valor | Esfuerzo | Estado | Decisión | Bloque |
 |---|---|---|---|---|---|---|---|---|
 | BM-B20 | **Módulo de Comunicaciones Internas** (solicitud/respuesta/circular/informativo entre dependencias) | Nueva func. | Alta | Muy Alto | XL | Identificado | En evaluación | por definir |
-| BM-B02 | Serie/subserie documental (TRD) en el radicado | Nueva func. | Alta | Muy Alto | L | Identificado | En evaluación | por definir |
+| BM-B02 | Serie/subserie documental (TRD) en el radicado | Nueva func. | Alta | Muy Alto | L | **Implementado** (C1: sellado en todos los canales) | Ejecutado | C1 |
 | BM-B01 | Formato del número de radicado (AAAAMM vs año) | Corrección | Alta | Alto | M | Pend. validar | Requiere validación normativa | por definir |
 | BM-B21 | Consecutivos por dependencia + serie propia de circulares | Nueva func. | Alta | Alto | L | Identificado | Requiere validación normativa | por definir |
 | BM-B23 | Firmante y circuito de firma de comunicaciones internas (revisar/corregir/firmar; físico/electrónico) | Mejora | Media-Alta | Alto | M | Identificado | En evaluación | por definir |
 | BM-B31 | Catálogo de cargos autorizados para firmar comunicaciones (G-GSC-170-003) | Nueva func. | Media | Alto | S | Identificado | Requiere validación normativa | por definir |
-| BM-B32 | Completar retención/disposición de las 4 series catalogadas sin ella (desde TRD) | Corrección datos | Media | Medio | XS | Identificado | En evaluación | por definir |
+| BM-B32 | Completar retención/disposición de las 4 series catalogadas sin ella (desde TRD) | Corrección datos | Media | Medio | XS | **Implementado parcial** (retención 4/4; disposición 1/4) | Ejecutado — falta B32-a | C1 |
 | BM-B16 | Catálogo completo de tipos PQRSD (felicitación, denuncia anticorrupción, queja anónima…) | Mejora | Media | Alto | S | Pend. validar | Requiere validación normativa | por definir |
 | BM-B18 | Ciclo completo de la planilla (admin: anular, reimprimir, registrar entrega con firma escaneada) | Mejora | Media-Alta | Alto | M | Pend. validar | En evaluación | por definir |
 | BM-B17 | Correo interno "Asignación de solicitud" a la dependencia | Mejora | Media | Alto | S | Identificado | En evaluación | por definir |
