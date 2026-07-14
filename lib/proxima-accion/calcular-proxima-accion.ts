@@ -1,5 +1,6 @@
 import type { VentanillaRadicado } from '@/src/types/ventanilla';
 import { diasRestantesHabiles } from '@/lib/tiempos-radicado';
+import { ESTADOS_ACTIVOS } from '@/lib/radicado-estados';
 
 /**
  * Panel Operativo Fase 1 — cálculo determinístico de la "próxima acción
@@ -35,10 +36,6 @@ export interface ProximaAccion {
   urgencia: UrgenciaAccion;
   ruleId:  RuleIdProximaAccion;
 }
-
-const ESTADOS_ACTIVOS = new Set<string>([
-  'PENDIENTE', 'ASIGNADO', 'EN_REVISION', 'EN_PROCESO', 'DEVUELTO', 'PRORROGA',
-]);
 
 function estaActivo(estadoActual: string): boolean {
   return ESTADOS_ACTIVOS.has(estadoActual);

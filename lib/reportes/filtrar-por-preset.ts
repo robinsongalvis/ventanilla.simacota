@@ -2,6 +2,7 @@ import type { TenantId } from '@/src/types/radicado';
 import type { VentanillaRadicado } from '@/src/types/ventanilla';
 import { fechaYmdColombia } from '@/lib/kpis-operativos/calcular-kpis-operativos';
 import { diasRestantesHabiles } from '@/lib/tiempos-radicado';
+import { ESTADOS_CERRADOS as ESTADOS_RESUELTOS } from '@/lib/radicado-estados';
 
 /**
  * Sprint 3C · Reportes — presets de período e indicadores del reporte.
@@ -25,7 +26,6 @@ export const ETIQUETA_PRESET: Record<PresetReporte, string> = {
   TODO:        'Histórico completo',
 };
 
-const ESTADOS_RESUELTOS = new Set<string>(['RESUELTO', 'RECHAZADO']);
 const ESTADOS_ASIGNADOS = new Set<string>(['ASIGNADO', 'EN_REVISION', 'EN_PROCESO']);
 const ESTADOS_DEVUELTOS = new Set<string>(['DEVUELTO', 'PRORROGA']);
 

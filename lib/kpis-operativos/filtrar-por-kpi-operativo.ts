@@ -1,5 +1,6 @@
 import type { VentanillaRadicado } from '@/src/types/ventanilla';
 import { fechaResolucion, fechaYmdColombia } from './calcular-kpis-operativos';
+import { ESTADOS_ACTIVOS, ESTADOS_CERRADOS as ESTADOS_RESUELTOS } from '@/lib/radicado-estados';
 
 /**
  * Panel Operativo Fase 2 — filtro operativo activo en la barra
@@ -14,11 +15,6 @@ export type FiltroKpiOperativo =
   | 'SIN_SELLAR'
   | 'CORREO_FALLIDO'
   | 'RESUELTOS_HOY';
-
-const ESTADOS_RESUELTOS = new Set<string>(['RESUELTO', 'RECHAZADO']);
-const ESTADOS_ACTIVOS = new Set<string>([
-  'PENDIENTE', 'ASIGNADO', 'EN_REVISION', 'EN_PROCESO', 'DEVUELTO', 'PRORROGA',
-]);
 
 const DIAS_MS = 24 * 60 * 60 * 1000;
 const VENTANA_SIN_SELLAR_MS = 30 * DIAS_MS;
