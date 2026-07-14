@@ -12,6 +12,14 @@ solo porque exista en el software de referencia. Toda propuesta se justifica por
 **J3** mejora medible para el ciudadano · **J4** reducción de carga administrativa ·
 **J5** innovación institucional.
 
+**Principio de Valor Neto (ADR-0020):** cada nueva capacidad debe **aumentar el
+valor sin incrementar innecesariamente la complejidad**. Si añade más complejidad
+que valor, se replantea o se descarta. Se evalúa como tercera pregunta de la
+compuerta: **P3** ¿el valor neto supera la complejidad añadida (código, operación,
+capacitación, mantenimiento)? Cada análisis mira también la plataforma de largo
+plazo (rejilla de sostenibilidad, lente F) y busca **consolidar/simplificar/
+reutilizar**, no solo agregar.
+
 **Campos:** id · título · descripción · fuente · evidencia · módulo · **tipo**
 (Corrección | Mejora | Nueva funcionalidad | Deuda técnica | Riesgo) ·
 **prioridad** (Crítica | Alta | Media | Baja) · impacto funcional · impacto
@@ -106,6 +114,41 @@ automática · **✕**=tarea repetitiva que desaparece.
 **Norte (criterio de éxito v2):** cada iniciativa debe **reducir trabajo manual**
 y **aumentar la autonomía** del sistema **sin** sustituir la decisión
 administrativa/jurídica (IA sugiere / funcionario decide es invariante).
+
+## F. Sostenibilidad — plataforma de largo plazo (ADR-0020)
+
+Cada ítem se evalúa contra la rejilla (escalabilidad · simplicidad operativa ·
+capacitación · reducción de carga · SIMI · experiencia ciudadano · cumplimiento ·
+seguridad/trazabilidad · mantenibilidad · reutilización · integraciones futuras ·
+crecimiento modular) y contra **P3 (valor neto > complejidad)**. Se prioriza
+**consolidar** sobre acumular.
+
+**Oportunidades de consolidación detectadas (unir features aisladas en un flujo
+más inteligente, en vez de módulos sueltos):**
+- **Motor de Comunicaciones** — BM-B17 (correo de asignación) + BM-B20
+  (comunicaciones internas) + BM-B23 (circuito de firma) + BM-B31 (cargos
+  autorizados) comparten remitente/destinatario/consecutivo/firma/notificación.
+  **Un solo dominio "Comunicaciones"** (envío interno/externo, plantillas, firma,
+  acuse) en lugar de cuatro features. Reutiliza numeración legal (helper H3) y
+  notificaciones. *P3: alto valor, complejidad contenida por reutilización.*
+- **Clasificación asistida** — BM-B02 (serie/subserie) + sugerencia de dependencia
+  + BM-B32 (retención) = **un flujo único "clasificar radicado"** donde SIMI
+  propone serie+dependencia+retención y el funcionario confirma. Evita tres
+  pantallas separadas.
+- **Contingencia operativa** — BM-B08/B09/B10 (falla del sistema, registro
+  diferido, atención preferencial) = **un modo contingencia** coherente, no tres
+  parches.
+- **Preparación para integraciones (no construir aún, no cerrar puertas):** el
+  modelo multi-tenant + foto inmutable de serie + identidad del solicitante ya
+  dejan la puerta abierta a GOV.CO / Carpeta Ciudadana / firma electrónica /
+  interoperabilidad SGDEA. Regla: **no acoplar** a Simacota lo que el modelo
+  multi-tenant ya generaliza (YAGNI + no cerrar puertas, AGENTS.md).
+
+**Decisiones revisables por evidencia (ADR-0020 §4):** ninguna decisión previa es
+restricción si hay evidencia objetiva de algo superior; se documenta y se propone
+por ADR que la supersede. *Ejemplo de disciplina:* BM-B01 (formato de radicado)
+podría revisar la decisión del formato si la TRD aprobada o la operación aportan
+evidencia — se trataría por ADR, no por inercia.
 
 ## Índice priorizable (impacto · costo · beneficio)
 
