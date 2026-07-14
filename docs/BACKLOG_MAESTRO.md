@@ -22,7 +22,8 @@ observaciones.
 | BM-B02 | Serie/subserie documental (TRD) en el radicado | Nueva func. | Alta | Muy Alto | L | Identificado | En evaluación | por definir |
 | BM-B01 | Formato del número de radicado (AAAAMM vs año) | Corrección | Alta | Alto | M | Pend. validar | Requiere validación normativa | por definir |
 | BM-B21 | Consecutivos por dependencia + serie propia de circulares | Nueva func. | Alta | Alto | L | Identificado | Requiere validación normativa | por definir |
-| BM-B23 | Firmante en comunicaciones internas (circuito de firma) | Mejora | Media-Alta | Alto | M | Identificado | En evaluación | por definir |
+| BM-B23 | Firmante y circuito de firma de comunicaciones internas (revisar/corregir/firmar; físico/electrónico) | Mejora | Media-Alta | Alto | M | Identificado | En evaluación | por definir |
+| BM-B31 | Catálogo de cargos autorizados para firmar comunicaciones (G-GSC-170-003) | Nueva func. | Media | Alto | S | Identificado | Requiere validación normativa | por definir |
 | BM-B16 | Catálogo completo de tipos PQRSD (felicitación, denuncia anticorrupción, queja anónima…) | Mejora | Media | Alto | S | Pend. validar | Requiere validación normativa | por definir |
 | BM-B18 | Ciclo completo de la planilla (admin: anular, reimprimir, registrar entrega con firma escaneada) | Mejora | Media-Alta | Alto | M | Pend. validar | En evaluación | por definir |
 | BM-B17 | Correo interno "Asignación de solicitud" a la dependencia | Mejora | Media | Alto | S | Identificado | En evaluación | por definir |
@@ -76,9 +77,13 @@ observaciones.
 - **Descripción:** al generar una comunicación interna, enviar copia a otras dependencias.
 - **Fuente:** M-GSC-004. **Evidencia:** §8.1.4 punto 14. **Tipo:** Mejora · **Prior.:** Media · **Valor:** Medio · **Esfuerzo:** M · **Estado:** Identificado · **Decisión:** En evaluación. **Dependencias:** BM-B20.
 
-### BM-B23 — Firmante en comunicaciones internas (circuito de firma)
-- **Descripción:** seleccionar el jefe que firma el documento generado. Extiende el circuito de firma que ya existe para respuestas SIMI.
-- **Fuente:** M-GSC-004. **Evidencia:** §8.1.4 punto 12. **Tipo:** Mejora · **Prior.:** Media-Alta · **Valor:** Alto · **Esfuerzo:** M · **Estado:** Identificado · **Decisión:** En evaluación. **Dependencias:** BM-B20; circuito de firma existente.
+### BM-B23 — Firmante y circuito de firma de comunicaciones internas
+- **Descripción:** seleccionar el jefe firmante y ejecutar el **circuito de firma**: la comunicación va a "Comunicaciones por firmar"; el firmante **revisa** y elige **CORREGIR** (comentario → vuelve al autor a MODIFICAR) o **FIRMAR**. Firma **electrónica** por el sistema, o **física** (imprimir → firmar → escanear el PDF firmado → cargar). Extiende el circuito que ya existe para respuestas SIMI.
+- **Fuente:** M-GSC-004 (§8.1.4 punto 12) + **P-GSC-170-003** (flujograma págs 3–4). **Módulo:** comunicaciones internas / firma. **Tipo:** Mejora · **Prior.:** Media-Alta · **Valor:** Alto · **Esfuerzo:** M · **Estado:** Identificado · **Decisión:** En evaluación. **Dependencias:** BM-B20, BM-B31; circuito de firma existente.
+
+### BM-B31 — Catálogo de cargos autorizados para firmar comunicaciones
+- **Descripción:** catálogo/parametrización de los cargos autorizados a firmar comunicaciones internas y externas (quién puede firmar qué), base del circuito de firma.
+- **Fuente:** P-GSC-170-003 (obs. 3, doc. de referencia G-GSC-8200-170-003). **Evidencia:** págs 1 y 3. **Módulo:** firma / gobernanza. **Tipo:** Nueva func. · **Prior.:** Media · **Valor:** Alto · **Esfuerzo:** S · **Estado:** Identificado · **Decisión:** Requiere validación normativa. **Dependencias:** BM-B23. **Observaciones:** el documento G-GSC-170-003 con los cargos concretos **no fue entregado** — pedirlo para el desarrollo.
 
 ### BM-B14 — Radicado pre-generado externo (Rad.Auto)
 - **Descripción:** opción para registrar un radicado **generado externamente** (máquina/reloj/dispositivo) en lugar del automático. Hoy solo autogeneramos.
@@ -141,12 +146,26 @@ Fuente canónica: `docs/PLAN_BLOQUE3.md` (D1–D10) y
 evitar duplicación. Todos **Pospuestos a Bloque 3** salvo BM-D09 (cierre del
 Bloque 2) y BM-D10 (branch protection, acción del propietario, **Aprobado**).
 
-## Estado del análisis de fuentes
-- **Leído en su totalidad** (vía `pymupdf`): P-GSC-170-001/014/007, M-GSC-002,
-  M-GSC-004, planilla, y las 10 TRD (100, 101, 110, 111, 112, 120, 130, 140×2,
-  150). **Ningún documento quedó sin analizar por limitaciones técnicas.**
-- **Pendiente de detalle (no de lectura):** el desglose serie-por-serie de las
-  TRD para BM-B02 se hará al scopear ese ítem (estructura confirmada: CÓDIGO /
-  SERIE / SUBSERIE / TIPOLOGÍA / retención gestión-central / disposición
-  CT-E-M-S, firmada por Secretaría General y Jefe de Archivo).
-- **Por incorporar cuando llegue:** retroalimentación de la Alcaldía (reuniones).
+## Estado del análisis de fuentes (verificación crítica de completitud)
+- **Leído en su totalidad** (vía `pymupdf`): **4 procedimientos** P-GSC-170-001,
+  **-003** (leído en esta ronda; faltaba), -007, -014; **2 manuales** M-GSC-002,
+  M-GSC-004; planilla F-GSC-238-37-001; **8 TRD únicas** (100, 101, 110, 111,
+  112, 120, 130, 140, 150 — "100 raíz" y "140 (1)" son **duplicados exactos**
+  verificados por hash). **Ningún documento entregado quedó sin analizar.**
+- **Pendiente de detalle (no de lectura):** desglose serie-por-serie de las TRD
+  para BM-B02 al scopearlo (estructura confirmada: CÓDIGO / SERIE / SUBSERIE /
+  TIPOLOGÍA / retención gestión-central / disposición CT-E-M-S, firmada por
+  Secretaría General y Jefe de Archivo).
+- **Documentos REFERENCIADOS en el corpus pero NO entregados** (obtenerlos para
+  completar el panorama y afinar ítems):
+  - **G-GSC-8200-170-003** Guía de cargos autorizados para firmar → **BM-B31/B23**.
+  - **M-GSC-8200-170-003** Manual Gestión del Servicio.
+  - **PO-GSC-8200-170-001** Política de PQRSD.
+  - **P-GFP-3100-170-039** Clasificar PQRSD de Hacienda → BM-B11.
+  - **NORMOGRAMA F-MC-1000-238,37-020** (normativa aplicable).
+  - Formatos: F-GSC-238-37-002 (Solicitud PQRSD), -37-006 (planilla atención),
+    -37-007 (control recepción), -37-017 (registro incidentes), -37-018
+    (digiturno) → afinan BM-B08/B09/B10.
+- **Por incorporar cuando llegue** (intake automático, ADR-0017): retroalimentación
+  de la Alcaldía (reuniones), observaciones de funcionarios, y cualquier documento
+  nuevo — se agregan a Backlog + Matriz sin duplicar, con trazabilidad de origen.

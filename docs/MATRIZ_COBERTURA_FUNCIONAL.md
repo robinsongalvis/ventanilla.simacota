@@ -107,6 +107,29 @@ con la Alcaldía**. Cada fila referencia el ítem del Backlog Maestro cuando apl
 | Medio de radicado (Oficio/Web/Email/Teléfono) | 🔎 | → **BM-B27** |
 | Ayuda in-app (video tutoriales + infografía) | ❌ | **BM-B28** |
 
+## P-GSC-170-003 — Gestión de Comunicaciones Internas y/o Externas
+
+| Aspecto funcional | Estado | Nota / Backlog |
+|---|---|---|
+| Generar comunicación interna/externa con consecutivo GSC | ❌ | **BM-B20/B21** |
+| Redactar con base en las TRD | ❌ | liga **BM-B02 ↔ BM-B20** |
+| Sección "Cuerpo" (redactar) + adjuntos | ❌ | **BM-B20** |
+| Circuito de firma: "Comunicaciones por firmar" → revisar → **Corregir/Firmar** | 🟡 | Existe para respuestas SIMI → **BM-B23** |
+| Firma física (imprimir/firmar/escanear/cargar) vs electrónica | 🟡 | Salidas con PDF ✅; internas ❌ → **BM-B23** |
+| Catálogo de cargos autorizados para firmar | ❌ | **BM-B31** (G-GSC-170-003 no entregado) |
+| Copia a líder / "todos" | ❌ | **BM-B22** |
+
+## Documentos referenciados en el corpus pero NO entregados
+
+| Documento | Relevancia | Backlog |
+|---|---|---|
+| G-GSC-8200-170-003 Guía de cargos autorizados para firmar | Alta | BM-B31/B23 |
+| M-GSC-8200-170-003 Manual Gestión del Servicio | Media | — |
+| PO-GSC-8200-170-001 Política de PQRSD | Media | — |
+| P-GFP-3100-170-039 Clasificar PQRSD de Hacienda | Baja | BM-B11 |
+| NORMOGRAMA F-MC-1000-238,37-020 | Media (normativa) | varios |
+| Formatos F-GSC-238-37-002/006/007/017/018 | Media | BM-B08/B09/B10 |
+
 ## TRD (10 archivos: 100 Alcalde … 150 Agricultura)
 
 | Aspecto | Estado | Nota / Backlog |
