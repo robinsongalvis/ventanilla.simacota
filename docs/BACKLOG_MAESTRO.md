@@ -72,8 +72,8 @@ moderna multi-tenant.
 **Naturaleza de los ítems (obligación vs. valor):**
 - **Norma (obligatorias):** BM-B02 (AGN/SGDEA), BM-B01 (AGN 060 numeración),
   BM-B05 (Ley 1755 24h), BM-B10 (atención preferencial), BM-B12 (Dcto 396),
-  BM-B16 (tipos Ley 1755), BM-B03 (imagen fiel AGN), BM-D09 (subsanación art.5),
-  BM-D03/D04/D05 (protección de datos / integridad).
+  BM-B16 (tipos Ley 1755), BM-B03 (imagen fiel AGN), BM-B32 (Ley 594 retención),
+  BM-D09 (subsanación art.5), BM-D03/D04/D05 (protección de datos / integridad).
 - **Buena práctica:** BM-B18, BM-B23, BM-B31, BM-B06/B07 (custodia), BM-B08/B09.
 - **Operativa (Simacota):** BM-B20, BM-B17, BM-B25, BM-B26, BM-B19, BM-B11.
 - **UX:** BM-B28, BM-B29, BM-B04.
@@ -117,6 +117,7 @@ administrativa/jurídica (IA sugiere / funcionario decide es invariante).
 | BM-B21 | Consecutivos por dependencia + serie propia de circulares | Nueva func. | Alta | Alto | L | Identificado | Requiere validación normativa | por definir |
 | BM-B23 | Firmante y circuito de firma de comunicaciones internas (revisar/corregir/firmar; físico/electrónico) | Mejora | Media-Alta | Alto | M | Identificado | En evaluación | por definir |
 | BM-B31 | Catálogo de cargos autorizados para firmar comunicaciones (G-GSC-170-003) | Nueva func. | Media | Alto | S | Identificado | Requiere validación normativa | por definir |
+| BM-B32 | Completar retención/disposición de las 4 series catalogadas sin ella (desde TRD) | Corrección datos | Media | Medio | XS | Identificado | En evaluación | por definir |
 | BM-B16 | Catálogo completo de tipos PQRSD (felicitación, denuncia anticorrupción, queja anónima…) | Mejora | Media | Alto | S | Pend. validar | Requiere validación normativa | por definir |
 | BM-B18 | Ciclo completo de la planilla (admin: anular, reimprimir, registrar entrega con firma escaneada) | Mejora | Media-Alta | Alto | M | Pend. validar | En evaluación | por definir |
 | BM-B17 | Correo interno "Asignación de solicitud" a la dependencia | Mejora | Media | Alto | S | Identificado | En evaluación | por definir |
@@ -177,6 +178,20 @@ administrativa/jurídica (IA sugiere / funcionario decide es invariante).
 ### BM-B31 — Catálogo de cargos autorizados para firmar comunicaciones
 - **Descripción:** catálogo/parametrización de los cargos autorizados a firmar comunicaciones internas y externas (quién puede firmar qué), base del circuito de firma.
 - **Fuente:** P-GSC-170-003 (obs. 3, doc. de referencia G-GSC-8200-170-003). **Evidencia:** págs 1 y 3. **Módulo:** firma / gobernanza. **Tipo:** Nueva func. · **Prior.:** Media · **Valor:** Alto · **Esfuerzo:** S · **Estado:** Identificado · **Decisión:** Requiere validación normativa. **Dependencias:** BM-B23. **Observaciones:** el documento G-GSC-170-003 con los cargos concretos **no fue entregado** — pedirlo para el desarrollo.
+
+### BM-B32 — Completar retención/disposición de las series catalogadas
+- **Descripción:** 4 de las 6 series que la ventanilla clasifica (`LICENCIA_CONSTRUCCION`, `LICENCIA_SUBDIVISION`, `PROCESO_VERBAL_ABREVIADO`, `DECLARACIONES_TRIBUTARIAS`) están en el catálogo **sin** `retencionGestionAnios` / `retencionCentralAnios` / `disposicionFinal`. Las TRD sí traen esos valores (extraídos en la re-verificación: p. ej. Licencia de Construcción 120.22.01 → gestión 2 / central 10; Proceso Verbal Abreviado 112.26.07 → gestión 2 / central 18). Completar el catálogo **desde la TRD** (no inventar valores).
+- **Fuente:** TRD 2025 (dependencias 112, 120, 130) — desglose serie-por-serie ronda 2026-07-14. **Evidencia:** tablas de retención por subserie. **Módulo:** `lib/catalogos/series-documentales.ts`. **Tipo:** Corrección de datos · **Prior.:** Media · **Valor:** Medio · **Esfuerzo:** XS · **Estado:** Identificado · **Decisión:** En evaluación (pospuesto — Bloque 2 congelado). **Naturaleza:** Norma (Ley 594/2000, AGN — ciclo vital documental).
+- **Necesidad que resuelve:** el radicado hoy nace sin retención/disposición para 4 series, dejando incompleta la evidencia del ciclo vital exigida por SGDEA.
+- **Beneficio Alcaldía:** cumplimiento archivístico verificable; base para transferencias primarias/secundarias y eliminación reglada.
+- **Beneficio ciudadano:** conservación correcta de sus expedientes (tutelas, licencias) durante el plazo legal.
+- **Impacto operativo:** nulo en el flujo (solo enriquece la foto de serie); no cambia pantallas.
+- **Impacto técnico:** mínimo — completar 4 objetos en un catálogo ya tipado; sin migración (los radicados guardan foto inmutable; aplica a nuevos).
+- **Valor institucional:** modelo de gestión documental completo, condición para ser referente SGDEA.
+- **Justificación:** **J1** (obligación Ley 594/AGN) + **J4** (evita corrección manual posterior por archivo).
+- **Qué automatiza SIMI:** puede **proponer** la serie/subserie y **precargar** retención/disposición leyendo la TRD; nada más.
+- **Qué decisión sigue humana:** la **validación archivística** de los valores de retención/disposición (Jefe de Archivo) — la IA no fija plazos legales de conservación.
+- **Compuerta (ADR-0018):** **P1** sí existe el modelo (solo faltan datos, no código) · **P2** la forma más simple es completar el catálogo existente, **sin** replicar el archivo completo (~56 series) que la ventanilla no produce.
 
 ### BM-B14 — Radicado pre-generado externo (Rad.Auto)
 - **Descripción:** opción para registrar un radicado **generado externamente** (máquina/reloj/dispositivo) en lugar del automático. Hoy solo autogeneramos.
@@ -242,13 +257,23 @@ Bloque 2) y BM-D10 (branch protection, acción del propietario, **Aprobado**).
 ## Estado del análisis de fuentes (verificación crítica de completitud)
 - **Leído en su totalidad** (vía `pymupdf`): **4 procedimientos** P-GSC-170-001,
   **-003** (leído en esta ronda; faltaba), -007, -014; **2 manuales** M-GSC-002,
-  M-GSC-004; planilla F-GSC-238-37-001; **8 TRD únicas** (100, 101, 110, 111,
-  112, 120, 130, 140, 150 — "100 raíz" y "140 (1)" son **duplicados exactos**
-  verificados por hash). **Ningún documento entregado quedó sin analizar.**
-- **Pendiente de detalle (no de lectura):** desglose serie-por-serie de las TRD
-  para BM-B02 al scopearlo (estructura confirmada: CÓDIGO / SERIE / SUBSERIE /
-  TIPOLOGÍA / retención gestión-central / disposición CT-E-M-S, firmada por
-  Secretaría General y Jefe de Archivo).
+  M-GSC-004; planilla F-GSC-238-37-001; **9 TRD por dependencia** (100, 101, 110,
+  111, 112, 120, 130, 140, 150 — "100 raíz" y "140 (1)" son **duplicados exactos**
+  por hash). **Ningún documento entregado quedó sin analizar.**
+- **Desglose serie-por-serie COMPLETADO (ronda 2026-07-14, vía detección de
+  tablas):** ~56 series / ~110 subseries en las 9 dependencias, cada una con
+  retención (gestión/central) + disposición final (CT/E/M/S). Hallazgo de la
+  re-verificación: la extracción inicial omitió **110 (Secretaría General y
+  Gobierno — donde vive la Ventanilla) y 112 (Inspección de Policía)** porque solo
+  existen como archivo "(1)"; se corrigió y se analizaron las 9. La estructura
+  está firmada por Secretaría General y Jefe de Archivo.
+- **Hallazgo crítico (medición > opinión):** la plataforma **ya modela** el ciclo
+  vital documental — `lib/catalogos/series-documentales.ts` tiene serie, subserie,
+  `retencionGestionAnios`, `retencionCentralAnios`, `disposicionFinal`. **No es
+  brecha.** El catálogo es un **subconjunto deliberado** (solo las ~6 series que la
+  ventanilla produce, no el archivo completo de ~56 series) — arquitectura correcta:
+  **no se replica el archivo por imitación** (regla ADR-0019). Brecha real y
+  pequeña: 4 de esas 6 series no tienen retención/disposición cargada → **BM-B32**.
 - **Documentos REFERENCIADOS en el corpus pero NO entregados** (obtenerlos para
   completar el panorama y afinar ítems):
   - **G-GSC-8200-170-003** Guía de cargos autorizados para firmar → **BM-B31/B23**.
