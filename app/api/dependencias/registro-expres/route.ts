@@ -9,6 +9,10 @@ import { removeUndefinedDeep } from '@/lib/firestore/removeUndefined';
 import { formatearRadicadoInstitucional } from '@/lib/radicado-institucional';
 import { formatearRadicadoSalida } from '@/lib/salidas/radicado-salida';
 import {
+  confirmarConsecutivosLegales,
+  leerConsecutivosLegales,
+} from '@/lib/server/consecutivo-legal';
+import {
   construirPaqueteExpres,
   validarRegistroExpres,
   type EntradaExpres,
@@ -101,40 +105,43 @@ export async function POST(request: Request): Promise<NextResponse> {
       return NextResponse.json({ error: errorValidacion }, { status: 400 });
     }
 
-    // Consecutivos de ENTRADA y SALIDA en una sola transacción — el
-    // paquete exprés nunca queda a medias por numeración.
+    // H3 (Bloque 2): consecutivos de ENTRADA y SALIDA + sus documentos en UNA
+    // sola transacción → si algo falla, ni los contadores avanzan ni los
+    // documentos existen (invariante no-huérfano). Dentro del callback SOLO
+    // cómputo puro y tx.set: construirPaqueteExpres es puro; ningún I/O.
     const db = getFirebaseAdminDb();
-    const year = ahora.getFullYear();
-    const refEntrada = db.doc(`counters/radicados-${year}`);
-    const refSalida = db.doc(`counters/salidas-${year}`);
 
-    const ids = await db.runTransaction(async (tx) => {
-      const [snapEntrada, snapSalida] = await Promise.all([
-        tx.get(refEntrada), tx.get(refSalida),
+    const { paquete, ids } = await db.runTransaction(async (tx) => {
+      const pendientes = await leerConsecutivosLegales(tx, db, ahora, [
+        { serie: 'radicados', formatear: formatearRadicadoInstitucional },
+        { serie: 'salidas',   formatear: formatearRadicadoSalida },
       ]);
-      const consecutivoEntrada = Number(snapEntrada.data()?.ultimo ?? 0) + 1;
-      const consecutivoSalida = Number(snapSalida.data()?.ultimo ?? 0) + 1;
-      const marca = { anio: year, actualizadoEn: ahora.toISOString() };
-      tx.set(refEntrada, { ultimo: consecutivoEntrada, ...marca }, { merge: true });
-      tx.set(refSalida, { ultimo: consecutivoSalida, ...marca }, { merge: true });
-      return {
-        consecutivoEntrada,
-        consecutivoSalida,
-        radicadoId: formatearRadicadoInstitucional(consecutivoEntrada, ahora),
-        salidaId:   formatearRadicadoSalida(consecutivoSalida, ahora),
+      const idsTx = {
+        consecutivoEntrada: pendientes[0].consecutivo,
+        consecutivoSalida:  pendientes[1].consecutivo,
+        radicadoId:         pendientes[0].documentoId,
+        salidaId:           pendientes[1].documentoId,
       };
+      const paqueteTx = construirPaqueteExpres(
+        entrada, idsTx, { uid: usuario.uid, nombre: usuario.nombre }, ahora,
+      );
+
+      confirmarConsecutivosLegales(tx, ahora, pendientes);
+      tx.set(
+        db.doc(`ventanilla_radicados/${idsTx.radicadoId}`),
+        removeUndefinedDeep(paqueteTx.radicado as unknown as Record<string, unknown>),
+      );
+      tx.set(
+        db.doc(`ventanilla_salidas/${idsTx.salidaId}`),
+        removeUndefinedDeep(paqueteTx.salida as unknown as Record<string, unknown>),
+      );
+      return { paquete: paqueteTx, ids: idsTx };
     });
 
-    const paquete = construirPaqueteExpres(
-      entrada, ids, { uid: usuario.uid, nombre: usuario.nombre }, ahora,
-    );
-
-    await db.doc(`ventanilla_radicados/${ids.radicadoId}`).set(
-      removeUndefinedDeep(paquete.radicado as unknown as Record<string, unknown>),
-    );
-    await db.doc(`ventanilla_salidas/${ids.salidaId}`).set(
-      removeUndefinedDeep(paquete.salida as unknown as Record<string, unknown>),
-    );
+    // Trazabilidad post-commit. DEUDA declarada (N8-adyacente, fuera del
+    // alcance de H3): el evento fundacional no es atómico con el radicado; un
+    // fallo aquí deja el radicado válido sin su evento inicial. No introduce
+    // fantasma (el consecutivo ya tiene su documento). Ver DEUDA_TECNICA.
     for (const [i, evento] of paquete.eventosEntrada.entries()) {
       await db.collection(`ventanilla_radicados/${ids.radicadoId}/trazabilidad`).add(
         removeUndefinedDeep({

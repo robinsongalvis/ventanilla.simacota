@@ -48,6 +48,10 @@ describe('todas las puertas de entrada usan el formateador canónico', () => {
 
   it('el registro exprés usa la misma serie', () => {
     const expres = readFileSync('app/api/dependencias/registro-expres/route.ts', 'utf8');
-    expect(expres).toContain('formatearRadicadoInstitucional(consecutivoEntrada, ahora)');
+    // El formateador canónico ahora se pasa al helper transaccional de
+    // consecutivos (Bloque 2, fix H3) en vez de invocarse suelto; la serie
+    // sigue siendo la misma (radicados → 1-110-...).
+    expect(expres).toContain('formatear: formatearRadicadoInstitucional');
+    expect(expres).toContain("serie: 'radicados'");
   });
 });
