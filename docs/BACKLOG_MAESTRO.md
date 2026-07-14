@@ -20,6 +20,16 @@ capacitación, mantenimiento)? Cada análisis mira también la plataforma de lar
 plazo (rejilla de sostenibilidad, lente F) y busca **consolidar/simplificar/
 reutilizar**, no solo agregar.
 
+**Las Cuatro Preguntas — compuerta ejecutiva de autorización (ADR-0021):** ninguna
+iniciativa se propone a desarrollo sin superarlas **con evidencia objetiva**:
+**(1)** ¿resuelve un problema real? · **(2)** ¿es la mejor solución posible? ·
+**(3)** ¿aporta más valor que complejidad? · **(4)** ¿contribuye a la visión de
+largo plazo? Son la síntesis de las compuertas detalladas (P1–P3 · lentes A–F ·
+J1–J5), no las reemplazan. Además, cada iniciativa lleva **Definición de Éxito**
+(cómo sabremos que aportó valor) y **relaciones del mapa de capacidades** — ver
+las dos secciones nuevas más abajo. El Plan Maestro es un **roadmap
+arquitectónico**, no una lista plana.
+
 **Campos:** id · título · descripción · fuente · evidencia · módulo · **tipo**
 (Corrección | Mejora | Nueva funcionalidad | Deuda técnica | Riesgo) ·
 **prioridad** (Crítica | Alta | Media | Baja) · impacto funcional · impacto
@@ -31,7 +41,11 @@ desarrollo | Diferido | Descartado | Implementado) · **decisión** (En evaluaci
 observaciones · **(ADR-0018)** **naturaleza** (Norma | Buena práctica | Operativa
 | UX | Innovación) y la **compuerta de dos preguntas** antes de proponer
 desarrollo: **(P1)** ¿existe ya algo equivalente en nuestra plataforma? · **(P2)**
-¿hay una forma más simple sin copiar el software de referencia?
+¿hay una forma más simple sin copiar el software de referencia? · **(ADR-0021)**
+**definición de éxito** (objetivo · resultado medible · KPIs · verificación de
+reducción · beneficios ciudadano/funcionario · riesgos+mitigación · costo de
+mantenimiento · impacto en arquitectura · evolución futura) y **relaciones del
+mapa de capacidades** (habilita · depende de · consolida · junto a · puede esperar).
 
 ## Análisis del Arquitecto Funcional (ADR-0018) — hacia una plataforma superior
 
@@ -149,6 +163,59 @@ restricción si hay evidencia objetiva de algo superior; se documenta y se propo
 por ADR que la supersede. *Ejemplo de disciplina:* BM-B01 (formato de radicado)
 podría revisar la decisión del formato si la TRD aprobada o la operación aportan
 evidencia — se trataría por ADR, no por inercia.
+
+## Definición de Éxito (ADR-0021) — cómo sabremos que aportó valor
+
+Antes de proponer implementación, cada iniciativa (de mayor valor primero) declara,
+cuando aplique: **objetivo esperado · resultado medible · KPIs · verificación de
+reducción (línea base → medición posterior, ADR-0015) · beneficio ciudadano ·
+beneficio funcionario · riesgos + mitigación · costo de mantenimiento · impacto en
+arquitectura · efecto en la evolución futura.** Si un KPI no tiene métrica
+disponible, se declara el supuesto (Principio 13), no se presenta como hecho.
+
+**Ejemplo aplicado — BM-B20 (Motor de Comunicaciones):**
+- **Objetivo:** un único dominio de comunicaciones internas/externas con
+  numeración, plantilla, firma y acuse, en lugar de oficios manuales sueltos.
+- **Resultado medible:** % de comunicaciones emitidas desde la plataforma (meta
+  progresiva) vs. fuera de ella.
+- **KPIs:** tiempo medio de emisión de un oficio; nº de consecutivos manuales
+  eliminados; % de comunicaciones con firma trazable; reprocesos por error de
+  numeración.
+- **Verificación de reducción:** medir hoy (línea base: minutos por oficio, errores
+  de consecutivo) y volver a medir tras la entrega.
+- **Beneficio ciudadano:** respuestas más rápidas y con trazabilidad de firma.
+- **Beneficio funcionario:** deja de buscar el consecutivo y de redactar en blanco
+  (SIMI asiste); firma con circuito claro.
+- **Riesgos + mitigación:** unicidad del consecutivo (reusar helper H3, ya probado);
+  firma no repudiable (circuito de cargos BM-B31, validación normativa).
+- **Costo de mantenimiento:** medio — un dominio bien encapsulado cuesta menos que
+  4 features sueltas (favorece la consolidación).
+- **Impacto en arquitectura:** reutiliza numeración legal y notificaciones; no
+  duplica.
+- **Evolución futura:** habilita firma electrónica e interoperabilidad SGDEA sin
+  rediseño.
+
+## Mapa de Capacidades — roadmap arquitectónico (ADR-0021)
+
+El Plan Maestro se organiza por **dominios funcionales**, no por features sueltas.
+Relaciones: **⤳ habilita · ⇠ depende de · ⊕ consolida · ∥ implementar junto · ⏸
+puede esperar**.
+
+| Dominio | Iniciativas | Relaciones clave |
+|---|---|---|
+| **Comunicaciones** | B20, B21, B22, B23, B31, B17 | ⊕ un solo dominio (comparten remitente/consecutivo/firma/notificación) · ⇠ helper numeración legal (H3, existe) · ∥ B23+B31 (firma+cargos) · ⤳ notificaciones y oficios |
+| **Clasificación** | B02, B32, sugerencia de dependencia | ⊕ flujo único "clasificar radicado" (SIMI propone serie+dependencia+retención) · ⇠ catálogo `series-documentales.ts` (existe) · B32 ⏸ puede esperar (solo completa datos) |
+| **Contingencia** | B08, B09, B10 | ⊕ un "modo contingencia" coherente · ∥ los tres juntos (falla → registro diferido → preferencial) |
+| **Planillas** | B18, B19, B06, B07 | ⇠ planilla base (existe) · ⤳ control de entrega y custodia |
+| **Bandejas / Estados** | B24, B25, B26 | ⊕ un modelo de bandejas (devueltas/prioridad/sin-término) sobre el estado del radicado (existe) |
+| **Identidad / Solicitante** | solicitante frecuente (implementado) | ⤳ precarga de datos en radicación y comunicaciones |
+| **IA-SIMI (transversal)** | clasificación asistida, borradores de respuesta, alertas | ⤳ habilita reducción de carga en casi todos los dominios · invariante: sugiere, no decide |
+| **Integraciones (futuro)** | GOV.CO, Carpeta Ciudadana, firma electrónica, interoperabilidad SGDEA | ⇠ multi-tenant + foto de serie + identidad (ya no cierran puertas) · no construir aún (YAGNI) |
+
+**Orden natural sugerido (no autorización):** primero cerrar Bloque 2; luego los
+dominios que más carga quitan y más reutilizan (Clasificación asistida y
+Comunicaciones), después Contingencia y Bandejas; Integraciones cuando exista
+demanda real. Cada paso, sujeto a las Cuatro Preguntas y a autorización expresa.
 
 ## Índice priorizable (impacto · costo · beneficio)
 
