@@ -268,3 +268,28 @@ export function diasRestantesHabiles(fechaVencimiento: string | Date, desde: str
 
   return count;
 }
+
+/**
+ * Suma `meses` calendario a una fecha con la regla del **Código Civil art. 67**
+ * (y Ley 4 de 1913): el plazo vence el día correspondiente del mes destino y,
+ * si ese día no existe en ese mes (p. ej. 31 de enero + 1 mes), vence el
+ * **último día** del mes destino. `Date.setMonth` NO aplica esta regla
+ * (desbordaría al mes siguiente), por eso se calcula el clamping explícito.
+ *
+ * Ancla a mediodía local para evitar corrimientos de día por zona horaria
+ * (mismo patrón que el resto del módulo). Uso previsto: BM-B33 — plazo de
+ * subsanación de 1 mes calendario desde la notificación (Ley 1755 Art. 17).
+ *
+ * Ejemplos: 31 ene 2026 +1 → 28 feb 2026; 31 ene 2024 +1 → 29 feb 2024;
+ * 30/31 mar +1 → 30 abr; 30 dic 2026 +1 → 30 ene 2027.
+ */
+export function sumarMesCalendario(fecha: string | Date, meses = 1): Date {
+  const base = atLocalNoon(fecha);
+  if (Number.isNaN(base.getTime())) return base; // fecha inválida → se propaga
+  // JS normaliza el desbordamiento de mes/año al construir la fecha.
+  const mesDestino = base.getMonth() + meses;
+  // Último día del mes destino = día 0 del mes siguiente.
+  const ultimoDiaDestino = new Date(base.getFullYear(), mesDestino + 1, 0, 12, 0, 0, 0);
+  const diaDestino = Math.min(base.getDate(), ultimoDiaDestino.getDate());
+  return new Date(base.getFullYear(), mesDestino, diaDestino, 12, 0, 0, 0);
+}
