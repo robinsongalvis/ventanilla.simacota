@@ -1,9 +1,41 @@
 # Blueprint Arquitectónico — BM-B33 · Subsanación y suspensión de términos (Ley 1755, Art. 17)
 
-**Estado:** **v2 — validado normativamente (gobierno-digital, 14 jul 2026) con
-correcciones incorporadas.** Definition of Ready alcanzable; pendiente solo autorización
-del propietario. **No autoriza implementación** (ADR-0023). Capacidad del **núcleo**
-(D3/Trámite), no un dominio nuevo. **Ortogonal a H3.** **Rol:** Chief Software Architect.
+**Estado:** **v3 — en implementación autorizada (14 jul 2026).** Validado por
+gobierno-digital (v2) y reforzado con QA + Seguridad (v3, abajo). OAT-05 ejecutada
+(estados centralizados, commit `248027a`). **Capacidad del núcleo** (D3/Trámite).
+**Ortogonal a H3.** **Rol:** Chief Software Architect (decisiones centralizadas).
+
+> **Refuerzos v3 — decisiones de arquitectura (QA + Seguridad, escaladas al Arquitecto
+> Principal):**
+> 1. **Reloj server-side (Seg. Alto):** `fechaNotificacion` y `diasHabilesRestantes` se
+>    calculan en el servidor (`new Date()` + `diasRestantesHabiles`), **nunca** desde el
+>    body — evita retrodatar/inflar el término. El body solo trae `motivo`. (§10, §12)
+> 2. **`sumarMesCalendario` con clamping C.C. art. 67 (QA Alto):** `Date.setMonth` NO
+>    sirve (31 ene +1 mes daría 3 mar). Nueva función pura en `tiempos-radicado`: si el
+>    día no existe en el mes destino, usa el último día de ese mes. Ancla a mediodía
+>    local (patrón `atLocalNoon` ya existente). (§6.3, pruebas CP-2.x)
+> 3. **Rol del desistimiento (Seg. Alto):** confirmar desistimiento = acto que extingue
+>    el derecho de petición → exige **ADMIN o JEFE_DEPENDENCIA** del tenant (nuevo
+>    `canConfirmarDesistimiento`), no un FUNCIONARIO cualquiera. Requerir subsanación =
+>    `canOperateTenant` (como devolver). (§9)
+> 4. **Cron solo propone (Seg. Alto):** nunca escribe `DESISTIDO`; filtra `isTest`;
+>    autenticado con `autorizarCron`. (§10, prueba obligatoria)
+> 5. **Reactivación desacoplada (Seg. Medio):** la "subsanación suficiente" la declara el
+>    **funcionario del tenant** en una acción explícita (`reactivar`), separada de
+>    `completar-datos` (que es de ADMIN/RECEPCIONISTA). Subsanación parcial NO reactiva. (§10)
+> 6. **ANONIMA/RESERVADA (Seg. Medio):** RESERVADA se notifica a su correo (usar
+>    `debeNotificarCiudadano`, no el gate estricto). **ANONIMA no tiene contacto** → no se
+>    puede anclar la suspensión por correo → **fuera de alcance v3**: se marca para vía
+>    manual/edicto y se documenta (no se deja el término corriendo en silencio: la UI
+>    advierte). (§16)
+> 7. **Prórroga fija +1 mes** calendario, **una sola vez**, solicitada antes de vencer;
+>    rechazo extemporáneo. (§6.4)
+> 8. **Controles temporales ejecutables (Seg. Medio):** `requerir-subsanacion` rechaza si
+>    `suspension.activa`; no se encadenan requerimientos. (§6.6)
+> 9. **0 días hábiles restantes (QA):** reactivación vence el **día hábil siguiente** al
+>    aporte (mínimo 1). (§6.5)
+> 10. **`EN_SUBSANACION` = reloj detenido** en semáforo y en el cron `alertas-vencimiento`
+>    (no emite falsas alertas de vencimiento). (§17, no-regresión CPR-8.x)
 
 > **Validación normativa (gobierno-digital):** concepto **"REQUIERE CORRECCIONES"** →
 > incorporadas 7 correcciones (abajo). El diseño acertó en lo esencial (el requerimiento
