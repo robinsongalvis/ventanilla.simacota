@@ -6,8 +6,12 @@ import {
 import { RadicadoActionError } from '@/lib/server/radicados-security';
 import { getFirebaseAdminDb } from '@/lib/firebase-admin';
 import { removeUndefinedDeep } from '@/lib/firestore/removeUndefined';
-import { construirPlanilla } from '@/lib/planillas/construir-planilla';
+import { construirPlanilla, formatearPlanillaId } from '@/lib/planillas/construir-planilla';
 import { obtenerPendientesDeReparto } from '@/lib/server/planillas-security';
+import {
+  confirmarConsecutivosLegales,
+  leerConsecutivosLegales,
+} from '@/lib/server/consecutivo-legal';
 import { logError } from '@/lib/logger';
 
 /* ══════════════════════════════════════════════════════════════
@@ -54,31 +58,30 @@ export async function POST(): Promise<NextResponse> {
       );
     }
 
-    // Consecutivo anual transaccional (misma mecánica del 2-SAL).
+    // H3 (Bloque 2): consecutivo de planilla + documento en UNA sola
+    // transacción → si algo falla, ni el contador avanza ni la planilla existe
+    // (invariante no-huérfano). Dentro del callback SOLO cómputo puro y tx.set:
+    // construirPlanilla es puro; ningún I/O. (`pendientes` = lista de reparto
+    // ya leída antes de la tx; `consecutivos` = resultado del helper.)
     const ahora = new Date();
-    const year = ahora.getFullYear();
-    const refCounter = db.doc(`counters/planillas-${year}`);
-    const consecutivo = await db.runTransaction(async (tx) => {
-      const snap = await tx.get(refCounter);
-      const siguiente = Number(snap.data()?.ultimo ?? 0) + 1;
-      tx.set(refCounter, {
-        ultimo: siguiente,
-        anio: year,
-        actualizadoEn: ahora.toISOString(),
-      }, { merge: true });
-      return siguiente;
+
+    const planilla = await db.runTransaction(async (tx) => {
+      const consecutivos = await leerConsecutivosLegales(tx, db, ahora, [
+        { serie: 'planillas', formatear: formatearPlanillaId },
+      ]);
+      const planillaTx = construirPlanilla(
+        pendientes,
+        consecutivos[0].consecutivo,
+        { uid: usuario.uid, nombre: usuario.nombre },
+        ahora,
+      );
+      confirmarConsecutivosLegales(tx, ahora, consecutivos);
+      tx.set(
+        db.doc(`ventanilla_planillas/${planillaTx.planillaId}`),
+        removeUndefinedDeep(planillaTx as unknown as Record<string, unknown>),
+      );
+      return planillaTx;
     });
-
-    const planilla = construirPlanilla(
-      pendientes,
-      consecutivo,
-      { uid: usuario.uid, nombre: usuario.nombre },
-      ahora,
-    );
-
-    await db.doc(`ventanilla_planillas/${planilla.planillaId}`).set(
-      removeUndefinedDeep(planilla as unknown as Record<string, unknown>),
-    );
 
     return NextResponse.json({ ok: true, planilla });
   } catch (error) {
