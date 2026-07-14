@@ -1,8 +1,16 @@
-# Backlog Maestro de Hallazgos y Requerimientos
+# Backlog Maestro — Plan Maestro de Evolución de la Plataforma
 
-**Único inventario oficial de trabajo futuro** (ADR-0017). Vivo: se actualiza en
-cada análisis, sin duplicados, con trazabilidad de origen. **Ningún ítem pasa a
+**Único inventario oficial de trabajo futuro** (ADR-0017), elevado a **Plan
+Maestro de Evolución** (ADR-0019): cada iniciativa lleva justificación
+**funcional, técnica, normativa y estratégica**. Vivo: se actualiza en cada
+análisis, sin duplicados, con trazabilidad de origen. **Ningún ítem pasa a
 desarrollo sin autorización explícita del propietario.**
+
+**Regla de arquitectura permanente (ADR-0019):** ninguna funcionalidad se propone
+solo porque exista en el software de referencia. Toda propuesta se justifica por
+≥1 criterio: **J1** obligación legal/normativa · **J2** necesidad operativa ·
+**J3** mejora medible para el ciudadano · **J4** reducción de carga administrativa ·
+**J5** innovación institucional.
 
 **Campos:** id · título · descripción · fuente · evidencia · módulo · **tipo**
 (Corrección | Mejora | Nueva funcionalidad | Deuda técnica | Riesgo) ·
@@ -75,6 +83,29 @@ moderna multi-tenant.
 proponerlo a desarrollo (P1 equivalente existente / P2 forma más simple). Se
 registra en el ítem. Ejemplos ya resueltos: BM-B23 (P1: sí, existe firma SIMI →
 unificar, no duplicar); BM-B02 (P2: IA sugiere la serie en vez de captura manual).
+
+## E. Automatizar — Transformación institucional (ADR-0019)
+
+*¿Cómo hacer cada proceso mejor, más simple, más automático y más útil?* Análisis
+por proceso: **M**=manual hoy · **→IA**=SIMI/IA como apoyo (sugiere, funcionario
+decide) · **✋**=aprobación humana obligatoria (legal/control) · **⟳**=precarga
+automática · **✕**=tarea repetitiva que desaparece.
+
+| Proceso | Hoy manual (M) | Automatizable (→IA / ⟳ / ✕) | Aprobación humana (✋) |
+|---|---|---|---|
+| **Radicación** | captura de datos, tipo, dependencia, folios | →IA clasifica tipo + **serie TRD** + sugiere dependencia; ⟳ solicitante frecuente por cédula; ⟳ término legal (ya); OCR del escaneo extrae asunto/remitente (✕ tecleo) | ✋ el acto de radicar (número legal) |
+| **Asignación/reasignación** | búsqueda de dependencia competente | →IA sugiere dependencia; ✕ enrutamiento manual; ⟳ correo interno de asignación (BM-B17) | ✋ la asignación/reasignación (Ley 1755) |
+| **Respuesta** | redacción desde cero | →IA (SIMI copiloto) borrador; ✕ página en blanco | ✋ aprobación y **firma** (BM-B23) |
+| **Vencimientos** | seguimiento manual | →IA alertas predictivas (ya) + proyección de carga | — |
+| **Planilla** | selección, generación, control de entrega | ✕ detección de radicados sin planilla (BM-B19); generación PDF (ya); ⟳ datos de entrega | ✋ firma de recibido (custodia física) |
+| **Comunicaciones internas** | consecutivo por dependencia, redacción | →IA borrador; ⟳ consecutivo por dependencia (BM-B21, ✕ búsqueda manual) | ✋ firmante autorizado (BM-B23/B31) |
+| **Clasificación TRD** | selección manual de serie | →IA sugiere serie/subserie + retención/disposición | ✋ validación del funcionario/archivo |
+| **Contingencia** | registro físico + radicado diferido | ✕ cola de radicación diferida; ⟳ aviso al ciudadano al restablecer (BM-B08) | ✋ verificación al restablecer |
+| **Reportes/informes** | consolidación | →IA generación (MIPG ya) + tablero predictivo | — |
+
+**Norte (criterio de éxito v2):** cada iniciativa debe **reducir trabajo manual**
+y **aumentar la autonomía** del sistema **sin** sustituir la decisión
+administrativa/jurídica (IA sugiere / funcionario decide es invariante).
 
 ## Índice priorizable (impacto · costo · beneficio)
 
