@@ -99,3 +99,14 @@ export function canAssignRadicado(user: InternalUserSession, currentTenant: Tena
 export function canReclassifyTipoSolicitud(user: InternalUserSession): boolean {
   return user.rol === 'ADMIN' || user.rol === 'RECEPCIONISTA';
 }
+
+/**
+ * BM-B33 — confirmar el desistimiento tácito es un ACTO ADMINISTRATIVO MOTIVADO
+ * que extingue el derecho de petición (Ley 1755 Art. 17). A diferencia de una
+ * devolución interna (reversible), exige rol superior: ADMIN o JEFE_DEPENDENCIA
+ * del tenant. NO lo puede un FUNCIONARIO/RECEPCIONISTA cualquiera.
+ */
+export function canConfirmarDesistimiento(user: InternalUserSession, tenantId: TenantId): boolean {
+  return user.rol === 'ADMIN'
+    || (user.rol === 'JEFE_DEPENDENCIA' && user.tenantId === tenantId);
+}

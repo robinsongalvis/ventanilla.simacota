@@ -27,6 +27,10 @@ export type TipoNotificacion =
   | 'ASIGNACION_INTERNA'
   | 'PRORROGA'
   | 'RESPUESTA_OFICIAL'
+  /** BM-B33 — requerimiento de subsanación (Ley 1755 Art. 17). */
+  | 'SUBSANACION'
+  /** BM-B33 — acto de desistimiento tácito notificado al ciudadano. */
+  | 'DESISTIMIENTO'
   | 'RESET_PASSWORD'
   /** Sprint Ventanilla Operativa 2 — envío manual de la constancia de radicación por correo. */
   | 'CONSTANCIA';
