@@ -238,7 +238,7 @@ demanda real. Cada paso, sujeto a las Cuatro Preguntas y a autorización expresa
 | BM-B32 | Completar retención/disposición de las 4 series catalogadas sin ella (desde TRD) | Corrección datos | Media | Medio | XS | **Implementado parcial** (retención 4/4; disposición 1/4) | Ejecutado — falta B32-a | C1 |
 | BM-B16 | Catálogo completo de tipos PQRSD (felicitación, denuncia anticorrupción, queja anónima…) | Mejora | Media | Alto | S | Pend. validar | Requiere validación normativa | por definir |
 | BM-B18 | Ciclo completo de la planilla (admin: anular, reimprimir, registrar entrega con firma escaneada) | Mejora | Media-Alta | Alto | M | Pend. validar | En evaluación | por definir |
-| BM-B17 | Correo interno "Asignación de solicitud" a la dependencia | Mejora | Media | Alto | S | Identificado | En evaluación | por definir |
+| BM-B17 | Correo interno "Asignación de solicitud" a la dependencia | Mejora | Media | Alto | S | **Implementado** (correo interno best-effort al asignar) | Ejecutado | C3 |
 | BM-B25 | Alerta/bandeja "Prioridad" (entes de control) | Mejora | Media-Alta | Alto | S-M | **Cubierto en gran parte** (proxima-accion urgencia + Prioridad + tipo PETICION_ENTES_CONTROL) | Reuso — residual gated funcionaria | C3 |
 | BM-B05 | Regla de 24 h para reasignación por no competencia | Nueva func. | Media-Alta | Alto | M | Identificado | Requiere validación normativa | por definir |
 | BM-B10 | Marca de atención prioritaria | Nueva func. | Media | Alto | S-M | Identificado | En evaluación | por definir |
