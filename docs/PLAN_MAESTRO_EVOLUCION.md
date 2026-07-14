@@ -397,7 +397,9 @@ sin afectar arquitectura.**
 ## Gobernanza
 
 Documento **rector de diseño**, no autorización. Mantiene vigentes ADR-0001 y
-0014–0022. Secuencia acordada: **validar las fichas y el mapa → elegir la primera
-capacidad → superar las Cuatro Preguntas (ADR-0021) → autorización expresa →
-desarrollo.** El Bloque 2 sigue congelado hasta CI + barrida (H3) y validación de
-la funcionaria. Ninguna capacidad inicia por este documento.
+0014–0023. Secuencia acordada (con la compuerta Blueprint de ADR-0023):
+**validar fichas y mapa → elegir la primera capacidad → construir su Blueprint
+Arquitectónico completo → análisis crítico (con bucle de re-revisión) → Cuatro
+Preguntas (ADR-0021) + Valor Neto (ADR-0020) → Definition of Ready → autorización
+expresa → desarrollo.** El Bloque 2 sigue congelado hasta CI + barrida (H3) y
+validación de la funcionaria. Ninguna capacidad inicia por este documento.
