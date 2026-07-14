@@ -68,15 +68,27 @@ export const SERIES_VENTANILLA = {
   },
   LICENCIA_CONSTRUCCION: {
     cs: '22', sub: '01', nombre: 'Licencias — Licencia de Construcción',
+    // TRD 120.22.01: retención gestión 2 / central 10.
+    // disposicionFinal pendiente de validación del Jefe de Archivo (B32-a).
+    retencionGestionAnios: 2, retencionCentralAnios: 10,
   },
   LICENCIA_SUBDIVISION: {
-    cs: '22', sub: '06', nombre: 'Licencias — Licencia de Subdivisión',
+    // TRD 120.22.06 la nombra "Licencia de Subdivisión Rural".
+    cs: '22', sub: '06', nombre: 'Licencias — Licencia de Subdivisión Rural',
+    // TRD 120.22.06: retención gestión 2 / central 10. Disposición pendiente (B32-a).
+    retencionGestionAnios: 2, retencionCentralAnios: 10,
   },
   PROCESO_VERBAL_ABREVIADO: {
     cs: '26', sub: '07', nombre: 'Procesos — Proceso Verbal Abreviado Policial',
+    // TRD 112.26.07: retención gestión 2 / central 18; disposición Selección
+    // (texto TRD: "se seleccionará una muestra").
+    retencionGestionAnios: 2, retencionCentralAnios: 18, disposicionFinal: 'S',
   },
   DECLARACIONES_TRIBUTARIAS: {
     cs: '11', nombre: 'Declaraciones Tributarias',
+    // TRD 130.11.01 (Declaraciones de Retenciones en la Fuente): gestión 2 /
+    // central 8. Disposición pendiente de validación del Jefe de Archivo (B32-a).
+    retencionGestionAnios: 2, retencionCentralAnios: 8,
   },
 } as const satisfies Record<string, SerieDocumentalDef>;
 
