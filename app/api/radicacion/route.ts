@@ -10,6 +10,7 @@ import {
   type TipoSolicitudId,
 } from '@/lib/tiempos-radicado';
 import { formatearRadicadoInstitucional } from '@/lib/radicado-institucional';
+import { sugerirSerieDocumental } from '@/lib/catalogos/series-documentales';
 import {
   confirmarConsecutivosLegales,
   leerConsecutivosLegales,
@@ -407,6 +408,12 @@ export async function POST(request: Request) {
       clasificacion: {
         oficinaDestino: TENANT_RECEPCION,
         zonaGeografica: ZONA_DEFAULT,
+        // C1 — el radicado nace clasificado en su serie TRD (foto inmutable).
+        // Reutiliza la función pura del catálogo; no toca la numeración (H3).
+        ...(() => {
+          const serie = sugerirSerieDocumental(tipoSolicitud.id, TENANT_RECEPCION);
+          return serie ? { serieDocumental: serie } : {};
+        })(),
       },
       detalle: {
         asunto,

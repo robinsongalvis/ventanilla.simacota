@@ -5,6 +5,7 @@ import type {
 } from '@/src/types/ventanilla';
 import type { SalidaOficial } from '@/src/types/salida';
 import { NOMBRES_TENANT } from '@/src/types/reglas-negocio';
+import { sugerirSerieDocumental } from '@/lib/catalogos/series-documentales';
 import {
   calcularFechaVencimiento,
   resolverTipoSolicitud,
@@ -151,6 +152,12 @@ export function construirPaqueteExpres(
       funcionarioResponsableUid:    actor.uid,
       funcionarioResponsableNombre: actor.nombre,
       fechaAsignacionResponsable:   ahora.toISOString(),
+      // C1 — el radicado nace clasificado en su serie TRD (foto inmutable).
+      // Función pura del catálogo; no interviene en la numeración (H3).
+      ...(() => {
+        const serie = sugerirSerieDocumental(e.tipoSolicitudId, e.dependencia);
+        return serie ? { serieDocumental: serie } : {};
+      })(),
     },
     detalle: {
       asunto:       e.asunto.trim(),
