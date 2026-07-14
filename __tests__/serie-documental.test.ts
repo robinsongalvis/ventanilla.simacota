@@ -163,4 +163,12 @@ describe('C1 — el radicado nace clasificado en todos los canales', () => {
     expect(route).toContain('sugerirSerieDocumental');
     expect(route).toContain('serieDocumental: serie');
   });
+
+  it('la reclasificación re-deriva la serie (BM-B11)', () => {
+    const route = readFileSync('app/api/radicados/[radicadoId]/reclasificar/route.ts', 'utf8');
+    expect(route).toContain('sugerirSerieDocumental');
+    expect(route).toContain("'clasificacion.serieDocumental'");
+    // deja huella del cambio de serie
+    expect(route).toContain('serieAnteriorCodigo');
+  });
 });
