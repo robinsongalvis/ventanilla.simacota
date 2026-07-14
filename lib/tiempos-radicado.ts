@@ -293,3 +293,80 @@ export function sumarMesCalendario(fecha: string | Date, meses = 1): Date {
   const diaDestino = Math.min(base.getDate(), ultimoDiaDestino.getDate());
   return new Date(base.getFullYear(), mesDestino, diaDestino, 12, 0, 0, 0);
 }
+
+/* ──────────────────────────────────────────────
+   BM-B33 — Reloj legal de la subsanación (Ley 1755 Art. 17)
+
+   Funciones puras (sin IO, sin tipos de dominio → sin ciclo con
+   `src/types/ventanilla.ts`). Los endpoints/cron las orquestan.
+────────────────────────────────────────────── */
+
+/**
+ * Plazo del ciudadano para subsanar: 1 mes calendario desde la NOTIFICACIÓN
+ * del requerimiento (no desde la emisión). Devuelve `Date` (mediodía local).
+ */
+export function plazoSubsanacion(fechaNotificacion: string | Date): Date {
+  return sumarMesCalendario(fechaNotificacion, 1);
+}
+
+/**
+ * Prórroga del ciudadano (Art. 17): hasta un término igual (1 mes calendario)
+ * a partir de la fecha límite vigente. Una sola vez.
+ */
+export function plazoConProrroga(fechaLimiteActual: string | Date): Date {
+  return sumarMesCalendario(fechaLimiteActual, 1);
+}
+
+/**
+ * Reactivación del término al subsanar: se reanuda por los días hábiles que
+ * quedaban, contados **desde el día siguiente** al aporte (Art. 17, no reinicia).
+ * Caso límite (0 restantes): vence el día hábil siguiente al aporte (mínimo 1).
+ */
+export function reactivarVencimiento(
+  fechaAporte: string | Date,
+  diasHabilesRestantes: number,
+  festivosExtra: string[] = [],
+): Date {
+  const inicio = atLocalNoon(fechaAporte);
+  const festivos = new Set([
+    ...festivosColombia(inicio.getFullYear()),
+    ...festivosColombia(inicio.getFullYear() + 1),
+    ...festivosExtra,
+  ]);
+  let pendientes = Math.max(1, Math.trunc(diasHabilesRestantes));
+  let cursor = inicio;
+  while (pendientes > 0) {
+    cursor = addDays(cursor, 1);            // arranca el día SIGUIENTE al aporte
+    if (esDiaHabil(cursor, festivos)) pendientes -= 1;
+  }
+  return cursor;
+}
+
+/**
+ * ¿El requerimiento se emite dentro de la ventana legal? Art. 17: dentro de los
+ * 10 días (hábiles, por consistencia con el resto de términos) desde la radicación.
+ */
+export function dentroVentanaRequerimiento(
+  fechaRadicado: string | Date,
+  ahora: string | Date = new Date(),
+  maxDiasHabiles = 10,
+): boolean {
+  const transcurridos = diasRestantesHabiles(ahora, fechaRadicado);
+  return transcurridos >= 0 && transcurridos <= maxDiasHabiles;
+}
+
+/** ¿La prórroga se solicita a tiempo (antes de vencer, inclusive el último día)? */
+export function prorrogaEsOportuna(
+  fechaLimite: string | Date,
+  ahora: string | Date = new Date(),
+): boolean {
+  return atLocalNoon(ahora).getTime() <= atLocalNoon(fechaLimite).getTime();
+}
+
+/** ¿Venció el plazo de subsanación? (para el cron: propone solo si venció). */
+export function subsanacionVencida(
+  fechaLimiteEfectiva: string | Date,
+  ahora: string | Date = new Date(),
+): boolean {
+  return atLocalNoon(ahora).getTime() > atLocalNoon(fechaLimiteEfectiva).getTime();
+}
