@@ -9,6 +9,11 @@ capacidades institucionales**: dominios coherentes, sin módulos paralelos, con
 máxima reutilización de lo ya construido. El objetivo no es copiar el referente,
 sino una plataforma moderna, modular, mantenible y evolutiva.
 
+**Documento rector asociado:** las fichas arquitectónicas completas por capacidad
+(20 campos + balance deuda/complejidad/valor neto) y el mapa de relaciones están en
+[`PLAN_MAESTRO_EVOLUCION.md`](PLAN_MAESTRO_EVOLUCION.md). Este archivo aporta la
+vista de arquitectura (dominios, diagrama, roadmap); aquél, el detalle por capacidad.
+
 ---
 
 ## Parte A — Inventario de la plataforma actual (evidencia)

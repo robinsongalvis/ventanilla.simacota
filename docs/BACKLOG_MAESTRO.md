@@ -7,11 +7,12 @@ análisis, sin duplicados, con trazabilidad de origen. **Ningún ítem pasa a
 desarrollo sin autorización explícita del propietario.**
 
 > **Fase de construcción por capacidades (ADR-0022):** este backlog se reorganiza
-> por **capacidades**, no por orden de descubrimiento. La vista rectora es la
-> **Arquitectura Funcional Objetivo** en
-> [`ARQUITECTURA_FUNCIONAL_OBJETIVO.md`](ARQUITECTURA_FUNCIONAL_OBJETIVO.md)
-> (dominios, roadmap por capacidades, reutiliza/reemplaza/simplifica/innova). Los
-> ítems BM-* son las piezas; las **capacidades** son la unidad de entrega.
+> por **capacidades**, no por orden de descubrimiento. Documento **rector**:
+> [`PLAN_MAESTRO_EVOLUCION.md`](PLAN_MAESTRO_EVOLUCION.md) (fichas arquitectónicas
+> por capacidad + balance deuda/complejidad/valor neto + mapa de relaciones). Vista
+> de arquitectura: [`ARQUITECTURA_FUNCIONAL_OBJETIVO.md`](ARQUITECTURA_FUNCIONAL_OBJETIVO.md)
+> (dominios, roadmap). Los ítems BM-* son las **piezas**; las **capacidades** son la
+> unidad de entrega.
 
 **Regla de arquitectura permanente (ADR-0019):** ninguna funcionalidad se propone
 solo porque exista en el software de referencia. Toda propuesta se justifica por
