@@ -1,7 +1,11 @@
 # Blueprint Arquitectónico — C11 · Archivo Institucional (Nivel 1)
 
-**Estado:** EN REVISIÓN → Definition of Ready. **No autoriza implementación** (ADR-0023).
-Capacidad **nueva**, ortogonal a H3. **Rol:** Chief Software Architect.
+**Estado:** **IDENTIFICADA — DIFERIDA a fase posterior (NO autorizada, 14 jul 2026).**
+Decisión del propietario: mantener el foco en el núcleo de la Ventanilla y no abrir un
+nuevo dominio funcional todavía. El diseño queda listo (Definition of Ready cumplida) para
+retomarse tal cual cuando se decida evolucionar hacia el módulo de Archivo Institucional
+(ahí se incorporarán el rol ARCHIVO, el catálogo TRD completo y la administración
+documental). **No autoriza implementación** (ADR-0023). Capacidad nueva, ortogonal a H3.
 
 - **Alcance elegido (propietario):** Nivel 1 — el **rol Archivo** es **dueño de la TRD
   completa** y **confirma la disposición final**. Cierra B32-a de raíz. *No* incluye
