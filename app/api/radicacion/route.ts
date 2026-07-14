@@ -10,6 +10,11 @@ import {
   type TipoSolicitudId,
 } from '@/lib/tiempos-radicado';
 import { formatearRadicadoInstitucional } from '@/lib/radicado-institucional';
+import {
+  confirmarConsecutivosLegales,
+  leerConsecutivosLegales,
+} from '@/lib/server/consecutivo-legal';
+import { randomUUID } from 'node:crypto';
 import { enviarEmail } from '@/lib/email/mailer';
 import {
   buildConfirmacionRadicacionHtml,
@@ -53,7 +58,6 @@ const CANALES_RESPUESTA = new Set<CanalRespuesta>([
   'DIRECCION_FISICA',
 ]);
 const TIPOS_PRESENTACION = new Set<TipoPresentacionPqrsd>(['IDENTIFICADA', 'ANONIMA', 'RESERVADA']);
-const CANAL_RADICADO = 'WEB';
 const MEDIO_RECEPCION: MedioRecepcion = 'WEB';
 const TENANT_RECEPCION: TenantId = 'VENTANILLA_UNICA';
 const ZONA_DEFAULT: ZonaGeografica = 'CASCO_URBANO';
@@ -168,63 +172,30 @@ function validarArchivos(files: File[]): string[] {
   return errores;
 }
 
-async function generarRadicadoInstitucionalAdmin(fecha: Date): Promise<{
-  radicadoId: string;
-  consecutivo: number;
-}> {
-  const db = getFirebaseAdminDb();
-  const year = fecha.getFullYear();
-  const counterRef = db.doc(`counters/radicados-${year}`);
 
-  return db.runTransaction(async (transaction) => {
-    const snap = await transaction.get(counterRef);
-    const ultimo = Number(snap.data()?.ultimo ?? 0);
-    const consecutivo = ultimo + 1;
-
-    transaction.set(counterRef, {
-      anio: year,
-      ultimo: consecutivo,
-      actualizadoEn: fecha.toISOString(),
-      canal: CANAL_RADICADO,
-    }, { merge: true });
-
-    return {
-      consecutivo,
-      // Mismo formateador canónico de toda entrada: 1-110-{año}-{####}
-      // (110 = oficina radicadora; el canal WEB queda en medioRecepcion).
-      radicadoId: formatearRadicadoInstitucional(consecutivo, fecha),
-    };
-  });
-}
-
-async function subirArchivoAdmin(file: File, radicadoId: string, orden: number): Promise<ArchivoRadicado> {
+function bucketStorage() {
   const bucketName = process.env.FIREBASE_STORAGE_BUCKET;
   if (!bucketName) {
     throw new Error('FIREBASE_STORAGE_BUCKET no configurado.');
   }
+  return getFirebaseAdminStorage().bucket(bucketName);
+}
 
-  const filename = `${Date.now()}_${orden}_${sanitizeFilename(file.name)}`;
-  const path = `radicados/${radicadoId}/${filename}`;
+/** H3: guarda los bytes en una ruta de Storage (usado para el staging previo
+ *  a la transacción). No calcula el path — el caller decide staging vs final. */
+async function guardarEnStorage(file: File, path: string): Promise<void> {
   const buffer = Buffer.from(await file.arrayBuffer());
+  await bucketStorage().file(path).save(buffer, {
+    resumable: false,
+    metadata: { contentType: file.type || 'application/octet-stream' },
+  });
+}
 
-  await getFirebaseAdminStorage()
-    .bucket(bucketName)
-    .file(path)
-    .save(buffer, {
-      resumable: false,
-      metadata: {
-        contentType: file.type || 'application/octet-stream',
-      },
-    });
-
-  return {
-    nombre: file.name,
-    url: '',
-    path,
-    tipo: file.type || 'application/octet-stream',
-    tamanioKB: Math.max(1, Math.round(file.size / 1024)),
-    orden,
-  };
+/** H3: mueve un objeto de staging a su ruta final tras confirmar la
+ *  transacción. Storage no es transaccional con Firestore (N8): un fallo aquí
+ *  deja el radicado válido y el adjunto pendiente de conciliación. */
+async function moverEnStorage(origen: string, destino: string): Promise<void> {
+  await bucketStorage().file(origen).move(destino);
 }
 
 function parseAnalisisIa(value: string): AnalisisIA | undefined {
@@ -345,16 +316,46 @@ export async function POST(request: Request) {
     }
 
     const ahora = new Date();
-    const { radicadoId, consecutivo } = await generarRadicadoInstitucionalAdmin(ahora);
-    radicadoIdActual = radicadoId;
     const termino = calcularFechaVencimiento(ahora, tipoSolicitudIdRaw);
-    const archivos = await Promise.all(files.map((file, index) => subirArchivoAdmin(file, radicadoId, index + 1)));
     const tipoSolicitud = TIPOS_SOLICITUD[tipoSolicitudIdRaw];
     const esAnonimo = tipoPresentacionRaw === 'ANONIMA';
     const identidadReservada = tipoPresentacionRaw === 'RESERVADA';
     const solicitanteNombre = esAnonimo ? 'Anónimo / Reservado' : nombre;
     const consultaToken = !email ? generarTokenConsulta() : undefined;
     const asunto = `${tipoSolicitud.nombre}: ${descripcion.slice(0, 90)}${descripcion.length > 90 ? '...' : ''}`;
+
+    // H3 (Bloque 2): staging → transacción → finalize.
+    // 1) Subir adjuntos a STAGING antes de consumir el consecutivo: un fallo de
+    //    subida no crea radicado ni gasta número.
+    const db = getFirebaseAdminDb();
+    const requestId = randomUUID();
+    const preparados = files.map((file, index) => ({
+      file,
+      orden: index + 1,
+      filename: `${Date.now()}_${index + 1}_${sanitizeFilename(file.name)}`,
+      tipo: file.type || 'application/octet-stream',
+      tamanioKB: Math.max(1, Math.round(file.size / 1024)),
+    }));
+    await Promise.all(preparados.map((p) =>
+      guardarEnStorage(p.file, `radicados/_pendientes/${requestId}/${p.filename}`),
+    ));
+
+    // 2) Consecutivo + documento en UNA transacción (atómico). Dentro del
+    //    callback SOLO cómputo puro y tx.set; ningún I/O de Storage.
+    const { radicadoId, archivos } = await db.runTransaction(async (tx) => {
+      const [consecRadicado] = await leerConsecutivosLegales(tx, db, ahora, [
+        { serie: 'radicados', formatear: formatearRadicadoInstitucional },
+      ]);
+      const radicadoId = consecRadicado.documentoId;
+      const consecutivo = consecRadicado.consecutivo;
+      const archivos: ArchivoRadicado[] = preparados.map((p) => ({
+        nombre: p.file.name,
+        url: '',
+        path: `radicados/${radicadoId}/${p.filename}`,
+        tipo: p.tipo,
+        tamanioKB: p.tamanioKB,
+        orden: p.orden,
+      }));
 
     const radicado: VentanillaRadicado = removeUndefinedDeep({
       radicadoId,
@@ -417,8 +418,21 @@ export async function POST(request: Request) {
       analisisIa,
     });
 
-    const db = getFirebaseAdminDb();
-    await db.doc(`ventanilla_radicados/${radicadoId}`).set(radicado);
+      confirmarConsecutivosLegales(tx, ahora, [consecRadicado]);
+      tx.set(db.doc(`ventanilla_radicados/${radicadoId}`), radicado);
+      return { radicadoId, archivos };
+    });
+    radicadoIdActual = radicadoId;
+
+    // 3) Finalize: mover adjuntos de staging a su ruta final (post-commit; el
+    //    radicado ya es válido — un fallo de move NO crea fantasma; N8 lo
+    //    concilia luego, deuda declarada).
+    await Promise.all(preparados.map((p) =>
+      moverEnStorage(
+        `radicados/_pendientes/${requestId}/${p.filename}`,
+        `radicados/${radicadoId}/${p.filename}`,
+      ).catch((error) => logError({ radicadoId, modulo: 'radicacion/finalize-adjunto', error })),
+    ));
     await db.collection(`ventanilla_radicados/${radicadoId}/trazabilidad`).add(removeUndefinedDeep({
       eventoId: `ev_${radicadoId}_RADICACION`,
       fecha: ahora.toISOString(),

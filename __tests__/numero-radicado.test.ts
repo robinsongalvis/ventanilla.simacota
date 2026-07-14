@@ -42,8 +42,10 @@ describe('consulta pública — el validador acepta nuevo y viejo formato', () =
 describe('todas las puertas de entrada usan el formateador canónico', () => {
   it('la API ciudadana web no arma el número a mano', () => {
     const api = readFileSync('app/api/radicacion/route.ts', 'utf8');
-    expect(api).toContain('formatearRadicadoInstitucional(consecutivo, fecha)');
-    expect(api).not.toContain('`1-${CANAL_RADICADO}');
+    // El formateador canónico ahora se pasa al helper transaccional de
+    // consecutivos (Bloque 2, fix H3), no se invoca suelto ni se arma a mano.
+    expect(api).toContain('formatear: formatearRadicadoInstitucional');
+    expect(api).toContain("serie: 'radicados'");
   });
 
   it('el registro exprés usa la misma serie', () => {
