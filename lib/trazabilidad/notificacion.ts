@@ -23,6 +23,8 @@ import { removeUndefinedDeep } from '@/lib/firestore/removeUndefined';
 export type TipoNotificacion =
   | 'RADICACION'
   | 'ASIGNACION'
+  /** BM-B17 — correo interno a la dependencia asignada (distinto del aviso al ciudadano). */
+  | 'ASIGNACION_INTERNA'
   | 'PRORROGA'
   | 'RESPUESTA_OFICIAL'
   | 'RESET_PASSWORD'
