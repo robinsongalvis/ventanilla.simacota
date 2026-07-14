@@ -4,7 +4,10 @@ on:
   push:
     branches: [ main, develop, release/fase5-hardening ]
   pull_request:
-    branches: [ main, develop, release/fase5-hardening ]
+    # pr1-base y pr2-h3 son las bases del stack de release de H3 (PR apilados):
+    # se añaden SOLO al trigger para que los PR contra ellas corran los mismos
+    # checks que un PR contra main. No cambia el comportamiento para main.
+    branches: [ main, develop, release/fase5-hardening, pr1-base, pr2-h3 ]
 
 jobs:
   validate:
