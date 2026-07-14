@@ -4,10 +4,15 @@ import {
   requireActiveInternalUser,
 } from '@/lib/server/internal-auth';
 import { RadicadoActionError } from '@/lib/server/radicados-security';
-import { uploadOficioSalidaAdmin } from '@/lib/server/salidas-security';
+import { moverOficioSalida, uploadOficioSalidaAdmin } from '@/lib/server/salidas-security';
 import { getFirebaseAdminDb } from '@/lib/firebase-admin';
 import { removeUndefinedDeep } from '@/lib/firestore/removeUndefined';
 import { formatearRadicadoSalida } from '@/lib/salidas/radicado-salida';
+import {
+  confirmarConsecutivosLegales,
+  leerConsecutivosLegales,
+} from '@/lib/server/consecutivo-legal';
+import { randomUUID } from 'node:crypto';
 import {
   construirDocSalida,
   construirNotaSalida,
@@ -99,42 +104,49 @@ export async function POST(request: Request): Promise<NextResponse> {
       }
     }
 
-    // Consecutivo 2-SAL transaccional (misma mecánica del registro exprés).
+    // H3 (Bloque 2): staging → transacción → finalize.
+    // 1) PDF opcional a STAGING: valida y sube ANTES de consumir el consecutivo
+    //    (un PDF inválido no crea salida ni gasta número).
     const ahora = new Date();
-    const year = ahora.getFullYear();
-    const refCounter = db.doc(`counters/salidas-${year}`);
-    const { consecutivo, salidaId } = await db.runTransaction(async (tx) => {
-      const snap = await tx.get(refCounter);
-      const siguiente = Number(snap.data()?.ultimo ?? 0) + 1;
-      tx.set(refCounter, {
-        ultimo: siguiente,
-        anio: year,
-        actualizadoEn: ahora.toISOString(),
-      }, { merge: true });
-      return {
-        consecutivo: siguiente,
-        salidaId: formatearRadicadoSalida(siguiente, ahora),
-      };
-    });
-
-    // PDF opcional — se sube ANTES de crear el doc, para que el libro
-    // nazca completo y nunca haya que actualizarlo.
+    const requestId = randomUUID();
     const archivo = formData.get('archivo');
-    const oficio = archivo instanceof File && archivo.size > 0
-      ? await uploadOficioSalidaAdmin(archivo, salidaId)
+    const oficioStaged = archivo instanceof File && archivo.size > 0
+      ? await uploadOficioSalidaAdmin(archivo, `salidas/_pendientes/${requestId}`)
       : null;
 
-    const salida = {
-      ...construirDocSalida(entrada, salidaId, consecutivo, {
-        uid: usuario.uid, nombre: usuario.nombre,
-      }, ahora),
-      archivoPath:   oficio?.path ?? null,
-      archivoNombre: oficio?.nombre ?? null,
-    };
+    // 2) Consecutivo 2-SAL + documento del libro en UNA transacción (atómico).
+    //    El libro nace COMPLETO (con su archivoPath final) y nunca se actualiza.
+    //    Dentro del callback SOLO cómputo puro y tx.set; ningún I/O.
+    const { consecutivo, salidaId, salida } = await db.runTransaction(async (tx) => {
+      const [consec] = await leerConsecutivosLegales(tx, db, ahora, [
+        { serie: 'salidas', formatear: formatearRadicadoSalida },
+      ]);
+      const salidaId = consec.documentoId;
+      const consecutivo = consec.consecutivo;
+      const salida = {
+        ...construirDocSalida(entrada, salidaId, consecutivo, {
+          uid: usuario.uid, nombre: usuario.nombre,
+        }, ahora),
+        archivoPath:   oficioStaged ? `salidas/${salidaId}/${oficioStaged.filename}` : null,
+        archivoNombre: oficioStaged?.nombre ?? null,
+      };
+      confirmarConsecutivosLegales(tx, ahora, [consec]);
+      tx.set(
+        db.doc(`ventanilla_salidas/${salidaId}`),
+        removeUndefinedDeep(salida as unknown as Record<string, unknown>),
+      );
+      return { consecutivo, salidaId, salida };
+    });
 
-    await db.doc(`ventanilla_salidas/${salidaId}`).set(
-      removeUndefinedDeep(salida as unknown as Record<string, unknown>),
-    );
+    // 3) Finalize: mover el oficio de staging a su ruta final (post-commit; la
+    //    salida ya es válida — un fallo de move NO crea fantasma; N8 concilia
+    //    luego, deuda declarada).
+    if (oficioStaged) {
+      await moverOficioSalida(
+        oficioStaged.path,
+        `salidas/${salidaId}/${oficioStaged.filename}`,
+      ).catch((error) => logError({ radicadoId: '', modulo: 'salidas/finalize-oficio', error }));
+    }
 
     // El amarre: la historia del radicado de entrada muestra el despacho.
     if (salida.radicadoEntradaId) {
@@ -151,7 +163,7 @@ export async function POST(request: Request): Promise<NextResponse> {
             salida.destinatario.nombre,
             salida.dependenciaOrigen,
           ),
-          metadata: { salidaId, conArchivo: Boolean(oficio) },
+          metadata: { salidaId, conArchivo: Boolean(oficioStaged) },
         } as Record<string, unknown>));
     }
 
