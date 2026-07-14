@@ -307,3 +307,15 @@ mejoras detectadas se derivan como deuda trazable, no se arrastran por inercia.*
 **autorización expresa** del propietario y la **liberación del Bloque 2** (cierre de
 H3 con CI + barrida y validación de la funcionaria). Este Blueprint **no** autoriza
 código.
+
+## H. Hallazgos Arquitectónicos Transversales (OAT)
+
+Detectada durante este análisis (registro canónico en
+[`../OAT_REGISTRO.md`](../OAT_REGISTRO.md)). **No autoriza cambios.**
+
+| OAT | Título | Prioridad | Momento recomendado |
+|---|---|---|---|
+| [OAT-01](../OAT_REGISTRO.md#oat-01) | Unificar el modelo del radicado (dual `radicado.ts`/`ventanilla.ts` + `clasificacionIA` con datos deterministas) | Media | Al abordar D9/D3 |
+
+*(Registrada además como deuda BM-D11; C1 no la aborda por Valor Neto — su coste
+supera el valor dentro de esta capacidad.)*

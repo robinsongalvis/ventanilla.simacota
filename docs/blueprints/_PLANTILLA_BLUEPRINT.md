@@ -130,3 +130,17 @@ consolidar más, el Blueprint **vuelve automáticamente a EN REVISIÓN** (§24).
 *Cumplir la Definition of Ready hace a la capacidad **candidata**. La
 implementación requiere **autorización expresa** del propietario y respeta el
 estado de congelamiento vigente (Bloque 2).*
+
+## H. Hallazgos Arquitectónicos Transversales (OAT)
+
+*(Rol Chief Software Architect.)* Mejoras que benefician a **varias** capacidades y
+que **no** se implementan ni se mezclan en este Blueprint. Se registran como
+Oportunidades Arquitectónicas Transversales en
+[`../OAT_REGISTRO.md`](../OAT_REGISTRO.md) (registro canónico) y se listan aquí las
+detectadas durante este análisis. **Las OAT no autorizan cambios.**
+
+| OAT | Título | Prioridad | Momento recomendado |
+|---|---|---|---|
+| OAT-NN | … | … | … |
+
+*Si no se detectó ninguna, indicarlo explícitamente.*
