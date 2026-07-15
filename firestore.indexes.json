@@ -83,6 +83,20 @@
           "order": "DESCENDING"
         }
       ]
+    },
+    {
+      "collectionGroup": "ventanilla_radicados",
+      "queryScope": "COLLECTION",
+      "fields": [
+        {
+          "fieldPath": "control.origen",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "control.fechaRadicado",
+          "order": "DESCENDING"
+        }
+      ]
     }
   ],
   "fieldOverrides": []
