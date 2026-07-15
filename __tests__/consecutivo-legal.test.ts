@@ -1,0 +1,130 @@
+/**
+ * Bloque 2 (fix H3) · Checkpoint 1 — pruebas del helper transaccional.
+ * Cobertura rama por rama (revisión cruzada firestore: el helper es punto único
+ * de fallo compartido por 5 rutas → exige cobertura exhaustiva).
+ *
+ * Dobles de `tx`/`db` en memoria — NO toca Firebase (ni real ni emulador).
+ */
+import { describe, it, expect, vi } from 'vitest';
+import type { Transaction, Firestore } from 'firebase-admin/firestore';
+import {
+  leerConsecutivosLegales,
+  confirmarConsecutivosLegales,
+  type ConsecutivoPendiente,
+} from '@/lib/server/consecutivo-legal';
+
+/** Doble de Firestore: `doc(path)` devuelve una ref con su path como id. */
+function fakeDb(): Firestore {
+  return {
+    doc: (path: string) => ({ path, id: path.split('/').pop() }),
+  } as unknown as Firestore;
+}
+
+/**
+ * Doble de Transaction: `get` sirve valores de contador desde un mapa por path;
+ * `set` registra las escrituras en orden. Registra si hubo algún `set` antes
+ * del último `get` (para verificar lecturas-antes-de-escrituras).
+ */
+function fakeTx(contadores: Record<string, number | undefined>) {
+  const escrituras: { path: string; data: Record<string, unknown> }[] = [];
+  let huboSetAntesDeGet = false;
+  const tx = {
+    get: vi.fn(async (ref: { path: string }) => {
+      if (escrituras.length > 0) huboSetAntesDeGet = true;
+      const ultimo = contadores[ref.path];
+      return { data: () => (ultimo === undefined ? undefined : { ultimo }) };
+    }),
+    set: vi.fn((ref: { path: string }, data: Record<string, unknown>) => {
+      escrituras.push({ path: ref.path, data });
+    }),
+  };
+  return { tx: tx as unknown as Transaction, escrituras, get huboSetAntesDeGet() { return huboSetAntesDeGet; } };
+}
+
+const fmtRadicado = (n: number, f: Date) => `1-110-${f.getFullYear()}-${String(n).padStart(8, '0')}`;
+const fmtSalida = (n: number, f: Date) => `2-110-${f.getFullYear()}-${String(n).padStart(8, '0')}`;
+const FECHA = new Date('2026-07-13T12:00:00Z');
+
+describe('consecutivo-legal — leerConsecutivosLegales', () => {
+  it('siguiente = ultimo + 1 cuando el contador existe', async () => {
+    const { tx } = fakeTx({ 'counters/radicados-2026': 41 });
+    const [p] = await leerConsecutivosLegales(tx, fakeDb(), FECHA, [
+      { serie: 'radicados', formatear: fmtRadicado },
+    ]);
+    expect(p.consecutivo).toBe(42);
+    expect(p.documentoId).toBe('1-110-2026-00000042');
+    expect(p.serie).toBe('radicados');
+  });
+
+  it('empieza en 1 cuando el contador no existe (data undefined)', async () => {
+    const { tx } = fakeTx({});
+    const [p] = await leerConsecutivosLegales(tx, fakeDb(), FECHA, [
+      { serie: 'radicados', formatear: fmtRadicado },
+    ]);
+    expect(p.consecutivo).toBe(1);
+    expect(p.documentoId).toBe('1-110-2026-00000001');
+  });
+
+  it('multi-serie: lee las N series y NO escribe nada durante la lectura', async () => {
+    const { tx, escrituras } = fakeTx({
+      'counters/radicados-2026': 10,
+      'counters/salidas-2026': 5,
+    });
+    const pend = await leerConsecutivosLegales(tx, fakeDb(), FECHA, [
+      { serie: 'radicados', formatear: fmtRadicado },
+      { serie: 'salidas', formatear: fmtSalida },
+    ]);
+    expect(pend.map((p) => p.consecutivo)).toEqual([11, 6]);
+    expect(pend[1].documentoId).toBe('2-110-2026-00000006');
+    expect(escrituras).toHaveLength(0); // fase lectura no confirma nada
+  });
+
+  it('usa el path de contador por serie y año correctos', async () => {
+    const { tx } = fakeTx({ 'counters/planillas-2026': 0 });
+    const [p] = await leerConsecutivosLegales(tx, fakeDb(), FECHA, [
+      { serie: 'planillas', formatear: (n) => `PL-${n}` },
+    ]);
+    expect((p.ref as unknown as { path: string }).path).toBe('counters/planillas-2026');
+    expect(p.consecutivo).toBe(1);
+  });
+});
+
+describe('consecutivo-legal — confirmarConsecutivosLegales', () => {
+  it('escribe cada contador con {ultimo, anio, actualizadoEn} y merge, DESPUÉS de leer', async () => {
+    const doble = fakeTx({ 'counters/radicados-2026': 41, 'counters/salidas-2026': 5 });
+    const pend = await leerConsecutivosLegales(doble.tx, fakeDb(), FECHA, [
+      { serie: 'radicados', formatear: fmtRadicado },
+      { serie: 'salidas', formatear: fmtSalida },
+    ]);
+    confirmarConsecutivosLegales(doble.tx, FECHA, pend);
+
+    expect(doble.escrituras).toHaveLength(2);
+    expect(doble.escrituras[0]).toEqual({
+      path: 'counters/radicados-2026',
+      data: { ultimo: 42, anio: 2026, actualizadoEn: FECHA.toISOString() },
+    });
+    expect(doble.huboSetAntesDeGet).toBe(false); // lecturas-antes-de-escrituras
+  });
+
+  it('lanza si los pendientes NO provienen de leer (arreglo construido a mano)', () => {
+    const { tx } = fakeTx({});
+    const falsos: ConsecutivoPendiente[] = [
+      { serie: 'radicados', ref: { path: 'counters/radicados-2026' } as never, consecutivo: 999, documentoId: 'x' },
+    ];
+    expect(() => confirmarConsecutivosLegales(tx, FECHA, falsos)).toThrow(
+      /leerConsecutivosLegales sobre la misma transacción/,
+    );
+  });
+
+  it('lanza si los pendientes provienen de OTRA transacción', async () => {
+    const a = fakeTx({ 'counters/radicados-2026': 0 });
+    const b = fakeTx({ 'counters/radicados-2026': 0 });
+    const pendDeA = await leerConsecutivosLegales(a.tx, fakeDb(), FECHA, [
+      { serie: 'radicados', formatear: fmtRadicado },
+    ]);
+    // Confirmar en la tx B con pendientes leídos en la tx A → debe lanzar.
+    expect(() => confirmarConsecutivosLegales(b.tx, FECHA, pendDeA)).toThrow();
+    // Y confirmar en A con sus propios pendientes → no lanza.
+    expect(() => confirmarConsecutivosLegales(a.tx, FECHA, pendDeA)).not.toThrow();
+  });
+});
