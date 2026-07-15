@@ -84,4 +84,38 @@ describe('Panel Op Fase 2 — BarraKpisOperativos', () => {
     fireEvent.click(screen.getByRole('button', { name: /KPI operativo: Correo fallido/i }));
     expect(onChange).not.toHaveBeenCalled();
   });
+
+  /* 5 · Sprint tablero-jerarquia — jerarquía por severidad: pastilla en
+     0 se atenúa (opacity ~0.55, borde gris) sin perder el resto de su
+     comportamiento (test 4 ya cubre que sigue deshabilitada). */
+  it('atenúa (opacity 0.55, borde gris) la pastilla con conteo 0', () => {
+    const kpisConCeros = { ...KPIS_BASE, correoFallido: 0 };
+    render(
+      <BarraKpisOperativos
+        kpis={kpisConCeros}
+        filtroActivo="NINGUNO"
+        onChange={vi.fn()}
+      />,
+    );
+    const pastilla = screen.getByRole('button', { name: /KPI operativo: Correo fallido/i });
+    expect(pastilla.style.opacity).toBe('0.55');
+    // jsdom normaliza el hex a rgb() al leer style.borderColor.
+    expect(pastilla.style.borderColor).toBe('rgb(217, 226, 217)');
+  });
+
+  /* 6 · Sprint tablero-jerarquia — banda única de estado: chipsExtra se
+     intercala entre el rótulo y las pastillas operativas, fusionando
+     la franja MIPG compacta con "Estado operativo" sin duplicar layout. */
+  it('renderiza chipsExtra dentro de la misma banda "Estado operativo"', () => {
+    render(
+      <BarraKpisOperativos
+        kpis={KPIS_BASE}
+        filtroActivo="NINGUNO"
+        onChange={vi.fn()}
+        chipsExtra={<button type="button">Prioridad MIPG · 2</button>}
+      />,
+    );
+    expect(screen.getByText(/Estado operativo/i)).toBeTruthy();
+    expect(screen.getByRole('button', { name: 'Prioridad MIPG · 2' })).toBeTruthy();
+  });
 });

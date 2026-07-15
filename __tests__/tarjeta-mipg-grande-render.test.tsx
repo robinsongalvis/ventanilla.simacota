@@ -71,4 +71,42 @@ describe('Panel Op Nivel 3B — TarjetaMIPGGrande', () => {
     // El componente no recibe ni renderiza nombre del solicitante.
     expect(screen.queryByText(/NOMBRE/i)).toBeNull();
   });
+
+  /* 6 · Sprint tablero-jerarquia — jerarquía por severidad */
+  describe('jerarquía por severidad', () => {
+    /* Vencidas > 0 → dominante: riel/borde más grueso y número más grande. */
+    it('Vencidas > 0 con dominante=true gana peso visual (riel y número más grandes)', () => {
+      render(<TarjetaMIPGGrande {...props({ label: 'Vencidas', valor: 4, dominante: true })} />);
+      const boton = screen.getByRole('button', { name: /Filtrar bandeja por Vencidas/i });
+      const tarjeta = boton.parentElement as HTMLElement;
+      expect(tarjeta.style.borderTopWidth).toBe('5px');
+      const numero = screen.getByText('4');
+      expect(numero.style.fontSize).toBe('44px');
+    });
+
+    /* Card en 0 → atenuada: opacity ~0.55, sigue visible y clicable. */
+    it('valor 0 con atenuada=true se atenúa (opacity 0.55) pero sigue clicable', () => {
+      const onFiltrar = vi.fn();
+      render(<TarjetaMIPGGrande {...props({
+        label: 'Radicadas', valor: 0, critico: null, atenuada: true, onFiltrar,
+      })} />);
+      const boton = screen.getByRole('button', { name: /Filtrar bandeja por Radicadas/i });
+      const tarjeta = boton.parentElement as HTMLElement;
+      expect(tarjeta.style.opacity).toBe('0.55');
+      // Sigue visible y clicable — nunca se deshabilita.
+      expect((boton as HTMLButtonElement).disabled).toBe(false);
+      fireEvent.click(boton);
+      expect(onFiltrar).toHaveBeenCalledOnce();
+    });
+
+    /* Sin dominante/atenuada explícitos (comportamiento por defecto,
+       tests 1-5 arriba) — no rompe el render existente. */
+    it('sin dominante ni atenuada, mantiene el tamaño y opacidad estándar', () => {
+      render(<TarjetaMIPGGrande {...props()} />);
+      const boton = screen.getByRole('button', { name: /Filtrar bandeja por Vencidas/i });
+      const tarjeta = boton.parentElement as HTMLElement;
+      expect(tarjeta.style.borderTopWidth).toBe('3px');
+      expect(tarjeta.style.opacity).toBe('1');
+    });
+  });
 });

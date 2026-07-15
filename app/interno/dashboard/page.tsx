@@ -878,41 +878,15 @@ const CRITICO_LABEL: Record<FiltroGrande, string> = {
   ASIGNADAS:  'Más próximo a vencer',
 };
 
-function TarjetasMIPG({
-  metricas,
-  filtroActivo,
-  onFiltroChange,
-  veTodosTenants,
-  tenantFiltro,
-  onTenantChange,
-  modoCompacto = false,
-  onToggleCompacto,
-  soloDatosIncompletos = false,
-  onToggleDatosIncompletos,
-  radicados,
-  onAbrirRadicado,
-}: {
-  metricas:       MetricasMIPGData;
-  filtroActivo:   FiltroMIPG;
-  onFiltroChange: (f: FiltroMIPG) => void;
-  /** Panel Op Nivel 1 — gatea el selector de dependencia. ADMIN,
-   *  CONTROL_INTERNO y RECEPCIONISTA lo ven; los demás no. */
-  veTodosTenants: boolean;
-  tenantFiltro:   TenantId | 'TODOS';
-  onTenantChange: (t: TenantId | 'TODOS') => void;
-  modoCompacto?:  boolean;
-  onToggleCompacto?: () => void;
-  soloDatosIncompletos?: boolean;
-  onToggleDatosIncompletos?: () => void;
-  /** Panel Op Nivel 3B — lista completa para calcular el radicado
-   *  crítico de cada tarjeta grande. */
-  radicados:      VentanillaRadicado[];
-  onAbrirRadicado: (id: string) => void;
-}) {
-  // Paleta operativa institucional: fondos claros + números y labels en
-  // tonos de alto contraste (-700/-800). Cada KPI se identifica por el
-  // riel izquierdo de 4px, no por el fondo (que se reserva para selección).
-  const tarjetas: TarjetaMIPGItem[] = [
+/** Paleta operativa institucional: fondos claros + números y labels en
+ *  tonos de alto contraste (-700/-800). Cada KPI se identifica por el
+ *  riel izquierdo de 4px, no por el fondo (que se reserva para
+ *  selección). Función pura — reutilizada por TarjetasMIPG (fila
+ *  grande + modo compacto) y por la banda "Estado operativo" fusionada
+ *  (sprint tablero-jerarquia), que necesita los mismos 4 chips MIPG
+ *  compactos fuera del árbol de TarjetasMIPG. */
+function construirTarjetasMIPG(metricas: MetricasMIPGData): TarjetaMIPGItem[] {
+  return [
     {
       filtro:     'RADICADAS',
       label:      'Radicadas',
@@ -975,6 +949,99 @@ function TarjetasMIPG({
       textoColor: '#9D174D',
     },
   ];
+}
+
+/** Texto oscuro AA-safe para el estado atenuado (valor === 0): tras el
+ *  opacity 0.55 del contenedor sigue cumpliendo ≥ 4.5:1 sobre fondo
+ *  claro (mismo criterio que TarjetaMIPGGrande). Solo el cromado
+ *  (riel/borde) pierde color; el texto nunca depende de la opacidad
+ *  para su legibilidad. */
+const TEXTO_ATENUADO = '#0F172A';
+const RIEL_ATENUADO  = '#CBD5D1';
+
+/** Chip MIPG compacto — reutilizado por TarjetasMIPG (fila compacta y
+ *  modo "minimizar paneles") y por la banda "Estado operativo"
+ *  fusionada. Jerarquía por severidad: valor 0 se atenúa pero sigue
+ *  visible y clicable. */
+function ChipMipgCompacto({
+  item,
+  activo,
+  compacto,
+  onClick,
+}: {
+  item: TarjetaMIPGItem;
+  activo: boolean;
+  compacto: boolean;
+  onClick: () => void;
+}) {
+  const atenuada = item.valor === 0;
+  const cls = compacto
+    ? { card: 'px-2.5 py-1', num: 'text-base', label: 'text-[9px] mt-0' }
+    : { card: 'px-4 py-3',   num: 'text-2xl',  label: 'text-[10px] mt-0.5' };
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      aria-pressed={activo}
+      aria-label={`Filtrar bandeja por ${item.label} (${item.valor})`}
+      className={`micro-card shrink-0 flex flex-col items-start ${cls.card} rounded-xl cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-700/30`}
+      style={{
+        background: activo ? '#EEF4EE' : '#F8FAF7',
+        border: `1px solid ${activo ? '#14532D' : '#D9E2D9'}`,
+        borderLeftColor: atenuada ? RIEL_ATENUADO : item.rielColor,
+        borderLeftWidth: 4,
+        opacity: atenuada ? 0.55 : 1,
+      }}
+    >
+      <span
+        className={`${cls.num} font-black leading-none tabular-nums flex items-center gap-1`}
+        style={{ color: atenuada ? TEXTO_ATENUADO : item.textoColor }}
+      >
+        {item.icono && <span className="mt-0.5">{item.icono}</span>}
+        {item.valor}
+      </span>
+      <span
+        className={`${cls.label} font-bold uppercase tracking-widest`}
+        style={{ color: atenuada ? TEXTO_ATENUADO : item.textoColor }}
+      >
+        {item.label}
+      </span>
+    </button>
+  );
+}
+
+function TarjetasMIPG({
+  metricas,
+  filtroActivo,
+  onFiltroChange,
+  veTodosTenants,
+  tenantFiltro,
+  onTenantChange,
+  modoCompacto = false,
+  onToggleCompacto,
+  soloDatosIncompletos = false,
+  onToggleDatosIncompletos,
+  radicados,
+  onAbrirRadicado,
+}: {
+  metricas:       MetricasMIPGData;
+  filtroActivo:   FiltroMIPG;
+  onFiltroChange: (f: FiltroMIPG) => void;
+  /** Panel Op Nivel 1 — gatea el selector de dependencia. ADMIN,
+   *  CONTROL_INTERNO y RECEPCIONISTA lo ven; los demás no. */
+  veTodosTenants: boolean;
+  tenantFiltro:   TenantId | 'TODOS';
+  onTenantChange: (t: TenantId | 'TODOS') => void;
+  modoCompacto?:  boolean;
+  onToggleCompacto?: () => void;
+  soloDatosIncompletos?: boolean;
+  onToggleDatosIncompletos?: () => void;
+  /** Panel Op Nivel 3B — lista completa para calcular el radicado
+   *  crítico de cada tarjeta grande. */
+  radicados:      VentanillaRadicado[];
+  onAbrirRadicado: (id: string) => void;
+}) {
+  const tarjetas: TarjetaMIPGItem[] = construirTarjetasMIPG(metricas);
 
   // Sprint UI Bandeja Operativa — variante compacta:
   // - py reducido (py-1.5 vs py-3).
@@ -982,13 +1049,15 @@ function TarjetasMIPG({
   // - Mantiene riel izquierdo y selección por color.
   const cls = modoCompacto
     ? { wrap: 'px-3 sm:px-4 py-1.5', card: 'px-2.5 py-1', num: 'text-base', label: 'text-[9px] mt-0' }
-    : { wrap: 'px-3 sm:px-4 py-3',    card: 'px-4 py-3',    num: 'text-2xl', label: 'text-[10px] mt-0.5' };
+    : { wrap: 'px-3 sm:px-4 py-2',    card: 'px-4 py-3',    num: 'text-2xl', label: 'text-[10px] mt-0.5' };
 
-  // Panel Op Nivel 3B — mapa por filtro para partir en grandes/compactas.
+  // Panel Op Nivel 3B — mapa por filtro para ubicar las 4 grandes.
+  // Sprint tablero-jerarquia — los 4 KPIs restantes (Prioridad MIPG,
+  // En término, Devueltas/Prórroga, Fuera de término) ya NO se
+  // renderizan aquí: se fusionaron en la banda "Estado operativo"
+  // (ver <BarraKpisOperativos chipsExtra=…> en el render principal)
+  // para cumplir la regla de banda única de estado.
   const porFiltro = new Map(tarjetas.map((t) => [t.filtro, t]));
-  const tarjetasCompactas = tarjetas.filter(
-    (t) => !(FILTROS_GRANDES as string[]).includes(t.filtro),
-  );
 
   const controlesTop = (
     <>
@@ -1042,74 +1111,42 @@ function TarjetasMIPG({
     </>
   );
 
-  const tarjetaTodos = (extraCls: string) => (
-    <button
-      onClick={() => onFiltroChange('TODOS')}
-      className={`micro-card shrink-0 flex flex-col items-start ${extraCls} rounded-xl border-l-4 cursor-pointer focus-visible:outline-none`}
-      style={{
-        background: filtroActivo === 'TODOS' ? '#EEF4EE' : '#F8FAF7',
-        border: `1px solid ${filtroActivo === 'TODOS' ? '#14532D' : '#D9E2D9'}`,
-        borderLeftColor: '#14532D',
-        borderLeftWidth: 4,
-      }}
-    >
-      <span className={`${cls.num} font-black leading-none tabular-nums`} style={{ color: '#14532D' }}>
-        {tarjetas.reduce((s, t) => s + t.valor, 0)}
-      </span>
-      <span className={`${cls.label} font-bold uppercase tracking-widest`} style={{ color: '#667085' }}>Todos</span>
-    </button>
+  const tarjetaPequena = (t: TarjetaMIPGItem) => (
+    <ChipMipgCompacto
+      key={t.filtro}
+      item={t}
+      activo={filtroActivo === t.filtro}
+      compacto={modoCompacto}
+      onClick={() => onFiltroChange(t.filtro)}
+    />
   );
 
-  const tarjetaPequena = (t: TarjetaMIPGItem) => {
-    const activo = filtroActivo === t.filtro;
-    return (
-      <button
-        key={t.filtro}
-        onClick={() => onFiltroChange(t.filtro)}
-        aria-pressed={activo}
-        className={`micro-card shrink-0 flex flex-col items-start ${cls.card} rounded-xl cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-700/30`}
-        style={{
-          background: activo ? '#EEF4EE' : '#F8FAF7',
-          border: `1px solid ${activo ? '#14532D' : '#D9E2D9'}`,
-          borderLeftColor: t.rielColor,
-          borderLeftWidth: 4,
-        }}
-      >
-        <span className={`${cls.num} font-black leading-none tabular-nums flex items-center gap-1`} style={{ color: t.textoColor }}>
-          {t.icono && <span className="mt-0.5">{t.icono}</span>}
-          {t.valor}
-        </span>
-        <span className={`${cls.label} font-bold uppercase tracking-widest`} style={{ color: t.textoColor }}>
-          {t.label}
-        </span>
-      </button>
-    );
-  };
-
   // Modo compacto: una sola fila con todas las tarjetas pequeñas
-  // (comportamiento previo intacto para dar altura a la lista).
+  // (comportamiento previo intacto para dar altura a la lista; la
+  // card vertical "Todos" se retiró — su total vive ahora en el chip
+  // "N activos" junto al título del Tablero, siempre visible).
   if (modoCompacto) {
     return (
       <div className={`${cls.wrap} shrink-0 bg-white`} style={{ borderBottom: '1px solid #D9E2D9' }}>
         <div className="flex gap-2 overflow-x-auto pb-0.5 items-center">
           {controlesTop}
-          {tarjetaTodos(cls.card)}
           {tarjetas.map(tarjetaPequena)}
         </div>
       </div>
     );
   }
 
-  // Modo expandido (default): 4 tarjetas grandes con radicado crítico +
-  // fila compacta con los KPIs restantes.
+  // Modo expandido (default): 4 tarjetas grandes con radicado crítico.
+  // Jerarquía por severidad (sprint tablero-jerarquia): Vencidas > 0 es
+  // la única tarjeta dominante; cualquier tarjeta en 0 se atenúa. Los
+  // 4 KPIs restantes se fusionaron en la banda "Estado operativo".
   return (
     <div className={`${cls.wrap} shrink-0 bg-white`} style={{ borderBottom: '1px solid #D9E2D9' }}>
-      <div className="flex gap-2 items-center mb-2">
+      <div className="flex gap-2 items-center mb-1.5">
         {controlesTop}
       </div>
 
       <div className="flex gap-2 overflow-x-auto pb-1 items-stretch">
-        {tarjetaTodos('px-4 py-3 justify-center')}
         {FILTROS_GRANDES.map((filtro) => {
           const t = porFiltro.get(filtro);
           if (!t) return null;
@@ -1125,16 +1162,12 @@ function TarjetasMIPG({
               critico={radicadoMasCriticoPorFiltro(radicados, filtro)}
               onFiltrar={() => onFiltroChange(filtro)}
               onAbrirRadicado={onAbrirRadicado}
+              dominante={filtro === 'VENCIDAS' && t.valor > 0}
+              atenuada={t.valor === 0}
             />
           );
         })}
       </div>
-
-      {tarjetasCompactas.length > 0 && (
-        <div className="flex gap-2 overflow-x-auto pt-2 items-center">
-          {tarjetasCompactas.map(tarjetaPequena)}
-        </div>
-      )}
     </div>
   );
 }
@@ -1171,10 +1204,13 @@ function PanelOperacionDependencia({
   const ambosMinimizados = bandejaMinimizada && siguienteMinimizada;
   return (
     <section
-      className={`shrink-0 bg-[#F8FAF7] px-3 sm:px-4 ${ambosMinimizados ? 'py-1.5' : 'py-3'}`}
+      className={`shrink-0 bg-[#F8FAF7] px-3 sm:px-4 ${ambosMinimizados ? 'py-1.5' : 'py-2'}`}
       style={{ borderBottom: '1px solid #D9E2D9' }}
     >
-      <div className="grid grid-cols-1 lg:grid-cols-[minmax(0,1.2fr)_minmax(0,1.8fr)] gap-2 sm:gap-3">
+      {/* Sprint tablero-jerarquia — la Bandeja operativa se compacta
+          (1fr) para que el hero de Siguiente atención (2fr) domine el
+          panorama visual, tal como pide la referencia Figma. */}
+      <div className="grid grid-cols-1 lg:grid-cols-[minmax(0,1fr)_minmax(0,2fr)] gap-2 sm:gap-3">
         {/* Panel bandeja */}
         {bandejaMinimizada ? (
           <div
@@ -1197,13 +1233,13 @@ function PanelOperacionDependencia({
             </button>
           </div>
         ) : (
-        <div className="micro-card-read rounded-xl px-4 py-3 bg-white" style={{ border: '1px solid #D9E2D9', boxShadow: '0 1px 3px rgba(20,83,45,0.06)' }}>
+        <div className="micro-card-read rounded-xl px-3 py-2.5 bg-white" style={{ border: '1px solid #D9E2D9', boxShadow: '0 1px 3px rgba(20,83,45,0.06)' }}>
           <div className="flex items-start justify-between gap-3">
             <div className="min-w-0">
               <p className="text-[10px] font-black uppercase tracking-widest" style={{ color: '#667085' }}>
                 Bandeja operativa
               </p>
-              <h2 className="mt-1 text-sm font-black truncate" style={{ color: '#1F2933' }}>
+              <h2 className="mt-0.5 text-sm font-black truncate" style={{ color: '#1F2933' }}>
                 {nombreAmbito}
               </h2>
             </div>
@@ -1224,7 +1260,7 @@ function PanelOperacionDependencia({
             </div>
           </div>
 
-          <div className="mt-3 grid grid-cols-3 sm:grid-cols-5 gap-2">
+          <div className="mt-2 grid grid-cols-3 sm:grid-cols-5 gap-2">
             {[
               { label: 'Activos',    value: resumen.totalActivos,    color: '#1F2933',  filtro: 'TODOS' as FiltroMIPG },
               { label: 'Sin resp.',  value: resumen.sinResponsable,  color: '#B45309',  filtro: 'ASIGNADAS' as FiltroMIPG },
@@ -1236,7 +1272,7 @@ function PanelOperacionDependencia({
                 key={item.label}
                 type="button"
                 onClick={() => onFiltroChange(item.filtro)}
-                className="micro-card rounded-lg px-2 py-2 text-left focus-visible:outline-none"
+                className="micro-card rounded-lg px-2 py-1.5 text-left focus-visible:outline-none"
                 style={{ border: '1px solid #D9E2D9', background: '#F8FAF7' }}
                 onMouseEnter={(e) => { (e.currentTarget as HTMLElement).style.background = '#EEF4EE'; }}
                 onMouseLeave={(e) => { (e.currentTarget as HTMLElement).style.background = '#F8FAF7'; }}
@@ -1277,7 +1313,7 @@ function PanelOperacionDependencia({
         ) : (
         <div
           className="micro-card-read rounded-[14px] px-4 py-3 bg-white"
-          style={{ border: '1px solid #E3EAE3', borderLeft: '3px solid #14532D', boxShadow: '0 1px 3px rgba(20,50,30,0.06)' }}
+          style={{ border: '1px solid #E3EAE3', borderLeft: '5px solid #14532D', boxShadow: '0 1px 3px rgba(20,50,30,0.06)' }}
         >
           <div className="flex items-start justify-between gap-3">
             <div className="min-w-0 flex items-start gap-2.5">
@@ -1293,6 +1329,12 @@ function PanelOperacionDependencia({
               <div className="min-w-0">
                 <p className="text-[10px] font-bold uppercase tracking-widest" style={{ color: '#5F8A6E' }}>
                   Siguiente atención sugerida
+                </p>
+                {/* Principio 9 (IA copiloto): SIMI sugiere el orden de
+                    atención, la funcionaria decide si atenderlo o no —
+                    el botón "Atender" nunca actúa solo. */}
+                <p className="text-[9.5px] italic" style={{ color: '#94A3B8' }}>
+                  SIMI propone, usted decide
                 </p>
                 <p className={`mt-1 text-sm font-bold ${
                   dias !== null && dias < 0
@@ -1319,11 +1361,11 @@ function PanelOperacionDependencia({
               <button
                 type="button"
                 onClick={() => onSeleccionar(siguiente)}
-                className="shrink-0 inline-flex items-center gap-1.5 rounded-lg px-3.5 py-2 text-xs font-bold focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-500/40 active:scale-95 transition-transform"
+                className="shrink-0 inline-flex items-center gap-1.5 rounded-lg px-4 py-2.5 text-sm font-bold focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-500/40 active:scale-95 transition-transform"
                 style={{ background: '#D4A017', color: '#3D2C00' }}
               >
                 Atender
-                <svg className="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2.5}>
+                <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2.5}>
                   <path strokeLinecap="round" strokeLinejoin="round" d="M5 12h14M13 6l6 6-6 6" />
                 </svg>
               </button>
@@ -1332,14 +1374,24 @@ function PanelOperacionDependencia({
           </div>
 
           {siguiente ? (
-            <div className="mt-3 grid grid-cols-1 sm:grid-cols-[minmax(150px,0.8fr)_minmax(0,1.2fr)_minmax(130px,0.7fr)] gap-3 text-xs">
+            <div className="mt-2 grid grid-cols-1 sm:grid-cols-[minmax(150px,0.7fr)_minmax(0,1.6fr)_minmax(120px,0.6fr)] gap-3 text-xs">
               <div className="min-w-0">
                 <p className="text-[9px] font-bold uppercase tracking-widest" style={{ color: '#94A3B8' }}>Radicado</p>
-                <p className="mt-1 truncate font-mono font-bold" style={{ color: '#14532D' }}>{siguiente.radicadoId}</p>
+                {/* Requisito legal — el número de radicado nunca se
+                    trunca: es el identificador oficial del trámite
+                    (AGN 060/2001). Puede envolver a dos líneas, no se
+                    recorta con ellipsis. */}
+                <p className="mt-1 font-mono font-bold break-words" style={{ color: '#14532D' }}>{siguiente.radicadoId}</p>
               </div>
               <div className="min-w-0">
                 <p className="text-[9px] font-bold uppercase tracking-widest" style={{ color: '#94A3B8' }}>Asunto</p>
-                <p className="mt-1 truncate" style={{ color: '#1F2933' }}>{siguiente.detalle.asunto}</p>
+                <p
+                  className="mt-1 line-clamp-2"
+                  style={{ color: '#1F2933' }}
+                  title={siguiente.detalle.asunto}
+                >
+                  {siguiente.detalle.asunto}
+                </p>
               </div>
               <div className="min-w-0">
                 <p className="text-[9px] font-bold uppercase tracking-widest" style={{ color: '#94A3B8' }}>Responsable</p>
@@ -1349,7 +1401,7 @@ function PanelOperacionDependencia({
               </div>
             </div>
           ) : (
-            <p className="mt-3 text-xs" style={{ color: '#94A3B8' }}>
+            <p className="mt-2 text-xs" style={{ color: '#94A3B8' }}>
               Cuando entren solicitudes activas, aquí aparecerá la prioridad operativa de la oficina.
             </p>
           )}
@@ -1491,9 +1543,11 @@ function TablaRadicados({
               }}
             >
               <div className="flex items-start justify-between gap-2 mb-1.5">
+                {/* Requisito legal — el radicado nunca se trunca; solo
+                    el badge de estado es shrink-0 para dejarle espacio. */}
                 <div className="flex items-center gap-1.5 min-w-0">
                   {esRojo && <span className="shrink-0 w-1.5 h-1.5 rounded-full bg-red-500 animate-pulse mt-0.5" />}
-                  <span className="font-mono text-[13px] font-extrabold tracking-tight truncate" style={{ color: '#14532D' }}>{r.radicadoId}</span>
+                  <span className="font-mono text-[13px] font-extrabold tracking-tight break-words" style={{ color: '#14532D' }}>{r.radicadoId}</span>
                 </div>
                 <span className={`shrink-0 inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wide border ${
                   BADGE_ESTADO[r.estadoActual] ?? 'bg-gray-100 text-gray-600 border-gray-200'
@@ -4562,6 +4616,22 @@ function DashboardInterior({ usuario, cerrarSesion }: { usuario: UsuarioAutentic
 
   const metricas = useMemo(() => calcularMetricas(todosLosRadicados), [todosLosRadicados]);
 
+  // Sprint tablero-jerarquia — la card vertical "Todos" desapareció de
+  // TarjetasMIPG; su total (suma de los 8 KPIs MIPG, mismo cálculo de
+  // siempre) pasa a un chip junto al título del Tablero. También
+  // reutilizamos los 4 KPIs "compactos" (Prioridad/En término/
+  // Devueltas-Prórroga/Fuera de término) para fusionarlos con la banda
+  // "Estado operativo" — ver <BarraKpisOperativos chipsExtra=…> abajo.
+  const tarjetasMipg = useMemo(() => construirTarjetasMIPG(metricas), [metricas]);
+  const totalKpisMipg = useMemo(
+    () => tarjetasMipg.reduce((s, t) => s + t.valor, 0),
+    [tarjetasMipg],
+  );
+  const tarjetasMipgCompactas = useMemo(
+    () => tarjetasMipg.filter((t) => !(FILTROS_GRANDES as string[]).includes(t.filtro)),
+    [tarjetasMipg],
+  );
+
   // Sprint 1.5 — toggle secundario "Datos incompletos" en la bandeja.
   // Estado local del componente (no va al store global porque es un
   // filtro efímero que no debe persistir entre sesiones).
@@ -4811,20 +4881,38 @@ function DashboardInterior({ usuario, cerrarSesion }: { usuario: UsuarioAutentic
             {/* Rediseño 3B.2 — encabezado de sala de operaciones (solo
                 desktop; el móvil ya tiene su propio header). */}
             {vistaActual === 'TABLERO' && (
-              <div className="hidden md:flex items-center justify-between gap-3 px-4 pt-3 pb-1 bg-white shrink-0">
-                <div>
-                  <div className="flex items-center gap-2">
-                    <span className="text-[10px] font-bold uppercase tracking-[0.12em]" style={{ color: '#5F8A6E' }}>
-                      Sala de operaciones
-                    </span>
-                    <span className="w-1.5 h-1.5 rounded-full" style={{ background: '#3B9E5F' }} />
-                    <span className="text-[10px]" style={{ color: '#7A8B7F' }}>tiempo real</span>
+              <div className="hidden md:flex items-center justify-between gap-3 px-4 pt-2 pb-1 bg-white shrink-0">
+                <div className="flex items-center gap-2.5 min-w-0">
+                  <div>
+                    <div className="flex items-center gap-2">
+                      <span className="text-[10px] font-bold uppercase tracking-[0.12em]" style={{ color: '#5F8A6E' }}>
+                        Sala de operaciones
+                      </span>
+                      <span className="w-1.5 h-1.5 rounded-full" style={{ background: '#3B9E5F' }} />
+                      <span className="text-[10px]" style={{ color: '#7A8B7F' }}>tiempo real</span>
+                    </div>
+                    <p className="text-lg font-black leading-tight mt-0.5" style={{ color: '#12261A' }}>
+                      Tablero · {veTodosTenants
+                        ? (tenantFiltro === 'TODOS' ? 'Vista municipal' : (NOMBRES_TENANT[tenantFiltro] ?? 'Vista municipal'))
+                        : NOMBRES_TENANT[usuario.tenantId]}
+                    </p>
                   </div>
-                  <p className="text-lg font-black leading-tight mt-0.5" style={{ color: '#12261A' }}>
-                    Tablero · {veTodosTenants
-                      ? (tenantFiltro === 'TODOS' ? 'Vista municipal' : (NOMBRES_TENANT[tenantFiltro] ?? 'Vista municipal'))
-                      : NOMBRES_TENANT[usuario.tenantId]}
-                  </p>
+                  {/* Sprint tablero-jerarquia — reemplaza la card vertical
+                      "Todos" que antes competía visualmente con las 4
+                      tarjetas de severidad; mismo total, mismo filtro de
+                      reinicio, ahora como chip discreto junto al título. */}
+                  <button
+                    type="button"
+                    onClick={() => dispatch({ type: 'SET_FILTRO_MIPG', filtro: 'TODOS' })}
+                    aria-pressed={filtroMIPG === 'TODOS'}
+                    aria-label={`Ver todos los radicados activos del panorama MIPG (${totalKpisMipg})`}
+                    className="shrink-0 inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-[11px] font-bold focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-700/30"
+                    style={filtroMIPG === 'TODOS'
+                      ? { background: '#EEF4EE', color: '#14532D', border: '1px solid #14532D' }
+                      : { background: '#F8FAF7', color: '#14532D', border: '1px solid #D9E2D9' }}
+                  >
+                    <span className="tabular-nums">{totalKpisMipg}</span> activos
+                  </button>
                 </div>
               </div>
             )}
@@ -4832,8 +4920,8 @@ function DashboardInterior({ usuario, cerrarSesion }: { usuario: UsuarioAutentic
             {/* Dashboard PQRSD compacto — vencimientos y riesgo.
                 En modo "compacto" se oculta para dar más altura al listado. */}
             {esAdmin && (
-              <div className="px-4 py-3 bg-white shrink-0" style={{ borderBottom: '1px solid #D9E2D9' }}>
-                <p className="text-[9px] font-bold uppercase tracking-widest mb-2" style={{ color: '#14532D' }}>
+              <div className="px-4 py-2 bg-white shrink-0" style={{ borderBottom: '1px solid #D9E2D9' }}>
+                <p className="text-[9px] font-bold uppercase tracking-widest mb-1.5" style={{ color: '#14532D' }}>
                   Semáforo PQRSD
                 </p>
                 <PqrsdDeadlineDashboard
@@ -4844,7 +4932,9 @@ function DashboardInterior({ usuario, cerrarSesion }: { usuario: UsuarioAutentic
               </div>
             )}
 
-            {/* Fila de métricas MIPG */}
+            {/* Fila de métricas MIPG — 4 tarjetas grandes con jerarquía
+                por severidad. Los 4 KPIs restantes se fusionaron en la
+                banda "Estado operativo" de abajo (chipsExtra). */}
             <TarjetasMIPG
               metricas={metricas}
               filtroActivo={filtroMIPG}
@@ -4860,11 +4950,28 @@ function DashboardInterior({ usuario, cerrarSesion }: { usuario: UsuarioAutentic
               onAbrirRadicado={(id) => abrirRadicadoPorId(id)}
             />
 
-            {/* Panel Op Fase 2 — barra secundaria de KPIs operativos. */}
+            {/* Panel Op Fase 2 — banda única "Estado operativo": KPIs
+                MIPG compactos + KPIs operativos del día en una sola
+                franja (sprint tablero-jerarquia). En modo compacto los
+                MIPG ya están en la fila de TarjetasMIPG — no se duplican. */}
             <BarraKpisOperativos
               kpis={kpisOperativos}
               filtroActivo={filtroOperativo}
               onChange={setFiltroOperativo}
+              chipsExtra={!indicadoresCompactos && tarjetasMipgCompactas.length > 0 ? (
+                <>
+                  {tarjetasMipgCompactas.map((t) => (
+                    <ChipMipgCompacto
+                      key={t.filtro}
+                      item={t}
+                      activo={filtroMIPG === t.filtro}
+                      compacto
+                      onClick={() => dispatch({ type: 'SET_FILTRO_MIPG', filtro: t.filtro })}
+                    />
+                  ))}
+                  <span className="w-px self-stretch shrink-0" style={{ background: '#D9E2D9' }} aria-hidden="true" />
+                </>
+              ) : undefined}
               misAsignados={misActivos}
               soloMios={soloMios}
               onToggleSoloMios={() => setSoloMios((v) => !v)}
