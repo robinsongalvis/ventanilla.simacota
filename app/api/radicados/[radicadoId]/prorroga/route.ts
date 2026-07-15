@@ -10,6 +10,7 @@ import {
   assertNotClosed,
   getRadicadoOrFail,
   RadicadoActionError,
+  validarProrroga,
 } from '@/lib/server/radicados-security';
 import { enviarEmail } from '@/lib/email/mailer';
 import {
@@ -23,6 +24,7 @@ import {
   registrarTrazabilidadNotificacion,
 } from '@/lib/trazabilidad/notificacion';
 import { logError } from '@/lib/logger';
+import { registrarEventoNegocio } from '@/lib/observabilidad/eventos-negocio';
 import { DIRECTORIO_TENANTS } from '@/src/types/reglas-negocio';
 
 export const runtime = 'nodejs';
@@ -39,9 +41,16 @@ function jsonError(error: unknown) {
 }
 
 export async function POST(request: Request, context: RouteContext): Promise<NextResponse> {
+  const inicioOperacion = Date.now();
+  let actorRolActual = 'DESCONOCIDO';
+  let tenantActual = 'DESCONOCIDO';
+  let radicadoIdActual: string | null = null;
   try {
     const usuario = await requireActiveInternalUser();
+    actorRolActual = usuario.rol;
+    tenantActual = usuario.tenantId;
     const { radicadoId } = await context.params;
+    radicadoIdActual = radicadoId;
     const body = await request.json().catch(() => null) as { motivo?: string; diasProrroga?: number } | null;
     const motivo = body?.motivo?.trim() ?? '';
     const diasProrroga = Number(body?.diasProrroga ?? 0);
@@ -55,13 +64,30 @@ export async function POST(request: Request, context: RouteContext): Promise<Nex
     }
 
     const radicado = await getRadicadoOrFail(radicadoId);
+    tenantActual = radicado.clasificacion.oficinaDestino;
     assertNotClosed(radicado);
 
     if (!canOperateTenant(usuario, radicado.clasificacion.oficinaDestino)) {
       return NextResponse.json({ error: 'Tu rol no permite prorrogar este radicado.' }, { status: 403 });
     }
 
-    const ahora = new Date().toISOString();
+    // ADR-0003 (hallazgo H1) + ADR-0012 (hallazgo R6) — control ejecutable de
+    // unicidad, tope legal y temporalidad (Ley 1755/2015 art. 14). Orden:
+    // unicidad → tope → temporalidad. Debe evaluarse ANTES de cualquier
+    // escritura para IMPEDIR (no solo advertir) la prórroga extemporánea.
+    const ahoraDate = new Date();
+    const rechazo = validarProrroga({
+      prorrogasAplicadas: radicado.termino.prorrogasAplicadas,
+      diasProrroga,
+      diasRespuesta: radicado.termino.diasRespuesta,
+      fechaVencimiento: radicado.termino.fechaVencimiento,
+      ahora: ahoraDate,
+    });
+    if (rechazo) {
+      return NextResponse.json({ error: rechazo.mensaje }, { status: rechazo.status });
+    }
+
+    const ahora = ahoraDate.toISOString();
     const fechaActual = new Date(radicado.termino.fechaVencimiento);
     const nuevaFecha = new Date(fechaActual);
     nuevaFecha.setDate(nuevaFecha.getDate() + diasProrroga);
@@ -160,6 +186,15 @@ export async function POST(request: Request, context: RouteContext): Promise<Nex
       }
     }
 
+    registrarEventoNegocio({
+      operacion: 'prorroga',
+      resultado: 'ok',
+      latenciaMs: Date.now() - inicioOperacion,
+      radicadoId: radicadoIdActual,
+      actorRol: actorRolActual,
+      tenant: tenantActual,
+    });
+
     return NextResponse.json({
       ok: true,
       estadoActual: 'PRORROGA',
@@ -169,6 +204,15 @@ export async function POST(request: Request, context: RouteContext): Promise<Nex
       ...(emailError ? { emailError } : {}),
     });
   } catch (error) {
+    registrarEventoNegocio({
+      operacion: 'prorroga',
+      resultado: 'error',
+      latenciaMs: Date.now() - inicioOperacion,
+      radicadoId: radicadoIdActual,
+      actorRol: actorRolActual,
+      tenant: tenantActual,
+      error,
+    });
     console.error('[radicados/prorroga]', error);
     return jsonError(error);
   }

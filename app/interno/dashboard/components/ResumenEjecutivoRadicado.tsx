@@ -7,6 +7,7 @@ import { calcularProximaAccion, type UrgenciaAccion } from '@/lib/proxima-accion
 import { etiquetarUltimaActuacion } from '@/lib/proxima-accion/etiquetar-trazabilidad';
 import { tieneDatosNoAportados } from '@/lib/busqueda/filtros-radicado';
 import { formatFechaColombia } from '@/lib/fecha-colombia';
+import { nombreSolicitanteVisible } from '@/lib/seguridad/identidad-protegida';
 
 /* ══════════════════════════════════════════════════════════════
    Panel Operativo Fase 1 — Resumen Ejecutivo del Radicado.
@@ -96,7 +97,7 @@ export function ResumenEjecutivoRadicado({
       {/* Grid de datos claves — 2 columnas */}
       <div className="grid grid-cols-2 gap-x-4 gap-y-2 text-xs">
         <ResumenFila label="Llegada" value={`${formatFechaColombia(radicado.control.fechaRadicado)} · ${radicado.control.horaRadicado}`} />
-        <ResumenFila label="Solicitante" value={radicado.solicitante.nombreCompleto} />
+        <ResumenFila label="Solicitante" value={nombreSolicitanteVisible(radicado, radicado.solicitante.nombreCompleto)} />
         <ResumenFila label="Dependencia" value={dependenciaNombre} />
         <ResumenFila label="Responsable" value={responsableNombre} muted={responsableNombre === 'Sin asignar'} />
         <ResumenFila label="Tipo" value={radicado.termino.tipoSolicitudNombre} />

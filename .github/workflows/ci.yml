@@ -4,12 +4,27 @@ on:
   push:
     branches: [ main, develop, release/fase5-hardening ]
   pull_request:
-    branches: [ main, develop, release/fase5-hardening ]
+    # pr1-base y pr2-h3 son las bases del stack de release de H3 (PR apilados):
+    # se añaden SOLO al trigger para que los PR contra ellas corran los mismos
+    # checks que un PR contra main. No cambia el comportamiento para main.
+    branches: [ main, develop, release/fase5-hardening, pr1-base, pr2-h3 ]
 
 jobs:
   validate:
     name: Build & Security Gates
     runs-on: ubuntu-latest
+    # Los pasos de control corren con `if: ${{ !cancelled() }}` para que TODOS
+    # se ejecuten aunque uno falle: así el informe de despliegue (job final,
+    # ADR-0013/2D) recibe una señal COMPLETA por categoría. Un paso en rojo sigue
+    # poniendo el job en rojo (no lleva continue-on-error) — la compuerta no se
+    # debilita.
+    outputs:
+      lint: ${{ steps.lint.outcome }}
+      tsc: ${{ steps.tsc.outcome }}
+      test: ${{ steps.test.outcome }}
+      presupuesto: ${{ steps.presupuesto.outcome }}
+      audit: ${{ steps.audit.outcome }}
+      build: ${{ steps.build.outcome }}
 
     steps:
       - name: Checkout Code
@@ -25,18 +40,37 @@ jobs:
         run: npm install
 
       - name: Lint Check (Linter Gate)
+        id: lint
+        if: ${{ !cancelled() }}
         run: npm run lint
 
       - name: TypeScript Compile Check (Type Gate)
+        id: tsc
+        if: ${{ !cancelled() }}
         run: npx tsc --noEmit
 
       - name: Test Suite (Quality Gate)
+        id: test
+        if: ${{ !cancelled() }}
         run: npm test
 
+      - name: Presupuesto de Rendimiento (R11 Gate — ADR-0011, 2B)
+        id: presupuesto
+        if: ${{ !cancelled() }}
+        # Control de regresión de escala: falla si una consulta de colección
+        # sobre `ventanilla_radicados` que debe estar acotada pierde su
+        # limit()/cursor (regresión O(N)), o si aparece una lectura ilimitada
+        # nueva sin clasificar. Estático y determinista — no requiere emulador.
+        run: npm run presupuesto:rendimiento
+
       - name: Security Scan (NPM Audit Gate)
+        id: audit
+        if: ${{ !cancelled() }}
         run: npm audit --audit-level=high
 
       - name: Production Build Check (Build Gate)
+        id: build
+        if: ${{ !cancelled() }}
         run: npm run build
         env:
           NEXT_PUBLIC_FIREBASE_API_KEY: ${{ secrets.NEXT_PUBLIC_FIREBASE_API_KEY }}
@@ -45,3 +79,80 @@ jobs:
           NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET: ${{ secrets.NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET }}
           NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID: ${{ secrets.NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID }}
           NEXT_PUBLIC_FIREBASE_APP_ID: ${{ secrets.NEXT_PUBLIC_FIREBASE_APP_ID }}
+
+  laboratorio-emulador:
+    name: Laboratorio - Emulador Firestore (Fase 1)
+    runs-on: ubuntu-latest
+    outputs:
+      sonda: ${{ steps.sonda.outcome }}
+      matriz: ${{ steps.matriz.outcome }}
+
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: 'npm'
+
+      - name: Setup Java (emulador)
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '21'
+
+      - name: Install Dependencies
+        run: npm install
+
+      - name: Emulador + reglas + sonda canario
+        id: sonda
+        if: ${{ !cancelled() }}
+        run: npx firebase-tools emulators:exec --only firestore --project demo-ventanilla-lab "node scripts/laboratorio/probar-emulador.mjs"
+
+      - name: Matriz de aislamiento por tenant (ADR-0007)
+        id: matriz
+        if: ${{ !cancelled() }}
+        run: npx firebase-tools emulators:exec --only firestore --project demo-ventanilla-lab "npm run test:rules"
+
+  informe-despliegue:
+    name: Compuerta de despliegue — Informe de gobernanza (ADR-0013, 2D)
+    runs-on: ubuntu-latest
+    needs: [ validate, laboratorio-emulador ]
+    # Corre SIEMPRE (salvo cancelación) para emitir el informe COMPLETO aunque
+    # algún job de control haya fallado. El propio informe decide su exit code:
+    # ROJO → exit 1 (con branch protection, bloquea el merge); AMBER/VERDE → exit 0.
+    if: ${{ !cancelled() }}
+
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: 'npm'
+
+      - name: Generar informe de despliegue (semáforo + veredicto)
+        run: node scripts/laboratorio/informe-despliegue.mjs
+        env:
+          INFORME_DIR: ${{ github.workspace }}/informe
+          # Outcomes de los controles → categorías (ADR-0013 §Decisión.2).
+          OUTCOME_LINT: ${{ needs.validate.outputs.lint }}
+          OUTCOME_TSC: ${{ needs.validate.outputs.tsc }}
+          OUTCOME_TEST: ${{ needs.validate.outputs.test }}
+          OUTCOME_PRESUPUESTO: ${{ needs.validate.outputs.presupuesto }}
+          OUTCOME_AUDIT: ${{ needs.validate.outputs.audit }}
+          OUTCOME_BUILD: ${{ needs.validate.outputs.build }}
+          OUTCOME_MATRIZ: ${{ needs.laboratorio-emulador.outputs.matriz }}
+          OUTCOME_SONDA: ${{ needs.laboratorio-emulador.outputs.sonda }}
+
+      - name: Publicar informe como artefacto (trazabilidad)
+        if: ${{ !cancelled() }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: informe-despliegue-${{ github.sha }}
+          path: informe/
+          if-no-files-found: warn

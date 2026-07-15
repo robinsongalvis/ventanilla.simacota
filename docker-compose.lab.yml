@@ -1,0 +1,24 @@
+# Laboratorio Institucional de Calidad — emulador Firebase local (ADR-0002, Fase 1)
+#
+# Resuelve la restricción de esta máquina (Java 8): el emulador corre dentro
+# de un contenedor con Temurin 21 + Node (firebase-tools exige Java 21+).
+#
+# Uso:      docker compose -f docker-compose.lab.yml up
+# Requiere: Docker Desktop instalado (pendiente opcional registrado).
+# Estado:   NO PROBADO localmente (Docker no está instalado en esta máquina);
+#           la misma configuración de emulador está validada por el job
+#           "Laboratorio - Emulador Firestore" del CI.
+services:
+  firebase-emulator:
+    image: eclipse-temurin:21-jre
+    working_dir: /workspace
+    volumes:
+      - ./:/workspace
+    ports:
+      - "8080:8080"   # Firestore
+      - "9099:9099"   # Auth
+    command: >
+      bash -c "apt-get update -qq && apt-get install -y -qq curl &&
+      curl -fsSL https://deb.nodesource.com/setup_22.x | bash - &&
+      apt-get install -y -qq nodejs &&
+      npx firebase-tools emulators:start --only firestore,auth --project demo-ventanilla-lab"

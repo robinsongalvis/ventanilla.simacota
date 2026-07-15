@@ -16,6 +16,31 @@ deja constancia de una línea; la excepción repetida se convierte en propuesta
 de cambio de regla. La Regla Suprema no autoriza a saltarse invariantes de
 producto, seguridad o ley (tenant, IA asistiva, PII, normativa).
 
+## Protocolo de comunicación y colaboración (directriz del propietario, 2026-07-09)
+
+**Resumen Ejecutivo primero.** Todo cierre de bloque de trabajo dirigido al
+propietario empieza EXACTAMENTE con: **Estado General** (🟢 Completado / 🟡 En
+progreso / 🔴 Bloqueado) → **¿Qué lograste?** (máx. 5 puntos) → **¿Qué problemas
+encontraste?** (solo relevantes) → **¿Necesitas alguna intervención mía?**
+(Sí/No; si Sí: qué exactamente y cuánto toma) → **Próximo paso**. El informe
+técnico detallado va DESPUÉS del resumen, nunca antes.
+
+**Problemas siempre con 4 elementos:** qué ocurrió, por qué ocurrió, qué
+alternativas existen, cuál se recomienda y por qué.
+
+**Colaboración permanente, no intervención aislada:** cada rol evalúa antes de
+cerrar si otra disciplina debe participar, y la solicita sin esperar a ser
+invocada. Nadie da su trabajo por terminado sin la revisión que aplique según
+la matriz. El arquitecto consolida el trabajo de todos antes del resultado
+final; QA valida el flujo completo antes de cerrar cualquier funcionalidad
+aunque todos los demás hayan aprobado su parte, y consolida las evidencias de
+auditoría contra los criterios del SOI.
+
+**Criterio técnico bajo congelamiento:** riesgos, oportunidades y mejoras se
+proponen SIEMPRE, pero se registran como candidatas para evaluación futura; no
+se incorporan durante la ejecución salvo evidencia suficiente o riesgo crítico
+(Regla Suprema, con su constancia).
+
 ## Cómo funciona la coordinación
 
 - La **sesión principal de Claude Code actúa como coordinadora**: recibe la tarea

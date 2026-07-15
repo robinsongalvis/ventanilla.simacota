@@ -12,6 +12,7 @@ import type { TenantId }           from '@/src/types/radicado';
 import { useAnalytics, type AlertaPredictiva, type PeriodoAnalytics } from './useAnalytics';
 import { NOMBRES_TENANT }          from '@/src/types/reglas-negocio';
 import { diasRestantesHabiles }    from '@/lib/tiempos-radicado';
+import { nombreSolicitanteVisible } from '@/lib/seguridad/identidad-protegida';
 import { useMemo, useState }        from 'react';
 
 
@@ -120,7 +121,7 @@ function TarjetaAlerta({
       {/* Fila 2: solicitante + dependencia */}
       <div className="flex items-start justify-between gap-2">
         <div className="min-w-0">
-          <p className="text-sm font-semibold truncate" style={{ color: '#1F2933' }}>{r.solicitante.nombreCompleto}</p>
+          <p className="text-sm font-semibold truncate" style={{ color: '#1F2933' }}>{nombreSolicitanteVisible(r, r.solicitante.nombreCompleto)}</p>
           <p className="text-[10px] mt-0.5" style={{ color: '#667085' }}>
             {NOMBRES_TENANT[r.clasificacion.oficinaDestino]} · {r.termino.tipoSolicitudNombre}
           </p>

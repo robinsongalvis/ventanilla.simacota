@@ -8,7 +8,12 @@
     "start": "next start",
     "lint": "eslint",
     "test": "vitest run",
-    "test:watch": "vitest"
+    "test:watch": "vitest",
+    "test:e2e": "playwright test",
+    "test:rules": "node --test e2e/rules/*.test.mjs",
+    "presupuesto:rendimiento": "node scripts/laboratorio/presupuesto-rendimiento.mjs",
+    "informe:despliegue": "node scripts/laboratorio/informe-despliegue.mjs",
+    "dev:stage": "node scripts/laboratorio/dev-stage.mjs"
   },
   "dependencies": {
     "@fontsource/dm-sans": "^5.2.8",
@@ -23,6 +28,8 @@
     "react-dom": "^19.2.6"
   },
   "devDependencies": {
+    "@firebase/rules-unit-testing": "^5.0.1",
+    "@playwright/test": "^1.61.1",
     "@sentry/nextjs": "^10.55.0",
     "@tailwindcss/postcss": "^4.2.2",
     "@testing-library/dom": "^10.4.1",

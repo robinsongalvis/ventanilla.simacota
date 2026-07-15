@@ -155,7 +155,11 @@ La trazabilidad permanece en subcolección append-only y cada acción crítica r
 ```
 
 **Reglas de Firestore:**
-- `allow create: if canWriteTrazabilidad()` — solo ADMIN, RECEPCIONISTA, FUNCIONARIO
+- `allow create: if canWriteTrazabilidad(radicadoId, database)` — ADMIN y RECEPCIONISTA
+  (alcance cross-tenant de ventanilla única), y FUNCIONARIO **solo** cuando el
+  `clasificacion.oficinaDestino` del radicado padre coincide con su `userTenant()`
+  (aislamiento por tenant, ADR-0008; refleja el `allow read`). JEFE_DEPENDENCIA y
+  CONTROL_INTERNO quedan fuera de la escritura (solo lectura).
 - `allow update, delete: if false` — **inmutable**
 - `allow read: if isInternalUser()` — todos los roles internos incluyendo JEFE_DEPENDENCIA y CONTROL_INTERNO
 
