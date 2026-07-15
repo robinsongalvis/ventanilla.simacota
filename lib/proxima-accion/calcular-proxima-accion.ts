@@ -1,5 +1,6 @@
 import type { VentanillaRadicado } from '@/src/types/ventanilla';
 import { diasRestantesHabiles } from '@/lib/tiempos-radicado';
+import { ESTADOS_ACTIVOS } from '@/lib/radicado-estados';
 
 /**
  * Panel Operativo Fase 1 — cálculo determinístico de la "próxima acción
@@ -26,8 +27,10 @@ export type RuleIdProximaAccion =
   | 'EN_PROCESO'
   | 'PRORROGA'
   | 'DEVUELTO'
+  | 'EN_SUBSANACION'
   | 'RESUELTO'
   | 'RECHAZADO'
+  | 'DESISTIDO'
   | 'DESCONOCIDO';
 
 export interface ProximaAccion {
@@ -35,10 +38,6 @@ export interface ProximaAccion {
   urgencia: UrgenciaAccion;
   ruleId:  RuleIdProximaAccion;
 }
-
-const ESTADOS_ACTIVOS = new Set<string>([
-  'PENDIENTE', 'ASIGNADO', 'EN_REVISION', 'EN_PROCESO', 'DEVUELTO', 'PRORROGA',
-]);
 
 function estaActivo(estadoActual: string): boolean {
   return ESTADOS_ACTIVOS.has(estadoActual);
@@ -65,6 +64,17 @@ export function calcularProximaAccion(radicado: VentanillaRadicado, ahora?: Date
       accion:  'Gestionar notificación fallida por correo institucional',
       urgencia: 'alta',
       ruleId:  'NOTIFICACION_FALLIDA',
+    };
+  }
+
+  // Regla 1.5 — EN_SUBSANACION (BM-B33): el término está SUSPENDIDO; se
+  // evalúa ANTES que vencido/por-vencer para no reportar un vencimiento falso
+  // mientras se espera al ciudadano.
+  if (radicado.estadoActual === 'EN_SUBSANACION') {
+    return {
+      accion:  'Esperando subsanación del ciudadano · término suspendido',
+      urgencia: 'media',
+      ruleId:  'EN_SUBSANACION',
     };
   }
 
@@ -166,6 +176,15 @@ export function calcularProximaAccion(radicado: VentanillaRadicado, ahora?: Date
       accion:  'Sin acción pendiente',
       urgencia: 'ninguna',
       ruleId:  'RECHAZADO',
+    };
+  }
+
+  // Regla 13 — DESISTIDO (BM-B33): cierre por desistimiento tácito.
+  if (radicado.estadoActual === 'DESISTIDO') {
+    return {
+      accion:  'Sin acción pendiente · archivado por desistimiento',
+      urgencia: 'ninguna',
+      ruleId:  'DESISTIDO',
     };
   }
 

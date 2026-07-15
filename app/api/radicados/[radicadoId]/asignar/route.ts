@@ -22,6 +22,10 @@ import {
   buildNotificacionEstadoHtml,
   buildNotificacionEstadoSubject,
 } from '@/lib/email/templates/notificacion-estado';
+import {
+  buildAsignacionInternaHtml,
+  buildAsignacionInternaSubject,
+} from '@/lib/email/templates/asignacion-interna';
 import { debeNotificarCiudadano } from '@/lib/email/debe-notificar-ciudadano';
 import {
   notificacionRecienteEnviada,
@@ -186,6 +190,53 @@ export async function POST(request: Request, context: RouteContext): Promise<Nex
             destinatario: emailDestino,
             estado: 'FALLIDA',
             error: emailError,
+            metadata: { dependenciaDestino: tenantDestino },
+          });
+        }
+      }
+    }
+
+    // ── BM-B17: correo interno a la dependencia asignada ──
+    // Fuente oficial: M-GSC-8200-170-002 (Paso 16, "ASIGNACIÓN DE SOLICITUD").
+    // Aviso de trabajo nuevo; best-effort — nunca bloquea la asignación.
+    // Ortogonal a H3: no toca numeración; reutiliza la infraestructura de correo.
+    const emailDependencia = dependenciaDestino.emailOficial;
+    if (emailDependencia) {
+      const duplicadoInterno = await notificacionRecienteEnviada({
+        radicadoId,
+        tipoNotificacion: 'ASIGNACION_INTERNA',
+        metadataMatch: { dependenciaDestino: tenantDestino },
+      });
+
+      if (!duplicadoInterno) {
+        try {
+          await enviarEmail({
+            to: emailDependencia,
+            subject: buildAsignacionInternaSubject(radicadoId),
+            html: buildAsignacionInternaHtml({
+              radicadoId,
+              dependenciaNombre: dependenciaDestino.nombreOficial,
+              asunto: radicado.detalle?.asunto ?? '(sin asunto)',
+              tipoSolicitudNombre: radicado.termino?.tipoSolicitudNombre,
+              fechaVencimiento: radicado.termino?.fechaVencimiento ?? null,
+              asignadoPor: usuario.nombre,
+            }),
+          });
+          await registrarTrazabilidadNotificacion({
+            radicadoId,
+            tipoNotificacion: 'ASIGNACION_INTERNA',
+            destinatario: emailDependencia,
+            estado: 'ENVIADA',
+            metadata: { dependenciaDestino: tenantDestino },
+          });
+        } catch (err) {
+          logError({ radicadoId, modulo: 'asignar/email-dependencia', error: err });
+          await registrarTrazabilidadNotificacion({
+            radicadoId,
+            tipoNotificacion: 'ASIGNACION_INTERNA',
+            destinatario: emailDependencia,
+            estado: 'FALLIDA',
+            error: err instanceof Error ? err.message : String(err),
             metadata: { dependenciaDestino: tenantDestino },
           });
         }

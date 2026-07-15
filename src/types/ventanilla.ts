@@ -119,6 +119,40 @@ export interface ControlRadicacion {
   tipoEntrada?: TipoEntrada;
 }
 
+/**
+ * BM-B33 — suspensión del término por requerimiento de subsanación
+ * (Ley 1755 Art. 17). Aditiva y auditable: NO reescribe el término original;
+ * el reloj se congela al NOTIFICAR (no al emitir) y se reanuda al subsanar.
+ */
+export interface SuspensionTermino {
+  /** El término está suspendido AHORA (solo tras la notificación). */
+  activa: boolean;
+  /** ISO — emisión interna del requerimiento. */
+  fechaRequerimiento: string;
+  /** ISO — NOTIFICACIÓN al ciudadano = ancla legal de la suspensión. Null hasta notificar. */
+  fechaNotificacion?: string | null;
+  /** ISO — `fechaNotificacion` + 1 mes calendario (C.C. art. 67). */
+  fechaLimiteSubsanacion?: string | null;
+  /** Días hábiles del término que quedaban AL NOTIFICAR (reloj congelado). */
+  diasHabilesRestantes?: number | null;
+  /** Contenido mínimo: qué debe subsanar el ciudadano. */
+  motivo: string;
+  /** Quién emitió el requerimiento (snapshot). */
+  requeridoPor: { uid: string; nombre: string };
+  /** Prórroga del ciudadano (Art. 17): hasta 1 mes más, pedida antes de vencer. */
+  prorroga?: {
+    solicitada: boolean;
+    fechaSolicitud: string;
+    /** `fechaLimiteSubsanacion` + 1 mes calendario. */
+    nuevaFechaLimite: string;
+  } | null;
+  /**
+   * BM-B33 — el cron ya PROPUSO el desistimiento (idempotencia). No implica
+   * decisión: el desistimiento lo confirma un humano por acto motivado.
+   */
+  desistimientoPropuesto?: boolean | null;
+}
+
 export interface TerminoLegal {
   tipoSolicitudId: TipoSolicitudId;
   tipoSolicitudNombre: string;
@@ -126,6 +160,8 @@ export interface TerminoLegal {
   unidad: UnidadTermino;
   fechaVencimiento: string;
   prorrogasAplicadas: number;
+  /** BM-B33 — presente solo cuando hubo requerimiento de subsanación. */
+  suspension?: SuspensionTermino | null;
 }
 
 /**

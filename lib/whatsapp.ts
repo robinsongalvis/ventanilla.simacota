@@ -6,21 +6,25 @@ import type { EstadoRadicado, TenantId } from '@/src/types/radicado';
 ══════════════════════════════════════════════════════════════ */
 
 const EMOJI_ESTADO: Record<EstadoRadicado, string> = {
-  PENDIENTE:   '⏳',
-  EN_REVISION: '🔍',
-  EN_PROCESO:  '⚙️',
-  RESUELTO:    '✅',
-  DEVUELTO:    '↩️',
-  RECHAZADO:   '❌',
+  PENDIENTE:      '⏳',
+  EN_REVISION:    '🔍',
+  EN_PROCESO:     '⚙️',
+  RESUELTO:       '✅',
+  DEVUELTO:       '↩️',
+  RECHAZADO:      '❌',
+  EN_SUBSANACION: '📄',
+  DESISTIDO:      '🗄️',
 };
 
 const LABEL_ESTADO: Record<EstadoRadicado, string> = {
-  PENDIENTE:   'PENDIENTE',
-  EN_REVISION: 'EN REVISIÓN',
-  EN_PROCESO:  'EN PROCESO',
-  RESUELTO:    'RESUELTO',
-  DEVUELTO:    'DEVUELTO',
-  RECHAZADO:   'RECHAZADO',
+  PENDIENTE:      'PENDIENTE',
+  EN_REVISION:    'EN REVISIÓN',
+  EN_PROCESO:     'EN PROCESO',
+  RESUELTO:       'RESUELTO',
+  DEVUELTO:       'DEVUELTO',
+  RECHAZADO:      'RECHAZADO',
+  EN_SUBSANACION: 'EN SUBSANACIÓN',
+  DESISTIDO:      'DESISTIDO',
 };
 
 /* ══════════════════════════════════════════════════════════════

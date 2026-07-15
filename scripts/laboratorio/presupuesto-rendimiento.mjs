@@ -162,6 +162,16 @@ const REGISTRO = [
       + 'aquí; RECOMENDADO acotar con limit + where(estado activo) (escalado al coordinador).',
     ref: 'HALLAZGO 2B (fuera de ADR-0010 §Deuda) — pendiente de decisión',
   },
+  {
+    archivo: 'app/api/cron/desistimiento-tacito/route.ts',
+    estado: 'DEUDA_DECLARADA',
+    clase: 'BATCH',
+    descripcion: 'Cron de desistimiento tácito C1 (diario, sin contexto de tenant; filtra '
+      + 'EN_SUBSANACION en memoria). Detectado por este gate en el CI de PR-3 (stack H3): '
+      + 'sin cota, igual que su gemelo alertas-vencimiento. RECOMENDADO acotar con '
+      + 'where(estadoActual==EN_SUBSANACION) + limit en Bloque 3 (PLAN_BLOQUE3 §9).',
+    ref: 'Gate R11 en PR-3 (2026-07-14) — deuda diferida a Bloque 3',
+  },
 ];
 
 // ─────────────────────────── escaneo ───────────────────────────

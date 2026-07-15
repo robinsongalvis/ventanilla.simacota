@@ -138,5 +138,12 @@ es deuda diferida, ordenada por prioridad:
   conciliación de `move` fallido (N8 declarado en ADR-0016).
 - **[Baja] Detector — consulta por rango** en vez de leer la colección completa
   (escalabilidad del script forense; ambos agentes).
+- **[Baja] Cron desistimiento-tácito sin cota** (gate R11 en el CI de PR-3,
+  2026-07-14): `app/api/cron/desistimiento-tacito/route.ts` lee
+  `ventanilla_radicados` completa y filtra `EN_SUBSANACION` en memoria — mismo
+  patrón O(N) que su gemelo `alertas-vencimiento` (deuda ya declarada). Acotar
+  con `where(estadoActual==EN_SUBSANACION)` + `limit` (batch diario tolera
+  procesar el resto al día siguiente). Registrada como `DEUDA_DECLARADA` en
+  `presupuesto-rendimiento.mjs`; el gate impide que crezca.
 - **[Cosmético] repro test** (qa P3): su "rojo" contra baseline es por incompatibilidad
   de import, no por la aserción del invariante; los otros 4 sí matan el mutante.

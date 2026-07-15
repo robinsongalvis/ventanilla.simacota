@@ -29,6 +29,7 @@ import {
 } from '@/lib/server/radicados-security';
 import { calcularFechaVencimiento, resolverTipoSolicitud } from '@/lib/tiempos-radicado';
 import { getTipoSolicitudById } from '@/lib/catalogos/tipos-solicitud';
+import { sugerirSerieDocumental } from '@/lib/catalogos/series-documentales';
 import { logError } from '@/lib/logger';
 
 export const runtime = 'nodejs';
@@ -107,6 +108,15 @@ export async function POST(request: Request, context: RouteContext): Promise<Nex
     const advertenciaTerminoMenor =
       terminoNuevoDiasHabilesEquivalente < terminoAnteriorDiasHabilesEquivalente;
 
+    // C1/BM-B11 — la serie TRD deriva de tipo × destino; al reclasificar el
+    // tipo, se re-deriva para que la clasificación no quede desactualizada.
+    // Ortogonal a H3: no toca el consecutivo, solo la foto de serie.
+    const oficinaDestino = radicado.clasificacion?.oficinaDestino;
+    const serieAnterior = radicado.clasificacion?.serieDocumental ?? null;
+    const serieNueva = oficinaDestino
+      ? sugerirSerieDocumental(nuevoTipoId, oficinaDestino)
+      : null;
+
     const update = removeUndefinedDeep({
       'termino.tipoSolicitudId': tipoNuevo.id,
       'termino.tipoSolicitudNombre': tipoNuevo.nombre,
@@ -115,6 +125,9 @@ export async function POST(request: Request, context: RouteContext): Promise<Nex
       'termino.fechaVencimiento': nuevaFechaVencimiento,
       ultimaActualizacion: ahora.toISOString(),
       prioridad: tipoNuevo.prioridadSugerida,
+      // Solo se reescribe cuando hay destino del que derivar (si el nuevo tipo
+      // no produce serie, queda null = "se clasifica en archivo").
+      ...(oficinaDestino ? { 'clasificacion.serieDocumental': serieNueva } : {}),
     });
 
     await getFirebaseAdminDb().doc(`ventanilla_radicados/${radicadoId}`).update(update);
@@ -143,6 +156,9 @@ export async function POST(request: Request, context: RouteContext): Promise<Nex
         advertenciaTerminoMenor,
         requiereValidacionJuridica: definicionNueva.requiereValidacionJuridica === true,
         actorRol: usuario.rol,
+        // C1/BM-B11 — trazabilidad del cambio de serie (foto documental).
+        serieAnteriorCodigo: serieAnterior?.codigo ?? null,
+        serieNuevaCodigo: serieNueva?.codigo ?? null,
       },
     });
 
@@ -158,6 +174,7 @@ export async function POST(request: Request, context: RouteContext): Promise<Nex
       fechaVencimiento: nuevaFechaVencimiento,
       advertenciaTerminoMenor,
       requiereValidacionJuridica: definicionNueva.requiereValidacionJuridica === true,
+      serieDocumental: serieNueva,
     });
   } catch (error) {
     const { radicadoId } = await context.params.catch(() => ({ radicadoId: 'desconocido' })) as { radicadoId: string };

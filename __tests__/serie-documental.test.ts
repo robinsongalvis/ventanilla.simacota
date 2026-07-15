@@ -4,8 +4,12 @@ import {
   CODIGO_TRD_DEPENDENCIA,
   FUENTE_TRD,
   labelSerieDocumental,
+  SERIES_VENTANILLA,
   sugerirSerieDocumental,
 } from '@/lib/catalogos/series-documentales';
+import type { SerieDocumentalDef } from '@/lib/catalogos/series-documentales';
+import { construirPaqueteExpres } from '@/lib/dependencias/registro-expres';
+import type { EntradaExpres, IdsExpres } from '@/lib/dependencias/registro-expres';
 
 /* ══════════════════════════════════════════════════════════════
    Sprint Serie documental — el radicado nace clasificado en su
@@ -75,5 +79,96 @@ describe('integración — el radicado nace con la serie', () => {
     const form = readFileSync('app/interno/recepcion/components/RadicacionFuncionarioForm.tsx', 'utf8');
     expect(form).toContain('Serie documental (TRD)');
     expect(form).toContain('labelSerieDocumental(serieSugerida)');
+  });
+});
+
+/* ══════════════════════════════════════════════════════════════
+   C1 — Ciclo vital documental (retención/disposición) desde la TRD.
+   Valores verificados contra la TRD oficial; disposición pendiente
+   de validación del Jefe de Archivo (B32-a) en 3 de 4 series.
+══════════════════════════════════════════════════════════════ */
+describe('C1 — retención/disposición del catálogo (BM-B32)', () => {
+  it('Derechos de Petición conserva su ciclo vital (2/8, Selección)', () => {
+    expect(SERIES_VENTANILLA.DERECHOS_DE_PETICION.retencionGestionAnios).toBe(2);
+    expect(SERIES_VENTANILLA.DERECHOS_DE_PETICION.retencionCentralAnios).toBe(8);
+    expect(SERIES_VENTANILLA.DERECHOS_DE_PETICION.disposicionFinal).toBe('S');
+  });
+
+  it('Licencia de Construcción (120.22.01) → retención 2/10', () => {
+    expect(SERIES_VENTANILLA.LICENCIA_CONSTRUCCION.retencionGestionAnios).toBe(2);
+    expect(SERIES_VENTANILLA.LICENCIA_CONSTRUCCION.retencionCentralAnios).toBe(10);
+  });
+
+  it('Licencia de Subdivisión Rural (120.22.06) → retención 2/10', () => {
+    expect(SERIES_VENTANILLA.LICENCIA_SUBDIVISION.retencionGestionAnios).toBe(2);
+    expect(SERIES_VENTANILLA.LICENCIA_SUBDIVISION.retencionCentralAnios).toBe(10);
+    expect(SERIES_VENTANILLA.LICENCIA_SUBDIVISION.nombre).toContain('Subdivisión Rural');
+  });
+
+  it('Proceso Verbal Abreviado (112.26.07) → retención 2/18, disposición Selección', () => {
+    expect(SERIES_VENTANILLA.PROCESO_VERBAL_ABREVIADO.retencionGestionAnios).toBe(2);
+    expect(SERIES_VENTANILLA.PROCESO_VERBAL_ABREVIADO.retencionCentralAnios).toBe(18);
+    expect(SERIES_VENTANILLA.PROCESO_VERBAL_ABREVIADO.disposicionFinal).toBe('S');
+  });
+
+  it('Declaraciones Tributarias (130.11.01) → retención 2/8', () => {
+    expect(SERIES_VENTANILLA.DECLARACIONES_TRIBUTARIAS.retencionGestionAnios).toBe(2);
+    expect(SERIES_VENTANILLA.DECLARACIONES_TRIBUTARIAS.retencionCentralAnios).toBe(8);
+  });
+
+  it('las 3 series pendientes NO inventan disposición (B32-a)', () => {
+    // Tipar con la interfaz: `as const satisfies` estrecha el literal y omite
+    // el campo ausente; la interfaz lo declara opcional y permite verificarlo.
+    const pendientes: SerieDocumentalDef[] = [
+      SERIES_VENTANILLA.LICENCIA_CONSTRUCCION,
+      SERIES_VENTANILLA.LICENCIA_SUBDIVISION,
+      SERIES_VENTANILLA.DECLARACIONES_TRIBUTARIAS,
+    ];
+    for (const serie of pendientes) {
+      expect(serie.disposicionFinal).toBeUndefined();
+    }
+  });
+});
+
+/* ══════════════════════════════════════════════════════════════
+   C1 — Cobertura del sellado por canal: TODO radicado nace con su
+   serie, no solo el de ventanilla. (Corrige la brecha detectada en
+   el Blueprint C1: la serie se sellaba solo en radicarVentanilla.)
+══════════════════════════════════════════════════════════════ */
+describe('C1 — el radicado nace clasificado en todos los canales', () => {
+  it('registro exprés sella la serie en el radicado (builder puro)', () => {
+    const entrada: EntradaExpres = {
+      remitenteNombre:  'Contraloría de Santander',
+      tipoSolicitudId:  'PETICION_GENERAL',
+      asunto:           'Solicitud de información predial',
+      descripcion:      'Solicitan copia del avalúo predial de un inmueble.',
+      fechaLlegada:     '2026-07-10T14:00:00.000Z',
+      respuestaResumen: 'Se remitió la certificación solicitada.',
+      fechaRespuesta:   '2026-07-11T14:00:00.000Z',
+      dependencia:      'SEC_HACIENDA',
+    };
+    const ids: IdsExpres = {
+      radicadoId: '1-110-2026-00000001', consecutivoEntrada: 1,
+      salidaId: '2-SAL-2026-00000001', consecutivoSalida: 1,
+    };
+    const paquete = construirPaqueteExpres(
+      entrada, ids, { uid: 'u1', nombre: 'Funcionaria' }, new Date('2026-07-12T09:00:00.000Z'),
+    );
+    // PETICION_GENERAL × SEC_HACIENDA → 130.12 Derechos de Petición.
+    expect(paquete.radicado.clasificacion.serieDocumental?.codigo).toBe('130.12');
+  });
+
+  it('la radicación WEB (API) sella la serie derivada', () => {
+    const route = readFileSync('app/api/radicacion/route.ts', 'utf8');
+    expect(route).toContain('sugerirSerieDocumental');
+    expect(route).toContain('serieDocumental: serie');
+  });
+
+  it('la reclasificación re-deriva la serie (BM-B11)', () => {
+    const route = readFileSync('app/api/radicados/[radicadoId]/reclasificar/route.ts', 'utf8');
+    expect(route).toContain('sugerirSerieDocumental');
+    expect(route).toContain("'clasificacion.serieDocumental'");
+    // deja huella del cambio de serie
+    expect(route).toContain('serieAnteriorCodigo');
   });
 });

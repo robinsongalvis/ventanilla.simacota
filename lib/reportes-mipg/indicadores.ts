@@ -1,5 +1,6 @@
 import type { VentanillaRadicado, TrazabilidadRadicado } from '@/src/types/ventanilla';
 import { diasRestantesHabiles } from '@/lib/tiempos-radicado';
+import { ESTADOS_CERRADOS as ESTADOS_RESUELTOS } from '@/lib/radicado-estados';
 
 /* ══════════════════════════════════════════════════════════════
    Cálculo de indicadores MIPG — Función pura, testable.
@@ -25,7 +26,6 @@ export interface IndicadoresMipg {
   anonimosOReservados:      number;
 }
 
-const ESTADOS_RESUELTOS = new Set<string>(['RESUELTO', 'RECHAZADO']);
 const ESTADOS_EN_TRAMITE = new Set<string>(['ASIGNADO', 'EN_REVISION', 'EN_PROCESO', 'PRORROGA']);
 const ESTADOS_PENDIENTES = new Set<string>(['PENDIENTE', 'DEVUELTO']);
 

@@ -23,8 +23,14 @@ import { removeUndefinedDeep } from '@/lib/firestore/removeUndefined';
 export type TipoNotificacion =
   | 'RADICACION'
   | 'ASIGNACION'
+  /** BM-B17 — correo interno a la dependencia asignada (distinto del aviso al ciudadano). */
+  | 'ASIGNACION_INTERNA'
   | 'PRORROGA'
   | 'RESPUESTA_OFICIAL'
+  /** BM-B33 — requerimiento de subsanación (Ley 1755 Art. 17). */
+  | 'SUBSANACION'
+  /** BM-B33 — acto de desistimiento tácito notificado al ciudadano. */
+  | 'DESISTIMIENTO'
   | 'RESET_PASSWORD'
   /** Sprint Ventanilla Operativa 2 — envío manual de la constancia de radicación por correo. */
   | 'CONSTANCIA';

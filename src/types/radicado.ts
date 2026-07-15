@@ -6,7 +6,11 @@ export type EstadoRadicado =
   | 'EN_PROCESO'
   | 'RESUELTO'
   | 'DEVUELTO'
-  | 'RECHAZADO';
+  | 'RECHAZADO'
+  /** BM-B33 — requerimiento de subsanación notificado: activo con el término legal SUSPENDIDO. */
+  | 'EN_SUBSANACION'
+  /** BM-B33 — desistimiento tácito confirmado por acto motivado (cierre). */
+  | 'DESISTIDO';
 
 export type Prioridad = 'ROJO' | 'NARANJA' | 'AMARILLO';
 
@@ -56,7 +60,19 @@ export type AccionAuditoria =
   /** Sprint Cierre del mostrador — el ciudadano aportó posteriormente datos de contacto que faltaban. */
   | 'DATOS_COMPLETADOS'
   /** Sprint Radicación de salida — se despachó un oficio de salida amarrado a este radicado. */
-  | 'OFICIO_SALIDA_REGISTRADO';
+  | 'OFICIO_SALIDA_REGISTRADO'
+  /** BM-B33 — se emitió un requerimiento de subsanación (Ley 1755 Art. 17). */
+  | 'REQUERIMIENTO_SUBSANACION'
+  /** BM-B33 — el requerimiento fue notificado al ciudadano: el término se SUSPENDE. */
+  | 'SUBSANACION_NOTIFICADA'
+  /** BM-B33 — el ciudadano solicitó prórroga del plazo de subsanación. */
+  | 'PRORROGA_SUBSANACION'
+  /** BM-B33 — el ciudadano subsanó y el funcionario reactivó el término. */
+  | 'SUBSANACION_RECIBIDA'
+  /** BM-B33 — el cron propone desistimiento tácito (no archiva). */
+  | 'DESISTIMIENTO_TACITO_PROPUESTO'
+  /** BM-B33 — el funcionario confirmó el desistimiento por acto motivado. */
+  | 'DESISTIMIENTO_TACITO_CONFIRMADO';
 
 export interface AuditoriaEntry {
   fecha:    string;
