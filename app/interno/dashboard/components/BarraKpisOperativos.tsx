@@ -1,19 +1,21 @@
 'use client';
 
+import type { ReactNode } from 'react';
 import type { KpisOperativos } from '@/lib/kpis-operativos/calcular-kpis-operativos';
 import type { FiltroKpiOperativo } from '@/lib/kpis-operativos/filtrar-por-kpi-operativo';
 
 /* ══════════════════════════════════════════════════════════════
    Panel Operativo Fase 2 — Barra secundaria de KPIs operativos.
 
-   Ubicada bajo la barra MIPG oficial. Cinco pastillas compactas
-   que la funcionaria de Ventanilla puede usar como filtro adicional
-   (combinable con el filtro MIPG activo; solo un filtro operativo
-   activo a la vez).
+   Sprint tablero-jerarquia (referencia Figma BZ8X6M4nqVqlCh27k5hnEz):
+   esta barra pasó a ser la ÚNICA banda de estado del Tablero — el
+   `chipsExtra` opcional permite que el llamador intercale los chips
+   MIPG compactos (Prioridad, En término, Devueltas/Prórroga, Fuera de
+   término) ANTES de las pastillas operativas, bajo un solo rótulo
+   "Estado operativo", sin duplicar el layout de banda.
 
-   Estilo intencionalmente más discreto que la barra MIPG para dejar
-   claro que estas métricas son operativas del día a día, no del set
-   MIPG oficial de gerencia.
+   Estilo intencionalmente más discreto que las tarjetas MIPG grandes
+   para dejar claro que estas métricas son operativas del día a día.
 ══════════════════════════════════════════════════════════════ */
 
 interface PastillaConfig {
@@ -39,6 +41,10 @@ export interface BarraKpisOperativosProps {
   misAsignados?:     number;
   soloMios?:         boolean;
   onToggleSoloMios?: () => void;
+  /** Sprint tablero-jerarquia — chips adicionales (hoy: MIPG compactos)
+   *  que se intercalan en la misma banda, antes de las pastillas
+   *  operativas, para fusionar las dos franjas en una sola. */
+  chipsExtra?: ReactNode;
 }
 
 export function BarraKpisOperativos({
@@ -48,6 +54,7 @@ export function BarraKpisOperativos({
   misAsignados = 0,
   soloMios = false,
   onToggleSoloMios,
+  chipsExtra,
 }: BarraKpisOperativosProps) {
   const pastillas: PastillaConfig[] = [
     { id: 'HOY',            label: 'Hoy',              valor: kpis.hoy,            tono: 'neutral',
@@ -80,9 +87,16 @@ export function BarraKpisOperativos({
         >
           Estado operativo
         </span>
+        {chipsExtra}
         {pastillas.map((p) => {
           const activo = filtroActivo === p.id;
           const t = TONOS[p.tono];
+          // Jerarquía por severidad (sprint tablero-jerarquia): valor 0 se
+          // atenúa (opacity ~0.55 + borde gris) pero el chip queda
+          // deshabilitado igual que antes — no tiene sentido filtrar por
+          // un estado vacío. El texto no pierde AA: la pastilla nunca
+          // dependió de opacidad para su contraste, solo se retira del
+          // primer plano visual.
           const deshabilitada = p.valor === 0 && !activo;
           return (
             <button
@@ -90,11 +104,12 @@ export function BarraKpisOperativos({
               type="button"
               onClick={() => handleClick(p.id)}
               disabled={deshabilitada}
-              className="shrink-0 flex items-center gap-1.5 px-2.5 py-1 rounded-full border text-[10px] font-semibold uppercase tracking-wide transition-all disabled:cursor-not-allowed disabled:opacity-40"
+              className="shrink-0 flex items-center gap-1.5 px-2.5 py-1 rounded-full border text-[10px] font-semibold uppercase tracking-wide transition-all disabled:cursor-not-allowed"
               style={{
                 background:  activo ? t.bgActivo : t.bg,
                 color:       activo ? t.textActivo : t.text,
-                borderColor: t.border,
+                borderColor: deshabilitada ? '#D9E2D9' : t.border,
+                opacity:     deshabilitada ? 0.55 : 1,
               }}
               aria-pressed={activo}
               aria-label={`KPI operativo: ${p.label} (${p.valor})`}
