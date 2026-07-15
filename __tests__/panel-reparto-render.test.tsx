@@ -99,6 +99,45 @@ describe('PanelReparto', () => {
     expect(screen.queryByRole('button', { name: /^anular$/i })).toBeNull();
   });
 
+  it('hoja imprimible: formato institucional aprobado, fuera del contenedor print:hidden', async () => {
+    mockFetch({ ok: true, pendientes: [], planillas: [PLANILLA_ABIERTA] });
+    render(<PanelReparto onCerrar={() => {}} />);
+
+    await waitFor(() => {
+      expect(document.getElementById('planilla-reparto-print')).toBeTruthy();
+    });
+
+    const hoja = document.getElementById('planilla-reparto-print') as HTMLElement;
+
+    // La hoja imprimible debe ser hija directa de <body> (portal), fuera del
+    // contenedor `print:hidden` que causaba la impresión en blanco.
+    expect(hoja.parentElement).toBe(document.body);
+    expect(hoja.closest('.print\\:hidden')).toBeNull();
+
+    // Formato oficial aprobado del sistema de calidad municipal.
+    expect(hoja.textContent).toContain('PLANILLA PARA ENTREGA DE CORRESPONDENCIA');
+    expect(hoja.textContent).toContain('F-GSC-8200-238-37-001');
+    expect(hoja.textContent).toContain('Alcaldía de SIMACOTA');
+
+    // Columnas de la cuadrícula, en el orden exacto del formato.
+    for (const columna of [
+      'No.', 'Fecha de Radicado', 'Hora Rad.', 'Número de Radicado',
+      'Dependencia Asignada', 'Área Asignada', 'Nombre del Solicitante Natural / Jurídica',
+      'Asunto', 'Dirección/Teléfonos', 'Nro. Fol.', 'Anexos',
+      'Fecha / Hora de Recibido', 'Devuelta SI / NO', 'Nombre y Firma',
+    ]) {
+      expect(hoja.textContent).toContain(columna);
+    }
+
+    // Protección de datos: la columna Dirección/Teléfonos siempre va en "-",
+    // nunca se incorpora PII nueva que el radicado no tenía.
+    const filaSolicitante = hoja.querySelector('td[style*="monospace"]')?.closest('tr');
+    expect(filaSolicitante?.textContent).toContain('Juan Pérez');
+    const celdas = filaSolicitante ? [...filaSolicitante.querySelectorAll('td')] : [];
+    // Orden de columnas: 4=radicado, 8=asunto, 9=Dirección/Teléfonos → índice 8.
+    expect(celdas[8]?.textContent).toBe('-');
+  });
+
   it('sin pendientes ni planillas: estado vacío honesto', async () => {
     mockFetch({ ok: true, pendientes: [], planillas: [] });
     render(<PanelReparto onCerrar={() => {}} />);

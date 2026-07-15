@@ -1,6 +1,11 @@
 'use client';
 
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+/* eslint-disable @next/next/no-img-element -- hoja imprimible detached de
+   Next/Image: mismo patrón que SelloDespacho.tsx (imagen suelta para que
+   funcione fuera del árbol optimizado por next/image al imprimir). */
+
+import { useCallback, useEffect, useMemo, useRef, useState, type CSSProperties } from 'react';
+import { createPortal } from 'react-dom';
 import { NOMBRES_TENANT } from '@/src/types/reglas-negocio';
 import { getNombreArea } from '@/lib/catalogos/areas';
 import { INSTITUCION } from '@/lib/institucion';
@@ -96,6 +101,11 @@ export function PanelReparto({ onCerrar }: PanelRepartoProps) {
 
   const stylesInjected = useRef(false);
   const inputEscaneo = useRef<HTMLInputElement>(null);
+
+  // La hoja imprimible viaja por portal a document.body (ver nota junto al
+  // JSX que la usa) — solo existe document tras montar en el cliente.
+  const [montado, setMontado] = useState(false);
+  useEffect(() => { setMontado(true); }, []);
 
   const cargar = useCallback(async () => {
     setCargando(true);
@@ -557,48 +567,90 @@ export function PanelReparto({ onCerrar }: PanelRepartoProps) {
         </div>
       </div>
 
-      {/* ── Hoja imprimible (solo visible al imprimir) ── */}
-      {abierta && (
+      {/* ── Hoja imprimible (solo visible al imprimir) ──
+          Va por portal a document.body: el contenedor raíz del panel
+          lleva `print:hidden` (display:none en @media print) y, si la
+          hoja quedara dentro como descendiente, ese display:none del
+          ancestro gana sobre el truco de visibility de PRINT_STYLES —
+          la impresión salía en blanco. Como hijo directo de <body>,
+          #planilla-reparto-print queda fuera de ese ancestro oculto. */}
+      {abierta && montado && createPortal(
         <div id="planilla-reparto-print" style={{ display: 'none' }}>
           <PlanillaImprimible planilla={abierta} />
-        </div>
+        </div>,
+        document.body,
       )}
     </div>
   );
 }
 
+/** Columnas de la cuadrícula, en el orden exacto del formato aprobado. */
+const COLUMNAS_PLANILLA = [
+  'No.',
+  'Fecha de Radicado',
+  'Hora Rad.',
+  'Número de Radicado',
+  'Dependencia Asignada',
+  'Área Asignada',
+  'Nombre del Solicitante Natural / Jurídica',
+  'Asunto',
+  'Dirección/Teléfonos',
+  'Nro. Fol.',
+  'Anexos',
+  'Fecha / Hora de Recibido',
+  'Devuelta SI / NO',
+  'Nombre y Firma',
+] as const;
+
+const CELDA: CSSProperties = { border: '1px solid #111', padding: '3px 5px', fontSize: 9.5 };
+
 /**
- * La hoja formal que viaja con la funcionaria — heredera del formato
- * F-GSC-8200-238-37-001 de Bucaramanga en talla Simacota: número
- * único, filas agrupadas por dependencia y renglón de firma por fila.
+ * La hoja formal que viaja con la funcionaria — replica el formato
+ * oficial aprobado del sistema de calidad municipal (F-GSC-8200-238-37-001).
+ *
+ * Nota de protección de datos: la columna "Dirección/Teléfonos" del
+ * formato legado siempre va en blanco ("-") — el radicado no guarda esos
+ * datos y esta planilla no es el lugar para incorporarlos.
  */
 function PlanillaImprimible({ planilla }: { planilla: PlanillaReparto }) {
+  const fechaGeneracion = new Date(planilla.fechaGeneracion).toLocaleString('es-CO', { timeZone: 'America/Bogota' });
+
   return (
-    <div style={{ fontFamily: 'Arial, sans-serif', color: '#111', fontSize: 11 }}>
-      <table style={{ width: '100%', borderCollapse: 'collapse', marginBottom: 8 }}>
+    <div style={{ fontFamily: 'Arial, sans-serif', color: '#111', fontSize: 10 }}>
+      {/* ── Encabezado institucional ── */}
+      <table style={{ width: '100%', borderCollapse: 'collapse', marginBottom: 6 }}>
         <tbody>
           <tr>
-            <td style={{ border: '1px solid #111', padding: '6px 10px', width: '60%' }}>
-              <strong style={{ fontSize: 13 }}>{INSTITUCION.nombre.toUpperCase()}</strong>
-              <br />
-              Planilla para entrega interna de correspondencia
+            <td style={{ border: '1px solid #111', padding: '6px 8px', width: '24%', verticalAlign: 'middle' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                <img src={INSTITUCION.logo} alt="Alcaldía de Simacota" style={{ height: 48, width: 'auto' }} />
+                <strong style={{ fontSize: 11 }}>Alcaldía de SIMACOTA</strong>
+              </div>
             </td>
-            <td style={{ border: '1px solid #111', padding: '6px 10px' }}>
-              <strong>Planilla No.: {planilla.planillaId}</strong>
-              <br />
-              Fecha de generación: {new Date(planilla.fechaGeneracion).toLocaleString('es-CO', { timeZone: 'America/Bogota' })}
-              <br />
-              Generada por: {planilla.generadaPor.nombre}
+            <td style={{ border: '1px solid #111', padding: '6px 8px', width: '52%', textAlign: 'center' }}>
+              <strong style={{ fontSize: 13 }}>PLANILLA PARA ENTREGA DE CORRESPONDENCIA</strong>
+            </td>
+            <td style={{ border: '1px solid #111', padding: '4px 8px', width: '24%', fontSize: 8.5, lineHeight: 1.5 }}>
+              <div>Código: F-GSC-8200-238-37-001</div>
+              <div>Versión: 0.0</div>
+              <div>Fecha de aprobación: Diciembre-18-2017</div>
+              <div>Página 1 de 1</div>
             </td>
           </tr>
         </tbody>
       </table>
 
+      <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 10, marginBottom: 6 }}>
+        <span><strong>Planilla Nro.:</strong> {planilla.planillaId}</span>
+        <span><strong>Fecha Generada:</strong> {fechaGeneracion}</span>
+      </div>
+
+      {/* ── Cuadrícula ── */}
       <table style={{ width: '100%', borderCollapse: 'collapse' }}>
         <thead>
           <tr>
-            {['No.', 'Fecha de radicado', 'Hora rad.', 'Número de radicado', 'Dependencia asignada', 'Área asignada', 'Solicitante', 'Asunto', 'Nro. fol.', 'Anexos', 'Fecha / Hora de recibido', 'Devuelta SÍ / NO', 'Nombre y firma'].map((h) => (
-              <th key={h} style={{ border: '1px solid #111', padding: '4px 6px', background: '#EFEFEF', textAlign: 'left', fontSize: 10 }}>
+            {COLUMNAS_PLANILLA.map((h) => (
+              <th key={h} style={{ ...CELDA, background: '#EFEFEF', textAlign: 'left', fontWeight: 700 }}>
                 {h}
               </th>
             ))}
@@ -607,34 +659,31 @@ function PlanillaImprimible({ planilla }: { planilla: PlanillaReparto }) {
         <tbody>
           {planilla.filas.map((fila, i) => (
             <tr key={fila.radicadoId}>
-              <td style={{ border: '1px solid #111', padding: '4px 6px' }}>{i + 1}</td>
-              <td style={{ border: '1px solid #111', padding: '4px 6px' }}>{fechaCorta(fila.fechaRadicado)}</td>
-              <td style={{ border: '1px solid #111', padding: '4px 6px' }}>{fila.horaRadicado}</td>
-              <td style={{ border: '1px solid #111', padding: '4px 6px', fontFamily: 'monospace' }}>{fila.radicadoId}</td>
-              <td style={{ border: '1px solid #111', padding: '4px 6px' }}>{nombreDependencia(fila.dependenciaDestino)}</td>
-              <td style={{ border: '1px solid #111', padding: '4px 6px' }}>{getNombreArea(fila.areaAsignada) || '—'}</td>
-              <td style={{ border: '1px solid #111', padding: '4px 6px' }}>{fila.solicitanteNombre}</td>
-              <td style={{ border: '1px solid #111', padding: '4px 6px' }}>{fila.asunto}</td>
-              <td style={{ border: '1px solid #111', padding: '4px 6px', textAlign: 'center' }}>{fila.numeroFolios}</td>
-              <td style={{ border: '1px solid #111', padding: '4px 6px' }}>{fila.anexosDescripcion ?? '—'}</td>
-              <td style={{ border: '1px solid #111', padding: '4px 6px', minWidth: 80 }}>
-                Día __ Mes __ Año __ Hora __:__
-              </td>
-              <td style={{ border: '1px solid #111', padding: '4px 6px', minWidth: 80 }}>
-                Devuelta SÍ__ NO__ Reasignada a: ______
-              </td>
-              <td style={{ border: '1px solid #111', padding: '4px 6px', minWidth: 130 }}>&nbsp;</td>
+              <td style={CELDA}>{i + 1}</td>
+              <td style={CELDA}>{fechaCorta(fila.fechaRadicado)}</td>
+              <td style={CELDA}>{fila.horaRadicado}</td>
+              <td style={{ ...CELDA, fontFamily: 'monospace' }}>{fila.radicadoId}</td>
+              <td style={CELDA}>{nombreDependencia(fila.dependenciaDestino)}</td>
+              <td style={CELDA}>{getNombreArea(fila.areaAsignada) || '-'}</td>
+              <td style={CELDA}>{fila.solicitanteNombre}</td>
+              <td style={CELDA}>{fila.asunto}</td>
+              <td style={{ ...CELDA, textAlign: 'center' }}>-</td>
+              <td style={{ ...CELDA, textAlign: 'center' }}>{fila.numeroFolios}</td>
+              <td style={CELDA}>{fila.anexosDescripcion ?? '-'}</td>
+              <td style={{ ...CELDA, minWidth: 90 }}>Día___Mes___Año___ / Hora___:Min___</td>
+              <td style={{ ...CELDA, minWidth: 90 }}>Devuelta SI__NO__ / Reasignada a: ________</td>
+              <td style={{ ...CELDA, minWidth: 120 }}>&nbsp;</td>
             </tr>
           ))}
         </tbody>
       </table>
 
+      {/* ── Pie ── */}
       <table style={{ width: '100%', borderCollapse: 'collapse', marginTop: 8 }}>
         <tbody>
           <tr>
-            <td style={{ border: '1px solid #111', padding: '5px 8px', fontSize: 9.5, width: '55%' }}>
-              Información de impresión: {new Date(planilla.fechaGeneracion).toLocaleString('es-CO', { timeZone: 'America/Bogota' })}
-              {' · '}Generada por: {planilla.generadaPor.nombre}
+            <td style={{ border: '1px solid #111', padding: '5px 8px', fontSize: 9, width: '55%' }}>
+              Información de Impresión: Fecha - {fechaGeneracion} - Creado Por: {planilla.generadaPor.nombre}
             </td>
             <td style={{ border: '1px solid #111', padding: '5px 8px', fontSize: 10 }}>
               <strong>NOMBRE COMPLETO DE QUIEN ENTREGA:</strong> ______________________________
