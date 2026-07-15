@@ -63,6 +63,18 @@ export function consecutivoDeId(docId) {
   return Number.isInteger(n) && n > 0 ? n : null;
 }
 
+/**
+ * ADR-0024: el id de un documento del año `anio` lleva ese año en el tercer
+ * segmento, ya sea puro (`-{anio}-`, formato anterior — nunca se reescribe)
+ * o con el mes pegado (`-{anio}{MM}-`, formato vigente). Ambos conviven en
+ * el mismo año: esta función es la ÚNICA fuente de verdad de "pertenece al
+ * año" para que el detector no quede ciego a ninguno de los dos.
+ */
+export function perteneceAlAnio(docId, anio) {
+  const re = new RegExp(`-${anio}-|-${anio}(?:0[1-9]|1[0-2])-`);
+  return re.test(String(docId));
+}
+
 /* ── Ejecución contra Firestore (solo lectura) ─────────────────────────── */
 
 async function main() {
@@ -99,7 +111,7 @@ async function main() {
     const docs = await db.collection(coleccion).get();
     const presentesLista = [];
     for (const d of docs.docs) {
-      if (!d.id.includes(`-${anio}-`)) continue;
+      if (!perteneceAlAnio(d.id, anio)) continue;
       const c = consecutivoDeId(d.id);
       if (c !== null) presentesLista.push(c);
     }

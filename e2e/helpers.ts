@@ -6,9 +6,12 @@ import { LAB_PASSWORD } from './env';
  *  stage repetidamente sin ambigüedad sobre qué radicados son sintéticos. */
 export const PREFIJO_E2E = '[E2E-AUTO]';
 
-/** `1-110-{año}-{########}` — formato institucional vigente (AGN 060/2001 +
- *  Ley 1755/2015), verificado en lib/seguridad/consulta-publica-radicado.ts. */
-export const RE_NUMERO_RADICADO = /^1-110-\d{4}-\d{8}$/;
+/** `1-110-{año|añomes}-{########}` — formato institucional vigente
+ *  (AGN 060/2001 + Ley 1755/2015), verificado en
+ *  lib/seguridad/consulta-publica-radicado.ts. ADR-0024: el tercer segmento
+ *  admite tanto el año puro `{AAAA}` (ids anteriores al cambio, nunca se
+ *  reescriben) como el nuevo `{AAAAMM}` (mes con padding). */
+export const RE_NUMERO_RADICADO = /^1-110-\d{4}(?:0[1-9]|1[0-2])?-\d{8}$/;
 
 /**
  * Formato institucional amplio (incluye los códigos de oficina radicadora
@@ -20,10 +23,14 @@ export const RE_NUMERO_RADICADO = /^1-110-\d{4}-\d{8}$/;
  * sin excepción (lib/radicado-institucional.ts:23) — se verifica cuál es
  * la realidad en vez de asumir cualquiera de las dos fuentes.
  */
-export const RE_NUMERO_RADICADO_AMPLIO = /^1-(110|WEB|OFICIO|EMAIL|PRESENCIAL)-\d{4}-\d{8}$/;
+export const RE_NUMERO_RADICADO_AMPLIO = /^1-(110|WEB|OFICIO|EMAIL|PRESENCIAL)-\d{4}(?:0[1-9]|1[0-2])?-\d{8}$/;
 
-/** `2-SAL-{año}-{########}` — lib/salidas/radicado-salida.ts:24. */
-export const RE_NUMERO_SALIDA = /^2-SAL-\d{4}-\d{8}$/;
+/** `2-110-{añomes}-{########}` — lib/salidas/radicado-salida.ts. ADR-0024:
+ *  reemplaza el canal `SAL` por el código de oficina `110` y suma el mes al
+ *  tercer segmento; el formato anterior `2-SAL-{AAAA}-{########}` sigue
+ *  existiendo en la base y debe seguir aceptándose (compatibilidad hacia
+ *  atrás, los ids no se reescriben). */
+export const RE_NUMERO_SALIDA = /^2-(110-\d{4}(?:0[1-9]|1[0-2])?|SAL-\d{4})-\d{8}$/;
 
 export function asuntoUnico(etiqueta: string): string {
   return `${PREFIJO_E2E} ${etiqueta} ${Date.now()}`;

@@ -16,7 +16,10 @@ import { buildRespuestaPublicaCiudadano } from '@/lib/server/respuesta-publica';
 const LEGACY_RADICADO_RE = /^EXT-\d{4}-\d{2}-\d{2}-\d{6}-[A-Z2-9]{4}$/;
 // Acepta el formato vigente (1-110-… con código de oficina radicadora)
 // y los históricos por canal: los números nunca se reescriben (AGN 060/2001).
-const INSTITUCIONAL_RADICADO_RE = /^1-(110|WEB|OFICIO|EMAIL|PRESENCIAL)-\d{4}-\d{8}$/;
+// ADR-0024: el tercer segmento admite tanto el año puro `{AAAA}` (ids
+// anteriores, que no se reescriben) como el nuevo `{AAAAMM}` (mes con
+// padding) — ambos conviven en la misma serie anual.
+const INSTITUCIONAL_RADICADO_RE = /^1-(110|WEB|OFICIO|EMAIL|PRESENCIAL)-\d{4}(?:0[1-9]|1[0-2])?-\d{8}$/;
 
 const ACCIONES_PUBLICAS = new Map<string, string>([
   ['RADICACION', 'Solicitud recibida'],

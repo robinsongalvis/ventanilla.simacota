@@ -19,6 +19,20 @@ import { getDb } from './firebase';
  *   1-PRESENCIAL-… conservan el suyo).
  * - Ley 1755/2015: los términos corren desde la radicación original.
  * - El consecutivo anual continúa: solo cambia la máscara.
+ *
+ * ADR-0024 (2026-07-15, decisión del propietario): el tercer segmento pasa
+ * de `{AAAA}` a `{AAAAMM}` para alinear el id con el formato del sistema
+ * legado municipal que los funcionarios ya conocen (continuidad
+ * institucional; evidencia = planilla física real). El consecutivo SIGUE
+ * SIENDO ANUAL — AGN 060/2001 exige una serie anual continua; el mes es
+ * solo informativo en el id, no reinicia la numeración. El contador
+ * (`counters/radicados-{año}`) y el helper transaccional
+ * (`lib/server/consecutivo-legal.ts`) no cambian: siguen indexando por año
+ * puro, calculado con la misma lógica (`fecha.getFullYear()`) de siempre.
+ * Los ids anteriores a este cambio (`1-110-{AAAA}-…`) siguen existiendo tal
+ * cual — nunca se reescriben — y todo consumidor que los lea debe seguir
+ * aceptándolos (ver `lib/seguridad/consulta-publica-radicado.ts` y
+ * `scripts/laboratorio/detectar-consecutivos-fantasma.mjs`).
  */
 export const CODIGO_OFICINA_RADICADORA = '110';
 
@@ -27,7 +41,8 @@ export function formatearRadicadoInstitucional(
   fecha = new Date(),
 ): string {
   const year = fecha.getFullYear();
-  return `1-${CODIGO_OFICINA_RADICADORA}-${year}-${String(consecutivo).padStart(8, '0')}`;
+  const mes = String(fecha.getMonth() + 1).padStart(2, '0');
+  return `1-${CODIGO_OFICINA_RADICADORA}-${year}${mes}-${String(consecutivo).padStart(8, '0')}`;
 }
 
 export async function generarRadicadoInstitucional(

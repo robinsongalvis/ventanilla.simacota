@@ -8,6 +8,7 @@ import {
   huecosDe,
   duplicadosDe,
   consecutivoDeId,
+  perteneceAlAnio,
 } from '@/scripts/laboratorio/detectar-consecutivos-fantasma.mjs';
 
 describe('detector de fantasmas — huecosDe', () => {
@@ -72,5 +73,73 @@ describe('detector de fantasmas — consecutivoDeId', () => {
 
   it('devuelve null para un id no parseable', () => {
     expect(consecutivoDeId('sin-numero-final-x')).toBeNull();
+  });
+});
+
+/* ══════════════════════════════════════════════════════════════
+   ADR-0024 (2026-07-15) — el tercer segmento del id pasa de {AAAA} a
+   {AAAAMM}. El detector NO puede quedar ciego a los ids nuevos: esta
+   suite prueba `perteneceAlAnio`, que reemplaza el filtro literal
+   `.includes('-{año}-')` para aceptar ambos formatos conviviendo en el
+   mismo año.
+══════════════════════════════════════════════════════════════ */
+describe('detector de fantasmas — perteneceAlAnio (formato viejo y nuevo conviven)', () => {
+  it('acepta el formato anterior, solo año (1-110-2026-00000025)', () => {
+    expect(perteneceAlAnio('1-110-2026-00000025', 2026)).toBe(true);
+  });
+
+  it('acepta el formato nuevo, año+mes (1-110-202607-00001217)', () => {
+    expect(perteneceAlAnio('1-110-202607-00001217', 2026)).toBe(true);
+  });
+
+  it('acepta salidas nuevas (2-110-202611-00000005) y viejas (2-SAL-2026-00000006)', () => {
+    expect(perteneceAlAnio('2-110-202611-00000005', 2026)).toBe(true);
+    expect(perteneceAlAnio('2-SAL-2026-00000006', 2026)).toBe(true);
+  });
+
+  it('acepta planillas (sin código de oficina, solo año)', () => {
+    expect(perteneceAlAnio('PL-2026-0007', 2026)).toBe(true);
+  });
+
+  it('rechaza un id de otro año, en cualquiera de los dos formatos', () => {
+    expect(perteneceAlAnio('1-110-2025-00000001', 2026)).toBe(false);
+    expect(perteneceAlAnio('1-110-202507-00000001', 2026)).toBe(false);
+  });
+
+  it('rechaza un mes inválido (13) para no colar falsos positivos', () => {
+    expect(perteneceAlAnio('1-110-202613-00000001', 2026)).toBe(false);
+  });
+
+  describe('huecos y duplicados correctos con ids mixtos (viejo + nuevo) en el mismo año', () => {
+    // Escenario real esperado en 2026: los primeros ~25 radicados nacieron
+    // con el formato anterior (sin mes); a partir del cambio, los ids
+    // llevan {AAAAMM}. El detector debe tratarlos como UNA sola serie anual.
+    const docsDelAnio = [
+      '1-110-2026-00000001',
+      '1-110-2026-00000002',
+      // hueco en el 3
+      '1-110-202607-00000004',
+      '1-110-202607-00000004', // duplicado del 4
+      '1-110-202611-00000005',
+    ];
+
+    it('detecta el hueco (3) y el duplicado (4) mezclando ambos formatos', () => {
+      const presentesLista = docsDelAnio
+        .filter((id) => perteneceAlAnio(id, 2026))
+        .map((id) => consecutivoDeId(id));
+      const presentes = new Set(presentesLista);
+
+      expect(huecosDe(5, presentes)).toEqual([3]);
+      expect(duplicadosDe(presentesLista)).toEqual([4]);
+    });
+
+    it('un id de otro año no contamina el conteo del año consultado', () => {
+      const conRuido = [...docsDelAnio, '1-110-2025-00000099', '1-110-202701-00000001'];
+      const presentesLista = conRuido
+        .filter((id) => perteneceAlAnio(id, 2026))
+        .map((id) => consecutivoDeId(id));
+
+      expect(presentesLista.length).toBe(5);
+    });
   });
 });
