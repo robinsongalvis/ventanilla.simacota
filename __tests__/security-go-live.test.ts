@@ -32,6 +32,15 @@ describe('cierre seguridad go-live', () => {
     expect(rules).not.toContain('allow create: if isAllowedRadicadoFile();');
   });
 
+  it('admite anexos Office (OOXML) por content type exacto, sin comodín application/*', () => {
+    const rules = read('storage.rules');
+
+    expect(rules).toContain('application/vnd.openxmlformats-officedocument.wordprocessingml.document');
+    expect(rules).toContain('application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+    expect(rules).toContain('application/vnd.openxmlformats-officedocument.presentationml.presentation');
+    expect(rules).not.toContain("contentType.matches('application/*')");
+  });
+
   it('revoca tokens al desactivar usuarios internos', () => {
     const route = read('app/api/admin/usuarios/[uid]/route.ts');
 

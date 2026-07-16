@@ -1,15 +1,24 @@
 /**
- * Validación de archivos por firma binaria y, para DOCX/XLSX,
+ * Validación de archivos por firma binaria y, para DOCX/XLSX/PPTX,
  * por estructura interna mínima del contenedor ZIP — H-08.
  *
  * El `Content-Type` y la extensión vienen del cliente y son falsificables.
  * Esta función inspecciona los primeros bytes del buffer real (PDF/JPG/PNG)
- * o los local file headers del ZIP (DOCX/XLSX) para confirmar que el
+ * o los local file headers del ZIP (DOCX/XLSX/PPTX) para confirmar que el
  * contenido coincide con el tipo declarado.
  *
  * NO implementa antivirus, NO descomprime el ZIP, NO parsea XML.
  * Solo confirma firma del formato y, en Office Open XML, presencia mínima
  * de la estructura esperada y ausencia de macros (vbaProject.bin).
+ *
+ * Exclusión deliberada de formatos Office antiguos (OLE): .doc/.xls/.ppt
+ * (Compound File Binary Format, firma D0 CF 11 E0 A1 B1 1A E1) NO se
+ * soportan. Son el vector clásico de macros maliciosas y, a diferencia de
+ * OOXML, su estructura interna no es un ZIP inspeccionable con este mismo
+ * método — no hay forma de confirmar ausencia de macros sin un parser OLE
+ * completo. Se prefiere no admitirlos a admitirlos sin poder auditarlos.
+ * Anexo de radicado en formato antiguo: se solicita al ciudadano/funcionario
+ * reconvertir a su equivalente moderno (.docx/.xlsx/.pptx) o PDF.
  */
 
 const PDF_MIME  = 'application/pdf';
@@ -18,6 +27,7 @@ const PNG_MIME  = 'image/png';
 const WEBP_MIME = 'image/webp';
 const DOCX_MIME = 'application/vnd.openxmlformats-officedocument.wordprocessingml.document';
 const XLSX_MIME = 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet';
+const PPTX_MIME = 'application/vnd.openxmlformats-officedocument.presentationml.presentation';
 
 const FIRMAS_PREFIJO: Record<string, readonly number[][]> = {
   [PDF_MIME]: [[0x25, 0x50, 0x44, 0x46, 0x2D]],            // %PDF-
@@ -30,7 +40,7 @@ const MAX_ZIP_ENTRIES_SCAN = 500;
 const ZIP_LOCAL_HEADER_SIZE = 30;
 
 export function tiposPermitidosMagicBytes(): readonly string[] {
-  return [PDF_MIME, JPG_MIME, PNG_MIME, WEBP_MIME, DOCX_MIME, XLSX_MIME];
+  return [PDF_MIME, JPG_MIME, PNG_MIME, WEBP_MIME, DOCX_MIME, XLSX_MIME, PPTX_MIME];
 }
 
 export function verificarMagicBytes(buffer: Buffer, tipoDeclarado: string): boolean {
@@ -43,6 +53,7 @@ export function verificarMagicBytes(buffer: Buffer, tipoDeclarado: string): bool
   if (tipoDeclarado === WEBP_MIME) return verificarWebp(buffer);
   if (tipoDeclarado === DOCX_MIME) return verificarEstructuraOffice(buffer, 'word');
   if (tipoDeclarado === XLSX_MIME) return verificarEstructuraOffice(buffer, 'xl');
+  if (tipoDeclarado === PPTX_MIME) return verificarEstructuraOffice(buffer, 'ppt');
 
   return false;
 }
@@ -74,11 +85,11 @@ function matchPrefijo(buffer: Buffer, firmas: readonly number[][]): boolean {
 }
 
 /**
- * Para DOCX/XLSX: ZIP que contiene `[Content_Types].xml` y al menos una
- * entrada bajo la carpeta esperada (`word/` o `xl/`), y que NO contiene
- * `vbaProject.bin` (eso es DOCM/XLSM disfrazado).
+ * Para DOCX/XLSX/PPTX: ZIP que contiene `[Content_Types].xml` y al menos una
+ * entrada bajo la carpeta esperada (`word/`, `xl/` o `ppt/`), y que NO
+ * contiene `vbaProject.bin` (eso es DOCM/XLSM/PPTM disfrazado).
  */
-function verificarEstructuraOffice(buffer: Buffer, carpetaEsperada: 'word' | 'xl'): boolean {
+function verificarEstructuraOffice(buffer: Buffer, carpetaEsperada: 'word' | 'xl' | 'ppt'): boolean {
   if (!matchPrefijo(buffer, [ZIP_LOCAL_HEADER])) return false;
 
   const nombres = extraerNombresZip(buffer);

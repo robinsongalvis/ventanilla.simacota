@@ -35,6 +35,15 @@ import type {
 import type { TenantId } from '@/src/types/radicado';
 import { NOMBRES_TENANT } from '@/src/types/reglas-negocio';
 
+// Anexos Office (OOXML) — mismos 3 tipos que valida el servidor en
+// lib/seguridad/magic-bytes.ts. Los formatos antiguos (.doc/.xls/.ppt, OLE)
+// quedan deliberadamente excluidos: ver justificación en ese archivo.
+const OFFICE_MIME_TYPES = new Set([
+  'application/vnd.openxmlformats-officedocument.wordprocessingml.document',   // DOCX
+  'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',         // XLSX
+  'application/vnd.openxmlformats-officedocument.presentationml.presentation', // PPTX
+]);
+
 const MUNICIPIOS_SANTANDER = [
   'Simacota',
   'Bucaramanga',
@@ -280,7 +289,9 @@ export function RadicacionFuncionarioForm({ radicadoPreview, onSubmit, formId, h
   function addFiles(files: FileList | null) {
     if (!files) return;
     const nuevos = Array.from(files).filter((file) =>
-      file.type === 'application/pdf' || file.type.startsWith('image/'),
+      file.type === 'application/pdf'
+      || file.type.startsWith('image/')
+      || OFFICE_MIME_TYPES.has(file.type),
     );
     setArchivos((prev) => [...prev, ...nuevos].slice(0, 10));
   }
@@ -803,15 +814,15 @@ export function RadicacionFuncionarioForm({ radicadoPreview, onSubmit, formId, h
             ref={fileInputRef}
             type="file"
             multiple
-            accept=".pdf,.jpg,.jpeg,.png,.webp"
+            accept=".pdf,.jpg,.jpeg,.png,.webp,.docx,.xlsx,.pptx"
             className="hidden"
             onChange={(e) => addFiles(e.target.files)}
           />
           <svg className="w-6 h-6 mx-auto mb-2" style={{ color: '#94A3B8' }} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
             <path strokeLinecap="round" strokeLinejoin="round" d="M19.5 14.25v-2.625a3.375 3.375 0 00-3.375-3.375h-1.5A1.125 1.125 0 0113.5 7.125v-1.5a3.375 3.375 0 00-3.375-3.375H8.25m6.75 12l-3-3m0 0l-3 3m3-3v6m-1.5-15H5.625c-.621 0-1.125.504-1.125 1.125v17.25c0 .621.504 1.125 1.125 1.125h12.75c.621 0 1.125-.504 1.125-1.125V11.25a9 9 0 00-9-9z" />
           </svg>
-          <p className="text-sm font-semibold" style={{ color: '#1F2933' }}>Arrastra PDFs o imágenes aquí</p>
-          <p className="mt-1 text-xs" style={{ color: '#94A3B8' }}>Máximo 10 archivos · PDF, JPG, PNG, WebP</p>
+          <p className="text-sm font-semibold" style={{ color: '#1F2933' }}>Arrastra PDF, imágenes o documentos de Office aquí</p>
+          <p className="mt-1 text-xs" style={{ color: '#94A3B8' }}>Máximo 10 archivos · PDF, JPG, PNG, WebP, DOCX, XLSX, PPTX</p>
         </div>
         {archivos.length > 0 && (
           <ul className="mt-3 grid gap-2 md:grid-cols-2">

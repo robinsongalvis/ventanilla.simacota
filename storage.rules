@@ -13,6 +13,12 @@ service firebase.storage {
         && (
           request.resource.contentType.matches('image/.*')
           || request.resource.contentType == 'application/pdf'
+          // Anexos Office (OOXML) — DOCX/XLSX/PPTX. Tipos exactos, sin
+          // comodín application/*: los formatos OLE antiguos (.doc/.xls/.ppt)
+          // quedan deliberadamente excluidos (ver lib/seguridad/magic-bytes.ts).
+          || request.resource.contentType == 'application/vnd.openxmlformats-officedocument.wordprocessingml.document'
+          || request.resource.contentType == 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+          || request.resource.contentType == 'application/vnd.openxmlformats-officedocument.presentationml.presentation'
         );
     }
 
