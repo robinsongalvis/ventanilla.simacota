@@ -49,8 +49,9 @@ const ALLOWED_FILE_TYPES = new Set([
   'application/pdf',
   'image/jpeg',
   'image/png',
-  'application/vnd.openxmlformats-officedocument.wordprocessingml.document', // DOCX
-  'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',       // XLSX
+  'application/vnd.openxmlformats-officedocument.wordprocessingml.document',   // DOCX
+  'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',         // XLSX
+  'application/vnd.openxmlformats-officedocument.presentationml.presentation', // PPTX
 ]);
 const CANALES_RESPUESTA = new Set<CanalRespuesta>([
   'CORREO',
@@ -162,7 +163,7 @@ function validarArchivos(files: File[]): string[] {
 
   files.forEach((file) => {
     if (!ALLOWED_FILE_TYPES.has(file.type)) {
-      errores.push(`El archivo ${file.name} debe ser PDF, JPG, PNG, DOCX o XLSX.`);
+      errores.push(`El archivo ${file.name} debe ser PDF, JPG, PNG, DOCX, XLSX o PPTX.`);
     }
 
     if (file.size > MAX_FILE_SIZE) {
@@ -301,7 +302,7 @@ export async function POST(request: Request) {
 
     // H-08: verificar firma binaria / estructura del buffer real.
     // El Content-Type y la extensión son falsificables; PDF/JPG/PNG se validan
-    // por firma, DOCX/XLSX por presencia de [Content_Types].xml + carpeta
+    // por firma, DOCX/XLSX/PPTX por presencia de [Content_Types].xml + carpeta
     // esperada y ausencia de vbaProject.bin (macro disfrazada).
     const erroresMagicBytes: string[] = [];
     for (const file of files) {

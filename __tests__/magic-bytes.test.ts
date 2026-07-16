@@ -3,7 +3,12 @@ import { verificarMagicBytes, tiposPermitidosMagicBytes } from '@/lib/seguridad/
 
 const DOCX_MIME = 'application/vnd.openxmlformats-officedocument.wordprocessingml.document';
 const XLSX_MIME = 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet';
+const PPTX_MIME = 'application/vnd.openxmlformats-officedocument.presentationml.presentation';
 const WEBP_MIME = 'image/webp';
+const DOC_OLE_MIME = 'application/msword';
+
+// Firma de Compound File Binary Format (OLE) — .doc/.xls/.ppt antiguos.
+const OLE_VALIDO = Buffer.from([0xD0, 0xCF, 0x11, 0xE0, 0xA1, 0xB1, 0x1A, 0xE1, 0x00, 0x00]);
 
 const PDF_VALIDO = Buffer.from([0x25, 0x50, 0x44, 0x46, 0x2D, 0x31, 0x2E, 0x34, 0x0A]);
 const JPG_VALIDO = Buffer.from([0xFF, 0xD8, 0xFF, 0xE0, 0x00, 0x10, 0x4A, 0x46]);
@@ -115,14 +120,51 @@ describe('verificarMagicBytes — DOCX/XLSX (H-08)', () => {
     expect(verificarMagicBytes(TEXTO,      DOCX_MIME)).toBe(false);
   });
 
-  it('expone la lista de 6 tipos permitidos', () => {
+  it('expone la lista de 7 tipos permitidos', () => {
     const tipos = tiposPermitidosMagicBytes();
     expect(tipos).toEqual(
       expect.arrayContaining([
-        'application/pdf', 'image/jpeg', 'image/png', WEBP_MIME, DOCX_MIME, XLSX_MIME,
+        'application/pdf', 'image/jpeg', 'image/png', WEBP_MIME, DOCX_MIME, XLSX_MIME, PPTX_MIME,
       ]),
     );
-    expect(tipos).toHaveLength(6);
+    expect(tipos).toHaveLength(7);
+  });
+});
+
+describe('verificarMagicBytes — PPTX (anexos Office)', () => {
+  it('acepta PPTX con [Content_Types].xml y carpeta ppt/', () => {
+    const zip = buildZipConFiles(['[Content_Types].xml', 'ppt/presentation.xml', 'ppt/slides/slide1.xml']);
+    expect(verificarMagicBytes(zip, PPTX_MIME)).toBe(true);
+  });
+
+  it('rechaza PPTX que contiene ppt/vbaProject.bin (PPTM disfrazado)', () => {
+    const zip = buildZipConFiles(['[Content_Types].xml', 'ppt/presentation.xml', 'ppt/vbaProject.bin']);
+    expect(verificarMagicBytes(zip, PPTX_MIME)).toBe(false);
+  });
+
+  it('rechaza ZIP genérico renombrado a .pptx (sin carpeta ppt/)', () => {
+    const zip = buildZipConFiles(['[Content_Types].xml', 'otra-carpeta/archivo.xml']);
+    expect(verificarMagicBytes(zip, PPTX_MIME)).toBe(false);
+  });
+
+  it('rechaza ZIP con carpeta ppt/ pero sin [Content_Types].xml', () => {
+    const zip = buildZipConFiles(['ppt/presentation.xml']);
+    expect(verificarMagicBytes(zip, PPTX_MIME)).toBe(false);
+  });
+
+  it('rechaza buffer no-ZIP declarado como PPTX', () => {
+    expect(verificarMagicBytes(PDF_VALIDO, PPTX_MIME)).toBe(false);
+    expect(verificarMagicBytes(TEXTO,      PPTX_MIME)).toBe(false);
+  });
+});
+
+describe('verificarMagicBytes — exclusión deliberada de formatos OLE antiguos', () => {
+  it('rechaza .doc (application/msword, Compound File Binary) — tipo declarado no soportado', () => {
+    expect(verificarMagicBytes(OLE_VALIDO, DOC_OLE_MIME)).toBe(false);
+  });
+
+  it('rechaza un OLE válido incluso si se declara como DOCX (no es un ZIP)', () => {
+    expect(verificarMagicBytes(OLE_VALIDO, DOCX_MIME)).toBe(false);
   });
 });
 

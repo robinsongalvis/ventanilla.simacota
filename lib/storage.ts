@@ -31,22 +31,12 @@ export interface UploadProgress {
  * El timestamp previene colisiones si el ciudadano sube dos archivos con el
  * mismo nombre en el mismo radicado.
  *
- * REGLAS DE STORAGE (configurar en Firebase Console → Storage → Rules):
- * ─────────────────────────────────────────────────────────────────────────
- * rules_version = '2';
- * service firebase.storage {
- *   match /b/{bucket}/o {
- *     match /radicados/{radicadoId}/{archivo} {
- *       // Escritura: cualquiera puede subir (ciudadano sin cuenta)
- *       // Solo PDF e imágenes, máximo 10 MB
- *       allow write: if request.resource.size < 10 * 1024 * 1024
- *                    && (request.resource.contentType.matches('image/.*')
- *                        || request.resource.contentType == 'application/pdf');
- *       // Lectura: solo usuarios autenticados (funcionarios)
- *       allow read: if request.auth != null;
- *     }
- *   }
- * }
+ * Las reglas reales y vigentes viven en `storage.rules` (raíz del repo,
+ * función `isAllowedRadicadoFile`) — este comentario es solo referencia
+ * rápida, no la fuente de verdad. Actualmente permite, hasta 10 MB:
+ * imágenes (`image/.*`), PDF, y los 3 formatos Office modernos (OOXML)
+ * DOCX/XLSX/PPTX. Los formatos Office antiguos (OLE: .doc/.xls/.ppt) NO
+ * se admiten — ver exclusión documentada en lib/seguridad/magic-bytes.ts.
  */
 export type StoragePrefijo = 'radicados' | 'respuestas';
 
