@@ -50,7 +50,20 @@ const TEL_RE        = /^3[0-9]{9}$/;
 const MAX_ARCHIVOS  = 3;
 const MAX_BYTES     = 5 * 1024 * 1024; // 5 MB
 const MAX_DESCRIPCION = 5000;
-const TIPOS_VALIDOS = new Set(['application/pdf', 'image/jpeg', 'image/png']);
+// Nota: el accept=".pdf,.jpg,.jpeg,.png,.docx,.xlsx" del input ya permitía
+// elegir DOCX/XLSX en el selector de archivos, pero este set no los incluía
+// y los rechazaba de inmediato tras la selección — se corrige junto con el
+// alta de PPTX. La validación real y no falsificable ocurre en el servidor
+// (verificarMagicBytes) — este set solo evita una subida que el backend
+// rechazaría de todos modos.
+const TIPOS_VALIDOS = new Set([
+  'application/pdf',
+  'image/jpeg',
+  'image/png',
+  'application/vnd.openxmlformats-officedocument.wordprocessingml.document',   // DOCX
+  'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',         // XLSX
+  'application/vnd.openxmlformats-officedocument.presentationml.presentation', // PPTX
+]);
 
 /* ══════════════════════════════════════════════════════════════
    UTILIDADES
@@ -315,7 +328,7 @@ export default function PortalCiudadano() {
 
     for (const archivo of lista.slice(0, disponible)) {
       if (!TIPOS_VALIDOS.has(archivo.type)) {
-        rechazados.push(`"${archivo.name}": tipo no permitido (solo PDF, JPG, PNG).`);
+        rechazados.push(`"${archivo.name}": tipo no permitido (solo PDF, imágenes o documentos de Office: DOCX, XLSX, PPTX).`);
       } else if (archivo.size > MAX_BYTES) {
         rechazados.push(`"${archivo.name}": supera 5 MB.`);
       } else {
@@ -784,7 +797,7 @@ export default function PortalCiudadano() {
                       ref={fileInputRef}
                       type="file"
                       className="sr-only"
-                      accept=".pdf,.jpg,.jpeg,.png,.docx,.xlsx"
+                      accept=".pdf,.jpg,.jpeg,.png,.docx,.xlsx,.pptx"
                       multiple
                       onChange={(e) => procesarArchivos(e.target.files)}
                       disabled={estado === 'enviando'}
@@ -804,7 +817,7 @@ export default function PortalCiudadano() {
                           Arrastra aquí o{' '}
                           <span className="text-indigo-400 underline underline-offset-2">selecciona archivos</span>
                         </p>
-                        <p className="text-xs text-slate-600 mt-1">PDF, JPG, PNG — máx. 5 MB por archivo</p>
+                        <p className="text-xs text-slate-600 mt-1">PDF, imágenes o documentos de Office (.docx, .xlsx, .pptx) — máx. 5 MB por archivo</p>
                       </div>
                     </div>
                   </div>
