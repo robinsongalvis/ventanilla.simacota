@@ -5,6 +5,7 @@ import {
   buscarRadicados,
   filtrarRadicados,
   rangoFechaPreset,
+  REGEX_RADICADO_COMPLETO,
   sanitizarRadicado,
   type AlcanceRol,
   type FiltrosBusqueda,
@@ -124,6 +125,32 @@ describe('Búsqueda Histórica Avanzada', () => {
     const filtros: FiltrosBusqueda = { q: '1-WEB-2026-00000003' };
     const r = buscarRadicados(RADICADOS, filtros, PAG, ALCANCE_ADMIN);
     expect(r.items[0].radicadoId).toBe('1-WEB-2026-00000003');
+  });
+
+  /* 1b — código de oficina numérico (formato vigente) y año+mes (ADR-0024) */
+  it('reconoce como id completo los formatos 1-110-AAAA y 1-110-AAAAMM y prioriza la coincidencia', () => {
+    expect(REGEX_RADICADO_COMPLETO.test('1-110-2026-00001217')).toBe(true);
+    expect(REGEX_RADICADO_COMPLETO.test('1-110-202607-00001217')).toBe(true);
+    expect(REGEX_RADICADO_COMPLETO.test('2-110-202607-00000005')).toBe(true);
+    // Formatos históricos por canal siguen aceptados
+    expect(REGEX_RADICADO_COMPLETO.test('1-WEB-2026-00000001')).toBe(true);
+    expect(REGEX_RADICADO_COMPLETO.test('2-SAL-2026-00000001')).toBe(true);
+    // Un id incompleto o con mes inválido NO cuenta como completo
+    expect(REGEX_RADICADO_COMPLETO.test('1-110-2026')).toBe(false);
+    expect(REGEX_RADICADO_COMPLETO.test('1-110-202613-00001217')).toBe(false);
+
+    const lote = [
+      radicadoBase({ radicadoId: '1-110-202607-00001217', fecha: '2026-01-10T08:00:00.000Z' }),
+      // Más reciente y menciona el id buscado en su asunto: sin priorización iría primero
+      radicadoBase({
+        radicadoId: '1-110-202607-00001218',
+        fecha: '2026-07-15T08:00:00.000Z',
+        asunto: 'Alcance al radicado 1-110-202607-00001217',
+      }),
+    ];
+    const r = buscarRadicados(lote, { q: '1-110-202607-00001217' }, PAG, ALCANCE_ADMIN);
+    expect(r.total).toBe(2);
+    expect(r.items[0].radicadoId).toBe('1-110-202607-00001217');
   });
 
   /* 2 */

@@ -275,7 +275,14 @@ function pasaFiltros(r: VentanillaRadicado, filtros: FiltrosBusqueda): boolean {
    5. Pagina (page 1-based, pageSize 25/50/100).
 ────────────────────────────────────────────── */
 
-export const REGEX_RADICADO_COMPLETO = /^\d+-[A-Z_]+-\d{4}-\d{4,}$/i;
+/**
+ * Detecta un número de radicado COMPLETO escrito en el buscador, en cualquiera
+ * de los formatos institucionales:
+ * - Segundo segmento: código de oficina radicadora numérico (`1-110-…`, formato
+ *   vigente) o etiqueta histórica por canal (`1-WEB-…`, `1-OFICIO-…`, `2-SAL-…`).
+ * - Tercer segmento: año puro `AAAA` (ids históricos) o `AAAAMM` (ADR-0024).
+ */
+export const REGEX_RADICADO_COMPLETO = /^\d+-(?:\d+|[A-Z_]+)-\d{4}(?:0[1-9]|1[0-2])?-\d{4,}$/i;
 
 /**
  * Aplica alcance por rol + todos los predicados de `pasaFiltros` a un lote
