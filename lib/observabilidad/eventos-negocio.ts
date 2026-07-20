@@ -43,8 +43,16 @@ export type OperacionCritica = 'radicacion' | 'asignacion' | 'prorroga' | 'respu
  */
 export type OperacionLectura = 'busqueda_radicados';
 
-/** Vocabulario completo de operaciones observables (escritura + lectura). */
-export type Operacion = OperacionCritica | OperacionLectura;
+/**
+ * Operaciones de SISTEMA (cron/background), sin actor humano ni radicado
+ * individual asociado. Cobertura inicial (A1): la auditoría semanal AGN
+ * 060/2001 de continuidad y unicidad de las series de radicación
+ * (`app/api/cron/auditoria-consecutivos/route.ts`).
+ */
+export type OperacionSistema = 'auditoria_consecutivos';
+
+/** Vocabulario completo de operaciones observables (escritura + lectura + sistema). */
+export type Operacion = OperacionCritica | OperacionLectura | OperacionSistema;
 
 export type ResultadoOperacion = 'ok' | 'error';
 
