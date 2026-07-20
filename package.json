@@ -12,6 +12,7 @@
     "test:e2e": "playwright test",
     "test:rules": "node --test e2e/rules/*.test.mjs",
     "presupuesto:rendimiento": "node scripts/laboratorio/presupuesto-rendimiento.mjs",
+    "verificar:indices": "node scripts/laboratorio/verificar-indices.mjs",
     "informe:despliegue": "node scripts/laboratorio/informe-despliegue.mjs",
     "dev:stage": "node scripts/laboratorio/dev-stage.mjs"
   },
