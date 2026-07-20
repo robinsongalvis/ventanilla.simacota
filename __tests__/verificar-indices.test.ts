@@ -19,23 +19,23 @@ function indices(entradas: Array<{ collectionGroup: string; fields: Array<{ fiel
 }
 
 describe('existeIndiceCompuesto', () => {
-  it('true si un índice empieza por campoWhere y contiene campoOrderBy', () => {
+  it('true si un índice empieza por el campo de igualdad (arreglo de 1) y contiene campoOrderBy', () => {
     const idx = indices([{ collectionGroup: 'x', fields: [{ fieldPath: 'a' }, { fieldPath: 'b' }] }]);
-    expect(existeIndiceCompuesto(idx, 'x', 'a', 'b')).toBe(true);
+    expect(existeIndiceCompuesto(idx, 'x', ['a'], 'b')).toBe(true);
   });
 
   it('false si la colección no tiene ningún índice declarado', () => {
-    expect(existeIndiceCompuesto(indices([]), 'x', 'a', 'b')).toBe(false);
+    expect(existeIndiceCompuesto(indices([]), 'x', ['a'], 'b')).toBe(false);
   });
 
-  it('false si el índice no EMPIEZA por campoWhere (aunque lo contenga en otra posición)', () => {
+  it('false si el índice no EMPIEZA por el conjunto de igualdades (aunque lo contenga en otra posición)', () => {
     const idx = indices([{ collectionGroup: 'x', fields: [{ fieldPath: 'z' }, { fieldPath: 'a' }, { fieldPath: 'b' }] }]);
-    expect(existeIndiceCompuesto(idx, 'x', 'a', 'b')).toBe(false);
+    expect(existeIndiceCompuesto(idx, 'x', ['a'], 'b')).toBe(false);
   });
 
-  it('false si el índice empieza por campoWhere pero NO contiene campoOrderBy', () => {
+  it('false si el índice empieza por el campo de igualdad pero NO contiene campoOrderBy', () => {
     const idx = indices([{ collectionGroup: 'x', fields: [{ fieldPath: 'a' }, { fieldPath: 'c' }] }]);
-    expect(existeIndiceCompuesto(idx, 'x', 'a', 'b')).toBe(false);
+    expect(existeIndiceCompuesto(idx, 'x', ['a'], 'b')).toBe(false);
   });
 
   it('true si hay VARIOS índices para la colección y uno de ellos cumple', () => {
@@ -43,7 +43,35 @@ describe('existeIndiceCompuesto', () => {
       { collectionGroup: 'x', fields: [{ fieldPath: 'z' }, { fieldPath: 'w' }] },
       { collectionGroup: 'x', fields: [{ fieldPath: 'a' }, { fieldPath: 'b' }] },
     ]);
-    expect(existeIndiceCompuesto(idx, 'x', 'a', 'b')).toBe(true);
+    expect(existeIndiceCompuesto(idx, 'x', ['a'], 'b')).toBe(true);
+  });
+
+  it('MÚLTIPLES igualdades: true si el prefijo del índice es EXACTAMENTE el conjunto, en CUALQUIER orden', () => {
+    // consulta real: where(tenantId)+where(estado)+orderBy(nombre). Firestore resuelve el AND
+    // de igualdades sin importar su orden, así que el checker debe reconocer ambos órdenes.
+    const idx = indices([{ collectionGroup: 'plantillas', fields: [{ fieldPath: 'tenantId' }, { fieldPath: 'estado' }, { fieldPath: 'nombre' }] }]);
+    expect(existeIndiceCompuesto(idx, 'plantillas', ['tenantId', 'estado'], 'nombre')).toBe(true);
+    expect(existeIndiceCompuesto(idx, 'plantillas', ['estado', 'tenantId'], 'nombre')).toBe(true);
+  });
+
+  it('MÚLTIPLES igualdades: false si la consulta pide un SUBCONJUNTO/campo distinto del prefijo declarado (sin falsos negativos)', () => {
+    const idx = indices([{ collectionGroup: 'plantillas', fields: [{ fieldPath: 'tenantId' }, { fieldPath: 'estado' }, { fieldPath: 'nombre' }] }]);
+    // el índice (tenantId, estado, nombre) NO sirve una consulta hipotética con
+    // solo where(estado)+orderBy(nombre): esa consulta necesita su propio índice (estado, nombre).
+    expect(existeIndiceCompuesto(idx, 'plantillas', ['estado'], 'nombre')).toBe(false);
+    // tampoco sirve where(tenantId)+orderBy(nombre) SIN filtrar por 'estado': no se puede
+    // saltar un campo del índice para llegar al orderBy.
+    expect(existeIndiceCompuesto(idx, 'plantillas', ['tenantId'], 'nombre')).toBe(false);
+  });
+
+  it('MÚLTIPLES igualdades: false si la consulta pide un SUPERCONJUNTO del prefijo declarado', () => {
+    const idx = indices([{ collectionGroup: 'x', fields: [{ fieldPath: 'a' }, { fieldPath: 'b' }] }]);
+    expect(existeIndiceCompuesto(idx, 'x', ['a', 'c'], 'b')).toBe(false);
+  });
+
+  it('un índice más largo (con campos extra después de la posición N) sí sirve — solo importa el prefijo exacto', () => {
+    const idx = indices([{ collectionGroup: 'x', fields: [{ fieldPath: 'a' }, { fieldPath: 'b' }, { fieldPath: 'c' }] }]);
+    expect(existeIndiceCompuesto(idx, 'x', ['a'], 'b')).toBe(true);
   });
 });
 
@@ -180,10 +208,10 @@ describe('analizarArchivo — where+orderBy de campo distinto', () => {
     expect(r.advertencias[0]).toContain('CAMPO DINÁMICO');
   });
 
-  it('con excepción registrada (archivo+colección+campos exactos) → DEUDA DECLARADA, no bloquea', () => {
+  it('con excepción registrada (archivo+colección+conjunto de igualdades exacto) → DEUDA DECLARADA, no bloquea', () => {
     const registro = [{
       archivo: 'archivo.ts', coleccion: 'coleccion_x',
-      campoWhere: 'campoA', campoOrderBy: 'campoB',
+      camposIgualdad: ['campoA'], campoOrderBy: 'campoB',
       motivo: 'preexistente - revisar en Bloque 3 (fixture de prueba)',
     }];
     const r = analizarArchivo(contenidoBase, 'archivo.ts', indices([]), registro);
@@ -201,12 +229,58 @@ describe('analizarArchivo — where+orderBy de campo distinto', () => {
     `;
     const registro = [{
       archivo: 'archivo.ts', coleccion: 'coleccion_x',
-      campoWhere: 'campoA', campoOrderBy: 'campoB', // no coincide con 'campoDistinto'
+      camposIgualdad: ['campoA'], campoOrderBy: 'campoB', // no coincide con 'campoDistinto'
       motivo: 'excepción para otro campo',
     }];
     const r = analizarArchivo(contenido, 'archivo.ts', indices([]), registro);
     expect(r.violaciones).toHaveLength(1);
     expect(r.deudaDeclarada).toHaveLength(0);
+  });
+
+  it('VARIOS where de la MISMA cadena se agrupan en UN solo hallazgo (no uno por campo)', () => {
+    const contenido = `
+      const q = db.collection('plantillas_respuesta')
+        .where('tenantId', '==', tenantId)
+        .where('estado', '==', 'activa')
+        .orderBy('nombre')
+        .limit(50);
+    `;
+    const r = analizarArchivo(contenido, 'archivo.ts', indices([]), []);
+    expect(r.violaciones).toHaveLength(1); // UN hallazgo, no dos
+    expect(r.violaciones[0]).toContain('tenantId');
+    expect(r.violaciones[0]).toContain('estado');
+    expect(r.violaciones[0]).toContain('nombre');
+  });
+
+  it('VARIOS where de la MISMA cadena, con índice de conjunto exacto (en cualquier orden) declarado → OK', () => {
+    const contenido = `
+      const q = db.collection('plantillas_respuesta')
+        .where('tenantId', '==', tenantId)
+        .where('estado', '==', 'activa')
+        .orderBy('nombre')
+        .limit(50);
+    `;
+    const idx = indices([{
+      collectionGroup: 'plantillas_respuesta',
+      fields: [{ fieldPath: 'estado' }, { fieldPath: 'tenantId' }, { fieldPath: 'nombre' }], // orden invertido respecto al código
+    }]);
+    const r = analizarArchivo(contenido, 'archivo.ts', idx, []);
+    expect(r.violaciones).toHaveLength(0);
+  });
+
+  it('un SUBCONJUNTO de las igualdades declaradas sigue exigiendo su propio índice (sin falsos negativos)', () => {
+    const contenido = `
+      const q = db.collection('plantillas_respuesta')
+        .where('estado', '==', 'activa')
+        .orderBy('nombre');
+    `;
+    // el índice existente es para (tenantId, estado, nombre) — no cubre where(estado) solo.
+    const idx = indices([{
+      collectionGroup: 'plantillas_respuesta',
+      fields: [{ fieldPath: 'tenantId' }, { fieldPath: 'estado' }, { fieldPath: 'nombre' }],
+    }]);
+    const r = analizarArchivo(contenido, 'archivo.ts', idx, []);
+    expect(r.violaciones).toHaveLength(1);
   });
 
   it('reasignación varias líneas después del .orderBy() base (patrón real de busqueda-avanzada) — sin índice: violación', () => {
@@ -273,11 +347,12 @@ describe('gate ejecutado contra el repo actual — evidencia de que corre limpio
     expect(REGISTRO_EXCEPCIONES.length).toBeGreaterThan(0);
   });
 
-  it('toda excepción exige archivo, colección y ambos campos (no hay bypass a nivel de archivo)', () => {
+  it('toda excepción exige archivo, colección, conjunto de igualdades y campo de orden (no hay bypass a nivel de archivo)', () => {
     for (const ex of REGISTRO_EXCEPCIONES) {
       expect(ex.archivo).toBeTruthy();
       expect(ex.coleccion).toBeTruthy();
-      expect(ex.campoWhere).toBeTruthy();
+      expect(Array.isArray(ex.camposIgualdad)).toBe(true);
+      expect(ex.camposIgualdad.length).toBeGreaterThan(0);
       expect(ex.campoOrderBy).toBeTruthy();
       expect(ex.motivo).toContain('preexistente');
     }

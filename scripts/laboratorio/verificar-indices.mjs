@@ -18,16 +18,28 @@
  *
  * REGLA (Firestore): un índice de un solo campo es automático; sirve para
  *   un único `where` o un único `orderBy` aislados. Pero si una consulta
- *   filtra por IGUALDAD/COMPARACIÓN en un campo A y ordena por un campo
- *   B ≠ A, Firestore exige un ÍNDICE COMPUESTO que empiece por A y
- *   contenga B — si no existe, la consulta falla en producción con
- *   FAILED_PRECONDITION (exactamente el incidente del Reparto). Múltiples
- *   `where` de solo-igualdad SIN `orderBy` en campo distinto no requieren
- *   compuesto (Firestore resuelve el AND de igualdades con índices de un
- *   solo campo) — por eso este gate NO los reporta.
+ *   filtra por IGUALDAD/COMPARACIÓN en uno o más campos (el conjunto A) y
+ *   ordena por un campo B ∉ A, Firestore exige un ÍNDICE COMPUESTO cuyo
+ *   PREFIJO DE IGUALDADES sea EXACTAMENTE el conjunto A (el orden entre
+ *   igualdades no importa — así resuelve Firestore el AND de varias
+ *   condiciones `==`, sin importar en qué orden se escribieron los
+ *   `.where()` en el código) seguido inmediatamente por B — si no existe,
+ *   la consulta falla en producción con FAILED_PRECONDITION (exactamente
+ *   el incidente del Reparto). Refinamiento (revisión arquitectónica):
+ *   TODOS los `.where()` de una misma cadena de consulta se agrupan en UN
+ *   solo hallazgo por cada `.orderBy()` — no uno por cada campo — porque
+ *   son la MISMA consulta y Firestore los resuelve con UN solo índice de
+ *   N+1 campos, no con N índices de 2 campos. Un índice más largo que
+ *   contenga campos adicionales DESPUÉS de la posición B sí sirve (un
+ *   índice puede servir una consulta que use solo su prefijo), pero el
+ *   PREFIJO DE IGUALDADES exacto (ni de más ni de menos) es obligatorio:
+ *   una consulta hipotética con un subconjunto distinto de igualdades
+ *   sigue exigiendo su propio índice (sin falsos negativos).
  *
  * QUÉ NO CUENTA COMO VIOLACIÓN (falso positivo estructural, no se reporta):
- *   - `where(campoA) + orderBy(campoA)` (mismo campo — rango simple).
+ *   - `where(campoA) + orderBy(campoA)` (mismo campo — rango simple). Si
+ *     tras excluir el campo del `orderBy` no queda ninguna igualdad, no
+ *     se requiere compuesto.
  *   - Un único predicado (`where` sin `orderBy`, o `orderBy` sin `where`).
  *
  * QUÉ SE REPORTA COMO ADVERTENCIA (no bloquea, para revisión humana):
@@ -36,11 +48,14 @@
  *
  * REGISTRO DE EXCEPCIONES: igual filosofía de deuda declarada que el
  *   presupuesto de rendimiento — un hallazgo real y preexistente se
- *   declara aquí (archivo + colección + campos + motivo) para que el gate
- *   quede VERDE hoy sin ocultar el hallazgo (se imprime igual, marcado
- *   como DEUDA DECLARADA) ni "arreglarlo" sin revisión (no se tocan
- *   índices desde este script). Una violación NUEVA, no registrada,
- *   SIGUE bloqueando el pipeline.
+ *   declara aquí (archivo + colección + CONJUNTO de igualdades `camposIgualdad`
+ *   + campo de orden + motivo) para que el gate quede VERDE hoy sin ocultar
+ *   el hallazgo (se imprime igual, marcado como DEUDA DECLARADA) ni
+ *   "arreglarlo" sin revisión (no se tocan índices desde este script). Una
+ *   violación NUEVA, no registrada, SIGUE bloqueando el pipeline. El match
+ *   de una excepción exige coincidencia EXACTA de (archivo, colección,
+ *   campoOrderBy, conjunto de camposIgualdad) — el orden dentro del
+ *   conjunto no importa, pero el conjunto sí debe ser idéntico.
  *
  * Las funciones puras (`encontrarBloques`, `extraerCampos`,
  * `existeIndiceCompuesto`, `construirIndicePorColeccion`, `analizarArchivo`)
@@ -69,94 +84,69 @@ const MAX_VENTANA_LINEAS = 80; // tope de líneas de un "bloque" de consulta
  * resuelvan en Bloque 3 (o se confirme que el índice ya existe en el
  * proyecto de Firebase y falta capturarlo en firestore.indexes.json).
  *
- * Cada entrada exige coincidencia EXACTA de (archivo, colección, campoWhere,
- * campoOrderBy) — no es un bypass a nivel de archivo completo: una
- * violación NUEVA y distinta en un archivo ya listado aquí sigue bloqueando.
+ * Cada entrada exige coincidencia EXACTA de (archivo, colección, conjunto de
+ * `camposIgualdad`, campoOrderBy) — no es un bypass a nivel de archivo
+ * completo: una violación NUEVA y distinta en un archivo ya listado aquí
+ * sigue bloqueando. `camposIgualdad` es el CONJUNTO de campos `where` de UNA
+ * misma cadena de consulta (una entrada por consulta real, no una por
+ * campo) — el orden dentro del arreglo no importa para el match.
  */
 export const REGISTRO_EXCEPCIONES = [
   {
     archivo: 'app/api/simi/juridico/aprobaciones/route.ts',
     coleccion: 'simi_aprobaciones_respuesta',
-    campoWhere: 'tenantId',
+    camposIgualdad: ['tenantId'],
     campoOrderBy: 'createdAt',
     motivo: 'preexistente - revisar en Bloque 3 (cola de aprobaciones por tenant, sin índice declarado)',
   },
   {
     archivo: 'app/api/simi/notificaciones/route.ts',
     coleccion: 'simi_notificaciones',
-    campoWhere: 'tenantId',
+    camposIgualdad: ['tenantId', 'destinatarioRol'],
     campoOrderBy: 'createdAt',
-    motivo: 'preexistente - revisar en Bloque 3 (notificaciones por tenant+rol[+leida], sin índice declarado)',
+    motivo: 'preexistente - revisar en Bloque 3 (notificaciones por tenant+rol, sin índice declarado)',
   },
   {
     archivo: 'app/api/simi/notificaciones/route.ts',
     coleccion: 'simi_notificaciones',
-    campoWhere: 'destinatarioRol',
-    campoOrderBy: 'createdAt',
-    motivo: 'preexistente - revisar en Bloque 3 (notificaciones por tenant+rol[+leida], sin índice declarado)',
-  },
-  {
-    archivo: 'app/api/simi/notificaciones/route.ts',
-    coleccion: 'simi_notificaciones',
-    campoWhere: 'leida',
+    camposIgualdad: ['tenantId', 'destinatarioRol', 'leida'],
     campoOrderBy: 'createdAt',
     motivo: 'preexistente - revisar en Bloque 3 (variante "solo no leídas": tenant+rol+leida, sin índice declarado)',
   },
   {
     archivo: 'app/api/simi/reportes/route.ts',
     coleccion: 'simi_aprobaciones_respuesta',
-    campoWhere: 'tenantId',
+    camposIgualdad: ['tenantId'],
     campoOrderBy: 'createdAt',
     motivo: 'preexistente - revisar en Bloque 3 (reporte de aprobaciones/métricas por tenant, sin índice declarado)',
   },
   {
     archivo: 'app/api/simi/reportes/trazabilidad/[radicadoId]/route.ts',
     coleccion: 'simi_borrador_versiones',
-    campoWhere: 'radicadoId',
+    camposIgualdad: ['radicadoId'],
     campoOrderBy: 'version',
     motivo: 'preexistente - revisar en Bloque 3 (historial de versiones del borrador, sin índice declarado)',
   },
   {
-    archivo: 'lib/simi-juridico/getOfficialTemplate.ts',
-    coleccion: 'plantillas_respuesta',
-    campoWhere: 'tenantId',
-    campoOrderBy: 'nombre',
-    motivo: 'preexistente - revisar en Bloque 3 (listado de plantillas por tenant+estado, sin índice declarado)',
-  },
-  {
-    archivo: 'lib/simi-juridico/getOfficialTemplate.ts',
-    coleccion: 'plantillas_respuesta',
-    campoWhere: 'estado',
-    campoOrderBy: 'nombre',
-    motivo: 'preexistente - revisar en Bloque 3 (listado de plantillas por tenant+estado, sin índice declarado)',
-  },
-  {
     archivo: 'lib/simi-juridico/borradorVersiones.ts',
     coleccion: 'simi_borrador_versiones',
-    campoWhere: 'radicadoId',
+    camposIgualdad: ['radicadoId'],
     campoOrderBy: 'version',
     motivo: 'preexistente - revisar en Bloque 3 (3 consultas de versión de borrador, sin índice declarado)',
   },
   {
     archivo: 'lib/simi-juridico/calculateQualityMetrics.ts',
     coleccion: 'simi_juridico_auditoria',
-    campoWhere: 'rol',
+    camposIgualdad: ['rol'],
     campoOrderBy: 'fechaHora',
     motivo: 'preexistente - revisar en Bloque 3 (auditoría jurídica != rol, sin índice declarado)',
   },
   {
     archivo: 'lib/simi-juridico/calculateQualityMetrics.ts',
     coleccion: 'simi_aprobaciones_respuesta',
-    campoWhere: 'tenantId',
+    camposIgualdad: ['tenantId'],
     campoOrderBy: 'createdAt',
     motivo: 'preexistente - revisar en Bloque 3 (métricas de calidad por tenant, sin índice declarado)',
-  },
-  {
-    archivo: 'lib/simi-juridico/calculateQualityMetrics.ts',
-    coleccion: 'simi_rag_consultas',
-    campoWhere: 'tenantId',
-    campoOrderBy: 'createdAt',
-    motivo: 'preexistente - revisar en Bloque 3 (fuentes RAG más usadas por tenant, sin índice declarado)',
   },
 ];
 
@@ -183,13 +173,36 @@ function cargarIndicesDeclarados() {
   return construirIndicePorColeccion(JSON.parse(raw));
 }
 
-/** PURA. ¿Existe un índice de `coleccion` que empiece por `campoWhere` y contenga `campoOrderBy`? */
-export function existeIndiceCompuesto(indicesPorColeccion, coleccion, campoWhere, campoOrderBy) {
+/**
+ * PURA. ¿Existe un índice de `coleccion` cuyos primeros N campos (N =
+ * igualdades.length) son EXACTAMENTE el conjunto `igualdades` — el orden
+ * entre igualdades no importa, así resuelve Firestore el AND de varias
+ * condiciones `==` sin importar el orden en que se escribieron los
+ * `.where()` — y cuyo campo N+1 es `campoOrderBy`? Campos adicionales del
+ * índice después de esa posición no afectan el resultado: un índice más
+ * largo puede servir una consulta que solo necesite su prefijo. El match
+ * del prefijo es EXACTO (ni de más ni de menos): un subconjunto o
+ * superconjunto de `igualdades` en esa posición no cuenta.
+ */
+export function existeIndiceCompuesto(indicesPorColeccion, coleccion, igualdades, campoOrderBy) {
+  const n = igualdades.length;
+  if (n === 0) return false;
+  const esperado = new Set(igualdades);
   const indices = indicesPorColeccion.get(coleccion) ?? [];
   return indices.some((fields) => {
-    if (!fields.length || fields[0].fieldPath !== campoWhere) return false;
-    return fields.slice(1).some((f) => f.fieldPath === campoOrderBy);
+    if (fields.length <= n) return false;
+    const prefijo = fields.slice(0, n);
+    if (prefijo.length !== esperado.size) return false;
+    if (!prefijo.every((f) => esperado.has(f.fieldPath))) return false;
+    return fields[n].fieldPath === campoOrderBy;
   });
+}
+
+/** PURA. ¿`a` y `b` son el mismo conjunto de strings (mismo tamaño, mismos elementos, orden libre)? */
+function mismoConjunto(a, b) {
+  if (a.length !== b.length) return false;
+  const setA = new Set(a);
+  return b.every((x) => setA.has(x));
 }
 
 // ─────────────────────────── escaneo de fuentes ───────────────────────────
@@ -315,35 +328,39 @@ export function analizarArchivo(contenido, archivoRel, indicesPorColeccion, regi
       continue;
     }
 
+    // Todos los `.where()` de esta cadena se agrupan en UN hallazgo por
+    // cada `.orderBy()` — son la MISMA consulta y Firestore la resuelve con
+    // UN solo índice de N+1 campos, no con N índices de 2 campos.
+    const wheresUnicos = [...new Set(wheres)];
+
     for (const campoOrderBy of new Set(orderBys)) {
-      for (const campoWhere of new Set(wheres)) {
-        if (campoWhere === campoOrderBy) continue; // mismo campo: rango simple, sin compuesto
+      const igualdades = wheresUnicos.filter((w) => w !== campoOrderBy);
+      if (igualdades.length === 0) continue; // mismo campo: rango simple, sin compuesto
 
-        if (existeIndiceCompuesto(indicesPorColeccion, bloque.coleccion, campoWhere, campoOrderBy)) {
-          continue; // índice compuesto declarado — OK
-        }
-
-        const excepcion = registroExcepciones.find((ex) =>
-          ex.archivo === archivoRel && ex.coleccion === bloque.coleccion
-          && ex.campoWhere === campoWhere && ex.campoOrderBy === campoOrderBy);
-
-        if (excepcion) {
-          exclusionesUsadas.add(excepcion);
-          deudaDeclarada.push(
-            `${archivoRel}:${bloque.lineaInicio} — '${bloque.coleccion}' where(${campoWhere})+orderBy(${campoOrderBy}) `
-            + `[DEUDA DECLARADA: ${excepcion.motivo}]`,
-          );
-          continue;
-        }
-
-        violaciones.push(
-          `SIN ÍNDICE COMPUESTO: ${archivoRel}:${bloque.lineaInicio} — colección '${bloque.coleccion}' filtra por `
-          + `\`${campoWhere}\` y ordena por \`${campoOrderBy}\` (campos distintos), pero ${INDICES_JSON} no declara `
-          + `ningún índice que empiece por '${campoWhere}' y contenga '${campoOrderBy}'. Esto falla en producción `
-          + `con FAILED_PRECONDITION (mismo incidente del Reparto). Declara el índice o, si es un falso positivo, `
-          + `regístralo en REGISTRO_EXCEPCIONES de scripts/laboratorio/verificar-indices.mjs.`,
-        );
+      if (existeIndiceCompuesto(indicesPorColeccion, bloque.coleccion, igualdades, campoOrderBy)) {
+        continue; // índice compuesto declarado — OK
       }
+
+      const excepcion = registroExcepciones.find((ex) =>
+        ex.archivo === archivoRel && ex.coleccion === bloque.coleccion
+        && ex.campoOrderBy === campoOrderBy && mismoConjunto(ex.camposIgualdad, igualdades));
+
+      if (excepcion) {
+        exclusionesUsadas.add(excepcion);
+        deudaDeclarada.push(
+          `${archivoRel}:${bloque.lineaInicio} — '${bloque.coleccion}' where(${igualdades.join('+')})+orderBy(${campoOrderBy}) `
+          + `[DEUDA DECLARADA: ${excepcion.motivo}]`,
+        );
+        continue;
+      }
+
+      violaciones.push(
+        `SIN ÍNDICE COMPUESTO: ${archivoRel}:${bloque.lineaInicio} — colección '${bloque.coleccion}' filtra por `
+        + `\`${igualdades.join('+')}\` y ordena por \`${campoOrderBy}\`, pero ${INDICES_JSON} no declara ningún `
+        + `índice cuyo prefijo de igualdades sea exactamente {${igualdades.join(', ')}} seguido de '${campoOrderBy}'. `
+        + `Esto falla en producción con FAILED_PRECONDITION (mismo incidente del Reparto). Declara el índice o, si `
+        + `es un falso positivo, regístralo en REGISTRO_EXCEPCIONES de scripts/laboratorio/verificar-indices.mjs.`,
+      );
     }
   }
 
@@ -383,7 +400,7 @@ async function main() {
   }
 
   console.log('\n══════════ ÍNDICES FIRESTORE — gate de consultas compuestas (A3) ══════════');
-  console.log('Regla: where(campoA) + orderBy(campoB), A≠B ⇒ exige índice compuesto que empiece por A y contenga B.\n');
+  console.log('Regla: where({conjunto de igualdades}) + orderBy(campoB) ⇒ exige índice cuyo prefijo de igualdades sea EXACTAMENTE ese conjunto, seguido de B.\n');
 
   if (deudaDeclarada.length) {
     console.log('── Deuda declarada (no bloquea — preexistente, ver REGISTRO_EXCEPCIONES) ──');
