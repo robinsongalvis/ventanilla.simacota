@@ -66,6 +66,16 @@ Generar con: `openssl rand -hex 32`
 Configurar en Vercel Cron Jobs → el endpoint `/api/cron/alertas-vencimiento`
 usa `Authorization: Bearer {CRON_SECRET}` para protegerse.
 
+### Cron de auditoría de consecutivos (A1 — AGN 060/2001)
+```
+AUDITORIA_ALERTA_EMAIL=gestion-documental@simacota-santander.gov.co   # opcional
+```
+Opcional. Si falta, la alerta cae a `EMAIL_USER`. El endpoint
+`/api/cron/auditoria-consecutivos` reutiliza el mismo `CRON_SECRET` de arriba.
+Corre semanalmente (lunes 8:00 a.m. Colombia); si detecta huecos o
+duplicados en las series de radicación, envía correo a este destino — si
+no hay hallazgos, no envía nada (silencio = todo bien).
+
 ### Sentry (monitoreo de errores — opcional pero recomendado)
 ```
 SENTRY_DSN=https://xxx@sentry.io/xxx
