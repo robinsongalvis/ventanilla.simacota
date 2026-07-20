@@ -63,6 +63,15 @@ jobs:
         # nueva sin clasificar. Estático y determinista — no requiere emulador.
         run: npm run presupuesto:rendimiento
 
+      - name: Índices Firestore (Gate de consultas compuestas)
+        id: indices
+        if: ${{ !cancelled() }}
+        # Lección del incidente del Reparto: una consulta where()+orderBy()
+        # sin índice compuesto declarado rompió una pantalla en producción
+        # (FAILED_PRECONDITION), y ni los tests ni el emulador lo exigen.
+        # Estático y determinista — no requiere emulador.
+        run: npm run verificar:indices
+
       - name: Security Scan (NPM Audit Gate)
         id: audit
         if: ${{ !cancelled() }}
