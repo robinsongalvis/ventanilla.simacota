@@ -16,7 +16,9 @@
 import { readFileSync, writeFileSync } from 'node:fs';
 import { randomBytes } from 'node:crypto';
 import { resolve } from 'node:path';
-import admin from 'firebase-admin';
+import { cert, initializeApp } from 'firebase-admin/app';
+import { getAuth } from 'firebase-admin/auth';
+import { getFirestore } from 'firebase-admin/firestore';
 
 const PROYECTO_PROD = 'ventanilla-unica-f31b1';
 const ENV_STAGE = resolve('.env.stage');
@@ -53,9 +55,9 @@ const FUNCIONARIOS = [
   { email: 'admin.lab@simacota.gov.co',          nombre: 'Admin Lab',           rol: 'ADMIN',            tenantId: 'VENTANILLA_UNICA' },
 ];
 
-admin.initializeApp({ credential: admin.credential.cert(sa), projectId: sa.project_id });
-const auth = admin.auth();
-const db = admin.firestore();
+initializeApp({ credential: cert(sa), projectId: sa.project_id });
+const auth = getAuth();
+const db = getFirestore();
 
 for (const u of FUNCIONARIOS) {
   let uid;

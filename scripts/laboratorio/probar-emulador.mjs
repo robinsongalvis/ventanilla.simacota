@@ -9,15 +9,16 @@
  *
  * No requiere credenciales: FIRESTORE_EMULATOR_HOST la inyecta emulators:exec.
  */
-import admin from 'firebase-admin';
+import { initializeApp } from 'firebase-admin/app';
+import { getFirestore } from 'firebase-admin/firestore';
 
 if (!process.env.FIRESTORE_EMULATOR_HOST) {
   console.error('⛔ Esta sonda solo corre contra el emulador (FIRESTORE_EMULATOR_HOST ausente).');
   process.exit(1);
 }
 
-admin.initializeApp({ projectId: process.env.GCLOUD_PROJECT ?? 'demo-ventanilla-lab' });
-const db = admin.firestore();
+initializeApp({ projectId: process.env.GCLOUD_PROJECT ?? 'demo-ventanilla-lab' });
+const db = getFirestore();
 
 const ref = db.doc('laboratorio_canario/sonda');
 await ref.set({ ok: true, ts: new Date().toISOString() });

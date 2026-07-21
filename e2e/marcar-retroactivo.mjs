@@ -21,7 +21,8 @@
  */
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
-import admin from 'firebase-admin';
+import { cert, initializeApp } from 'firebase-admin/app';
+import { getFirestore } from 'firebase-admin/firestore';
 
 const PROYECTO_PROD = 'ventanilla-unica-f31b1';
 const ENV_STAGE = resolve('.env.stage');
@@ -39,8 +40,8 @@ if (sa.project_id === PROYECTO_PROD) {
   process.exit(1);
 }
 
-admin.initializeApp({ credential: admin.credential.cert(sa), projectId: sa.project_id });
-const db = admin.firestore();
+initializeApp({ credential: cert(sa), projectId: sa.project_id });
+const db = getFirestore();
 
 const PREFIJO = '[E2E-AUTO]';
 const LIMITE_SUPERIOR = PREFIJO + String.fromCharCode(0xf8ff);

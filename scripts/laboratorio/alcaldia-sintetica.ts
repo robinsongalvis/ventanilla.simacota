@@ -47,7 +47,8 @@
 
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
-import admin from 'firebase-admin';
+import { cert, initializeApp, type ServiceAccount } from 'firebase-admin/app';
+import { getFirestore } from 'firebase-admin/firestore';
 
 // ── Reutilización de la lógica real del dominio (prohibido duplicarla) ──
 import {
@@ -339,11 +340,11 @@ if (!env.NEXT_PUBLIC_FIREBASE_API_KEY) {
   process.exit(1);
 }
 
-admin.initializeApp({
-  credential: admin.credential.cert(JSON.parse(env.FIREBASE_SERVICE_ACCOUNT) as admin.ServiceAccount),
+initializeApp({
+  credential: cert(JSON.parse(env.FIREBASE_SERVICE_ACCOUNT) as ServiceAccount),
   projectId: sa.project_id,
 });
-const db = admin.firestore();
+const db = getFirestore();
 
 /* ══════════════════════════════════════════════════════════════
    Sesiones de laboratorio (Firebase Auth REST + /api/auth/session)

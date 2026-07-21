@@ -75,13 +75,14 @@ console.log(`✔ Eliminado ${archivo} (el secreto no debe quedar en Descargas).`
 
 /* 5 · verificación real contra Firestore */
 process.env.FIREBASE_SERVICE_ACCOUNT = JSON.stringify(sa);
-const { default: admin } = await import('firebase-admin');
+const { initializeApp, cert } = await import('firebase-admin/app');
+const { getFirestore } = await import('firebase-admin/firestore');
 try {
-  const app = admin.initializeApp({
-    credential: admin.credential.cert(sa),
+  const app = initializeApp({
+    credential: cert(sa),
     projectId: sa.project_id,
   }, `verificacion-${Date.now()}`);
-  await app.firestore().listCollections();
+  await getFirestore(app).listCollections();
   console.log(`✔ Verificado: el Admin SDK inicializa y consulta Firestore de "${sa.project_id}".`);
   process.exit(0);
 } catch (e) {
