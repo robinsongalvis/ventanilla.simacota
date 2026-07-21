@@ -1,4 +1,5 @@
-import admin from 'firebase-admin';
+import { cert, getApps, initializeApp, type ServiceAccount } from 'firebase-admin/app';
+import { getFirestore, type DocumentData, type Firestore } from 'firebase-admin/firestore';
 import { leerServiceAccountStage } from './env';
 
 /**
@@ -15,15 +16,15 @@ import { leerServiceAccountStage } from './env';
  *    al crear, el resto del propio test dejaría de verlo en la UI).
  */
 
-let dbInstancia: admin.firestore.Firestore | null = null;
+let dbInstancia: Firestore | null = null;
 
-function getAdminDb(): admin.firestore.Firestore {
+function getAdminDb(): Firestore {
   if (dbInstancia) return dbInstancia;
   const { projectId, credencial } = leerServiceAccountStage();
-  const app = admin.apps.length > 0
-    ? admin.apps[0]!
-    : admin.initializeApp({ credential: admin.credential.cert(credencial as admin.ServiceAccount), projectId });
-  dbInstancia = admin.firestore(app);
+  const app = getApps().length > 0
+    ? getApps()[0]!
+    : initializeApp({ credential: cert(credencial as ServiceAccount), projectId });
+  dbInstancia = getFirestore(app);
   return dbInstancia;
 }
 
@@ -66,12 +67,12 @@ export async function marcarDocumentoDePrueba(coleccion: string, id: string): Pr
  * `termino.prorrogasAplicadas`, que el endpoint de prórroga no devuelve
  * en su respuesta JSON). NUNCA escribe nada.
  */
-export async function leerRadicado(radicadoId: string): Promise<FirebaseFirestore.DocumentData | undefined> {
+export async function leerRadicado(radicadoId: string): Promise<DocumentData | undefined> {
   return leerDocumento('ventanilla_radicados', radicadoId);
 }
 
 /** Lectura de solo lectura genérica — usada por 15-registro-salida.spec.ts. */
-export async function leerDocumento(coleccion: string, id: string): Promise<FirebaseFirestore.DocumentData | undefined> {
+export async function leerDocumento(coleccion: string, id: string): Promise<DocumentData | undefined> {
   const db = getAdminDb();
   const snap = await db.doc(`${coleccion}/${id}`).get();
   return snap.data();
@@ -82,7 +83,7 @@ export async function leerDocumento(coleccion: string, id: string): Promise<Fire
  * fecha — usada por 13-expediente-completo.spec.ts para comparar el
  * expediente (documento + historia) al inicio y al cierre del trámite.
  */
-export async function leerTrazabilidad(radicadoId: string): Promise<FirebaseFirestore.DocumentData[]> {
+export async function leerTrazabilidad(radicadoId: string): Promise<DocumentData[]> {
   const db = getAdminDb();
   const snap = await db
     .collection(`ventanilla_radicados/${radicadoId}/trazabilidad`)

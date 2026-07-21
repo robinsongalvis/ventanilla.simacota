@@ -12,7 +12,9 @@
  * - Producción desplegada en ventanilla-simacota.vercel.app
  */
 
-import * as admin from 'firebase-admin';
+import { cert, getApps, initializeApp } from 'firebase-admin/app';
+import { getAuth } from 'firebase-admin/auth';
+import { getFirestore } from 'firebase-admin/firestore';
 import * as path  from 'path';
 import * as fs    from 'fs';
 
@@ -71,15 +73,15 @@ if (!fs.existsSync(SA_PATH)) {
 const sa = JSON.parse(fs.readFileSync(SA_PATH, 'utf-8'));
 if (sa.private_key) sa.private_key = sa.private_key.replace(/\\n/g, '\n');
 
-if (!admin.apps.length) {
-  admin.initializeApp({
-    credential: admin.credential.cert(sa),
+if (!getApps().length) {
+  initializeApp({
+    credential: cert(sa),
     storageBucket: process.env.FIREBASE_STORAGE_BUCKET || `${sa.project_id}.appspot.com`,
   });
 }
 
-const auth = admin.auth();
-const db   = admin.firestore();
+const auth = getAuth();
+const db   = getFirestore();
 
 /* ══════════════════════════════════════════════════════════════
    UTILIDADES

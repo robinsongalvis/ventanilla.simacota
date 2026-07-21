@@ -7,7 +7,8 @@
  */
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
-import admin from 'firebase-admin';
+import { cert, initializeApp } from 'firebase-admin/app';
+import { getFirestore } from 'firebase-admin/firestore';
 
 const PROYECTO_PROD = 'ventanilla-unica-f31b1';
 const env = Object.fromEntries(
@@ -19,8 +20,8 @@ const env = Object.fromEntries(
 const sa = JSON.parse(env.FIREBASE_SERVICE_ACCOUNT);
 if (sa.project_id === PROYECTO_PROD) { console.error('⛔ GUARDA prod. Abortado.'); process.exit(1); }
 
-admin.initializeApp({ credential: admin.credential.cert(sa), projectId: sa.project_id });
-const db = admin.firestore();
+initializeApp({ credential: cert(sa), projectId: sa.project_id });
+const db = getFirestore();
 
 const PREFIJO = '[E2E-AUTO]';
 const snap = await db.collection('ventanilla_radicados')

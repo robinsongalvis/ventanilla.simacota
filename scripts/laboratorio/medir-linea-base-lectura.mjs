@@ -47,7 +47,8 @@
 
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
-import admin from 'firebase-admin';
+import { cert, initializeApp } from 'firebase-admin/app';
+import { getFirestore } from 'firebase-admin/firestore';
 
 const PROYECTO_PROD = 'ventanilla-unica-f31b1';
 const RADICADO_PROTEGIDO = '1-110-2026-00000001';
@@ -87,8 +88,8 @@ if (sa.project_id === PROYECTO_PROD) {
   process.exit(1);
 }
 
-admin.initializeApp({ credential: admin.credential.cert(sa), projectId: sa.project_id });
-const db = admin.firestore();
+initializeApp({ credential: cert(sa), projectId: sa.project_id });
+const db = getFirestore();
 
 function percentil(valoresAscendentes, p) {
   const idx = Math.min(valoresAscendentes.length - 1, Math.max(0, Math.ceil((p / 100) * valoresAscendentes.length) - 1));

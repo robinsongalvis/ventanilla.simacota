@@ -20,7 +20,8 @@
  *      FIREBASE_SERVICE_ACCOUNT como JSON en env.
  */
 
-import * as admin from 'firebase-admin';
+import { applicationDefault, cert, getApp, getApps, initializeApp, type App, type ServiceAccount } from 'firebase-admin/app';
+import { getFirestore } from 'firebase-admin/firestore';
 import { NORMOGRAMA_NUCLEO, validarSemilla } from '../lib/simi/normograma-nucleo';
 
 const COLECCION = 'normatividad_nacional';
@@ -39,16 +40,16 @@ function parseArgs(): Opciones {
   };
 }
 
-function inicializarAdmin(): admin.app.App {
-  if (admin.apps.length > 0) return admin.app();
+function inicializarAdmin(): App {
+  if (getApps().length > 0) return getApp();
 
   const credsEnv = process.env.FIREBASE_SERVICE_ACCOUNT;
   if (credsEnv) {
-    const creds = JSON.parse(credsEnv) as admin.ServiceAccount;
-    return admin.initializeApp({ credential: admin.credential.cert(creds) });
+    const creds = JSON.parse(credsEnv) as ServiceAccount;
+    return initializeApp({ credential: cert(creds) });
   }
   if (process.env.GOOGLE_APPLICATION_CREDENTIALS) {
-    return admin.initializeApp({ credential: admin.credential.applicationDefault() });
+    return initializeApp({ credential: applicationDefault() });
   }
   throw new Error(
     'Credenciales ausentes. Configure GOOGLE_APPLICATION_CREDENTIALS o FIREBASE_SERVICE_ACCOUNT.',
@@ -84,7 +85,7 @@ async function ejecutar(opts: Opciones): Promise<void> {
   }
 
   const app = inicializarAdmin();
-  const db  = app.firestore();
+  const db  = getFirestore(app);
   const ahora = new Date().toISOString();
   let escritos = 0;
 
