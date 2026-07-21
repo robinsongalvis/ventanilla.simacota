@@ -41,6 +41,28 @@
  * SALIDA: exit 0 dentro de presupuesto (imprime inventario + advertencias);
  *         exit 1 ante cualquier VIOLACIÓN (con reporte accionable).
  *
+ * ── AMPLIACIÓN (Roadmap P1.5) — cierre del falso verde de `useSalidas` ──
+ * El mecanismo original SOLO barre lecturas de `ventanilla_radicados`. Un
+ * `onSnapshot` sin cota sobre OTRA colección (p. ej. `ventanilla_salidas` en
+ * `lib/hooks/useSalidas.ts`, hallado en la auditoría P1.5: mismo antipatrón
+ * O(N) que R11 pero fuera del radar de este gate) pasaba en VERDE. Se añade
+ * un SEGUNDO mecanismo, independiente del primero, enfocado en la superficie
+ * de mayor riesgo de este antipatrón — suscripciones en tiempo real de hooks
+ * de cliente (`lib/hooks/**`) — sobre CUALQUIER colección:
+ *   - Descubre cada `onSnapshot(` en `lib/hooks/**`.
+ *   - Identifica la colección asociada (el `collection(...)` literal más
+ *     cercano hacia atrás, dentro de la misma ventana de líneas).
+ *   - Está ACOTADA si en su ventana de construcción aparece `limit(` (o
+ *     cursor `startAfter(`/`startAt(`) — misma señal binaria que el
+ *     mecanismo original.
+ *   - Toda suscripción descubierta debe estar clasificada en
+ *     `REGISTRO_HOOKS` (ACOTADA o DEUDA_DECLARADA) — misma filosofía de
+ *     deuda declarada: lo no clasificado bloquea el pipeline.
+ * No sustituye el mecanismo de `REGISTRO` (que sigue siendo la fuente de
+ * verdad para `ventanilla_radicados`, incluyendo lecturas Admin SDK y
+ * `getDocs` fuera de hooks) — lo complementa cerrando el hueco de
+ * descubrimiento en `onSnapshot` de hooks para colecciones distintas.
+ *
  * Uso:
  *   node scripts/laboratorio/presupuesto-rendimiento.mjs
  */
@@ -155,22 +177,78 @@ const REGISTRO = [
   },
   {
     archivo: 'app/api/cron/alertas-vencimiento/route.ts',
-    estado: 'DEUDA_DECLARADA',
+    estado: 'ACOTADA',
     clase: 'BATCH',
-    descripcion: 'Cron de alertas de vencimiento (sin contexto de tenant, lee activos). '
-      + 'HALLAZGO 2B: sin cota y NO estaba en la deuda declarada de ADR-0010 — catalogado '
-      + 'aquí; RECOMENDADO acotar con limit + where(estado activo) (escalado al coordinador).',
-    ref: 'HALLAZGO 2B (fuera de ADR-0010 §Deuda) — pendiente de decisión',
+    descripcion: 'Cron de alertas de vencimiento (sin contexto de tenant). DEUDA SALDADA '
+      + '(Roadmap P1.4): antes leía toda la colección y filtraba en memoria (HALLAZGO 2B). '
+      + 'Ahora consulta acotada por estado activo + rango de fecha de vencimiento '
+      + '(where estadoActual in + where termino.fechaVencimiento <= cota + orderBy), más '
+      + 'techo duro TECHO_LECTURA_CRON como defensa en profundidad.',
+    cotaRegex: /const TECHO_LECTURA_CRON\s*=\s*(\d+)/,
+    cotaMax: 1000,
+    ref: 'Roadmap P1.4 · antes HALLAZGO 2B (fuera de ADR-0010 §Deuda)',
   },
   {
     archivo: 'app/api/cron/desistimiento-tacito/route.ts',
-    estado: 'DEUDA_DECLARADA',
+    estado: 'ACOTADA',
     clase: 'BATCH',
-    descripcion: 'Cron de desistimiento tácito C1 (diario, sin contexto de tenant; filtra '
-      + 'EN_SUBSANACION en memoria). Detectado por este gate en el CI de PR-3 (stack H3): '
-      + 'sin cota, igual que su gemelo alertas-vencimiento. RECOMENDADO acotar con '
-      + 'where(estadoActual==EN_SUBSANACION) + limit en Bloque 3 (PLAN_BLOQUE3 §9).',
-    ref: 'Gate R11 en PR-3 (2026-07-14) — deuda diferida a Bloque 3',
+    descripcion: 'Cron de desistimiento tácito C1 (diario, sin contexto de tenant). DEUDA '
+      + 'SALDADA (Roadmap P1.4): antes leía toda la colección y filtraba en memoria por '
+      + 'EN_SUBSANACION (detectado en el gate R11 del PR-3, stack H3). Ahora consulta '
+      + 'acotada por where(estadoActual==EN_SUBSANACION) + techo duro TECHO_LECTURA_CRON.',
+    cotaRegex: /const TECHO_LECTURA_CRON\s*=\s*(\d+)/,
+    cotaMax: 1000,
+    ref: 'Roadmap P1.4 · antes Gate R11 en PR-3 (2026-07-14)',
+  },
+];
+
+/**
+ * REGISTRO_HOOKS — inventario clasificado de suscripciones `onSnapshot` en
+ * `lib/hooks/**`, sobre CUALQUIER colección (ver "AMPLIACIÓN" en el
+ * encabezado). Clave de entrada: (archivo, colección) — un mismo archivo
+ * podría en teoría suscribirse a más de una colección; se clasifica cada
+ * combinación por separado para no ocultar una nueva sin cota detrás de una
+ * ya acotada del mismo archivo.
+ *
+ * estado:
+ *   ACOTADA          — debe llevar `limit()`/cursor; el control FALLA si lo pierde.
+ *   DEUDA_DECLARADA  — sin cota, explícitamente diferida y justificada; permitida
+ *                      pero congelada (una pérdida de cota en otra suscripción
+ *                      nueva del mismo hook no se cuela detrás de esta entrada).
+ */
+export const REGISTRO_HOOKS = [
+  {
+    archivo: 'lib/hooks/useVentanillaRadicados.ts',
+    coleccion: 'ventanilla_radicados',
+    estado: 'ACOTADA',
+    descripcion: 'Stream operativo de la bandeja (ventana 180d + limit 500). Ya cubierta '
+      + 'también por el REGISTRO de ventanilla_radicados arriba; se repite aquí para que '
+      + 'el mecanismo de hooks tenga cobertura completa por sí mismo.',
+    ref: 'ADR-0010 §2 (2A) · stream acotado',
+  },
+  {
+    archivo: 'lib/hooks/useSalidas.ts',
+    coleccion: 'ventanilla_salidas',
+    estado: 'ACOTADA',
+    descripcion: 'Libro de salidas (Roadmap P1.5). DEUDA SALDADA: antes onSnapshot + '
+      + 'orderBy(fechaSalida) SIN limit/ventana — mismo antipatrón O(N) de R11, fuera del '
+      + 'radar del REGISTRO original por ser otra colección. Ahora ventana '
+      + 'VENTANA_DIAS_STREAM_SALIDAS (180d) + limit(LIMITE_DOCUMENTOS_STREAM_SALIDAS=500), '
+      + 'mismo patrón que useVentanillaRadicados.',
+    ref: 'Roadmap P1.5 · antes falso verde del gate original',
+  },
+  {
+    archivo: 'lib/hooks/useRadicados.ts',
+    coleccion: 'radicados',
+    estado: 'DEUDA_DECLARADA',
+    descripcion: 'onSnapshot SIN limit/ventana sobre la colección legacy "radicados" '
+      + '(distinta de ventanilla_radicados). Verificado por búsqueda en todo el repo: sin '
+      + 'ningún import activo fuera de esta propia definición (solo una mención en '
+      + 'comentario de src/types/firestore-schema.ts) — código muerto. Fuera del alcance de '
+      + 'este incremento (P1.5 solo pidió acotar useSalidas); se declara para no bloquear '
+      + 'el gate sin ocultar el hallazgo. Seguimiento propuesto: eliminar el hook muerto o '
+      + 'acotarlo si se reactiva su uso.',
+    ref: 'Roadmap P1.5 · hallazgo colateral, seguimiento aparte',
   },
 ];
 
@@ -224,124 +302,250 @@ function detectarLecturas(rutaAbs, rel) {
   return lecturas;
 }
 
-// ─────────────────────────── validación ───────────────────────────
+// ───────────────── descubrimiento: onSnapshot en lib/hooks/** ─────────────────
 
-const violaciones = [];
-const advertencias = [];
+const DIR_HOOKS = join(RAIZ, 'lib', 'hooks');
+/** Ventana hacia atrás para asociar un `onSnapshot` con su `limit()`/cursor y
+ * su `collection(...)`: las suscripciones de este repo construyen las
+ * constraints (where/orderBy/limit) en un arreglo ANTES de `query(...)`, así
+ * que la cota puede quedar más arriba que la propia línea de `collection(`.
+ * 60 líneas cubre con margen el patrón real (useVentanillaRadicados/useSalidas
+ * usan <40 líneas entre el inicio del useEffect y el onSnapshot). */
+const VENTANA_LINEAS_ONSNAPSHOT = 60;
+const RE_ONSNAPSHOT = /onSnapshot\(/;
+// Cliente: `collection(<handle>, 'nombre')`.
+const RE_COLECCION_CLIENTE_GENERICA = /collection\(\s*[^,]+,\s*['"]([^'"]+)['"]\s*\)/;
+// Admin (por si algún hook lo usara): `.collection('nombre')`.
+const RE_COLECCION_ADMIN_GENERICA = /\.collection\(\s*['"]([^'"]+)['"]\s*\)/;
 
-// 1. Descubrir todas las lecturas de colección.
-const descubiertas = [];
-for (const dir of DIRS_ESCANEO) {
-  for (const rutaAbs of listarFuentes(join(RAIZ, dir))) {
-    const rel = rutaAbs.slice(RAIZ.length + 1);
-    descubiertas.push(...detectarLecturas(rutaAbs, rel));
-  }
-}
+/**
+ * PURA. Encuentra las suscripciones `onSnapshot` en el contenido (string) de
+ * un archivo bajo `lib/hooks/**`, con la colección asociada (si se puede
+ * resolver a un literal) y si están acotadas (limit/cursor) en su ventana de
+ * construcción. Exportada para probarla sin tocar el filesystem — mismo
+ * patrón que `verificar-indices.mjs`.
+ */
+export function detectarSuscripcionesOnSnapshotEnContenido(contenido, rel) {
+  const lineas = contenido.split('\n');
+  const hallazgos = [];
+  for (let i = 0; i < lineas.length; i += 1) {
+    if (!RE_ONSNAPSHOT.test(lineas[i])) continue;
 
-const porArchivo = new Map();
-for (const l of descubiertas) {
-  if (!porArchivo.has(l.archivo)) porArchivo.set(l.archivo, []);
-  porArchivo.get(l.archivo).push(l);
-}
-const registroPorArchivo = new Map(REGISTRO.map((r) => [r.archivo, r]));
+    const desde = Math.max(0, i - VENTANA_LINEAS_ONSNAPSHOT);
+    const hasta = Math.min(lineas.length, i + 3);
+    const ventana = lineas.slice(desde, hasta).join('\n');
+    const acotada = RE_COTA.test(ventana);
 
-// 2. Toda superficie descubierta debe estar registrada y cumplir su estado.
-for (const [archivo, lecturas] of porArchivo) {
-  const reg = registroPorArchivo.get(archivo);
-  const algunaSinCota = lecturas.some((l) => !l.acotada);
-
-  if (!reg) {
-    violaciones.push(
-      `SUPERFICIE NO REGISTRADA: ${archivo} (líneas ${lecturas.map((l) => l.linea).join(', ')}) `
-      + `lee la colección '${COLECCION}'${algunaSinCota ? ' SIN COTA' : ''}. `
-      + `Clasifícala en el REGISTRO de scripts/laboratorio/presupuesto-rendimiento.mjs.`,
-    );
-    continue;
-  }
-
-  if (reg.estado === 'ACOTADA') {
-    if (algunaSinCota) {
-      violaciones.push(
-        `PRESUPUESTO EXCEDIDO (regresión O(N)): ${archivo} declarada ACOTADA pero una lectura de `
-        + `'${COLECCION}' perdió su cota (líneas ${lecturas.filter((l) => !l.acotada).map((l) => l.linea).join(', ')}). `
-        + `Restablece limit()/cursor.`,
-      );
+    // Colección asociada: el `collection(...)` literal más cercano, buscando
+    // hacia atrás desde la propia línea de onSnapshot.
+    let coleccion = null;
+    for (let j = i; j >= desde; j -= 1) {
+      const m = lineas[j].match(RE_COLECCION_CLIENTE_GENERICA) || lineas[j].match(RE_COLECCION_ADMIN_GENERICA);
+      if (m) { coleccion = m[1]; break; }
     }
-    // Verificación de la cota numérica declarada.
-    const contenido = readFileSync(join(RAIZ, archivo), 'utf8');
-    const m = contenido.match(reg.cotaRegex);
-    if (!m) {
+
+    hallazgos.push({ archivo: rel, linea: i + 1, coleccion, acotada });
+  }
+  return hallazgos;
+}
+
+/** Envoltorio de I/O: lee el archivo y delega en la función pura. */
+function detectarSuscripcionesOnSnapshot(rutaAbs, rel) {
+  return detectarSuscripcionesOnSnapshotEnContenido(readFileSync(rutaAbs, 'utf8'), rel);
+}
+
+/** Clave de agrupación: archivo + colección (colección `null` si no se pudo resolver a literal). */
+export const claveHook = (archivo, coleccion) => `${archivo}::${coleccion ?? '(colección dinámica)'}`;
+
+// ─────────────────────────── validación + reporte (I/O) ───────────────────────────
+
+async function main() {
+  const violaciones = [];
+  const advertencias = [];
+
+  // 1. Descubrir todas las lecturas de colección.
+  const descubiertas = [];
+  for (const dir of DIRS_ESCANEO) {
+    for (const rutaAbs of listarFuentes(join(RAIZ, dir))) {
+      const rel = rutaAbs.slice(RAIZ.length + 1);
+      descubiertas.push(...detectarLecturas(rutaAbs, rel));
+    }
+  }
+
+  const porArchivo = new Map();
+  for (const l of descubiertas) {
+    if (!porArchivo.has(l.archivo)) porArchivo.set(l.archivo, []);
+    porArchivo.get(l.archivo).push(l);
+  }
+  const registroPorArchivo = new Map(REGISTRO.map((r) => [r.archivo, r]));
+
+  // 2. Toda superficie descubierta debe estar registrada y cumplir su estado.
+  for (const [archivo, lecturas] of porArchivo) {
+    const reg = registroPorArchivo.get(archivo);
+    const algunaSinCota = lecturas.some((l) => !l.acotada);
+
+    if (!reg) {
       violaciones.push(
-        `PRESUPUESTO: ${archivo} ACOTADA pero no se pudo verificar la cota declarada `
-        + `(${reg.cotaRegex}). ¿Cambió la forma de la cota? Actualiza el REGISTRO.`,
+        `SUPERFICIE NO REGISTRADA: ${archivo} (líneas ${lecturas.map((l) => l.linea).join(', ')}) `
+        + `lee la colección '${COLECCION}'${algunaSinCota ? ' SIN COTA' : ''}. `
+        + `Clasifícala en el REGISTRO de scripts/laboratorio/presupuesto-rendimiento.mjs.`,
       );
-    } else {
-      const valor = Number(m[1]);
-      const techo = reg.clase === 'INTERACTIVA' ? PRESUPUESTO_INTERACTIVO_DOCS : TECHO_BATCH_DOCS;
-      if (valor > reg.cotaMax || valor > techo) {
+      continue;
+    }
+
+    if (reg.estado === 'ACOTADA') {
+      if (algunaSinCota) {
         violaciones.push(
-          `PRESUPUESTO EXCEDIDO: ${archivo} declara cota ${valor} > permitido `
-          + `(cotaMax ${reg.cotaMax}, techo ${reg.clase} ${techo}).`,
+          `PRESUPUESTO EXCEDIDO (regresión O(N)): ${archivo} declarada ACOTADA pero una lectura de `
+          + `'${COLECCION}' perdió su cota (líneas ${lecturas.filter((l) => !l.acotada).map((l) => l.linea).join(', ')}). `
+          + `Restablece limit()/cursor.`,
         );
       }
+      // Verificación de la cota numérica declarada.
+      const contenido = readFileSync(join(RAIZ, archivo), 'utf8');
+      const m = contenido.match(reg.cotaRegex);
+      if (!m) {
+        violaciones.push(
+          `PRESUPUESTO: ${archivo} ACOTADA pero no se pudo verificar la cota declarada `
+          + `(${reg.cotaRegex}). ¿Cambió la forma de la cota? Actualiza el REGISTRO.`,
+        );
+      } else {
+        const valor = Number(m[1]);
+        const techo = reg.clase === 'INTERACTIVA' ? PRESUPUESTO_INTERACTIVO_DOCS : TECHO_BATCH_DOCS;
+        if (valor > reg.cotaMax || valor > techo) {
+          violaciones.push(
+            `PRESUPUESTO EXCEDIDO: ${archivo} declara cota ${valor} > permitido `
+            + `(cotaMax ${reg.cotaMax}, techo ${reg.clase} ${techo}).`,
+          );
+        }
+      }
+    } else if (reg.estado === 'PENDIENTE_2A') {
+      if (algunaSinCota) {
+        advertencias.push(
+          `PENDIENTE 2A (R11 ABIERTO): ${archivo} — ${reg.descripcion} [${reg.ref}]. `
+          + `El control NO lo bloquea aún; promuévelo a ACOTADA cuando 2A aterrice el cursor.`,
+        );
+      } else {
+        advertencias.push(
+          `2A ATERRIZÓ: ${archivo} ya está acotada. Promuévela de PENDIENTE_2A a ACOTADA en el REGISTRO `
+          + `para enforzar la regresión de forma permanente.`,
+        );
+      }
+    } else if (reg.estado === 'DEUDA_DECLARADA') {
+      if (!algunaSinCota) {
+        advertencias.push(
+          `DEUDA SALDADA: ${archivo} ya está acotada. Reclasifícala como ACOTADA en el REGISTRO.`,
+        );
+      }
+      // Deuda explícita: permitida, no viola.
     }
-  } else if (reg.estado === 'PENDIENTE_2A') {
-    if (algunaSinCota) {
-      advertencias.push(
-        `PENDIENTE 2A (R11 ABIERTO): ${archivo} — ${reg.descripcion} [${reg.ref}]. `
-        + `El control NO lo bloquea aún; promuévelo a ACOTADA cuando 2A aterrice el cursor.`,
-      );
-    } else {
-      advertencias.push(
-        `2A ATERRIZÓ: ${archivo} ya está acotada. Promuévela de PENDIENTE_2A a ACOTADA en el REGISTRO `
-        + `para enforzar la regresión de forma permanente.`,
-      );
-    }
-  } else if (reg.estado === 'DEUDA_DECLARADA') {
-    if (!algunaSinCota) {
-      advertencias.push(
-        `DEUDA SALDADA: ${archivo} ya está acotada. Reclasifícala como ACOTADA en el REGISTRO.`,
-      );
-    }
-    // Deuda explícita: permitida, no viola.
   }
-}
 
-// 3. Entradas del registro que ya no se descubren (higiene del registro).
-for (const reg of REGISTRO) {
-  if (!porArchivo.has(reg.archivo)) {
-    advertencias.push(
-      `REGISTRO OBSOLETO: ${reg.archivo} (${reg.estado}) ya no contiene una lectura de colección `
-      + `de '${COLECCION}'. Elimínala del REGISTRO.`,
-    );
+  // 3. Entradas del registro que ya no se descubren (higiene del registro).
+  for (const reg of REGISTRO) {
+    if (!porArchivo.has(reg.archivo)) {
+      advertencias.push(
+        `REGISTRO OBSOLETO: ${reg.archivo} (${reg.estado}) ya no contiene una lectura de colección `
+        + `de '${COLECCION}'. Elimínala del REGISTRO.`,
+      );
+    }
   }
+
+  // 4. Segundo mecanismo (Roadmap P1.5): onSnapshot de lib/hooks/**, cualquier
+  //    colección — ver "AMPLIACIÓN" en el encabezado del archivo.
+  const descubiertasHooks = [];
+  for (const rutaAbs of listarFuentes(DIR_HOOKS)) {
+    const rel = rutaAbs.slice(RAIZ.length + 1);
+    descubiertasHooks.push(...detectarSuscripcionesOnSnapshot(rutaAbs, rel));
+  }
+
+  const porClaveHook = new Map();
+  for (const h of descubiertasHooks) {
+    const clave = claveHook(h.archivo, h.coleccion);
+    if (!porClaveHook.has(clave)) porClaveHook.set(clave, []);
+    porClaveHook.get(clave).push(h);
+  }
+  const registroHooksPorClave = new Map(
+    REGISTRO_HOOKS.map((r) => [claveHook(r.archivo, r.coleccion), r]),
+  );
+
+  for (const [clave, hallazgos] of porClaveHook) {
+    const reg = registroHooksPorClave.get(clave);
+    const algunaSinCota = hallazgos.some((h) => !h.acotada);
+    const lineas = hallazgos.map((h) => h.linea).join(', ');
+
+    if (!reg) {
+      violaciones.push(
+        `SUSCRIPCIÓN onSnapshot NO REGISTRADA (hooks): ${clave} (líneas ${lineas})`
+        + `${algunaSinCota ? ' SIN COTA (limit/cursor)' : ''}. `
+        + `Clasifícala en REGISTRO_HOOKS de scripts/laboratorio/presupuesto-rendimiento.mjs.`,
+      );
+      continue;
+    }
+
+    if (reg.estado === 'ACOTADA' && algunaSinCota) {
+      violaciones.push(
+        `PRESUPUESTO EXCEDIDO (hooks, regresión O(N)): ${reg.archivo} declarada ACOTADA para `
+        + `'${reg.coleccion}' pero su onSnapshot perdió la cota (líneas `
+        + `${hallazgos.filter((h) => !h.acotada).map((h) => h.linea).join(', ')}). Restablece limit()/cursor.`,
+      );
+    } else if (reg.estado === 'DEUDA_DECLARADA' && !algunaSinCota) {
+      advertencias.push(
+        `DEUDA SALDADA (hooks): ${reg.archivo} ('${reg.coleccion}') ya está acotada. `
+        + `Reclasifícala como ACOTADA en REGISTRO_HOOKS.`,
+      );
+    }
+  }
+
+  // Higiene de REGISTRO_HOOKS: entradas que ya no se descubren.
+  for (const reg of REGISTRO_HOOKS) {
+    if (!porClaveHook.has(claveHook(reg.archivo, reg.coleccion))) {
+      advertencias.push(
+        `REGISTRO_HOOKS OBSOLETO: ${reg.archivo} ('${reg.coleccion}') ya no tiene una suscripción `
+        + `onSnapshot detectada. Elimínala de REGISTRO_HOOKS.`,
+      );
+    }
+  }
+
+  // ─────────────────────────── reporte ───────────────────────────
+
+  console.log('\n══════════ PRESUPUESTO DE RENDIMIENTO — lectura de radicados (ADR-0011, 2B) ══════════');
+  console.log(`Presupuesto INTERACTIVO: ≤ ${PRESUPUESTO_INTERACTIVO_DOCS} docs/consulta · Techo BATCH: ≤ ${TECHO_BATCH_DOCS} docs`);
+  console.log(`Superficies de lectura de colección descubiertas: ${porArchivo.size}\n`);
+
+  const orden = { ACOTADA: 0, PENDIENTE_2A: 1, DEUDA_DECLARADA: 2 };
+  for (const reg of [...REGISTRO].sort((a, b) => orden[a.estado] - orden[b.estado])) {
+    const lecturas = porArchivo.get(reg.archivo) || [];
+    const cota = lecturas.length ? (lecturas.every((l) => l.acotada) ? 'ACOTADA' : 'SIN-COTA') : '—';
+    const marca = reg.estado === 'ACOTADA' ? '✔' : reg.estado === 'PENDIENTE_2A' ? '⚠' : '·';
+    console.log(`  ${marca} [${reg.estado}/${reg.clase}] ${reg.archivo} → ${cota}`);
+  }
+
+  console.log(`\n── onSnapshot en lib/hooks/** (cualquier colección, Roadmap P1.5) — ${porClaveHook.size} suscripción(es) ──`);
+  for (const reg of [...REGISTRO_HOOKS].sort((a, b) => orden[a.estado] - orden[b.estado])) {
+    const hallazgos = porClaveHook.get(claveHook(reg.archivo, reg.coleccion)) || [];
+    const cota = hallazgos.length ? (hallazgos.every((h) => h.acotada) ? 'ACOTADA' : 'SIN-COTA') : '—';
+    const marca = reg.estado === 'ACOTADA' ? '✔' : '·';
+    console.log(`  ${marca} [${reg.estado}] ${reg.archivo} ('${reg.coleccion}') → ${cota}`);
+  }
+
+  if (advertencias.length) {
+    console.log('\n── Advertencias (no bloquean) ──');
+    for (const a of advertencias) console.log(`  ⚠ ${a}`);
+  }
+
+  if (violaciones.length) {
+    console.log('\n── VIOLACIONES (bloquean el pipeline) ──');
+    for (const v of violaciones) console.log(`  ⛔ ${v}`);
+    console.log(`\n⛔ Presupuesto de rendimiento: ${violaciones.length} violación(es). Pipeline detenido.`);
+    process.exit(1);
+  }
+
+  console.log('\n✔ Presupuesto de rendimiento: sin violaciones. Todas las lecturas acotadas están dentro de cota.');
+  process.exit(0);
 }
 
-// ─────────────────────────── reporte ───────────────────────────
-
-console.log('\n══════════ PRESUPUESTO DE RENDIMIENTO — lectura de radicados (ADR-0011, 2B) ══════════');
-console.log(`Presupuesto INTERACTIVO: ≤ ${PRESUPUESTO_INTERACTIVO_DOCS} docs/consulta · Techo BATCH: ≤ ${TECHO_BATCH_DOCS} docs`);
-console.log(`Superficies de lectura de colección descubiertas: ${porArchivo.size}\n`);
-
-const orden = { ACOTADA: 0, PENDIENTE_2A: 1, DEUDA_DECLARADA: 2 };
-for (const reg of [...REGISTRO].sort((a, b) => orden[a.estado] - orden[b.estado])) {
-  const lecturas = porArchivo.get(reg.archivo) || [];
-  const cota = lecturas.length ? (lecturas.every((l) => l.acotada) ? 'ACOTADA' : 'SIN-COTA') : '—';
-  const marca = reg.estado === 'ACOTADA' ? '✔' : reg.estado === 'PENDIENTE_2A' ? '⚠' : '·';
-  console.log(`  ${marca} [${reg.estado}/${reg.clase}] ${reg.archivo} → ${cota}`);
+// Solo ejecuta si se invoca directamente (permite importar las funciones puras en tests).
+if (process.argv[1] && process.argv[1].endsWith('presupuesto-rendimiento.mjs')) {
+  main().catch((err) => { console.error(err); process.exit(1); });
 }
-
-if (advertencias.length) {
-  console.log('\n── Advertencias (no bloquean) ──');
-  for (const a of advertencias) console.log(`  ⚠ ${a}`);
-}
-
-if (violaciones.length) {
-  console.log('\n── VIOLACIONES (bloquean el pipeline) ──');
-  for (const v of violaciones) console.log(`  ⛔ ${v}`);
-  console.log(`\n⛔ Presupuesto de rendimiento: ${violaciones.length} violación(es). Pipeline detenido.`);
-  process.exit(1);
-}
-
-console.log('\n✔ Presupuesto de rendimiento: sin violaciones. Todas las lecturas acotadas están dentro de cota.');
-process.exit(0);

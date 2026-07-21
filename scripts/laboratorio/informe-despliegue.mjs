@@ -186,6 +186,7 @@ const CATEGORIAS = [
     titulo: 'Rendimiento',
     fuentes: [
       { clave: 'presupuesto', desc: 'Presupuesto de rendimiento R11 (ADR-0011)', env: 'OUTCOME_PRESUPUESTO', comandoLocal: 'npm run presupuesto:rendimiento', evidencia: 'job validate · paso Presupuesto · scripts/laboratorio/presupuesto-rendimiento.mjs' },
+      { clave: 'indices', desc: 'Índices Firestore (gate de consultas compuestas, A3)', env: 'OUTCOME_INDICES', comandoLocal: 'npm run verificar:indices', evidencia: 'job validate · paso Índices Firestore · scripts/laboratorio/verificar-indices.mjs' },
     ],
   },
   {

@@ -23,6 +23,7 @@ jobs:
       tsc: ${{ steps.tsc.outcome }}
       test: ${{ steps.test.outcome }}
       presupuesto: ${{ steps.presupuesto.outcome }}
+      indices: ${{ steps.indices.outcome }}
       audit: ${{ steps.audit.outcome }}
       build: ${{ steps.build.outcome }}
 
@@ -153,6 +154,7 @@ jobs:
           OUTCOME_TSC: ${{ needs.validate.outputs.tsc }}
           OUTCOME_TEST: ${{ needs.validate.outputs.test }}
           OUTCOME_PRESUPUESTO: ${{ needs.validate.outputs.presupuesto }}
+          OUTCOME_INDICES: ${{ needs.validate.outputs.indices }}
           OUTCOME_AUDIT: ${{ needs.validate.outputs.audit }}
           OUTCOME_BUILD: ${{ needs.validate.outputs.build }}
           OUTCOME_MATRIZ: ${{ needs.laboratorio-emulador.outputs.matriz }}

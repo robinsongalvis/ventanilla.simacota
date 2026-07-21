@@ -7,6 +7,15 @@ import { logError } from '@/lib/logger';
 import type { VentanillaRadicado } from '@/src/types/ventanilla';
 
 export const runtime = 'nodejs';
+// Techo del plan (Vercel Hobby/Pro: 300s en funciones cron) — mismo estándar
+// que los demás crons de plazo legal (Roadmap P1.4).
+export const maxDuration = 300;
+
+// Techo duro adicional (clase BATCH, ADR-0011 2B: hasta 1000 docs,
+// N-independiente) como defensa en profundidad sobre la cota por estado: un
+// límite numérico explícito impide una lectura sin cota si el volumen de
+// radicados en subsanación simultánea escalara.
+const TECHO_LECTURA_CRON = 1000;
 
 /* ══════════════════════════════════════════════════════════════
    GET /api/cron/desistimiento-tacito   (BM-B33)
@@ -38,10 +47,19 @@ export async function GET(request: Request): Promise<NextResponse> {
   let errores = 0;
 
   try {
-    const snap = await db.collection('ventanilla_radicados').get();
+    // Consulta ACOTADA (Roadmap P1.4): antes se leía la colección completa y
+    // se filtraba en memoria por `estadoActual === 'EN_SUBSANACION'` (el
+    // resto de la regla — activa, no propuesto, plazo vencido — vive en
+    // `debeProponerDesistimiento` y sigue evaluándose exacta sobre el
+    // resultado ya acotado). El estado es un único campo de igualdad: no
+    // requiere índice compuesto (Firestore indexa cada campo automáticamente).
+    const snap = await db.collection('ventanilla_radicados')
+      .where('estadoActual', '==', 'EN_SUBSANACION')
+      .limit(TECHO_LECTURA_CRON)
+      .get();
     const candidatos = snap.docs
       .map((d) => ({ id: d.id, r: d.data() as VentanillaRadicado & { isTest?: boolean; excludeFromMetrics?: boolean } }))
-      .filter(({ r }) => r.estadoActual === 'EN_SUBSANACION' && !r.isTest && !r.excludeFromMetrics
+      .filter(({ r }) => !r.isTest && !r.excludeFromMetrics
         && debeProponerDesistimiento(r, ahora));
 
     for (const { id, r } of candidatos) {

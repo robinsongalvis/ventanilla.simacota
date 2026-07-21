@@ -12,6 +12,11 @@ import { createNotification }    from '@/lib/simi-juridico/createNotification';
 import { autorizarCron }         from '@/lib/seguridad/autorizar-cron';
 
 export const runtime = 'nodejs';
+// Techo del plan (Vercel Hobby/Pro: 300s en funciones cron) — mismo estándar
+// que los demás crons de plazo legal (Roadmap P1.4). La consulta subyacente
+// (`generateDeadlineAlerts` en lib/simi-juridico/predictDeadlineAlerts.ts) ya
+// está acotada con `.limit(500)` — no se toca (pertenece al dominio IA/SIMI).
+export const maxDuration = 300;
 
 export async function GET(request: Request): Promise<NextResponse> {
   const auth = autorizarCron({
