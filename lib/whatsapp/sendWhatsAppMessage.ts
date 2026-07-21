@@ -6,7 +6,15 @@ function providerFromEnv(): WhatsAppProvider {
   return 'none';
 }
 
-function normalizePhone(value: string): string | null {
+/**
+ * Normaliza un número al formato E.164 sin `+` usado por los proveedores de
+ * WhatsApp (código de país + dígitos). Se exporta para que los consumidores
+ * que deben CONTRASTAR dos teléfonos (p. ej. verificar que el destino de una
+ * notificación coincide con el teléfono registrado del solicitante) usen la
+ * misma normalización que efectivamente se envía — evita falsos negativos o
+ * positivos por diferencias de formato ("+57 310...", "310...", etc.).
+ */
+export function normalizePhone(value: string): string | null {
   const digits = value.replace(/\D/g, '');
   if (digits.length < 10 || digits.length > 15) return null;
   return digits.startsWith('57') ? digits : `57${digits}`;
