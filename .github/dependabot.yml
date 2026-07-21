@@ -14,10 +14,16 @@ updates:
     commit-message:
       prefix: "chore(deps)"
     groups:
+      # Los grupos solo agrupan minor/patch (seguros). Las actualizaciones
+      # MAYORES llegan como PR individuales para revisarse una a una — un mayor
+      # (typescript 5→7, firebase-admin 13→14, eslint 9→10) puede romper el build
+      # y no debe mezclarse con parches en un PR de "todo o nada".
       produccion:
         dependency-type: "production"
+        update-types: ["minor", "patch"]
       desarrollo:
         dependency-type: "development"
+        update-types: ["minor", "patch"]
   - package-ecosystem: "github-actions"
     directory: "/"
     schedule:
