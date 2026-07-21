@@ -345,9 +345,14 @@ export async function POST(request: Request) {
     // 2) Consecutivo + documento en UNA transacción (atómico). Dentro del
     //    callback SOLO cómputo puro y tx.set; ningún I/O de Storage.
     const { radicadoId, archivos } = await db.runTransaction(async (tx) => {
-      const [consecRadicado] = await leerConsecutivosLegales(tx, db, ahora, [
+      // Se conserva el ARREGLO devuelto por leer (no se desestructura y descarta):
+      // confirmarConsecutivosLegales exige exactamente esa misma referencia
+      // (guarda por identidad, consecutivo-legal.ts:107). Pasar un arreglo nuevo
+      // hacía fallar la transacción con 500 en toda radicación pública (P0).
+      const pendientesRadicado = await leerConsecutivosLegales(tx, db, ahora, [
         { serie: 'radicados', formatear: formatearRadicadoInstitucional },
       ]);
+      const [consecRadicado] = pendientesRadicado;
       const radicadoId = consecRadicado.documentoId;
       const consecutivo = consecRadicado.consecutivo;
       const archivos: ArchivoRadicado[] = preparados.map((p) => ({
@@ -426,7 +431,7 @@ export async function POST(request: Request) {
       analisisIa,
     });
 
-      confirmarConsecutivosLegales(tx, ahora, [consecRadicado]);
+      confirmarConsecutivosLegales(tx, ahora, pendientesRadicado);
       tx.set(db.doc(`ventanilla_radicados/${radicadoId}`), radicado);
       return { radicadoId, archivos };
     });
