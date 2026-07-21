@@ -1,0 +1,11 @@
+{
+  "__doc__": "Política de retención del bucket de respaldos de Firestore. Se aplica con: gcloud storage buckets update gs://<bucket> --lifecycle-file=scripts/backups/lifecycle-retention.json  (lo hace setup-gcp-backups.sh). Cada export diario vive bajo diario/YYYY-MM-DD/; esta regla borra automáticamente los objetos con más de 30 días. Ajusta 'age' si el municipio define otra ventana legal de retención.",
+  "lifecycle": {
+    "rule": [
+      {
+        "action": { "type": "Delete" },
+        "condition": { "age": 30 }
+      }
+    ]
+  }
+}

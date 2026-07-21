@@ -44,16 +44,62 @@ Para evitar la pérdida de información en formularios largos en caso de descone
 El activo de información más valioso del municipio son los documentos de `radicados` y su `trazabilidad`. Se establecen las siguientes políticas oficiales de DR:
 
 ### 3.1. Respaldos Automáticos Diarios (Backups)
-Se programa una función nativa en Google Cloud Platform (GCP) para exportar diariamente la base de datos completa de Firestore a un bucket seguro de Google Cloud Storage (`gs://backups-ventanilla-simacota/`):
+
+**Estado (Roadmap P2.4):** el mecanismo de respaldo está **implementado y
+versionado** en el repositorio. Antes esta sección describía un export
+"programado" que no existía en ningún lado (hallazgo CR-3, auditoría 2026-07-20):
+no había Cloud Scheduler, ni Action, ni script. Ya no es así.
+
+**Qué quedó AUTOMATIZADO (en el repo, listo para activar):**
+- Workflow `.github/workflows/backup-firestore.yml` — export diario de Firestore
+  de producción a `gs://ventanilla-simacota-backups/diario/YYYY-MM-DD/`, a las
+  02:00 hora Colombia (07:00 UTC), más disparo manual de prueba.
+- `scripts/backups/setup-gcp-backups.sh` — provisión idempotente de bucket,
+  retención (30 días vía lifecycle), service account de backups e IAM mínimo.
+- `scripts/backups/export-firestore.sh` — export manual equivalente para correr
+  desde una máquina con `gcloud`.
+
+El comando de fondo (lo ejecuta el workflow; la fecha la estampa el runner):
 ```bash
-gcloud firestore export gs://backups-ventanilla-simacota/diario/
+gcloud firestore export gs://ventanilla-simacota-backups/diario/$(date -u +%F) \
+  --project=ventanilla-unica-f31b1 --database='(default)'
 ```
 
+**Qué es MANUAL / acción del propietario (una sola vez):**
+- Ejecutar `setup-gcp-backups.sh` (requiere `gcloud` como Owner/Editor del proyecto).
+- Cargar los secrets/variables en GitHub (WIF recomendado, o clave JSON). Detalle
+  en `scripts/backups/README.md` y `VARIABLES_ENTORNO.md`.
+- Hasta que esos secrets existan, el workflow **falla con un mensaje claro**
+  ("infraestructura sin provisionar") en lugar de fingir que respalda.
+
+**Por qué GitHub Actions y no Cloud Scheduler:** justificación en
+`scripts/backups/README.md`. Resumen: la config queda versionada (raíz del
+hallazgo CR-3), una sola superficie operativa (la de CI), y estampado por día
+sin infraestructura extra.
+
+**Salvedad:** los workflows programados de GitHub se auto-deshabilitan tras
+60 días sin `push` al repo. En mantenimiento activo no aplica; si el repo entra
+en pausa larga, hay que reactivar el workflow o migrar el disparo a Cloud
+Scheduler (+ Cloud Function para plantillar la fecha).
+
+**Hardening pendiente del propietario** (verificado en prod 2026-07-20): PITR y
+Delete Protection están DESHABILITADOS en la base de producción — habilitarlos
+es complementario a los exports (ver `docs/RUNBOOK_RESTAURACION.md` §7).
+
 ### 3.2. Proceso de Restauración ante Corrupción de Datos
-Si se detecta una pérdida accidental o corrupción masiva de datos:
-1. **Poner el panel administrativo en modo de lectura única** mediante un Feature Flag global (`MAINTENANCE_MODE = true`).
-2. **Importar la última copia de seguridad válida**:
+
+El procedimiento **exacto, probado y con criterios de éxito** vive en
+`docs/RUNBOOK_RESTAURACION.md`. Resumen:
+
+1. Toda restauración de *ensayo* va a **STAGE** (`ventanilla-simacota-stage`),
+   nunca a producción.
+2. Ante corrupción real: **congelar escritura** (modo mantenimiento), restaurar
+   primero a stage para validar el backup, y solo entonces importar a producción
+   **con orden explícita del propietario**:
    ```bash
-   gcloud firestore import gs://backups-ventanilla-simacota/diario/YYYY-MM-DD/
+   gcloud firestore import gs://ventanilla-simacota-backups/diario/YYYY-MM-DD \
+     --project=ventanilla-unica-f31b1 --database='(default)'
    ```
-3. **Validar consistencia de los consecutivos** revisando el contador en `counters/radicados-{year}` antes de reabrir el acceso público.
+3. **Validar consistencia de los consecutivos** con el detector de solo lectura
+   `scripts/laboratorio/detectar-consecutivos-fantasma.mjs` (cuenta documentos y
+   verifica unicidad + continuidad, AGN 060/2001) antes de reabrir el acceso.
