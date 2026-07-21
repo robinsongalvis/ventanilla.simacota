@@ -8,7 +8,7 @@ import {
   construirClasificacionInicial,
   construirNotaRadicacion,
 } from '@/lib/recepcion/clasificacion-inicial';
-import { sugerirSerieDocumental } from '@/lib/catalogos/series-documentales';
+import { construirVentanillaRadicado } from '@/lib/recepcion/construir-radicado';
 import type {
   CanalRespuesta,
   DatosNoAportados,
@@ -227,20 +227,23 @@ export async function radicarInstitucionalmente(
   const hayNoAportados = algunNoAportado(datosNoAportados);
 
   /* Sprint Radicación dirigida — presentación del solicitante, con la
-     misma derivación del flujo público (lib/radicacion.ts). */
+     misma derivación de la superficie pública (app/api/radicacion/route.ts;
+     el constructor puro compartido deriva esAnonimo/identidadReservada
+     internamente a partir de tipoPresentacion). */
   const tipoPresentacion = datos.tipoPresentacion ?? 'IDENTIFICADA';
   const esAnonimo = tipoPresentacion === 'ANONIMA';
-  const identidadReservada = tipoPresentacion === 'RESERVADA';
 
-  const radicado: VentanillaRadicado = {
+  // C1/M1 (pieza angular) — constructor puro compartido con la superficie
+  // pública (app/api/radicacion/route.ts). Reutiliza construirClasificacionInicial
+  // (funcionarioResponsableUid) aquí, como siempre; el constructor resuelve
+  // internamente sugerirSerieDocumental. No toca la numeración (H3).
+  const radicado: VentanillaRadicado = construirVentanillaRadicado({
     radicadoId,
-    estadoActual: 'PENDIENTE',
-    ultimaActualizacion: ahora.toISOString(),
-    prioridad:    tipo.prioridadSugerida,
-    canalRespuesta: datos.canalRespuesta ?? null,
+    consecutivo,
+    ahora,
+    prioridad: tipo.prioridadSugerida,
     tipoPresentacion,
-    esAnonimo,
-    identidadReservada,
+    canalRespuesta: datos.canalRespuesta ?? null,
 
     solicitante: {
       tipoPersona:     datos.tipoPersona,
@@ -265,12 +268,9 @@ export async function radicarInstitucionalmente(
     },
 
     control: {
-      radicadoId,
-      consecutivo,
-      fechaRadicado:  ahora.toISOString(),
-      horaRadicado:   ahora.toLocaleTimeString('es-CO', { hour: '2-digit', minute: '2-digit' }),
       medioRecepcion: datos.medioRecepcion,
       origen:         datos.medioRecepcion === 'WEB' ? 'WEB' : 'FISICO_ESCANER',
+      horaRadicado:   ahora.toLocaleTimeString('es-CO', { hour: '2-digit', minute: '2-digit' }),
       origenIngreso:  datos.origenIngreso ?? 'PQRSD_WEB_OFICIAL',
       tipoEntrada:    datos.tipoEntrada   ?? 'PQRSD',
     },
@@ -281,32 +281,18 @@ export async function radicarInstitucionalmente(
       diasRespuesta:       tipo.diasRespuesta,
       unidad:              tipo.unidad,
       fechaVencimiento:    datos.fechaVencimiento,
-      prorrogasAplicadas:  0,
     },
 
     /* Sprint Radicación dirigida: el radicado nace dirigido a la
        dependencia elegida en recepción. Si va a otra dependencia, nace
        sin funcionario responsable ("sin asignar" allá). */
-    clasificacion: {
-      ...construirClasificacionInicial(
-        datos.oficinaDestino ?? 'VENTANILLA_UNICA',
-        actor.uid,
-      ),
-      // Sprint Área al radicar — el área nace con el radicado cuando la
-      // recepción la conoce; si no, la fija la dependencia al asignar.
-      ...(datos.areaResponsable?.trim()
-        ? { areaResponsable: datos.areaResponsable.trim() }
-        : {}),
-      // Sprint Serie documental — el radicado nace clasificado en su
-      // serie TRD (foto inmutable: código + nombre + versión de la TRD).
-      ...(() => {
-        const serie = sugerirSerieDocumental(
-          datos.tipoSolicitudId,
-          datos.oficinaDestino ?? 'VENTANILLA_UNICA',
-        );
-        return serie ? { serieDocumental: serie } : {};
-      })(),
-    },
+    clasificacionBase: construirClasificacionInicial(
+      datos.oficinaDestino ?? 'VENTANILLA_UNICA',
+      actor.uid,
+    ),
+    // Sprint Área al radicar — el área nace con el radicado cuando la
+    // recepción la conoce; si no, la fija la dependencia al asignar.
+    areaResponsable: datos.areaResponsable?.trim() || undefined,
 
     detalle: {
       asunto:       datos.asunto.trim(),
@@ -328,8 +314,7 @@ export async function radicarInstitucionalmente(
       tamanioKB: a.tamanioKB,
       orden:     i + 1,
     })),
-
-  };
+  });
 
   // Capa de defensa final: sanitizeFirestoreData garantiza que ningún campo
   // llegue como `undefined` aunque se añadan atributos nuevos en el futuro.

@@ -55,8 +55,13 @@ describe('Radicación Rápida — selector de área', () => {
 
 describe('acción de radicar — el área viaja a la clasificación', () => {
   it('clasificacion.areaResponsable se escribe solo si viene con valor', () => {
+    // Pieza angular (P2.1) Fase 1 — la acción sigue calculando el valor
+    // (trim de datos.areaResponsable), pero la escritura CONDICIONAL en
+    // clasificacion.areaResponsable (solo si hay valor) se movió al
+    // constructor puro compartido `lib/recepcion/construir-radicado.ts`.
     const accion = readFileSync('lib/actions/radicarVentanilla.ts', 'utf8');
     expect(accion).toContain('datos.areaResponsable?.trim()');
-    expect(accion).toContain('{ areaResponsable: datos.areaResponsable.trim() }');
+    const constructor = readFileSync('lib/recepcion/construir-radicado.ts', 'utf8');
+    expect(constructor).toContain('entrada.areaResponsable ? { areaResponsable: entrada.areaResponsable } : {}');
   });
 });
