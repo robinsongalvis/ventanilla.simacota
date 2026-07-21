@@ -70,9 +70,14 @@ describe('labelSerieDocumental', () => {
 
 describe('integración — el radicado nace con la serie', () => {
   it('la acción de radicar persiste la foto de la serie en la clasificación', () => {
+    // Pieza angular (P2.1) Fase 1 — la construcción del radicado (incluida
+    // la foto de serieDocumental) se extrajo al constructor puro compartido
+    // `lib/recepcion/construir-radicado.ts`; la acción interna delega ahí.
     const accion = readFileSync('lib/actions/radicarVentanilla.ts', 'utf8');
-    expect(accion).toContain('sugerirSerieDocumental');
-    expect(accion).toContain('serieDocumental: serie');
+    expect(accion).toContain('construirVentanillaRadicado');
+    const constructor = readFileSync('lib/recepcion/construir-radicado.ts', 'utf8');
+    expect(constructor).toContain('sugerirSerieDocumental');
+    expect(constructor).toContain('serieDocumental: serie');
   });
 
   it('la Radicación Rápida muestra la serie derivada', () => {
@@ -159,9 +164,14 @@ describe('C1 — el radicado nace clasificado en todos los canales', () => {
   });
 
   it('la radicación WEB (API) sella la serie derivada', () => {
+    // Pieza angular (P2.1) Fase 1 — misma nota que la superficie interna:
+    // la ruta pública delega la construcción del radicado (con su serie)
+    // al constructor puro compartido.
     const route = readFileSync('app/api/radicacion/route.ts', 'utf8');
-    expect(route).toContain('sugerirSerieDocumental');
-    expect(route).toContain('serieDocumental: serie');
+    expect(route).toContain('construirVentanillaRadicado');
+    const constructor = readFileSync('lib/recepcion/construir-radicado.ts', 'utf8');
+    expect(constructor).toContain('sugerirSerieDocumental');
+    expect(constructor).toContain('serieDocumental: serie');
   });
 
   it('la reclasificación re-deriva la serie (BM-B11)', () => {

@@ -10,7 +10,7 @@ import {
   type TipoSolicitudId,
 } from '@/lib/tiempos-radicado';
 import { formatearRadicadoInstitucional } from '@/lib/radicado-institucional';
-import { sugerirSerieDocumental } from '@/lib/catalogos/series-documentales';
+import { construirVentanillaRadicado } from '@/lib/recepcion/construir-radicado';
 import {
   confirmarConsecutivosLegales,
   leerConsecutivosLegales,
@@ -364,17 +364,18 @@ export async function POST(request: Request) {
         orden: p.orden,
       }));
 
-    const radicado: VentanillaRadicado = removeUndefinedDeep({
+    // C1/M1 (pieza angular) — constructor puro compartido con la superficie
+    // interna (lib/actions/radicarVentanilla.ts). Reutiliza
+    // sugerirSerieDocumental internamente; no toca la numeración (H3).
+    const radicado: VentanillaRadicado = removeUndefinedDeep(construirVentanillaRadicado({
       radicadoId,
-      estadoActual: 'PENDIENTE',
-      ultimaActualizacion: ahora.toISOString(),
+      consecutivo,
+      ahora,
       prioridad: tipoSolicitud.prioridadSugerida as Prioridad,
       cumplioTermino: null,
-      esAnonimo,
       tipoPresentacion: tipoPresentacionRaw,
-      identidadReservada,
-      ...(consultaToken ? { consultaTokenHash: hashTokenConsulta(consultaToken) } : {}),
       canalRespuesta: canalRespuestaRaw,
+      ...(consultaToken ? { consultaTokenHash: hashTokenConsulta(consultaToken) } : {}),
       solicitante: {
         tipoPersona: 'NATURAL',
         tipoDocumento: 'OTRO' as TipoDocumento,
@@ -391,17 +392,14 @@ export async function POST(request: Request) {
         },
       },
       control: {
-        radicadoId,
-        consecutivo,
-        fechaRadicado: ahora.toISOString(),
+        medioRecepcion: MEDIO_RECEPCION,
+        origen: 'WEB',
         horaRadicado: ahora.toLocaleTimeString('es-CO', {
           hour: '2-digit',
           minute: '2-digit',
           second: '2-digit',
           hour12: false,
         }),
-        medioRecepcion: MEDIO_RECEPCION,
-        origen: 'WEB',
       },
       termino: {
         tipoSolicitudId: tipoSolicitud.id,
@@ -409,17 +407,10 @@ export async function POST(request: Request) {
         diasRespuesta: termino.diasRespuesta,
         unidad: termino.unidad,
         fechaVencimiento: termino.fechaVencimiento,
-        prorrogasAplicadas: 0,
       },
-      clasificacion: {
+      clasificacionBase: {
         oficinaDestino: TENANT_RECEPCION,
         zonaGeografica: ZONA_DEFAULT,
-        // C1 — el radicado nace clasificado en su serie TRD (foto inmutable).
-        // Reutiliza la función pura del catálogo; no toca la numeración (H3).
-        ...(() => {
-          const serie = sugerirSerieDocumental(tipoSolicitud.id, TENANT_RECEPCION);
-          return serie ? { serieDocumental: serie } : {};
-        })(),
       },
       detalle: {
         asunto,
@@ -429,7 +420,7 @@ export async function POST(request: Request) {
       },
       archivos,
       analisisIa,
-    });
+    }));
 
       confirmarConsecutivosLegales(tx, ahora, pendientesRadicado);
       tx.set(db.doc(`ventanilla_radicados/${radicadoId}`), radicado);
