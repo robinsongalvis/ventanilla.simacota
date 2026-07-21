@@ -1,0 +1,113 @@
+name: Backup Firestore (respaldo diario · Roadmap P2.4)
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Respaldo automatizado de Firestore de PRODUCCIÓN mediante export gestionado a
+# Google Cloud Storage. Es la contraparte EJECUTABLE de docs/disaster-recovery.md
+# (antes solo describía el export como si estuviera programado — CR-3 de la
+# auditoría 2026-07-20). El export es ADITIVO: escribe un backup nuevo, jamás
+# toca ni borra datos de Firestore.
+#
+# Vía elegida: GitHub Actions programado (no Cloud Scheduler) — justificación en
+# scripts/backups/README.md y docs/disaster-recovery.md §3.1. Resumen: la config
+# queda versionada en el repo (raíz del hallazgo CR-3), corre sobre la misma
+# superficie de CI que el equipo ya opera, y estampa la carpeta por día sin
+# infraestructura extra (Cloud Scheduler no puede plantillar la fecha sin una
+# Cloud Function adicional).
+#
+# REQUISITOS DE INFRAESTRUCTURA (los provisiona el propietario UNA vez con
+# scripts/backups/setup-gcp-backups.sh):
+#   - Bucket GCS de respaldos con política de retención (lifecycle).
+#   - Service account de backups con roles/datastore.importExportAdmin.
+#   - Federación de identidad (WIF) GitHub↔GCP  ·  o clave JSON como fallback.
+#   - Secrets/vars del repo (ver §Secrets abajo y VARIABLES_ENTORNO.md).
+# ─────────────────────────────────────────────────────────────────────────────
+
+on:
+  schedule:
+    # 07:00 UTC = 02:00 America/Bogota (ventana de bajo tráfico). Diario.
+    - cron: '0 7 * * *'
+  # Permite disparar un backup de prueba manual desde la pestaña Actions.
+  workflow_dispatch:
+    inputs:
+      confirmar:
+        description: 'Escribe "backup" para confirmar un export manual'
+        required: true
+        default: ''
+
+# Nunca dos exports solapados (uno diario + uno manual a la vez).
+concurrency:
+  group: backup-firestore
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+  id-token: write   # requerido por la federación de identidad (WIF, keyless).
+
+jobs:
+  export:
+    name: Export Firestore -> GCS
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    env:
+      # Ajustar en Settings -> Secrets and variables -> Actions -> Variables.
+      GCP_PROJECT: ${{ vars.GCP_BACKUP_PROJECT || 'ventanilla-unica-f31b1' }}
+      BACKUP_BUCKET: ${{ vars.GCP_BACKUP_BUCKET || 'ventanilla-simacota-backups' }}
+
+    steps:
+      - name: Validar disparo manual
+        if: ${{ github.event_name == 'workflow_dispatch' && github.event.inputs.confirmar != 'backup' }}
+        run: |
+          echo "::error::Disparo manual sin confirmar. Escribe 'backup' en el input."
+          exit 1
+
+      - name: Verificar que la infraestructura está provisionada
+        run: |
+          faltan=""
+          if [ -z "${{ secrets.GCP_WORKLOAD_IDENTITY_PROVIDER }}" ] && [ -z "${{ secrets.GCP_BACKUP_SA_KEY }}" ]; then
+            faltan="$faltan\n  - Auth GCP: define GCP_WORKLOAD_IDENTITY_PROVIDER+GCP_BACKUP_SA (WIF, recomendado) o GCP_BACKUP_SA_KEY (clave JSON, fallback)."
+          fi
+          if [ -n "$faltan" ]; then
+            echo "::error::Backup NO ejecutado — infraestructura sin provisionar."
+            echo "Ejecuta scripts/backups/setup-gcp-backups.sh y carga los secrets. Falta:"
+            echo -e "$faltan"
+            exit 1
+          fi
+
+      # ── Autenticación (elige UNA de las dos vías con los secrets que existan) ──
+      # Vía A (recomendada, keyless): Workload Identity Federation.
+      - name: Autenticar a GCP (WIF)
+        if: ${{ secrets.GCP_WORKLOAD_IDENTITY_PROVIDER != '' }}
+        uses: google-github-actions/auth@v2
+        with:
+          workload_identity_provider: ${{ secrets.GCP_WORKLOAD_IDENTITY_PROVIDER }}
+          service_account: ${{ secrets.GCP_BACKUP_SA }}
+
+      # Vía B (fallback): clave JSON de un service account guardada como secret.
+      - name: Autenticar a GCP (clave JSON)
+        if: ${{ secrets.GCP_WORKLOAD_IDENTITY_PROVIDER == '' && secrets.GCP_BACKUP_SA_KEY != '' }}
+        uses: google-github-actions/auth@v2
+        with:
+          credentials_json: ${{ secrets.GCP_BACKUP_SA_KEY }}
+
+      - name: Configurar gcloud
+        uses: google-github-actions/setup-gcloud@v2
+
+      - name: Ejecutar export gestionado de Firestore
+        run: |
+          set -euo pipefail
+          FECHA="$(date -u +%F)"                      # p.ej. 2026-07-20
+          DESTINO="gs://${BACKUP_BUCKET}/diario/${FECHA}"
+          echo "Exportando Firestore de ${GCP_PROJECT} -> ${DESTINO}"
+          # Sin --async: el paso refleja el resultado real del export (verde/rojo).
+          gcloud firestore export "${DESTINO}" \
+            --project="${GCP_PROJECT}" \
+            --database='(default)'
+          echo "Export solicitado y completado. Retención: la aplica el lifecycle del bucket."
+
+      - name: Resumen
+        if: ${{ always() }}
+        run: |
+          echo "### Backup Firestore" >> "$GITHUB_STEP_SUMMARY"
+          echo "- Proyecto: \`${GCP_PROJECT}\`" >> "$GITHUB_STEP_SUMMARY"
+          echo "- Destino: \`gs://${BACKUP_BUCKET}/diario/$(date -u +%F)\`" >> "$GITHUB_STEP_SUMMARY"
+          echo "- Resultado del job: \`${{ job.status }}\`" >> "$GITHUB_STEP_SUMMARY"

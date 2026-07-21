@@ -83,6 +83,32 @@ NEXT_PUBLIC_SENTRY_DSN=https://xxx@sentry.io/xxx
 ```
 Sin esto, los errores de producción no se reportan.
 
+### Respaldos de Firestore (GitHub Actions — Roadmap P2.4)
+
+Estos NO van en Vercel: se configuran en **GitHub → Settings → Secrets and
+variables → Actions**. Los usa `.github/workflows/backup-firestore.yml`. El
+script `scripts/backups/setup-gcp-backups.sh` los imprime al terminar.
+
+Secrets (autenticación GCP — elige UNA vía):
+```
+# Vía A (recomendada, sin clave de larga vida — Workload Identity Federation):
+GCP_WORKLOAD_IDENTITY_PROVIDER=projects/<num>/locations/global/workloadIdentityPools/github-actions/providers/github
+GCP_BACKUP_SA=firestore-backup@ventanilla-unica-f31b1.iam.gserviceaccount.com
+
+# Vía B (fallback — clave JSON del service account de backups; rótala cada 90 días):
+GCP_BACKUP_SA_KEY={"type":"service_account","project_id":"...", ...}
+```
+
+Variables (no secretas):
+```
+GCP_BACKUP_PROJECT=ventanilla-unica-f31b1
+GCP_BACKUP_BUCKET=ventanilla-simacota-backups
+```
+
+Sin estos secrets el workflow **falla con un mensaje claro** en vez de fingir que
+respalda. Nunca pegues la clave JSON en código ni en logs — solo como secret de
+GitHub. Retención y runbook: `scripts/backups/README.md`, `docs/RUNBOOK_RESTAURACION.md`.
+
 ---
 
 ## Checklist de verificación pre-deploy
