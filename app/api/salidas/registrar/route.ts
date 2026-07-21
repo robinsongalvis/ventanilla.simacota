@@ -118,9 +118,13 @@ export async function POST(request: Request): Promise<NextResponse> {
     //    El libro nace COMPLETO (con su archivoPath final) y nunca se actualiza.
     //    Dentro del callback SOLO cómputo puro y tx.set; ningún I/O.
     const { consecutivo, salidaId, salida } = await db.runTransaction(async (tx) => {
-      const [consec] = await leerConsecutivosLegales(tx, db, ahora, [
+      // Se conserva el ARREGLO devuelto por leer (misma referencia que exige
+      // confirmarConsecutivosLegales por identidad) — pasar uno nuevo hacía
+      // fallar con 500 todo registro de salida (P0, mismo bug que api/radicacion).
+      const pendientesSalida = await leerConsecutivosLegales(tx, db, ahora, [
         { serie: 'salidas', formatear: formatearRadicadoSalida },
       ]);
+      const [consec] = pendientesSalida;
       const salidaId = consec.documentoId;
       const consecutivo = consec.consecutivo;
       const salida = {
@@ -130,7 +134,7 @@ export async function POST(request: Request): Promise<NextResponse> {
         archivoPath:   oficioStaged ? `salidas/${salidaId}/${oficioStaged.filename}` : null,
         archivoNombre: oficioStaged?.nombre ?? null,
       };
-      confirmarConsecutivosLegales(tx, ahora, [consec]);
+      confirmarConsecutivosLegales(tx, ahora, pendientesSalida);
       tx.set(
         db.doc(`ventanilla_salidas/${salidaId}`),
         removeUndefinedDeep(salida as unknown as Record<string, unknown>),
