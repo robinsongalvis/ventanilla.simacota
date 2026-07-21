@@ -3,7 +3,8 @@ import { cookies } from 'next/headers';
 import { SESSION_COOKIE_NAME } from '@/lib/auth-cookie';
 import { getFirebaseAdminAuth, getFirebaseAdminDb } from '@/lib/firebase-admin';
 import { sendCitizenWhatsAppNotification } from '@/lib/simi-juridico/sendCitizenWhatsAppNotification';
-import { isValidWhatsAppPhone } from '@/lib/whatsapp/sendWhatsAppMessage';
+import { isValidWhatsAppPhone, normalizePhone } from '@/lib/whatsapp/sendWhatsAppMessage';
+import { getRadicadoOrFail, RadicadoActionError } from '@/lib/server/radicados-security';
 import type { RolInterno } from '@/lib/hooks/useAuth';
 import type { TenantId } from '@/src/types/radicado';
 import type { WhatsAppEventType } from '@/src/types/simi-whatsapp';
@@ -40,6 +41,13 @@ async function verificarSesion() {
   }
 }
 
+function jsonError(error: unknown) {
+  if (error instanceof RadicadoActionError) {
+    return NextResponse.json({ error: error.message }, { status: error.status });
+  }
+  return NextResponse.json({ error: 'No fue posible enviar la notificación de WhatsApp.' }, { status: 500 });
+}
+
 export async function POST(request: Request): Promise<NextResponse> {
   const usuario = await verificarSesion();
   if (!usuario) return NextResponse.json({ error: 'No autorizado.' }, { status: 401 });
@@ -52,7 +60,6 @@ export async function POST(request: Request): Promise<NextResponse> {
     telefono?: string;
     eventType?: WhatsAppEventType;
     consentimiento?: boolean;
-    tenantId?: TenantId;
   };
   try {
     body = await request.json();
@@ -61,26 +68,73 @@ export async function POST(request: Request): Promise<NextResponse> {
   }
 
   const radicadoId = body.radicadoId?.trim().toUpperCase();
-  const telefono = body.telefono?.trim() ?? '';
+  const telefonoSolicitado = body.telefono?.trim() ?? '';
   if (!radicadoId || !body.eventType || !EVENTOS_VALIDOS.has(body.eventType)) {
     return NextResponse.json({ error: 'Radicado y evento son requeridos.' }, { status: 400 });
   }
   if (!body.consentimiento) {
     return NextResponse.json({ error: 'No hay consentimiento para WhatsApp.' }, { status: 422 });
   }
-  if (!isValidWhatsAppPhone(telefono)) {
+  if (!isValidWhatsAppPhone(telefonoSolicitado)) {
     return NextResponse.json({ error: 'Número de WhatsApp inválido.' }, { status: 422 });
   }
 
-  const tenantId = body.tenantId ?? usuario.tenantId;
-  if (usuario.rol !== 'ADMIN' && tenantId !== usuario.tenantId) {
-    return NextResponse.json({ error: 'Sin acceso al tenant solicitado.' }, { status: 403 });
+  /*
+   * H-M3 (auditoría de seguridad) — hasta aquí, `radicadoId` y `telefono`
+   * eran datos auto-declarados del body: nunca se cargaba el radicado real
+   * ni se comparaba contra su solicitante. Un funcionario autenticado podía
+   * notificar CUALQUIER radicado (de cualquier tenant) a un número
+   * arbitrario que él controlara → fuga/suplantación de PII.
+   *
+   * A partir de aquí, el radicado y el teléfono de destino se derivan
+   * SIEMPRE del documento en Firestore (fuente de verdad), nunca del body.
+   */
+  let radicado;
+  try {
+    radicado = await getRadicadoOrFail(radicadoId);
+  } catch (error) {
+    return jsonError(error);
   }
 
+  const tenantRadicado = radicado.clasificacion.oficinaDestino;
+  if (usuario.rol !== 'ADMIN' && tenantRadicado !== usuario.tenantId) {
+    return NextResponse.json({ error: 'Sin acceso al tenant de este radicado.' }, { status: 403 });
+  }
+
+  /*
+   * Teléfono REGISTRADO del solicitante: `telefonoMovil` es la fuente de
+   * verdad para WhatsApp (canal exclusivamente móvil). El legado
+   * `telefono` cubre radicados anteriores al split móvil/fijo — ver JSDoc
+   * de `SolicitanteRadicado` en src/types/ventanilla.ts. `telefonoFijo` NO
+   * se acepta: una línea fija no puede recibir WhatsApp.
+   */
+  const telefonoRegistrado = radicado.solicitante.telefonoMovil ?? radicado.solicitante.telefono ?? null;
+  if (!telefonoRegistrado || !isValidWhatsAppPhone(telefonoRegistrado)) {
+    return NextResponse.json(
+      { error: 'El radicado no tiene un teléfono móvil válido registrado del solicitante; no es posible enviar WhatsApp.' },
+      { status: 422 },
+    );
+  }
+  if (normalizePhone(telefonoSolicitado) !== normalizePhone(telefonoRegistrado)) {
+    return NextResponse.json(
+      { error: 'El número indicado no coincide con el teléfono registrado del solicitante de este radicado.' },
+      { status: 403 },
+    );
+  }
+
+  /*
+   * NOTA (consentimiento): `SolicitanteRadicado` (src/types/ventanilla.ts)
+   * todavía no persiste un flag explícito de autorización de notificación
+   * electrónica capturado al radicar; `body.consentimiento` sigue siendo la
+   * única señal disponible y queda auto-declarada por el funcionario en
+   * cada envío. Deuda declarada para el especialista de datos: agregar un
+   * campo persistido (p. ej. `solicitante.consentimientoWhatsApp`) capturado
+   * en el momento de la radicación en vez de un booleano por solicitud.
+   */
   const result = await sendCitizenWhatsAppNotification({
     radicadoId,
-    tenantId,
-    to: telefono,
+    tenantId: tenantRadicado,
+    to: telefonoRegistrado,
     eventType: body.eventType,
     consentimiento: true,
     actorUid: usuario.uid,
