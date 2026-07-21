@@ -1,4 +1,5 @@
 import { NextResponse }          from 'next/server';
+import { FieldPath } from 'firebase-admin/firestore';
 import { getFirebaseAdminDb }    from '@/lib/firebase-admin';
 import { autorizarCron }         from '@/lib/seguridad/autorizar-cron';
 import { enviarEmail }           from '@/lib/email/mailer';
@@ -18,6 +19,13 @@ import {
 } from '@/scripts/laboratorio/detectar-consecutivos-fantasma.mjs';
 
 export const runtime = 'nodejs';
+// Techo del plan (Vercel Hobby/Pro: 300s en funciones cron) — mismo estándar
+// que los demás crons de plazo legal (Roadmap P1.4).
+export const maxDuration = 300;
+
+// Tamaño de lote para la barrida por cursor (ver nota junto al bucle de
+// lectura más abajo sobre por qué esta serie SÍ debe leerse completa).
+const TAMANO_LOTE_BARRIDA = 500;
 
 /* ══════════════════════════════════════════════════════════════
    GET /api/cron/auditoria-consecutivos   (A1)
@@ -59,6 +67,44 @@ interface ReporteSerie {
   duplicados: number[];
 }
 
+/**
+ * Lee TODOS los IDs de documento de una colección, en lotes con cursor
+ * (`limit` + `startAfter`), SIN techo de lectura: a diferencia de otras
+ * consultas acotadas del Roadmap (P1.4), esta barrida es una auditoría de
+ * CONTINUIDAD de la serie — necesita ver el 100% de los consecutivos
+ * persistidos del año para poder afirmar "no hay huecos ni duplicados".
+ * Detenerse antes de agotar la colección invalidaría el propósito del
+ * control (silencio ≠ "todo bien" si en realidad quedó sin barrer). El
+ * lote acota la MEMORIA y la forma de la lectura (varias páginas en vez de
+ * un `.get()` monolítico), no el ALCANCE, que sigue siendo la colección
+ * completa. Solo se pide `FieldPath.documentId()` como orden estable de
+ * paginación — no se leen campos de negocio, la auditoría solo usa el ID.
+ */
+async function leerTodosLosIds(
+  db: FirebaseFirestore.Firestore,
+  coleccion: string,
+): Promise<string[]> {
+  const ids: string[] = [];
+  let cursor: FirebaseFirestore.QueryDocumentSnapshot | undefined;
+  let agotado = false;
+
+  while (!agotado) {
+    let lote: FirebaseFirestore.Query = db.collection(coleccion).orderBy(FieldPath.documentId()).limit(TAMANO_LOTE_BARRIDA);
+    if (cursor) lote = lote.startAfter(cursor);
+
+    const loteSnap = await lote.get();
+    for (const d of loteSnap.docs) ids.push(d.id);
+    // `docs.length` (no `.size`) a propósito: es la señal de fin de página
+    // más robusta — no depende de una propiedad específica del snapshot real
+    // de Firestore (que en los tests con mock no siempre está presente) y es
+    // matemáticamente idéntica a `.size` en el SDK real.
+    if (loteSnap.docs.length > 0) cursor = loteSnap.docs[loteSnap.docs.length - 1];
+    if (loteSnap.docs.length < TAMANO_LOTE_BARRIDA) agotado = true;
+  }
+
+  return ids;
+}
+
 export async function GET(request: Request): Promise<NextResponse> {
   const auth = autorizarCron({
     authorization: request.headers.get('authorization'),
@@ -91,12 +137,14 @@ export async function GET(request: Request): Promise<NextResponse> {
       // incluidos los marcados isTest — un radicado de prueba consume un
       // consecutivo real de la MISMA serie/contador, así que excluirlo del
       // conteo de "presentes" generaría un falso hueco. No se cambia esta
-      // semántica (ver reporte de la tarea A1).
-      const docsSnap = await db.collection(coleccion).get();
+      // semántica (ver reporte de la tarea A1). La lectura en sí ahora es
+      // por lotes con cursor (`leerTodosLosIds`) en vez de un único `.get()`
+      // — MISMO alcance (toda la colección), solo cambia la forma de traerla.
+      const idsColeccion = await leerTodosLosIds(db, coleccion);
       const presentesLista: number[] = [];
-      for (const d of docsSnap.docs) {
-        if (!perteneceAlAnio(d.id, anio)) continue;
-        const c = consecutivoDeId(d.id);
+      for (const id of idsColeccion) {
+        if (!perteneceAlAnio(id, anio)) continue;
+        const c = consecutivoDeId(id);
         if (c !== null) presentesLista.push(c);
       }
       const presentes = new Set(presentesLista);

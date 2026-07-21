@@ -1,7 +1,7 @@
 import { NextResponse }          from 'next/server';
 import { getFirebaseAdminDb }    from '@/lib/firebase-admin';
 import { enviarEmail }           from '@/lib/email/mailer';
-import { diasRestantesHabiles }  from '@/lib/tiempos-radicado';
+import { diasRestantesHabiles, fechaLimiteAlertaVencimiento } from '@/lib/tiempos-radicado';
 import { DIRECTORIO_TENANTS }    from '@/src/types/reglas-negocio';
 import { logError }              from '@/lib/logger';
 import { autorizarCron }         from '@/lib/seguridad/autorizar-cron';
@@ -13,6 +13,10 @@ import type { VentanillaRadicado } from '@/src/types/ventanilla';
 import type { TenantId }         from '@/src/types/radicado';
 
 export const runtime = 'nodejs';
+// Techo del plan (Vercel Hobby/Pro: 300s en funciones cron) — evita que un
+// barrido a escala se trunque en silencio antes de enviar todas las alertas
+// de plazo legal (Roadmap P1.4; Ley 1755).
+export const maxDuration = 300;
 
 /* ══════════════════════════════════════════════════════════════
    GET /api/cron/alertas-vencimiento
@@ -30,6 +34,12 @@ const ESTADOS_ACTIVOS = new Set([
 ]);
 
 const UMBRAL_DIAS = 2; // Alerta cuando quedan ≤ 2 días hábiles
+
+// Techo duro adicional (clase BATCH, ADR-0011 2B: hasta 1000 docs, N-independiente)
+// como defensa en profundidad SOBRE la cota por estado+fecha: aunque el rango de
+// fecha ya excluye la inmensa mayoría de la colección, un techo numérico explícito
+// impide una lectura sin límite si el volumen de vencimientos simultáneos escalara.
+const TECHO_LECTURA_CRON = 1000;
 
 export async function GET(request: Request): Promise<NextResponse> {
   // Verificar autorización
@@ -51,8 +61,24 @@ export async function GET(request: Request): Promise<NextResponse> {
   let omitidos = 0;
 
   try {
-    // Consultar TODOS los radicados activos (los cron no tienen contexto de tenant)
-    const snap = await db.collection('ventanilla_radicados').get();
+    // Consulta ACOTADA (Roadmap P1.4): antes se leía la colección completa y
+    // se filtraba en memoria — a escala eso se trunca en silencio sin
+    // `maxDuration` suficiente y sin cota de lectura. Ahora se acota por
+    // estado activo (== los mismos ESTADOS_ACTIVOS que antes filtraban en
+    // memoria) y por una cota superior de fecha calculada con
+    // `fechaLimiteAlertaVencimiento`: cualquier `fechaVencimiento` mayor a
+    // esa cota tiene, por construcción, más de UMBRAL_DIAS días hábiles
+    // restantes y jamás calificaría para la alerta, así que excluirla de la
+    // lectura no cambia el resultado. El filtro EXACTO (`diasRestantesHabiles`,
+    // incluida la exclusión de vencidos) se preserva intacto sobre el
+    // resultado ya acotado — los cron no tienen contexto de tenant.
+    const limiteVencimiento = fechaLimiteAlertaVencimiento(new Date(), UMBRAL_DIAS).toISOString();
+    const snap = await db.collection('ventanilla_radicados')
+      .where('estadoActual', 'in', [...ESTADOS_ACTIVOS])
+      .where('termino.fechaVencimiento', '<=', limiteVencimiento)
+      .orderBy('termino.fechaVencimiento')
+      .limit(TECHO_LECTURA_CRON)
+      .get();
     const radicados = snap.docs
       .map((d) => d.data() as VentanillaRadicado & { isTest?: boolean; excludeFromMetrics?: boolean })
       .filter((r) => ESTADOS_ACTIVOS.has(r.estadoActual) && !r.isTest && !r.excludeFromMetrics);

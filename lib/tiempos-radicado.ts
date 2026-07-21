@@ -248,6 +248,42 @@ export function calcularFechaVencimiento(
   };
 }
 
+/**
+ * Fecha límite (calendario) tal que CUALQUIER `fechaVencimiento <=` esta
+ * fecha tiene, como máximo, `umbralDiasHabiles` días hábiles restantes desde
+ * `desde` — es decir, una cota superior segura para acotar consultas
+ * Firestore por rango en vez de traer la colección completa y filtrar en
+ * memoria con `diasRestantesHabiles` (Roadmap P1.4: crons escalables). El
+ * filtro exacto sigue siendo `diasRestantesHabiles` sobre el resultado ya
+ * acotado — esta función solo decide QUÉ leer, no reemplaza la regla.
+ *
+ * Construida caminando hacia adelante exactamente `umbralDiasHabiles` días
+ * hábiles desde `desde` (mismo algoritmo que `calcularFechaVencimiento` en
+ * su rama HABILES). El conteo de días hábiles entre `desde+1` y el resultado
+ * es, por construcción, `umbralDiasHabiles`; como ese conteo es monótono no
+ * decreciente al avanzar la fecha, cualquier fecha anterior o igual al
+ * resultado tiene un conteo <= umbralDiasHabiles.
+ */
+export function fechaLimiteAlertaVencimiento(
+  desde: string | Date,
+  umbralDiasHabiles: number,
+  festivosExtra: string[] = [],
+): Date {
+  const inicio = atLocalNoon(desde);
+  const festivos = new Set([
+    ...festivosColombia(inicio.getFullYear()),
+    ...festivosColombia(inicio.getFullYear() + 1),
+    ...festivosExtra,
+  ]);
+  let cursor = inicio;
+  let pendientes = Math.max(0, Math.trunc(umbralDiasHabiles));
+  while (pendientes > 0) {
+    cursor = addDays(cursor, 1);
+    if (esDiaHabil(cursor, festivos)) pendientes -= 1;
+  }
+  return cursor;
+}
+
 export function diasRestantesHabiles(fechaVencimiento: string | Date, desde: string | Date = new Date()): number {
   const fin = atLocalNoon(fechaVencimiento);
   const cursorInicial = atLocalNoon(desde);

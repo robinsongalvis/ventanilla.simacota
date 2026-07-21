@@ -155,22 +155,28 @@ const REGISTRO = [
   },
   {
     archivo: 'app/api/cron/alertas-vencimiento/route.ts',
-    estado: 'DEUDA_DECLARADA',
+    estado: 'ACOTADA',
     clase: 'BATCH',
-    descripcion: 'Cron de alertas de vencimiento (sin contexto de tenant, lee activos). '
-      + 'HALLAZGO 2B: sin cota y NO estaba en la deuda declarada de ADR-0010 — catalogado '
-      + 'aquí; RECOMENDADO acotar con limit + where(estado activo) (escalado al coordinador).',
-    ref: 'HALLAZGO 2B (fuera de ADR-0010 §Deuda) — pendiente de decisión',
+    descripcion: 'Cron de alertas de vencimiento (sin contexto de tenant). DEUDA SALDADA '
+      + '(Roadmap P1.4): antes leía toda la colección y filtraba en memoria (HALLAZGO 2B). '
+      + 'Ahora consulta acotada por estado activo + rango de fecha de vencimiento '
+      + '(where estadoActual in + where termino.fechaVencimiento <= cota + orderBy), más '
+      + 'techo duro TECHO_LECTURA_CRON como defensa en profundidad.',
+    cotaRegex: /const TECHO_LECTURA_CRON\s*=\s*(\d+)/,
+    cotaMax: 1000,
+    ref: 'Roadmap P1.4 · antes HALLAZGO 2B (fuera de ADR-0010 §Deuda)',
   },
   {
     archivo: 'app/api/cron/desistimiento-tacito/route.ts',
-    estado: 'DEUDA_DECLARADA',
+    estado: 'ACOTADA',
     clase: 'BATCH',
-    descripcion: 'Cron de desistimiento tácito C1 (diario, sin contexto de tenant; filtra '
-      + 'EN_SUBSANACION en memoria). Detectado por este gate en el CI de PR-3 (stack H3): '
-      + 'sin cota, igual que su gemelo alertas-vencimiento. RECOMENDADO acotar con '
-      + 'where(estadoActual==EN_SUBSANACION) + limit en Bloque 3 (PLAN_BLOQUE3 §9).',
-    ref: 'Gate R11 en PR-3 (2026-07-14) — deuda diferida a Bloque 3',
+    descripcion: 'Cron de desistimiento tácito C1 (diario, sin contexto de tenant). DEUDA '
+      + 'SALDADA (Roadmap P1.4): antes leía toda la colección y filtraba en memoria por '
+      + 'EN_SUBSANACION (detectado en el gate R11 del PR-3, stack H3). Ahora consulta '
+      + 'acotada por where(estadoActual==EN_SUBSANACION) + techo duro TECHO_LECTURA_CRON.',
+    cotaRegex: /const TECHO_LECTURA_CRON\s*=\s*(\d+)/,
+    cotaMax: 1000,
+    ref: 'Roadmap P1.4 · antes Gate R11 en PR-3 (2026-07-14)',
   },
 ];
 

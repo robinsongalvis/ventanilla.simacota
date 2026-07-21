@@ -19,11 +19,31 @@ const {
   mockRegistrarEventoNegocio: vi.fn(),
 }));
 
+/* Roadmap P1.4 — auditoria-consecutivos ahora lee cada serie por lotes con
+   cursor (`leerTodosLosIds`: .orderBy(FieldPath.documentId()).limit().get()`,
+   con `.startAfter()` entre páginas) en vez de un único `.get()`. El mock de
+   `collection()` debe soportar esa cadena; como los fixtures de este archivo
+   siempre caben en una sola página (< TAMANO_LOTE_BARRIDA), basta con que
+   cada eslabón devuelva el mismo query encadenable y el `.get()` final
+   resuelva `mockCollectionGet(name)` — MISMO comportamiento observable que
+   antes (un único snapshot por colección), solo con la forma de la cadena. */
 vi.mock('@/lib/firebase-admin', () => ({
   getFirebaseAdminDb: () => ({
     doc: (path: string) => ({ get: () => mockCounterGet(path) }),
-    collection: (name: string) => ({ get: () => mockCollectionGet(name) }),
+    collection: (name: string) => {
+      const query = {
+        orderBy: () => query,
+        limit: () => query,
+        startAfter: () => query,
+        get: () => mockCollectionGet(name),
+      };
+      return query;
+    },
   }),
+}));
+
+vi.mock('firebase-admin/firestore', () => ({
+  FieldPath: { documentId: () => 'documentId-mock' },
 }));
 
 vi.mock('@/lib/email/mailer', () => ({ enviarEmail: mockEnviarEmail }));
