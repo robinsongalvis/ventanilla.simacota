@@ -38,7 +38,10 @@ describe('clasificación de los estados nuevos (OAT-05)', () => {
 });
 
 describe('próxima acción — el reloj no corre en subsanación (CPR-8.2 / Seg. #7)', () => {
-  const ayer = new Date(Date.now() - 3 * 86400000).toISOString();
+  // -10 días calendario (no -3): garantiza ≥6 días hábiles en el pasado sea cual
+  // sea el día en que corra el CI. Con -3, un fin de semana intermedio dejaba el
+  // vencimiento a 0 días hábiles y el test fallaba de forma intermitente (UTC).
+  const ayer = new Date(Date.now() - 10 * 86400000).toISOString();
 
   it('EN_SUBSANACION con vencimiento PASADO NO reporta VENCIDO', () => {
     const pa = calcularProximaAccion(radicado('EN_SUBSANACION', ayer));

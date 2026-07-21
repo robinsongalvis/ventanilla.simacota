@@ -195,7 +195,8 @@ describe('Panel Op Fase 1 — calcularProximaAccion (12 reglas)', () => {
   it('VENCIDO gana sobre EN_PROCESO cuando ambas condiciones aplican', () => {
     const r = radicadoBase({
       estadoActual: 'EN_PROCESO',
-      termino: { ...radicadoBase().termino, fechaVencimiento: fechaVencimientoEn(-3) },
+      // -10 (no -3): vencido inequívoco en días hábiles cualquier día que corra el CI.
+      termino: { ...radicadoBase().termino, fechaVencimiento: fechaVencimientoEn(-10) },
     });
     const p = calcularProximaAccion(r);
     expect(p.ruleId).toBe('VENCIDO');
