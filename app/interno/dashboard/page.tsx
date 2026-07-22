@@ -13,7 +13,7 @@ import { VentanillaProvider, useVentanilla } from '@/lib/store/ventanillaStore';
 import { NOMBRES_TENANT, DIRECTORIO_TENANTS } from '@/src/types/reglas-negocio';
 import { diasRestantesHabiles, resolverTipoSolicitud } from '@/lib/tiempos-radicado';
 import { RadicacionFuncionarioForm }       from '@/app/interno/recepcion/components/RadicacionFuncionarioForm';
-import { radicarInstitucionalmente }       from '@/lib/actions/radicarVentanilla';
+import { radicarSegunFlag }                from '@/lib/recepcion/radicar-segun-flag';
 import { asignarRadicado, asignarMasivo }  from '@/lib/actions/asignarRadicado';
 import { ComprobanteRadicado }             from '@/app/interno/dashboard/components/ComprobanteRadicado';
 import { SelloRecibido }                   from '@/app/interno/dashboard/components/SelloRecibido';
@@ -3441,7 +3441,11 @@ function DrawerNuevoRadicado({
 
     try {
       const ahora = new Date();
-      const { radicadoId } = await radicarInstitucionalmente(
+      // Pieza angular (P2.1) — Fase 3: bifurcación por
+      // USA_RADICACION_INTERNA_SERVER (docs/CRONOGRAMA_PIEZA_ANGULAR.md
+      // §FASE 3). Con el switch en false (hoy) es exactamente la misma
+      // llamada de siempre — ver lib/recepcion/radicar-segun-flag.ts.
+      const { radicadoId } = await radicarSegunFlag(
         payload,
         { uid: usuario.uid, nombre: usuario.nombre, tenantId: usuario.tenantId },
         (msg, pct) => { setProgreso(msg); setProgresoPct(pct); },
