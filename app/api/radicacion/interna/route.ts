@@ -26,6 +26,11 @@ import {
 } from '@/lib/recepcion/clasificacion-inicial';
 import { construirVentanillaRadicado } from '@/lib/recepcion/construir-radicado';
 import {
+  CAMPOS_RADICACION_INTERNA,
+  type RespuestaRadicacionInternaError,
+  type RespuestaRadicacionInternaOk,
+} from '@/lib/recepcion/contrato-radicacion-interna';
+import {
   confirmarConsecutivosLegales,
   leerConsecutivosLegales,
 } from '@/lib/server/consecutivo-legal';
@@ -158,12 +163,10 @@ const TENANT_DEFAULT: TenantId = 'VENTANILLA_UNICA';
  *  de memoria dev-backend sobre bypass de rate-limit por X-Forwarded-For). */
 const RATE_LIMIT = { maxRequests: 30, windowMs: 60_000 };
 
-interface ErrorResponse {
-  error: string;
-  errores?: string[];
-}
-
-function badRequest(error: string, errores: string[] = [error]): NextResponse<ErrorResponse> {
+function badRequest(
+  error: string,
+  errores: string[] = [error],
+): NextResponse<RespuestaRadicacionInternaError> {
   return NextResponse.json({ error, errores }, { status: 400 });
 }
 
@@ -257,7 +260,7 @@ function algunNoAportado(d: DatosNoAportados): boolean {
   return Boolean(d.documento || d.telefono || d.correo || d.direccion);
 }
 
-function jsonAuthError(error: InternalAuthError): NextResponse<ErrorResponse> {
+function jsonAuthError(error: InternalAuthError): NextResponse<RespuestaRadicacionInternaError> {
   return NextResponse.json({ error: error.message }, { status: error.status });
 }
 
@@ -302,47 +305,47 @@ export async function POST(request: Request): Promise<NextResponse> {
     // SÍ es entrada legítima (recepción elige ANONIMA/RESERVADA).
     const formData = await request.formData();
 
-    const tipoSolicitudIdRaw = campo(formData, 'tipoSolicitudId');
+    const tipoSolicitudIdRaw = campo(formData, CAMPOS_RADICACION_INTERNA.tipoSolicitudId);
     if (!isTipoSolicitud(tipoSolicitudIdRaw)) {
       return badRequest('Tipo de solicitud no válido.');
     }
 
-    const tipoPresentacionRaw = campo(formData, 'tipoPresentacion') || 'IDENTIFICADA';
+    const tipoPresentacionRaw = campo(formData, CAMPOS_RADICACION_INTERNA.tipoPresentacion) || 'IDENTIFICADA';
     if (!isTipoPresentacion(tipoPresentacionRaw)) {
       return badRequest('Tipo de presentación no válido.');
     }
 
-    const canalRespuestaRaw = campo(formData, 'canalRespuesta');
+    const canalRespuestaRaw = campo(formData, CAMPOS_RADICACION_INTERNA.canalRespuesta);
     if (canalRespuestaRaw && !isCanalRespuesta(canalRespuestaRaw)) {
       return badRequest('Canal de respuesta no válido.');
     }
 
-    const tipoPersonaRaw = campo(formData, 'tipoPersona');
+    const tipoPersonaRaw = campo(formData, CAMPOS_RADICACION_INTERNA.tipoPersona);
     if (!isTipoPersona(tipoPersonaRaw)) {
       return badRequest('Tipo de persona no válido.');
     }
 
-    const tipoDocumentoRaw = campo(formData, 'tipoDocumento');
+    const tipoDocumentoRaw = campo(formData, CAMPOS_RADICACION_INTERNA.tipoDocumento);
     if (!isTipoDocumento(tipoDocumentoRaw)) {
       return badRequest('Tipo de documento no válido.');
     }
 
-    const medioRecepcionRaw = campo(formData, 'medioRecepcion');
+    const medioRecepcionRaw = campo(formData, CAMPOS_RADICACION_INTERNA.medioRecepcion);
     if (!isMedioRecepcion(medioRecepcionRaw)) {
       return badRequest('Medio de recepción no válido.');
     }
 
-    const origenIngresoRaw = campo(formData, 'origenIngreso');
+    const origenIngresoRaw = campo(formData, CAMPOS_RADICACION_INTERNA.origenIngreso);
     if (origenIngresoRaw && !isOrigenIngreso(origenIngresoRaw)) {
       return badRequest('Origen de ingreso no válido.');
     }
 
-    const tipoEntradaRaw = campo(formData, 'tipoEntrada');
+    const tipoEntradaRaw = campo(formData, CAMPOS_RADICACION_INTERNA.tipoEntrada);
     if (tipoEntradaRaw && !isTipoEntrada(tipoEntradaRaw)) {
       return badRequest('Tipo de entrada no válido.');
     }
 
-    const oficinaDestinoRaw = campo(formData, 'oficinaDestino');
+    const oficinaDestinoRaw = campo(formData, CAMPOS_RADICACION_INTERNA.oficinaDestino);
     if (oficinaDestinoRaw && !isOficinaDestino(oficinaDestinoRaw)) {
       return badRequest('La dependencia destino no existe en el catálogo institucional.');
     }
@@ -351,29 +354,29 @@ export async function POST(request: Request): Promise<NextResponse> {
       : TENANT_DEFAULT;
     tenantActual = oficinaDestino;
 
-    const nombreCompleto = campo(formData, 'nombreCompleto');
-    const numeroDocumento = campo(formData, 'numeroDocumento');
-    const email = campo(formData, 'email').toLowerCase();
-    const telefono = campo(formData, 'telefono').replace(/\s/g, '');
-    const telefonoMovil = campo(formData, 'telefonoMovil').replace(/\s/g, '');
-    const telefonoFijo = campo(formData, 'telefonoFijo').replace(/\s/g, '');
-    const direccion = campo(formData, 'direccion');
-    const pais = campo(formData, 'pais') || 'Colombia';
-    const departamento = campo(formData, 'departamento') || 'Santander';
-    const municipio = campo(formData, 'municipio') || 'Simacota';
-    const barrio = campo(formData, 'barrio');
-    const asunto = campo(formData, 'asunto');
-    const descripcion = campo(formData, 'descripcion');
-    const numeroFolios = Number(campo(formData, 'numeroFolios')) || 0;
-    const numeroAnexos = Number(campo(formData, 'numeroAnexos')) || 0;
-    const anexosDescripcion = campo(formData, 'anexosDescripcion');
-    const observacionesAnexos = campo(formData, 'observacionesAnexos');
-    const areaResponsable = campo(formData, 'areaResponsable');
-    const noAportaDocumento = campo(formData, 'noAportaDocumento') === 'true';
-    const noAportaCorreo = campo(formData, 'noAportaCorreo') === 'true';
-    const noAportaTelefono = campo(formData, 'noAportaTelefono') === 'true';
-    const noAportaDireccion = campo(formData, 'noAportaDireccion') === 'true';
-    const files = formData.getAll('archivos').filter((v): v is File => v instanceof File && v.size > 0);
+    const nombreCompleto = campo(formData, CAMPOS_RADICACION_INTERNA.nombreCompleto);
+    const numeroDocumento = campo(formData, CAMPOS_RADICACION_INTERNA.numeroDocumento);
+    const email = campo(formData, CAMPOS_RADICACION_INTERNA.email).toLowerCase();
+    const telefono = campo(formData, CAMPOS_RADICACION_INTERNA.telefono).replace(/\s/g, '');
+    const telefonoMovil = campo(formData, CAMPOS_RADICACION_INTERNA.telefonoMovil).replace(/\s/g, '');
+    const telefonoFijo = campo(formData, CAMPOS_RADICACION_INTERNA.telefonoFijo).replace(/\s/g, '');
+    const direccion = campo(formData, CAMPOS_RADICACION_INTERNA.direccion);
+    const pais = campo(formData, CAMPOS_RADICACION_INTERNA.pais) || 'Colombia';
+    const departamento = campo(formData, CAMPOS_RADICACION_INTERNA.departamento) || 'Santander';
+    const municipio = campo(formData, CAMPOS_RADICACION_INTERNA.municipio) || 'Simacota';
+    const barrio = campo(formData, CAMPOS_RADICACION_INTERNA.barrio);
+    const asunto = campo(formData, CAMPOS_RADICACION_INTERNA.asunto);
+    const descripcion = campo(formData, CAMPOS_RADICACION_INTERNA.descripcion);
+    const numeroFolios = Number(campo(formData, CAMPOS_RADICACION_INTERNA.numeroFolios)) || 0;
+    const numeroAnexos = Number(campo(formData, CAMPOS_RADICACION_INTERNA.numeroAnexos)) || 0;
+    const anexosDescripcion = campo(formData, CAMPOS_RADICACION_INTERNA.anexosDescripcion);
+    const observacionesAnexos = campo(formData, CAMPOS_RADICACION_INTERNA.observacionesAnexos);
+    const areaResponsable = campo(formData, CAMPOS_RADICACION_INTERNA.areaResponsable);
+    const noAportaDocumento = campo(formData, CAMPOS_RADICACION_INTERNA.noAportaDocumento) === 'true';
+    const noAportaCorreo = campo(formData, CAMPOS_RADICACION_INTERNA.noAportaCorreo) === 'true';
+    const noAportaTelefono = campo(formData, CAMPOS_RADICACION_INTERNA.noAportaTelefono) === 'true';
+    const noAportaDireccion = campo(formData, CAMPOS_RADICACION_INTERNA.noAportaDireccion) === 'true';
+    const files = formData.getAll(CAMPOS_RADICACION_INTERNA.archivos).filter((v): v is File => v instanceof File && v.size > 0);
 
     const esAnonimo = tipoPresentacionRaw === 'ANONIMA';
 
@@ -612,7 +615,13 @@ export async function POST(request: Request): Promise<NextResponse> {
       tenant: oficinaDestino,
     });
 
-    return NextResponse.json({ ok: true, radicadoId, consecutivo, archivosSubidos: archivos.length });
+    const respuestaOk: RespuestaRadicacionInternaOk = {
+      ok: true,
+      radicadoId,
+      consecutivo,
+      archivosSubidos: archivos.length,
+    };
+    return NextResponse.json(respuestaOk);
   } catch (error) {
     if (error instanceof InternalAuthError) {
       return jsonAuthError(error);
