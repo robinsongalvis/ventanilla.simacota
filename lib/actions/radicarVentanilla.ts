@@ -1,5 +1,6 @@
 import { addDoc, collection, doc, getDoc, runTransaction } from 'firebase/firestore';
 import { getDb } from '@/lib/firebase';
+import { sanitizeFirestoreData } from '@/lib/firestore/removeUndefined';
 import { formatearRadicadoInstitucional } from '@/lib/radicado-institucional';
 import { TIPOS_SOLICITUD, type TipoSolicitudId } from '@/lib/tiempos-radicado';
 import { subirArchivos } from '@/lib/storage';
@@ -123,42 +124,16 @@ export interface ResultadoRadicacion {
 ══════════════════════════════════════════════════════════════ */
 
 /**
- * Elimina recursivamente todos los valores `undefined` de un objeto
- * antes de enviarlo a Firestore. Convierte los `undefined` a `null`
- * para preservar la estructura del documento y respetar el tipado.
- *
- * Firestore: acepta `null` ✅ — rechaza `undefined` ❌
+ * Pieza angular (P2.1, Fase 2) — la implementación vive ahora en
+ * `lib/firestore/removeUndefined.ts` (junto a `removeUndefinedDeep`, su
+ * contraparte "ausente") para que la nueva ruta
+ * `app/api/radicacion/interna/route.ts` la reutilice sin duplicar la
+ * lógica. Re-exportada aquí (import arriba + export abajo, en vez de
+ * `export … from`) porque este módulo también LLAMA a la función más
+ * abajo — sin cambio de comportamiento ni de ruta de import para no
+ * romper a los consumidores existentes de este módulo.
  */
-export function sanitizeFirestoreData(
-  data: Record<string, unknown>,
-): Record<string, unknown> {
-  const sanitized: Record<string, unknown> = {};
-
-  for (const [key, value] of Object.entries(data)) {
-    if (value === undefined) {
-      // Convertimos undefined a null para cumplir con Firestore
-      sanitized[key] = null;
-    } else if (
-      value !== null &&
-      typeof value === 'object' &&
-      !Array.isArray(value)
-    ) {
-      // Recursión sobre objetos anidados (ej. solicitante, detalle, termino)
-      sanitized[key] = sanitizeFirestoreData(value as Record<string, unknown>);
-    } else if (Array.isArray(value)) {
-      // Los arrays se sanitizan elemento a elemento
-      sanitized[key] = value.map((item) =>
-        item !== null && typeof item === 'object'
-          ? sanitizeFirestoreData(item as Record<string, unknown>)
-          : item ?? null,
-      );
-    } else {
-      sanitized[key] = value;
-    }
-  }
-
-  return sanitized;
-}
+export { sanitizeFirestoreData };
 
 /* El canal ya no viaja en el número de radicado: desde el Sprint
    Número con oficina radicadora, todos los radicados de entrada llevan
