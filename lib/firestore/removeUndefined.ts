@@ -34,3 +34,45 @@ export function removeUndefinedDeep<T>(value: T): T {
 
   return value;
 }
+
+/**
+ * Pieza angular (P2.1, Fase 2) — política de sanitización "null explícito",
+ * movida aquí desde `lib/actions/radicarVentanilla.ts` para que la nueva
+ * ruta `app/api/radicacion/interna/route.ts` la reutilice sin duplicar la
+ * lógica (Principio 3 — reutilización por defecto). Comportamiento IDÉNTICO
+ * al original: convierte recursivamente cada `undefined` a `null`
+ * CONSERVANDO la clave — en vez de eliminarla como hace `removeUndefinedDeep`.
+ * Es la contraparte "ausente" de este mismo módulo; ambas conviven a
+ * propósito (decisión de la revisión cruzada firestore-datos del blueprint
+ * v2: la unificación null-vs-ausente NO se resuelve en Fase 1 salvo para el
+ * endpoint NUEVO de Fase 2, que adopta esta política explícitamente).
+ *
+ * Firestore: acepta `null` ✅ — rechaza `undefined` ❌
+ */
+export function sanitizeFirestoreData(
+  data: Record<string, unknown>,
+): Record<string, unknown> {
+  const sanitized: Record<string, unknown> = {};
+
+  for (const [key, value] of Object.entries(data)) {
+    if (value === undefined) {
+      sanitized[key] = null;
+    } else if (
+      value !== null &&
+      typeof value === 'object' &&
+      !Array.isArray(value)
+    ) {
+      sanitized[key] = sanitizeFirestoreData(value as Record<string, unknown>);
+    } else if (Array.isArray(value)) {
+      sanitized[key] = value.map((item) =>
+        item !== null && typeof item === 'object'
+          ? sanitizeFirestoreData(item as Record<string, unknown>)
+          : item ?? null,
+      );
+    } else {
+      sanitized[key] = value;
+    }
+  }
+
+  return sanitized;
+}
