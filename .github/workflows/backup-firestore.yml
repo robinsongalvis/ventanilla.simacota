@@ -52,6 +52,11 @@ jobs:
       # Ajustar en Settings -> Secrets and variables -> Actions -> Variables.
       GCP_PROJECT: ${{ vars.GCP_BACKUP_PROJECT || 'ventanilla-unica-f31b1' }}
       BACKUP_BUCKET: ${{ vars.GCP_BACKUP_BUCKET || 'ventanilla-simacota-backups' }}
+      # Secrets izados a env: el contexto secrets NO esta permitido en los if:
+      # de pasos — GitHub invalidaba el workflow completo (runs failure/0-jobs,
+      # hallazgo G6 del ADR-0025). Los if: condicionan sobre env, que si lo esta.
+      WIF_PROVIDER: ${{ secrets.GCP_WORKLOAD_IDENTITY_PROVIDER }}
+      SA_KEY_JSON: ${{ secrets.GCP_BACKUP_SA_KEY }}
 
     steps:
       - name: Validar disparo manual
@@ -63,7 +68,7 @@ jobs:
       - name: Verificar que la infraestructura está provisionada
         run: |
           faltan=""
-          if [ -z "${{ secrets.GCP_WORKLOAD_IDENTITY_PROVIDER }}" ] && [ -z "${{ secrets.GCP_BACKUP_SA_KEY }}" ]; then
+          if [ -z "$WIF_PROVIDER" ] && [ -z "$SA_KEY_JSON" ]; then
             faltan="$faltan\n  - Auth GCP: define GCP_WORKLOAD_IDENTITY_PROVIDER+GCP_BACKUP_SA (WIF, recomendado) o GCP_BACKUP_SA_KEY (clave JSON, fallback)."
           fi
           if [ -n "$faltan" ]; then
@@ -76,7 +81,7 @@ jobs:
       # ── Autenticación (elige UNA de las dos vías con los secrets que existan) ──
       # Vía A (recomendada, keyless): Workload Identity Federation.
       - name: Autenticar a GCP (WIF)
-        if: ${{ secrets.GCP_WORKLOAD_IDENTITY_PROVIDER != '' }}
+        if: ${{ env.WIF_PROVIDER != '' }}
         uses: google-github-actions/auth@v3
         with:
           workload_identity_provider: ${{ secrets.GCP_WORKLOAD_IDENTITY_PROVIDER }}
@@ -84,7 +89,7 @@ jobs:
 
       # Vía B (fallback): clave JSON de un service account guardada como secret.
       - name: Autenticar a GCP (clave JSON)
-        if: ${{ secrets.GCP_WORKLOAD_IDENTITY_PROVIDER == '' && secrets.GCP_BACKUP_SA_KEY != '' }}
+        if: ${{ env.WIF_PROVIDER == '' && env.SA_KEY_JSON != '' }}
         uses: google-github-actions/auth@v3
         with:
           credentials_json: ${{ secrets.GCP_BACKUP_SA_KEY }}
