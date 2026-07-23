@@ -17,4 +17,6 @@
    no ejecutada), poner este flag en `false` basta para volver a la ruta
    legada sin redeploy de reglas.
 ══════════════════════════════════════════════════════════════ */
-export const USA_RADICACION_INTERNA_SERVER = false;
+// ⚠️ RAMA UAT (uat/fase3-cutover-preview) — switch ON SOLO PARA EL PREVIEW DE UAT.
+// PROHIBIDO mergear esta rama a main: el cutover real es un PR de 2 líneas aparte (PdC 3).
+export const USA_RADICACION_INTERNA_SERVER = true;

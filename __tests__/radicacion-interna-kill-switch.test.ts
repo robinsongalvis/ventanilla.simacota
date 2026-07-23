@@ -56,17 +56,17 @@ const DATOS: DatosRadicacionInstitucional = {
 
 describe('kill-switch de radicación interna a servidor', () => {
   it('nace en OFF — la producción no cambia de comportamiento', () => {
-    expect(USA_RADICACION_INTERNA_SERVER).toBe(false);
+    expect(USA_RADICACION_INTERNA_SERVER).toBe(true) /* rama UAT: switch ON solo preview */;
   });
 
-  it('con el switch en OFF, el caller invoca el camino legado — nunca el cliente del endpoint', async () => {
+  it('RAMA UAT: con el switch en ON, el caller invoca el cliente del endpoint — nunca el legado', async () => {
     const resultado = await radicarSegunFlag(
       DATOS,
       { uid: 'u1', nombre: 'Ana Recepción', tenantId: 'VENTANILLA_UNICA' },
     );
 
-    expect(radicarInstitucionalmente).toHaveBeenCalledTimes(1);
-    expect(radicarInternaCliente).not.toHaveBeenCalled();
-    expect(resultado).toEqual({ radicadoId: 'legado', consecutivo: 1 });
+    expect(radicarInternaCliente).toHaveBeenCalledTimes(1);
+    expect(radicarInstitucionalmente).not.toHaveBeenCalled();
+    expect(resultado).toEqual({ radicadoId: 'nuevo', consecutivo: 1 });
   });
 });
