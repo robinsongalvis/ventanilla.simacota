@@ -49,3 +49,50 @@ El multi-tenant existente permite que el motor sirva a otras dependencias. La **
 - El módulo entrega valor real (digitaliza Planeación) reutilizando la base sin componentes paralelos.
 - Deja explícito lo que NO es genérico (resolución) para no vender configurabilidad inexistente.
 - Los formatos concretos (`numeroExpediente`, nombres de estados de resolución, régimen de subsanación por trámite) son **implementación**, se fijan en el plan por fases y en PRs con revisión cruzada, no en este ADR.
+
+---
+
+## Adenda 2026-08-05 — Cierre del PdC 0 (Fase 0)
+
+La Fase 0 (cimientos de lógica pura: tipos + evaluador de completitud + reloj de subsanación + guard de consecutivos) se construyó, verificó (1231 tests verdes, `tsc` 0, `lint` 0, `build` OK), revisó en cruz (Datos → SÓLIDO; Seguridad → SIN HALLAZGOS ALTOS) y validó en arquitectura contra los 5 principios del propietario: **veredicto APROBADO_CON_CONDICIONES** — núcleo trámite-agnóstico confirmado, sin literal de "Licencia" en código ejecutable, dos simulaciones adversariales (Concepto de uso del suelo; Subdivisión) devolvieron GENERICO_CONFIRMADO. Con este cierre, **la Fase 0 queda CONGELADA**: no se introducen nuevas funcionalidades ni cambios de diseño sobre el núcleo salvo defecto crítico; la Fase 1 construye capacidades sobre un núcleo estable.
+
+### A1 — Limitación conocida de diseño: frontera de expresividad del DSL de requisitos
+
+El DSL de `CondicionRequisito` (`lib/motor-expedientes/tipos.ts`) es **puramente categórico**: `IGUAL` / `DISTINTO` / `EN` sobre claves del contexto, compuestos con `Y` / `O` / `NO`. La invariante D4 ("trámite nuevo = crear un documento, sin desplegar") **queda acotada a checklists categóricos**. En consecuencia, **NO** son expresables hoy sólo con datos, y requerirían modificar el núcleo (ampliar la unión `CondicionRequisito` + `evaluarCondicion` + `clavesReferenciadas`):
+
+- **Umbrales numéricos/ordinales** (`>`, `<`, `≥`, `≤`, `ENTRE`) sobre un hecho crudo — área, nº de pisos, altura, valor de obra, hectáreas/UAF. *Mitigación vigente (YAGNI):* el trámite pre-categoriza el hecho fuera del motor (p. ej. `categoriaComplejidad ∈ {BAJA,MEDIA,ALTA}`) y el DSL evalúa la categoría. Cubre el caso mientras ningún trámite exija reglas sobre el número crudo.
+- **Requisitos alternativos / "al menos uno de {A,B}" / documento sustituto**, y condicionar un requisito al **aporte** de otro (`requisitoAplica` sólo ve el contexto, no los aportes; `OPCIONAL` nunca bloquea).
+- **Hechos multivaluados** y **término principal en MESES** (`TerminoLegal.unidad` aún no admite MESES; sí lo hace `RegimenSubsanacion`).
+
+**Regla de gobierno:** cualquier ampliación de estos operadores es una **excepción arquitectónica** y se añade **por ADR** (con revisión de Gobierno Digital), nunca de forma implícita. Se medirá empíricamente con el segundo trámite (Fase 3) antes de decidir ampliar.
+
+### A2 — Registro de deudas técnicas de la Fase 0 → fase de resolución
+
+Todas las deudas detectadas quedan asociadas explícitamente a la fase donde se resuelven. Ninguna es breaking ni irreversible; todas son aditivas.
+
+| # | Deuda | Sev. | Fase de resolución |
+|---|---|---|---|
+| 1 | DSL sin operadores numéricos/ordinales (ver A1) — documentar frontera + corregir comentario `tipos.ts` | ALTA | **Fase 0** (documentar, hecho en esta adenda) · ampliar por ADR en Fase 3 o antes si aparece umbral real |
+| 2 | Flags `requiereVisita`/`generaResolucion` sin consumidor — reintroducen resolución-por-bool | MEDIA | **Fase 1** (ADR que los retire o ratifique como marcadores, antes de codear la resolución) |
+| 3 | Sin reloj de término PRINCIPAL genérico; única función atada al catálogo PQRSD con fallback silencioso | MEDIA | **Fase 1/2** (consumidor genérico de `terminos {días,unidad}`, sin usar `calcularFechaVencimiento`; `unidad` → MESES) |
+| 4 | Sin contrato definición↔contexto ni validador (typo → INDETERMINADO indistinguible; `Y`/`O` vacíos vacuous) | MEDIA | **Fase 1** (catálogo de claves declaradas + validador al publicar la Definición) |
+| 5 | No hay requisitos alternativos "N-de-M" ni condición sobre aportes | MEDIA | **Fase 1** al materializar el checklist real (o ADR si aparece) |
+| 6 | `Actuacion`/`Observacion` sin `tenantId` (bloquea `collectionGroup` por tenant) | MEDIA | **Fase 1** (denormalizar `tenantId` en el mapper de persistencia) |
+| 7 | Guard D9 `verificarAvanceCounter` definido pero NO cableado a `confirmarConsecutivosLegales` | MEDIA | **Fase 1** (centralizar escritura de counters tras el guard y/o narrowing del wildcard `counters` en reglas; extender detector de fantasmas a `expedientes`) |
+| 8 | `Actuacion` sin schema de honestidad probatoria completo (doble fecha, split de actor, `documentoRespaldoRef`) | MEDIA | **Fase 2** (antes de habilitar la migración de expedientes en trámite) |
+| 9 | Fechas ISO-string en los tipos — no persistir verbatim | BAJA | **Fase 1** (mapper ISO → `Timestamp`/`serverTimestamp` en la frontera de persistencia) |
+| 10 | `OrigenActuacion` y `OrigenConsecutivo` son la misma unión duplicada | BAJA | **Fase 1** (unificar en un tipo compartido) |
+| 11 | Ubicación de tipos `lib/motor-expedientes/tipos.ts` vs `src/types/expediente.ts` del blueprint | BAJA | **Fase 1** (reconciliar al introducir endpoints/UI) |
+| 12 | `COLECCION_POR_SERIE` del detector de fantasmas no incluye `expedientes` | BAJA | **Fase 1** (cerrar junto con la colección) |
+| 13 | `counters/expedientes-{año}` single-writer global | BAJA | **Fase 1** (revisar namespacing/sharded al fijar el formato `numeroExpediente`) |
+
+### A3 — Principios de revisión obligatoria durante la Fase 1
+
+Criterios vinculantes de revisión cruzada para **todo** PR de la Fase 1:
+
+1. El motor debe seguir siendo **completamente reutilizable**.
+2. **Ninguna Secretaría** debe requerir modificaciones del núcleo para incorporar un nuevo trámite.
+3. Todo **comportamiento específico** queda **fuera del motor**: se resuelve por parametrización (dato) o por módulos especializados (resolución por trámite, en código con ADR).
+4. Toda **excepción arquitectónica** se documenta **mediante ADR antes de implementarse**.
+
+Si durante la Fase 1 una decisión rompe estos principios, se **detiene el desarrollo**, se revisa la arquitectura y se corrige el rumbo antes de continuar.

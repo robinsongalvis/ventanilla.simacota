@@ -91,8 +91,12 @@ export type ContextoEvaluacionRequisito = Record<string, string | number | boole
  *  - "categorías Baja y Media Complejidad"  → EN categoriaComplejidad=[BAJA,MEDIA]
  *  - "NO sujeto a Título E NSR-10"          → IGUAL sujetoTituloENSR10=false
  *  - "salvo predio rodeado de espacio público" → IGUAL predioRodeadoEspacioPublico=false
- * `Y` / `O` / `NO` permiten componer condiciones más complejas sin código
- * nuevo si un trámite futuro las necesita.
+ * `Y` / `O` / `NO` componen estas condiciones CATEGÓRICAS entre sí sin código
+ * nuevo. Frontera de expresividad conocida (ADR-0026 §A1): el DSL es sólo
+ * categórico — umbrales numéricos/ordinales (área, nº de pisos, valor de obra),
+ * requisitos alternativos "N-de-M" y condiciones sobre aportes NO son
+ * expresables por dato y requieren ampliar la unión por ADR, no de forma
+ * implícita.
  */
 export type CondicionRequisito =
   | { operador: 'IGUAL'; clave: string; valor: string | number | boolean }
