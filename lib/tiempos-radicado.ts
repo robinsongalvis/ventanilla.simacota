@@ -124,12 +124,25 @@ function toDateOnly(date: Date): string {
   return `${y}-${m}-${d}`;
 }
 
-function atLocalNoon(value: string | Date): Date {
+/**
+ * Ancla una fecha a mediodía local (evita corrimientos de día por zona
+ * horaria). Exportada para que otros módulos de cómputo de plazos legales
+ * (p. ej. `lib/motor-expedientes/subsanacion-regimen.ts`) reutilicen la
+ * misma normalización en vez de duplicarla — cambio aditivo, no rompe a
+ * ningún consumidor existente de este archivo.
+ */
+export function atLocalNoon(value: string | Date): Date {
   const date = value instanceof Date ? value : new Date(value);
   return new Date(date.getFullYear(), date.getMonth(), date.getDate(), 12, 0, 0, 0);
 }
 
-function addDays(date: Date, days: number): Date {
+/**
+ * Suma (o resta, con `days` negativo) días CALENDARIO a una fecha. Exportada
+ * por el mismo motivo que `atLocalNoon` — utilidad técnica genérica,
+ * reutilizada por el reloj de subsanación del motor de expedientes en vez de
+ * reimplementar la suma de días.
+ */
+export function addDays(date: Date, days: number): Date {
   const next = new Date(date);
   next.setDate(next.getDate() + days);
   return next;
