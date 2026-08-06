@@ -178,7 +178,7 @@ const CATEGORIAS = [
     titulo: 'Seguridad',
     fuentes: [
       { clave: 'matriz', desc: 'Matriz de aislamiento por tenant (rules-unit-testing, ADR-0007)', env: 'OUTCOME_MATRIZ', comandoLocal: null, evidencia: 'job laboratorio-emulador · e2e/rules/matriz-aislamiento-tenant.test.mjs' },
-      { clave: 'audit', desc: 'npm audit (--audit-level=high)', env: 'OUTCOME_AUDIT', comandoLocal: 'npm audit --audit-level=high', evidencia: 'job validate · paso Security Scan' },
+      { clave: 'audit', desc: 'Gate de auditoría gobernado (high/critical + allowlist con caducidad, ADR-0028)', env: 'OUTCOME_AUDIT', comandoLocal: 'npm run audit:gate', evidencia: 'job validate · paso Security Scan · scripts/ci/audit-gate.mjs' },
     ],
   },
   {

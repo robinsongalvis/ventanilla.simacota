@@ -73,10 +73,17 @@ jobs:
         # Estático y determinista — no requiere emulador.
         run: npm run verificar:indices
 
-      - name: Security Scan (NPM Audit Gate)
+      - name: Security Scan (NPM Audit Gate — GOBERNADO, ADR-0028)
         id: audit
         if: ${{ !cancelled() }}
-        run: npm audit --audit-level=high
+        # Gate de auditoría GOBERNADO (reemplaza `npm audit --audit-level=high`
+        # crudo): sigue fallando ante CUALQUIER advisory high/critical nueva,
+        # pero permite declarar en `audit-allowlist.json` excepciones puntuales,
+        # con caducidad (≤90 días) y responsable, para transitivas sin fix
+        # upstream — rompe el hard-deadlock del branch protection sin debilitar
+        # el gate. Su `outcome` alimenta la Compuerta de gobernanza (ADR-0013),
+        # que sigue leyendo `steps.audit.outcome` sin cambios.
+        run: node scripts/ci/audit-gate.mjs
 
       - name: Production Build Check (Build Gate)
         id: build
