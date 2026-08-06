@@ -1,7 +1,7 @@
 # Checklist oficial — Licencia de Construcción · Modalidad Obra Nueva (Simacota)
 
 > Insumo real entregado por el propietario (levantamiento con Secretaría de Planeación). Es la **parametrización de la primera "Definición de Trámite"** del motor genérico de expedientes (no código: dato configurable desde administración).
-> ⚠️ **Es "Página 1 de 2" — falta la página 2.** Pendiente de recibir para completar el catálogo.
+> ✅ **Checklist COMPLETO y confirmado** contra el documento oficial de la Alcaldía **Certificación `F-PGD-009`, versión 02 (aprobación 15/01/2024), "Licencia de Construcción en la modalidad de Obra Nueva", páginas 1 y 2 de 2**, entregado por la Secretaría de Planeación el 2026-08-06. La tabla de abajo se cotejó fila por fila contra ambas páginas del documento oficial y coincide.
 
 ## Requisitos (marcar tipo: OBLIGATORIO / CONDICIONAL / con regla)
 
@@ -33,4 +33,8 @@
 
 También confirma, del análisis normativo: **citación a colindantes con 5 días hábiles** (#18), **expensas** (#19), y **Decreto 1203 de 2017** como norma vigente del contenido de la licencia (además del Decreto 1077).
 
-**Pendiente:** página 2 del checklist + validación del listado completo con la Secretaría de Planeación.
+**Estado:** checklist completo (páginas 1 y 2) recibido y confirmado (`F-PGD-009` v02, 2026-08-06). **Cierra la precondición P2 de ADR-0026** (checklist oficial completo). La validación del listado con Planeación se materializa en este documento oficial que la propia Secretaría entrega.
+
+**Nota de diseño — deuda #5 (ADR-0026 §A2), ahora CONCRETA:** este trámite exige requisitos **alternativos / documento sustituto** que hoy NO son expresables sólo con datos (el DSL es categórico; `OPCIONAL` nunca bloquea): #6 (identidad de persona natural **o** certificado de existencia de persona jurídica) y #7 (predial **o** certificación de acuerdo de pago de Hacienda). Materializar la Definición real requiere resolver #5 — extensión "N-de-M"/documento-sustituto por ADR (§A1, excepción arquitectónica) **o** modelarlo por pre-categorización fuera del motor. En cambio, la categoría de complejidad (#12/#13, Baja/Media) es **categórica** → NO dispara la deuda #1 (operadores numéricos): el DSL categórico la cubre.
+
+**Precondición que este documento NO cierra:** P1 de ADR-0026 (**concepto jurídico** formal de la oficina jurídica: hito de radicación D5, plazo reglado de la revisión previa, silencio positivo, acto administrativo de delegación del alcalde). Es un concepto **legal**, distinto de este catálogo de requisitos, y sigue **BLOQUEANTE** para la Fase 2.
