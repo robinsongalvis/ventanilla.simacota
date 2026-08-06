@@ -72,6 +72,12 @@ gcloud firestore export gs://ventanilla-simacota-backups/diario/$(date -u +%F) \
 - Hasta que esos secrets existan, el workflow **falla con un mensaje claro**
   ("infraestructura sin provisionar") en lugar de fingir que respalda.
 
+**Estado verificado 2026-08-06:** el aprovisionamiento GCP sigue **PENDIENTE** — el
+workflow acumula fallos diarios (secrets de auth vacíos), por lo que **aún no
+existe ningún export durable de producción**. La única red de recuperación vigente
+es PITR (7 días; ver "Hardening de la base" abajo). **El reset de producción a
+"radicado 1" no debe autorizarse sin ≥1 export verificado.**
+
 **Por qué GitHub Actions y no Cloud Scheduler:** justificación en
 `scripts/backups/README.md`. Resumen: la config queda versionada (raíz del
 hallazgo CR-3), una sola superficie operativa (la de CI), y estampado por día
@@ -82,9 +88,15 @@ sin infraestructura extra.
 en pausa larga, hay que reactivar el workflow o migrar el disparo a Cloud
 Scheduler (+ Cloud Function para plantillar la fecha).
 
-**Hardening pendiente del propietario** (verificado en prod 2026-07-20): PITR y
-Delete Protection están DESHABILITADOS en la base de producción — habilitarlos
-es complementario a los exports (ver `docs/RUNBOOK_RESTAURACION.md` §7).
+**Hardening de la base (verificado en prod el 2026-08-06 vía `gcloud firestore
+databases describe`):** PITR y Delete Protection están **HABILITADOS** —
+`POINT_IN_TIME_RECOVERY_ENABLED` (retención 7 días, `versionRetentionPeriod:
+604800s`, ventana desde 2026-07-30) y `DELETE_PROTECTION_ENABLED`. Esto **corrige**
+el estado anterior de este documento, que los daba por deshabilitados (snapshot del
+2026-07-20, previo a su activación). **PITR no es un backup:** es una ventana de
+recuperación de 7 días *dentro de la misma base* (útil ante corrupción reciente),
+**complementaria** al export durable a GCS, no un sustituto. Ver
+`docs/RUNBOOK_RESTAURACION.md` §7.
 
 ### 3.2. Proceso de Restauración ante Corrupción de Datos
 

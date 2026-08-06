@@ -176,10 +176,17 @@ Escenario distinto del drill: pérdida o corrupción confirmada en producción.
 
 ## 7. Hardening recomendado (fuera del alcance de este runbook, para el propietario)
 
-Verificado en prod el 2026-07-20:
+Verificado en prod el 2026-08-06 (vía `gcloud firestore databases describe`):
 
-- **Point-in-Time Recovery (PITR): DESHABILITADO.** Habilitarlo da recuperación
-  a cualquier instante de los últimos 7 días, complementario a los exports
-  diarios: `gcloud firestore databases update --database='(default)' --enable-pitr --project=ventanilla-unica-f31b1`.
-- **Delete Protection: DESHABILITADA.** Habilitarla evita el borrado accidental
-  de la base: `gcloud firestore databases update --database='(default)' --delete-protection --project=ventanilla-unica-f31b1`.
+- **Point-in-Time Recovery (PITR): HABILITADO ✅** — `POINT_IN_TIME_RECOVERY_ENABLED`,
+  retención 7 días (`versionRetentionPeriod: 604800s`, ventana desde 2026-07-30). Da
+  recuperación a cualquier instante de los últimos 7 días, **complementaria** (no
+  sustituta) de los exports durables a GCS. (Estado anterior de este documento:
+  deshabilitado, snapshot 2026-07-20, previo a su activación.)
+- **Delete Protection: HABILITADA ✅** — `DELETE_PROTECTION_ENABLED`. Evita el
+  borrado accidental de la base.
+- **Exports durables a GCS: PENDIENTE (owner-gated).** El workflow
+  `backup-firestore.yml` aún falla por falta de aprovisionamiento GCP (secrets de
+  auth vacíos): ejecutar `scripts/backups/setup-gcp-backups.sh` + cargar los secrets.
+  **PITR ≠ backup:** sin ≥1 export verificado no hay respaldo durable, y el reset de
+  producción a "radicado 1" no debe autorizarse.
