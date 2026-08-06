@@ -43,7 +43,7 @@ Para evitar la pérdida de información en formularios largos en caso de descone
 
 El activo de información más valioso del municipio son los documentos de `radicados` y su `trazabilidad`. Se establecen las siguientes políticas oficiales de DR:
 
-### 3.1. Respaldos Automáticos Diarios (Backups)
+### 3.1. Respaldos Automáticos Diarios (Backups) — OPERATIVO (primer export verificado 2026-08-06)
 
 **Estado (Roadmap P2.4):** el mecanismo de respaldo está **implementado y
 versionado** en el repositorio. Antes esta sección describía un export
@@ -72,6 +72,15 @@ gcloud firestore export gs://ventanilla-simacota-backups/diario/$(date -u +%F) \
 - Hasta que esos secrets existan, el workflow **falla con un mensaje claro**
   ("infraestructura sin provisionar") en lugar de fingir que respalda.
 
+**Estado verificado 2026-08-06:** los backups están **OPERATIVOS**. Primer export
+manual verificado (GitHub Actions run `31088181768`, `success`) en
+`gs://ventanilla-simacota-backups/diario/2026-08-06/` (`overall_export_metadata` +
+`output-0/1`); tamaño del export ≈ **361 KB**. El aprovisionamiento requirió —además
+de `setup-gcp-backups.sh` + los secrets WIF— habilitar `iamcredentials.googleapis.com`
+(necesaria para la impersonación WIF; **falta añadirla al script**). Con ≥1 export
+durable verificado, la precondición de backup para el reset de producción queda
+**cumplida** (el reset sigue requiriendo tu orden explícita).
+
 **Por qué GitHub Actions y no Cloud Scheduler:** justificación en
 `scripts/backups/README.md`. Resumen: la config queda versionada (raíz del
 hallazgo CR-3), una sola superficie operativa (la de CI), y estampado por día
@@ -82,14 +91,21 @@ sin infraestructura extra.
 en pausa larga, hay que reactivar el workflow o migrar el disparo a Cloud
 Scheduler (+ Cloud Function para plantillar la fecha).
 
-**Hardening pendiente del propietario** (verificado en prod 2026-07-20): PITR y
-Delete Protection están DESHABILITADOS en la base de producción — habilitarlos
-es complementario a los exports (ver `docs/RUNBOOK_RESTAURACION.md` §7).
+**Hardening de la base (verificado en prod el 2026-08-06 vía `gcloud firestore
+databases describe`):** PITR y Delete Protection están **HABILITADOS** —
+`POINT_IN_TIME_RECOVERY_ENABLED` (retención 7 días, `versionRetentionPeriod:
+604800s`, ventana desde 2026-07-30) y `DELETE_PROTECTION_ENABLED`. Esto **corrige**
+el estado anterior de este documento, que los daba por deshabilitados (snapshot del
+2026-07-20, previo a su activación). **PITR no es un backup:** es una ventana de
+recuperación de 7 días *dentro de la misma base* (útil ante corrupción reciente),
+**complementaria** al export durable a GCS, no un sustituto. Ver
+`docs/RUNBOOK_RESTAURACION.md` §7.
 
 ### 3.2. Proceso de Restauración ante Corrupción de Datos
 
-El procedimiento **exacto, probado y con criterios de éxito** vive en
-`docs/RUNBOOK_RESTAURACION.md`. Resumen:
+El procedimiento **exacto, con criterios de éxito** vive en
+`docs/RUNBOOK_RESTAURACION.md` (está **definido**; el drill end-to-end contra un
+export real de producción queda **pendiente** hasta el primer export durable). Resumen:
 
 1. Toda restauración de *ensayo* va a **STAGE** (`ventanilla-simacota-stage`),
    nunca a producción.
