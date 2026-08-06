@@ -43,7 +43,7 @@ Para evitar la pérdida de información en formularios largos en caso de descone
 
 El activo de información más valioso del municipio son los documentos de `radicados` y su `trazabilidad`. Se establecen las siguientes políticas oficiales de DR:
 
-### 3.1. Respaldos Automáticos Diarios (Backups)
+### 3.1. Respaldos Automáticos Diarios (Backups) — exports pendientes de aprovisionamiento
 
 **Estado (Roadmap P2.4):** el mecanismo de respaldo está **implementado y
 versionado** en el repositorio. Antes esta sección describía un export
@@ -100,8 +100,9 @@ recuperación de 7 días *dentro de la misma base* (útil ante corrupción recie
 
 ### 3.2. Proceso de Restauración ante Corrupción de Datos
 
-El procedimiento **exacto, probado y con criterios de éxito** vive en
-`docs/RUNBOOK_RESTAURACION.md`. Resumen:
+El procedimiento **exacto, con criterios de éxito** vive en
+`docs/RUNBOOK_RESTAURACION.md` (está **definido**; el drill end-to-end contra un
+export real de producción queda **pendiente** hasta el primer export durable). Resumen:
 
 1. Toda restauración de *ensayo* va a **STAGE** (`ventanilla-simacota-stage`),
    nunca a producción.

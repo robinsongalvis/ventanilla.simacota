@@ -1,8 +1,9 @@
 # Runbook de restauración de Firestore
 
 **Objetivo:** restaurar un export de respaldo de Firestore y **verificar que es
-recuperable**, sin tocar producción. Es la contraparte probada del respaldo
-descrito en `docs/disaster-recovery.md` §3.
+recuperable**, sin tocar producción. Es la contraparte de restauración del respaldo
+descrito en `docs/disaster-recovery.md` §3 (procedimiento **definido**; el drill
+end-to-end contra un export real queda **pendiente** hasta el primer export durable).
 
 > **Regla de oro:** una restauración de *ensayo* (drill) SIEMPRE va a **STAGE**
 > (`ventanilla-simacota-stage`), **NUNCA** a producción (`ventanilla-unica-f31b1`).
