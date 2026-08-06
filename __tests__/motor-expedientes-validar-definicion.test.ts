@@ -129,6 +129,52 @@ describe('validarDefinicionTramite — (a) condición Y/O vacía (H1)', () => {
   });
 });
 
+describe("validarDefinicionTramite — (a') EN con valores vacíos (GEMELO de H1)", () => {
+  it('rechaza una condición "EN" con valores: [] (veredicto: nunca aplica, en silencio)', () => {
+    const definicion = definicionBase({
+      requisitos: [requisitoCondicional('req-en-vacio', { operador: 'EN', clave: 'categoria', valores: [] })],
+    });
+
+    const resultado = validarDefinicionTramite(definicion);
+
+    expect(resultado.valida).toBe(false);
+    expect(resultado.errores).toEqual([
+      expect.objectContaining({ codigo: 'VALORES_VACIOS', requisitoId: 'req-en-vacio' }),
+    ]);
+  });
+
+  it('rechaza un "EN" vacío anidado dentro de un árbol por lo demás válido', () => {
+    const definicion = definicionBase({
+      requisitos: [
+        requisitoCondicional('req-en-vacio-anidado', {
+          operador: 'Y',
+          condiciones: [
+            { operador: 'IGUAL', clave: 'esRepresentante', valor: true },
+            { operador: 'EN', clave: 'categoria', valores: [] },
+          ],
+        }),
+      ],
+    });
+
+    const resultado = validarDefinicionTramite(definicion);
+
+    expect(resultado.valida).toBe(false);
+    expect(resultado.errores).toEqual([
+      expect.objectContaining({ codigo: 'VALORES_VACIOS', requisitoId: 'req-en-vacio-anidado' }),
+    ]);
+  });
+
+  it('acepta una condición "EN" con al menos un valor', () => {
+    const definicion = definicionBase({
+      requisitos: [requisitoCondicional('req-en-ok', { operador: 'EN', clave: 'categoria', valores: ['A'] })],
+    });
+
+    const resultado = validarDefinicionTramite(definicion);
+
+    expect(resultado.valida).toBe(true);
+  });
+});
+
 describe('validarDefinicionTramite — (b) clave no declarada (typo indistinguible de hecho ausente)', () => {
   it('rechaza una condición que referencia una clave no declarada en clavesContexto', () => {
     const definicion = definicionBase({
@@ -174,6 +220,70 @@ describe('validarDefinicionTramite — (b) clave no declarada (typo indistinguib
     expect(resultado.errores).toEqual([
       expect.objectContaining({ codigo: 'CLAVE_NO_DECLARADA', requisitoId: 'req-sin-catalogo' }),
     ]);
+  });
+
+  it('reporta la MISMA clave no declarada una sola vez aunque el árbol la referencie varias veces', () => {
+    const definicion = definicionBase({
+      requisitos: [
+        requisitoCondicional('req-clave-repetida', {
+          operador: 'Y',
+          condiciones: [
+            { operador: 'IGUAL', clave: 'claveFantasma', valor: true },
+            { operador: 'DISTINTO', clave: 'claveFantasma', valor: false },
+            { operador: 'EN', clave: 'claveFantasma', valores: ['x'] },
+          ],
+        }),
+      ],
+    });
+
+    const resultado = validarDefinicionTramite(definicion);
+
+    expect(resultado.valida).toBe(false);
+    expect(resultado.errores).toEqual([
+      expect.objectContaining({ codigo: 'CLAVE_NO_DECLARADA', requisitoId: 'req-clave-repetida' }),
+    ]);
+  });
+});
+
+describe("validarDefinicionTramite — (b') nombre de clave duplicado en clavesContexto (GEMELO de H2)", () => {
+  it('rechaza clavesContexto con el mismo nombre declarado dos veces', () => {
+    const definicion = definicionBase({
+      clavesContexto: [
+        { nombre: 'esRepresentante', tipo: 'boolean' },
+        { nombre: 'esRepresentante', tipo: 'string' },
+      ],
+      requisitos: [{ id: 'doc-base', nombre: 'Documento base', tipo: 'OBLIGATORIO' }],
+    });
+
+    const resultado = validarDefinicionTramite(definicion);
+
+    expect(resultado.valida).toBe(false);
+    expect(resultado.errores).toEqual([expect.objectContaining({ codigo: 'CLAVE_DUPLICADA' })]);
+  });
+
+  it('reporta un nombre de clave duplicado una sola vez aunque aparezca 3 o más veces', () => {
+    const definicion = definicionBase({
+      clavesContexto: [
+        { nombre: 'triple', tipo: 'string' },
+        { nombre: 'triple', tipo: 'string' },
+        { nombre: 'triple', tipo: 'string' },
+      ],
+      requisitos: [{ id: 'doc-base', nombre: 'Documento base', tipo: 'OBLIGATORIO' }],
+    });
+
+    const resultado = validarDefinicionTramite(definicion);
+
+    expect(resultado.errores.filter((e) => e.codigo === 'CLAVE_DUPLICADA')).toHaveLength(1);
+  });
+
+  it('acepta clavesContexto con nombres todos distintos', () => {
+    const definicion = definicionBase({
+      requisitos: [{ id: 'doc-base', nombre: 'Documento base', tipo: 'OBLIGATORIO' }],
+    });
+
+    const resultado = validarDefinicionTramite(definicion);
+
+    expect(resultado.valida).toBe(true);
   });
 });
 
@@ -310,6 +420,37 @@ describe('validarDefinicionTramite — (e) tipo/valor incoherente con la clave d
 
     expect(resultado.errores).toHaveLength(1);
     expect(resultado.errores[0]).toEqual(expect.objectContaining({ codigo: 'CLAVE_NO_DECLARADA' }));
+  });
+});
+
+describe('validarDefinicionTramite — (f) dominio del catálogo incoherente con el tipo declarado', () => {
+  it('rechaza una clave cuyo dominio contiene un valor de tipo distinto al declarado', () => {
+    const definicion = definicionBase({
+      clavesContexto: [{ nombre: 'categoria', tipo: 'string', dominio: ['A', 'B', 1 as unknown as string] }],
+      requisitos: [{ id: 'doc-base', nombre: 'Documento base', tipo: 'OBLIGATORIO' }],
+    });
+
+    const resultado = validarDefinicionTramite(definicion);
+
+    expect(resultado.valida).toBe(false);
+    expect(resultado.errores).toEqual([expect.objectContaining({ codigo: 'DOMINIO_TIPO_INCOHERENTE' })]);
+  });
+
+  it('reporta el dominio incoherente del catálogo aunque ninguna condición referencie esa clave', () => {
+    const definicion = definicionBase({
+      clavesContexto: [{ nombre: 'sinUso', tipo: 'boolean', dominio: ['si' as unknown as boolean] }],
+      requisitos: [{ id: 'doc-base', nombre: 'Documento base', tipo: 'OBLIGATORIO' }],
+    });
+
+    const resultado = validarDefinicionTramite(definicion);
+
+    expect(resultado.valida).toBe(false);
+    expect(resultado.errores).toEqual([expect.objectContaining({ codigo: 'DOMINIO_TIPO_INCOHERENTE' })]);
+  });
+
+  it('acepta un dominio cuyos valores son todos del tipo declarado', () => {
+    const resultado = validarDefinicionTramite(definicionBase());
+    expect(resultado.valida).toBe(true);
   });
 });
 
