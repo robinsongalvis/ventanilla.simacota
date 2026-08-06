@@ -6,11 +6,14 @@
 # comprueba si el recurso ya existe antes de crearlo.
 #
 # Qué deja montado:
-#   1. Bucket GCS de respaldos, en la MISMA ubicación que Firestore (nam5 -> US).
-#   2. Política de retención (lifecycle) de 30 días sobre ese bucket.
-#   3. Service account dedicada de backups (identidad separada de la app).
-#   4. IAM mínimo: datastore.importExportAdmin (export/import) + objectAdmin en el bucket.
-#   5. (Opcional, recomendado) Federación de identidad (WIF) GitHub Actions -> GCP,
+#   1. APIs de GCP requeridas habilitadas (iamcredentials, iam, firestore, storage).
+#      iamcredentials es imprescindible: sin ella la impersonación de la SA vía WIF
+#      falla con 403 SERVICE_DISABLED y el primer backup no corre (visto 2026-08-06).
+#   2. Bucket GCS de respaldos, en la MISMA ubicación que Firestore (nam5 -> US).
+#   3. Política de retención (lifecycle) de 30 días sobre ese bucket.
+#   4. Service account dedicada de backups (identidad separada de la app).
+#   5. IAM mínimo: datastore.importExportAdmin (export/import) + objectAdmin en el bucket.
+#   6. (Opcional, recomendado) Federación de identidad (WIF) GitHub Actions -> GCP,
 #      para autenticar el workflow SIN clave JSON de larga vida.
 #
 # NO ejecuta ningún export ni toca datos. Solo crea/verifica recursos de infra.
@@ -46,11 +49,26 @@ echo
 command -v gcloud >/dev/null || { echo "ERROR: gcloud no está instalado."; exit 1; }
 gcloud config set project "${PROJECT}" >/dev/null
 
-# ── 1. Bucket de respaldos ───────────────────────────────────────────────────
+# ── 1. Habilitación de APIs requeridas ───────────────────────────────────────
+# Debe ir ANTES de crear bucket/SA/IAM/WIF: cada paso siguiente depende de una
+# de estas APIs. En particular, la impersonación de la SA vía WIF requiere
+# iamcredentials.googleapis.com; sin ella el primer backup falla con
+# 403 SERVICE_DISABLED (visto el 2026-08-06). Idempotente: habilitar una API ya
+# habilitada es no-op. Se piden todas en una sola llamada (batch).
+echo "[1/6] Habilitando APIs requeridas (idempotente)..."
+gcloud services enable \
+  iamcredentials.googleapis.com \
+  iam.googleapis.com \
+  firestore.googleapis.com \
+  storage.googleapis.com \
+  --project="${PROJECT}"
+echo "      OK: iamcredentials + iam + firestore + storage"
+
+# ── 2. Bucket de respaldos ───────────────────────────────────────────────────
 if gcloud storage buckets describe "gs://${BUCKET}" >/dev/null 2>&1; then
-  echo "[1/5] Bucket gs://${BUCKET} ya existe. OK"
+  echo "[2/6] Bucket gs://${BUCKET} ya existe. OK"
 else
-  echo "[1/5] Creando bucket gs://${BUCKET} en ${LOCATION}..."
+  echo "[2/6] Creando bucket gs://${BUCKET} en ${LOCATION}..."
   gcloud storage buckets create "gs://${BUCKET}" \
     --project="${PROJECT}" \
     --location="${LOCATION}" \
@@ -58,22 +76,22 @@ else
     --public-access-prevention
 fi
 
-# ── 2. Retención (lifecycle) ─────────────────────────────────────────────────
-echo "[2/5] Aplicando política de retención (${LIFECYCLE_FILE})..."
+# ── 3. Retención (lifecycle) ─────────────────────────────────────────────────
+echo "[3/6] Aplicando política de retención (${LIFECYCLE_FILE})..."
 gcloud storage buckets update "gs://${BUCKET}" --lifecycle-file="${LIFECYCLE_FILE}"
 
-# ── 3. Service account de backups ────────────────────────────────────────────
+# ── 4. Service account de backups ────────────────────────────────────────────
 if gcloud iam service-accounts describe "${BACKUP_SA}" >/dev/null 2>&1; then
-  echo "[3/5] SA ${BACKUP_SA} ya existe. OK"
+  echo "[4/6] SA ${BACKUP_SA} ya existe. OK"
 else
-  echo "[3/5] Creando SA ${BACKUP_SA}..."
+  echo "[4/6] Creando SA ${BACKUP_SA}..."
   gcloud iam service-accounts create "${BACKUP_SA_NAME}" \
     --project="${PROJECT}" \
     --display-name="Firestore backups (export diario)"
 fi
 
-# ── 4. IAM mínimo ────────────────────────────────────────────────────────────
-echo "[4/5] Concediendo roles mínimos..."
+# ── 5. IAM mínimo ────────────────────────────────────────────────────────────
+echo "[5/6] Concediendo roles mínimos..."
 # Export/import de Firestore.
 gcloud projects add-iam-policy-binding "${PROJECT}" \
   --member="serviceAccount:${BACKUP_SA}" \
@@ -85,15 +103,15 @@ gcloud storage buckets add-iam-policy-binding "gs://${BUCKET}" \
   --role="roles/storage.objectAdmin" >/dev/null
 echo "      OK: datastore.importExportAdmin + storage.objectAdmin@bucket"
 
-# ── 5. Federación de identidad (WIF) — recomendado, sin clave de larga vida ───
+# ── 6. Federación de identidad (WIF) — recomendado, sin clave de larga vida ───
 if [ "${SETUP_WIF}" = "ask" ]; then
-  read -r -p "[5/5] ¿Configurar WIF para GitHub Actions (${GH_REPO})? [y/N] " resp
+  read -r -p "[6/6] ¿Configurar WIF para GitHub Actions (${GH_REPO})? [y/N] " resp
   case "${resp}" in y|Y|yes|si|s) SETUP_WIF=yes;; *) SETUP_WIF=no;; esac
 fi
 
 if [ "${SETUP_WIF}" = "yes" ]; then
   PROJECT_NUM="$(gcloud projects describe "${PROJECT}" --format='value(projectNumber)')"
-  echo "[5/5] Configurando Workload Identity Federation..."
+  echo "[6/6] Configurando Workload Identity Federation..."
   gcloud iam workload-identity-pools describe "${WIF_POOL}" --location=global >/dev/null 2>&1 || \
     gcloud iam workload-identity-pools create "${WIF_POOL}" \
       --location=global --display-name="GitHub Actions"
@@ -115,7 +133,7 @@ if [ "${SETUP_WIF}" = "yes" ]; then
   echo "     GCP_WORKLOAD_IDENTITY_PROVIDER = ${PROVIDER_RESOURCE}"
   echo "     GCP_BACKUP_SA                  = ${BACKUP_SA}"
 else
-  echo "[5/5] WIF omitido. Fallback con clave JSON (rótala cada 90 días):"
+  echo "[6/6] WIF omitido. Fallback con clave JSON (rótala cada 90 días):"
   echo "     gcloud iam service-accounts keys create backup-sa.json --iam-account=${BACKUP_SA}"
   echo "     gh secret set GCP_BACKUP_SA_KEY < backup-sa.json   # luego BORRA backup-sa.json"
 fi
