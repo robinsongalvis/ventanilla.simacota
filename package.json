@@ -11,6 +11,7 @@
     "test:watch": "vitest",
     "test:e2e": "playwright test",
     "test:rules": "node --test e2e/rules/*.test.mjs",
+    "audit:gate": "node scripts/ci/audit-gate.mjs",
     "presupuesto:rendimiento": "node scripts/laboratorio/presupuesto-rendimiento.mjs",
     "verificar:indices": "node scripts/laboratorio/verificar-indices.mjs",
     "informe:despliegue": "node scripts/laboratorio/informe-despliegue.mjs",
