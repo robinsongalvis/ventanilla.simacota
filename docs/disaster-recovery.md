@@ -54,8 +54,10 @@ no había Cloud Scheduler, ni Action, ni script. Ya no es así.
 - Workflow `.github/workflows/backup-firestore.yml` — export diario de Firestore
   de producción a `gs://ventanilla-simacota-backups/diario/YYYY-MM-DD/`, a las
   02:00 hora Colombia (07:00 UTC), más disparo manual de prueba.
-- `scripts/backups/setup-gcp-backups.sh` — provisión idempotente de bucket,
-  retención (30 días vía lifecycle), service account de backups e IAM mínimo.
+- `scripts/backups/setup-gcp-backups.sh` — provisión idempotente: habilitación de
+  las APIs requeridas (`iamcredentials`/`iam`/`firestore`/`storage`), bucket,
+  retención (30 días vía lifecycle), service account de backups, IAM mínimo y
+  federación de identidad (WIF) opcional.
 - `scripts/backups/export-firestore.sh` — export manual equivalente para correr
   desde una máquina con `gcloud`.
 
@@ -75,9 +77,13 @@ gcloud firestore export gs://ventanilla-simacota-backups/diario/$(date -u +%F) \
 **Estado verificado 2026-08-06:** los backups están **OPERATIVOS**. Primer export
 manual verificado (GitHub Actions run `31088181768`, `success`) en
 `gs://ventanilla-simacota-backups/diario/2026-08-06/` (`overall_export_metadata` +
-`output-0/1`); tamaño del export ≈ **361 KB**. El aprovisionamiento requirió —además
-de `setup-gcp-backups.sh` + los secrets WIF— habilitar `iamcredentials.googleapis.com`
-(necesaria para la impersonación WIF; **falta añadirla al script**). Con ≥1 export
+`output-0/1`); tamaño del export ≈ **361 KB**. El primer intento (run `31087985656`)
+había fallado con `403 SERVICE_DISABLED`: el aprovisionamiento requería —además de
+`setup-gcp-backups.sh` + los secrets WIF— habilitar `iamcredentials.googleapis.com`
+(necesaria para la impersonación WIF), que se activó a mano y el export pasó. Ese
+hueco **ya está cerrado en el script** (PR #152, mergeado en `main`): `setup-gcp-backups.sh`
+ahora habilita esa API —y `iam`/`firestore`/`storage`— **antes** de crear SA/IAM/WIF,
+de modo que una provisión limpia queda completa en una sola pasada. Con ≥1 export
 durable verificado, la precondición de backup para el reset de producción queda
 **cumplida** (el reset sigue requiriendo tu orden explícita).
 
@@ -90,6 +96,16 @@ sin infraestructura extra.
 60 días sin `push` al repo. En mantenimiento activo no aplica; si el repo entra
 en pausa larga, hay que reactivar el workflow o migrar el disparo a Cloud
 Scheduler (+ Cloud Function para plantillar la fecha).
+
+**Salvedad operativa (colisión de ruta el mismo día):** la ruta de destino lleva
+solo la fecha (`date -u +%F`, sin hora) y Firestore rechaza exportar a una ruta ya
+existente (`INVALID_ARGUMENT: Path already exists`). Si un mismo día UTC corren dos
+exports (p. ej. una prueba manual + el programado), el segundo falla. Ocurrió el
+2026-08-06: el programado de las 09:34 UTC (run `31089676325`) falló **tras autenticar
+bien** porque la prueba manual de las 09:13 ya había escrito `diario/2026-08-06`. Es
+benigno bajo el cron normal (1/día → fecha única) y **no** indica un problema de
+infraestructura ni de la API. Endurecimiento pendiente (ruta única por hora/run-id o
+salto idempotente si la ruta del día ya existe).
 
 **Hardening de la base (verificado en prod el 2026-08-06 vía `gcloud firestore
 databases describe`):** PITR y Delete Protection están **HABILITADOS** —
@@ -104,8 +120,9 @@ recuperación de 7 días *dentro de la misma base* (útil ante corrupción recie
 ### 3.2. Proceso de Restauración ante Corrupción de Datos
 
 El procedimiento **exacto, con criterios de éxito** vive en
-`docs/RUNBOOK_RESTAURACION.md` (está **definido**; el drill end-to-end contra un
-export real de producción queda **pendiente** hasta el primer export durable). Resumen:
+`docs/RUNBOOK_RESTAURACION.md` (está **definido**; con el primer export durable ya
+verificado el 2026-08-06, el drill end-to-end contra un export real de producción
+queda **desbloqueado y pendiente de ejecutar** contra STAGE). Resumen:
 
 1. Toda restauración de *ensayo* va a **STAGE** (`ventanilla-simacota-stage`),
    nunca a producción.
