@@ -10,6 +10,7 @@ import type { Transaction, Firestore } from 'firebase-admin/firestore';
 import {
   leerConsecutivosLegales,
   confirmarConsecutivosLegales,
+  verificarAvanceCounter,
   type ConsecutivoPendiente,
 } from '@/lib/server/consecutivo-legal';
 
@@ -126,5 +127,61 @@ describe('consecutivo-legal — confirmarConsecutivosLegales', () => {
     expect(() => confirmarConsecutivosLegales(b.tx, FECHA, pendDeA)).toThrow();
     // Y confirmar en A con sus propios pendientes → no lanza.
     expect(() => confirmarConsecutivosLegales(a.tx, FECHA, pendDeA)).not.toThrow();
+  });
+});
+
+describe('consecutivo-legal — verificarAvanceCounter (guard monotónico D9, ADR-0026)', () => {
+  it('acepta un avance REAL estrictamente mayor que el actual', () => {
+    expect(() =>
+      verificarAvanceCounter({ serie: 'radicados', ultimoActual: 41, ultimoPropuesto: 42, origen: 'REAL' }),
+    ).not.toThrow();
+  });
+
+  it('acepta arrancar desde 0 (contador nuevo) con origen REAL', () => {
+    expect(() =>
+      verificarAvanceCounter({ serie: 'expedientes', ultimoActual: 0, ultimoPropuesto: 1, origen: 'REAL' }),
+    ).not.toThrow();
+  });
+
+  it('rechaza un propuesto igual al actual (estancamiento)', () => {
+    expect(() =>
+      verificarAvanceCounter({ serie: 'radicados', ultimoActual: 10, ultimoPropuesto: 10, origen: 'REAL' }),
+    ).toThrow(/no puede retroceder ni estancarse/);
+  });
+
+  it('rechaza un propuesto MENOR al actual (retroceso)', () => {
+    expect(() =>
+      verificarAvanceCounter({ serie: 'radicados', ultimoActual: 100, ultimoPropuesto: 5, origen: 'REAL' }),
+    ).toThrow(/no puede retroceder ni estancarse/);
+  });
+
+  it('rechaza cualquier avance de origen RECONSTRUIDO, incluso si es monótono', () => {
+    expect(() =>
+      verificarAvanceCounter({ serie: 'expedientes', ultimoActual: 5, ultimoPropuesto: 6, origen: 'RECONSTRUIDO' }),
+    ).toThrow(/RECONSTRUIDO/);
+  });
+
+  it('rechaza ultimoActual no entero o negativo', () => {
+    expect(() =>
+      verificarAvanceCounter({ serie: 'radicados', ultimoActual: -1, ultimoPropuesto: 1, origen: 'REAL' }),
+    ).toThrow(/ultimoActual/);
+    expect(() =>
+      verificarAvanceCounter({ serie: 'radicados', ultimoActual: 1.5, ultimoPropuesto: 2, origen: 'REAL' }),
+    ).toThrow(/ultimoActual/);
+  });
+
+  it('rechaza ultimoPropuesto no entero o negativo', () => {
+    expect(() =>
+      verificarAvanceCounter({ serie: 'radicados', ultimoActual: 1, ultimoPropuesto: -2, origen: 'REAL' }),
+    ).toThrow(/ultimoPropuesto/);
+    expect(() =>
+      verificarAvanceCounter({ serie: 'radicados', ultimoActual: 1, ultimoPropuesto: 2.7, origen: 'REAL' }),
+    ).toThrow(/ultimoPropuesto/);
+  });
+
+  it('la serie nueva "expedientes" es aceptada por el tipo sin romper el guard (no-breaking)', () => {
+    expect(() =>
+      verificarAvanceCounter({ serie: 'expedientes', ultimoActual: 0, ultimoPropuesto: 1, origen: 'REAL' }),
+    ).not.toThrow();
   });
 });
