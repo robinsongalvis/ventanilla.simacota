@@ -3,6 +3,7 @@ import type {
   Firestore,
   Transaction,
 } from 'firebase-admin/firestore';
+import type { OrigenActuacion } from '@/lib/motor-expedientes/tipos';
 
 /**
  * Helper transaccional de consecutivos legales — Bloque 2, corrección de H3.
@@ -29,7 +30,7 @@ import type {
  *     idempotente (la transacción puede reejecutarse en un reintento).
  */
 
-export type SerieConsecutivo = 'radicados' | 'salidas' | 'planillas';
+export type SerieConsecutivo = 'radicados' | 'salidas' | 'planillas' | 'expedientes';
 
 /** Descripción de una serie a asignar: su nombre y su formateador de id. */
 export interface SolicitudSerie {
@@ -114,5 +115,103 @@ export function confirmarConsecutivosLegales(
   const marca = { anio: fecha.getFullYear(), actualizadoEn: fecha.toISOString() };
   for (const p of pendientes) {
     tx.set(p.ref, { ultimo: p.consecutivo, ...marca }, { merge: true });
+  }
+}
+
+/**
+ * Origen del consecutivo que se pretende escribir en un `counters/{serie}-{año}`.
+ *
+ * Alias del tipo canónico `OrigenActuacion` (`lib/motor-expedientes/tipos.ts`)
+ * — ambos representan la MISMA unión conceptual ('REAL'|'RECONSTRUIDO') y
+ * antes de este cambio estaban declarados por separado en dos módulos sin
+ * ninguna relación estructural entre sí (deuda #10, ADR-0026 §A2): un cambio
+ * futuro en uno (p. ej. añadir un tercer origen) podía olvidarse en el otro
+ * sin que el compilador lo detectara. Se conserva el nombre `OrigenConsecutivo`
+ * en este módulo (cero cambio de firma para sus consumidores) reexportando el
+ * tipo de `lib/motor-expedientes/tipos.ts` como fuente única de verdad:
+ *
+ * - `REAL`: consumo genuino y nuevo de la serie (radicación normal).
+ * - `RECONSTRUIDO`: número que proviene de reconstruir un evento histórico
+ *   (p. ej. migración de expedientes en trámite, ADR-0026 D6/D9) o de un
+ *   formato legado. Nunca debe avanzar el contador vigente de una serie
+ *   real: el expediente reconstruido conserva su fecha/numeración
+ *   original como dato de la actuación (`Actuacion.origen`, ver
+ *   `lib/motor-expedientes/tipos.ts`), pero el contador Firestore que
+ *   emite los PRÓXIMOS números nuevos no debe moverse por su causa.
+ */
+export type OrigenConsecutivo = OrigenActuacion;
+
+export interface GuardAvanceCounterInput {
+  serie: SerieConsecutivo;
+  /** Valor actual de `counters/{serie}-{año}.ultimo` (0 si el documento no existe). */
+  ultimoActual: number;
+  /** Valor que se pretende escribir en `ultimo`. */
+  ultimoPropuesto: number;
+  /** Origen del consecutivo que produjo `ultimoPropuesto`. */
+  origen: OrigenConsecutivo;
+}
+
+/**
+ * Guard puro (D9, ADR-0026) — salvaguarda de seguridad de datos que debe
+ * quedar implementada y verificada ANTES de introducir la serie
+ * `expedientes` (precondición #4 del ADR). No reemplaza la atomicidad
+ * transaccional de `confirmarConsecutivosLegales` (eso ya lo resuelve el
+ * fix de H3): este guard es una defensa adicional para cualquier punto de
+ * escritura de `counters` — presente o futuro (p. ej. un asistente de
+ * migración de la Fase 5) — que no pase por el flujo transaccional
+ * estándar de este archivo.
+ *
+ * Dos invariantes, ambas obligatorias:
+ *  1. **Monotonicidad**: `ultimo` de una serie JAMÁS retrocede ni se
+ *     estanca. `ultimoPropuesto` debe ser estrictamente mayor que
+ *     `ultimoActual`.
+ *  2. **Prohibición de números legados/reconstruidos en series reales**:
+ *     un consecutivo de `origen: 'RECONSTRUIDO'` (migración de un
+ *     expediente histórico, o cualquier número derivado de un formato
+ *     legado) NUNCA puede avanzar el contador vigente. Las actuaciones
+ *     reconstruidas se marcan como tales (D6/D8) pero no consumen la
+ *     serie legal — solo un evento `REAL` (radicación/expedición nueva)
+ *     puede hacerlo.
+ *
+ * Supuesto declarado (Principio 13 — no hay aún especificación cerrada del
+ * formato de "número legado" porque la Fase 5 de migración no está
+ * diseñada): este guard NO intenta parsear ni reconocer formatos legados
+ * por su forma de string. En su lugar excluye por `origen` declarado por
+ * el caller, que es la señal que SÍ conoce hoy el dominio (D6: la
+ * migración marca explícitamente cada actuación/consecutivo que reconstruye
+ * como `RECONSTRUIDO`). Si en la Fase 5 aparece un caso que requiera
+ * detección estructural del formato, se amplía este guard con ADR — no se
+ * fuerza aquí una regla sin caso real que la motive (YAGNI).
+ *
+ * Lanza `Error` (no devuelve `boolean`) a propósito: esto es un guard de
+ * corrección de datos, no una validación de negocio recuperable — un
+ * caller que lo invoca con un valor inválido tiene un bug que debe
+ * detenerse, no degradarse en silencio.
+ */
+export function verificarAvanceCounter(input: GuardAvanceCounterInput): void {
+  const { serie, ultimoActual, ultimoPropuesto, origen } = input;
+
+  if (!Number.isInteger(ultimoActual) || ultimoActual < 0) {
+    throw new Error(
+      `Guard de counters: 'ultimoActual' inválido para la serie '${serie}' (${ultimoActual}). Debe ser un entero >= 0.`,
+    );
+  }
+  if (!Number.isInteger(ultimoPropuesto) || ultimoPropuesto < 0) {
+    throw new Error(
+      `Guard de counters: 'ultimoPropuesto' inválido para la serie '${serie}' (${ultimoPropuesto}). Debe ser un entero >= 0.`,
+    );
+  }
+  if (ultimoPropuesto <= ultimoActual) {
+    throw new Error(
+      `Guard de counters: la serie '${serie}' no puede retroceder ni estancarse ` +
+        `(actual=${ultimoActual}, propuesto=${ultimoPropuesto}).`,
+    );
+  }
+  if (origen === 'RECONSTRUIDO') {
+    throw new Error(
+      `Guard de counters: prohibido avanzar el contador vigente de la serie real ` +
+        `'${serie}' con un consecutivo de origen RECONSTRUIDO (migración/legado). ` +
+        `Las actuaciones reconstruidas no consumen la serie legal vigente (D9, ADR-0026).`,
+    );
   }
 }
