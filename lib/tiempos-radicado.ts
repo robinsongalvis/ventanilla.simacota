@@ -125,15 +125,62 @@ function toDateOnly(date: Date): string {
 }
 
 /**
- * Ancla una fecha a mediodía local (evita corrimientos de día por zona
- * horaria). Exportada para que otros módulos de cómputo de plazos legales
- * (p. ej. `lib/motor-expedientes/subsanacion-regimen.ts`) reutilicen la
- * misma normalización en vez de duplicarla — cambio aditivo, no rompe a
- * ningún consumidor existente de este archivo.
+ * Formateador reutilizable para extraer el día calendario en horario Colombia
+ * (America/Bogota, UTC-5 sin DST) de un instante. Mismo enfoque `Intl` que
+ * `lib/fecha-colombia.ts`. Se crea una sola vez (los formateadores de Intl son
+ * sin estado al formatear).
+ */
+const PARTES_DIA_BOGOTA = new Intl.DateTimeFormat('en-CA', {
+  timeZone: 'America/Bogota',
+  year: 'numeric',
+  month: '2-digit',
+  day: '2-digit',
+});
+
+/** Año/mes/día del instante en horario Colombia (no el del runtime). */
+function diaCalendarioBogota(instante: Date): { anio: number; mes: number; dia: number } {
+  const partes = PARTES_DIA_BOGOTA.formatToParts(instante);
+  const valor = (tipo: string) => Number(partes.find((p) => p.type === tipo)?.value);
+  return { anio: valor('year'), mes: valor('month'), dia: valor('day') };
+}
+
+/**
+ * Ancla una fecha al **mediodía del día calendario de America/Bogota**, de forma
+ * INDEPENDIENTE de la zona horaria del runtime.
+ *
+ * Antes derivaba el día con `getFullYear/Month/Date` (getters de la TZ del
+ * entorno): en un servidor en UTC (Vercel) eso corría el día ±1 respecto a
+ * Colombia para instantes de la franja nocturna colombiana (19:00–24:00), que
+ * en UTC ya pertenecen al día siguiente — sesgando TODOS los plazos legales
+ * (RS-1, ADR-0026 §A2 #15). El anclaje a mediodía preserva el día bajo los
+ * getters locales de las funciones aguas abajo, en cualquier TZ.
+ *
+ * Dos casos de entrada:
+ *  - **Instante** (`Date` o ISO con hora): se toma su día calendario en
+ *    America/Bogota.
+ *  - **String de SOLO fecha** `YYYY-MM-DD`: se toma el día **literal** (no es un
+ *    instante; parsearlo como UTC medianoche lo correría al día anterior en
+ *    Colombia).
+ *
+ * Exportada para que otros módulos de plazos legales (p. ej.
+ * `lib/motor-expedientes/subsanacion-regimen.ts`) reutilicen esta normalización.
  */
 export function atLocalNoon(value: string | Date): Date {
+  if (typeof value === 'string') {
+    const soloFecha = value.match(/^(\d{4})-(\d{2})-(\d{2})$/);
+    if (soloFecha) {
+      const anio = Number(soloFecha[1]);
+      const mes = Number(soloFecha[2]);
+      const dia = Number(soloFecha[3]);
+      const fecha = new Date(anio, mes - 1, dia, 12, 0, 0, 0);
+      // Preserva "fecha inválida → inválida" ante overflow (p. ej. '2026-02-31').
+      return fecha.getMonth() === mes - 1 ? fecha : new Date(NaN);
+    }
+  }
   const date = value instanceof Date ? value : new Date(value);
-  return new Date(date.getFullYear(), date.getMonth(), date.getDate(), 12, 0, 0, 0);
+  if (Number.isNaN(date.getTime())) return date; // inválida → se propaga a las guardas aguas abajo
+  const { anio, mes, dia } = diaCalendarioBogota(date);
+  return new Date(anio, mes - 1, dia, 12, 0, 0, 0);
 }
 
 /**
