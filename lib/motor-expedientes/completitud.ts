@@ -44,8 +44,14 @@ function claveDefinida(contexto: ContextoEvaluacionRequisito, clave: string): bo
   return Object.prototype.hasOwnProperty.call(contexto, clave);
 }
 
-/** Recolecta, recursivamente, todas las claves de contexto que referencia un árbol de condición. */
-function clavesReferenciadas(condicion: CondicionRequisito): string[] {
+/**
+ * Recolecta, recursivamente, todas las claves de contexto que referencia un
+ * árbol de condición. Exportada (Fase 1, ADR-0026 §A2 #4) para que
+ * `validar-definicion.ts` la reutilice al comprobar que toda clave
+ * referenciada esté declarada en el catálogo de la Definición — evita
+ * duplicar el recorrido del árbol de `CondicionRequisito` en dos módulos.
+ */
+export function clavesReferenciadas(condicion: CondicionRequisito): string[] {
   switch (condicion.operador) {
     case 'IGUAL':
     case 'DISTINTO':
@@ -152,8 +158,25 @@ export interface RequisitoIndeterminado {
   clavesFaltantes: string[];
 }
 
+/**
+ * Requisito con más de una entrada en `aportes` para el mismo `requisitoId`
+ * (H2, ADR-0026 §A2 #14). Razón distinguible de `RequisitoFaltante` e
+ * `RequisitoIndeterminado`: aquí la causa raíz no es "falta el documento" ni
+ * "falta un dato del caso" — es que el ARREGLO `aportes` de entrada está mal
+ * formado para este requisito (dos o más registros compitiendo por el mismo
+ * slot). La corrección es deduplicar `aportes` antes de invocar al
+ * evaluador (responsabilidad del caller/persistencia), no que este módulo
+ * adivine cuál copia es la válida.
+ */
+export interface RequisitoAporteDuplicado {
+  requisitoId: string;
+  nombre: string;
+  /** Cuántas entradas de `aportes` referencian este mismo `requisitoId`. */
+  cantidadAportes: number;
+}
+
 export interface ResultadoCompletitud {
-  /** `false` si hay al menos un faltante O un indeterminado (fail-closed). */
+  /** `false` si hay al menos un faltante, un indeterminado, O un aporte duplicado (fail-closed). */
   completo: boolean;
   /** Requisitos que SÍ aplican al caso y aún no tienen aporte con documento real — bloquean la completitud. */
   faltantes: RequisitoFaltante[];
@@ -161,6 +184,13 @@ export interface ResultadoCompletitud {
   noAplicables: string[];
   /** Requisitos condicionales cuya condición no se pudo evaluar por contexto incompleto — bloquean la completitud. */
   indeterminados: RequisitoIndeterminado[];
+  /**
+   * Requisitos cuyo `requisitoId` aparece más de una vez en `aportes` (H2,
+   * ADR-0026 §A2 #14) — bloquean la completitud SIN evaluar su aplicación ni
+   * su estado de aporte, porque el dato de entrada mismo es ambiguo. Vacío
+   * en el caso normal (un aporte por requisito).
+   */
+  aportesDuplicados: RequisitoAporteDuplicado[];
 }
 
 /**
@@ -175,12 +205,36 @@ export function evaluarCompletitud(
   aportes: AporteRequisito[],
   contexto: ContextoEvaluacionRequisito,
 ): ResultadoCompletitud {
+  // H2 (ADR-0026 §A2 #14): el `Map` de abajo, construido con
+  // `new Map(aportes.map(...))`, sobrescribe silenciosamente una entrada
+  // anterior cuando dos elementos de `aportes` comparten `requisitoId` — "el
+  // último gana", con lo que el veredicto de completitud dependía del ORDEN
+  // de `aportes`, no de su contenido. DECISIÓN: contar cuántas veces
+  // aparece cada `requisitoId` y, para cualquier requisito de la Definición
+  // cuyo id tenga más de una entrada, NO decidir cuál copia es la válida —
+  // se reporta en `aportesDuplicados` (categoría de bloqueo propia, ver
+  // `RequisitoAporteDuplicado`) y se bloquea `completo`, fail-closed y
+  // coherente con el resto del módulo (que ya nunca "adivina" ante un dato
+  // ambiguo — ver INDETERMINADO). El requisito NO se evalúa por `requisitoAplica`
+  // en este caso: no tendría sentido decidir aplicación/completitud sobre un
+  // dato de entrada que es, en sí mismo, contradictorio.
+  const conteoAportes = new Map<string, number>();
+  for (const aporte of aportes) {
+    conteoAportes.set(aporte.requisitoId, (conteoAportes.get(aporte.requisitoId) ?? 0) + 1);
+  }
   const aportePorRequisito = new Map(aportes.map((a) => [a.requisitoId, a] as const));
   const faltantes: RequisitoFaltante[] = [];
   const noAplicables: string[] = [];
   const indeterminados: RequisitoIndeterminado[] = [];
+  const aportesDuplicados: RequisitoAporteDuplicado[] = [];
 
   for (const requisito of tramite.requisitos) {
+    const cantidadAportes = conteoAportes.get(requisito.id) ?? 0;
+    if (cantidadAportes > 1) {
+      aportesDuplicados.push({ requisitoId: requisito.id, nombre: requisito.nombre, cantidadAportes });
+      continue;
+    }
+
     const resultado = requisitoAplica(requisito, contexto);
 
     if (resultado === 'INDETERMINADO') {
@@ -216,9 +270,10 @@ export function evaluarCompletitud(
   }
 
   return {
-    completo: faltantes.length === 0 && indeterminados.length === 0,
+    completo: faltantes.length === 0 && indeterminados.length === 0 && aportesDuplicados.length === 0,
     faltantes,
     noAplicables,
     indeterminados,
+    aportesDuplicados,
   };
 }

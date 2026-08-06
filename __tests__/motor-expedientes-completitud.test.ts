@@ -415,6 +415,159 @@ describe('evaluarCompletitud — checklist real de Licencia de Construcción', (
     });
   });
 
+  describe('COB-2 (ultrareview) — clavesFaltantes de una condición COMPUESTA multi-clave (Y/O)', () => {
+    // Antes de este bloque, `clavesFaltantesDe` solo se probaba con
+    // condiciones de UNA sola clave suelta (ver describe FAIL-CLOSED arriba:
+    // `poder-apoderado` referencia solo `esApoderado`). Un mutante que, por
+    // ejemplo, recorriera solo la PRIMERA rama de un `Y`/`O` en vez de las
+    // `condiciones` completas (`clavesReferenciadas`) seguiría pasando toda
+    // la suite existente: se necesita un requisito cuya condición referencie
+    // MÁS DE UNA clave para exponerlo.
+    function tramiteConRequisitoCompuesto(): DefinicionTramite {
+      const base = tramiteLicencia();
+      return {
+        ...base,
+        requisitos: [
+          {
+            id: 'requisito-compuesto',
+            nombre: 'Requisito con condición Y de dos claves',
+            tipo: 'CONDICIONAL',
+            condicion: {
+              operador: 'Y',
+              condiciones: [
+                { operador: 'IGUAL', clave: 'claveA', valor: true },
+                { operador: 'EN', clave: 'claveB', valores: ['x', 'y'] },
+              ],
+            },
+          },
+        ],
+      };
+    }
+
+    it('ninguna de las dos claves está en el contexto: AMBAS aparecen en clavesFaltantes, no solo la primera', () => {
+      const tramite = tramiteConRequisitoCompuesto();
+      const resultado = evaluarCompletitud(tramite, [], {});
+
+      expect(resultado.indeterminados).toEqual([
+        { requisitoId: 'requisito-compuesto', nombre: 'Requisito con condición Y de dos claves', clavesFaltantes: ['claveA', 'claveB'] },
+      ]);
+    });
+
+    it('solo la SEGUNDA clave falta: clavesFaltantes reporta exclusivamente esa (guarda contra un mutante que solo mira la primera rama)', () => {
+      const tramite = tramiteConRequisitoCompuesto();
+      const resultado = evaluarCompletitud(tramite, [], { claveA: true }); // claveB sigue ausente
+
+      expect(resultado.indeterminados).toEqual([
+        { requisitoId: 'requisito-compuesto', nombre: 'Requisito con condición Y de dos claves', clavesFaltantes: ['claveB'] },
+      ]);
+    });
+
+    it('solo la PRIMERA clave falta: clavesFaltantes reporta exclusivamente esa (guarda contra un mutante que solo mira la segunda rama)', () => {
+      const tramite = tramiteConRequisitoCompuesto();
+      const resultado = evaluarCompletitud(tramite, [], { claveB: 'x' }); // claveA sigue ausente
+
+      expect(resultado.indeterminados).toEqual([
+        { requisitoId: 'requisito-compuesto', nombre: 'Requisito con condición Y de dos claves', clavesFaltantes: ['claveA'] },
+      ]);
+    });
+  });
+
+  describe('H2 (ADR-0026 §A2 #14) — requisitoId duplicado en aportes: fail-closed, no "el último gana"', () => {
+    it('dos aportes para el mismo requisitoId bloquean completitud vía aportesDuplicados, no vía last-wins', () => {
+      const tramite = tramiteLicencia();
+      const contexto: ContextoEvaluacionRequisito = {
+        esApoderado: false,
+        predioRodeadoEspacioPublico: true,
+        categoriaComplejidad: 'ALTA',
+        sujetoTituloENSR10: true,
+      };
+      // "solicitud-escrita" aparece dos veces: antes del fix, `new Map(...)`
+      // se quedaría con la ÚLTIMA entrada (pendiente) y el requisito
+      // aparecería como `faltante`, ocultando que el dato de entrada mismo
+      // es ambiguo.
+      const aportes: AporteRequisito[] = [
+        aportado('solicitud-escrita'),
+        pendiente('solicitud-escrita'),
+        aportado('certificado-tradicion'),
+      ];
+
+      const resultado = evaluarCompletitud(tramite, aportes, contexto);
+
+      expect(resultado.completo).toBe(false);
+      expect(resultado.aportesDuplicados).toEqual([
+        { requisitoId: 'solicitud-escrita', nombre: 'Solicitud escrita del titular', cantidadAportes: 2 },
+      ]);
+      // No decide un veredicto normal para el requisito ambiguo: no aparece
+      // como faltante ni como indeterminado, solo como aporte duplicado.
+      expect(resultado.faltantes).toEqual([]);
+      expect(resultado.indeterminados).toEqual([]);
+    });
+
+    it('el resultado NO depende del orden de las entradas duplicadas (antes sí dependía — "el último gana")', () => {
+      const tramite = tramiteLicencia();
+      const contexto: ContextoEvaluacionRequisito = {
+        esApoderado: false,
+        predioRodeadoEspacioPublico: true,
+        categoriaComplejidad: 'ALTA',
+        sujetoTituloENSR10: true,
+      };
+      const base = [aportado('certificado-tradicion')];
+
+      const ordenA = evaluarCompletitud(
+        tramite,
+        [aportado('solicitud-escrita'), pendiente('solicitud-escrita'), ...base],
+        contexto,
+      );
+      const ordenB = evaluarCompletitud(
+        tramite,
+        [pendiente('solicitud-escrita'), aportado('solicitud-escrita'), ...base],
+        contexto,
+      );
+
+      expect(ordenA).toEqual(ordenB);
+      expect(ordenA.completo).toBe(false);
+      expect(ordenA.aportesDuplicados.map((d) => d.requisitoId)).toEqual(['solicitud-escrita']);
+    });
+
+    it('tres o más aportes para el mismo requisitoId se reportan con el conteo real, no solo "duplicado"', () => {
+      const tramite = tramiteLicencia();
+      const contexto: ContextoEvaluacionRequisito = {
+        esApoderado: false,
+        predioRodeadoEspacioPublico: true,
+        categoriaComplejidad: 'ALTA',
+        sujetoTituloENSR10: true,
+      };
+      const aportes: AporteRequisito[] = [
+        aportado('solicitud-escrita'),
+        aportado('solicitud-escrita'),
+        pendiente('solicitud-escrita'),
+        aportado('certificado-tradicion'),
+      ];
+
+      const resultado = evaluarCompletitud(tramite, aportes, contexto);
+
+      expect(resultado.aportesDuplicados).toEqual([
+        { requisitoId: 'solicitud-escrita', nombre: 'Solicitud escrita del titular', cantidadAportes: 3 },
+      ]);
+    });
+
+    it('sin duplicados, aportesDuplicados es vacío y no afecta el veredicto (sin regresión)', () => {
+      const tramite = tramiteLicencia();
+      const contexto: ContextoEvaluacionRequisito = {
+        esApoderado: false,
+        predioRodeadoEspacioPublico: true,
+        categoriaComplejidad: 'ALTA',
+        sujetoTituloENSR10: true,
+      };
+      const aportes = [aportado('solicitud-escrita'), aportado('certificado-tradicion')];
+
+      const resultado = evaluarCompletitud(tramite, aportes, contexto);
+
+      expect(resultado.aportesDuplicados).toEqual([]);
+      expect(resultado.completo).toBe(true);
+    });
+  });
+
   describe('defensa en profundidad — documento real (hallazgo MEDIO #2 del Arquitecto)', () => {
     it('un aporte APORTADO sin documentoIds NO cuenta como satisfecho', () => {
       const tramite = tramiteLicencia();
