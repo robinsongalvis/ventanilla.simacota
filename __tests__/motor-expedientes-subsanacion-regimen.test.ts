@@ -71,9 +71,50 @@ describe('calcularLimiteSubsanacion — régimen Licencia (30 días hábiles, De
     expect(diasRestantesHabiles(limite, notificacion)).toBe(30);
   });
 
-  it('acepta fechas como string ISO, igual que el resto del módulo', () => {
-    const limite = calcularLimiteSubsanacion(REGIMEN_LICENCIA, '2026-06-02T00:00:00.000Z');
-    expect(esDiaHabil(limite)).toBe(true);
+  it('acepta fechas como string ISO: produce EXACTAMENTE el mismo resultado que la fecha local(...) equivalente (RS-3, ultrareview — antes solo se aseveraba esDiaHabil, tautológico bajo HABILES: cualquier salida de un régimen HABILES es, por construcción, día hábil)', () => {
+    const notificacionIso = '2026-06-02T00:00:00.000Z';
+    // Día calendario LOCAL que `atLocalNoon` verá al convertir este string —
+    // se deriva del mismo valor bajo prueba (con los getters locales del
+    // entorno de ejecución), en vez de asumir que "Z" implica el mismo día
+    // calendario en cualquier huso horario (no es cierto: en UTC-5 este
+    // instante cae en la noche del día ANTERIOR en hora local).
+    const comoFecha = new Date(notificacionIso);
+    const equivalenteLocal = local(comoFecha.getFullYear(), comoFecha.getMonth() + 1, comoFecha.getDate());
+
+    const limiteDesdeString = calcularLimiteSubsanacion(REGIMEN_LICENCIA, notificacionIso);
+    const limiteDesdeLocal = calcularLimiteSubsanacion(REGIMEN_LICENCIA, equivalenteLocal);
+
+    // Contrato EXACTO (getTime), no solo "cae en día hábil": si la rama de
+    // parseo de string de `atLocalNoon` divergiera de la rama de `Date`
+    // (p. ej. no extrajera año/mes/día en hora LOCAL antes de fijar el
+    // mediodía), este assert lo detecta; `esDiaHabil` por sí solo no podía.
+    expect(limiteDesdeString.getTime()).toBe(limiteDesdeLocal.getTime());
+    expect(esDiaHabil(limiteDesdeString)).toBe(true);
+  });
+
+  describe('festivosExtra (RS-3, ultrareview) — hoy nunca se ejercita con un valor no vacío', () => {
+    it('un festivo adicional NO oficial desplaza el límite un día hábil más, bajo HABILES', () => {
+      // Setiembre de 2026 no tiene ningún festivo del calendario colombiano
+      // (fijo ni trasladado a lunes), así que el único festivo en juego es
+      // el declarado en `festivosExtra`.
+      const notificacion = local(2026, 9, 1); // martes
+      const regimenUnDiaHabil: RegimenSubsanacion = {
+        dias: 1,
+        unidad: 'HABILES',
+        prorrogaDias: 0,
+        ventanaRequerimiento: { dias: 1, unidad: 'HABILES' },
+      };
+
+      const sinFestivoExtra = calcularLimiteSubsanacion(regimenUnDiaHabil, notificacion);
+      const conFestivoExtra = calcularLimiteSubsanacion(regimenUnDiaHabil, notificacion, ['2026-09-02']);
+
+      expect(ymd(sinFestivoExtra)).toBe('2026-09-02');
+      // Con el 2 de septiembre marcado como festivo adicional, el único día
+      // hábil se corre al 3 — si `festivosExtra` no se usara realmente en
+      // `sumarPlazo`, este resultado sería idéntico al de arriba.
+      expect(ymd(conFestivoExtra)).toBe('2026-09-03');
+      expect(conFestivoExtra.getTime()).toBeGreaterThan(sinFestivoExtra.getTime());
+    });
   });
 });
 
@@ -155,15 +196,23 @@ describe('sumarPlazo — rama CALENDARIO (régimen hipotético, cobertura de las
 
 describe('mismo motor, datos distintos (D5) — resumen de equivalencia', () => {
   it.each([
-    { nombre: 'Licencia (Decreto 1077)', regimen: REGIMEN_LICENCIA, diasEsperados: 30, unidadEsperada: 'HABILES' },
-    { nombre: 'Ley 1755', regimen: REGIMEN_LEY_1755, diasEsperados: 1, unidadEsperada: 'MESES' },
-  ])('$nombre: el régimen declara $diasEsperados $unidadEsperada sin que el reloj los tenga hardcodeados', ({ regimen, diasEsperados, unidadEsperada }) => {
+    // `ymdEsperado` es el resultado EXACTO de `calcularLimiteSubsanacion` para
+    // esta `notificacion` fija (2026-03-02) — verificado de forma independiente
+    // contra `diasRestantesHabiles`/`sumarMesCalendario` antes de fijarlo aquí.
+    { nombre: 'Licencia (Decreto 1077)', regimen: REGIMEN_LICENCIA, diasEsperados: 30, unidadEsperada: 'HABILES', ymdEsperado: '2026-04-16' },
+    { nombre: 'Ley 1755', regimen: REGIMEN_LEY_1755, diasEsperados: 1, unidadEsperada: 'MESES', ymdEsperado: '2026-04-02' },
+  ])('$nombre: el régimen declara $diasEsperados $unidadEsperada sin que el reloj los tenga hardcodeados', ({ regimen, diasEsperados, unidadEsperada, ymdEsperado }) => {
     expect(regimen.dias).toBe(diasEsperados);
     expect(regimen.unidad).toBe(unidadEsperada);
-    // Si el motor tuviera algún valor hardcodeado, cambiar el fixture y volver
-    // a calcular no produciría un resultado consistente con el fixture mismo.
+    // COB-4 (ultrareview): antes la única aserción sobre el cálculo era
+    // `getTime > getTime`, trivialmente cierta para cualquier plazo positivo
+    // (incluso uno mal calculado). Se compara contra el valor ESPECÍFICO
+    // esperado de cada régimen, no solo contra "es posterior".
     const notificacion = local(2026, 3, 2);
     const limite = calcularLimiteSubsanacion(regimen, notificacion);
-    expect(limite.getTime()).toBeGreaterThan(notificacion.getTime());
+    expect(ymd(limite)).toBe(ymdEsperado);
+    if (unidadEsperada === 'HABILES') {
+      expect(diasRestantesHabiles(limite, notificacion)).toBe(diasEsperados);
+    }
   });
 });

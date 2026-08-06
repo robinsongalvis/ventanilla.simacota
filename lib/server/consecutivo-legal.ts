@@ -3,6 +3,7 @@ import type {
   Firestore,
   Transaction,
 } from 'firebase-admin/firestore';
+import type { OrigenActuacion } from '@/lib/motor-expedientes/tipos';
 
 /**
  * Helper transaccional de consecutivos legales — Bloque 2, corrección de H3.
@@ -120,6 +121,15 @@ export function confirmarConsecutivosLegales(
 /**
  * Origen del consecutivo que se pretende escribir en un `counters/{serie}-{año}`.
  *
+ * Alias del tipo canónico `OrigenActuacion` (`lib/motor-expedientes/tipos.ts`)
+ * — ambos representan la MISMA unión conceptual ('REAL'|'RECONSTRUIDO') y
+ * antes de este cambio estaban declarados por separado en dos módulos sin
+ * ninguna relación estructural entre sí (deuda #10, ADR-0026 §A2): un cambio
+ * futuro en uno (p. ej. añadir un tercer origen) podía olvidarse en el otro
+ * sin que el compilador lo detectara. Se conserva el nombre `OrigenConsecutivo`
+ * en este módulo (cero cambio de firma para sus consumidores) reexportando el
+ * tipo de `lib/motor-expedientes/tipos.ts` como fuente única de verdad:
+ *
  * - `REAL`: consumo genuino y nuevo de la serie (radicación normal).
  * - `RECONSTRUIDO`: número que proviene de reconstruir un evento histórico
  *   (p. ej. migración de expedientes en trámite, ADR-0026 D6/D9) o de un
@@ -129,7 +139,7 @@ export function confirmarConsecutivosLegales(
  *   `lib/motor-expedientes/tipos.ts`), pero el contador Firestore que
  *   emite los PRÓXIMOS números nuevos no debe moverse por su causa.
  */
-export type OrigenConsecutivo = 'REAL' | 'RECONSTRUIDO';
+export type OrigenConsecutivo = OrigenActuacion;
 
 export interface GuardAvanceCounterInput {
   serie: SerieConsecutivo;
