@@ -1,0 +1,26 @@
+# CODEOWNERS — Ventanilla Única Inteligente de Simacota
+#
+# Propósito: exigir la revisión del PROPIETARIO sobre los artefactos del gate de
+# auditoría gobernado (ADR-0028). En un repositorio de un solo dueño, el
+# CODEOWNER es el propietario y su aprobación representa el "visto de Seguridad"
+# a toda alta de la allowlist y a todo cambio del propio gate o del pipeline que
+# lo ejecuta (principio 5 — revisión cruzada; nadie valida su propio trabajo).
+#
+# ALCANCE / APLICABILIDAD: GitHub solo EXIGE la aprobación de code owners cuando
+# la rama protegida activa "Require review from Code Owners" (owner-gated). Sin
+# esa protección de rama, este archivo es DOCUMENTAL (deja constancia de quién
+# debe revisar) pero no bloquea por sí mismo. La activación de branch protection
+# es decisión del propietario (ver ADR-0013 / compuerta 2D).
+#
+# Sintaxis: última regla que casa gana. La regla catch-all inicial evita que un
+# path quede sin dueño; las reglas específicas fijan al propietario en los
+# artefactos sensibles del gate.
+
+# Dueño por defecto de todo el repositorio.
+*                           @robinsongalvis
+
+# Artefactos del gate de auditoría gobernado (ADR-0028) — visto de Seguridad.
+/audit-allowlist.json       @robinsongalvis
+/scripts/ci/audit-gate.mjs  @robinsongalvis
+/.github/workflows/ci.yml   @robinsongalvis
+/.github/CODEOWNERS         @robinsongalvis

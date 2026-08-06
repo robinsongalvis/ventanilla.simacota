@@ -90,12 +90,45 @@ array `exceptions` (también acepta un array directo).
   captura stdout aunque npm salga ≠0 por haber vulnerabilidades), lee la allowlist y calcula
   `hoy`. Mismo patrón de funciones puras exportadas + guardia `if (process.argv[1]…)` que
   `scripts/laboratorio/verificar-indices.mjs` y `presupuesto-rendimiento.mjs`.
-- **`hoy` inyectable:** de `AUDIT_GATE_TODAY` (YYYY-MM-DD) si está presente — para tests
-  deterministas — si no, del reloj del sistema. Una env var mal formada **lanza** (no degrada
-  a hora de pared).
-- **Fail-closed:** si `npm audit --json` no devuelve JSON parseable (sin lockfile / sin red), o
-  si la metadata reporta high/critical pero no se extrae ninguna advisory (formato inesperado),
-  el gate **bloquea**. Nunca pasa por defecto ante lo desconocido.
+- **`hoy` inyectable SOLO en test:** `AUDIT_GATE_TODAY` (YYYY-MM-DD) únicamente se honra en
+  contexto de test (`process.env.VITEST` o `NODE_ENV==='test'`) — para tests deterministas. En
+  **ejecución normal/CI se IGNORA** y se usa el reloj del sistema, de modo que un valor inyectado
+  en el entorno de CI **no puede viajar en el tiempo** para revivir entradas de allowlist
+  vencidas ni adelantar caducidades. En test, un valor mal formado **lanza** (no degrada a hora
+  de pared).
+- **Fail-closed (garantía real y verificada, no aspiracional):** el gate **BLOQUEA** —nunca pasa
+  por defecto ante lo desconocido— en TODOS estos casos:
+  - `npm audit --json` no devuelve JSON **parseable** (sin lockfile / sin red): el wrapper lanza
+    y el proceso sale con **exit 1**.
+  - `npm audit --json` devuelve JSON **parseable pero de ERROR**. Cuando el registro está caído o
+    no hay lockfile, npm emite un JSON con la forma `{"error":{"code":"ENOLOCK"}}` o
+    `{"message":"…failed…","error":{…}}` **sin** `metadata`/`vulnerabilities`. El núcleo lo
+    detecta (`validarFormaReporte`) y **falla-cerrado**: **NO** lo confunde con "árbol limpio".
+    Solo un reporte con la **forma completa de un `npm audit --json` v2** (`auditReportVersion`
+    numérico, objeto `vulnerabilities`, objeto `metadata.vulnerabilities` con conteos numéricos)
+    y **0 high/critical** cuenta como árbol limpio.
+  - La metadata reporta high/critical pero la extracción de advisories es **nula o parcial**, o
+    el número de nodos high/critical que vemos **no cuadra** con `metadata.vulnerabilities`
+    (formato inesperado / árbol incompleto).
+
+  Esto corrige una regresión del primer diseño: el JSON-de-error se trataba como "árbol limpio"
+  (exit 0), más laxo que el `npm audit --audit-level=high` crudo (que salía exit 1). Los tests
+  a nivel de **proceso** (`__tests__/audit-gate.test.ts`) verifican los exit codes reales.
+
+### CODEOWNERS — visto de Seguridad owner-gated
+
+El "visto de Seguridad" a toda alta de la allowlist (invariante 5) es un control de **proceso**.
+Para materializarlo sin ambigüedad, `.github/CODEOWNERS` fija al **propietario** (`@robinsongalvis`)
+como revisor obligatorio de los artefactos del gate: `audit-allowlist.json`,
+`scripts/ci/audit-gate.mjs` y `.github/workflows/ci.yml`. En un repositorio de un solo dueño el
+CODEOWNER **es** el propietario, y su aprobación representa ese visto de Seguridad.
+
+**Aplicabilidad:** GitHub solo **exige** la aprobación de code owners cuando la rama protegida
+activa *"Require review from Code Owners"* (**owner-gated**). Mientras esa opción no esté activa,
+`CODEOWNERS` es **documental** (deja constancia de quién debe revisar) pero no bloquea por sí
+mismo el merge — igual que la activación de branch protection descrita en la Compuerta 2D
+(ADR-0013), es una acción del propietario. Con la protección activa, una entrada de allowlist
+bien formada pero con justificación falsa **no** puede entrar sin la aprobación del propietario.
 
 ## Alternativas evaluadas
 
@@ -119,9 +152,12 @@ array `exceptions` (también acepta un array directo).
   El gate sigue **estricto** ante advisories nuevas no declaradas. La Compuerta ADR-0013 no
   cambia (mismo `id: audit`, mismo `outcome`).
 - **Deuda declarada:** la allowlist arranca vacía; no se introduce ninguna excepción hoy. El
-  visto de Seguridad para las altas es un control **de proceso** (no automatizable en el gate);
-  el gate sí automatiza la caducidad y el esquema.
+  visto de Seguridad para las altas se encauza vía `.github/CODEOWNERS` (owner-gated: solo bloquea
+  con branch protection activa); el gate automatiza la caducidad, el esquema y el fail-closed.
 - **Verificación:** `node scripts/ci/audit-gate.mjs` sobre el árbol limpio actual → exit 0;
-  simulación de advisory nueva → exit 1; simulación de entrada vencida → exit 1; suite unitaria
-  `__tests__/audit-gate.test.ts` (16 casos, incluidos los 5 escenarios de los invariantes)
-  verde; `npm run lint` y `npx tsc --noEmit` sin errores.
+  simulación de advisory nueva → exit 1; entrada vencida → exit 1; **JSON de error de npm
+  (`{"error":{"code":"ENOLOCK"}}` y `{"message":"…failed…"}`) → exit 1 (fail-closed, verificado a
+  nivel de PROCESO, no solo de campo)**; `AUDIT_GATE_TODAY` ignorado fuera de contexto de test.
+  Suite `__tests__/audit-gate.test.ts` verde (incluidos los 5 escenarios de los invariantes, los
+  casos de fail-closed de forma/extracción parcial y las pruebas de proceso con `npm audit`
+  mockeado por un shim en el PATH); `npm run lint` y `npx tsc --noEmit` sin errores.
