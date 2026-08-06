@@ -1,6 +1,6 @@
 # ADR-0025 — Incidente SEV-1 ERR_REQUIRE_ESM (firebase-admin 14) y política resultante de dependencias/runtime
 
-- **Estado:** ACEPTADO (2026-07-22) · Incidente MITIGADO; cierre oficial pendiente de monitoreo 24 h
+- **Estado:** ACEPTADO (2026-07-22) · Incidente **CERRADO** — cierre documentado 2026-08-06 (ver **§Adenda 2026-08-06 — Cierre oficial**). Monitoreo de 24 h superado, estabilidad sostenida >2 semanas, integridad intacta, G6 (backups) resuelta. La **ratificación formal es del propietario** y se materializa al aprobar/mergear este cambio (hasta entonces, "cierre propuesto").
 - **Decisores:** Propietario (Robinson David Galvis) + war room de 7 frentes + panel adversarial de 6 revisores
 - **Nota de numeración:** ADR-0024 reservado (formato de radicado AAAAMM, rama `feat/formato-radicado-aaaamm`).
 
@@ -70,3 +70,37 @@ El 21-jul-2026 a las 12:02 (Colombia) el merge del PR #130 (migración `firebase
 3. Los engines de npm no son un gate (npm no falla por engines de transitivas) — la inconsistencia firebase-admin(`>=22`) vs jwks-rsa(`^22.12`) pasó sin ruido.
 4. En incidentes: sondas propias marcadas, Sentry como memoria forense, y el mecanismo de rollback REAL verificado antes de necesitarlo (Instant Rollback en Hobby solo retrocede un deployment).
 5. El proceso funcionó: la exigencia del propietario de evidencia sobre hipótesis descartó dos causas falsas (runtime viejo, NODE_OPTIONS) antes de actuar.
+
+---
+
+## Adenda 2026-08-06 — Cierre oficial del incidente
+
+El incidente SEV-1 se declara **CERRADO**. La **ratificación formal corresponde al propietario** (IA propone / funcionario decide, Principio 9) y se materializa al aprobar/mergear este cambio; hasta entonces es un **cierre propuesto**.
+
+### Condiciones de cierre verificadas
+- **Producción restaurada** el 22-jul 09:21 (`/api/health` 200, matriz verde, integridad de datos verificada) — ver Línea de tiempo.
+- **Estabilidad sostenida:** >2 semanas sin recurrencia. El reconocimiento adversarial del 5-6 ago halló el plano servidor operativo. **Ventana de monitoreo de 24 h superada** (única condición de cierre declarada en el estado original).
+- **Integridad de datos intacta** (verificada en el war room; sin hallazgos nuevos posteriores).
+- **Deuda URGENTE ligada al cierre — G6 (backups) RESUELTA:** primer export real verificado el 6-ago (GitHub Actions run `31088181768`) a `gs://ventanilla-simacota-backups/diario/2026-08-06/`; script de provisión corregido (PR #152). Se cumple así la regla G6 ("ningún doc de DR se declara operativo sin restauración probada" → export durable verificado; ver `docs/disaster-recovery.md`).
+
+### Efecto sobre la Fase 2 del motor de expedientes
+Se **levanta el congelamiento de Fase 2 imputable al SEV-1** ("Fase 2 CONGELADA hasta cierre oficial"). **Esto NO abre la Fase 2 por sí solo:** la Fase 2 sigue gobernada por sus otras precondiciones (ADR-0026 §Precondiciones), en particular **P1 (concepto jurídico)**, aún pendiente. El cierre del SEV-1 elimina *este* bloqueo, no los demás.
+
+### Estado de las medidas preventivas al cierre
+Las medidas G/D eran **seguimiento con dueños y disparadores propios**, no condición del cierre del incidente (que solo exigía el monitoreo de 24 h). Estado verificado al 6-ago:
+
+| Medida | Estado |
+|---|---|
+| **G1** gate ESM en CI | ✅ **ACTIVO** (`__tests__/regresion-esm-require-firebase-admin.test.ts`) |
+| **G2** pin de runtime | 🟡 **PARCIAL** — CI fija `node-version: 22`; el flag `--no-experimental-require-module` lo ejerce el test G1; faltan `.nvmrc`/`engines` explícitos |
+| **G3/G4** smoke-test post-deploy + bypass automation | ⏳ **ABIERTO** |
+| **G5** política de majors (triaje N3, matriz de runtime demostrada) | ✅ **VIGENTE** (reforzada por el gate de auditoría gobernado, ADR-0028) |
+| **G6** backups Firestore | ✅ **RESUELTO** (#152, export verificado 6-ago) |
+| **G7** Sentry forense | ⏳ **ABIERTO** (no configurado; forense aún depende de logs de Vercel) |
+| **D1** retiro del override `jose@^5` | 🗓️ **PROGRAMADO** (revisión trimestral, primera 2026-10-31; override `^5` vigente) |
+| **D2** scope anidado del override | ⏳ antes del próximo bump de `firebase-admin` |
+| **D3** gate ESM ampliado | ⏳ a evaluar |
+| **D4** rama diagnóstica/endpoint temporal | ✅ **HECHO** 22-jul |
+| **D5** rotación `FIREBASE_SERVICE_ACCOUNT` | ⏳ a criterio del propietario |
+
+Las medidas abiertas (**G2 parcial, G3/G4, G7, D1-D3, D5**) quedan como **backlog de endurecimiento gestionado**, con dueños y disparadores ya definidos en la tabla de medidas preventivas. **No** bloqueaban el cierre del incidente ni bloquean la Fase 2; se rastrean como deuda operativa continua. Recomendación al propietario: priorizar **G7 (Sentry)** y completar **G2** en la próxima ventana de devops.
