@@ -85,6 +85,11 @@ Todas las deudas detectadas quedan asociadas explícitamente a la fase donde se 
 | 11 | Ubicación de tipos `lib/motor-expedientes/tipos.ts` vs `src/types/expediente.ts` del blueprint | BAJA | **Fase 1** (reconciliar al introducir endpoints/UI) |
 | 12 | `COLECCION_POR_SERIE` del detector de fantasmas no incluye `expedientes` | BAJA | **Fase 1** (cerrar junto con la colección) |
 | 13 | `counters/expedientes-{año}` single-writer global | BAJA | **Fase 1** (revisar namespacing/sharded al fijar el formato `numeroExpediente`) |
+| 14 | `evaluarCompletitud` construye el `Map` de aportes con `new Map(aportes.map(...))`: ante `requisitoId` duplicado, el último gana en silencio → el veredicto depende del orden de entrada (H2 del ultrareview) | BAJA | **Fase 1** (persistir aportes keyed por `requisitoId` — duplicado estructuralmente imposible — o guard fail-closed en `evaluarCompletitud`) |
+| 15 | `atLocalNoon` (`tiempos-radicado.ts`) extrae el día calendario con getters de TZ del entorno en vez de anclar a `America/Bogota` → desplazamiento de ±1 día en el límite de subsanación (RS-1 del ultrareview). **Pre-existente** (afecta también a BM-B33), NO introducido por el motor | MEDIA (**→ ALTA** al cablear el reloj) | **PRECONDICIÓN de Fase 1**: anclar `atLocalNoon` a `America/Bogota` (patrón `Intl` de `lib/fecha-colombia.ts`) **antes** de conectar el reloj a cualquier endpoint/cron; ahí toca plazos legales (archivo indebido / silencio administrativo). Gobierno Digital valida el efecto legal del ±1 día |
+| 16 | Brechas de resistencia a mutación en la suite (día exacto en la ruta string-ISO del reloj, `festivosExtra` sin ejercitar, `clavesFaltantes` con condición compuesta multi-clave). El operador `NO` en dirección `CUMPLE→NO_CUMPLE` (COB-1) **ya se cerró en #146** | BAJA | **Fase 1** (endurecimiento de tests por QA, junto con el fix de RS-1 que aporta el test que detecta el ±1 día) |
+
+> Deudas #14–#16 provienen de la **ultra-revisión adversarial** de #146 (veredicto `MERGE_CON_DEUDA_REGISTRADA`, sin defectos nuevos que bloqueen). #1 (`Y`/`O` vacíos) fue reproducida ejecutablemente y confirmada como la deuda #4 ya registrada (validador de Definición). RS-1 (#15) es el único ítem que exige acción **antes** de la Fase 1.
 
 ### A3 — Principios de revisión obligatoria durante la Fase 1
 

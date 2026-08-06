@@ -130,6 +130,18 @@ describe('evaluarCondicion — árbol de expresión de tres valores (CUMPLE/NO_C
     expect(evaluarCondicion(c, contexto)).toBe('CUMPLE');
   });
 
+  it('NO — invierte CUMPLE a NO_CUMPLE (dirección faltante anti-mutante, COB-1 del ultrareview)', () => {
+    // esApoderado === false en el contexto → IGUAL esApoderado=false es CUMPLE → NO(CUMPLE) = NO_CUMPLE.
+    // Sin este caso, un mutante que pierda la negación (devolver siempre CUMPLE) sobreviviría a la suite.
+    const c: CondicionRequisito = { operador: 'NO', condicion: { operador: 'IGUAL', clave: 'esApoderado', valor: false } };
+    expect(evaluarCondicion(c, contexto)).toBe('NO_CUMPLE');
+  });
+
+  it('NO — propaga INDETERMINADO cuando su rama es indeterminada', () => {
+    const c: CondicionRequisito = { operador: 'NO', condicion: { operador: 'IGUAL', clave: 'claveAusente', valor: true } };
+    expect(evaluarCondicion(c, contexto)).toBe('INDETERMINADO');
+  });
+
   describe('FAIL-CLOSED — clave ausente en el contexto (hallazgo MEDIO #1)', () => {
     it('IGUAL/DISTINTO/EN sobre una clave ausente son INDETERMINADO, no NO_CUMPLE', () => {
       expect(evaluarCondicion({ operador: 'IGUAL', clave: 'noExiste', valor: true }, contexto)).toBe('INDETERMINADO');
