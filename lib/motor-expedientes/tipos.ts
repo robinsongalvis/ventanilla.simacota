@@ -106,6 +106,38 @@ export type CondicionRequisito =
   | { operador: 'O'; condiciones: CondicionRequisito[] }
   | { operador: 'NO'; condicion: CondicionRequisito };
 
+/* ──────────────────────────────────────────────
+   Catálogo de claves de contexto (Fase 1, ADR-0026 §A2 #4)
+────────────────────────────────────────────── */
+
+/** Tipo primitivo declarado para una clave de contexto. Refleja los tipos que ya admite `ContextoEvaluacionRequisito`. */
+export type TipoClaveContexto = 'string' | 'number' | 'boolean';
+
+/**
+ * Declaración de UNA clave de contexto que una Definición de Trámite puede
+ * referenciar en las condiciones de sus requisitos CONDICIONALES. Es
+ * ESTRUCTURA genérica del motor — cada Definición concreta (Licencia,
+ * Concepto de Uso del Suelo, cualquier trámite futuro) llena este catálogo
+ * con SUS propias claves; el motor no conoce ni asume ninguna clave
+ * particular.
+ *
+ * Cierra la deuda #4 de ADR-0026 §A2 (H del ultrareview de #146): hoy un
+ * typo en la clave de una condición (`'esApodrado'` en vez de
+ * `'esApoderado'`) no falla en ningún sitio — `evaluarCondicion` lo trata
+ * como INDETERMINADO (fail-closed, correcto en tiempo de EVALUACIÓN), pero
+ * es indistinguible de un hecho legítimamente ausente del caso concreto.
+ * `validarDefinicionTramite` (`./validar-definicion.ts`) usa este catálogo
+ * para rechazar, en el momento de PUBLICAR la Definición, cualquier
+ * condición que referencie una clave no declarada.
+ */
+export interface ClaveContextoDeclarada {
+  /** Nombre de la clave tal como aparece en `ContextoEvaluacionRequisito` y en `CondicionRequisito.clave`. */
+  nombre: string;
+  tipo: TipoClaveContexto;
+  /** Dominio cerrado de valores permitidos (opcional). Si se omite, cualquier valor del `tipo` declarado es válido. */
+  dominio?: Array<string | number | boolean>;
+}
+
 interface RequisitoBase {
   /** Slug estable del requisito dentro de su Definición de Trámite (p. ej. `poder-apoderado`). */
   id: string;
@@ -157,6 +189,17 @@ export interface DefinicionTramite {
   /** D1: puntos de variación parametrizados por datos sobre el esqueleto de estados en código. */
   requiereVisita: boolean;
   generaResolucion: boolean;
+  /**
+   * Catálogo de claves de contexto que esta Definición declara y que sus
+   * requisitos CONDICIONALES pueden referenciar (Fase 1, ADR-0026 §A2 #4).
+   * OPCIONAL a propósito: campo ADITIVO — ninguna Definición ni fixture de
+   * Fase 0 existente deja de tipar por su ausencia. Una Definición SIN este
+   * catálogo simplemente no tiene ninguna clave declarada, por lo que
+   * `validarDefinicionTramite` rechazará cualquier condición que referencie
+   * una clave (fail-closed) hasta que se declare — el catálogo vacío/ausente
+   * nunca se interpreta como "todo vale".
+   */
+  clavesContexto?: ClaveContextoDeclarada[];
 }
 
 /* ──────────────────────────────────────────────
