@@ -18,13 +18,13 @@ En el marco del proyecto de digitalización de la Ventanilla Única y del expedi
 
 A continuación exponemos nuestro **entendimiento preliminar** —que puede ser corregido— y la **consulta concreta** de cada punto.
 
-## 1. Hito de inicio y duración del término para resolver
+## 1. Duración y hito de inicio del término para resolver
 
-**Lo que indica la Secretaría de Planeación (práctica operativa):** el término para resolver es de **45 días hábiles** y **se cuenta desde el ingreso de la solicitud a la ventanilla** (radicación); en la práctica los trámites se resuelven antes de ese plazo.
+**Lo que indica la Secretaría de Planeación (práctica operativa):** el término se cuenta desde la **radicación en Ventanilla, una vez Planeación verifica que la documentación está completa** (flujo: revisa completitud → remite a Ventanilla → radica → corren los días). **Sobre la duración hay una discrepancia que pedimos zanjar:** primero se nos indicó **45 días hábiles** y luego **45 días corridos**.
 
 **Consulta:**
-1.1. ¿Confirma que el término es de **45 días hábiles** y que su fundamento vigente es el **Decreto 1077 de 2015** (y normas concordantes)?
-1.2. Sobre el "punto cero": ¿se cuenta desde el **ingreso a la ventanilla**, o legalmente desde la **radicación en legal y debida forma** (una vez la solicitud está **completa**)? Necesitamos precisar el hito para el cómputo automatizado, especialmente cuando la solicitud ingresa con requisitos por subsanar.
+1.1. **(Crítico)** ¿El término es de 45 días **hábiles** o **corridos**? La diferencia es de ~3 semanas y determina el vencimiento y el riesgo de silencio positivo. ¿Cuál es el fundamento vigente (entendemos que el **Decreto 1077 de 2015** cuenta en días **hábiles**)?
+1.2. ¿Confirma que el "punto cero" es la **radicación en debida forma** (una vez completa la documentación), y no el primer ingreso del solicitante?
 1.3. ¿Admite ese término **prórroga** por parte de la autoridad? De ser así, ¿en qué casos y por cuánto tiempo?
 
 ## 2. Efecto de una modificación o subsanación sobre el término (punto crítico)
@@ -38,6 +38,7 @@ Señalamos, con el debido respeto y a título técnico, que el mecanismo del **r
 2.2. ¿Qué actuación constituye un "**cambio**" que afecta el término: una **modificación del proyecto** por el solicitante, un **requerimiento de subsanación** de documentos, o ambos? ¿Reciben el mismo tratamiento?
 2.3. Si el término se reinicia, ¿existe un **tope máximo** (número de reinicios o plazo total) para que el trámite no quede sin fecha de vencimiento definida?
 2.4. La fase de **revisión previa** de requisitos (antes de radicar), ¿tiene un plazo reglado propio y bajo qué **régimen de subsanación** (días, hábiles/calendario, prórroga)? Tener presente que —según nuestro entendimiento— **no** debería regirse por el término del derecho de petición (**Ley 1755 de 2015**), por tratarse de un trámite especial urbanístico.
+2.5. Planeación indica que el reinicio se materializa con un **nuevo radicado**. Operativamente sería preferible mantener el **mismo radicado**. ¿Es jurídicamente admisible **reiniciar el término sobre el mismo radicado**, o el reinicio exige un radicado **nuevo** para no arrastrar el término de la radicación original (riesgo de silencio positivo)?
 
 ## 3. Silencio administrativo positivo
 
@@ -50,10 +51,10 @@ Señalamos, con el debido respeto y a título técnico, que el mecanismo del **r
 
 ## 4. Competencia para expedir la licencia
 
-**Lo que ya observamos:** las resoluciones de licencia vigentes son expedidas por la **Secretaría de Planeación e Infraestructura**, "en uso de sus facultades legales" y con fundamento en el **Art. 99 de la Ley 388 de 1997**, los Decretos **1077 de 2015**, **1783 de 2021**, **2218 de 2015**, **097 de 2006** y **1469 de 2010**, y el **Acuerdo Municipal 013 de 2003 (EOT)**. Entendemos, por tanto, que la competencia está radicada en esa Secretaría (el municipio no cuenta con curador urbano).
+**Lo que ya observamos y nos confirmó Planeación:** las resoluciones las expide la **Secretaría de Planeación e Infraestructura** (firma el **Secretario** o el **Subsecretario**), en uso de sus facultades legales (Art. 99 Ley 388/1997; Decretos 1077/2015, 1783/2021, 2218/2015, 097/2006, 1469/2010; Acuerdo Municipal 013/2003, EOT). Planeación indica que **el Alcalde no interviene** en este trámite ni media una delegación expresa suya.
 
 **Consulta:**
-4.1. ¿Confirma que esa es la **base de competencia vigente**? ¿Existe además un **acto administrativo de delegación** del Alcalde que debamos citar en el expediente digital? De existir, solicitamos su **referencia (tipo de acto, número y fecha)**.
+4.1. ¿Confirma que la competencia es **propia de la Secretaría de Planeación** (sin necesidad de un acto de delegación del Alcalde)? ¿Existe algún **acto interno de asignación de funciones** (Secretario/Subsecretario) que debamos citar como soporte en el expediente digital (tipo, número, fecha)?
 
 ## 5. Compatibilidad del apoyo digital
 

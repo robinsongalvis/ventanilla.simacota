@@ -20,7 +20,7 @@
 
 | Reloj | Inicio | Duración | Comportamiento | Estado |
 |---|---|---|---|---|
-| **R1 · Término para resolver** | Ingreso a ventanilla (radicación) | **45 días hábiles** | Ante un cambio, **REINICIA** (según Planeación) | ⏳ P1: confirmar *reinicia vs. suspende*, qué es "cambio", tope máximo, y el hito ("en debida forma"). Silencio positivo si se vence. |
+| **R1 · Término para resolver** | Radicación en Ventanilla **tras verificar completitud** (= "en debida forma") ✅ | **45 días** — ⚠️ **CONTRADICCIÓN: hábiles (ing) vs. corridos (Planeación)** → ⏳ Jurídica | **REINICIA** ante modificación **o** subsanación (ambas igual). Planeación describe **nuevo radicado**; el ing **prefiere mantener el mismo radicado** → ⏳ Jurídica: ¿el reinicio exige radicado nuevo, o vale sobre el mismo sin gatillar silencio positivo? El motor abstrae "término desde el último **evento de radicación/reinicio**" (soporta ambos). | Hito y reinicio confirmados por Planeación. ⏳ **Jurídica:** unidad (hábiles/corridos), silencio positivo, nuevo-vs-mismo radicado, tope. |
 | **R2 · Ejecutoria** | Notificación de la resolución | **10 días** para recursos | Firme si no hay recurso | Observado en documentos reales |
 | **R3 · Vigencia de la licencia** | Firmeza / expedición | **36 meses** (obra nueva) · **24** (ampliación) | Prorrogable **una sola vez** por **+12 meses**; y **+6 meses adicionales para terminar** (según Planeación) | Decreto 1077/2015 art. 2.2.6.1.2.4.1 (vigencia + prórroga). ⏳ **Los +6 meses no están en ese artículo** — probablemente una **revalidación para terminación de obra**; confirmar base legal, si es a solicitud, y si exige obra avanzada |
 
@@ -32,7 +32,7 @@
 - **CONSIDERANDO.**
 - **RESUELVE (artículos):** aprobar; términos de ejecución (vigencia); normas propias (ubicación, cuadro de áreas, reformas); conceder licencia Nº; responsables; responsabilidad civil; **notificación** (interesado + vecinos); sellamiento por cambio de uso; NSR-10/EOT; prohibiciones; **recursos (10 días)**; aislamientos.
 - **CONSTANCIA DE EJECUTORIA:** fecha de notificación, firmeza y ejecutoria.
-- **Firma** del Secretario de Planeación e Infraestructura.
+- **Firma** del Secretario de Planeación e Infraestructura (o **Subsecretario**). **Sin delegación del Alcalde** — la competencia es propia de Planeación (confirmado por Planeación).
 
 ### Licencia (certificado)
 - Encabezado + "LICENCIA".
@@ -48,18 +48,26 @@
 
 ```
 termino.dias                 = 45
-termino.unidad               = HABILES            # confirmado por Planeación
-termino.hito                 = INGRESO_VENTANILLA # ⏳ P1: ¿vs. "radicación en debida forma"?
-termino.comportamienteCambio = REINICIA           # ⏳ P1: ¿REINICIA vs SUSPENDE? ¿qué es "cambio"? ¿tope?
+termino.unidad               = ???                 # ⚠️ CONTRADICCIÓN: ing dijo HABILES, Planeación dice CORRIDOS → ⏳ Jurídica (la norma suele ser hábiles)
+termino.hito                 = RADICACION_EN_DEBIDA_FORMA  # radicación tras verificar completitud (Planeación) ✅
+termino.reinicioAnteCambio   = SI                  # modificación o subsanación (ambas igual) ✅ operativo
+termino.reinicioRadicado     = ???                 # NUEVO (Planeación) vs. MISMO (preferencia ing) → ⏳ Jurídica (silencio positivo)
+termino.origen               = ULTIMO_EVENTO_RADICACION  # abstracción del motor: soporta nuevo o mismo radicado
+termino.competencia          = SECRETARIO_PLANEACION      # o Subsecretario; SIN delegación del Alcalde ✅
+termino.tope                 = ???                 # ⏳ Jurídica: ¿límite de reinicios / plazo total?
 ejecutoria.recursos_dias     = 10
-vigencia.obra_nueva_meses    = 36                 # + prórroga única +12
-vigencia.ampliacion_meses    = 24                 # + prórroga única +12
-vigencia.terminacion_meses   = 6                  # ⏳ base legal por confirmar (¿revalidación para terminación de obra? ¿a solicitud?)
+vigencia.obra_nueva_meses    = 36                  # + prórroga única +12
+vigencia.ampliacion_meses    = 24                  # + prórroga única +12
+vigencia.otras               = {12, 6}             # Planeación menciona vigencias de 1 año y 6 meses según el tipo de licencia
+vigencia.terminacion_meses   = 6                   # ⏳ aclarar con Planeación si es esto o una vigencia de 6 meses (posible confusión)
+alerta.previaVencimiento     = 1_MES               # NUEVO (Planeación): alertar 1 mes antes del vencimiento de la LICENCIA (avisar al titular / pedir prórroga), auto-computado, para toda vigencia
 ```
 
 ## Mapeo a ADR-0026 (qué implica para el motor)
 
 - La **resolución y la licencia son SALIDA** de la fase de resolución → **D1** (código, trámite-específico, revisión de Gobierno Digital). **No** es configurable por datos.
-- El **reloj del término principal** conecta con la **deuda #3 (§A2)**: se necesita un consumidor genérico de `terminos {días, unidad}` con `unidad` = **HÁBILES**, sin reutilizar `calcularFechaVencimiento` del catálogo PQRSD.
-- El comportamiento **REINICIA/SUSPENDE** es un **parámetro** del régimen, no una constante: se implementa configurable y su valor legal lo fija el concepto jurídico.
-- **Precondición P1 sigue BLOQUEANTE** para implementar esta fase: los ítems ⏳ deben quedar resueltos por escrito antes de cablear cualquier plazo a un endpoint/cron (toca términos legales, silencio positivo y archivo indebido).
+- El **reloj del término principal** conecta con la **deuda #3 (§A2)**: consumidor genérico de `terminos {días, unidad}`, sin reutilizar `calcularFechaVencimiento` del catálogo PQRSD. **La `unidad` (hábiles vs. corridos) está en disputa** (ver R1) → no cablear hasta que Jurídica la fije.
+- **Modelo de reinicio:** el término corre desde el **último evento de radicación/reinicio**. Planeación describe un **nuevo radicado** por cambio; el ing prefiere el **mismo radicado**. El motor lo abstrae en un evento (`radicación vigente`), de modo que el expediente (D3) puede enlazar **uno o varios** radicados en el tiempo — la elección nuevo-vs-mismo y su validez frente al silencio positivo la fija Jurídica.
+- **Alerta preventiva (NUEVO, Planeación):** 1 mes antes del vencimiento de la **licencia** (R3), auto-computada, para avisar al titular y permitir la prórroga — aplica a toda vigencia (36/24/12/6 meses).
+- El comportamiento del término (unidad, reinicio, tope) es **parametrizable**; su valor **legal** lo fija el concepto jurídico, no la práctica operativa.
+- **Precondición P1 sigue BLOQUEANTE** para implementar esta fase: los ítems ⏳ deben quedar resueltos **por escrito por Jurídica** antes de cablear cualquier plazo a un endpoint/cron (toca términos legales, silencio positivo y archivo indebido). **Las respuestas de Planeación son operativas, no sustituyen el concepto jurídico** — en especial la unidad del término (hábiles/corridos), hoy contradictoria.
