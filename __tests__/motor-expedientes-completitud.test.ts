@@ -415,6 +415,63 @@ describe('evaluarCompletitud — checklist real de Licencia de Construcción', (
     });
   });
 
+  describe('COB-2 (ultrareview) — clavesFaltantes de una condición COMPUESTA multi-clave (Y/O)', () => {
+    // Antes de este bloque, `clavesFaltantesDe` solo se probaba con
+    // condiciones de UNA sola clave suelta (ver describe FAIL-CLOSED arriba:
+    // `poder-apoderado` referencia solo `esApoderado`). Un mutante que, por
+    // ejemplo, recorriera solo la PRIMERA rama de un `Y`/`O` en vez de las
+    // `condiciones` completas (`clavesReferenciadas`) seguiría pasando toda
+    // la suite existente: se necesita un requisito cuya condición referencie
+    // MÁS DE UNA clave para exponerlo.
+    function tramiteConRequisitoCompuesto(): DefinicionTramite {
+      const base = tramiteLicencia();
+      return {
+        ...base,
+        requisitos: [
+          {
+            id: 'requisito-compuesto',
+            nombre: 'Requisito con condición Y de dos claves',
+            tipo: 'CONDICIONAL',
+            condicion: {
+              operador: 'Y',
+              condiciones: [
+                { operador: 'IGUAL', clave: 'claveA', valor: true },
+                { operador: 'EN', clave: 'claveB', valores: ['x', 'y'] },
+              ],
+            },
+          },
+        ],
+      };
+    }
+
+    it('ninguna de las dos claves está en el contexto: AMBAS aparecen en clavesFaltantes, no solo la primera', () => {
+      const tramite = tramiteConRequisitoCompuesto();
+      const resultado = evaluarCompletitud(tramite, [], {});
+
+      expect(resultado.indeterminados).toEqual([
+        { requisitoId: 'requisito-compuesto', nombre: 'Requisito con condición Y de dos claves', clavesFaltantes: ['claveA', 'claveB'] },
+      ]);
+    });
+
+    it('solo la SEGUNDA clave falta: clavesFaltantes reporta exclusivamente esa (guarda contra un mutante que solo mira la primera rama)', () => {
+      const tramite = tramiteConRequisitoCompuesto();
+      const resultado = evaluarCompletitud(tramite, [], { claveA: true }); // claveB sigue ausente
+
+      expect(resultado.indeterminados).toEqual([
+        { requisitoId: 'requisito-compuesto', nombre: 'Requisito con condición Y de dos claves', clavesFaltantes: ['claveB'] },
+      ]);
+    });
+
+    it('solo la PRIMERA clave falta: clavesFaltantes reporta exclusivamente esa (guarda contra un mutante que solo mira la segunda rama)', () => {
+      const tramite = tramiteConRequisitoCompuesto();
+      const resultado = evaluarCompletitud(tramite, [], { claveB: 'x' }); // claveA sigue ausente
+
+      expect(resultado.indeterminados).toEqual([
+        { requisitoId: 'requisito-compuesto', nombre: 'Requisito con condición Y de dos claves', clavesFaltantes: ['claveA'] },
+      ]);
+    });
+  });
+
   describe('H2 (ADR-0026 §A2 #14) — requisitoId duplicado en aportes: fail-closed, no "el último gana"', () => {
     it('dos aportes para el mismo requisitoId bloquean completitud vía aportesDuplicados, no vía last-wins', () => {
       const tramite = tramiteLicencia();
