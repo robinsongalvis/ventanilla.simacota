@@ -186,8 +186,10 @@ Verificado en prod el 2026-08-06 (vía `gcloud firestore databases describe`):
   deshabilitado, snapshot 2026-07-20, previo a su activación.)
 - **Delete Protection: HABILITADA ✅** — `DELETE_PROTECTION_ENABLED`. Evita el
   borrado accidental de la base.
-- **Exports durables a GCS: PENDIENTE (owner-gated).** El workflow
-  `backup-firestore.yml` aún falla por falta de aprovisionamiento GCP (secrets de
-  auth vacíos): ejecutar `scripts/backups/setup-gcp-backups.sh` + cargar los secrets.
-  **PITR ≠ backup:** sin ≥1 export verificado no hay respaldo durable, y el reset de
-  producción a "radicado 1" no debe autorizarse.
+- **Exports durables a GCS: OPERATIVO ✅ (verificado 2026-08-06).** `backup-firestore.yml`
+  ejecutó su primer export con éxito (run `31088181768`) a
+  `gs://ventanilla-simacota-backups/diario/2026-08-06/` (≈ 361 KB). Aprovisionamiento:
+  `setup-gcp-backups.sh` + secrets WIF + `iamcredentials.googleapis.com` habilitada
+  (esta última **falta añadirla al script**). Con ≥1 export verificado, la precondición
+  de backup para el reset de producción queda cumplida (el reset sigue requiriendo
+  orden explícita del propietario).

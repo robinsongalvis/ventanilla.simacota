@@ -43,7 +43,7 @@ Para evitar la pérdida de información en formularios largos en caso de descone
 
 El activo de información más valioso del municipio son los documentos de `radicados` y su `trazabilidad`. Se establecen las siguientes políticas oficiales de DR:
 
-### 3.1. Respaldos Automáticos Diarios (Backups) — exports pendientes de aprovisionamiento
+### 3.1. Respaldos Automáticos Diarios (Backups) — OPERATIVO (primer export verificado 2026-08-06)
 
 **Estado (Roadmap P2.4):** el mecanismo de respaldo está **implementado y
 versionado** en el repositorio. Antes esta sección describía un export
@@ -72,11 +72,14 @@ gcloud firestore export gs://ventanilla-simacota-backups/diario/$(date -u +%F) \
 - Hasta que esos secrets existan, el workflow **falla con un mensaje claro**
   ("infraestructura sin provisionar") en lugar de fingir que respalda.
 
-**Estado verificado 2026-08-06:** el aprovisionamiento GCP sigue **PENDIENTE** — el
-workflow acumula fallos diarios (secrets de auth vacíos), por lo que **aún no
-existe ningún export durable de producción**. La única red de recuperación vigente
-es PITR (7 días; ver "Hardening de la base" abajo). **El reset de producción a
-"radicado 1" no debe autorizarse sin ≥1 export verificado.**
+**Estado verificado 2026-08-06:** los backups están **OPERATIVOS**. Primer export
+manual verificado (GitHub Actions run `31088181768`, `success`) en
+`gs://ventanilla-simacota-backups/diario/2026-08-06/` (`overall_export_metadata` +
+`output-0/1`); tamaño del export ≈ **361 KB**. El aprovisionamiento requirió —además
+de `setup-gcp-backups.sh` + los secrets WIF— habilitar `iamcredentials.googleapis.com`
+(necesaria para la impersonación WIF; **falta añadirla al script**). Con ≥1 export
+durable verificado, la precondición de backup para el reset de producción queda
+**cumplida** (el reset sigue requiriendo tu orden explícita).
 
 **Por qué GitHub Actions y no Cloud Scheduler:** justificación en
 `scripts/backups/README.md`. Resumen: la config queda versionada (raíz del
