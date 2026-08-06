@@ -43,6 +43,14 @@ export interface SolicitudSerie {
 export interface ConsecutivoPendiente {
   serie: SerieConsecutivo;
   ref: DocumentReference;
+  /**
+   * Valor de `counters/{serie}-{año}.ultimo` leído en ESTA transacción (0 si el
+   * documento no existe). Se conserva —además del `consecutivo`— para que
+   * `confirmarConsecutivosLegales` alimente el guard D9 (`verificarAvanceCounter`)
+   * con el actual REALMENTE leído; derivarlo de `consecutivo` haría la
+   * comprobación de monotonicidad tautológica (nunca detectaría nada).
+   */
+  ultimoActual: number;
   consecutivo: number;
   /** Id de negocio ya formateado a partir del consecutivo leído. */
   documentoId: string;
@@ -74,10 +82,12 @@ export async function leerConsecutivosLegales(
   const snaps = await Promise.all(refs.map((ref) => tx.get(ref)));
 
   const pendientes: ConsecutivoPendiente[] = solicitudes.map((s, i) => {
-    const consecutivo = Number(snaps[i].data()?.ultimo ?? 0) + 1;
+    const ultimoActual = Number(snaps[i].data()?.ultimo ?? 0);
+    const consecutivo = ultimoActual + 1;
     return {
       serie: s.serie,
       ref: refs[i],
+      ultimoActual,
       consecutivo,
       documentoId: s.formatear(consecutivo, fecha),
     };
@@ -110,6 +120,24 @@ export function confirmarConsecutivosLegales(
       'confirmarConsecutivosLegales exige el arreglo devuelto por ' +
         'leerConsecutivosLegales sobre la misma transacción.',
     );
+  }
+
+  // Guard D9 (ADR-0026, precondición #4): validar TODOS los avances ANTES de
+  // escribir ninguno. El flujo transaccional estándar siempre emite números
+  // nuevos (`origen: 'REAL'`): lee el contador vigente y propone `ultimo + 1`.
+  // Con `ultimoActual` capturado en la lectura, la monotonicidad detiene
+  // cualquier `consecutivo` manipulado a un valor <= al leído (defensa en
+  // profundidad; NO sustituye la atomicidad del fix H3). Validar-todo-antes-de-
+  // escribir-nada evita cualquier `tx.set` parcial si una serie del lote falla.
+  // Los números RECONSTRUIDOS (migración D6/Fase 5) no pasan por aquí: usan su
+  // propia vía, donde el guard los rechaza.
+  for (const p of pendientes) {
+    verificarAvanceCounter({
+      serie: p.serie,
+      ultimoActual: p.ultimoActual,
+      ultimoPropuesto: p.consecutivo,
+      origen: 'REAL',
+    });
   }
 
   const marca = { anio: fecha.getFullYear(), actualizadoEn: fecha.toISOString() };
@@ -156,10 +184,11 @@ export interface GuardAvanceCounterInput {
  * quedar implementada y verificada ANTES de introducir la serie
  * `expedientes` (precondición #4 del ADR). No reemplaza la atomicidad
  * transaccional de `confirmarConsecutivosLegales` (eso ya lo resuelve el
- * fix de H3): este guard es una defensa adicional para cualquier punto de
- * escritura de `counters` — presente o futuro (p. ej. un asistente de
- * migración de la Fase 5) — que no pase por el flujo transaccional
- * estándar de este archivo.
+ * fix de H3): este guard es una defensa adicional que protege TODO punto de
+ * escritura de `counters`. Desde la Fase 1 (ADR-0026 §A2 #7) el flujo
+ * transaccional estándar de este archivo —`confirmarConsecutivosLegales`— lo
+ * invoca antes de cada `tx.set`; y sigue disponible para cualquier vía futura
+ * que no pase por ese flujo (p. ej. un asistente de migración de la Fase 5).
  *
  * Dos invariantes, ambas obligatorias:
  *  1. **Monotonicidad**: `ultimo` de una serie JAMÁS retrocede ni se

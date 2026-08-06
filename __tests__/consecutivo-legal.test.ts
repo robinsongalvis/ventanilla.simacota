@@ -110,7 +110,7 @@ describe('consecutivo-legal — confirmarConsecutivosLegales', () => {
   it('lanza si los pendientes NO provienen de leer (arreglo construido a mano)', () => {
     const { tx } = fakeTx({});
     const falsos: ConsecutivoPendiente[] = [
-      { serie: 'radicados', ref: { path: 'counters/radicados-2026' } as never, consecutivo: 999, documentoId: 'x' },
+      { serie: 'radicados', ref: { path: 'counters/radicados-2026' } as never, ultimoActual: 998, consecutivo: 999, documentoId: 'x' },
     ];
     expect(() => confirmarConsecutivosLegales(tx, FECHA, falsos)).toThrow(
       /leerConsecutivosLegales sobre la misma transacción/,
@@ -127,6 +127,44 @@ describe('consecutivo-legal — confirmarConsecutivosLegales', () => {
     expect(() => confirmarConsecutivosLegales(b.tx, FECHA, pendDeA)).toThrow();
     // Y confirmar en A con sus propios pendientes → no lanza.
     expect(() => confirmarConsecutivosLegales(a.tx, FECHA, pendDeA)).not.toThrow();
+  });
+
+  // ── Cableado del guard D9 en el flujo estándar (ADR-0026 §A2 #7) ──────────
+  it('cablea el guard D9: un `consecutivo` manipulado a un valor <= al leído hace throw ANTES del set', async () => {
+    const doble = fakeTx({ 'counters/radicados-2026': 41 });
+    const pend = await leerConsecutivosLegales(doble.tx, fakeDb(), FECHA, [
+      { serie: 'radicados', formatear: fmtRadicado },
+    ]);
+    // Simula un bug/manipulación que baja el propuesto por debajo del leído (41).
+    pend[0].consecutivo = 40;
+    expect(() => confirmarConsecutivosLegales(doble.tx, FECHA, pend)).toThrow(
+      /no puede retroceder ni estancarse/,
+    );
+    expect(doble.escrituras).toHaveLength(0); // el guard corre ANTES del tx.set
+  });
+
+  it('cablea el guard D9: si una serie del lote es inválida, NO escribe ninguna (validar-todo-antes)', async () => {
+    const doble = fakeTx({ 'counters/radicados-2026': 10, 'counters/salidas-2026': 5 });
+    const pend = await leerConsecutivosLegales(doble.tx, fakeDb(), FECHA, [
+      { serie: 'radicados', formatear: fmtRadicado },
+      { serie: 'salidas', formatear: fmtSalida },
+    ]);
+    // La segunda serie se corrompe a un valor no monótono; la primera es válida.
+    pend[1].consecutivo = 5;
+    expect(() => confirmarConsecutivosLegales(doble.tx, FECHA, pend)).toThrow(
+      /no puede retroceder ni estancarse/,
+    );
+    expect(doble.escrituras).toHaveLength(0); // ni la serie válida se escribió
+  });
+
+  it('cablea el guard D9: un flujo REAL normal (ultimo+1) pasa el guard y escribe', async () => {
+    const doble = fakeTx({ 'counters/expedientes-2026': 0 });
+    const pend = await leerConsecutivosLegales(doble.tx, fakeDb(), FECHA, [
+      { serie: 'expedientes', formatear: (n, f) => `EXP-${f.getFullYear()}-${n}` },
+    ]);
+    expect(() => confirmarConsecutivosLegales(doble.tx, FECHA, pend)).not.toThrow();
+    expect(doble.escrituras).toHaveLength(1);
+    expect(doble.escrituras[0].data).toMatchObject({ ultimo: 1 });
   });
 });
 
