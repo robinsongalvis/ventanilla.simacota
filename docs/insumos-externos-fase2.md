@@ -1,37 +1,39 @@
-# Insumos externos pendientes para habilitar la Fase 2 — Motor de expedientes (Licencia de Construcción)
+# Insumos externos para habilitar la Fase 2 — Motor de expedientes (Licencia de Construcción)
 
-> **Propósito:** consolidar en un solo lugar lo que falta validar con **Jurídica** y **Planeación** antes de construir la **fase de resolución** del motor, para no edificar sobre supuestos. La ingeniería interna ya está **cerrada** (guard D9, RS-1, cierre SEV-1); estos son los **únicos** bloqueos que restan para la Fase 2.
+> **Propósito:** consolidar lo que falta validar antes de construir la **fase de resolución** del motor. La ingeniería interna está **cerrada** (guard D9, RS-1, cierre SEV-1, G2). El **insumo de investigación normativa del 6-ago-2026** resolvió las contradicciones previas a nivel de investigación; queda **una sola gestión externa**: la **ratificación por la Oficina Jurídica** del texto consolidado (el propio insumo la exige antes de programar reglas).
 >
-> El sistema **calcula y alerta** plazos legales de forma **asistiva**; la decisión administrativa siempre es del funcionario (IA propone / funcionario decide).
+> El sistema **calcula y alerta** de forma **asistiva**; la decisión administrativa siempre es del funcionario.
 
-## ✅ Resuelto por Planeación (operativo) — NO volver a preguntar
-| Punto | Respuesta |
-|---|---|
-| **Hito de inicio** | Radicación en Ventanilla **tras verificar completitud** (= "en debida forma"): Planeación revisa → remite a Ventanilla → radica → cuentan los días |
-| **Reinicio ante cambio** | Una **modificación** del proyecto o una **subsanación** (ambas igual) **reinician** el término |
-| **Competencia** | La **Secretaría de Planeación** (firma el Secretario o Subsecretario). **El Alcalde NO interviene**; el motor no asume delegación del Alcalde |
-| **Alerta preventiva** | El sistema debe **alertar 1 mes antes del vencimiento de la licencia** (avisar al titular / pedir prórroga), auto-computada |
-| **Checklist de requisitos** | **Completo** (Certificación `F-PGD-009` v02, págs. 1 y 2) |
+## ✅ Resuelto (operativo + investigación normativa) — NO volver a preguntar
 
-> ⚠️ **La duración NO está resuelta:** el ing dijo antes **45 días hábiles**; Planeación ahora dice **45 días corridos**. **Contradicción** → la resuelve Jurídica (ver abajo).
+| Punto | Resolución | Fuente |
+|---|---|---|
+| **Unidad del término** | **45 días HÁBILES** (la contradicción hábiles/corridos se resuelve a favor de **hábiles**) | D. 1077 art. 2.2.6.1.2.3.1 + concepto Minvivienda |
+| **Hito de inicio** | **Radicación en legal y debida forma** (tras verificar completitud; flujo Planeación: revisa → remite → radica → corren los días) | Planeación + D. 1077 |
+| **Mecanismo ante observaciones** | ⚠️ **PARCIAL — es el único punto con tensión abierta.** Norma investigada: el acta **SUSPENDE** y el término **se REANUDA** al subsanar (mismo radicado); reinicio solo vía desistimiento→archivo→nueva solicitud. **Decisión operativa del propietario (6-ago): REINICIO a cero** + modelo dual de radicado (`LEGACY_NUEVO` → objetivo `MISMO_RADICADO`) por bandera. El motor implementa **ambas semánticas**; cuál se activa lo decide la **ratificación de Jurídica** (es el gate del oficio §2) | D. 1077 arts. 2.2.6.1.2.2.4 / 2.2.6.1.2.3.1 + CPACA art. 17 · decisión 6-ago |
+| **Tope de reinicios** | **No hay tope legal** (cada radicación es petición independiente). Trazar radicados sucesivos por predio/proyecto, sin bloquear | CPACA + D. 1077 |
+| **Silencio positivo (SAP)** | Opera si no se resuelve **ni notifica** en el término neto; NO se configura si hubo pronunciamiento (acta); NO legaliza lo inviable. Reglas: reloj neto en hábiles, suspensiones automáticas, alertas 60/80/90%, control de **notificación**, trazabilidad | CPACA 84-85 + jurisprudencia |
+| **Los "6 meses"** | Son la **REVALIDACIÓN** (figura separada, a solicitud, con avance ≥50%): ventana **2 meses** en texto base (D. 1783/2021), ampliada transitoriamente (D. 74/2025, solicitudes hasta 30-jun-2026, ya vencida). **NO codificar "6 meses"** — parametrizar por fecha | D. 1077 art. 2.2.6.1.2.4.2 |
+| **Vigencias** | Obra nueva 36+12=48 · otras modalidades 24+12=36 · saneamiento/subdivisión 12 (no prorrogable). Prórroga: solicitar **≥30 días hábiles antes** del vencimiento | D. 1783/2021 |
+| **Competencia** | **Propia de Planeación** (Secretario/Subsecretario). **El Alcalde no interviene** | Planeación + resoluciones reales |
+| **Checklist** | Completo (`F-PGD-009` v02, págs. 1-2) | Documento oficial |
+| **Alerta preventiva** | Requerida por Planeación. ⚠️ **Ajuste de diseño:** "1 mes antes" llega **tarde** (la prórroga se pide ≥30 días **hábiles** antes ≈ 6 semanas) → alerta principal **≥2 meses antes** + recordatorio del cierre real + alerta post-vencimiento (ventana de revalidación) | Planeación + D. 1783 |
 
-## 🔴 A · Para la Oficina Jurídica (concepto formal) — lo que Planeación NO puede zanjar
+## 🔴 ÚNICA gestión externa restante — Oficina Jurídica: RATIFICAR el texto consolidado
 
-> Oficio ya redactado: `docs/juridico/solicitud-concepto-juridico-licencia-construccion.md`. Preguntas núcleo (legales):
+> Oficio listo para tramitar: `docs/juridico/solicitud-concepto-juridico-licencia-construccion.md`. Ya no son preguntas abiertas — es **confirmar (o corregir)** cada punto contra el texto consolidado vigente:
 
-1. **Unidad del término (CRÍTICO — resolver contradicción):** los 45 días, ¿son **hábiles** o **corridos**? El ing dijo hábiles; Planeación, corridos; la norma nacional suele contar en **hábiles**. Cambia el vencimiento ~3 semanas y el riesgo de silencio positivo.
-2. **Legalidad del reinicio:** ante un cambio, ¿es correcto que el término **se REINICIE** (a cero), o el mecanismo legal es **suspender y reanudar**? Fundamento.
-3. **¿Reinicio con radicado NUEVO o el MISMO?** Planeación describe un **nuevo radicado** por cambio; operativamente el ing prefiere mantener el **mismo radicado**. ¿Se puede reiniciar el término **sobre el mismo radicado** sin que el término de la radicación **original** gatille **silencio positivo**?
-4. **Tope:** ¿hay un límite de reinicios o un plazo total, para que el trámite no quede sin fecha de vencimiento?
-5. **Silencio administrativo positivo:** ¿en qué momento y bajo qué condiciones se configura, y qué salvaguardas lo conjuran? (Ley 388 art. 99 / Decreto 1077.)
-6. **Competencia (solo confirmar):** ¿confirma que la competencia es de Planeación (**sin** acto de delegación del Alcalde)? ¿Hay algún acto interno de asignación de funciones que debamos citar?
+1. Término: **45 días hábiles** desde radicación en debida forma; ¿el término mismo admite prórroga de la autoridad?
+2. **Mecánica del cambio (EL punto crítico):** la norma investigada dice **suspende/reanuda** (acta, 30+15; nuevo radicado solo tras desistimiento); la operación decidió **reinicio a cero sobre el MISMO radicado**. Jurídica debe pronunciarse **expresamente**: ¿es admisible reiniciar a cero sobre el mismo radicado **sin riesgo de SAP** (que el término original se tenga por vencido)? Sin este pronunciamiento escrito, la semántica `REINICIA_A_CERO` **no se activa**.
+3. **SAP:** condiciones, límites y salvaguardas; visto al control por fecha de **notificación**. **No existe aún respuesta de Jurídica sobre SAP** — lo que hay es investigación normativa (no oficial).
+4. **Vigencias/prórroga/revalidación:** cuadro D. 1783/2021; **ventana de revalidación aplicable HOY** a solicitudes nuevas (¿2 meses?); tratamiento de expedientes bajo D. 74/2025; confirmación de que "6 meses" no es el valor vigente.
+5. **Competencia** propia de Planeación; referencia del acto interno de funciones, si existe.
 
-## 🟠 B · Para Planeación / el ingeniero (operativo)
+## 🟠 Con Planeación (menor, no bloqueante)
 
-1. **Los 6 meses "para terminar":** después de la vigencia + la prórroga (12 meses), esos **6 meses**, ¿son una **revalidación para terminación de obra** (a solicitud, con obra avanzada), o son en realidad una **vigencia de 6 meses** de cierto tipo de licencia? (En vigencias mencionaste 3 años / 1 año / 6 meses — conviene distinguir si "6 meses" es una vigencia o un plazo extra de terminación.)
-2. **Acto interno de asignación de funciones** (si existe): suministrarlo como soporte de la competencia de Planeación.
+1. **Validar el ajuste de la alerta** (≥2 meses antes en lugar de 1 mes — ver arriba).
+2. **Acto interno de asignación de funciones** (si existe), como soporte documental de la competencia.
 
-## Por qué importa (efecto en el diseño)
-- La **unidad (hábiles/corridos)** y el **reinicio (mismo/nuevo radicado)** definen el cómputo del vencimiento y el riesgo de **silencio positivo** — el núcleo del reloj del motor.
-- La **vigencia + prórroga + los 6 meses** definen el **vencimiento real** de la licencia y la **alerta preventiva** (1 mes antes), ver `docs/blueprints/ciclo-vida-licencia-construccion.md`.
-- Sin estas respuestas, el diseño de la fase de resolución se construiría sobre supuestos; por eso la Fase 2 permanece detenida hasta tenerlas. **Las respuestas de Planeación son operativas; la unidad del término y el silencio positivo los debe fijar Jurídica por escrito.**
+## Por qué la ratificación sigue siendo el gate
+
+El propio insumo normativo lo advierte: las normas de vigencia/prórroga/revalidación **cambiaron varias veces** (D. 1783/2021, D. 74/2025) y la versión aplicable depende de la **fecha de cada expediente**; el texto consolidado debe confirmarlo Jurídica **antes de programar reglas**. El motor lo absorbe con **valores en configuración parametrizada** (nunca constantes en código): la arquitectura puede avanzar; los **valores legales** esperan la ratificación.

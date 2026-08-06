@@ -1,80 +1,64 @@
-# BORRADOR — Solicitud de concepto jurídico
+# BORRADOR — Solicitud de ratificación jurídica (texto consolidado) · Licencia de Construcción
 
-> **Uso:** borrador de trabajo para que la Secretaría de Planeación (o la Alcaldía) lo revise, ajuste y tramite ante la oficina jurídica. Los campos entre `[corchetes]` se completan antes de firmar. **No** contiene firmas, radicados ni membretes oficiales: eso lo pone la entidad al oficializarlo.
+> **Uso:** borrador de trabajo para que la Alcaldía lo revise, ajuste y tramite ante la **Oficina Jurídica**. Los campos entre `[corchetes]` se completan antes de firmar. Sin firmas, radicados ni membretes: los pone la entidad al oficializarlo.
 >
-> **Por qué existe:** cierra la **precondición P1 de [ADR-0026](../adr/0026-motor-generico-expedientes-administrativos.md)** (concepto jurídico formal), único bloqueo *legal* pendiente para diseñar la fase de resolución del motor de expedientes (licencia de construcción). Las referencias normativas se plantean como **entendimiento preliminar sujeto al concepto** de la oficina jurídica: la IA/el sistema propone, la autoridad decide.
+> **Por qué existe:** cierra la **precondición P1 de [ADR-0026](../adr/0026-motor-generico-expedientes-administrativos.md)**. Gracias a la investigación normativa del 6-ago-2026 (ver [insumo](../blueprints/ciclo-vida-licencia-construccion.md)), ya **no pedimos un concepto desde cero**: pedimos **ratificar (o corregir) el texto consolidado vigente** de los artículos que gobiernan los plazos, porque las normas de vigencia/prórroga/revalidación han cambiado varias veces (D. 1783/2021, D. 74/2025) y el sistema no debe programar reglas sin esa confirmación. La IA/el sistema propone; la autoridad decide.
 
 ---
 
 **[Ciudad], [fecha]**
 
-**Para:** [Nombre], Jefe(a) de la Oficina Jurídica — Alcaldía Municipal de Simacota
-**De:** [Nombre], [Cargo — p. ej. Secretario(a) de Planeación e Infraestructura]
-**Asunto:** Solicitud de concepto jurídico sobre el trámite de Licencia de Construcción (inicio del término, plazo de revisión previa, silencio administrativo positivo y competencia para expedir), en el marco de la digitalización de la Ventanilla Única.
+**Para:** [Nombre], Oficina Jurídica — Alcaldía Municipal de Simacota
+**De:** [Nombre], [Cargo]
+**Asunto:** Ratificación del texto consolidado vigente que rige los términos de la Licencia de Construcción, para parametrizar el expediente electrónico de la Ventanilla Única.
 
 Cordial saludo.
 
-En el marco del proyecto de digitalización de la Ventanilla Única y del expediente electrónico de trámites de la Secretaría de Planeación —cuyo primer trámite es la **Licencia de Construcción en la modalidad de Obra Nueva** (Certificación `F-PGD-009` v02)— requerimos, antes de configurar el cómputo de términos y el flujo del expediente en el sistema, un **concepto jurídico formal** sobre los siguientes puntos. El sistema calculará y recordará plazos legales de forma **asistiva** (nunca decisoria), por lo que necesitamos que el fundamento jurídico quede fijado por esa oficina.
+Para configurar el cómputo **asistivo** de términos del expediente electrónico (la decisión administrativa permanece siempre en el funcionario competente), hemos consolidado el siguiente entendimiento a partir del Decreto 1077 de 2015, la Ley 1437 de 2011 (CPACA), los Decretos 1783 de 2021 y 74 de 2025, y conceptos de Minvivienda. Solicitamos **ratificar cada punto contra el texto consolidado vigente**, o corregirlo donde nuestra lectura sea inexacta.
 
-A continuación exponemos nuestro **entendimiento preliminar** —que puede ser corregido— y la **consulta concreta** de cada punto.
+## 1. Término para resolver — 45 días HÁBILES desde la radicación en legal y debida forma
 
-## 1. Duración y hito de inicio del término para resolver
+**Entendimiento:** la autoridad dispone de un **máximo de 45 días hábiles** para resolver, contados desde la **radicación en legal y debida forma** (art. 2.2.6.1.2.3.1, Decreto 1077 de 2015; en igual sentido, concepto Minvivienda 2022EE0054113). Los días son **hábiles**, no corridos.
 
-**Lo que indica la Secretaría de Planeación (práctica operativa):** el término se cuenta desde la **radicación en Ventanilla, una vez Planeación verifica que la documentación está completa** (flujo: revisa completitud → remite a Ventanilla → radica → corren los días). **Sobre la duración hay una discrepancia que pedimos zanjar:** primero se nos indicó **45 días hábiles** y luego **45 días corridos**.
+**Ratificar:** 1.1 ¿Confirma unidad (hábiles) e hito? · 1.2 ¿El término mismo admite alguna **prórroga o ampliación por parte de la autoridad**? De ser así, ¿cuál es su fuente y extensión?
 
-**Consulta:**
-1.1. **(Crítico)** ¿El término es de 45 días **hábiles** o **corridos**? La diferencia es de ~3 semanas y determina el vencimiento y el riesgo de silencio positivo. ¿Cuál es el fundamento vigente (entendemos que el **Decreto 1077 de 2015** cuenta en días **hábiles**)?
-1.2. ¿Confirma que el "punto cero" es la **radicación en debida forma** (una vez completa la documentación), y no el primer ingreso del solicitante?
-1.3. ¿Admite ese término **prórroga** por parte de la autoridad? De ser así, ¿en qué casos y por cuánto tiempo?
+## 2. Suspensión por acta de observaciones · desistimiento · nueva radicación
 
-## 2. Efecto de una modificación o subsanación sobre el término (punto crítico)
+**Entendimiento:** durante la revisión se levanta **acta de observaciones y correcciones** (art. 2.2.6.1.2.2.4), que **suspende** el término; el solicitante cuenta con **30 días hábiles, prorrogables 15 más a solicitud de parte**, para subsanar. Si subsana, el término **se reanuda** (mismo radicado). Si no subsana, la solicitud **se entiende desistida** y se **archiva por acto administrativo** (art. 2.2.6.1.2.3.1, en concordancia con el art. 17 del CPACA), acto que admite **recurso de reposición**. Tras el archivo, continuar exige **nueva solicitud (nuevo radicado)**, que abre un **nuevo término de 45 días**. También suspenden el término el plazo para aportar comprobantes de **pago de expensas e impuestos** (30 días hábiles) y la **citación a vecinos**.
 
-**Lo que indica la Secretaría de Planeación (práctica operativa):** si durante los 45 días hábiles **surge un cambio**, el término **se reinicia** — vuelven a contarse los 45 días desde ese momento.
+**Ratificar:** 2.1 ¿Confirma el mecanismo (suspende/reanuda dentro del radicado; reinicio solo vía desistimiento→archivo→nueva solicitud)? · 2.2 ¿Confirma los plazos de subsanación (30+15 hábiles) y las demás causales de suspensión? · 2.3 ¿Confirma que **no existe tope legal** al número de nuevas radicaciones ni un plazo máximo global del trámite (el sistema trazará radicados sucesivos sin bloquearlos)?
 
-Señalamos, con el debido respeto y a título técnico, que el mecanismo del **reinicio** difiere del de **suspensión** (pausar el término mientras el solicitante subsana y luego reanudarlo), y que la elección entre uno y otro **incide directamente en el riesgo de silencio administrativo positivo** y en que el trámite tenga o no una fecha de vencimiento determinada. Por eso solicitamos que la oficina jurídica lo precise:
+## 3. Silencio administrativo positivo (SAP)
 
-**Consulta:**
-2.1. Ante un cambio durante el trámite, ¿el término legalmente **se REINICIA** (vuelve a cero) o **se SUSPENDE** (se pausa y luego se reanuda)? ¿Cuál es el fundamento normativo?
-2.2. ¿Qué actuación constituye un "**cambio**" que afecta el término: una **modificación del proyecto** por el solicitante, un **requerimiento de subsanación** de documentos, o ambos? ¿Reciben el mismo tratamiento?
-2.3. Si el término se reinicia, ¿existe un **tope máximo** (número de reinicios o plazo total) para que el trámite no quede sin fecha de vencimiento definida?
-2.4. La fase de **revisión previa** de requisitos (antes de radicar), ¿tiene un plazo reglado propio y bajo qué **régimen de subsanación** (días, hábiles/calendario, prórroga)? Tener presente que —según nuestro entendimiento— **no** debería regirse por el término del derecho de petición (**Ley 1755 de 2015**), por tratarse de un trámite especial urbanístico.
-2.5. Planeación indica que el reinicio se materializa con un **nuevo radicado**. Operativamente sería preferible mantener el **mismo radicado**. ¿Es jurídicamente admisible **reiniciar el término sobre el mismo radicado**, o el reinicio exige un radicado **nuevo** para no arrastrar el término de la radicación original (riesgo de silencio positivo)?
+**Entendimiento:** si la autoridad **no resuelve ni notifica** dentro del término neto (descontadas suspensiones válidas), opera el SAP (arts. 84-85 CPACA; art. 2.2.6.1.2.3.1), con dos límites jurisprudenciales: no se configura si **hubo pronunciamiento** dentro del término (p. ej., el acta de observaciones), y **no legaliza** lo urbanísticamente inviable (no nace derecho contra el POT).
 
-## 3. Silencio administrativo positivo
+**Ratificar:** 3.1 ¿Confirma condiciones y límites del SAP? · 3.2 ¿La expedición **y notificación** oportunas del acta/decisión son la salvaguarda suficiente, o recomienda actuaciones adicionales? · 3.3 ¿Valida que el sistema controle la fecha de **notificación** (no solo la de firma) y conserve trazabilidad probatoria de cada actuación?
 
-**Entendimiento preliminar:** un manejo inadecuado de los términos podría configurar **silencio administrativo positivo** a favor del solicitante (entendemos que en materia de licencias urbanísticas ello se relaciona con el **artículo 99 de la Ley 388 de 1997** y con el régimen del Decreto 1077 de 2015).
+## 4. Vigencia, prórroga y revalidación — texto consolidado aplicable
 
-**Consulta:**
-3.1. ¿En qué momento y bajo qué condiciones se configura el **silencio administrativo positivo** en la licencia de construcción?
-3.2. ¿Qué salvaguardas de procedimiento debemos incorporar para evitar que una solicitud **completa presentada pero no radicada oportunamente** derive en silencio positivo?
-3.3. ¿El plazo reglado de la fase previa (punto 2) es un mecanismo idóneo y suficiente para conjurar ese riesgo, o se requiere alguna actuación adicional?
+**Entendimiento (D. 1783/2021):** obra nueva/urbanización/parcelación: **36 meses + prórroga única de 12** (total 48); otras modalidades de construcción e intervención de espacio público: **24 + 12** (36); saneamiento y subdivisión: **12, no prorrogables**. La prórroga se solicita **a más tardar 30 días hábiles antes** del vencimiento. Vencida la licencia, procede la **REVALIDACIÓN** (art. 2.2.6.1.2.4.2): acto nuevo, **a solicitud expresa**, dentro de una ventana de **2 meses** tras el vencimiento (texto base), con **avance de obra ≥50%** certificado, sujeta a las normas vigentes al momento de la nueva solicitud. El **Decreto 74 de 2025** habilitó transitoriamente una **segunda prórroga (12 meses)** y amplió la ventana de revalidación, con **solicitudes hasta el 30 de junio de 2026** (fecha ya vencida para solicitudes nuevas).
 
-## 4. Competencia para expedir la licencia
+**Ratificar:** 4.1 ¿Confirma el cuadro de vigencias/prórrogas y el plazo de solicitud de prórroga? · 4.2 ¿Confirma la ventana de revalidación **aplicable hoy** a solicitudes nuevas (¿2 meses?) y el tratamiento de expedientes cobijados por el D. 74/2025? · 4.3 ¿Confirma que la cifra "6 meses" (mencionada operativamente) corresponde a regímenes anteriores y **no** debe programarse como valor vigente?
 
-**Lo que ya observamos y nos confirmó Planeación:** las resoluciones las expide la **Secretaría de Planeación e Infraestructura** (firma el **Secretario** o el **Subsecretario**), en uso de sus facultades legales (Art. 99 Ley 388/1997; Decretos 1077/2015, 1783/2021, 2218/2015, 097/2006, 1469/2010; Acuerdo Municipal 013/2003, EOT). Planeación indica que **el Alcalde no interviene** en este trámite ni media una delegación expresa suya.
+## 5. Competencia
 
-**Consulta:**
-4.1. ¿Confirma que la competencia es **propia de la Secretaría de Planeación** (sin necesidad de un acto de delegación del Alcalde)? ¿Existe algún **acto interno de asignación de funciones** (Secretario/Subsecretario) que debamos citar como soporte en el expediente digital (tipo, número, fecha)?
+**Entendimiento (confirmado por Planeación):** la competencia para expedir es **propia de la Secretaría de Planeación e Infraestructura** (firma el Secretario o el Subsecretario), con fundamento en el Art. 99 de la Ley 388 de 1997 y el Decreto 1077 de 2015 — **sin intervención ni delegación del Alcalde**.
 
-## 5. Compatibilidad del apoyo digital
+**Ratificar:** 5.1 ¿Confirma? Si existe un **acto interno de asignación de funciones**, agradecemos su referencia (tipo, número, fecha) para citarlo en el expediente digital.
 
-5.1. ¿Encuentra la oficina jurídica alguna objeción a que el sistema **calcule y recuerde** los términos y vencimientos de forma **asistiva**, quedando la decisión administrativa (aprobar, negar, requerir, archivar) **siempre en cabeza del funcionario competente**?
+## 6. Compatibilidad del apoyo digital
+
+6.1 ¿Alguna objeción a que el sistema **calcule, suspenda/reanude y alerte** términos de forma asistiva (alertas al 60/80/90% del término neto; control de fecha de notificación), quedando toda decisión administrativa **en cabeza del funcionario competente**?
 
 ---
 
-Agradecemos que el concepto se emita **por escrito**, en lo posible dentro de los **[p. ej., quince (15) días hábiles]** siguientes al recibo de esta solicitud, dado que el diseño técnico del expediente electrónico se encuentra **a la espera de este pronunciamiento** para no configurar reglas de plazos que resulten contrarias a derecho.
-
-Quedamos atentos.
+Agradecemos respuesta **por escrito** en lo posible dentro de los **[quince (15) días hábiles]** siguientes: la parametrización del expediente electrónico queda **a la espera de esta ratificación** para no configurar reglas de plazos contrarias a derecho.
 
 Atentamente,
 
-[Nombre]
-[Cargo]
-Secretaría de Planeación e Infraestructura — Alcaldía Municipal de Simacota
+[Nombre] · [Cargo]
 [Correo] · [Teléfono]
 
----
-
-> **Anexo sugerido:** copia de la Certificación `F-PGD-009` v02 (checklist de requisitos de la Licencia de Construcción — Obra Nueva), para contexto del trámite.
+> **Anexos sugeridos:** (i) Certificación `F-PGD-009` v02 (checklist); (ii) el insumo de investigación normativa del 6-ago-2026 con sus fuentes.
 >
-> **Nota para el equipo (no incluir en el oficio):** las cuatro consultas corresponden 1:1 a la precondición P1 de ADR-0026 (hito de radicación → D5; plazo reglado previo; silencio positivo; acto de competencia). La respuesta a 1.2/2.2 alimenta el parámetro `TerminoLegal {días, unidad, prórroga}` y el `RegimenSubsanacion` del motor; la de 4.1 fija la autoridad expedidora del expediente. Verificar los números de artículo (Decreto 1077/2015, Ley 388/1997 art. 99, Decreto 1203/2017) con la oficina jurídica antes de citarlos como definitivos.
+> **Nota interna (no incluir en el oficio):** las ratificaciones alimentan directamente la configuración del motor (`docs/blueprints/ciclo-vida-licencia-construccion.md` §Parámetros). Puntos de mayor riesgo si cambian: unidad del término (1.1), mecánica de suspensión (2.1) y ventana de revalidación (4.2).
