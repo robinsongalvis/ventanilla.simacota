@@ -68,6 +68,64 @@ interface ReporteSerie {
 }
 
 /**
+ * Rama propia para la serie `expedientes` (PASO 6, Fase 2 arranque) —
+ * DELIBERADAMENTE fuera de `COLECCION_POR_SERIE`/`huecosDe`/`duplicadosDe`:
+ * esa maquinaria asume el formato `1-110-{AAAA}-{NNNNNNNN}` de las 3 series
+ * legadas (`perteneceAlAnio` con regex de año de 4 dígitos;
+ * `consecutivoDeId` toma el ÚLTIMO segmento tras `-`). El número de
+ * expediente (`68745-0-26-0020`) tiene AÑO DE 2 DÍGITOS en el PENÚLTIMO
+ * segmento — reutilizar esas funciones tal cual produciría 19 "huecos"
+ * falsos (`perteneceAlAnio` nunca matchearía `-26-`) y `consecutivoDeId`
+ * devolvería el consecutivo real por casualidad de posición, no por diseño.
+ * Ampliar esa maquinaria para dos formatos de id es tarea de Fase 1, cuando
+ * exista la colección real de expedientes (deuda #12, ADR-0026 §A2) — aquí
+ * NO se inventa un nombre de colección que todavía no existe.
+ *
+ * Por eso esta serie solo reporta el ESTADO del contador, sin auditoría de
+ * continuidad/unicidad contra documentos (no hay colección que barrer):
+ * - `SIN_ABRIR`: el counter `counters/expedientes-{año}` no existe — cero
+ *   ruido, es el estado normal antes de que Fase 1/2 emita el primer
+ *   expediente.
+ * - `PARCIAL`: el counter existe y tiene forma válida (`ultimo` entero >=
+ *   0) — se reporta su valor, pero la auditoría de continuidad real queda
+ *   pendiente de que exista la colección.
+ * - `CORRUPTO`: el counter existe pero `ultimo` NO es un entero >= 0 — esto
+ *   SÍ es un hallazgo real (dato corrupto), y es el único caso de esta
+ *   rama que dispara el correo de alerta.
+ */
+interface ReporteSerieExpedientes {
+  estado: 'SIN_ABRIR' | 'PARCIAL' | 'CORRUPTO';
+  ultimo?: number;
+  motivo?: string;
+}
+
+/**
+ * Lógica PURA de la rama `expedientes` — testeable sin Firestore: recibe el
+ * dato ya leído de `counters/expedientes-{año}` (`undefined` si el
+ * documento no existe) y decide el estado. No hace I/O.
+ */
+export function auditarCounterExpedientes(
+  data: Record<string, unknown> | undefined,
+): ReporteSerieExpedientes {
+  if (data === undefined) {
+    return { estado: 'SIN_ABRIR' };
+  }
+  const ultimoRaw = data.ultimo;
+  const ultimo = Number(ultimoRaw);
+  if (!Number.isInteger(ultimo) || ultimo < 0) {
+    return {
+      estado: 'CORRUPTO',
+      motivo: `counters/expedientes-{año}.ultimo inválido (${JSON.stringify(ultimoRaw)}): debe ser un entero >= 0.`,
+    };
+  }
+  return {
+    estado: 'PARCIAL',
+    ultimo,
+    motivo: 'auditoría de continuidad pendiente de colección (Fase 1)',
+  };
+}
+
+/**
  * Lee TODOS los IDs de documento de una colección, en lotes con cursor
  * (`limit` + `startAfter`), SIN techo de lectura: a diferencia de otras
  * consultas acotadas del Roadmap (P1.4), esta barrida es una auditoría de
@@ -122,7 +180,7 @@ export async function GET(request: Request): Promise<NextResponse> {
   const timestampIso = new Date().toISOString();
 
   try {
-    const series: Record<string, ReporteSerie> = {};
+    const series: Record<string, ReporteSerie | ReporteSerieExpedientes> = {};
     let totalHuecos = 0;
     let totalDuplicados = 0;
     let totalDocumentosLeidos = 0;
@@ -163,7 +221,23 @@ export async function GET(request: Request): Promise<NextResponse> {
       totalDocumentosLeidos += presentesLista.length;
     }
 
-    const totalHallazgos = totalHuecos + totalDuplicados;
+    // Rama propia de 'expedientes' (PASO 6) — SIEMPRE se agrega al reporte,
+    // sin importar el estado, para que el reporte nunca "olvide" la serie
+    // mientras Fase 1 no le asigna colección (ver JSDoc de
+    // ReporteSerieExpedientes / auditarCounterExpedientes arriba).
+    const counterExpedientesSnap = await db.doc(`counters/expedientes-${anio}`).get();
+    const reporteExpedientes = auditarCounterExpedientes(counterExpedientesSnap.data());
+    series.expedientes = reporteExpedientes;
+    const expedientesCorrupto = reporteExpedientes.estado === 'CORRUPTO';
+    if (expedientesCorrupto) {
+      logError({
+        radicadoId: 'n/a',
+        modulo: 'cron/auditoria-consecutivos/expedientes',
+        error: new Error(reporteExpedientes.motivo ?? 'counter de expedientes corrupto'),
+      });
+    }
+
+    const totalHallazgos = totalHuecos + totalDuplicados + (expedientesCorrupto ? 1 : 0);
 
     registrarEventoNegocio({
       operacion:  'auditoria_consecutivos',
@@ -194,9 +268,16 @@ export async function GET(request: Request): Promise<NextResponse> {
       });
     } else {
       try {
-        const seriesArr: SerieHallazgoAuditoria[] = Object.entries(series).map(([nombre, s]) => ({
-          serie: nombre, ...s,
-        }));
+        // La plantilla del correo (SerieHallazgoAuditoria) asume la forma de
+        // las 3 series legadas (huecos/duplicados) — 'expedientes' tiene una
+        // forma distinta (estado) y se excluye aquí; su hallazgo CORRUPTO ya
+        // se registró vía logError arriba y siempre aparece en la respuesta
+        // JSON. Extender la plantilla para 'expedientes' queda para cuando
+        // Fase 1 le asigne colección real y tenga auditoría de continuidad
+        // que valga la pena mostrar en el correo.
+        const seriesArr: SerieHallazgoAuditoria[] = Object.entries(series)
+          .filter((entry): entry is [string, ReporteSerie] => entry[0] !== 'expedientes')
+          .map(([nombre, s]) => ({ serie: nombre, ...s }));
 
         const asunto = buildAuditoriaConsecutivosSubject(totalHallazgos, anio);
         const html = buildAuditoriaConsecutivosHtml({

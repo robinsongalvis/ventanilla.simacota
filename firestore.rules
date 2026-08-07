@@ -210,6 +210,14 @@ service cloud.firestore {
       allow read, write: if isAdmin() || isRecepcionista();
     }
 
+    // ── Reserva de unicidad de números de expediente (Fase 2) ─────────────
+    // Doc id = número de expediente formateado. Escrita SOLO por el servidor
+    // (Admin SDK, tx.create en lib/server/emitir-numero-expediente.ts);
+    // ningún cliente lee ni escribe.
+    match /unicidad_expedientes/{id} {
+      allow read, write: if false;
+    }
+
     // ── Auditoría administrativa — append-only, solo lectura Admin ────────
     match /admin_auditoria/{eventoId} {
       allow read: if isAdmin();
