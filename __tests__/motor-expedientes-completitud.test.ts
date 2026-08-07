@@ -27,11 +27,16 @@ function tramiteLicencia(): DefinicionTramite {
     nombre: 'Licencia de Construcción · Obra Nueva',
     activo: true,
     terminos: { dias: 45, unidad: 'HABILES' },
+    // `regimenSubsanacion` refleja el Decreto 1077 de 2015 en dias/prorrogaDias
+    // (30 hábiles + 15 de prórroga). `ventanaRequerimiento` es un PLACEHOLDER
+    // técnico para ejercitar el motor — el Decreto 1077 NO define esta
+    // ventana; valor real pendiente de ratificación de Jurídica. NO copiar
+    // como semilla de configuración real.
     regimenSubsanacion: {
       dias: 30,
       unidad: 'HABILES',
       prorrogaDias: 15,
-      ventanaRequerimiento: { dias: 10, unidad: 'HABILES' },
+      ventanaRequerimiento: { dias: 10, unidad: 'HABILES' }, // placeholder, ver comentario arriba
     },
     requiereVisita: true,
     generaResolucion: true,

@@ -1,13 +1,20 @@
 import { INSTITUCION } from '@/lib/institucion';
 import { formatFechaLargaColombia } from '@/lib/fecha-colombia';
+import type { TextosLegalesSubsanacion } from '@/lib/catalogos/regimen-legal-subsanacion';
 
 /* ══════════════════════════════════════════════════════════════
    TEMPLATE: Requerimiento de subsanación al ciudadano (BM-B33)
 
-   Ley 1755/2015 Art. 17. Contenido mínimo (validado por gobierno-digital):
-   qué debe subsanar + plazo de 1 mes + derecho a prórroga + advertencia de
+   Contenido mínimo (validado por gobierno-digital para Ley 1755/2015 Art.
+   17): qué debe subsanar + plazo + derecho a prórroga + advertencia de
    desistimiento tácito. El texto del "motivo" lo redacta el funcionario (o
    SIMI como apoyo) y se ESCAPA como HTML.
+
+   El contenido LEGAL (plazo, prórroga, fundamento) ahora es PARÁMETRO por
+   régimen (`textos`) — no se hardcodea aquí. `planRequerirSubsanacion`
+   (lib/server/subsanacion.ts) garantiza, vía su gate de régimen, que solo
+   los radicados con régimen Ley 1755 llegan hasta esta plantilla; ver
+   `lib/catalogos/regimen-legal-subsanacion.ts`.
 ══════════════════════════════════════════════════════════════ */
 
 export interface TemplateRequerimientoParams {
@@ -15,8 +22,10 @@ export interface TemplateRequerimientoParams {
   ciudadanoNombre:   string;
   /** Qué debe aportar/aclarar el ciudadano (texto del funcionario). */
   motivo:            string;
-  /** ISO — fecha límite para subsanar (1 mes desde hoy). */
+  /** ISO — fecha límite para subsanar. */
   fechaLimite:       string;
+  /** Textos legales del régimen aplicable (plazo, prórroga, fundamento). */
+  textos:            TextosLegalesSubsanacion;
 }
 
 function escapeHtml(str: string): string {
@@ -46,14 +55,15 @@ export function buildRequerimientoHtml(p: TemplateRequerimientoParams): string {
       ${escapeHtml(p.motivo)}
     </div>
     <p style="margin:0 0 12px;font-size:14px;">
-      Cuenta con <strong>un (1) mes</strong>, hasta el <strong>${escapeHtml(limite)}</strong>,
-      para aportar lo requerido. Puede <strong>solicitar una prórroga</strong> por un término
-      igual, siempre que lo pida antes del vencimiento.
+      Cuenta con <strong>${escapeHtml(p.textos.plazoDescripcion)}</strong>, hasta el
+      <strong>${escapeHtml(limite)}</strong>, para aportar lo requerido. Puede
+      <strong>solicitar una prórroga</strong> ${escapeHtml(p.textos.prorrogaDescripcion)},
+      siempre que lo pida antes del vencimiento.
     </p>
     <p style="margin:0 0 14px;font-size:14px;color:#bf360c;">
       Si no aporta la información en el plazo señalado, se entenderá que ha
       <strong>desistido</strong> de su solicitud y esta será archivada mediante acto
-      administrativo motivado (Ley 1755 de 2015, artículo 17).
+      administrativo motivado (${escapeHtml(p.textos.fundamentoLegal)}).
     </p>
     <p style="margin:16px 0 0;font-size:12px;color:#90a4ae;">${escapeHtml(INSTITUCION.nombre)}</p>
   </div>`;

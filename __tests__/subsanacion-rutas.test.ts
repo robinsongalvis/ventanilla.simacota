@@ -4,6 +4,7 @@ import {
   buildRequerimientoHtml,
   buildRequerimientoSubject,
 } from '@/lib/email/templates/requerimiento-subsanacion';
+import { TEXTOS_SUBSANACION_LEY_1755 } from '@/lib/catalogos/regimen-legal-subsanacion';
 
 /* BM-B33 pieza (4) — plantilla del requerimiento + cableado de las rutas. */
 
@@ -13,6 +14,7 @@ describe('plantilla del requerimiento de subsanación (contenido mínimo Art. 17
     ciudadanoNombre: 'Juan Pérez',
     motivo: 'Adjuntar copia legible del documento de identidad',
     fechaLimite: '2026-07-03T12:00:00.000Z',
+    textos: TEXTOS_SUBSANACION_LEY_1755,
   };
 
   it('el asunto lleva el radicado', () => {
