@@ -28,6 +28,7 @@ import {
   buildRequerimientoHtml,
   buildRequerimientoSubject,
 } from '@/lib/email/templates/requerimiento-subsanacion';
+import { TEXTOS_SUBSANACION_LEY_1755 } from '@/lib/catalogos/regimen-legal-subsanacion';
 import { registrarTrazabilidadNotificacion } from '@/lib/trazabilidad/notificacion';
 import { logError } from '@/lib/logger';
 
@@ -89,11 +90,15 @@ export async function POST(request: Request, context: RouteContext): Promise<Nex
         await enviarEmail({
           to: emailDestino,
           subject: buildRequerimientoSubject(radicadoId),
+          // El gate de `planRequerirSubsanacion` (lib/server/subsanacion.ts)
+          // ya garantizó que este radicado es régimen Ley 1755 antes de
+          // llegar aquí — por eso los textos legales son la constante fija.
           html: buildRequerimientoHtml({
             radicadoId,
             ciudadanoNombre: radicado.solicitante?.nombreCompleto ?? 'ciudadano/a',
             motivo: motivo.trim(),
             fechaLimite,
+            textos: TEXTOS_SUBSANACION_LEY_1755,
           }),
         });
         emailEnviado = true;

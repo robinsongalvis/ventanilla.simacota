@@ -41,12 +41,19 @@ function ymd(d: Date): string {
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
 }
 
-/** Régimen de Licencia de Construcción — Decreto 1077 de 2015. */
-const REGIMEN_LICENCIA: RegimenSubsanacion = {
+/**
+ * Régimen de Licencia de Construcción — Decreto 1077 de 2015 (30 días
+ * hábiles + prórroga de 15 días hábiles). `ventanaRequerimiento` es un
+ * PLACEHOLDER técnico para ejercitar el motor — el Decreto 1077 NO define
+ * esta ventana (el acta de observaciones opera dentro de la revisión, no
+ * como una ventana posterior de 10 días); valor real pendiente de
+ * ratificación de Jurídica. NO copiar como semilla de configuración real.
+ */
+const REGIMEN_LICENCIA_D1077_PLACEHOLDER: RegimenSubsanacion = {
   dias: 30,
   unidad: 'HABILES',
   prorrogaDias: 15,
-  ventanaRequerimiento: { dias: 10, unidad: 'HABILES' },
+  ventanaRequerimiento: { dias: 10, unidad: 'HABILES' }, // placeholder, ver comentario arriba
 };
 
 /** Régimen de derecho de petición — Ley 1755 de 2015, Art. 17. */
@@ -60,14 +67,14 @@ const REGIMEN_LEY_1755: RegimenSubsanacion = {
 describe('calcularLimiteSubsanacion — régimen Licencia (30 días hábiles, Decreto 1077)', () => {
   it('vence exactamente 30 días hábiles después de la notificación, en día hábil', () => {
     const notificacion = local(2026, 6, 2);
-    const limite = calcularLimiteSubsanacion(REGIMEN_LICENCIA, notificacion);
+    const limite = calcularLimiteSubsanacion(REGIMEN_LICENCIA_D1077_PLACEHOLDER, notificacion);
     expect(esDiaHabil(limite)).toBe(true);
     expect(diasRestantesHabiles(limite, notificacion)).toBe(30);
   });
 
   it('atraviesa un festivo (20 de julio) sin contarlo', () => {
     const notificacion = local(2026, 7, 10);
-    const limite = calcularLimiteSubsanacion(REGIMEN_LICENCIA, notificacion);
+    const limite = calcularLimiteSubsanacion(REGIMEN_LICENCIA_D1077_PLACEHOLDER, notificacion);
     expect(diasRestantesHabiles(limite, notificacion)).toBe(30);
   });
 
@@ -81,8 +88,8 @@ describe('calcularLimiteSubsanacion — régimen Licencia (30 días hábiles, De
     const comoFecha = new Date(notificacionIso);
     const equivalenteLocal = local(comoFecha.getFullYear(), comoFecha.getMonth() + 1, comoFecha.getDate());
 
-    const limiteDesdeString = calcularLimiteSubsanacion(REGIMEN_LICENCIA, notificacionIso);
-    const limiteDesdeLocal = calcularLimiteSubsanacion(REGIMEN_LICENCIA, equivalenteLocal);
+    const limiteDesdeString = calcularLimiteSubsanacion(REGIMEN_LICENCIA_D1077_PLACEHOLDER, notificacionIso);
+    const limiteDesdeLocal = calcularLimiteSubsanacion(REGIMEN_LICENCIA_D1077_PLACEHOLDER, equivalenteLocal);
 
     // Contrato EXACTO (getTime), no solo "cae en día hábil": si la rama de
     // parseo de string de `atLocalNoon` divergiera de la rama de `Date`
@@ -121,8 +128,8 @@ describe('calcularLimiteSubsanacion — régimen Licencia (30 días hábiles, De
 describe('calcularLimiteConProrroga — régimen Licencia (15 días hábiles)', () => {
   it('la prórroga son exactamente 15 días hábiles después del límite vigente', () => {
     const notificacion = local(2026, 6, 2);
-    const limiteInicial = calcularLimiteSubsanacion(REGIMEN_LICENCIA, notificacion);
-    const conProrroga = calcularLimiteConProrroga(REGIMEN_LICENCIA, limiteInicial);
+    const limiteInicial = calcularLimiteSubsanacion(REGIMEN_LICENCIA_D1077_PLACEHOLDER, notificacion);
+    const conProrroga = calcularLimiteConProrroga(REGIMEN_LICENCIA_D1077_PLACEHOLDER, limiteInicial);
     expect(diasRestantesHabiles(conProrroga, limiteInicial)).toBe(15);
     expect(conProrroga.getTime()).toBeGreaterThan(limiteInicial.getTime());
   });
@@ -157,19 +164,19 @@ describe('calcularFinVentanaRequerimiento + dentroVentanaRequerimientoRegimen �
   const radicacion = local(2026, 6, 1);
 
   it('el fin de ventana está exactamente 10 días hábiles después de la radicación', () => {
-    const fin = calcularFinVentanaRequerimiento(REGIMEN_LICENCIA, radicacion);
+    const fin = calcularFinVentanaRequerimiento(REGIMEN_LICENCIA_D1077_PLACEHOLDER, radicacion);
     expect(diasRestantesHabiles(fin, radicacion)).toBe(10);
   });
 
   it('al 10.º día hábil sigue dentro de la ventana (inclusive)', () => {
-    const fin = calcularFinVentanaRequerimiento(REGIMEN_LICENCIA, radicacion);
-    expect(dentroVentanaRequerimientoRegimen(REGIMEN_LICENCIA, radicacion, fin)).toBe(true);
+    const fin = calcularFinVentanaRequerimiento(REGIMEN_LICENCIA_D1077_PLACEHOLDER, radicacion);
+    expect(dentroVentanaRequerimientoRegimen(REGIMEN_LICENCIA_D1077_PLACEHOLDER, radicacion, fin)).toBe(true);
   });
 
   it('un día hábil después del fin de ventana queda fuera', () => {
-    const fin = calcularFinVentanaRequerimiento(REGIMEN_LICENCIA, radicacion);
-    const finMasUnHabil = calcularLimiteSubsanacion({ ...REGIMEN_LICENCIA, dias: 1 }, fin);
-    expect(dentroVentanaRequerimientoRegimen(REGIMEN_LICENCIA, radicacion, finMasUnHabil)).toBe(false);
+    const fin = calcularFinVentanaRequerimiento(REGIMEN_LICENCIA_D1077_PLACEHOLDER, radicacion);
+    const finMasUnHabil = calcularLimiteSubsanacion({ ...REGIMEN_LICENCIA_D1077_PLACEHOLDER, dias: 1 }, fin);
+    expect(dentroVentanaRequerimientoRegimen(REGIMEN_LICENCIA_D1077_PLACEHOLDER, radicacion, finMasUnHabil)).toBe(false);
   });
 
   it('el mismo cálculo de ventana aplica igual para el régimen Ley 1755 (comparten forma, no valores)', () => {
@@ -199,7 +206,7 @@ describe('mismo motor, datos distintos (D5) — resumen de equivalencia', () => 
     // `ymdEsperado` es el resultado EXACTO de `calcularLimiteSubsanacion` para
     // esta `notificacion` fija (2026-03-02) — verificado de forma independiente
     // contra `diasRestantesHabiles`/`sumarMesCalendario` antes de fijarlo aquí.
-    { nombre: 'Licencia (Decreto 1077)', regimen: REGIMEN_LICENCIA, diasEsperados: 30, unidadEsperada: 'HABILES', ymdEsperado: '2026-04-16' },
+    { nombre: 'Licencia (Decreto 1077)', regimen: REGIMEN_LICENCIA_D1077_PLACEHOLDER, diasEsperados: 30, unidadEsperada: 'HABILES', ymdEsperado: '2026-04-16' },
     { nombre: 'Ley 1755', regimen: REGIMEN_LEY_1755, diasEsperados: 1, unidadEsperada: 'MESES', ymdEsperado: '2026-04-02' },
   ])('$nombre: el régimen declara $diasEsperados $unidadEsperada sin que el reloj los tenga hardcodeados', ({ regimen, diasEsperados, unidadEsperada, ymdEsperado }) => {
     expect(regimen.dias).toBe(diasEsperados);

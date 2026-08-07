@@ -30,6 +30,7 @@ import {
   buildDesistimientoHtml,
   buildDesistimientoSubject,
 } from '@/lib/email/templates/desistimiento';
+import { TEXTOS_SUBSANACION_LEY_1755 } from '@/lib/catalogos/regimen-legal-subsanacion';
 import { registrarTrazabilidadNotificacion } from '@/lib/trazabilidad/notificacion';
 import { logError } from '@/lib/logger';
 
@@ -94,10 +95,14 @@ export async function POST(request: Request, context: RouteContext): Promise<Nex
         await enviarEmail({
           to: emailDestino,
           subject: buildDesistimientoSubject(radicadoId),
+          // El desistimiento solo procede sobre una subsanación que ya nació
+          // bajo el gate de régimen Ley 1755 (planRequerirSubsanacion no se
+          // bloquea aquí — ver JSDoc en lib/server/subsanacion.ts).
           html: buildDesistimientoHtml({
             radicadoId,
             ciudadanoNombre: radicado.solicitante?.nombreCompleto ?? 'ciudadano/a',
             motivo: motivo.trim(),
+            fundamentoLegal: TEXTOS_SUBSANACION_LEY_1755.fundamentoLegal,
           }),
         });
         emailEnviado = true;

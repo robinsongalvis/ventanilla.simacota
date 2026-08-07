@@ -9,6 +9,7 @@ import {
   buildDesistimientoHtml,
   buildDesistimientoSubject,
 } from '@/lib/email/templates/desistimiento';
+import { TEXTOS_SUBSANACION_LEY_1755 } from '@/lib/catalogos/regimen-legal-subsanacion';
 
 /* BM-B33 pieza (5) — cron de desistimiento (solo PROPONE) + plantilla del acto. */
 
@@ -58,7 +59,12 @@ describe('planPropuestaDesistimiento — NO cambia el estado', () => {
 });
 
 describe('plantilla del acto de desistimiento', () => {
-  const base = { radicadoId: '1-110-2026-00000009', ciudadanoNombre: 'Ana', motivo: 'No aportó lo requerido.' };
+  const base = {
+    radicadoId: '1-110-2026-00000009',
+    ciudadanoNombre: 'Ana',
+    motivo: 'No aportó lo requerido.',
+    fundamentoLegal: TEXTOS_SUBSANACION_LEY_1755.fundamentoLegal,
+  };
   it('asunto con radicado', () => {
     expect(buildDesistimientoSubject(base.radicadoId)).toContain('1-110-2026-00000009');
   });

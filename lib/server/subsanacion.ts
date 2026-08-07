@@ -9,6 +9,8 @@ import {
   subsanacionVencida,
   diasRestantesHabiles,
 } from '@/lib/tiempos-radicado';
+import { getRegimenLegalSubsanacion } from '@/lib/catalogos/regimen-legal-subsanacion';
+import { getTipoSolicitudById } from '@/lib/catalogos/tipos-solicitud';
 
 /* ══════════════════════════════════════════════════════════════
    BM-B33 — Lógica de DECISIÓN de la subsanación (Ley 1755 Art. 17).
@@ -89,6 +91,21 @@ export function planPropuestaDesistimiento(radicado: VentanillaRadicado, ahora: 
  * el requerimiento se ancla YA (reloj server-side); si no (p. ej. ANONIMA), se
  * registra el requerimiento pero NO se suspende el término (sigue corriendo) —
  * queda pendiente de notificación por vía manual (fuera de alcance v3).
+ *
+ * GATE de régimen legal (hallazgo severidad ALTA, 6-ago-2026): el
+ * requerimiento estándar de este módulo implementa Ley 1755 Art. 17, que NO
+ * gobierna todo tipo de solicitud (p. ej. Licencia de Construcción se rige
+ * por el Decreto 1077 de 2015, sin ventana de 10 días). Por eso esta es la
+ * PRIMERA validación de la función: se resuelve el régimen aplicable vía
+ * `getRegimenLegalSubsanacion` y se bloquea (422) si no es `LEY_1755`. Ver
+ * `lib/catalogos/regimen-legal-subsanacion.ts`.
+ *
+ * DELIBERADO: `planProrrogaSubsanacion`, `planReactivarSubsanacion` y
+ * `planDesistimiento` NO llevan este gate. Operan sobre una suspensión que
+ * YA EXISTE y que, por construcción, solo pudo haberse creado bajo este
+ * mismo gate (flujo Ley 1755) — bloquearlas dejaría varados radicados con
+ * una subsanación legítima en curso, sin forma de prorrogarla, reactivarla
+ * o (si venció) archivarla.
  */
 export function planRequerirSubsanacion(
   radicado: VentanillaRadicado,
@@ -97,6 +114,26 @@ export function planRequerirSubsanacion(
   ahora: Date,
   notificable: boolean,
 ): PlanSubsanacion | ErrorSubsanacion {
+  const regimen = getRegimenLegalSubsanacion(radicado.termino?.tipoSolicitudId);
+  if (regimen.clase === 'ESPECIAL_NO_HABILITADO') {
+    const tipo = getTipoSolicitudById(radicado.termino?.tipoSolicitudId);
+    const nombreTipo = tipo?.nombre ?? radicado.termino?.tipoSolicitudId ?? 'este tipo de solicitud';
+    return {
+      status: 422,
+      // Redacción exacta ratificada por dictamen de gobierno-digital (6-ago-2026).
+      mensaje: `El requerimiento estándar de subsanación (Ley 1755 de 2015, artículo 17) no aplica a "${nombreTipo}": este trámite se rige por ${regimen.regimenAplicable}, aún no habilitado en la plataforma. Gestione el requerimiento por el instrumento propio de ese régimen y deje constancia en la trazabilidad del radicado. Importante: la plataforma NO suspenderá el término de este radicado.`,
+    };
+  }
+  if (regimen.clase === 'NO_APLICA') {
+    const tipo = getTipoSolicitudById(radicado.termino?.tipoSolicitudId);
+    const nombreTipo = tipo?.nombre ?? radicado.termino?.tipoSolicitudId ?? 'este tipo de solicitud';
+    return {
+      status: 422,
+      // Redacción exacta ratificada por dictamen de gobierno-digital (6-ago-2026).
+      mensaje: `"${nombreTipo}" es un documento de gestión interna: no constituye una petición ciudadana susceptible de requerimiento de subsanación (Ley 1755 de 2015, artículo 17). Si el documento corresponde en realidad a una petición, reclasifíquelo al tipo PQRSD apropiado antes de requerir.`,
+    };
+  }
+
   const motivoLimpio = motivo.trim();
   if (motivoLimpio.length < MOTIVO_MIN) {
     return { status: 400, mensaje: `Indica con claridad qué debe subsanar el ciudadano (mínimo ${MOTIVO_MIN} caracteres).` };
@@ -214,6 +251,15 @@ export function planReactivarSubsanacion(
 /**
  * Confirmar desistimiento tácito (acto motivado, decisión HUMANA). Solo procede
  * si venció el plazo (con prórroga si la hubo) y el radicado sigue en subsanación.
+ *
+ * ADVERTENCIA DE TRANSICIÓN (dictamen de gobierno-digital, 6-ago-2026): esta
+ * función NO lleva el gate de régimen de `planRequerirSubsanacion` (ver su
+ * JSDoc) — opera sobre suspensiones que pudieron haberse abierto ANTES de
+ * que el gate existiera, sobre un tipo que hoy se reclasificó a un régimen
+ * distinto de Ley 1755 (p. ej. HABEAS_DATA, PETICION_ENTES_CONTROL). En ese
+ * caso se añade `advertenciaRegimen` en `evento.metadata` para que quede
+ * constancia en la trazabilidad, pero NO se bloquea la acción: el
+ * desistimiento sigue siendo decisión humana del funcionario (Principio 9).
  */
 export function planDesistimiento(
   radicado: VentanillaRadicado,
@@ -234,13 +280,18 @@ export function planDesistimiento(
     return { status: 409, mensaje: 'El desistimiento tácito solo procede una vez vencido el plazo de subsanación (con su prórroga, si la hubo).' };
   }
   const nowIso = ahora.toISOString();
+  const regimen = getRegimenLegalSubsanacion(radicado.termino?.tipoSolicitudId);
+  const metadata: Record<string, unknown> = { actorRol: actor.rol, fechaLimiteEfectiva: limite };
+  if (regimen.clase !== 'LEY_1755') {
+    metadata.advertenciaRegimen = 'El régimen de subsanación de este tipo de solicitud está en revisión jurídica; pondere esta circunstancia en el acto motivado de desistimiento.';
+  }
   return {
     update: { estadoActual: 'DESISTIDO', 'termino.suspension.activa': false, ultimaActualizacion: nowIso },
     nuevoEstado: 'DESISTIDO',
     evento: {
       accion: 'DESISTIMIENTO_TACITO_CONFIRMADO',
       nota: motivoLimpio,
-      metadata: { actorRol: actor.rol, fechaLimiteEfectiva: limite },
+      metadata,
     },
   };
 }
