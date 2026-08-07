@@ -28,15 +28,55 @@ import type { OrigenActuacion } from '@/lib/motor-expedientes/tipos';
  *  4. Dentro del callback de la transacción SOLO debe haber cómputo puro y
  *     `tx.*`: ningún I/O, ninguna subida a Storage, ningún efecto no
  *     idempotente (la transacción puede reejecutarse en un reintento).
+ *  5. Desde 6-ago-2026, `confirmarConsecutivosLegales` invoca el guard D9
+ *     (`verificarAvanceCounter`) sobre CADA pendiente antes de cualquier
+ *     `tx.set` — fail-closed: un counter corrupto o un consecutivo de
+ *     origen `RECONSTRUIDO` abortan toda la confirmación (ver su JSDoc).
  */
 
 export type SerieConsecutivo = 'radicados' | 'salidas' | 'planillas' | 'expedientes';
+
+/**
+ * Origen del consecutivo que se pretende escribir en un `counters/{serie}-{año}`.
+ *
+ * Alias del tipo canónico `OrigenActuacion` (`lib/motor-expedientes/tipos.ts`)
+ * — ambos representan la MISMA unión conceptual ('REAL'|'RECONSTRUIDO') y
+ * antes de este cambio estaban declarados por separado en dos módulos sin
+ * ninguna relación estructural entre sí (deuda #10, ADR-0026 §A2): un cambio
+ * futuro en uno (p. ej. añadir un tercer origen) podía olvidarse en el otro
+ * sin que el compilador lo detectara. Se conserva el nombre `OrigenConsecutivo`
+ * en este módulo (cero cambio de firma para sus consumidores) reexportando el
+ * tipo de `lib/motor-expedientes/tipos.ts` como fuente única de verdad:
+ *
+ * - `REAL`: consumo genuino y nuevo de la serie (radicación normal).
+ * - `RECONSTRUIDO`: número que proviene de reconstruir un evento histórico
+ *   (p. ej. migración de expedientes en trámite, ADR-0026 D6/D9) o de un
+ *   formato legado. Nunca debe avanzar el contador vigente de una serie
+ *   real: el expediente reconstruido conserva su fecha/numeración
+ *   original como dato de la actuación (`Actuacion.origen`, ver
+ *   `lib/motor-expedientes/tipos.ts`), pero el contador Firestore que
+ *   emite los PRÓXIMOS números nuevos no debe moverse por su causa.
+ */
+export type OrigenConsecutivo = OrigenActuacion;
 
 /** Descripción de una serie a asignar: su nombre y su formateador de id. */
 export interface SolicitudSerie {
   serie: SerieConsecutivo;
   /** Formateador canónico del id de negocio (p. ej. `1-110-{año}-{####}`). */
   formatear: (consecutivo: number, fecha: Date) => string;
+  /**
+   * Origen del consecutivo a leer para esta serie. OPCIONAL — default
+   * `'REAL'`, aplicado en `leerConsecutivosLegales` (los 5 call sites
+   * actuales no cambian: todos son radicación/expedición genuina).
+   *
+   * La migración de la Fase 5 (reconstrucción de expedientes históricos,
+   * D6/D9 ADR-0026) NUNCA debe usar este flujo para AVANZAR counters. Si lo
+   * intentara declarando `origen: 'RECONSTRUIDO'` aquí, el guard D9 dentro
+   * de `confirmarConsecutivosLegales` lanza y aborta toda la transacción —
+   * esa es exactamente la protección que exige D9: un número reconstruido
+   * jamás consume la serie legal vigente.
+   */
+  origen?: OrigenConsecutivo;
 }
 
 /** Consecutivo leído (aún no confirmado) para una serie. */
@@ -46,6 +86,10 @@ export interface ConsecutivoPendiente {
   consecutivo: number;
   /** Id de negocio ya formateado a partir del consecutivo leído. */
   documentoId: string;
+  /** Valor de `counters/{serie}-{año}.ultimo` leído (0 si el documento no existía). Alimenta el guard D9 en `confirmarConsecutivosLegales`. */
+  ultimoActual: number;
+  /** Origen declarado por el caller (`SolicitudSerie.origen`, default `'REAL'`). Alimenta el guard D9 en `confirmarConsecutivosLegales`. */
+  origen: OrigenConsecutivo;
 }
 
 /**
@@ -74,12 +118,15 @@ export async function leerConsecutivosLegales(
   const snaps = await Promise.all(refs.map((ref) => tx.get(ref)));
 
   const pendientes: ConsecutivoPendiente[] = solicitudes.map((s, i) => {
-    const consecutivo = Number(snaps[i].data()?.ultimo ?? 0) + 1;
+    const ultimoActual = Number(snaps[i].data()?.ultimo ?? 0);
+    const consecutivo = ultimoActual + 1;
     return {
       serie: s.serie,
       ref: refs[i],
       consecutivo,
       documentoId: s.formatear(consecutivo, fecha),
+      ultimoActual,
+      origen: s.origen ?? 'REAL',
     };
   });
 
@@ -98,6 +145,14 @@ export async function leerConsecutivosLegales(
  * transacción. DEBE recibir exactamente el arreglo devuelto por
  * `leerConsecutivosLegales` sobre esta misma `tx`; de lo contrario lanza —
  * evita confirmar un contador que no se leyó transaccionalmente.
+ *
+ * Desde 6-ago-2026 (precondición #4 del ADR-0026, deuda #7 §A2): ANTES de
+ * escribir un solo `tx.set`, corre el guard D9 (`verificarAvanceCounter`)
+ * sobre CADA pendiente. Fail-closed — un counter corrupto (`ultimo` no
+ * entero o negativo) o un `origen: 'RECONSTRUIDO'` lanzan y abortan ESTA
+ * función completa antes de tocar ningún `tx.set`; combinado con la
+ * atomicidad ya existente de la transacción del caller, eso significa que
+ * ni el contador ni el documento de negocio quedan escritos.
  */
 export function confirmarConsecutivosLegales(
   tx: Transaction,
@@ -112,34 +167,21 @@ export function confirmarConsecutivosLegales(
     );
   }
 
+  // Guard D9 primero, para TODOS los pendientes, antes de cualquier tx.set.
+  for (const p of pendientes) {
+    verificarAvanceCounter({
+      serie: p.serie,
+      ultimoActual: p.ultimoActual,
+      ultimoPropuesto: p.consecutivo,
+      origen: p.origen,
+    });
+  }
+
   const marca = { anio: fecha.getFullYear(), actualizadoEn: fecha.toISOString() };
   for (const p of pendientes) {
     tx.set(p.ref, { ultimo: p.consecutivo, ...marca }, { merge: true });
   }
 }
-
-/**
- * Origen del consecutivo que se pretende escribir en un `counters/{serie}-{año}`.
- *
- * Alias del tipo canónico `OrigenActuacion` (`lib/motor-expedientes/tipos.ts`)
- * — ambos representan la MISMA unión conceptual ('REAL'|'RECONSTRUIDO') y
- * antes de este cambio estaban declarados por separado en dos módulos sin
- * ninguna relación estructural entre sí (deuda #10, ADR-0026 §A2): un cambio
- * futuro en uno (p. ej. añadir un tercer origen) podía olvidarse en el otro
- * sin que el compilador lo detectara. Se conserva el nombre `OrigenConsecutivo`
- * en este módulo (cero cambio de firma para sus consumidores) reexportando el
- * tipo de `lib/motor-expedientes/tipos.ts` como fuente única de verdad:
- *
- * - `REAL`: consumo genuino y nuevo de la serie (radicación normal).
- * - `RECONSTRUIDO`: número que proviene de reconstruir un evento histórico
- *   (p. ej. migración de expedientes en trámite, ADR-0026 D6/D9) o de un
- *   formato legado. Nunca debe avanzar el contador vigente de una serie
- *   real: el expediente reconstruido conserva su fecha/numeración
- *   original como dato de la actuación (`Actuacion.origen`, ver
- *   `lib/motor-expedientes/tipos.ts`), pero el contador Firestore que
- *   emite los PRÓXIMOS números nuevos no debe moverse por su causa.
- */
-export type OrigenConsecutivo = OrigenActuacion;
 
 export interface GuardAvanceCounterInput {
   serie: SerieConsecutivo;
@@ -152,14 +194,21 @@ export interface GuardAvanceCounterInput {
 }
 
 /**
- * Guard puro (D9, ADR-0026) — salvaguarda de seguridad de datos que debe
- * quedar implementada y verificada ANTES de introducir la serie
- * `expedientes` (precondición #4 del ADR). No reemplaza la atomicidad
- * transaccional de `confirmarConsecutivosLegales` (eso ya lo resuelve el
- * fix de H3): este guard es una defensa adicional para cualquier punto de
+ * Guard puro (D9, ADR-0026) — salvaguarda de seguridad de datos, precondición
+ * #4 del ADR antes de introducir la serie `expedientes`.
+ *
+ * CABLEADO desde 6-ago-2026 (deuda #7 §A2): `confirmarConsecutivosLegales`
+ * invoca este guard automáticamente sobre cada pendiente antes de escribir
+ * ningún contador — todo caller que pase por el flujo estándar de este
+ * archivo ya queda protegido sin llamarlo explícitamente. No reemplaza la
+ * atomicidad transaccional de `confirmarConsecutivosLegales` (eso ya lo
+ * resuelve el fix de H3): este guard es una defensa adicional de CORRECCIÓN
+ * de datos (valores imposibles, orígenes prohibidos), no de atomicidad.
+ * Se exporta también como función independiente para cualquier punto de
  * escritura de `counters` — presente o futuro (p. ej. un asistente de
- * migración de la Fase 5) — que no pase por el flujo transaccional
- * estándar de este archivo.
+ * migración de la Fase 5) — que no pase por `confirmarConsecutivosLegales`;
+ * ver el hallazgo de cobertura real (grep de escrituras directas a
+ * `counters/` fuera de este archivo) documentado en el registro de deudas.
  *
  * Dos invariantes, ambas obligatorias:
  *  1. **Monotonicidad**: `ultimo` de una serie JAMÁS retrocede ni se

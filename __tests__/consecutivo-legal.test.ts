@@ -110,7 +110,14 @@ describe('consecutivo-legal — confirmarConsecutivosLegales', () => {
   it('lanza si los pendientes NO provienen de leer (arreglo construido a mano)', () => {
     const { tx } = fakeTx({});
     const falsos: ConsecutivoPendiente[] = [
-      { serie: 'radicados', ref: { path: 'counters/radicados-2026' } as never, consecutivo: 999, documentoId: 'x' },
+      {
+        serie: 'radicados',
+        ref: { path: 'counters/radicados-2026' } as never,
+        consecutivo: 999,
+        documentoId: 'x',
+        ultimoActual: 998,
+        origen: 'REAL',
+      },
     ];
     expect(() => confirmarConsecutivosLegales(tx, FECHA, falsos)).toThrow(
       /leerConsecutivosLegales sobre la misma transacción/,
@@ -127,6 +134,81 @@ describe('consecutivo-legal — confirmarConsecutivosLegales', () => {
     expect(() => confirmarConsecutivosLegales(b.tx, FECHA, pendDeA)).toThrow();
     // Y confirmar en A con sus propios pendientes → no lanza.
     expect(() => confirmarConsecutivosLegales(a.tx, FECHA, pendDeA)).not.toThrow();
+  });
+});
+
+describe('consecutivo-legal — guard D9 cableado en confirmarConsecutivosLegales (deuda #7 §A2, 6-ago-2026)', () => {
+  it('counter corrupto (ultimo=3.5, no entero) → confirmar lanza el guard y NO escribe ningún tx.set', async () => {
+    const doble = fakeTx({ 'counters/radicados-2026': 3.5 });
+    const pend = await leerConsecutivosLegales(doble.tx, fakeDb(), FECHA, [
+      { serie: 'radicados', formatear: fmtRadicado },
+    ]);
+    expect(pend[0].ultimoActual).toBe(3.5);
+    expect(() => confirmarConsecutivosLegales(doble.tx, FECHA, pend)).toThrow(/ultimoActual/);
+    expect(doble.escrituras).toHaveLength(0);
+  });
+
+  it('counter corrupto (ultimo=-2, negativo) → confirmar lanza el guard y NO escribe ningún tx.set', async () => {
+    const doble = fakeTx({ 'counters/radicados-2026': -2 });
+    const pend = await leerConsecutivosLegales(doble.tx, fakeDb(), FECHA, [
+      { serie: 'radicados', formatear: fmtRadicado },
+    ]);
+    expect(pend[0].ultimoActual).toBe(-2);
+    expect(() => confirmarConsecutivosLegales(doble.tx, FECHA, pend)).toThrow(/ultimoActual/);
+    expect(doble.escrituras).toHaveLength(0);
+  });
+
+  it('SolicitudSerie con origen RECONSTRUIDO → confirmar lanza (invariante 2) y NO escribe', async () => {
+    const doble = fakeTx({ 'counters/expedientes-2026': 5 });
+    const pend = await leerConsecutivosLegales(doble.tx, fakeDb(), FECHA, [
+      { serie: 'expedientes', formatear: (n) => `EXP-${n}`, origen: 'RECONSTRUIDO' },
+    ]);
+    expect(pend[0].origen).toBe('RECONSTRUIDO');
+    expect(() => confirmarConsecutivosLegales(doble.tx, FECHA, pend)).toThrow(/RECONSTRUIDO/);
+    expect(doble.escrituras).toHaveLength(0);
+  });
+
+  it('lote multi-serie: si UNA falla el guard, NINGUNA se escribe (fail-closed sobre el lote completo)', async () => {
+    const doble = fakeTx({ 'counters/radicados-2026': 10, 'counters/expedientes-2026': 5 });
+    const pend = await leerConsecutivosLegales(doble.tx, fakeDb(), FECHA, [
+      { serie: 'radicados', formatear: fmtRadicado }, // este solo sería válido
+      { serie: 'expedientes', formatear: (n) => `EXP-${n}`, origen: 'RECONSTRUIDO' }, // este lo bloquea
+    ]);
+    expect(() => confirmarConsecutivosLegales(doble.tx, FECHA, pend)).toThrow(/RECONSTRUIDO/);
+    expect(doble.escrituras).toHaveLength(0); // ni siquiera 'radicados' (válido) quedó escrito
+  });
+
+  it('flujo normal REAL, counter sano → sigue confirmando y escribiendo ultimo correcto', async () => {
+    const doble = fakeTx({ 'counters/radicados-2026': 41 });
+    const pend = await leerConsecutivosLegales(doble.tx, fakeDb(), FECHA, [
+      { serie: 'radicados', formatear: fmtRadicado },
+    ]);
+    expect(pend[0].ultimoActual).toBe(41);
+    expect(pend[0].origen).toBe('REAL');
+    expect(() => confirmarConsecutivosLegales(doble.tx, FECHA, pend)).not.toThrow();
+    expect(doble.escrituras).toEqual([
+      { path: 'counters/radicados-2026', data: { ultimo: 42, anio: 2026, actualizadoEn: FECHA.toISOString() } },
+    ]);
+  });
+
+  it('flujo normal REAL, counter inexistente (→0) → sigue confirmando y escribiendo ultimo=1', async () => {
+    const doble = fakeTx({});
+    const pend = await leerConsecutivosLegales(doble.tx, fakeDb(), FECHA, [
+      { serie: 'radicados', formatear: fmtRadicado },
+    ]);
+    expect(pend[0].ultimoActual).toBe(0);
+    expect(() => confirmarConsecutivosLegales(doble.tx, FECHA, pend)).not.toThrow();
+    expect(doble.escrituras).toEqual([
+      { path: 'counters/radicados-2026', data: { ultimo: 1, anio: 2026, actualizadoEn: FECHA.toISOString() } },
+    ]);
+  });
+
+  it('SolicitudSerie sin origen declarado → default REAL (los 5 call sites actuales no cambian)', async () => {
+    const doble = fakeTx({ 'counters/salidas-2026': 3 });
+    const pend = await leerConsecutivosLegales(doble.tx, fakeDb(), FECHA, [
+      { serie: 'salidas', formatear: fmtSalida },
+    ]);
+    expect(pend[0].origen).toBe('REAL');
   });
 });
 
