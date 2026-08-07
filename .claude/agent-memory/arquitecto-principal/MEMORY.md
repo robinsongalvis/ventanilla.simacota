@@ -1,2 +1,3 @@
 - [Consolidación post-Ola 2](project_consolidacion_post_ola2.md) — revisión cruzada 13 jul 2026; branch protection exige los 3 checks por nombre visible; ADR-0014 propuesto pendiente del propietario
 - [Revisión insumo licencias](project_revision_insumo_licencias.md) — 6 ago 2026: APROBADO CON CAMBIOS; 6 tensiones (D9 vs series-como-dato, guard no cableado, migración=Fase 5, predio fuera del núcleo, glosario radicadoLegal, cohorte sin estado)
+- [Arranque Fase 2 licencias](project_arranque_fase2_licencias.md) — veredictos 1-8 (6 ago): calendario único sin façade, fix #15 obligatorio, formateador fuera del núcleo, unicidad tx.create, cron PARCIAL sin falsos huecos
