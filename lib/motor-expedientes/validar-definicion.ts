@@ -59,7 +59,9 @@ import type {
   ClaveContextoDeclarada,
   CondicionRequisito,
   DefinicionTramite,
+  Expediente,
   RequisitoDefinicion,
+  SubtipoTramite,
 } from './tipos';
 
 /**
@@ -104,7 +106,10 @@ export type CodigoErrorValidacionDefinicion =
   | 'REQUISITO_ID_DUPLICADO'
   | 'TIPO_INCOHERENTE'
   | 'VALOR_FUERA_DE_DOMINIO'
-  | 'DOMINIO_TIPO_INCOHERENTE';
+  | 'DOMINIO_TIPO_INCOHERENTE'
+  | 'SUBTIPO_CODIGO_VACIO'
+  | 'SUBTIPO_CODIGO_DUPLICADO'
+  | 'SUBTIPO_NO_DECLARADO';
 
 export interface ErrorValidacionDefinicion {
   codigo: CodigoErrorValidacionDefinicion;
@@ -153,6 +158,7 @@ export function validarDefinicionTramite(definicion: DefinicionTramite): Resulta
   errores.push(...detectarIdsDuplicados(definicion.requisitos));
   errores.push(...detectarClavesContextoDuplicadas(clavesContexto));
   errores.push(...detectarDominioIncoherenteConTipo(clavesContexto));
+  errores.push(...detectarSubtiposInvalidos(definicion.subtipos ?? []));
 
   for (const requisito of definicion.requisitos) {
     if (requisito.tipo !== 'CONDICIONAL') continue;
@@ -237,6 +243,68 @@ function detectarDominioIncoherenteConTipo(clavesContexto: ClaveContextoDeclarad
     }
   }
   return errores;
+}
+
+/**
+ * Subtipos de la Definición (Fase 2, PASO 7): cada `codigo` debe ser no
+ * vacío y único DENTRO de la Definición — mismo patrón de fail-closed que
+ * `clavesContexto` (b'): un código repetido o vacío se rechaza al publicar,
+ * nunca se resuelve "el último gana" en silencio.
+ */
+function detectarSubtiposInvalidos(subtipos: SubtipoTramite[]): ErrorValidacionDefinicion[] {
+  const errores: ErrorValidacionDefinicion[] = [];
+  const vistos = new Set<string>();
+  const duplicados = new Set<string>();
+  for (const subtipo of subtipos) {
+    if (!subtipo.codigo || subtipo.codigo.trim().length === 0) {
+      errores.push({
+        codigo: 'SUBTIPO_CODIGO_VACIO',
+        mensaje: `Un subtipo de la Definición tiene código vacío ("${subtipo.nombre}"); todo subtipo debe tener un código no vacío.`,
+      });
+      continue;
+    }
+    if (vistos.has(subtipo.codigo)) duplicados.add(subtipo.codigo);
+    vistos.add(subtipo.codigo);
+  }
+  for (const codigo of duplicados) {
+    errores.push({
+      codigo: 'SUBTIPO_CODIGO_DUPLICADO',
+      mensaje: `El código de subtipo "${codigo}" está declarado más de una vez en la Definición; los códigos deben ser únicos.`,
+    });
+  }
+  return errores;
+}
+
+/**
+ * Valida que `expediente.subtipos` (códigos elegidos para ESTE caso
+ * concreto) referencien únicamente subtipos DECLARADOS por su
+ * `DefinicionTramite` — mismo principio fail-closed que `CLAVE_NO_DECLARADA`
+ * para condiciones: un código inventado o mal escrito no debe colarse en
+ * silencio. Función SEPARADA de `validarDefinicionTramite` a propósito: esa
+ * valida la ESTRUCTURA de la Definición en sí (independiente de cualquier
+ * caso concreto); esta valida un Expediente CONTRA su Definición ya
+ * publicada — dos momentos y dos entradas distintas.
+ *
+ * Si la Definición no declara `subtipos` en absoluto (`undefined`), CUALQUIER
+ * código en `expediente.subtipos` se rechaza (fail-closed, mismo criterio
+ * que `clavesContexto` ausente) — no se interpreta la ausencia como "todo
+ * vale".
+ */
+export function validarSubtiposExpediente(
+  expediente: Pick<Expediente, 'subtipos'>,
+  definicion: DefinicionTramite,
+): ResultadoValidacionDefinicion {
+  const codigosDeclarados = new Set((definicion.subtipos ?? []).map((s) => s.codigo));
+  const errores: ErrorValidacionDefinicion[] = [];
+  for (const codigo of expediente.subtipos ?? []) {
+    if (!codigosDeclarados.has(codigo)) {
+      errores.push({
+        codigo: 'SUBTIPO_NO_DECLARADO',
+        mensaje: `El expediente referencia el subtipo "${codigo}", que no está declarado en la Definición "${definicion.id}".`,
+      });
+    }
+  }
+  return { valida: errores.length === 0, errores };
 }
 
 function recorrerArbolCondicion(

@@ -200,6 +200,24 @@ export interface DefinicionTramite {
    * nunca se interpreta como "todo vale".
    */
   clavesContexto?: ClaveContextoDeclarada[];
+  /**
+   * Subtipos declarados por esta Definición (Fase 2, arranque PASO 7) —
+   * p. ej. Licencia de Construcción tiene subtipos "Obra Nueva",
+   * "Ampliación", "Modificación"... OPCIONAL y ADITIVO, mismo patrón que
+   * `clavesContexto`: una Definición sin este campo simplemente no tiene
+   * subtipos declarados, y `Expediente.subtipos` que referencien códigos
+   * no declarados aquí se rechazan (fail-closed) en
+   * `validarDefinicionTramite` — nunca "todo vale" por ausencia.
+   */
+  subtipos?: SubtipoTramite[];
+}
+
+/** Un subtipo de trámite declarado por una `DefinicionTramite` (Fase 2, PASO 7). */
+export interface SubtipoTramite {
+  /** Código estable, único DENTRO de la Definición (p. ej. `obra-nueva`). */
+  codigo: string;
+  nombre: string;
+  descripcion?: string;
 }
 
 /* ──────────────────────────────────────────────
@@ -230,9 +248,49 @@ export interface AporteRequisito {
 }
 
 /**
+ * Número de expediente emitido (`lib/motor-expedientes/numero-expediente.ts`
+ * + `lib/server/emitir-numero-expediente.ts` — Fase 2 arranque, PASO 4/5).
+ */
+export interface NumeroExpedienteAsignado {
+  /** Número formateado completo, p. ej. `68745-0-26-0020`. */
+  numero: string;
+  /** Serie del consecutivo que lo emitió (`SerieConsecutivo`, `lib/server/consecutivo-legal.ts`). */
+  serieId: string;
+  /** Año (4 dígitos) usado para el consecutivo — NO el `AA` de 2 dígitos del número formateado. */
+  año: number;
+  /** `true` si, al reservar unicidad, el número YA existía (Fase 5: importación reconstruida que choca con uno REAL). */
+  colision?: boolean;
+}
+
+/** Procedencia de un expediente importado (Fase 5 — migración, aún sin diseñar). */
+export interface ProvenanceExpediente {
+  /** Sistema/archivo de origen del dato migrado. */
+  fuente: string;
+  /** ISO 8601 — cuándo se ejecutó la importación (no cuándo ocurrió el hecho real). */
+  fechaImportacion: string;
+  /** Referencia a la fila/registro de origen, para auditar la migración hasta su dato crudo. */
+  filaOrigen?: string;
+}
+
+/** Acto administrativo que cierra el expediente (resolución de licencia, negación, etc.). */
+export interface ActoFinalExpediente {
+  numero?: string;
+  /** ISO 8601. */
+  fecha?: string;
+  /** ISO 8601 — hasta cuándo vale la licencia/permiso otorgado, si aplica. */
+  vigenciaHasta?: string;
+  /** `true` si el expediente está cerrado pero no se conserva el detalle del acto (p. ej. migración incompleta) — nunca se inventa un valor por default. */
+  cierreDesconocido?: boolean;
+}
+
+/**
  * Expediente digital único (D3) — un documento raíz por trámite, enlazado
  * bidireccionalmente con el radicado tras el handoff a Ventanilla (D2).
  * `radicadoId` es `null` hasta que ocurre ese handoff (Fase 2).
+ *
+ * Campos con `?` añadidos en Fase 2 (arranque, PASO 7) — TODOS aditivos y
+ * opcionales: ningún `Expediente` ni fixture de Fase 0/1 existente deja de
+ * tipar por su ausencia.
  */
 export interface Expediente {
   id: string;
@@ -248,6 +306,16 @@ export interface Expediente {
   radicadoId: string | null;
   creadoEn: string;
   actualizadoEn: string;
+  /** Número de expediente emitido — ausente hasta que se emite (PASO 4/5). */
+  numeroExpediente?: NumeroExpedienteAsignado;
+  /** Códigos de `SubtipoTramite` declarados por la Definición que aplican a este caso concreto. */
+  subtipos?: string[];
+  /** REAL si el expediente nació en la plataforma; RECONSTRUIDO si viene de migración (D6, Fase 5). Mismo tipo que `Actuacion.origen`. */
+  origen?: OrigenActuacion;
+  /** Presente solo si `origen === 'RECONSTRUIDO'` (Fase 5, aún sin diseñar). */
+  provenance?: ProvenanceExpediente;
+  /** Presente solo si el expediente está cerrado. */
+  actoFinal?: ActoFinalExpediente;
 }
 
 /* ──────────────────────────────────────────────
