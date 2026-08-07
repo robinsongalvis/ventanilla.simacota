@@ -80,13 +80,13 @@ describe('calcularLimiteSubsanacion — régimen Licencia (30 días hábiles, De
 
   it('acepta fechas como string ISO: produce EXACTAMENTE el mismo resultado que la fecha local(...) equivalente (RS-3, ultrareview — antes solo se aseveraba esDiaHabil, tautológico bajo HABILES: cualquier salida de un régimen HABILES es, por construcción, día hábil)', () => {
     const notificacionIso = '2026-06-02T00:00:00.000Z';
-    // Día calendario LOCAL que `atLocalNoon` verá al convertir este string —
-    // se deriva del mismo valor bajo prueba (con los getters locales del
-    // entorno de ejecución), en vez de asumir que "Z" implica el mismo día
-    // calendario en cualquier huso horario (no es cierto: en UTC-5 este
-    // instante cae en la noche del día ANTERIOR en hora local).
-    const comoFecha = new Date(notificacionIso);
-    const equivalenteLocal = local(comoFecha.getFullYear(), comoFecha.getMonth() + 1, comoFecha.getDate());
+    // Equivalente LITERAL bajo el anclaje a America/Bogota (deuda #15,
+    // ADR-0026): este instante es el 1-jun a las 19:00 hora Bogotá, así que
+    // su día civil colombiano es el 1-jun EN CUALQUIER entorno de ejecución.
+    // (Antes se derivaba con los getters de TZ del entorno — pasaba en
+    // máquinas UTC-5 y fallaba en CI/UTC: la clase exacta de ±1 día que el
+    // anclaje eliminó.)
+    const equivalenteLocal = local(2026, 6, 1);
 
     const limiteDesdeString = calcularLimiteSubsanacion(REGIMEN_LICENCIA_D1077_PLACEHOLDER, notificacionIso);
     const limiteDesdeLocal = calcularLimiteSubsanacion(REGIMEN_LICENCIA_D1077_PLACEHOLDER, equivalenteLocal);

@@ -52,7 +52,7 @@ vi.mock('@/lib/observabilidad/eventos-negocio', () => ({
   registrarEventoNegocio: mockRegistrarEventoNegocio,
 }));
 
-import { GET } from '@/app/api/cron/auditoria-consecutivos/route';
+import { GET, auditarCounterExpedientes } from '@/app/api/cron/auditoria-consecutivos/route';
 
 const ENV_ORIGINAL = { ...process.env };
 
@@ -226,6 +226,87 @@ describe('cron/auditoria-consecutivos — con hallazgos', () => {
     expect(res.status).toBe(200);
     expect(data.correoEnviado).toBe(false);
     expect(mockLogError).toHaveBeenCalled();
+  });
+});
+
+describe('auditarCounterExpedientes — lógica pura (PASO 6, Fase 2 arranque)', () => {
+  it('counter inexistente (data undefined) → SIN_ABRIR', () => {
+    expect(auditarCounterExpedientes(undefined)).toEqual({ estado: 'SIN_ABRIR' });
+  });
+
+  it('counter con ultimo entero >= 0 → PARCIAL, con el valor y el motivo', () => {
+    expect(auditarCounterExpedientes({ ultimo: 19 })).toEqual({
+      estado: 'PARCIAL', ultimo: 19, motivo: 'auditoría de continuidad pendiente de colección (Fase 1)',
+    });
+  });
+
+  it('ultimo=0 (contador recién creado, aún válido) → PARCIAL', () => {
+    expect(auditarCounterExpedientes({ ultimo: 0 })).toMatchObject({ estado: 'PARCIAL', ultimo: 0 });
+  });
+
+  it('ultimo no entero (3.5) → CORRUPTO', () => {
+    expect(auditarCounterExpedientes({ ultimo: 3.5 }).estado).toBe('CORRUPTO');
+  });
+
+  it('ultimo negativo → CORRUPTO', () => {
+    expect(auditarCounterExpedientes({ ultimo: -2 }).estado).toBe('CORRUPTO');
+  });
+
+  it('ultimo ausente en un documento existente (data={}) → CORRUPTO (NaN no es entero)', () => {
+    expect(auditarCounterExpedientes({}).estado).toBe('CORRUPTO');
+  });
+});
+
+describe('cron/auditoria-consecutivos — rama "expedientes" (PASO 6) SIEMPRE en el reporte', () => {
+  beforeEach(() => {
+    process.env.CRON_SECRET = 'secreto-real';
+  });
+
+  function mockCounterPorPath(porPath: Record<string, { ultimo?: unknown } | undefined>) {
+    mockCounterGet.mockImplementation((path: string) => {
+      const anio = new Date().getFullYear();
+      if (path === `counters/expedientes-${anio}`) {
+        const data = porPath.expedientes;
+        return Promise.resolve({ data: () => data });
+      }
+      return Promise.resolve({ data: () => ({ ultimo: 0 }) });
+    });
+  }
+
+  it('sin hallazgos en las 3 series legadas: "expedientes" (SIN_ABRIR) igual aparece en el reporte', async () => {
+    mockCounterPorPath({ expedientes: undefined });
+    const res = await GET(reqConSecreto());
+    const data = await res.json();
+    expect(data.series.expedientes).toEqual({ estado: 'SIN_ABRIR' });
+    expect(mockEnviarEmail).not.toHaveBeenCalled(); // SIN_ABRIR no es hallazgo
+  });
+
+  it('counter de expedientes sembrado (PARCIAL) aparece en el reporte y NO dispara correo por sí solo', async () => {
+    mockCounterPorPath({ expedientes: { ultimo: 19 } });
+    const res = await GET(reqConSecreto());
+    const data = await res.json();
+    expect(data.series.expedientes).toMatchObject({ estado: 'PARCIAL', ultimo: 19 });
+    expect(data.hallazgos).toBe(0);
+    expect(mockEnviarEmail).not.toHaveBeenCalled();
+  });
+
+  it('counter de expedientes CORRUPTO: aparece en el reporte, cuenta como hallazgo, dispara correo y se loguea', async () => {
+    mockCounterPorPath({ expedientes: { ultimo: -5 } });
+    const res = await GET(reqConSecreto());
+    const data = await res.json();
+    expect(data.series.expedientes.estado).toBe('CORRUPTO');
+    expect(data.hallazgos).toBeGreaterThan(0);
+    expect(mockEnviarEmail).toHaveBeenCalledTimes(1);
+    expect(mockLogError).toHaveBeenCalledWith(
+      expect.objectContaining({ modulo: 'cron/auditoria-consecutivos/expedientes' }),
+    );
+  });
+
+  it('el correo por CORRUPTO en expedientes no incluye una fila "expedientes" en el HTML (plantilla no extendida, ver JSDoc)', async () => {
+    mockCounterPorPath({ expedientes: { ultimo: -5 } });
+    await GET(reqConSecreto());
+    const llamada = mockEnviarEmail.mock.calls[0]![0] as { html: string };
+    expect(llamada.html).not.toContain('expedientes');
   });
 });
 

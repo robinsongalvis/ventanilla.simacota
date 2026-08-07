@@ -20,6 +20,7 @@ import {
   type PrioridadSugerida,
   type TipoSolicitudCatalogo,
 } from './catalogos/tipos-solicitud';
+import { TIMEZONE_COLOMBIA } from './fecha-colombia';
 
 /* ──────────────────────────────────────────────
    Tipos públicos (compatibilidad histórica)
@@ -125,15 +126,67 @@ function toDateOnly(date: Date): string {
 }
 
 /**
- * Ancla una fecha a mediodía local (evita corrimientos de día por zona
- * horaria). Exportada para que otros módulos de cómputo de plazos legales
- * (p. ej. `lib/motor-expedientes/subsanacion-regimen.ts`) reutilicen la
- * misma normalización en vez de duplicarla — cambio aditivo, no rompe a
- * ningún consumidor existente de este archivo.
+ * Extrae año/mes/día del CALENDARIO CIVIL de Bogotá para un instante, sin
+ * importar la zona horaria del proceso — usa `Intl.DateTimeFormat` anclado
+ * a `TIMEZONE_COLOMBIA` (mismo patrón de `lib/fecha-colombia.ts`), NUNCA los
+ * getters locales nativos (`getFullYear`/`getMonth`/`getDate`), que leen la
+ * zona horaria CONFIGURADA DEL PROCESO — en Vercel eso es UTC salvo que se
+ * fije `TZ`, y para un instante después de ~19:00 hora Bogotá (medianoche
+ * UTC ya pasada) esos getters devuelven el día UTC siguiente: un día civil
+ * distinto al de Bogotá (RS-1, ultrareview; deuda #15 ADR-0026 §A2).
+ */
+function partesFechaColombia(date: Date): { year: number; month: number; day: number } {
+  const partes = new Intl.DateTimeFormat('en-CA', {
+    timeZone: TIMEZONE_COLOMBIA,
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+  }).formatToParts(date);
+  const valor = (tipo: string) => Number(partes.find((p) => p.type === tipo)?.value);
+  return { year: valor('year'), month: valor('month'), day: valor('day') };
+}
+
+/**
+ * Ancla un instante al MEDIODÍA del día CIVIL de Bogotá (America/Bogota),
+ * evitando corrimientos de día por zona horaria. Exportada para que otros
+ * módulos de cómputo de plazos legales (p. ej.
+ * `lib/motor-expedientes/subsanacion-regimen.ts`) reutilicen la misma
+ * normalización en vez de duplicarla.
+ *
+ * CORRECCIÓN 6-ago-2026 (RS-1, deuda #15 ADR-0026 §A2 — precondición de
+ * Fase 1 antes de conectar el reloj a cualquier endpoint/cron): antes, el
+ * día se extraía con los getters LOCALES del proceso
+ * (`date.getFullYear()`/`getMonth()`/`getDate()`), que en un servidor cuyo
+ * proceso corre en UTC (Vercel, por defecto) leen el día UTC — distinto al
+ * día civil de Bogotá para cualquier instante entre ~19:00 y 23:59 hora
+ * Colombia (que ya cayó en el día UTC siguiente). Ahora el día se extrae
+ * SIEMPRE con `Intl.DateTimeFormat` anclado a `America/Bogota`
+ * (`partesFechaColombia`), independiente de la zona del proceso. El
+ * mediodía resultante se construye con el constructor `Date` de 6
+ * argumentos (interpretado en la zona del proceso) — eso es seguro porque
+ * el resto del módulo SIEMPRE lee estos `Date` con los mismos getters
+ * locales dentro del MISMO proceso (autoconsistente); lo único que debía
+ * corregirse era la EXTRACCIÓN del día civil de la entrada, no la
+ * representación interna.
+ *
+ * Hora legal colombiana: UTC−5 (Decreto 2707 de 1982); custodio vigente
+ * **INM** (Decreto Ley 4175 de 2011, art. 6 num. 14, mod. Decreto 062/2021)
+ * — NO la SIC (lo fue solo hasta 2011). Validación jurídica del fix:
+ * dictamen de gobierno-digital `docs/planes/DICTAMEN_TZ_DIA_CIVIL.md`
+ * (2026-08-07): defecto de implementación, corrección restituye
+ * conformidad — no es "cambio de criterio". Ese dictamen exige además un
+ * barrido one-off transicional sobre radicados en trámite (ver
+ * `scripts/laboratorio/barrido-vencimientos-tz.mjs`), que NUNCA acorta
+ * plazos ya comunicados al ciudadano.
+ *
+ * Fechas inválidas se propagan como `Invalid Date` sin lanzar (igual que
+ * antes) — varios consumidores (`sumarMesCalendario`) dependen de eso.
  */
 export function atLocalNoon(value: string | Date): Date {
   const date = value instanceof Date ? value : new Date(value);
-  return new Date(date.getFullYear(), date.getMonth(), date.getDate(), 12, 0, 0, 0);
+  if (Number.isNaN(date.getTime())) return date;
+  const { year, month, day } = partesFechaColombia(date);
+  return new Date(year, month - 1, day, 12, 0, 0, 0);
 }
 
 /**
@@ -214,6 +267,72 @@ export function esDiaHabil(date: Date, festivos = festivosColombia(date.getFullY
   return !isWeekend(date) && !festivos.has(toDateOnly(date));
 }
 
+/**
+ * Avanza `dias` días hábiles desde `inicio` (saltando fines de semana y
+ * `festivos`) y devuelve la fecha resultante. Pieza interna ÚNICA de conteo
+ * — antes de este cambio, el mismo bucle vivía copiado 3 veces en este
+ * archivo (`calcularFechaVencimiento`, `fechaLimiteAlertaVencimiento`,
+ * `reactivarVencimiento`); las tres ahora reutilizan esta función, igual que
+ * el nuevo export público `sumarDiasHabiles`.
+ *
+ * `dias <= 0` devuelve `inicio` sin avanzar — "cero días hábiles más" es
+ * literalmente la misma fecha, incluso si `inicio` cae en fin de semana o
+ * festivo (no es "el próximo día hábil").
+ */
+function avanzarDiasHabiles(inicio: Date, dias: number, festivos: Set<string>): Date {
+  let cursor = inicio;
+  let pendientes = dias;
+  while (pendientes > 0) {
+    cursor = addDays(cursor, 1);
+    if (esDiaHabil(cursor, festivos)) pendientes -= 1;
+  }
+  return cursor;
+}
+
+/**
+ * Suma `n` días hábiles colombianos a `desde` y devuelve la fecha resultante
+ * (mediodía del día civil de Bogotá) — salta fines de semana y festivos
+ * (`festivosColombia` + `festivosExtra`).
+ *
+ * CONTRATO explícito (semántica ya vigente en los 3 usos existentes que esta
+ * función generaliza): cuenta a partir del día SIGUIENTE a `desde` — `desde`
+ * mismo NUNCA se cuenta como uno de los `n` días hábiles, sea o no hábil.
+ * Por construcción, si `n >= 1` el resultado NUNCA cae en fin de semana ni
+ * festivo: el contador solo decrementa al aterrizar en un día hábil, así
+ * que el paso que lo agota es necesariamente hábil. `n <= 0` devuelve
+ * `desde` sin avanzar (ver `avanzarDiasHabiles`).
+ *
+ * GENERALIZA el bucle de conteo que antes vivía copiado 3 veces en este
+ * archivo (`calcularFechaVencimiento`, `fechaLimiteAlertaVencimiento`,
+ * `reactivarVencimiento` — las tres delegan ahora en `avanzarDiasHabiles`,
+ * la misma pieza que reutiliza este export). Añadido para consumidores
+ * nuevos (Fase 2, módulo de licencias) que necesitan "sumar N hábiles" sin
+ * acoplarse al catálogo cerrado `TipoSolicitudId` — a diferencia de
+ * `calcularFechaVencimiento`, que sí resuelve el plazo a partir de un id de
+ * tipo de solicitud.
+ *
+ * Limitación heredada (no nueva de este export, comparte el patrón de las
+ * 3 funciones ya existentes que reutiliza): el set de festivos solo cubre
+ * el año de `desde` y el siguiente. Sumar una cantidad de días hábiles tan
+ * grande que cruce a un TERCER año calendario no tendría los festivos de
+ * ese tercer año disponibles. Ningún consumidor actual necesita ese rango
+ * (términos legales típicos son de meses, no años); si aparece un caso
+ * real, se amplía el lookahead — no se generaliza sin necesidad (YAGNI).
+ */
+export function sumarDiasHabiles(
+  desde: string | Date,
+  n: number,
+  festivosExtra: string[] = [],
+): Date {
+  const inicio = atLocalNoon(desde);
+  const festivos = new Set([
+    ...festivosColombia(inicio.getFullYear()),
+    ...festivosColombia(inicio.getFullYear() + 1),
+    ...festivosExtra,
+  ]);
+  return avanzarDiasHabiles(inicio, Math.max(0, Math.trunc(n)), festivos);
+}
+
 /* ──────────────────────────────────────────────
    Cálculo de vencimiento
 ────────────────────────────────────────────── */
@@ -245,11 +364,7 @@ export function calcularFechaVencimiento(
   if (tipoSolicitud.unidad === 'CALENDARIO') {
     cursor = addDays(cursor, tipoSolicitud.diasRespuesta);
   } else {
-    let pendientes = tipoSolicitud.diasRespuesta;
-    while (pendientes > 0) {
-      cursor = addDays(cursor, 1);
-      if (esDiaHabil(cursor, festivos)) pendientes -= 1;
-    }
+    cursor = avanzarDiasHabiles(cursor, tipoSolicitud.diasRespuesta, festivos);
   }
 
   return {
@@ -288,13 +403,8 @@ export function fechaLimiteAlertaVencimiento(
     ...festivosColombia(inicio.getFullYear() + 1),
     ...festivosExtra,
   ]);
-  let cursor = inicio;
-  let pendientes = Math.max(0, Math.trunc(umbralDiasHabiles));
-  while (pendientes > 0) {
-    cursor = addDays(cursor, 1);
-    if (esDiaHabil(cursor, festivos)) pendientes -= 1;
-  }
-  return cursor;
+  const pendientes = Math.max(0, Math.trunc(umbralDiasHabiles));
+  return avanzarDiasHabiles(inicio, pendientes, festivos);
 }
 
 export function diasRestantesHabiles(fechaVencimiento: string | Date, desde: string | Date = new Date()): number {
@@ -382,13 +492,8 @@ export function reactivarVencimiento(
     ...festivosColombia(inicio.getFullYear() + 1),
     ...festivosExtra,
   ]);
-  let pendientes = Math.max(1, Math.trunc(diasHabilesRestantes));
-  let cursor = inicio;
-  while (pendientes > 0) {
-    cursor = addDays(cursor, 1);            // arranca el día SIGUIENTE al aporte
-    if (esDiaHabil(cursor, festivos)) pendientes -= 1;
-  }
-  return cursor;
+  const pendientes = Math.max(1, Math.trunc(diasHabilesRestantes));
+  return avanzarDiasHabiles(inicio, pendientes, festivos); // arranca el día SIGUIENTE al aporte
 }
 
 /**

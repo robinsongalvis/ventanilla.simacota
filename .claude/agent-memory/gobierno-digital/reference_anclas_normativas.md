@@ -38,6 +38,15 @@ Anclas verificadas y notas de precisión de citas:
   requerimiento sin respuesta → se entiende desistido. Desplaza al art. 17
   de la 1755 (régimen estatutario especial). Art. 14 (consultas): 10 días +
   prórroga 5. Confianza ALTA.
+- Hora legal de Colombia (verificado 6-ago-2026, inm.gov.co + Función
+  Pública): UTC-5 (Decreto 2707/1982); custodio ACTUAL es el INM — Decreto
+  Ley 4175/2011 art. 6 num. 14 (mod. Decreto 062/2021: "generar, monitorear,
+  coordinar y difundir la hora legal"). La SIC lo fue solo hasta 2011 — NO
+  citarla como custodio vigente. Sin horario de verano vigente →
+  America/Bogota = UTC-5 fijo. Cómputo civil: C.C. art. 67 (plazos completos,
+  corren hasta la MEDIANOCHE del último día — medianoche hora legal
+  colombiana) + Ley 4ª/1913 art. 62 (plazos de días en actos oficiales =
+  días hábiles salvo expresión contraria). Confianza ALTA.
 - CPACA arts. 74 (catálogo de recursos) y 76 (reposición/apelación: en la
   diligencia de notificación personal o dentro de los 10 días siguientes,
   ante quien dictó la decisión). Art. 67 par. 1 + art. 56: notificación
