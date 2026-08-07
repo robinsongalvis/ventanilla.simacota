@@ -41,6 +41,7 @@ El multi-tenant existente permite que el motor sirva a otras dependencias. La **
 
 ## Precondiciones para levantar la suspensión e implementar
 1. **Concepto jurídico formal** de la oficina jurídica de la Alcaldía sobre: el hito de radicación (D5), el plazo reglado de la revisión previa, el silencio positivo, y el acto administrativo del alcalde que designa la competencia de expedir en Planeación. **BLOQUEANTE.**
+   *(Actualización 6-ago-2026: Planeación confirmó que la competencia es **propia** de la Secretaría —firma el Secretario o Subsecretario— **sin intervención ni delegación del Alcalde**; la parte del "acto del alcalde" queda sin objeto y se sustituye por la referencia del **acto interno de asignación de funciones**, si existe. El resto de la precondición sigue vigente, reformulada como **ratificación del texto consolidado** — ver `docs/insumos-externos-fase2.md` y `docs/juridico/solicitud-concepto-juridico-licencia-construccion.md`.)*
 2. **Checklist oficial completo** (hoy tenemos "página 1 de 2" de Licencia — `docs/blueprints/requisitos-licencia-construccion-obra-nueva.md`).
 3. **Validación con la Secretaría de Planeación** (flujo real, búsqueda, campos del predio).
 4. Los pre-requisitos de seguridad de datos de D9 (guard monotónico en counters) implementados y verificados antes de la serie `expedientes`.

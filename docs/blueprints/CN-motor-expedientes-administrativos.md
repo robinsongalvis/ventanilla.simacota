@@ -297,6 +297,7 @@ previa y su salida forzosa; efecto de no-arranque del recibo frente a expediente
 nomenclatura de los dos números frente a AGN 060; formatos de constancia. El procedimiento debe
 quedar respaldado por **acto administrativo del alcalde** (competencia de Planeación, municipio sin
 curador, Ley 388 art. 99), no solo por decisión de producto.
+*(Corrección 6-ago-2026: Planeación confirmó que la competencia es **propia** de la Secretaría —Secretario/Subsecretario— **sin acto de delegación del Alcalde**; el respaldo documental pasa a ser el acto interno de asignación de funciones, si existe. Ver `docs/blueprints/ciclo-vida-licencia-construccion.md`.)*
 
 ---
 

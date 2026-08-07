@@ -2,6 +2,11 @@
 
 > **Estado: v1 REVISADO POR PANEL (Seguridad · UX · Gobierno Digital · Datos). Requiere REESCRITURA v2 antes de codear.** Los 4 veredictos entraron; hay hallazgos que reencuadran el diseño (ver §Revisión cruzada al final). Ninguno rechaza el módulo; todos son incorporables. Pendiente: aprobación del propietario de la decisión de fondo (hito de radicación) + validación jurídica y UX con la Secretaría de Planeación real, antes del ADR.
 > Autor: Arquitecto Principal. Nivel 3 (módulo + colección + flujo + integración nuevos).
+>
+> ⚠️ **CORRECCIÓN NORMATIVA (6-ago-2026) — leer antes que el cuerpo v1.** Dos supuestos de este v1 quedaron superados por el insumo de investigación normativa y la confirmación de Planeación (fuente vigente: `docs/blueprints/ciclo-vida-licencia-construccion.md`):
+> 1. **El régimen de términos/subsanación NO es Ley 1755** (las menciones en §modelo de datos y §invariantes son incorrectas): rige el **Decreto 1077** — 45 días hábiles desde radicación en debida forma; acta de observaciones que suspende; subsanación **30 días hábiles + 15 de prórroga**; desistimiento (art. 17 CPACA) → archivo → nueva solicitud.
+> 2. **No existe ni procede "acto de designación de competencia del alcalde"**: la competencia es **propia** de la Secretaría de Planeación (Secretario/Subsecretario). El soporte documental es el acto interno de asignación de funciones, si existe.
+> La reescritura v2 debe incorporar ambas correcciones.
 
 ## 0. Principio rector y anclaje en lo existente
 

@@ -1,16 +1,16 @@
 # Insumos externos para habilitar la Fase 2 — Motor de expedientes (Licencia de Construcción)
 
-> **Propósito:** consolidar lo que falta validar antes de construir la **fase de resolución** del motor. La ingeniería interna está **cerrada** (guard D9, RS-1, cierre SEV-1, G2). El **insumo de investigación normativa del 6-ago-2026** resolvió las contradicciones previas a nivel de investigación; queda **una sola gestión externa**: la **ratificación por la Oficina Jurídica** del texto consolidado (el propio insumo la exige antes de programar reglas).
+> **Propósito:** consolidar lo que falta validar antes de construir la **fase de resolución** del motor. La ingeniería interna está **cerrada** (guard D9, RS-1, cierre SEV-1, G2). El **insumo de investigación normativa del 6-ago-2026** resolvió casi todo a nivel de investigación; queda **una gestión externa BLOQUEANTE** — la **ratificación por la Oficina Jurídica** (en especial la semántica del reinicio, único punto en tensión) — más **dos gestiones menores no bloqueantes** con Planeación (ver al final).
 >
 > El sistema **calcula y alerta** de forma **asistiva**; la decisión administrativa siempre es del funcionario.
 
-## ✅ Resuelto (operativo + investigación normativa) — NO volver a preguntar
+## Estado de los puntos (✅ = resuelto, NO volver a preguntar · ⚠️ = la ÚNICA fila abierta, gate del oficio §2.4)
 
 | Punto | Resolución | Fuente |
 |---|---|---|
 | **Unidad del término** | **45 días HÁBILES** (la contradicción hábiles/corridos se resuelve a favor de **hábiles**) | D. 1077 art. 2.2.6.1.2.3.1 + concepto Minvivienda |
 | **Hito de inicio** | **Radicación en legal y debida forma** (tras verificar completitud; flujo Planeación: revisa → remite → radica → corren los días) | Planeación + D. 1077 |
-| **Mecanismo ante observaciones** | ⚠️ **PARCIAL — es el único punto con tensión abierta.** Norma investigada: el acta **SUSPENDE** y el término **se REANUDA** al subsanar (mismo radicado); reinicio solo vía desistimiento→archivo→nueva solicitud. **Decisión operativa del propietario (6-ago): REINICIO a cero** + modelo dual de radicado (`LEGACY_NUEVO` → objetivo `MISMO_RADICADO`) por bandera. El motor implementa **ambas semánticas**; cuál se activa lo decide la **ratificación de Jurídica** (es el gate del oficio §2) | D. 1077 arts. 2.2.6.1.2.2.4 / 2.2.6.1.2.3.1 + CPACA art. 17 · decisión 6-ago |
+| **Mecanismo ante observaciones** | ⚠️ **PARCIAL — es el único punto con tensión abierta.** Norma investigada: el acta **SUSPENDE** y el término **se REANUDA** al subsanar (mismo radicado); reinicio solo vía desistimiento→archivo→nueva solicitud. **Decisión operativa del propietario (6-ago): REINICIO a cero** + modelo dual de radicado (`LEGACY_NUEVO` → objetivo `MISMO_RADICADO`) por bandera. El motor implementa **ambas semánticas**; cuál se activa lo decide la **ratificación de Jurídica** (es el gate del oficio §2.4) | D. 1077 arts. 2.2.6.1.2.2.4 / 2.2.6.1.2.3.1 + CPACA art. 17 · decisión 6-ago |
 | **Tope de reinicios** | **No hay tope legal** (cada radicación es petición independiente). Trazar radicados sucesivos por predio/proyecto, sin bloquear | CPACA + D. 1077 |
 | **Silencio positivo (SAP)** | Opera si no se resuelve **ni notifica** en el término neto; NO se configura si hubo pronunciamiento (acta); NO legaliza lo inviable. Reglas: reloj neto en hábiles, suspensiones automáticas, alertas 60/80/90%, control de **notificación**, trazabilidad | CPACA 84-85 + jurisprudencia |
 | **Los "6 meses"** | Son la **REVALIDACIÓN** (figura separada, a solicitud, con avance ≥50%): ventana **2 meses** en texto base (D. 1783/2021), ampliada transitoriamente (D. 74/2025, solicitudes hasta 30-jun-2026, ya vencida). **NO codificar "6 meses"** — parametrizar por fecha | D. 1077 art. 2.2.6.1.2.4.2 |

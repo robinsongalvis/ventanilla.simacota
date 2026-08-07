@@ -18,7 +18,7 @@ Para configurar el cómputo **asistivo** de términos del expediente electrónic
 
 ## 1. Término para resolver — 45 días HÁBILES desde la radicación en legal y debida forma
 
-**Entendimiento:** la autoridad dispone de un **máximo de 45 días hábiles** para resolver, contados desde la **radicación en legal y debida forma** (art. 2.2.6.1.2.3.1, Decreto 1077 de 2015; en igual sentido, concepto Minvivienda 2022EE0054113). Los días son **hábiles**, no corridos.
+**Entendimiento:** la autoridad dispone de un **máximo de 45 días hábiles** para resolver, contados desde la **radicación en legal y debida forma** (art. 2.2.6.1.2.3.1, Decreto 1077 de 2015; en igual sentido, concepto Minvivienda radicado 2022EE0054113 — *referencia tomada del insumo de investigación; verificar el número al oficializar*). Los días son **hábiles**, no corridos.
 
 **Ratificar:** 1.1 ¿Confirma unidad (hábiles) e hito? · 1.2 ¿El término mismo admite alguna **prórroga o ampliación por parte de la autoridad**? De ser así, ¿cuál es su fuente y extensión?
 
@@ -26,7 +26,9 @@ Para configurar el cómputo **asistivo** de términos del expediente electrónic
 
 **Entendimiento:** durante la revisión se levanta **acta de observaciones y correcciones** (art. 2.2.6.1.2.2.4), que **suspende** el término; el solicitante cuenta con **30 días hábiles, prorrogables 15 más a solicitud de parte**, para subsanar. Si subsana, el término **se reanuda** (mismo radicado). Si no subsana, la solicitud **se entiende desistida** y se **archiva por acto administrativo** (art. 2.2.6.1.2.3.1, en concordancia con el art. 17 del CPACA), acto que admite **recurso de reposición**. Tras el archivo, continuar exige **nueva solicitud (nuevo radicado)**, que abre un **nuevo término de 45 días**. También suspenden el término el plazo para aportar comprobantes de **pago de expensas e impuestos** (30 días hábiles) y la **citación a vecinos**.
 
-**Ratificar:** 2.1 ¿Confirma el mecanismo (suspende/reanuda dentro del radicado; reinicio solo vía desistimiento→archivo→nueva solicitud)? · 2.2 ¿Confirma los plazos de subsanación (30+15 hábiles) y las demás causales de suspensión? · 2.3 ¿Confirma que **no existe tope legal** al número de nuevas radicaciones ni un plazo máximo global del trámite (el sistema trazará radicados sucesivos sin bloquearlos)?
+**Ratificar:** 2.1 ¿Confirma el mecanismo (suspende/reanuda dentro del radicado; reinicio solo vía desistimiento→archivo→nueva solicitud)? · 2.2 ¿Confirma los plazos de subsanación (30+15 hábiles) y las demás causales de suspensión (expensas, citación a vecinos)? · 2.3 ¿Confirma que **no existe tope legal** al número de nuevas radicaciones ni un plazo máximo global del trámite (el sistema trazará radicados sucesivos sin bloquearlos)?
+
+**2.4 — Consulta expresa (LA decisión que necesitamos):** operativamente, la Secretaría de Planeación desea manejar los cambios/subsanaciones **reiniciando el término a cero (nuevos 45 días hábiles) sobre el MISMO radicado**, en lugar del esquema suspende/reanuda o del nuevo radicado tras desistimiento. ¿Es esa práctica **jurídicamente admisible**? En particular: ¿existe riesgo de que, frente a un tercero o un juez, el término de la radicación **original** se tenga por corrido y vencido (configurando **silencio administrativo positivo**), al no mediar la suspensión formal del acta ni una nueva radicación? Si la práctica es admisible, ¿qué actuación formal debe registrarse en el expediente para que cada reinicio quede válidamente soportado? **El sistema NO activará esta modalidad sin su pronunciamiento expreso.**
 
 ## 3. Silencio administrativo positivo (SAP)
 
@@ -48,7 +50,7 @@ Para configurar el cómputo **asistivo** de términos del expediente electrónic
 
 ## 6. Compatibilidad del apoyo digital
 
-6.1 ¿Alguna objeción a que el sistema **calcule, suspenda/reanude y alerte** términos de forma asistiva (alertas al 60/80/90% del término neto; control de fecha de notificación), quedando toda decisión administrativa **en cabeza del funcionario competente**?
+6.1 ¿Alguna objeción a que el sistema **calcule y alerte** términos de forma asistiva — aplicando la mecánica que esa oficina ratifique en el punto 2 (suspensión/reanudación **o** reinicio sobre el mismo radicado), con alertas al 60/80/90% del término neto y control de fecha de notificación — quedando toda decisión administrativa **en cabeza del funcionario competente**?
 
 ---
 
