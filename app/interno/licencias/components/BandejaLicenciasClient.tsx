@@ -18,6 +18,14 @@
    (`ChipEstadoJuridico`), no el semáforo `EstadoLicenciaUI` que usaban los
    fixtures (ese sigue vivo en `ChipEstado`, pero solo para el preview de
    componentes — ver `fixtures.ts`).
+
+   Bloque C: el botón "Exportar libro consecutivo ↓" del pie YA NO es
+   `BotonAccionPlaceholder` — el Libro Consecutivo real existe
+   (`LibroConsecutivoClient`, con su propio export CSV). Este botón solo
+   LLEVA hasta esa pantalla (misma decisión que `onAbrirExpediente`): en
+   ruta standalone es un `<Link>` a `/interno/licencias/libro-consecutivo`;
+   embebido en `VistaLicencias` (Bloque B), `onIrALibroConsecutivo` cambia
+   de sub-pestaña local sin navegar.
 ══════════════════════════════════════════════════════════════ */
 
 import { useCallback, useEffect, useMemo, useState } from 'react';
@@ -31,7 +39,6 @@ import { ChipEstadoJuridico } from './ChipEstadoJuridico';
 import { ChipPrueba } from './ChipPrueba';
 import { NumeroLegal } from './NumeroLegal';
 import { TarjetaKPI } from './TarjetaKPI';
-import { BotonAccionPlaceholder } from './BotonAccionPlaceholder';
 import { RadicarSolicitudModal } from './RadicarSolicitudModal';
 import { CrearDesdeRadicadoModal } from './CrearDesdeRadicadoModal';
 
@@ -62,6 +69,14 @@ export interface BandejaLicenciasClientProps {
    * es exactamente el de antes: `<Link>`.
    */
   onAbrirExpediente?: (expedienteId: string) => void;
+  /**
+   * Bloque C — mismo principio que `onAbrirExpediente`: si se recibe, el
+   * botón "Exportar libro consecutivo ↓" del pie cambia de sub-pestaña
+   * LOCAL en `VistaLicencias` en vez de navegar de ruta. Sin esta prop
+   * (ruta standalone), navega con `<Link>` a `/interno/licencias/
+   * libro-consecutivo`.
+   */
+  onIrALibroConsecutivo?: () => void;
 }
 
 /**
@@ -96,7 +111,7 @@ function EnlaceExpediente({
   );
 }
 
-export function BandejaLicenciasClient({ onAbrirExpediente }: BandejaLicenciasClientProps = {}) {
+export function BandejaLicenciasClient({ onAbrirExpediente, onIrALibroConsecutivo }: BandejaLicenciasClientProps = {}) {
   const { usuario, cargando: cargandoAuth } = useAuth();
   const [expedientes, setExpedientes] = useState<ExpedienteLicenciaDoc[]>([]);
   const [cargando, setCargando] = useState(true);
@@ -319,7 +334,7 @@ export function BandejaLicenciasClient({ onAbrirExpediente }: BandejaLicenciasCl
         <p>
           {kpis.totalContable} expediente{kpis.totalContable === 1 ? '' : 's'} · {totalPrueba} de prueba visible{totalPrueba === 1 ? '' : 's'}
         </p>
-        <BotonAccionPlaceholder label="Exportar libro consecutivo ↓" variant="outline" />
+        <BotonIrALibroConsecutivo onIrALibroConsecutivo={onIrALibroConsecutivo} />
       </div>
 
       {modalAbierto && (
@@ -341,5 +356,36 @@ function Th({ children, ancho }: { children: React.ReactNode; ancho?: number }) 
     >
       {children}
     </th>
+  );
+}
+
+/**
+ * "Exportar libro consecutivo ↓" — mismo estilo `outline` que tenía
+ * `BotonAccionPlaceholder` (para que el reemplazo no cambie la jerarquía
+ * visual del pie), pero ahora es un enlace/botón real: lleva al Libro
+ * Consecutivo (`LibroConsecutivoClient`), que tiene su propio botón
+ * "Exportar CSV ↓" — este botón NO exporta directamente (evita duplicar
+ * el estado de año/filas aquí, la Bandeja no filtra por año).
+ */
+function BotonIrALibroConsecutivo({ onIrALibroConsecutivo }: { onIrALibroConsecutivo?: () => void }) {
+  const claseBase =
+    'inline-flex items-center gap-2 rounded-[10px] px-4 py-2.5 text-sm font-bold transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-1 hover:brightness-95 active:scale-[0.98]';
+  const estiloOutline: React.CSSProperties = {
+    background: 'transparent',
+    color: 'var(--text-secondary)',
+    border: '1px solid var(--color-border)',
+  };
+
+  if (onIrALibroConsecutivo) {
+    return (
+      <button type="button" onClick={onIrALibroConsecutivo} className={claseBase} style={estiloOutline}>
+        Exportar libro consecutivo ↓
+      </button>
+    );
+  }
+  return (
+    <Link href="/interno/licencias/libro-consecutivo" className={claseBase} style={estiloOutline}>
+      Exportar libro consecutivo ↓
+    </Link>
   );
 }

@@ -16,15 +16,23 @@ import { GuardModuloPlaneacion } from './components/GuardModuloPlaneacion';
  * permiso no debe ver ni la marca "Secretaría de Planeación" del sidebar
  * antes de la tarjeta de acceso restringido. Este layout sigue siendo
  * Server Component; el guard es el único límite 'use client' del módulo.
+ *
+ * `print:h-auto print:overflow-visible` (Bloque C, Libro consecutivo): el
+ * chrome de pantalla es `h-screen overflow-hidden` con scroll interno en
+ * `<main>` — correcto en pantalla, pero al imprimir cortaría la tabla del
+ * libro a lo que cabe en un viewport. `LicenciasSidebar`/
+ * `LicenciasTopBarMovil` ya se ocultan con `print:hidden` (ver su JSDoc);
+ * estos overrides dejan que el contenido fluya a tantas páginas como haga
+ * falta.
  */
 export default function LicenciasLayout({ children }: { children: ReactNode }) {
   return (
     <GuardModuloPlaneacion>
-      <div className="h-screen flex overflow-hidden" style={{ background: 'var(--bg-base)' }}>
+      <div className="h-screen flex overflow-hidden print:h-auto print:overflow-visible print:block" style={{ background: 'var(--bg-base)' }}>
         <LicenciasSidebar />
-        <div className="flex-1 flex flex-col min-w-0 overflow-hidden">
+        <div className="flex-1 flex flex-col min-w-0 overflow-hidden print:overflow-visible print:block">
           <LicenciasTopBarMovil titulo="Licencias" />
-          <main className="flex-1 overflow-y-auto">{children}</main>
+          <main className="flex-1 overflow-y-auto print:overflow-visible">{children}</main>
         </div>
       </div>
     </GuardModuloPlaneacion>
