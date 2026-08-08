@@ -23,12 +23,36 @@
  * mapeable va a CUARENTENA (se reporta, no se fuerza una equivalencia).
  */
 
-/** Una fila de la tabla: un texto histórico exacto → los códigos de subtipo a los que equivale (soporta combinados). */
+/**
+ * Una fila de la tabla: un texto histórico exacto → los códigos de subtipo
+ * a los que equivale (soporta combinados).
+ *
+ * `estado`/`fundamento`/`nota` son OPCIONALES (DF-4, ADR-0029) — ADITIVOS,
+ * no rompen fixtures previos que solo declaran `{textoHistorico, codigos}`:
+ *  - `estado: 'MAPEADO'`: la equivalencia está CONFIRMADA POR NORMA (o por
+ *    composición evidente de códigos ya mapeados); `codigos` debe tener al
+ *    menos uno y `fundamento` debe citar la base normativa.
+ *  - `estado: 'CUARENTENA'`: el texto histórico NO se mapea — su
+ *    significado local está pendiente del ingeniero (P1′). `codigos` DEBE
+ *    quedar vacío (una fila en cuarentena que además trajera códigos sería
+ *    contradictoria) y `nota` explica el porqué. `resolverEquivalencia`
+ *    trata estas filas como NO RESUELTAS (devuelve `null`) aunque existan
+ *    en la tabla — existen para dejar constancia de que el texto fue
+ *    VISTO y deliberadamente NO mapeado, no para resolverlo.
+ *  - Filas SIN `estado` (legado/tests): se resuelven exactamente como
+ *    antes de DF-4, sin cambio de comportamiento.
+ */
 export interface EquivalenciaMigracion {
   /** Texto tal como aparece en el sistema legado, ANTES de normalizar (se conserva verbatim para trazabilidad). */
   textoHistorico: string;
-  /** Códigos de `SubtipoTramite.codigo` a los que equivale. `length > 1` = combinado (p. ej. "LCR VISR" → dos códigos). */
+  /** Códigos de `SubtipoTramite.codigo` a los que equivale. `length > 1` = combinado (p. ej. "LCR VISR" → dos códigos). Vacío si `estado === 'CUARENTENA'`. */
   codigos: string[];
+  /** DF-4: estado de la fila frente a la migración. Ausente = comportamiento legado (se resuelve igual que 'MAPEADO'). */
+  estado?: 'MAPEADO' | 'CUARENTENA';
+  /** Cita normativa exacta que sustenta la equivalencia (obligatoria en la práctica para `estado: 'MAPEADO'`). */
+  fundamento?: string;
+  /** Motivo de la cuarentena (obligatoria en la práctica para `estado: 'CUARENTENA'`). */
+  nota?: string;
 }
 
 /**
@@ -54,13 +78,20 @@ export function resolverEquivalencia(
 ): string[] | null {
   const buscado = normalizarTextoHistorico(textoHistorico);
   const fila = tabla.find((f) => normalizarTextoHistorico(f.textoHistorico) === buscado);
-  return fila ? fila.codigos : null;
+  if (!fila) return null;
+  // DF-4: una fila en CUARENTENA está en la tabla para dejar constancia de
+  // que el texto fue visto y NO se mapeó — JAMÁS se resuelve, aunque exista.
+  if (fila.estado === 'CUARENTENA') return null;
+  return fila.codigos;
 }
 
 export type CodigoErrorEquivalenciaMigracion =
   | 'TEXTO_HISTORICO_VACIO'
   | 'TEXTO_HISTORICO_DUPLICADO'
-  | 'SIN_CODIGOS';
+  | 'SIN_CODIGOS'
+  | 'CUARENTENA_CON_CODIGOS'
+  | 'MAPEADO_SIN_FUNDAMENTO'
+  | 'CUARENTENA_SIN_NOTA';
 
 export interface ErrorEquivalenciaMigracion {
   codigo: CodigoErrorEquivalenciaMigracion;
@@ -79,8 +110,12 @@ export interface ResultadoValidacionEquivalencias {
  *  - Dos filas NO pueden normalizar al mismo `textoHistorico` (ambigüedad
  *    silenciosa: ¿cuál de las dos gana? Fail-closed, se rechaza en vez de
  *    decidir).
- *  - `codigos` no puede estar vacío (una fila sin códigos no es una
- *    equivalencia, es una fila rota).
+ *  - `codigos` no puede estar vacío — SALVO en filas `estado: 'CUARENTENA'`,
+ *    donde vacío es lo esperado (DF-4): ahí el error simétrico es que SÍ
+ *    traiga códigos (`CUARENTENA_CON_CODIGOS`) o que le falte `nota`
+ *    (`CUARENTENA_SIN_NOTA`).
+ *  - `estado: 'MAPEADO'` sin `fundamento` → `MAPEADO_SIN_FUNDAMENTO`: una
+ *    equivalencia marcada como confirmada por norma debe citar su base.
  */
 export function validarTablaEquivalencias(tabla: EquivalenciaMigracion[]): ResultadoValidacionEquivalencias {
   const errores: ErrorEquivalenciaMigracion[] = [];
@@ -96,10 +131,32 @@ export function validarTablaEquivalencias(tabla: EquivalenciaMigracion[]): Resul
     if (normalizadosVistos.has(normalizado)) normalizadosDuplicados.add(normalizado);
     normalizadosVistos.add(normalizado);
 
+    if (fila.estado === 'CUARENTENA') {
+      if (fila.codigos.length > 0) {
+        errores.push({
+          codigo: 'CUARENTENA_CON_CODIGOS',
+          mensaje: `La fila "${fila.textoHistorico}" está en CUARENTENA pero declara códigos (${fila.codigos.join(', ')}); una fila en cuarentena no debe tener códigos — es contradictorio.`,
+        });
+      }
+      if (!fila.nota || fila.nota.trim().length === 0) {
+        errores.push({
+          codigo: 'CUARENTENA_SIN_NOTA',
+          mensaje: `La fila "${fila.textoHistorico}" está en CUARENTENA pero no explica el motivo ("nota").`,
+        });
+      }
+      continue; // una fila en cuarentena no se valida por las reglas de las filas mapeadas
+    }
+
     if (fila.codigos.length === 0) {
       errores.push({
         codigo: 'SIN_CODIGOS',
         mensaje: `La fila "${fila.textoHistorico}" no tiene ningún código de subtipo asociado.`,
+      });
+    }
+    if (fila.estado === 'MAPEADO' && (!fila.fundamento || fila.fundamento.trim().length === 0)) {
+      errores.push({
+        codigo: 'MAPEADO_SIN_FUNDAMENTO',
+        mensaje: `La fila "${fila.textoHistorico}" está marcada MAPEADO pero no cita "fundamento" normativo.`,
       });
     }
   }
