@@ -33,6 +33,7 @@ import { NumeroLegal } from './NumeroLegal';
 import { TarjetaKPI } from './TarjetaKPI';
 import { BotonAccionPlaceholder } from './BotonAccionPlaceholder';
 import { RadicarSolicitudModal } from './RadicarSolicitudModal';
+import { CrearDesdeRadicadoModal } from './CrearDesdeRadicadoModal';
 
 /**
  * Partición del dominio de `EstadoJuridicoLicencia` en 3 baldes
@@ -55,6 +56,7 @@ export function BandejaLicenciasClient() {
   const [cargando, setCargando] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [modalAbierto, setModalAbierto] = useState(false);
+  const [modalDesdeRadicadoAbierto, setModalDesdeRadicadoAbierto] = useState(false);
 
   const cargar = useCallback(async () => {
     setCargando(true);
@@ -114,7 +116,15 @@ export function BandejaLicenciasClient() {
             Estado jurídico del ciclo (D.1077/2015) · el término legal (45 días hábiles) se proyecta en el detalle de cada expediente.
           </p>
         </div>
-        <div className="shrink-0">
+        <div className="shrink-0 flex flex-wrap items-center justify-end gap-2">
+          <button
+            type="button"
+            onClick={() => setModalDesdeRadicadoAbierto(true)}
+            className="inline-flex items-center gap-2 rounded-[10px] px-4 py-2.5 text-sm font-bold transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-1 hover:brightness-95 active:scale-[0.98]"
+            style={{ background: 'transparent', color: '#14532D', border: '1px solid #14532D' }}
+          >
+            Crear desde radicado
+          </button>
           <button
             type="button"
             onClick={() => setModalAbierto(true)}
@@ -260,6 +270,9 @@ export function BandejaLicenciasClient() {
 
       {modalAbierto && (
         <RadicarSolicitudModal onCerrar={() => setModalAbierto(false)} onCreado={() => void cargar()} />
+      )}
+      {modalDesdeRadicadoAbierto && (
+        <CrearDesdeRadicadoModal onCerrar={() => setModalDesdeRadicadoAbierto(false)} onCreado={() => void cargar()} />
       )}
     </div>
   );

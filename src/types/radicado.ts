@@ -72,7 +72,9 @@ export type AccionAuditoria =
   /** BM-B33 — el cron propone desistimiento tácito (no archiva). */
   | 'DESISTIMIENTO_TACITO_PROPUESTO'
   /** BM-B33 — el funcionario confirmó el desistimiento por acto motivado. */
-  | 'DESISTIMIENTO_TACITO_CONFIRMADO';
+  | 'DESISTIMIENTO_TACITO_CONFIRMADO'
+  /** Bloque A·A4 (D2) — el radicado quedó vinculado a un expediente de licencias del motor. */
+  | 'EXPEDIENTE_LICENCIA_VINCULADO';
 
 export interface AuditoriaEntry {
   fecha:    string;

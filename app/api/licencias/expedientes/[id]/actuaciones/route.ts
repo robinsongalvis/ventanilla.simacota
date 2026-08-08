@@ -7,7 +7,11 @@
    término sigue ⚖️ dual/bloqueado (`lib/motor-expedientes/termino.ts`,
    hueco 1 ADR-0029) — esta ruta NO calcula ni persiste ningún vencimiento.
 
-   Bloque "Integración UI y demo".
+   Bloque "Integración UI y demo" / Bloque A·A5. Para 'acta-observaciones'
+   el body admite el campo opcional `fechaComunicacion` (ISO): si viene, se
+   calcula `fechaLimiteRespuesta` (30 días hábiles desde la comunicación,
+   NO la expedición — condición del dictamen) y se imprime en el aviso al
+   ciudadano; si NO viene, el aviso se envía igual pero SIN esa fecha.
 ══════════════════════════════════════════════════════════════ */
 
 import { NextResponse } from 'next/server';
@@ -18,11 +22,17 @@ import {
   requireActiveInternalUser,
 } from '@/lib/server/internal-auth';
 import type { TenantId } from '@/src/types/radicado';
+import type { VentanillaRadicado } from '@/src/types/ventanilla';
 import {
   planRegistrarActuacion,
   esErrorExpediente,
+  debeEnviarComunicacionExpediente,
+  calcularFechaLimiteRespuestaActa,
+  construirActuacionComunicacionEnviada,
   type ExpedienteLicenciaDoc,
 } from '@/lib/server/expedientes-licencias';
+import { buildAvisoActaHtml, buildAvisoActaSubject } from '@/lib/email/templates/aviso-acta-observaciones';
+import { enviarEmail } from '@/lib/email/mailer';
 import { logError } from '@/lib/logger';
 
 export const runtime = 'nodejs';
@@ -55,7 +65,7 @@ export async function POST(request: Request, context: RouteContext): Promise<Nex
       return NextResponse.json({ error: 'Tu rol no permite registrar actuaciones en este expediente.' }, { status: 403 });
     }
 
-    const body = await request.json().catch(() => null) as { tipo?: string; detalle?: string } | null;
+    const body = await request.json().catch(() => null) as { tipo?: string; detalle?: string; fechaComunicacion?: string } | null;
 
     // Solo se necesita el `tipo` de cada actuación existente para el guard
     // de acta única — no se traen los documentos completos.
@@ -84,7 +94,51 @@ export async function POST(request: Request, context: RouteContext): Promise<Nex
     });
     await batch.commit();
 
-    return NextResponse.json({ ok: true, actuacion: plan.actuacion, estadoJuridico: plan.nuevoEstadoJuridico });
+    // Aviso de acta (A5, dictamen gobierno-digital 8-ago) — SOLO para
+    // 'acta-observaciones', post-commit, best-effort: un fallo de envío
+    // NUNCA revierte el registro de la actuación ya confirmado.
+    let avisoEnviado = false;
+    const actor = { uid: usuario.uid, nombre: usuario.nombre, rol: usuario.rol };
+    if (body?.tipo === 'acta-observaciones' && expediente.radicadoId) {
+      const radicadoSnap = await db.doc(`ventanilla_radicados/${expediente.radicadoId}`).get();
+      const radicado = radicadoSnap.exists ? (radicadoSnap.data() as VentanillaRadicado) : null;
+      const gate = debeEnviarComunicacionExpediente(expediente.tramiteId, radicado);
+      if (gate.debeEnviar && radicado) {
+        const email = radicado.solicitante.email!;
+        const numero = expediente.numeroExpediente?.numero ?? id;
+        // La fecha límite SOLO se imprime si el funcionario registró
+        // fechaComunicacion (condición del dictamen: el plazo corre desde
+        // la comunicación, no la expedición) — sin ella, se omite.
+        const fechaLimiteRespuesta = body?.fechaComunicacion
+          ? calcularFechaLimiteRespuestaActa(body.fechaComunicacion)
+          : undefined;
+        try {
+          await enviarEmail({
+            to: email,
+            subject: buildAvisoActaSubject(numero),
+            html: buildAvisoActaHtml({
+              numeroExpedienteFUN: numero,
+              solicitanteNombre: expediente.solicitanteNombre,
+              fechaLimiteRespuesta,
+            }),
+          });
+          avisoEnviado = true;
+          await expedienteRef.collection('actuaciones').add(
+            construirActuacionComunicacionEnviada(
+              id,
+              expediente.tenantId,
+              { tipoComunicacion: 'Aviso de acta de observaciones y correcciones', destinatario: email, asunto: buildAvisoActaSubject(numero) },
+              actor,
+              new Date(),
+            ),
+          );
+        } catch (err) {
+          logError({ radicadoId: id, modulo: 'licencias/expedientes/[id]/actuaciones/aviso-acta', error: err });
+        }
+      }
+    }
+
+    return NextResponse.json({ ok: true, actuacion: plan.actuacion, estadoJuridico: plan.nuevoEstadoJuridico, avisoEnviado });
   } catch (error) {
     logError({ radicadoId: 'n/a', modulo: 'licencias/expedientes/[id]/actuaciones/POST', error });
     return jsonError(error);

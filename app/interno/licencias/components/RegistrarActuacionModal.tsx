@@ -42,6 +42,8 @@ export interface RegistrarActuacionModalProps {
 export function RegistrarActuacionModal({ expedienteId, tipo, onCerrar, onRegistrada }: RegistrarActuacionModalProps) {
   const copia = COPIA[tipo];
   const [detalle, setDetalle] = useState('');
+  /** Solo aplica a 'acta-observaciones' (A5) — `<input type="date">` da "YYYY-MM-DD" sin hora. */
+  const [fechaComunicacion, setFechaComunicacion] = useState('');
   const [guardando, setGuardando] = useState(false);
   const [errorServidor, setErrorServidor] = useState<string | null>(null);
 
@@ -58,11 +60,25 @@ export function RegistrarActuacionModal({ expedienteId, tipo, onCerrar, onRegist
     setErrorServidor(null);
     setGuardando(true);
     try {
+      // Ancla la fecha del `<input type="date">` al mediodía de Bogotá
+      // (`T12:00:00-05:00`, mismo patrón que `app/api/interno/resumen-
+      // diario/route.ts`) ANTES de enviarla — el servidor no re-ancla
+      // `fechaComunicacion` (`calcularFechaLimiteRespuestaActa` →
+      // `sumarDiasHabiles` → `atLocalNoon`, `lib/tiempos-radicado.ts`), y un
+      // "YYYY-MM-DD" crudo se interpretaría como medianoche UTC — un día
+      // civil ANTES en Bogotá (UTC-5) — corriendo el plazo de 30 días desde
+      // la fecha equivocada.
+      const fechaComunicacionAnclada =
+        tipo === 'acta-observaciones' && fechaComunicacion ? `${fechaComunicacion}T12:00:00-05:00` : undefined;
       const res = await fetch(`/api/licencias/expedientes/${encodeURIComponent(expedienteId)}/actuaciones`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         credentials: 'include',
-        body: JSON.stringify({ tipo, detalle }),
+        body: JSON.stringify({
+          tipo,
+          detalle,
+          ...(fechaComunicacionAnclada ? { fechaComunicacion: fechaComunicacionAnclada } : {}),
+        }),
       });
       const body = await res.json().catch(() => ({}));
       if (!res.ok) {
@@ -111,6 +127,27 @@ export function RegistrarActuacionModal({ expedienteId, tipo, onCerrar, onRegist
               placeholder={copia.placeholder}
             />
           </label>
+
+          {tipo === 'acta-observaciones' && (
+            <div>
+              <label>
+                <span className="mb-1 block text-[10px] font-bold uppercase tracking-widest" style={{ color: '#667085' }}>
+                  Fecha de comunicación del acta{' '}
+                  <span className="normal-case font-normal" style={{ color: '#94A3B8' }}>(opcional)</span>
+                </span>
+                <input
+                  type="date"
+                  value={fechaComunicacion}
+                  onChange={(e) => setFechaComunicacion(e.target.value)}
+                  className="input-internal"
+                  aria-describedby="ayuda-fecha-comunicacion-acta"
+                />
+              </label>
+              <p id="ayuda-fecha-comunicacion-acta" className="text-xs mt-1" style={{ color: '#667085' }}>
+                Si la registra, el aviso al ciudadano incluirá la fecha límite de respuesta; el plazo corre desde la comunicación, no desde la expedición.
+              </p>
+            </div>
+          )}
 
           {errorServidor && (
             <p role="alert" className="rounded-lg px-3 py-2 text-xs"

@@ -162,6 +162,17 @@ const REGISTRO = [
     ref: 'ADR-0010 §2.1 · R11 RESUELTO',
   },
   {
+    archivo: 'app/api/licencias/radicados-candidatos/route.ts',
+    estado: 'ACOTADA',
+    clase: 'INTERACTIVA',
+    descripcion: 'Selector de radicados candidatos al handoff radicado⇄expediente '
+      + '(Bloque A·A4): where por oficinaDestino + limit duro; orden en memoria '
+      + 'sobre el lote acotado (sin orderBy para no exigir índice compuesto).',
+    cotaRegex: /const LIMITE_CANDIDATOS\s*=\s*(\d+)/,
+    cotaMax: 500,
+    ref: 'ADR-0011 · Bloque A·A4 (handoff D2)',
+  },
+  {
     archivo: 'app/api/reportes/mipg/excel/route.ts',
     estado: 'DEUDA_DECLARADA',
     clase: 'BATCH',

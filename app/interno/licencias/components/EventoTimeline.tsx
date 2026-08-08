@@ -4,6 +4,10 @@ const COLOR_POR_TIPO: Record<EventoTimelineItem['tipo'], string> = {
   RADICACION: '#14532D',           // verde institucional
   ACTA: '#D97706',                 // ámbar
   SUBSANACION: '#2563EB',          // azul
+  // Tono INFO del sistema de diseño (`--color-info`, `app/globals.css`) —
+  // una comunicación enviada es informativa, deliberadamente NO el verde de
+  // éxito (Bloque A·A4/A5): no es un logro del trámite, es un aviso.
+  COMUNICACION: 'var(--color-info)',
   VENCIMIENTO_CALCULADO: '#DC2626', // rojo — es una proyección, nunca un hecho
 };
 

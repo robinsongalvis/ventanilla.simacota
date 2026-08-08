@@ -65,11 +65,29 @@ export async function GET(request: Request, context: RouteContext): Promise<Next
     const documentosSnap = await expedienteRef.collection(SUBCOLECCION_DOCUMENTOS).get();
     const documentos = documentosSnap.docs.map((d) => d.data());
 
+    // Bloque A·A4 (D2): proyección mínima del radicado de origen, si el
+    // expediente nació por handoff (`radicadoId` poblado). Solo id + fecha
+    // del vínculo — no se trae el radicado completo (N+1 evitado a
+    // propósito: la UI que necesite más detalle del radicado lo pide por
+    // su propia ruta).
+    let radicadoVinculado: { id: string; fecha: string } | null = null;
+    const radicadoId = (expediente as { radicadoId?: string | null }).radicadoId;
+    if (radicadoId) {
+      const radicadoSnap = await db.doc(`ventanilla_radicados/${radicadoId}`).get();
+      const vinculo = radicadoSnap.exists
+        ? (radicadoSnap.data() as { vinculoExpediente?: { fecha: string } | null })?.vinculoExpediente
+        : null;
+      if (vinculo) {
+        radicadoVinculado = { id: radicadoId, fecha: vinculo.fecha };
+      }
+    }
+
     return NextResponse.json({
       ok: true,
       expediente,
       actuaciones,
       documentos,
+      radicadoVinculado,
       // Placeholder: única Definición sembrada hoy (Bloque A·A2). Cuando
       // exista resolución real por `expediente.tramiteId` (persistencia de
       // Fase 1), este campo se resuelve dinámicamente en vez de fijo.
