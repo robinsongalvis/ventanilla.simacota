@@ -218,6 +218,42 @@ service cloud.firestore {
       allow read, write: if false;
     }
 
+    // ── Motor de expedientes — persistencia (D3 ADR-0026; DF-1..DF-9 ADR-0029)
+    // ESQUEMA (decisión firestore-datos, 2026-08-08):
+    //  · expedientes/{expedienteId}: id SINTÉTICO (DF-9) — el número de
+    //    expediente NUNCA es el doc id; viaja como atributo
+    //    `numeroExpediente {numero, serieId, año, colision?}` emitido en
+    //    transacción por lib/server/emitir-numero-expediente.ts. El doc
+    //    raíz es el contrato `Expediente` (lib/motor-expedientes/tipos.ts,
+    //    congelado por ADR-0029) MÁS: `estadoJuridico`
+    //    (EstadoJuridicoLicencia, DF-5) y `esPrueba?: boolean` — marca de
+    //    DEMO: un expediente de demo JAMÁS consume la serie legal y su
+    //    `numeroExpediente.numero` lleva prefijo 'DEMO-', nunca el formato
+    //    legal puro {dane}-{curaduria}-{AA}-{CCCC} (DF-1).
+    //  · Subcolección actuaciones/{actuacionId}: trazabilidad APPEND-ONLY
+    //    (D8) = contrato `Actuacion` + `tenantId` DENORMALIZADO — cierra,
+    //    para esta subcolección, la deuda #6 de ADR-0026 §A2: habilita
+    //    collectionGroup y futuras reglas de lectura por tenant sin get()
+    //    del documento padre.
+    // ACCESO (D3): escritura EXCLUSIVAMENTE server-side — Admin SDK, que
+    // bypasea estas reglas — así que create/update/delete quedan en false
+    // y cierran por diseño las clases CR-1/CR-2/R8. La lectura TAMBIÉN
+    // queda en false: bandeja y detalle se sirven por route handlers
+    // server-side que filtran por tenant (mismo patrón server-only de
+    // unicidad_expedientes). Si una fase futura habilita lectura cliente,
+    // exigirá resource.data.tenantId == userTenant() y query con filtro
+    // explícito (ver ADVERTENCIA sobre 'list' más abajo).
+    match /expedientes/{expedienteId} {
+      allow read, write: if false;
+
+      // Append-only real: ni siquiera el create es de cliente (D8 — actor
+      // capturado en servidor; el cliente nunca escribe trazabilidad del
+      // expediente, a diferencia de ventanilla_radicados/trazabilidad).
+      match /actuaciones/{actuacionId} {
+        allow read, write: if false;
+      }
+    }
+
     // ── Auditoría administrativa — append-only, solo lectura Admin ────────
     match /admin_auditoria/{eventoId} {
       allow read: if isAdmin();
