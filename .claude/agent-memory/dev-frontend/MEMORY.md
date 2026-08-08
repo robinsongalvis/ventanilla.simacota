@@ -2,3 +2,4 @@
 
 - [Ola 2 — ventana del stream (2A)](project_ola2_ventana_stream_2a.md) — ADR-0010/R11: `useVentanillaRadicados` acotado a 180 días + limit(500); cambio de semántica en useAnalytics 'TODO'
 - [Límites de rol](feedback_limites_de_rol.md) — declinar tareas de otro rol (normativa/seguridad/backend) reenviadas por el coordinador a mitad de tarea; reportar, no ejecutar
+- [Bloque A3 — checklist + documentos](project_bloque_a3_checklist_documentos.md) — POST .../documentos y PATCH .../contexto tienen contrato REAL distinto al briefing; verificar código, no el encargo, antes de construir sobre esos endpoints

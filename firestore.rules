@@ -235,6 +235,19 @@ service cloud.firestore {
     //    para esta subcolección, la deuda #6 de ADR-0026 §A2: habilita
     //    collectionGroup y futuras reglas de lectura por tenant sin get()
     //    del documento padre.
+    //  · Subcolección documentos/{documentoId} (D7, Bloque A·A1): documento
+    //    LÓGICO — nombre, requisitoId?, tenantId DENORMALIZADO (misma deuda
+    //    #6), espejo `versionVigente` + `totalVersiones` para que el
+    //    checklist resuelva con UNA query sin tocar versiones. Contrato:
+    //    lib/server/expedientes-documentos-tipos.ts (invariantes INV-1..5).
+    //  · Sub-subcolección versiones/{vNNNN} (D7): versión INMUTABLE
+    //    append-only — cada subida es tx.create() de un doc NUEVO (id
+    //    determinista v0001, v0002… = candado anti-duplicado concurrente)
+    //    + tx.update del espejo del lógico en la MISMA transacción; una
+    //    versión JAMÁS se edita ni se borra (anti-pérdida). hashSha256
+    //    calculado SERVER-side; binario en Storage bajo
+    //    expedientes/{expedienteId}/{documentoId}/{vNNNN}/{archivo}
+    //    (ver storage.rules).
     // ACCESO (D3): escritura EXCLUSIVAMENTE server-side — Admin SDK, que
     // bypasea estas reglas — así que create/update/delete quedan en false
     // y cierran por diseño las clases CR-1/CR-2/R8. La lectura TAMBIÉN
@@ -251,6 +264,20 @@ service cloud.firestore {
       // expediente, a diferencia de ventanilla_radicados/trazabilidad).
       match /actuaciones/{actuacionId} {
         allow read, write: if false;
+      }
+
+      // D7 — documentos del expediente: mismo régimen server-only. Si una
+      // fase futura habilita lectura cliente, exigirá
+      // resource.data.tenantId == userTenant() (ya denormalizado aquí,
+      // sin get() del padre) + query con filtro explícito por tenant.
+      match /documentos/{documentoId} {
+        allow read, write: if false;
+
+        // Versiones INMUTABLES (D7): ninguna vía cliente, y el servidor
+        // solo hace tx.create de docs nuevos — nunca update/delete.
+        match /versiones/{versionId} {
+          allow read, write: if false;
+        }
       }
     }
 
