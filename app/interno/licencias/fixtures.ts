@@ -21,8 +21,8 @@ import {
 } from '@/lib/motor-expedientes/termino';
 import { formatearNumeroExpediente, type CodigosExpediente } from '@/lib/motor-expedientes/numero-expediente';
 import { atLocalNoon, diasRestantesHabiles } from '@/lib/tiempos-radicado';
-import { formatFechaColombia } from '@/lib/fecha-colombia';
 import type { Actuacion } from '@/lib/motor-expedientes/tipos';
+import { construirTimelineDesdeActuaciones } from './presentacion-actuaciones';
 import type { DetalleLicencia, EstadoLicenciaUI, EventoTimelineItem, FilaLicencia } from './tipos';
 
 /* ──────────────────────────────────────────────
@@ -443,39 +443,14 @@ export function kpisBandeja(filas: FilaLicencia[]): KpisBandeja {
    Detalle de expediente (Pantalla 02)
 ────────────────────────────────────────────── */
 
-const TITULO_ACTUACION: Record<string, string> = {
-  'radicacion-debida-forma': 'Radicación en debida forma',
-  'acta-observaciones': 'Acta de observaciones',
-  'respuesta-subsanacion': 'Respuesta de subsanación',
-  'modificacion-solicitud': 'Modificación de la solicitud',
-};
-
-const TIPO_TIMELINE: Record<string, EventoTimelineItem['tipo']> = {
-  'radicacion-debida-forma': 'RADICACION',
-  'acta-observaciones': 'ACTA',
-  'respuesta-subsanacion': 'SUBSANACION',
-  'modificacion-solicitud': 'SUBSANACION',
-};
-
+/**
+ * Delegado a `presentacion-actuaciones.ts` (bloque "Integración UI y
+ * demo") — la MISMA función construye el timeline aquí (fixtures, preview
+ * de componentes) y en la Pantalla 02 real, para no mantener dos mapas de
+ * etiquetas de actuación divergentes.
+ */
 function construirTimeline(fx: FixtureExpediente, vigente: Date | null): EventoTimelineItem[] {
-  const items: EventoTimelineItem[] = fx.actuaciones
-    .slice()
-    .sort((a, b) => new Date(a.fecha).getTime() - new Date(b.fecha).getTime())
-    .map((a) => ({
-      tipo: TIPO_TIMELINE[a.tipo] ?? 'SUBSANACION',
-      titulo: TITULO_ACTUACION[a.tipo] ?? a.tipo,
-      meta: a.detalle ? `${formatFechaColombia(a.fecha)} · ${a.detalle}` : formatFechaColombia(a.fecha),
-    }));
-
-  if (fx.origen === 'REAL' && vigente) {
-    items.push({
-      tipo: 'VENCIMIENTO_CALCULADO',
-      titulo: `Vencimiento calculado: ${formatFechaColombia(vigente)}`,
-      meta: 'Proyección, nunca almacenado — se recalcula en cada consulta a partir de los hechos anteriores.',
-    });
-  }
-
-  return items;
+  return construirTimelineDesdeActuaciones(fx.actuaciones, fx.origen, vigente);
 }
 
 export function detalleLicencia(id: string): DetalleLicencia | null {
@@ -493,7 +468,7 @@ export function detalleLicencia(id: string): DetalleLicencia | null {
     };
   }
 
-  const { eventos, vigente, ambiguo } = proyectarVencimiento(fx.actuaciones);
+  const { eventos, vigente } = proyectarVencimiento(fx.actuaciones);
   const radicacion = fx.actuaciones.find((a) => a.tipo === 'radicacion-debida-forma');
 
   return {
@@ -513,7 +488,11 @@ export function detalleLicencia(id: string): DetalleLicencia | null {
   };
 }
 
-export { proyectarVencimiento };
+// `PLAZO_DIAS` se reexporta para que la Pantalla 02 real
+// (`[expedienteId]/DetalleLicenciaClient.tsx`) reutilice `proyectarVencimiento`
+// con el MISMO plazo (45 días hábiles, Decreto 1077) sin declarar la cifra
+// una segunda vez.
+export { proyectarVencimiento, PLAZO_DIAS };
 export const totalesUniverso = {
   /** Universo completo del sistema (no solo la muestra renderizada en esta bandeja) — cifra declarada por Planeación, ver pie de la Pantalla 01. */
   activosReal: 21,

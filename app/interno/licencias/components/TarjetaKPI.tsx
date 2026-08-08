@@ -1,16 +1,21 @@
 import type { ReactNode } from 'react';
 
-export type TonoTarjetaKPI = 'critico' | 'normal' | 'exito';
+export type TonoTarjetaKPI = 'critico' | 'normal' | 'exito' | 'advertencia';
 
 /**
  * Tarjeta KPI de la Bandeja de Licencias (spec C.2): superficie, radio 12,
  * sombra suave, overline + cifra Bold 40 + detalle 12.
  *
- * `tono='critico'` marca el KPI de Vencidas: borde 2px rojo y cifra roja —
- * llama la atención sin necesitar que la funcionaria lea el overline
- * primero. `tono='exito'` (En término) solo tiñe el overline de verde
- * institucional; la cifra se mantiene en el tono neutro de texto primario
- * para no competir visualmente con el crítico.
+ * `tono='critico'` marca un KPI verificadamente urgente (p. ej. Vencidas
+ * en el semáforo por fecha): borde 2px rojo y cifra roja — llama la
+ * atención sin necesitar que la funcionaria lea el overline primero.
+ * `tono='exito'` (p. ej. En término/Resueltos) tiñe solo el overline de
+ * verde institucional. `tono='advertencia'` (bloque "Integración UI y
+ * demo", ámbar = advertencia del sistema de diseño) es el mismo peso
+ * visual que `exito` — solo tiñe el overline, sin borde — para un KPI que
+ * pide atención (p. ej. "Con acta de observaciones") SIN afirmar una
+ * urgencia que el sistema no puede verificar (no hay fecha de vencimiento
+ * detrás): `critico` queda reservado para cuando sí existe ese dato.
  */
 export function TarjetaKPI({
   overline,
@@ -25,6 +30,7 @@ export function TarjetaKPI({
 }) {
   const critico = tono === 'critico';
   const exito = tono === 'exito';
+  const advertencia = tono === 'advertencia';
 
   return (
     <div
@@ -37,7 +43,7 @@ export function TarjetaKPI({
     >
       <p
         className="text-[10.5px] font-bold uppercase tracking-widest"
-        style={{ color: exito ? '#14532D' : 'var(--text-secondary)' }}
+        style={{ color: exito ? '#14532D' : advertencia ? '#9A6206' : 'var(--text-secondary)' }}
       >
         {overline}
       </p>
