@@ -3,7 +3,6 @@
 export const dynamic = 'force-dynamic';
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import Link from 'next/link';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { collection, getDocs, limit, orderBy, query } from 'firebase/firestore';
 import { signInWithEmailAndPassword }     from 'firebase/auth';
@@ -61,6 +60,7 @@ import { VistaAnalytics }                  from '@/app/interno/dashboard/compone
 import { VistaAlertas, contarAlertasActivas } from '@/app/interno/dashboard/components/analytics/VistaAlertas';
 import { VistaSupervisionIA }              from '@/app/interno/dashboard/components/analytics/VistaSupervisionIA';
 import { VistaAnticipacionOperativa }      from '@/app/interno/dashboard/components/analytics/VistaAnticipacionOperativa';
+import { VistaLicencias }                  from '@/app/interno/dashboard/components/licencias/VistaLicencias';
 import type {
   FiltroMIPG,
   VistaActual,
@@ -308,13 +308,14 @@ function puedeVerAnaliticaAvanzada(usuario: UsuarioAutenticado): boolean {
  * Licencias urbanísticas (Secretaría de Planeación) — micro-bloque "acceso
  * solo Planeación" (encargo del propietario, ago-2026). Mismos roles que
  * `GuardModuloPlaneacion` (`app/interno/licencias/components/
- * GuardModuloPlaneacion.tsx`), que es la autoridad real: este helper solo
- * decide si el LINK aparece en el Tablero, el guard decide si el módulo
- * se ve. No es una entrada de `VistaActual` (no cambia `vistaActual`, no
- * toca `lib/store/ventanillaStore.tsx`) — es un link de página completa a
- * `/interno/licencias`, mismo patrón declarado en el JSDoc de
- * `LicenciasSidebar` (integrar a `VistaActual` queda para cuando Licencias
- * tenga su propio flujo de datos real, Fase 3+).
+ * GuardModuloPlaneacion.tsx`), que sigue siendo la autoridad real para la
+ * ruta standalone `/interno/licencias` (deep-links, sigue viva). Bloque B
+ * ("la ventanita") integró Licencias como pestaña REAL de `VistaActual`
+ * (`'LICENCIAS'`, `lib/store/ventanillaStore.tsx`): este helper decide si
+ * la entrada de navegación aparece en el Tablero Y gatea el acceso a esa
+ * vista (`puedeAccederVista` de abajo), mismo patrón que ya usan
+ * Analítica/Alertas — la puerta que dejaba abierta el JSDoc anterior de
+ * `LicenciasSidebar` ya está cruzada.
  */
 function puedeVerLicencias(usuario: UsuarioAutenticado): boolean {
   return usuario.rol === 'ADMIN'
@@ -330,6 +331,7 @@ function puedeAccederVista(usuario: UsuarioAutenticado, vista: VistaActual): boo
   if (vista === 'SUPERVISION_IA' || vista === 'ANTICIPACION_OPERATIVA') {
     return usuario.rol === 'ADMIN' || usuario.rol === 'CONTROL_INTERNO';
   }
+  if (vista === 'LICENCIAS') return puedeVerLicencias(usuario);
   if (vista === 'ANALYTICS') return puedeVerAnaliticaAvanzada(usuario);
   // Sprint 3C — Reportes se abre también a RECEPCIONISTA: ella responde
   // "¿qué llegó este mes?" con los mismos datos que ya ve en el Tablero.
@@ -635,6 +637,24 @@ function SidebarNav({
     });
   }
 
+  // Licencias urbanísticas — Bloque B ("la ventanita"): pestaña REAL del
+  // panel interno (ya no un link de página completa a `/interno/licencias`,
+  // ver JSDoc de `puedeVerLicencias`). Mismo patrón de push condicional que
+  // Anticipación Operativa / Supervisión IA arriba — no vive en `NAV_ITEMS`
+  // porque su visibilidad no es un simple filtro por `puedeAccederVista`
+  // sobre la lista fija, sino un helper de dominio propio (Planeación).
+  if (puedeVerLicencias(usuario)) {
+    items.push({
+      vista: 'LICENCIAS' as const,
+      label: 'Licencias',
+      icono: (
+        <svg className="w-[18px] h-[18px]" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.8}>
+          <path strokeLinecap="round" strokeLinejoin="round" d="M3.75 21h16.5M4.5 3h15M5.25 3v18m13.5-18v18M9 6.75h1.5m-1.5 3h1.5m-1.5 3h1.5m3-6H15m-1.5 3H15m-1.5 3H15M9 21v-3.375c0-.621.504-1.125 1.125-1.125h3.75c.621 0 1.125.504 1.125 1.125V21" />
+        </svg>
+      ),
+    });
+  }
+
   return (
     <aside className={`h-full flex flex-col shrink-0 w-[250px] overflow-hidden ${className}`}
            style={{ background: '#14532D' }}>
@@ -756,38 +776,22 @@ function SidebarNav({
                   {miCarga.activos > 99 ? '99+' : miCarga.activos}
                 </span>
               )}
+              {/* Licencias urbanísticas — Bloque B: badge "Planeación" que
+                  antes vivía en el link de página completa (mismo texto,
+                  ahora dentro del ítem de navegación normal). Contraste
+                  distinto activo/inactivo: sobre dorado (#D4A017) el texto
+                  claro perdía legibilidad. */}
+              {vista === 'LICENCIAS' && (
+                <span
+                  className="text-[9px] font-bold uppercase tracking-wide shrink-0"
+                  style={{ color: activo ? 'rgba(20,83,45,0.65)' : 'rgba(255,255,255,0.40)' }}
+                >
+                  Planeación
+                </span>
+              )}
             </button>
           );
         })}
-
-        {/* Licencias urbanísticas — módulo aparte (Fase 1, fixtures/Firestore
-            propio), NO es una `VistaActual`: es un link de página completa a
-            `/interno/licencias`, no un cambio de estado dentro de este SPA.
-            Integrar a `VistaActual` queda declarado como deuda en el JSDoc
-            de `LicenciasSidebar` — fuera de alcance de este micro-bloque
-            (no se toca `lib/store`). Visible solo para quien el guard del
-            propio módulo (`GuardModuloPlaneacion`) también deja pasar. */}
-        {puedeVerLicencias(usuario) && (
-          <div className="mt-1 pt-1" style={{ borderTop: '1px solid rgba(255,255,255,0.10)' }}>
-            <Link
-              href="/interno/licencias"
-              className="micro-sidebar-item w-full flex items-center gap-2.5 px-3 py-2.5 rounded-xl text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset"
-              style={{ color: 'rgba(255,255,255,0.75)' }}
-              onMouseEnter={(e) => { (e.currentTarget as HTMLElement).style.background = 'rgba(255,255,255,0.10)'; (e.currentTarget as HTMLElement).style.color = '#ffffff'; }}
-              onMouseLeave={(e) => { (e.currentTarget as HTMLElement).style.background = 'transparent'; (e.currentTarget as HTMLElement).style.color = 'rgba(255,255,255,0.75)'; }}
-            >
-              <span style={{ color: 'rgba(255,255,255,0.55)' }}>
-                <svg className="w-[18px] h-[18px]" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.8}>
-                  <path strokeLinecap="round" strokeLinejoin="round" d="M3.75 21h16.5M4.5 3h15M5.25 3v18m13.5-18v18M9 6.75h1.5m-1.5 3h1.5m-1.5 3h1.5m3-6H15m-1.5 3H15m-1.5 3H15M9 21v-3.375c0-.621.504-1.125 1.125-1.125h3.75c.621 0 1.125.504 1.125 1.125V21" />
-                </svg>
-              </span>
-              <span className="text-xs font-medium flex-1">Licencias</span>
-              <span className="text-[9px] font-bold uppercase tracking-wide shrink-0" style={{ color: 'rgba(255,255,255,0.40)' }}>
-                Planeación
-              </span>
-            </Link>
-          </div>
-        )}
       </nav>
 
       {/* Resumen del Día */}
@@ -850,7 +854,9 @@ function MobileTopBar({
       ? 'Supervisión IA'
       : vistaActual === 'ANTICIPACION_OPERATIVA'
         ? 'Anticipación'
-        : 'Panel interno');
+        : vistaActual === 'LICENCIAS'
+          ? 'Licencias'
+          : 'Panel interno');
   const rolCompacto: Record<string, string> = {
     ADMIN: 'Admin',
     RECEPCIONISTA: 'Recepción',
@@ -4887,6 +4893,14 @@ function DashboardInterior({ usuario, cerrarSesion }: { usuario: UsuarioAutentic
           <div className="flex-1 overflow-y-auto p-4 md:p-6 bg-[#0E0E10]/40">
             <VistaAnticipacionOperativa radicados={todosLosRadicados} />
           </div>
+        ) : vistaActual === 'LICENCIAS' ? (
+          /* Bloque B ("la ventanita") — Licencias como pestaña REAL del
+             panel interno, ya no página aparte. Módulo de pantalla
+             completa: gestiona su propia navegación interna (bandeja/libro
+             consecutivo/detalle) con estado local, no con `VistaActual`. */
+          <div className="flex-1 overflow-y-auto" style={{ background: 'var(--bg-base)' }}>
+            <VistaLicencias />
+          </div>
         ) : vistaActual === 'CONTROL_INTERNO' ? (
           <div className="flex-1 overflow-y-auto p-4 sm:p-6 space-y-6" style={{ background: '#F8FAF7' }}>
             <CentroControlInterno />
@@ -5080,7 +5094,7 @@ function DashboardInterior({ usuario, cerrarSesion }: { usuario: UsuarioAutentic
        && vistaActual !== 'ANALYTICS' && vistaActual !== 'ALERTAS'
        && vistaActual !== 'SUPERVISION_IA' && vistaActual !== 'ANTICIPACION_OPERATIVA'
        && vistaActual !== 'APROBACIONES'
-       && vistaActual !== 'CONTROL_INTERNO' && (
+       && vistaActual !== 'CONTROL_INTERNO' && vistaActual !== 'LICENCIAS' && (
         <div
           className={`fixed inset-y-0 right-0 z-40 max-w-full transition-transform duration-300 ease-in-out md:relative md:z-auto md:shrink-0 md:overflow-hidden md:transition-all ${
             panelDerechoAbierto

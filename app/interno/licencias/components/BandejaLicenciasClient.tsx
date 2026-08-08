@@ -50,7 +50,53 @@ function esReconstruido(exp: ExpedienteLicenciaDoc): boolean {
   return exp.origen === 'RECONSTRUIDO';
 }
 
-export function BandejaLicenciasClient() {
+export interface BandejaLicenciasClientProps {
+  /**
+   * Bloque B ("la ventanita") — cuando la Bandeja se monta EMBEBIDA dentro
+   * de `VistaLicencias` (`app/interno/dashboard/components/licencias/
+   * VistaLicencias.tsx`, `VistaActual === 'LICENCIAS'`), abrir un
+   * expediente es un cambio de estado local del panel, no una navegación
+   * de ruta. Si se recibe, las filas/enlaces a un expediente llaman esto
+   * EN VEZ de `<Link href="/interno/licencias/{id}">`. Sin esta prop
+   * (ruta standalone `/interno/licencias`, deep-links) el comportamiento
+   * es exactamente el de antes: `<Link>`.
+   */
+  onAbrirExpediente?: (expedienteId: string) => void;
+}
+
+/**
+ * Enlace a un expediente que se comporta como `<Link>` (ruta standalone) o
+ * como botón de estado local (`onAbrirExpediente`, Bloque B) según lo que
+ * reciba el padre — ver `BandejaLicenciasClientProps.onAbrirExpediente`.
+ * Único punto que decide esa rama: evita duplicar el `if` en cada una de
+ * las dos filas de esta pantalla que enlazan a un expediente.
+ */
+function EnlaceExpediente({
+  id,
+  onAbrirExpediente,
+  className,
+  children,
+}: {
+  id: string;
+  onAbrirExpediente?: (expedienteId: string) => void;
+  className: string;
+  children: React.ReactNode;
+}) {
+  if (onAbrirExpediente) {
+    return (
+      <button type="button" onClick={() => onAbrirExpediente(id)} className={className}>
+        {children}
+      </button>
+    );
+  }
+  return (
+    <Link href={`/interno/licencias/${id}`} className={className}>
+      {children}
+    </Link>
+  );
+}
+
+export function BandejaLicenciasClient({ onAbrirExpediente }: BandejaLicenciasClientProps = {}) {
   const { usuario, cargando: cargandoAuth } = useAuth();
   const [expedientes, setExpedientes] = useState<ExpedienteLicenciaDoc[]>([]);
   const [cargando, setCargando] = useState(true);
@@ -151,9 +197,13 @@ export function BandejaLicenciasClient() {
           detalle={
             kpis.esperandoHaceMas ? (
               <div className="flex flex-col gap-0.5">
-                <Link href={`/interno/licencias/${kpis.esperandoHaceMas.id}`} className="focus-visible:outline-none focus-visible:ring-2 rounded w-fit">
+                <EnlaceExpediente
+                  id={kpis.esperandoHaceMas.id}
+                  onAbrirExpediente={onAbrirExpediente}
+                  className="focus-visible:outline-none focus-visible:ring-2 rounded w-fit"
+                >
                   <NumeroLegal value={kpis.esperandoHaceMas.numeroExpediente?.numero ?? kpis.esperandoHaceMas.id} variant="expediente" size="sm" />
-                </Link>
+                </EnlaceExpediente>
                 <span>esperando respuesta hace más tiempo</span>
               </div>
             ) : (
@@ -221,10 +271,14 @@ export function BandejaLicenciasClient() {
                 return (
                   <tr key={exp.id} className="micro-row" style={{ borderBottom: '1px solid var(--color-border)' }}>
                     <td className="px-3 py-2.5 align-top">
-                      <Link href={`/interno/licencias/${exp.id}`} className="focus-visible:outline-none focus-visible:ring-2 rounded inline-flex items-center gap-1.5 flex-wrap">
+                      <EnlaceExpediente
+                        id={exp.id}
+                        onAbrirExpediente={onAbrirExpediente}
+                        className="focus-visible:outline-none focus-visible:ring-2 rounded inline-flex items-center gap-1.5 flex-wrap"
+                      >
                         <NumeroLegal value={numero} variant="expediente" size="sm" />
                         {exp.esPrueba && <ChipPrueba />}
-                      </Link>
+                      </EnlaceExpediente>
                       <p className="text-[11px] mt-1" style={{ color: 'var(--text-secondary)' }}>
                         {exp.radicadoId ? <NumeroLegal value={exp.radicadoId} variant="radicado" size="sm" /> : 'Sin radicado Ventanilla vinculado'}
                       </p>
