@@ -70,6 +70,21 @@ service firebase.storage {
       allow read, write: if false;
     }
 
+    // Motor de expedientes — D7 ADR-0026 (Bloque A·A1): binarios de
+    // versiones INMUTABLES de documentos. Dos formas de ruta, ambas SOLO
+    // Admin SDK (patrón H3 de /api/radicacion: staging → transacción
+    // Firestore → move a ruta final), por eso el glob {resto=**}:
+    //   · staging: expedientes/_pendientes/{requestId}/{archivo}
+    //   · final:   expedientes/{expedienteId}/{documentoId}/{vNNNN}/{archivo}
+    // Una versión JAMÁS se sobrescribe ni se borra (append-only); corregir
+    // = subir vNNNN+1. Lectura NUNCA directa ni pública: descarga
+    // autorizada server-side por tenant (anti-IDOR), mismo patrón de
+    // /api/interno/archivo + lib/seguridad/autorizar-descarga-archivo.ts.
+    // Contrato de rutas: lib/server/expedientes-documentos-tipos.ts.
+    match /expedientes/{resto=**} {
+      allow read, write: if false;
+    }
+
     match /{path=**} {
       allow read, write: if false;
     }
