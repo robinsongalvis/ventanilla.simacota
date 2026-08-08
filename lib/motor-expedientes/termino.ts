@@ -25,11 +25,29 @@ import type { Actuacion } from './tipos';
    Tipos
 ────────────────────────────────────────────── */
 
+/**
+ * DF-7 (ADR-0029) amplió el vocabulario con 5 tipos nuevos —
+ * `COMUNICACION_ACTA`, `RENUNCIA_PLAZO_RESTANTE`, `ACTO_VIABILIDAD`,
+ * `ENTREGA_DOCUMENTOS_PAGO`, `PRORROGA_TERMINO_ADMINISTRACION` — que el
+ * anexo normativo confirma como hitos reales del ciclo (comunicación del
+ * acta ≠ su expedición; renuncia expresa al plazo restante; suspensión por
+ * pagos en el acto de viabilidad; prórroga administrativa del término),
+ * pero cuyo EFECTO sobre el cómputo del vencimiento queda ⚖️ BLOQUEADO
+ * (hueco 1, ADR-0029) hasta el concepto escrito de Jurídica —
+ * `calcularVencimiento` los trata como INERTES (ver su JSDoc y el switch
+ * exhaustivo `esEventoQueReinicia`): se reconocen sin alterar el resultado
+ * de ninguna de las dos políticas.
+ */
 export type TipoEventoTermino =
   | 'RADICACION_DEBIDA_FORMA'
   | 'ACTA_OBSERVACIONES'
   | 'RESPUESTA_SUBSANACION'
-  | 'MODIFICACION_SOLICITUD';
+  | 'MODIFICACION_SOLICITUD'
+  | 'COMUNICACION_ACTA'
+  | 'RENUNCIA_PLAZO_RESTANTE'
+  | 'ACTO_VIABILIDAD'
+  | 'ENTREGA_DOCUMENTOS_PAGO'
+  | 'PRORROGA_TERMINO_ADMINISTRACION';
 
 export interface EventoTermino {
   tipo: TipoEventoTermino;
@@ -64,11 +82,34 @@ export interface PoliticaTermino {
   anclaje: 'RADICACION_EN_DEBIDA_FORMA';
 }
 
-const EVENTOS_QUE_REINICIAN: readonly TipoEventoTermino[] = [
-  'ACTA_OBSERVACIONES',
-  'RESPUESTA_SUBSANACION',
-  'MODIFICACION_SOLICITUD',
-];
+/**
+ * ¿Este tipo de evento reinicia el plazo bajo `REINICIO_A_CERO`? Switch
+ * EXHAUSTIVO (no un `Array.includes`) a propósito: el caso `default` con
+ * asignación a `never` fuerza al COMPILADOR a rechazar el build si algún
+ * día se añade un `TipoEventoTermino` nuevo sin decidir aquí si reinicia o
+ * no — nunca queda un tipo "sin decidir" en silencio. Los 5 tipos nuevos de
+ * DF-7 (ADR-0029) son INERTES también bajo esta política — su semántica
+ * real (⚖️ hueco 1) no está definida, así que NO reinician nada.
+ */
+function esEventoQueReinicia(tipo: TipoEventoTermino): boolean {
+  switch (tipo) {
+    case 'ACTA_OBSERVACIONES':
+    case 'RESPUESTA_SUBSANACION':
+    case 'MODIFICACION_SOLICITUD':
+      return true;
+    case 'RADICACION_DEBIDA_FORMA':
+    case 'COMUNICACION_ACTA':
+    case 'RENUNCIA_PLAZO_RESTANTE':
+    case 'ACTO_VIABILIDAD':
+    case 'ENTREGA_DOCUMENTOS_PAGO':
+    case 'PRORROGA_TERMINO_ADMINISTRACION':
+      return false;
+    default: {
+      const _exhaustivo: never = tipo;
+      throw new Error(`Tipo de evento de término no contemplado en esEventoQueReinicia: ${String(_exhaustivo)}`);
+    }
+  }
+}
 
 /**
  * Calcula el vencimiento vigente a partir de la serie de eventos y la
@@ -87,7 +128,7 @@ export function calcularVencimiento(eventos: EventoTermino[], politica: Politica
   if (!radicacion) return null;
 
   if (politica.efectoSubsanacion === 'REINICIO_A_CERO') {
-    const reinicios = ordenados.filter((e) => EVENTOS_QUE_REINICIAN.includes(e.tipo));
+    const reinicios = ordenados.filter((e) => esEventoQueReinicia(e.tipo));
     const ancla = reinicios.length > 0 ? reinicios[reinicios.length - 1]! : radicacion;
     return sumarDiasHabiles(ancla.fecha, politica.plazoDias);
   }
@@ -97,17 +138,44 @@ export function calcularVencimiento(eventos: EventoTermino[], politica: Politica
   let diasRestantesGuardados: number | null = null;
 
   for (const evento of ordenados) {
-    if (evento.tipo === 'RADICACION_DEBIDA_FORMA') continue;
-    if (evento.tipo === 'ACTA_OBSERVACIONES' && diasRestantesGuardados === null) {
-      // Congela los días hábiles que quedaban ENTRE el acta y el vencimiento vigente.
-      diasRestantesGuardados = diasRestantesHabiles(vencimiento, evento.fecha);
-    } else if (evento.tipo === 'RESPUESTA_SUBSANACION' && diasRestantesGuardados !== null) {
-      vencimiento = sumarDiasHabiles(evento.fecha, diasRestantesGuardados);
-      diasRestantesGuardados = null;
+    // Switch EXHAUSTIVO (ver `esEventoQueReinicia` arriba para el mismo
+    // patrón bajo REINICIO_A_CERO): el `default` con `never` obliga al
+    // compilador a rechazar el build si se añade un tipo sin decidir su
+    // efecto aquí.
+    switch (evento.tipo) {
+      case 'RADICACION_DEBIDA_FORMA':
+        break; // ya se usó como ancla arriba
+      case 'ACTA_OBSERVACIONES':
+        if (diasRestantesGuardados === null) {
+          // Congela los días hábiles que quedaban ENTRE el acta y el vencimiento vigente.
+          diasRestantesGuardados = diasRestantesHabiles(vencimiento, evento.fecha);
+        }
+        break;
+      case 'RESPUESTA_SUBSANACION':
+        if (diasRestantesGuardados !== null) {
+          vencimiento = sumarDiasHabiles(evento.fecha, diasRestantesGuardados);
+          diasRestantesGuardados = null;
+        }
+        break;
+      case 'MODIFICACION_SOLICITUD':
+      case 'COMUNICACION_ACTA':
+      case 'RENUNCIA_PLAZO_RESTANTE':
+      case 'ACTO_VIABILIDAD':
+      case 'ENTREGA_DOCUMENTOS_PAGO':
+      case 'PRORROGA_TERMINO_ADMINISTRACION':
+        // INERTES (⚖️ hueco 1, DF-7 ADR-0029): su semántica real —
+        // reanudación al plazo MÁXIMO salvo renuncia expresa, descuento
+        // expedición→comunicación del acta, suspensión por el acto de
+        // viabilidad mientras se aportan documentos de pago, prórroga
+        // administrativa ≤ mitad del término — queda BLOQUEADA hasta el
+        // concepto escrito de Jurídica (P7 del anexo normativo). Se
+        // reconocen (no lanzan) pero NO alteran el cómputo.
+        break;
+      default: {
+        const _exhaustivo: never = evento.tipo;
+        throw new Error(`Tipo de evento de término no contemplado en calcularVencimiento: ${String(_exhaustivo)}`);
+      }
     }
-    // MODIFICACION_SOLICITUD y ACTA/RESPUESTA fuera de secuencia (p. ej. una
-    // segunda acta mientras ya está suspendido): sin efecto adicional —
-    // supuesto declarado arriba.
   }
 
   return vencimiento;
