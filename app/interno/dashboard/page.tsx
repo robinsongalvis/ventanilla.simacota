@@ -3,6 +3,7 @@
 export const dynamic = 'force-dynamic';
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import Link from 'next/link';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { collection, getDocs, limit, orderBy, query } from 'firebase/firestore';
 import { signInWithEmailAndPassword }     from 'firebase/auth';
@@ -301,6 +302,23 @@ function puedeVerAnaliticaAvanzada(usuario: UsuarioAutenticado): boolean {
   return usuario.rol === 'ADMIN'
     || usuario.rol === 'CONTROL_INTERNO'
     || usuario.rol === 'JEFE_DEPENDENCIA';
+}
+
+/**
+ * Licencias urbanísticas (Secretaría de Planeación) — micro-bloque "acceso
+ * solo Planeación" (encargo del propietario, ago-2026). Mismos roles que
+ * `GuardModuloPlaneacion` (`app/interno/licencias/components/
+ * GuardModuloPlaneacion.tsx`), que es la autoridad real: este helper solo
+ * decide si el LINK aparece en el Tablero, el guard decide si el módulo
+ * se ve. No es una entrada de `VistaActual` (no cambia `vistaActual`, no
+ * toca `lib/store/ventanillaStore.tsx`) — es un link de página completa a
+ * `/interno/licencias`, mismo patrón declarado en el JSDoc de
+ * `LicenciasSidebar` (integrar a `VistaActual` queda para cuando Licencias
+ * tenga su propio flujo de datos real, Fase 3+).
+ */
+function puedeVerLicencias(usuario: UsuarioAutenticado): boolean {
+  return usuario.rol === 'ADMIN'
+    || (usuario.rol === 'FUNCIONARIO' && usuario.tenantId === 'SEC_PLANEACION');
 }
 
 function puedeAccederVista(usuario: UsuarioAutenticado, vista: VistaActual): boolean {
@@ -741,6 +759,35 @@ function SidebarNav({
             </button>
           );
         })}
+
+        {/* Licencias urbanísticas — módulo aparte (Fase 1, fixtures/Firestore
+            propio), NO es una `VistaActual`: es un link de página completa a
+            `/interno/licencias`, no un cambio de estado dentro de este SPA.
+            Integrar a `VistaActual` queda declarado como deuda en el JSDoc
+            de `LicenciasSidebar` — fuera de alcance de este micro-bloque
+            (no se toca `lib/store`). Visible solo para quien el guard del
+            propio módulo (`GuardModuloPlaneacion`) también deja pasar. */}
+        {puedeVerLicencias(usuario) && (
+          <div className="mt-1 pt-1" style={{ borderTop: '1px solid rgba(255,255,255,0.10)' }}>
+            <Link
+              href="/interno/licencias"
+              className="micro-sidebar-item w-full flex items-center gap-2.5 px-3 py-2.5 rounded-xl text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset"
+              style={{ color: 'rgba(255,255,255,0.75)' }}
+              onMouseEnter={(e) => { (e.currentTarget as HTMLElement).style.background = 'rgba(255,255,255,0.10)'; (e.currentTarget as HTMLElement).style.color = '#ffffff'; }}
+              onMouseLeave={(e) => { (e.currentTarget as HTMLElement).style.background = 'transparent'; (e.currentTarget as HTMLElement).style.color = 'rgba(255,255,255,0.75)'; }}
+            >
+              <span style={{ color: 'rgba(255,255,255,0.55)' }}>
+                <svg className="w-[18px] h-[18px]" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.8}>
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M3.75 21h16.5M4.5 3h15M5.25 3v18m13.5-18v18M9 6.75h1.5m-1.5 3h1.5m-1.5 3h1.5m3-6H15m-1.5 3H15m-1.5 3H15M9 21v-3.375c0-.621.504-1.125 1.125-1.125h3.75c.621 0 1.125.504 1.125 1.125V21" />
+                </svg>
+              </span>
+              <span className="text-xs font-medium flex-1">Licencias</span>
+              <span className="text-[9px] font-bold uppercase tracking-wide shrink-0" style={{ color: 'rgba(255,255,255,0.40)' }}>
+                Planeación
+              </span>
+            </Link>
+          </div>
+        )}
       </nav>
 
       {/* Resumen del Día */}
