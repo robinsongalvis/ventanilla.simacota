@@ -6,3 +6,5 @@
 - [Bloque A4 — handoff radicado⇄expediente](project_bloque_a4_handoff_radicado_expediente.md) — contrato real de los 3 endpoints; `metadata.tipo` NO existe, comunicacion-enviada se distingue por prefijo de `detalle`
 - [Fecha input → ancla Bogotá](feedback_fecha_input_ancla_bogota.md) — `<input type="date">` que alimenta atLocalNoon/sumarDiasHabiles debe enviarse como `T12:00:00-05:00`, si no corre un día antes
 - [Bloque B — Licencias como VistaActual](project_bloque_b_licencias_vistaactual.md) — 'LICENCIAS' embebida vía VistaLicencias; props aditivas onAbrirExpediente/onVolver; ruta standalone/layout/guard viva a propósito
+- [Bloque C — Libro Consecutivo](project_bloque_c_libro_consecutivo.md) — reemplaza el Excel real de Planeación; lógica pura en presentacion-libro-consecutivo.ts; onIrALibroConsecutivo aditivo en Bandeja; print:hidden en chrome del módulo
+- [Testing sin fake timers](feedback_testing_libro_consecutivo_sin_fake_timers.md) — vi.useFakeTimers()+waitFor() se cuelgan; leer el valor real del control o seleccionar el año del fixture en vez de fijar el reloj
