@@ -1,4 +1,4 @@
-import { describe, expect, it, vi, beforeEach } from 'vitest';
+import { describe, expect, it, vi, beforeEach, afterEach } from 'vitest';
 import { readFileSync } from 'node:fs';
 import { GET as getResumenDiario } from '@/app/api/interno/resumen-diario/route';
 import { POST as vistoResumenDiario } from '@/app/api/interno/resumen-diario/visto/route';
@@ -91,9 +91,20 @@ function mockRadicado(overrides: Partial<VentanillaRadicado> = {}): VentanillaRa
 
 describe('Resumen Diario API & Lógica', () => {
   beforeEach(() => {
+    // Reloj CONGELADO en un miércoles hábil fijo (mediodía Bogotá): los
+    // fixtures construyen fechas RELATIVAS a "ahora" (new Date()/Date.now()),
+    // y con el reloj real la relación vencido/por-vencer dependía del día en
+    // que corriera la suite — el test 9 fallaba de forma determinista en fin
+    // de semana (verificado el sábado 8-ago-2026, en cualquier rama). Solo se
+    // simula Date (toFake) para no interferir con timers/promesas.
+    vi.useFakeTimers({ now: new Date(2026, 7, 5, 12, 0, 0, 0), toFake: ['Date'] });
     vi.clearAllMocks();
     mockWhere.mockReturnThis();
     mockLimit.mockReturnThis();
+  });
+
+  afterEach(() => {
+    vi.useRealTimers();
   });
 
   // 1. Usuario sin alertas no recibe modal
