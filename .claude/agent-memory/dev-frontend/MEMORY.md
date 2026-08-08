@@ -5,3 +5,4 @@
 - [Bloque A3 — checklist + documentos](project_bloque_a3_checklist_documentos.md) — POST .../documentos y PATCH .../contexto tienen contrato REAL distinto al briefing; verificar código, no el encargo, antes de construir sobre esos endpoints
 - [Bloque A4 — handoff radicado⇄expediente](project_bloque_a4_handoff_radicado_expediente.md) — contrato real de los 3 endpoints; `metadata.tipo` NO existe, comunicacion-enviada se distingue por prefijo de `detalle`
 - [Fecha input → ancla Bogotá](feedback_fecha_input_ancla_bogota.md) — `<input type="date">` que alimenta atLocalNoon/sumarDiasHabiles debe enviarse como `T12:00:00-05:00`, si no corre un día antes
+- [Bloque B — Licencias como VistaActual](project_bloque_b_licencias_vistaactual.md) — 'LICENCIAS' embebida vía VistaLicencias; props aditivas onAbrirExpediente/onVolver; ruta standalone/layout/guard viva a propósito
