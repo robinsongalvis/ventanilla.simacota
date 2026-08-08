@@ -2,6 +2,10 @@ import type { TenantId } from '@/src/types/radicado';
 import type { Expediente, Actuacion, ContextoEvaluacionRequisito, DefinicionTramite } from '@/lib/motor-expedientes/tipos';
 import { CATALOGO_FIGURAS_NORMATIVAS } from '@/lib/motor-expedientes/catalogo-subtipos-normativo';
 import { puedeTransicionar, type EstadoJuridicoLicencia } from '@/lib/motor-expedientes/estados-licencia';
+import { esEstadoCerrado } from '@/lib/radicado-estados';
+import { DEFINICION_LICENCIA_CONSTRUCCION_PARCIAL } from '@/lib/motor-expedientes/definiciones/licencia-construccion-parcial';
+import { sumarDiasHabiles } from '@/lib/tiempos-radicado';
+import { debeNotificarCiudadano, type CriterioNotificacion } from '@/lib/email/debe-notificar-ciudadano';
 
 /* ══════════════════════════════════════════════════════════════
    Lógica de DECISIÓN de expedientes de licencias — bloque "Integración UI
@@ -181,7 +185,7 @@ export function planCrearExpedienteDemo(
     // Placeholder documentado: no existe todavía una `DefinicionTramite`
     // publicada para licencias (eso es persistencia de Fase 1) — este
     // id es el que se espera que tenga cuando exista.
-    tramiteId: 'licencias-urbanisticas',
+    tramiteId: DEFINICION_LICENCIA_CONSTRUCCION_PARCIAL.id,
     estado: 'EN_REVISION',
     estadoJuridico: 'RADICADA_EN_DEBIDA_FORMA',
     solicitanteNombre: nombre,
@@ -395,4 +399,244 @@ export function planActualizarContexto(
   }
 
   return { contexto: { ...contextoActual, ...(input as ContextoEvaluacionRequisito) } };
+}
+
+/* ──────────────────────────────────────────────
+   Handoff radicado⇄expediente (Bloque A·A4, D2)
+────────────────────────────────────────────── */
+
+/** Subconjunto mínimo de `VentanillaRadicado` que necesita el handoff — evita acoplar este módulo al tipo completo de ventanilla. */
+export interface RadicadoParaHandoff {
+  radicadoId: string;
+  estadoActual: string;
+  clasificacion: { oficinaDestino: string };
+  solicitante: { nombreCompleto: string; numeroDocumento: string };
+  vinculoExpediente?: { expedienteId: string; numeroExpediente: string; fecha: string } | null;
+}
+
+export interface CrearExpedienteDesdeRadicadoInput {
+  subtipos: string[];
+  contexto?: ContextoEvaluacionRequisito;
+}
+
+export interface VinculoExpedienteRadicado {
+  expedienteId: string;
+  numeroExpediente: string;
+  fecha: string;
+}
+
+export interface PlanCrearExpedienteDesdeRadicado {
+  expediente: ExpedienteLicenciaDoc;
+  primeraActuacion: ActuacionLicenciaDoc;
+  /** Lo que se escribe en `VentanillaRadicado.vinculoExpediente` — MISMA transacción que crea el expediente. */
+  vinculoRadicado: VinculoExpedienteRadicado;
+}
+
+/**
+ * Plan del handoff radicado→expediente (D2, ADR-0026). Función PURA:
+ * recibe el radicado YA LEÍDO (el caller es responsable de que esa lectura
+ * ocurra DENTRO de la misma transacción en la que luego se escriben ambos
+ * documentos — `tx.get` antes de cualquier `tx.create`, regla del Admin
+ * SDK — así el chequeo "sin vínculo previo" y la escritura del vínculo son
+ * atómicos: dos solicitudes concurrentes de vincular el MISMO radicado no
+ * pueden ambas ganar).
+ *
+ * Validaciones, en orden:
+ *  1. El radicado debe estar clasificado hacia `SEC_PLANEACION` — un
+ *     expediente de licencias no nace de un radicado de otra dependencia.
+ *  2. El radicado no puede estar cerrado (mismo criterio que
+ *     `assertNotClosed`, `lib/server/radicados-security.ts` — reutiliza
+ *     `esEstadoCerrado`, no lo duplica).
+ *  3. Vínculo ÚNICO: si `radicado.vinculoExpediente` ya existe, 409 — no
+ *     se encadenan expedientes sobre el mismo radicado.
+ *  4. `subtipos` — misma validación que `planCrearExpedienteDemo` contra
+ *     el catálogo normativo (DF-4).
+ *
+ * PROYECCIÓN MÍNIMA D2 (deliberada — "no copies la PII completa"): el
+ * expediente solo recibe `solicitanteNombre`/`solicitanteDocumento` del
+ * radicado. El EMAIL nunca se copia al expediente — se usa, si existe,
+ * SOLO en el momento de enviar la constancia (A5), leído del radicado en
+ * ese instante, nunca persistido como campo del expediente.
+ *
+ * Candado R10 INTACTO: igual que `planCrearExpedienteDemo`, esta función
+ * siempre construye el camino DEMO (`esPrueba: true`, prefijo `DEMO-`) —
+ * no referencia `emitirNumeroExpedienteReal` en ninguna rama.
+ */
+export function planCrearExpedienteDesdeRadicado(
+  radicado: RadicadoParaHandoff,
+  input: CrearExpedienteDesdeRadicadoInput,
+  tenantId: TenantId,
+  actor: ActorExpediente,
+  ahora: Date,
+): PlanCrearExpedienteDesdeRadicado | ErrorExpediente {
+  if (radicado.clasificacion.oficinaDestino !== 'SEC_PLANEACION') {
+    return {
+      status: 400,
+      mensaje: 'El radicado no está clasificado hacia la Secretaría de Planeación; no procede crear un expediente de licencias a partir de él.',
+    };
+  }
+  if (esEstadoCerrado(radicado.estadoActual)) {
+    return { status: 409, mensaje: 'El radicado está cerrado; no admite esta acción.' };
+  }
+  if (radicado.vinculoExpediente) {
+    return {
+      status: 409,
+      mensaje: `El radicado ya está vinculado al expediente "${radicado.vinculoExpediente.expedienteId}" (${radicado.vinculoExpediente.numeroExpediente}); no procede vincular otro.`,
+    };
+  }
+  if (!Array.isArray(input.subtipos) || input.subtipos.length === 0) {
+    return { status: 400, mensaje: 'Debe indicar al menos un subtipo (figura normativa) para el expediente.' };
+  }
+  for (const codigo of input.subtipos) {
+    if (!CODIGOS_CATALOGO_NORMATIVO.has(codigo)) {
+      return {
+        status: 422,
+        mensaje: `El subtipo "${codigo}" no está en el catálogo normativo de figuras (DF-4, ADR-0029). Si es un código local histórico (p. ej. "LA", "LCR VISR", "LRC"), su significado está pendiente del ingeniero (P1′) y no puede usarse para radicar todavía.`,
+      };
+    }
+  }
+
+  const id = crypto.randomUUID();
+  const nowIso = ahora.toISOString();
+  const numero = formatearNumeroExpedienteDemo(ahora);
+
+  const expediente: ExpedienteLicenciaDoc = {
+    id,
+    tenantId,
+    tramiteId: DEFINICION_LICENCIA_CONSTRUCCION_PARCIAL.id,
+    estado: 'EN_REVISION',
+    estadoJuridico: 'RADICADA_EN_DEBIDA_FORMA',
+    solicitanteNombre: radicado.solicitante.nombreCompleto,
+    solicitanteDocumento: radicado.solicitante.numeroDocumento,
+    contexto: input.contexto ?? {},
+    aportes: [],
+    radicadoId: radicado.radicadoId,
+    creadoEn: nowIso,
+    actualizadoEn: nowIso,
+    subtipos: [...input.subtipos],
+    origen: 'REAL',
+    numeroExpediente: { numero, serieId: 'demo', año: ahora.getFullYear() },
+    esPrueba: true,
+  };
+
+  const primeraActuacion: ActuacionLicenciaDoc = {
+    id: crypto.randomUUID(),
+    expedienteId: id,
+    tenantId,
+    tipo: 'radicacion-debida-forma',
+    etapa: 'radicacion',
+    actorUid: actor.uid,
+    actorNombre: actor.nombre,
+    actorRol: actor.rol,
+    fecha: nowIso,
+    origen: 'REAL',
+    detalle: `Expediente creado a partir del radicado de ventanilla ${radicado.radicadoId} (handoff D2). Demostración (esPrueba: true) — candado de emisión real cerrado (R10, ADR-0026 precondición #4).`,
+  };
+
+  return {
+    expediente,
+    primeraActuacion,
+    vinculoRadicado: { expedienteId: id, numeroExpediente: numero, fecha: nowIso },
+  };
+}
+
+/* ──────────────────────────────────────────────
+   Comunicaciones al ciudadano (Bloque A·A5) — dictamen gobierno-digital
+   8-ago-2026, VINCULANTE
+────────────────────────────────────────────── */
+
+/**
+ * v1 restringe el envío de comunicaciones (constancia y aviso de acta) a
+ * expedientes de esta Definición — condición (c) del dictamen: "término
+ * de 45 días SOLO para definiciones de licencia". Hoy solo existe
+ * `DEFINICION_LICENCIA_CONSTRUCCION_PARCIAL`; una Definición de "PH sola"
+ * (15 días) queda deliberadamente FUERA de v1 — ampliar esta lista exige
+ * decidir, para cada Definición nueva, si sus textos institucionales
+ * (que citan artículos específicos de la licencia) le aplican.
+ */
+const DEFINICIONES_HABILITADAS_COMUNICACION_EXPEDIENTE = new Set([DEFINICION_LICENCIA_CONSTRUCCION_PARCIAL.id]);
+
+export interface RadicadoParaComunicacion extends CriterioNotificacion {
+  solicitante: {
+    email?: string | null;
+    /** Marca "no aporta correo" — condición (e) del dictamen, además de `debeNotificarCiudadano`. */
+    datosNoAportados?: { correo?: boolean };
+  };
+}
+
+export interface GateComunicacionExpediente {
+  debeEnviar: boolean;
+  /** Motivo de NO envío — para logging/trazabilidad, nunca se expone como error HTTP (enviar o no email nunca bloquea la operación principal). */
+  motivo?: string;
+}
+
+/**
+ * Decide si procede enviar UNA comunicación (constancia o aviso de acta)
+ * para un expediente — condiciones (c) y (e) del dictamen:
+ *  - `tramiteId` debe estar en la lista habilitada (v1: solo licencia).
+ *  - Debe existir un radicado vinculado con email válido, SIN marca de
+ *    "no aporta correo" y SIN presentación anónima/reservada
+ *    (`debeNotificarCiudadano`, mismo criterio que el resto del sistema).
+ * Sin radicado vinculado (expediente creado por el camino normal, sin
+ * handoff D2) NUNCA hay email disponible — no se copia PII de contacto al
+ * expediente (proyección mínima D2) — así que nunca se envía.
+ */
+export function debeEnviarComunicacionExpediente(
+  tramiteId: string,
+  radicado: RadicadoParaComunicacion | null | undefined,
+): GateComunicacionExpediente {
+  if (!DEFINICIONES_HABILITADAS_COMUNICACION_EXPEDIENTE.has(tramiteId)) {
+    return { debeEnviar: false, motivo: 'La Definición de este expediente no está habilitada para comunicaciones por correo en v1 (solo licencia de construcción).' };
+  }
+  if (!radicado) {
+    return { debeEnviar: false, motivo: 'El expediente no tiene radicado vinculado con datos de contacto (no se copia email al expediente, proyección mínima D2).' };
+  }
+  if (radicado.solicitante.datosNoAportados?.correo) {
+    return { debeEnviar: false, motivo: 'El solicitante marcó que no aporta correo.' };
+  }
+  if (!debeNotificarCiudadano(radicado)) {
+    return { debeEnviar: false, motivo: 'No hay un correo válido para notificar, o la presentación es anónima/reservada.' };
+  }
+  return { debeEnviar: true };
+}
+
+/**
+ * Fecha límite de respuesta al acta: 30 días hábiles desde la
+ * COMUNICACIÓN del acta (no su expedición) — art. 2.2.6.1.2.2.4. Reutiliza
+ * `sumarDiasHabiles` (`lib/tiempos-radicado.ts`) — NO reimplementa la
+ * aritmética de días hábiles. Distinto del vencimiento de 45 días de la
+ * licencia (DF-7 inerte, sigue sin calcularse): este plazo SÍ es literal
+ * de la norma y no depende del hueco 1 del ADR-0029.
+ */
+export function calcularFechaLimiteRespuestaActa(fechaComunicacion: string | Date): string {
+  return sumarDiasHabiles(fechaComunicacion, 30).toISOString();
+}
+
+/**
+ * Actuación `comunicacion-enviada` — copia en el expediente de cada envío
+ * (constancia o aviso), condición (i) del dictamen (CPACA arts. 36/59).
+ * Metadata mínima: tipo de comunicación, destinatario, asunto — NUNCA el
+ * cuerpo completo del correo (eso vive en el proveedor de correo, no se
+ * duplica en Firestore).
+ */
+export function construirActuacionComunicacionEnviada(
+  expedienteId: string,
+  tenantId: string,
+  meta: { tipoComunicacion: string; destinatario: string; asunto: string },
+  actor: ActorExpediente,
+  ahora: Date,
+): ActuacionLicenciaDoc {
+  return {
+    id: crypto.randomUUID(),
+    expedienteId,
+    tenantId,
+    tipo: 'comunicacion-enviada',
+    etapa: 'comunicacion',
+    actorUid: actor.uid,
+    actorNombre: actor.nombre,
+    actorRol: actor.rol,
+    fecha: ahora.toISOString(),
+    origen: 'REAL',
+    detalle: `${meta.tipoComunicacion} enviada a ${meta.destinatario}. Asunto: "${meta.asunto}".`,
+  };
 }

@@ -358,6 +358,21 @@ export interface VentanillaRadicado {
     fecha: string;
     recibidoPor: string;
   } | null;
+  /**
+   * Bloque A·A4 (D2 ADR-0026) — handoff radicado⇄expediente de licencias.
+   * Presente cuando este radicado dio origen a un expediente del motor
+   * (`POST /api/licencias/expedientes/desde-radicado`). Vínculo ÚNICO: la
+   * ruta rechaza (409) un segundo intento de vincular el mismo radicado —
+   * el chequeo y la escritura ocurren en la MISMA transacción que crea el
+   * expediente. Ausente = radicado sin expediente vinculado.
+   */
+  vinculoExpediente?: {
+    expedienteId: string;
+    /** `NumeroExpedienteAsignado.numero` del expediente al momento de vincular (p. ej. `DEMO-26-a1b2c3d4`). */
+    numeroExpediente: string;
+    /** ISO 8601 — momento de la vinculación (reloj del servidor). */
+    fecha: string;
+  } | null;
 }
 
 
