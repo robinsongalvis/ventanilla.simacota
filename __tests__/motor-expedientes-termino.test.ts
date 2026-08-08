@@ -138,6 +138,74 @@ describe('derivarEventosTermino — deriva desde Actuacion[] real (append-only)'
   });
 });
 
+describe('DF-7 (ADR-0029) — los 5 eventos nuevos son INERTES bajo AMBAS políticas', () => {
+  // Mismo escenario base que la suite REINICIO_A_CERO vs SUSPENSION_REANUDACION.
+  const actaFecha = sumarDiasHabiles(RADICACION_FECHA, 15);
+  const respuestaFecha = sumarDiasHabiles(actaFecha, 5);
+  const eventosBase: EventoTermino[] = [
+    { tipo: 'RADICACION_DEBIDA_FORMA', fecha: RADICACION_FECHA },
+    { tipo: 'ACTA_OBSERVACIONES', fecha: actaFecha },
+    { tipo: 'RESPUESTA_SUBSANACION', fecha: respuestaFecha },
+  ];
+
+  const eventosNuevos: EventoTermino[] = [
+    { tipo: 'COMUNICACION_ACTA', fecha: sumarDiasHabiles(actaFecha, 1) },
+    { tipo: 'RENUNCIA_PLAZO_RESTANTE', fecha: sumarDiasHabiles(actaFecha, 2) },
+    { tipo: 'ACTO_VIABILIDAD', fecha: sumarDiasHabiles(respuestaFecha, 3) },
+    { tipo: 'ENTREGA_DOCUMENTOS_PAGO', fecha: sumarDiasHabiles(respuestaFecha, 4) },
+    { tipo: 'PRORROGA_TERMINO_ADMINISTRACION', fecha: sumarDiasHabiles(respuestaFecha, 10) },
+  ];
+
+  it.each(['REINICIO_A_CERO', 'SUSPENSION_REANUDACION'] as const)(
+    'política %s: mismos eventos ± los 5 nuevos ⇒ resultado IDÉNTICO',
+    (efecto) => {
+      const politica: PoliticaTermino = { ...POLITICA_REINICIO, efectoSubsanacion: efecto };
+      const sinNuevos = calcularVencimiento(eventosBase, politica);
+      const conNuevos = calcularVencimiento([...eventosBase, ...eventosNuevos], politica);
+      expect(conNuevos?.getTime()).toBe(sinNuevos?.getTime());
+    },
+  );
+
+  it('inercia también evento por evento (cada uno solo, no únicamente todos juntos)', () => {
+    for (const efecto of ['REINICIO_A_CERO', 'SUSPENSION_REANUDACION'] as const) {
+      const politica: PoliticaTermino = { ...POLITICA_REINICIO, efectoSubsanacion: efecto };
+      const base = calcularVencimiento(eventosBase, politica);
+      for (const eventoNuevo of eventosNuevos) {
+        const resultado = calcularVencimiento([...eventosBase, eventoNuevo], politica);
+        expect(resultado?.getTime(), `${efecto} + ${eventoNuevo.tipo} debería ser inerte`).toBe(base?.getTime());
+      }
+    }
+  });
+
+  it('un evento nuevo COMO ÚNICO evento tras la radicación tampoco altera el vencimiento base (solo radicación)', () => {
+    for (const efecto of ['REINICIO_A_CERO', 'SUSPENSION_REANUDACION'] as const) {
+      const politica: PoliticaTermino = { ...POLITICA_REINICIO, efectoSubsanacion: efecto };
+      const soloRadicacion: EventoTermino[] = [{ tipo: 'RADICACION_DEBIDA_FORMA', fecha: RADICACION_FECHA }];
+      const base = calcularVencimiento(soloRadicacion, politica);
+      for (const eventoNuevo of eventosNuevos) {
+        const resultado = calcularVencimiento([...soloRadicacion, eventoNuevo], politica);
+        expect(resultado?.getTime()).toBe(base?.getTime());
+      }
+    }
+  });
+});
+
+describe('DF-7 — exhaustividad del vocabulario de eventos (defensa en tiempo de ejecución del switch exhaustivo)', () => {
+  it('un tipo no contemplado lanza en tiempo de ejecución (el compilador ya lo rechazaría en tiempo de compilación vía `never`)', () => {
+    // El compilador NUNCA permitiría construir este literal con un `tipo`
+    // fuera de `TipoEventoTermino` — por eso el `as never` explícito: este
+    // test verifica la RED DE SEGURIDAD en runtime (p. ej. datos crudos
+    // deserializados desde Firestore que burlen el tipo estático), no algo
+    // alcanzable escribiendo TypeScript válido.
+    const eventoInvalido = { tipo: 'TIPO_INEXISTENTE', fecha: RADICACION_FECHA } as unknown as EventoTermino;
+    const eventos: EventoTermino[] = [
+      { tipo: 'RADICACION_DEBIDA_FORMA', fecha: RADICACION_FECHA },
+      eventoInvalido,
+    ];
+    expect(() => calcularVencimiento(eventos, POLITICA_SUSPENSION)).toThrow(/no contemplado/);
+  });
+});
+
 describe('integración: derivarEventosTermino + calcularVencimiento sobre trazabilidad mixta REAL/RECONSTRUIDO', () => {
   it('un acta RECONSTRUIDA no dispara la suspensión bajo SUSPENSION_REANUDACION', () => {
     const base: Omit<Actuacion, 'id' | 'tipo' | 'origen' | 'fecha'> = {

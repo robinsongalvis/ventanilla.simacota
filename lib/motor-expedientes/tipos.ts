@@ -277,6 +277,18 @@ export interface ActoFinalExpediente {
   numero?: string;
   /** ISO 8601. */
   fecha?: string;
+  /**
+   * ISO 8601 — fecha de FIRMEZA del acto (CPACA art. 87), DF-6/ADR-0029.
+   * Dato obligatorio de cierre para expedientes `origen: 'REAL'`
+   * (`validarCierreExpediente`, `./estados-licencia.ts`): desde ella corren
+   * las vigencias (D.1077/2015 art. 2.2.6.1.2.4.1) y nace la obligación del
+   * reporte mensual ELIC/DANE (art. 2.2.6.1.2.3.12) — el registro histórico
+   * de Planeación (0 de 202 expedientes con esta fecha) documenta
+   * exactamente la brecha que este campo corrige hacia adelante.
+   */
+  fechaFirmeza?: string;
+  /** Referencia (id de documento/adjunto) a la constancia de notificación del acto (art. 2.2.6.1.2.3.7) — DF-6/ADR-0029. */
+  constanciaNotificacionRef?: string;
   /** ISO 8601 — hasta cuándo vale la licencia/permiso otorgado, si aplica. */
   vigenciaHasta?: string;
   /** `true` si el expediente está cerrado pero no se conserva el detalle del acto (p. ej. migración incompleta) — nunca se inventa un valor por default. */
