@@ -63,6 +63,7 @@ export function DetalleLicenciaClient({ expedienteId }: { expedienteId: string }
   const [actuaciones, setActuaciones] = useState<ActuacionLicenciaDoc[]>([]);
   const [documentos, setDocumentos] = useState<DocumentoExpedienteDoc[]>([]);
   const [definicionId, setDefinicionId] = useState<string | null>(null);
+  const [radicadoVinculado, setRadicadoVinculado] = useState<{ id: string; fecha: string } | null>(null);
   const [modalActuacion, setModalActuacion] = useState<'acta-observaciones' | 'respuesta-subsanacion' | null>(null);
 
   /**
@@ -96,6 +97,11 @@ export function DetalleLicenciaClient({ expedienteId }: { expedienteId: string }
       setActuaciones(Array.isArray(body.actuaciones) ? body.actuaciones : []);
       setDocumentos(Array.isArray(body.documentos) ? body.documentos : []);
       setDefinicionId(typeof body.definicionId === 'string' ? body.definicionId : null);
+      setRadicadoVinculado(
+        body.radicadoVinculado && typeof body.radicadoVinculado.fecha === 'string'
+          ? { id: String(body.radicadoVinculado.id), fecha: body.radicadoVinculado.fecha }
+          : null,
+      );
       if (!silencioso) setEstadoCarga('listo');
     } catch {
       if (!silencioso) {
@@ -235,8 +241,19 @@ export function DetalleLicenciaClient({ expedienteId }: { expedienteId: string }
             {expediente.solicitanteNombre}
             <span style={{ color: 'var(--text-secondary)' }}> · {expediente.solicitanteDocumento}</span>
           </Metadato>
-          <Metadato label="Radicado de origen (Ventanilla)">
-            {expediente.radicadoId ? <NumeroLegal value={expediente.radicadoId} variant="radicado" size="sm" /> : 'Sin vincular aún'}
+          <Metadato label="Radicado de origen (Ventanilla)" truncar={false}>
+            {expediente.radicadoId ? (
+              <span className="flex flex-col gap-0.5">
+                <NumeroLegal value={expediente.radicadoId} variant="radicado" size="sm" />
+                <span className="text-xs" style={{ color: 'var(--text-secondary)' }}>
+                  {radicadoVinculado?.fecha
+                    ? `Vinculado el ${formatFechaColombia(radicadoVinculado.fecha)}`
+                    : 'Fecha de vinculación no disponible'}
+                </span>
+              </span>
+            ) : (
+              'Sin vincular aún'
+            )}
           </Metadato>
           <Metadato label="Origen">{expediente.origen ?? 'REAL'}</Metadato>
           <Metadato label="Creado">{formatFechaColombia(expediente.creadoEn)}</Metadato>
@@ -378,13 +395,22 @@ function VolverBandeja() {
   );
 }
 
-function Metadato({ label, children }: { label: string; children: ReactNode }) {
+function Metadato({
+  label,
+  children,
+  truncar = true,
+}: {
+  label: string;
+  children: ReactNode;
+  /** `false` cuando el contenido necesita más de una línea (p. ej. radicado + fecha de vinculación) — el resto de metadatos sigue truncando a una línea. */
+  truncar?: boolean;
+}) {
   return (
     <div className="min-w-0">
       <p className="text-[10px] font-bold uppercase tracking-widest" style={{ color: 'var(--text-secondary)' }}>
         {label}
       </p>
-      <div className="text-sm mt-0.5 truncate" style={{ color: 'var(--text-primary)' }}>
+      <div className={`text-sm mt-0.5 ${truncar ? 'truncate' : ''}`} style={{ color: 'var(--text-primary)' }}>
         {children}
       </div>
     </div>

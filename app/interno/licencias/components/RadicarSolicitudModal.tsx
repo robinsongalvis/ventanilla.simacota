@@ -2,8 +2,8 @@
 
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { CATALOGO_FIGURAS_NORMATIVAS, type TipoFigura } from '@/lib/motor-expedientes/catalogo-subtipos-normativo';
 import type { ExpedienteLicenciaDoc } from '@/lib/server/expedientes-licencias';
+import { SelectorSubtiposNormativos } from './SelectorSubtiposNormativos';
 
 /* ══════════════════════════════════════════════════════════════
    Formulario "Radicar solicitud" — bloque "Integración UI y demo".
@@ -17,14 +17,6 @@ import type { ExpedienteLicenciaDoc } from '@/lib/server/expedientes-licencias';
    Modal`, `app/interno/dashboard/components/`): overlay + card, `role=
    dialog`, error del servidor mostrado literal en `role=alert`.
 ══════════════════════════════════════════════════════════════ */
-
-const TITULO_GRUPO: Record<TipoFigura, string> = {
-  LICENCIA: 'Licencias',
-  ACTO_RECONOCIMIENTO: 'Actos de reconocimiento',
-  OTRA_ACTUACION: 'Otras actuaciones',
-};
-
-const GRUPOS: TipoFigura[] = ['LICENCIA', 'ACTO_RECONOCIMIENTO', 'OTRA_ACTUACION'];
 
 export interface RadicarSolicitudModalProps {
   onCerrar: () => void;
@@ -171,44 +163,7 @@ export function RadicarSolicitudModal({ onCerrar, onCreado }: RadicarSolicitudMo
               </label>
             </div>
 
-            <fieldset>
-              <legend className={labelCls} style={labelStyle}>
-                Subtipos (figuras normativas) — selecciona al menos uno
-              </legend>
-              <div className="flex flex-col gap-3 mt-1">
-                {GRUPOS.map((grupo) => {
-                  const figuras = CATALOGO_FIGURAS_NORMATIVAS.filter((f) => f.tipoFigura === grupo);
-                  if (figuras.length === 0) return null;
-                  return (
-                    <div key={grupo}>
-                      <p className="text-[10px] font-bold uppercase tracking-widest mb-1" style={{ color: '#94A3B8' }}>
-                        {TITULO_GRUPO[grupo]}
-                      </p>
-                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-3 gap-y-1.5">
-                        {figuras.map((f) => (
-                          <label key={f.codigo} className="flex items-start gap-2 text-sm" style={{ color: '#1F2933' }}>
-                            <input
-                              type="checkbox"
-                              checked={subtipos.includes(f.codigo)}
-                              onChange={() => alternarSubtipo(f.codigo)}
-                              className="mt-0.5 h-4 w-4 rounded border-[#D9E2D9] accent-[#14532D] focus-visible:outline-none focus-visible:ring-2"
-                            />
-                            <span>
-                              {f.nombre} <span className="font-mono text-[11px]" style={{ color: '#94A3B8' }}>({f.codigo})</span>
-                            </span>
-                          </label>
-                        ))}
-                      </div>
-                    </div>
-                  );
-                })}
-              </div>
-              {errorSubtipos && (
-                <p role="alert" className="text-xs mt-2" style={{ color: '#DC2626' }}>
-                  {errorSubtipos}
-                </p>
-              )}
-            </fieldset>
+            <SelectorSubtiposNormativos seleccionados={subtipos} onAlternar={alternarSubtipo} error={errorSubtipos} />
 
             {errorServidor && (
               <p role="alert" className="rounded-lg px-3 py-2 text-xs"

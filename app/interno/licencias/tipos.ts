@@ -57,7 +57,8 @@ export interface FilaLicencia {
 
 /** Evento mostrado en `EventoTimeline` (Pantalla 02, panel historial). */
 export interface EventoTimelineItem {
-  tipo: 'RADICACION' | 'ACTA' | 'SUBSANACION' | 'VENCIMIENTO_CALCULADO';
+  /** `COMUNICACION` (Bloque A·A4/A5): constancia o aviso de acta enviados al ciudadano — tono INFORMATIVO, nunca el verde de éxito de `RADICACION`. */
+  tipo: 'RADICACION' | 'ACTA' | 'SUBSANACION' | 'VENCIMIENTO_CALCULADO' | 'COMUNICACION';
   titulo: string;
   meta: string;
 }

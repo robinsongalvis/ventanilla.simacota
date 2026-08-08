@@ -23,7 +23,27 @@ export const TIPO_TIMELINE: Record<string, EventoTimelineItem['tipo']> = {
   'acta-observaciones': 'ACTA',
   'respuesta-subsanacion': 'SUBSANACION',
   'modificacion-solicitud': 'SUBSANACION',
+  'comunicacion-enviada': 'COMUNICACION',
 };
+
+/**
+ * Título de una actuación `comunicacion-enviada` (Bloque A·A4/A5). El
+ * SERVIDOR no distingue constancia de aviso de acta con un campo propio —
+ * `Actuacion`/`ActuacionLicenciaDoc` (`lib/motor-expedientes/tipos.ts`,
+ * `lib/server/expedientes-licencias.ts`) NO tienen `metadata`; las dos
+ * comparten `tipo: 'comunicacion-enviada'` y solo se distinguen por el
+ * PREFIJO de `detalle` que arma `construirActuacionComunicacionEnviada`
+ * (`"Constancia de radicación…"` desde `desde-radicado/route.ts`,
+ * `"Aviso de acta de observaciones…"` desde `[id]/actuaciones/route.ts`).
+ * Si el texto no coincide con ninguno de los dos prefijos conocidos hoy,
+ * cae en un título genérico en vez de fallar — un `detalle` inesperado no
+ * debe romper el timeline.
+ */
+export function tituloComunicacionEnviada(detalle: string | undefined): string {
+  if (detalle?.startsWith('Aviso de acta')) return 'Aviso de acta enviado';
+  if (detalle?.startsWith('Constancia')) return 'Constancia enviada al ciudadano';
+  return 'Comunicación enviada al ciudadano';
+}
 
 /**
  * Construye el timeline de presentación a partir de la trazabilidad REAL
@@ -42,7 +62,7 @@ export function construirTimelineDesdeActuaciones(
     .sort((a, b) => new Date(a.fecha).getTime() - new Date(b.fecha).getTime())
     .map((a) => ({
       tipo: TIPO_TIMELINE[a.tipo] ?? 'SUBSANACION',
-      titulo: TITULO_ACTUACION[a.tipo] ?? a.tipo,
+      titulo: a.tipo === 'comunicacion-enviada' ? tituloComunicacionEnviada(a.detalle) : (TITULO_ACTUACION[a.tipo] ?? a.tipo),
       meta: a.detalle ? `${formatFechaColombia(a.fecha)} · ${a.detalle}` : formatFechaColombia(a.fecha),
     }));
 
