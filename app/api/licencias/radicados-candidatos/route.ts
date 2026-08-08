@@ -30,6 +30,17 @@ export const runtime = 'nodejs';
 
 const TENANT_LICENCIAS: TenantId = 'SEC_PLANEACION';
 
+/**
+ * Cota dura de lectura (R11, ADR-0011): la consulta de candidatos es
+ * INTERACTIVA y no puede crecer con el histórico del tenant. 300 ≤ el
+ * presupuesto interactivo (500). Sin `orderBy` en Firestore (evita exigir
+ * índice compuesto): el orden lo aplica el handler en memoria sobre el
+ * lote acotado, de modo que con más de LIMITE_CANDIDATOS radicados del
+ * tenant el selector muestra un subconjunto — aceptable para el caso de
+ * uso (vincular radicados recientes) y declarado aquí.
+ */
+const LIMITE_CANDIDATOS = 300;
+
 function jsonError(error: unknown) {
   if (error instanceof InternalAuthError) {
     return NextResponse.json({ error: error.message }, { status: error.status });
@@ -54,6 +65,7 @@ export async function GET(): Promise<NextResponse> {
     const db = getFirebaseAdminDb();
     const snap = await db.collection('ventanilla_radicados')
       .where('clasificacion.oficinaDestino', '==', TENANT_LICENCIAS)
+      .limit(LIMITE_CANDIDATOS)
       .get();
 
     const candidatos: RadicadoCandidato[] = [];

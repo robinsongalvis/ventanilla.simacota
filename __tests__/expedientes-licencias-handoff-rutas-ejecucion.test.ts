@@ -32,16 +32,22 @@ function docRef(path: string) {
 function collectionRef(basePath: string) {
   return {
     doc: (id?: string) => docRef(`${basePath}/${id ?? `auto-${Math.random().toString(36).slice(2)}`}`),
-    where: (campo: string, _op: string, valor: unknown) => ({
-      get: async () => {
+    where: (campo: string, _op: string, valor: unknown) => {
+      const ejecutar = async (tope?: number) => {
         const leerRuta = (d: Record<string, unknown>) =>
           campo.split('.').reduce<unknown>((acc, key) => (acc && typeof acc === 'object' ? (acc as Record<string, unknown>)[key] : undefined), d);
         const docs = [...store.entries()]
           .filter(([p, d]) => p.startsWith(`${basePath}/`) && p.slice(basePath.length + 1).split('/').length === 1 && leerRuta(d as Record<string, unknown>) === valor)
-          .map(([p, d]) => ({ id: p.split('/').pop()!, data: () => d }));
+          .map(([p, d]) => ({ id: p.split('/').pop()!, data: () => d }))
+          .slice(0, tope);
         return { docs, size: docs.length };
-      },
-    }),
+      };
+      return {
+        // `.limit(n)` refleja la cota R11 real de la ruta (LIMITE_CANDIDATOS).
+        limit: (n: number) => ({ get: async () => ejecutar(n) }),
+        get: async () => ejecutar(),
+      };
+    },
     get: async () => {
       const docs = [...store.entries()]
         .filter(([p]) => p.startsWith(`${basePath}/`) && p.slice(basePath.length + 1).split('/').length === 1)
