@@ -243,7 +243,7 @@ export type EstadoAporteRequisito = 'PENDIENTE' | 'APORTADO' | 'NO_APLICA';
 export interface AporteRequisito {
   requisitoId: string;
   estado: EstadoAporteRequisito;
-  /** Ids de versiones de documento (D7) que satisfacen este requisito. Vacío si no está APORTADO. */
+  /** Ids de versiones de documento (D7) que satisfacen este requisito. Vacío si no está APORTADO. Precisión (addendum A2 aprobado 8-ago): el id referenciado es el del documento LÓGICO (`DocumentoExpedienteDoc.id`, `lib/server/expedientes-documentos-tipos.ts`), no el de una versión — la vigente se resuelve vía `versionVigente`. */
   documentoIds: string[];
 }
 

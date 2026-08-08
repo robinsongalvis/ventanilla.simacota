@@ -1,5 +1,5 @@
 import type { TenantId } from '@/src/types/radicado';
-import type { Expediente, Actuacion, ContextoEvaluacionRequisito } from '@/lib/motor-expedientes/tipos';
+import type { Expediente, Actuacion, ContextoEvaluacionRequisito, DefinicionTramite } from '@/lib/motor-expedientes/tipos';
 import { CATALOGO_FIGURAS_NORMATIVAS } from '@/lib/motor-expedientes/catalogo-subtipos-normativo';
 import { puedeTransicionar, type EstadoJuridicoLicencia } from '@/lib/motor-expedientes/estados-licencia';
 
@@ -332,4 +332,67 @@ export function planRegistrarActuacion(
   };
 
   return { actuacion, nuevoEstadoJuridico: estadoDestino };
+}
+
+/* ──────────────────────────────────────────────
+   Contexto del caso (Bloque A·A2)
+────────────────────────────────────────────── */
+
+export interface PlanActualizarContexto {
+  contexto: ContextoEvaluacionRequisito;
+}
+
+/**
+ * Plan de actualización del `contexto` de un expediente — los hechos
+ * (`esApoderado`, `categoriaComplejidad`, …) que `evaluarCondicion`
+ * necesita para resolver los requisitos CONDICIONALES de su Definición
+ * (`lib/motor-expedientes/completitud.ts`). Sin esto, los condicionales
+ * quedan INDETERMINADOS para siempre.
+ *
+ * Fail-closed (mismo criterio que `validarDefinicionTramite`,
+ * `CLAVE_NO_DECLARADA`): toda clave del `input` DEBE estar en
+ * `definicion.clavesContexto`; una clave no declarada rechaza TODA la
+ * actualización con 400 (no se aplican las claves válidas y se ignora la
+ * inválida en silencio — todo o nada, para que el error sea imposible de
+ * pasar por alto). El TIPO del valor también debe coincidir con el tipo
+ * declarado de la clave (`ClaveContextoDeclarada.tipo`).
+ *
+ * PARCIAL, no total: solo actualiza las claves presentes en `input` —
+ * combina (merge) sobre el `contextoActual`, no lo reemplaza completo.
+ */
+export function planActualizarContexto(
+  contextoActual: ContextoEvaluacionRequisito,
+  input: Record<string, unknown>,
+  definicion: DefinicionTramite,
+): PlanActualizarContexto | ErrorExpediente {
+  const clavesDeclaradas = new Map((definicion.clavesContexto ?? []).map((c) => [c.nombre, c] as const));
+
+  if (Object.keys(input).length === 0) {
+    return { status: 400, mensaje: 'No se envió ninguna clave de contexto para actualizar.' };
+  }
+
+  for (const [clave, valor] of Object.entries(input)) {
+    const declarada = clavesDeclaradas.get(clave);
+    if (!declarada) {
+      const catalogo = [...clavesDeclaradas.keys()].join(', ') || '(ninguna declarada)';
+      return {
+        status: 400,
+        mensaje: `La clave de contexto "${clave}" no está declarada en la Definición "${definicion.id}". Claves válidas: ${catalogo}.`,
+      };
+    }
+    if (typeof valor !== declarada.tipo) {
+      return {
+        status: 400,
+        mensaje: `La clave de contexto "${clave}" espera un valor de tipo "${declarada.tipo}", se recibió "${typeof valor}".`,
+      };
+    }
+    if (declarada.dominio && !declarada.dominio.includes(valor as string | number | boolean)) {
+      return {
+        status: 400,
+        mensaje: `El valor "${String(valor)}" no pertenece al dominio permitido de "${clave}" (${declarada.dominio.join(', ')}).`,
+      };
+    }
+  }
+
+  return { contexto: { ...contextoActual, ...(input as ContextoEvaluacionRequisito) } };
 }

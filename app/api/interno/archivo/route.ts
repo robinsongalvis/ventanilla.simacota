@@ -15,6 +15,7 @@
  * (bucket, ruta completa, stack traces, UID).
  */
 
+import { createHash } from 'node:crypto';
 import { NextResponse } from 'next/server';
 import {
   InternalAuthError,
@@ -25,10 +26,14 @@ import {
   aRadicadoParaDescarga,
   aSalidaParaDescarga,
   autorizarDescargaArchivo,
+  autorizarDescargaDocumentoExpediente,
   autorizarDescargaSalida,
   parsearPathArchivo,
+  parsearPathDocumentoExpediente,
+  type ExpedienteParaDescarga,
   type ResultadoAutorizacion,
 } from '@/lib/seguridad/autorizar-descarga-archivo';
+import type { VersionDocumentoExpedienteDoc } from '@/lib/server/expedientes-documentos-tipos';
 import { registrarDescargaAuditoria } from '@/lib/seguridad/auditoria-descargas';
 import { getClientIp } from '@/lib/ai/rate-limit';
 import { logError } from '@/lib/logger';
@@ -38,6 +43,11 @@ import type { SalidaOficial } from '@/src/types/salida';
 export const runtime = 'nodejs';
 
 const SIGNED_URL_EXPIRES_MS = 15 * 60 * 1000;
+
+/** `expedientes/{expedienteId}/{documentoId}/{vNNNN}/{archivo}` — 4 segmentos tras el prefijo, distinto del resto. */
+function esPathDocumentoExpediente(path: string): boolean {
+  return path.startsWith('expedientes/');
+}
 
 function denegado(status: 400 | 401 | 403 | 404 | 500, mensaje: string): NextResponse {
   return NextResponse.json({ error: mensaje }, { status });
@@ -58,8 +68,17 @@ export async function GET(request: Request): Promise<NextResponse> {
     return denegado(401, 'Debe iniciar sesión nuevamente.');
   }
 
-  // 2. Path estructuralmente válido (parseo y validación temprana).
   const path = new URL(request.url).searchParams.get('path');
+
+  // Documentos de expediente (D7, Bloque A) — forma de path distinta (4
+  // segmentos) y, a diferencia del resto, exige validar el HASH del
+  // binario antes de entregarlo (INV-3): vive en su propio flujo, sin
+  // tocar el de radicados/salidas de abajo.
+  if (path && esPathDocumentoExpediente(path)) {
+    return manejarDescargaDocumentoExpediente(request, usuario, path);
+  }
+
+  // 2. Path estructuralmente válido (parseo y validación temprana).
   const parsed = parsearPathArchivo(path);
   if (!parsed || !path) {
     return denegado(400, 'La ruta del archivo no es válida.');
@@ -184,6 +203,129 @@ export async function GET(request: Request): Promise<NextResponse> {
       modulo: 'interno/archivo/firmar',
       error: err,
     });
+    return denegado(500, 'No fue posible generar la descarga. Intente nuevamente.');
+  }
+}
+
+/* ══════════════════════════════════════════════════════════════
+   Documentos de expediente (D7, Bloque A·A2) — flujo separado:
+   autoriza por TENANT del expediente (anti-IDOR) y, a diferencia del
+   resto de este endpoint, valida el HASH del binario (INV-3) ANTES de
+   entregarlo — por eso descarga los bytes y los sirve directamente en
+   vez de emitir una URL firmada (que nunca pasaría por este servidor
+   para poder hashearla).
+══════════════════════════════════════════════════════════════ */
+async function manejarDescargaDocumentoExpediente(
+  request: Request,
+  usuario: Awaited<ReturnType<typeof requireActiveInternalUser>>,
+  path: string,
+): Promise<NextResponse> {
+  const parsed = parsearPathDocumentoExpediente(path);
+  if (!parsed) {
+    return denegado(400, 'La ruta del archivo no es válida.');
+  }
+
+  let decision: ResultadoAutorizacion;
+  try {
+    const snap = await getFirebaseAdminDb().doc(`expedientes/${parsed.expedienteId}`).get();
+    const expediente = snap.exists ? (snap.data() as { tenantId?: string }) : null;
+    const expedienteParaDescarga: ExpedienteParaDescarga | null = expediente?.tenantId
+      ? { tenantId: expediente.tenantId }
+      : null;
+    decision = autorizarDescargaDocumentoExpediente({ path, usuario, expediente: expedienteParaDescarga });
+  } catch (err) {
+    logError({ radicadoId: parsed.expedienteId, modulo: 'interno/archivo/leer-expediente', error: err });
+    return denegado(500, 'No fue posible generar la descarga. Intente nuevamente.');
+  }
+
+  if (!decision.ok) {
+    console.warn('[ventanilla:audit]', JSON.stringify({
+      evento: 'ARCHIVO_DESCARGA_DENEGADA',
+      radicadoId: parsed.expedienteId,
+      motivo: decision.motivo,
+      actorRol: usuario.rol,
+      actorTenant: usuario.tenantId,
+      prefijo: 'expedientes',
+      timestamp: new Date().toISOString(),
+    }));
+    await registrarDescargaAuditoria({
+      evento: 'ARCHIVO_DESCARGA_DENEGADA',
+      radicadoId: parsed.expedienteId,
+      archivoNombre: parsed.nombre.slice(0, 200),
+      tipoArchivo: null,
+      motivo: decision.motivo,
+      actorUid: usuario.uid,
+      actorNombre: usuario.nombre,
+      actorRol: usuario.rol,
+      actorTenant: usuario.tenantId,
+      ip: getClientIp(request),
+      userAgent: request.headers.get('user-agent'),
+    });
+    return denegado(decision.status, decision.mensaje);
+  }
+
+  // INV-3: valida el hash del binario contra el doc de versión ANTES de
+  // entregar un solo byte. Si no coincide (corrupción, manipulación de
+  // Storage por fuera de esta vía), 500 + log, y NUNCA se entrega.
+  try {
+    const bucketName = process.env.FIREBASE_STORAGE_BUCKET;
+    if (!bucketName) {
+      logError({ radicadoId: parsed.expedienteId, modulo: 'interno/archivo/config', error: new Error('FIREBASE_STORAGE_BUCKET no configurado.') });
+      return denegado(500, 'No fue posible generar la descarga. Intente nuevamente.');
+    }
+
+    const versionRef = getFirebaseAdminDb().doc(
+      `expedientes/${parsed.expedienteId}/documentos/${parsed.documentoId}/versiones/${parsed.idVersion}`,
+    );
+    const versionSnap = await versionRef.get();
+    if (!versionSnap.exists) {
+      return denegado(404, 'Archivo no encontrado.');
+    }
+    const version = versionSnap.data() as VersionDocumentoExpedienteDoc;
+
+    const [bytes] = await getFirebaseAdminStorage().bucket(bucketName).file(path).download();
+    const hashCalculado = createHash('sha256').update(bytes).digest('hex');
+
+    if (hashCalculado !== version.hashSha256) {
+      logError({
+        radicadoId: parsed.expedienteId,
+        modulo: 'interno/archivo/hash-mismatch',
+        error: new Error(`Hash no coincide para ${path}: esperado ${version.hashSha256}, calculado ${hashCalculado}.`),
+      });
+      return denegado(500, 'No fue posible generar la descarga. Intente nuevamente.');
+    }
+
+    console.info('[ventanilla:audit]', JSON.stringify({
+      evento: 'ARCHIVO_DESCARGA_AUTORIZADA',
+      radicadoId: decision.radicadoId,
+      tipo: decision.tipoArchivo,
+      actorRol: usuario.rol,
+      actorTenant: usuario.tenantId,
+      timestamp: new Date().toISOString(),
+    }));
+    await registrarDescargaAuditoria({
+      evento: 'ARCHIVO_DESCARGA_AUTORIZADA',
+      radicadoId: decision.radicadoId,
+      archivoNombre: parsed.nombre.slice(0, 200),
+      tipoArchivo: decision.tipoArchivo,
+      actorUid: usuario.uid,
+      actorNombre: usuario.nombre,
+      actorRol: usuario.rol,
+      actorTenant: usuario.tenantId,
+      ip: getClientIp(request),
+      userAgent: request.headers.get('user-agent'),
+    });
+
+    return new NextResponse(new Uint8Array(bytes), {
+      status: 200,
+      headers: {
+        'Content-Type': version.mimeType || 'application/octet-stream',
+        'Content-Disposition': `inline; filename="${parsed.nombre}"`,
+        'Cache-Control': 'private, no-store',
+      },
+    });
+  } catch (err) {
+    logError({ radicadoId: parsed.expedienteId, modulo: 'interno/archivo/servir-expediente', error: err });
     return denegado(500, 'No fue posible generar la descarga. Intente nuevamente.');
   }
 }

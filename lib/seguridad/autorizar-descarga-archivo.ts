@@ -22,10 +22,11 @@ import type { RolInterno } from '@/lib/hooks/useAuth';
 import type { TenantId } from '@/src/types/radicado';
 import type { VentanillaRadicado } from '@/src/types/ventanilla';
 import type { SalidaOficial } from '@/src/types/salida';
+import { PATH_REGEX_DOCUMENTO_EXPEDIENTE } from '@/lib/server/expedientes-documentos-tipos';
 
 /** Prefijos de Storage aceptados por este endpoint. */
 export const PREFIJOS_PERMITIDOS = ['radicados', 'respuestas', 'salidas'] as const;
-export type PrefijoArchivo = typeof PREFIJOS_PERMITIDOS[number];
+export type PrefijoArchivo = typeof PREFIJOS_PERMITIDOS[number] | 'expedientes';
 
 export interface UsuarioParaDescarga {
   uid:      string;
@@ -49,6 +50,7 @@ export type MotivoDenegacion =
   | 'ARCHIVO_NO_PERTENECE_AL_RADICADO'
   | 'SALIDA_NO_ENCONTRADA'
   | 'ARCHIVO_NO_PERTENECE_A_LA_SALIDA'
+  | 'EXPEDIENTE_NO_ENCONTRADO'
   | 'SIN_PERMISO_DE_DEPENDENCIA';
 
 export interface ResultadoAutorizacionDenegada {
@@ -62,10 +64,10 @@ export interface ResultadoAutorizacionDenegada {
 export interface ResultadoAutorizacionConcedida {
   ok:           true;
   prefijo:      PrefijoArchivo;
-  /** Id del documento dueño (radicadoId o salidaId, según el prefijo). */
+  /** Id del documento dueño (radicadoId, salidaId o expedienteId, según el prefijo). */
   radicadoId:   string;
   /** Tipo de archivo concedido — útil para el log de auditoría. */
-  tipoArchivo:  'ADJUNTO_CIUDADANO' | 'RESPUESTA_OFICIAL' | 'OFICIO_SALIDA';
+  tipoArchivo:  'ADJUNTO_CIUDADANO' | 'RESPUESTA_OFICIAL' | 'OFICIO_SALIDA' | 'DOCUMENTO_EXPEDIENTE';
 }
 
 export type ResultadoAutorizacion =
@@ -332,5 +334,102 @@ export function aSalidaParaDescarga(doc: SalidaOficial | null): SalidaParaDescar
   return {
     dependenciaOrigen: doc.dependenciaOrigen,
     archivoPath: typeof doc.archivoPath === 'string' ? doc.archivoPath : null,
+  };
+}
+
+/* ══════════════════════════════════════════════════════════════
+   DOCUMENTOS DE EXPEDIENTE (D7, Bloque A·A1/A2)
+
+   Forma de path DISTINTA de las anteriores (4 segmentos, no 2):
+   `expedientes/{expedienteId}/{documentoId}/{vNNNN}/{archivo}`
+   (`PATH_REGEX_DOCUMENTO_EXPEDIENTE`, contrato de
+   `lib/server/expedientes-documentos-tipos.ts` — NO se toca ese regex
+   aquí, solo se importa). Por eso vive en un parser/autorizador propio en
+   vez de forzarse en `parsearPathArchivo`/`PATH_REGEX` (2 segmentos).
+   El alfabeto del contrato EXCLUYE `_` en `expedienteId`/`documentoId` —
+   `expedientes/_pendientes/…` (staging) nunca matchea: la exclusión de
+   staging es estructural, no una comprobación aparte.
+══════════════════════════════════════════════════════════════ */
+
+export interface PathParseadoDocumentoExpediente {
+  expedienteId: string;
+  documentoId:  string;
+  /** `vNNNN`, p. ej. `v0001`. */
+  idVersion:    string;
+  nombre:       string;
+}
+
+export function parsearPathDocumentoExpediente(input: unknown): PathParseadoDocumentoExpediente | null {
+  if (typeof input !== 'string') return null;
+  const path = input.trim();
+  if (path.length === 0) return null;
+  if (path.startsWith('/')) return null;
+  if (path.includes('..')) return null;
+  if (path.includes('//')) return null;
+  if (/[\x00-\x1F]/.test(path)) return null;
+  if (!PATH_REGEX_DOCUMENTO_EXPEDIENTE.test(path)) return null;
+
+  const [, expedienteId, documentoId, idVersion, ...resto] = path.split('/');
+  if (!expedienteId || !documentoId || !idVersion || resto.length !== 1) return null;
+
+  return { expedienteId, documentoId, idVersion, nombre: resto[0] };
+}
+
+/** Datos mínimos del expediente dueño, para el anti-IDOR (por tenant). */
+export interface ExpedienteParaDescarga {
+  tenantId: string;
+}
+
+/**
+ * Autoriza la descarga de un documento de expediente — anti-IDOR CONTRA
+ * EL TENANT del expediente (no contra una lista de paths pertenecientes,
+ * a diferencia de `autorizarDescargaArchivo`: el path YA codifica
+ * `expedienteId`/`documentoId`/versión de forma no adivinable —
+ * `crypto.randomUUID()`/auto-id de Firestore — así que la defensa
+ * relevante es "¿este usuario puede operar el TENANT de este expediente?",
+ * mismo criterio de `canOperateTenant`).
+ *
+ * La validación de HASH (INV-3) NO vive aquí — esta función es pura y no
+ * puede leer el binario ni el doc de versión; la hace el endpoint
+ * (`app/api/interno/archivo/route.ts`) DESPUÉS de autorizar, antes de
+ * entregar cualquier byte.
+ */
+export function autorizarDescargaDocumentoExpediente(args: {
+  path: string;
+  usuario: UsuarioParaDescarga | null;
+  expediente: ExpedienteParaDescarga | null;
+}): ResultadoAutorizacion {
+  const parsed = parsearPathDocumentoExpediente(args.path);
+  if (!parsed) {
+    return { ok: false, status: 400, motivo: 'PATH_INVALIDO', mensaje: 'La ruta del archivo no es válida.' };
+  }
+
+  if (!args.usuario) {
+    return { ok: false, status: 401, motivo: 'SESION_INVALIDA', mensaje: 'Debe iniciar sesión nuevamente.' };
+  }
+
+  if (!args.expediente) {
+    return { ok: false, status: 404, motivo: 'EXPEDIENTE_NO_ENCONTRADO', mensaje: 'Archivo no encontrado.' };
+  }
+
+  const { rol, tenantId } = args.usuario;
+  const concedido: ResultadoAutorizacionConcedida = {
+    ok: true,
+    prefijo: 'expedientes',
+    radicadoId: parsed.expedienteId,
+    tipoArchivo: 'DOCUMENTO_EXPEDIENTE',
+  };
+
+  if (ROLES_GLOBALES.has(rol)) return concedido;
+
+  if (ROLES_POR_DEPENDENCIA.has(rol) && args.expediente.tenantId === tenantId) {
+    return concedido;
+  }
+
+  return {
+    ok: false,
+    status: 403,
+    motivo: 'SIN_PERMISO_DE_DEPENDENCIA',
+    mensaje: 'No tiene permiso para descargar este archivo.',
   };
 }
