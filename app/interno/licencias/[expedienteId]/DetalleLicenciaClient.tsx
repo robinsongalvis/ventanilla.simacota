@@ -20,6 +20,9 @@ import type { ActuacionLicenciaDoc, ExpedienteLicenciaDoc } from '@/lib/server/e
 import { puedeTransicionar, type EstadoJuridicoLicencia } from '@/lib/motor-expedientes/estados-licencia';
 import { atLocalNoon, diasRestantesHabiles } from '@/lib/tiempos-radicado';
 import { formatFechaColombia } from '@/lib/fecha-colombia';
+import type { ContextoEvaluacionRequisito, DefinicionTramite } from '@/lib/motor-expedientes/tipos';
+import type { DocumentoExpedienteDoc } from '@/lib/server/expedientes-documentos-tipos';
+import { DEFINICION_LICENCIA_CONSTRUCCION_PARCIAL } from '@/lib/motor-expedientes/definiciones/licencia-construccion-parcial';
 import { proyectarVencimiento, PLAZO_DIAS } from '../fixtures';
 import { construirTimelineDesdeActuaciones } from '../presentacion-actuaciones';
 import { nombreSubtipo } from '../presentacion-subtipos';
@@ -30,8 +33,23 @@ import { EventoTimeline } from '../components/EventoTimeline';
 import { AvisoPoliticaSubsanacion } from '../components/AvisoPoliticaSubsanacion';
 import { BotonAccionPlaceholder } from '../components/BotonAccionPlaceholder';
 import { RegistrarActuacionModal } from '../components/RegistrarActuacionModal';
+import { ChecklistRequisitos } from '../components/ChecklistRequisitos';
 
 type EstadoCarga = 'cargando' | 'error' | 'no-encontrado' | 'listo';
+
+/**
+ * Registro de Definiciones de Trámite conocidas por el CLIENTE — Bloque
+ * A·A3. Hoy solo hay una sembrada (`DEFINICION_LICENCIA_CONSTRUCCION_
+ * PARCIAL`, dato puro importable, ver su propio JSDoc); el servidor
+ * (`GET .../[id]`) devuelve `definicionId` como STRING, no el objeto — la
+ * UI resuelve aquí. Cuando exista resolución dinámica de Definiciones por
+ * `tramiteId` (Fase 1, fuera de este bloque), este registro se reemplaza
+ * por esa fuente sin tocar `ChecklistRequisitos` (recibe `DefinicionTramite`
+ * ya resuelta, no un id).
+ */
+const DEFINICIONES_CONOCIDAS: Record<string, DefinicionTramite> = {
+  [DEFINICION_LICENCIA_CONSTRUCCION_PARCIAL.id]: DEFINICION_LICENCIA_CONSTRUCCION_PARCIAL,
+};
 
 /** Los dos tránsitos que esta pantalla puede disparar — mismo mapeo tipo→destino que `ESTADO_DESTINO_POR_TIPO_ACTUACION` en `lib/server/expedientes-licencias.ts` (no exportado; se declara aquí SOLO para decidir si el botón se muestra habilitado, la autoridad final sigue siendo el guard del servidor). */
 const DESTINO_ACTA: EstadoJuridicoLicencia = 'CON_ACTA_DE_OBSERVACIONES';
@@ -43,28 +61,47 @@ export function DetalleLicenciaClient({ expedienteId }: { expedienteId: string }
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
   const [expediente, setExpediente] = useState<ExpedienteLicenciaDoc | null>(null);
   const [actuaciones, setActuaciones] = useState<ActuacionLicenciaDoc[]>([]);
+  const [documentos, setDocumentos] = useState<DocumentoExpedienteDoc[]>([]);
+  const [definicionId, setDefinicionId] = useState<string | null>(null);
   const [modalActuacion, setModalActuacion] = useState<'acta-observaciones' | 'respuesta-subsanacion' | null>(null);
 
-  const cargar = useCallback(async () => {
-    setEstadoCarga('cargando');
+  /**
+   * `opts.silencioso`: recarga tras una subida de documento (checklist) SIN
+   * pasar por `estadoCarga: 'cargando'` — evita que el detalle entero
+   * parpadee a la pantalla de carga cada vez que el funcionario sube un
+   * papel (Bloque A·A3). Si la recarga silenciosa falla, se deja el último
+   * estado bueno en pantalla en vez de reemplazarlo por una pantalla de
+   * error — la subida en sí YA se confirmó con el funcionario (el propio
+   * control de carga mostró su resultado); solo el refresco posterior no
+   * llegó, y el próximo cambio (o recargar la página) lo reintenta.
+   */
+  const cargar = useCallback(async (opts?: { silencioso?: boolean }) => {
+    const silencioso = opts?.silencioso ?? false;
+    if (!silencioso) setEstadoCarga('cargando');
     try {
       const res = await fetch(`/api/licencias/expedientes/${encodeURIComponent(expedienteId)}`, { credentials: 'include' });
       if (res.status === 404) {
-        setEstadoCarga('no-encontrado');
+        if (!silencioso) setEstadoCarga('no-encontrado');
         return;
       }
       const body = await res.json().catch(() => ({}));
       if (!res.ok) {
-        setErrorMsg(body.error ?? 'No fue posible cargar el expediente.');
-        setEstadoCarga('error');
+        if (!silencioso) {
+          setErrorMsg(body.error ?? 'No fue posible cargar el expediente.');
+          setEstadoCarga('error');
+        }
         return;
       }
       setExpediente(body.expediente as ExpedienteLicenciaDoc);
       setActuaciones(Array.isArray(body.actuaciones) ? body.actuaciones : []);
-      setEstadoCarga('listo');
+      setDocumentos(Array.isArray(body.documentos) ? body.documentos : []);
+      setDefinicionId(typeof body.definicionId === 'string' ? body.definicionId : null);
+      if (!silencioso) setEstadoCarga('listo');
     } catch {
-      setErrorMsg('Error de red al cargar el expediente.');
-      setEstadoCarga('error');
+      if (!silencioso) {
+        setErrorMsg('Error de red al cargar el expediente.');
+        setEstadoCarga('error');
+      }
     }
   }, [expedienteId]);
 
@@ -104,6 +141,21 @@ export function DetalleLicenciaClient({ expedienteId }: { expedienteId: string }
     setModalActuacion(null);
   }
 
+  /**
+   * El PATCH de `.../contexto` ya devuelve el `contexto` MERGEADO
+   * (`planActualizarContexto`, `lib/server/expedientes-licencias.ts`) — se
+   * aplica directo al expediente en memoria, sin recargar todo el detalle
+   * (los `aportes`/`documentos` no cambian al editar un hecho del caso).
+   */
+  function alActualizarContexto(nuevoContexto: ContextoEvaluacionRequisito) {
+    setExpediente((prev) => (prev ? { ...prev, contexto: nuevoContexto } : prev));
+  }
+
+  /** La subida de documento (D7) solo confirma ids/metadatos, no el `DocumentoExpedienteDoc` completo — se recarga en silencio para reflejar la versión/aporte reales que persistió el servidor. */
+  function alSubirDocumento() {
+    void cargar({ silencioso: true });
+  }
+
   if (estadoCarga === 'cargando' || cargandoAuth) {
     return (
       <div className="p-4 md:p-6 max-w-[1400px] mx-auto">
@@ -140,6 +192,18 @@ export function DetalleLicenciaClient({ expedienteId }: { expedienteId: string }
   const numero = expediente.numeroExpediente?.numero ?? expediente.id;
   const puedeRegistrarActa = puedeTransicionar(expediente.estadoJuridico, DESTINO_ACTA, { yaHuboActa });
   const puedeRegistrarRespuesta = yaHuboActa && puedeTransicionar(expediente.estadoJuridico, DESTINO_RESPUESTA, { yaHuboActa });
+
+  // Checklist (Bloque A·A3) — solo-lectura para histórico migrado (no se
+  // "aporta" a un expediente reconstruido) o expediente ya EN_FIRME (mismo
+  // candado que aplica el propio servidor en `POST .../documentos`, 409).
+  const definicion = definicionId ? DEFINICIONES_CONOCIDAS[definicionId] : undefined;
+  const soloLecturaChecklist = expediente.origen === 'RECONSTRUIDO' || expediente.estadoJuridico === 'EN_FIRME';
+  const motivoSoloLecturaChecklist =
+    expediente.origen === 'RECONSTRUIDO'
+      ? 'Expediente histórico migrado — no admite nuevos aportes.'
+      : expediente.estadoJuridico === 'EN_FIRME'
+        ? 'Expediente en firme — no admite nuevos aportes.'
+        : undefined;
 
   return (
     <div className="p-4 md:p-6 flex flex-col gap-5 max-w-[1400px] mx-auto">
@@ -265,6 +329,27 @@ export function DetalleLicenciaClient({ expedienteId }: { expedienteId: string }
           <EventoTimeline eventos={timeline} />
         </div>
       </div>
+
+      {/* ── Checklist de requisitos ── */}
+      {definicion ? (
+        <ChecklistRequisitos
+          expedienteId={expediente.id}
+          definicion={definicion}
+          contexto={expediente.contexto ?? {}}
+          aportes={expediente.aportes ?? []}
+          documentos={documentos}
+          soloLectura={soloLecturaChecklist}
+          motivoSoloLectura={motivoSoloLecturaChecklist}
+          onContextoActualizado={alActualizarContexto}
+          onDocumentoSubido={alSubirDocumento}
+        />
+      ) : definicionId ? (
+        <div className="rounded-xl p-4" style={{ background: 'var(--bg-surface-2)', border: '1px solid var(--color-border)' }}>
+          <p className="text-sm" style={{ color: 'var(--text-secondary)' }}>
+            Definición de trámite &quot;{definicionId}&quot; no reconocida — no es posible mostrar el checklist.
+          </p>
+        </div>
+      ) : null}
 
       {modalActuacion && (
         <RegistrarActuacionModal
