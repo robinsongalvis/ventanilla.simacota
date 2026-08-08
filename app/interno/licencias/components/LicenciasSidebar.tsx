@@ -11,17 +11,17 @@ import { InstitucionalHeader } from '@/app/components/institucional/Instituciona
  * de ítem activo dorado), pero es un componente PROPIO de este módulo, no
  * el mismo componente reutilizado literalmente.
  *
- * Motivo (declarado, no un descuido): `SidebarNav` vive dentro de
- * `app/interno/dashboard/page.tsx` acoplado a `VistaActual`
- * (`lib/store/ventanillaStore.tsx`) y al estado de autenticación/roles de
- * ese archivo de 5000+ líneas. Licencias todavía es Fase 1 (fixtures, sin
- * colección Firestore) y su ruta es independiente (`/interno/licencias`),
- * así que integrarlo en `VistaActual` exigiría tocar `lib/store` — fuera
- * del alcance del Desarrollador Frontend (esa capa es estado/tipo
- * compartido, no una página). Se declara como dependencia en la respuesta
- * de la tarea: cuando Licencias tenga su propio flujo de datos real
- * (Fase 3+), dar de alta un ítem "Licencias" en `VistaActual` es el mismo
- * patrón que ya usan Analítica/Alertas — no hay puertas cerradas.
+ * Actualización (Bloque B, "la ventanita"): `VistaActual` YA tiene un
+ * ítem `'LICENCIAS'` (`lib/store/ventanillaStore.tsx`) que monta
+ * `VistaLicencias` (`app/interno/dashboard/components/licencias/
+ * VistaLicencias.tsx`) EMBEBIDO dentro de `SidebarNav`, con su propia
+ * sub-navegación local (Bandeja / Libro consecutivo) — ese es hoy el
+ * camino principal para el funcionario de Planeación. Este sidebar y la
+ * ruta standalone que envuelve (`/interno/licencias`, `layout.tsx`) NO se
+ * retiraron: siguen vivos a propósito para deep-links (un enlace directo a
+ * `/interno/licencias/{id}` sigue funcionando fuera del panel). Los dos
+ * caminos comparten los mismos Client Components (`BandejaLicenciasClient`,
+ * `DetalleLicenciaClient`), no lógica duplicada.
  */
 const ITEMS = [
   { href: '/interno/licencias', label: 'Licencias' },

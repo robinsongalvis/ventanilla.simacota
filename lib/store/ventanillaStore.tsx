@@ -42,7 +42,8 @@ export type VistaActual =
   | 'ANTICIPACION_OPERATIVA' // Anticipación Operativa y Análisis Predictivo — Fase 4.1
   | 'ADMINISTRACION'         // Gestión de usuarios internos — Solo ADMIN
   | 'APROBACIONES'           // Cola de aprobaciones — Jefe + Admin
-  | 'CONTROL_INTERNO';       // Dashboard métricas MIPG — Control Interno
+  | 'CONTROL_INTERNO'        // Dashboard métricas MIPG — Control Interno
+  | 'LICENCIAS';             // Licencias urbanísticas (Secretaría de Planeación) — Bloque B
 
 
 interface VentanillaState {

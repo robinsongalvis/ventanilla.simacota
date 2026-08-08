@@ -55,7 +55,22 @@ const DEFINICIONES_CONOCIDAS: Record<string, DefinicionTramite> = {
 const DESTINO_ACTA: EstadoJuridicoLicencia = 'CON_ACTA_DE_OBSERVACIONES';
 const DESTINO_RESPUESTA: EstadoJuridicoLicencia = 'EN_VIABILIDAD';
 
-export function DetalleLicenciaClient({ expedienteId }: { expedienteId: string }) {
+export interface DetalleLicenciaClientProps {
+  expedienteId: string;
+  /**
+   * Bloque B ("la ventanita") — cuando el Detalle se monta EMBEBIDO dentro
+   * de `VistaLicencias` (`app/interno/dashboard/components/licencias/
+   * VistaLicencias.tsx`), "← Bandeja de Licencias" es un cambio de estado
+   * local del panel (volver a `expedienteSeleccionado = null`), no una
+   * navegación de ruta. Si se recibe, `VolverBandeja` renderiza un botón
+   * que llama esto en vez de `<Link href="/interno/licencias">`. Sin esta
+   * prop (ruta standalone `/interno/licencias/{id}`) el comportamiento es
+   * exactamente el de antes: `<Link>`.
+   */
+  onVolver?: () => void;
+}
+
+export function DetalleLicenciaClient({ expedienteId, onVolver }: DetalleLicenciaClientProps) {
   const { usuario, cargando: cargandoAuth } = useAuth();
   const [estadoCarga, setEstadoCarga] = useState<EstadoCarga>('cargando');
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
@@ -173,7 +188,7 @@ export function DetalleLicenciaClient({ expedienteId }: { expedienteId: string }
   if (estadoCarga === 'no-encontrado') {
     return (
       <div className="p-4 md:p-6 max-w-[720px] mx-auto flex flex-col items-start gap-3">
-        <VolverBandeja />
+        <VolverBandeja onVolver={onVolver} />
         <div className="rounded-xl p-5 w-full" style={{ background: 'var(--bg-surface)', border: '1px solid var(--color-border)', boxShadow: 'var(--shadow-soft)' }}>
           <h1 className="font-headline text-xl" style={{ color: 'var(--text-primary)' }}>Expediente no encontrado</h1>
           <p className="text-sm mt-2" style={{ color: 'var(--text-secondary)' }}>
@@ -187,7 +202,7 @@ export function DetalleLicenciaClient({ expedienteId }: { expedienteId: string }
   if (estadoCarga === 'error' || !expediente) {
     return (
       <div className="p-4 md:p-6 max-w-[720px] mx-auto flex flex-col items-start gap-3">
-        <VolverBandeja />
+        <VolverBandeja onVolver={onVolver} />
         <p role="alert" className="rounded-lg px-3 py-2 text-sm w-full" style={{ background: '#FEF2F2', border: '1px solid #FECACA', color: '#991B1B' }}>
           {errorMsg ?? 'No fue posible cargar el expediente.'}
         </p>
@@ -213,7 +228,7 @@ export function DetalleLicenciaClient({ expedienteId }: { expedienteId: string }
 
   return (
     <div className="p-4 md:p-6 flex flex-col gap-5 max-w-[1400px] mx-auto">
-      <VolverBandeja />
+      <VolverBandeja onVolver={onVolver} />
 
       {/* ── Tarjeta encabezado ── */}
       <div
@@ -380,17 +395,26 @@ export function DetalleLicenciaClient({ expedienteId }: { expedienteId: string }
   );
 }
 
-function VolverBandeja() {
-  return (
-    <Link
-      href="/interno/licencias"
-      className="inline-flex items-center gap-1.5 text-sm font-medium w-fit rounded focus-visible:outline-none focus-visible:ring-2"
-      style={{ color: '#14532D' }}
-    >
+function VolverBandeja({ onVolver }: { onVolver?: () => void }) {
+  const className = 'inline-flex items-center gap-1.5 text-sm font-medium w-fit rounded focus-visible:outline-none focus-visible:ring-2';
+  const contenido = (
+    <>
       <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
         <path strokeLinecap="round" strokeLinejoin="round" d="M10.5 19.5L3 12m0 0l7.5-7.5M3 12h18" />
       </svg>
       Bandeja de Licencias
+    </>
+  );
+  if (onVolver) {
+    return (
+      <button type="button" onClick={onVolver} className={className} style={{ color: '#14532D' }}>
+        {contenido}
+      </button>
+    );
+  }
+  return (
+    <Link href="/interno/licencias" className={className} style={{ color: '#14532D' }}>
+      {contenido}
     </Link>
   );
 }
