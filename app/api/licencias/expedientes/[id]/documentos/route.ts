@@ -25,6 +25,7 @@ import { DEFINICION_LICENCIA_CONSTRUCCION_PARCIAL } from '@/lib/motor-expediente
 import {
   validarYPrepararArchivoDocumento,
   validarRequisitoIdContraDefinicion,
+  validarRequisitoAplicaContraContexto,
   planSubirDocumento,
 } from '@/lib/server/expedientes-documentos';
 import { construirStoragePathStaging } from '@/lib/server/expedientes-documentos-tipos';
@@ -100,6 +101,15 @@ export async function POST(request: Request, context: RouteContext): Promise<Nex
     const errorRequisito = validarRequisitoIdContraDefinicion(requisitoId, DEFINICION_LICENCIA_CONSTRUCCION_PARCIAL);
     if (errorRequisito) {
       return NextResponse.json({ error: errorRequisito.mensaje }, { status: errorRequisito.status });
+    }
+
+    // Defensa en profundidad (endurecimiento pre-reunión, hallazgo QA): si
+    // el requisito es CONDICIONAL y su condición evalúa NO_APLICA contra
+    // los hechos YA registrados en `expediente.contexto`, el server
+    // rechaza — la UI ya lo bloquea, pero no es la única defensa.
+    const errorNoAplica = validarRequisitoAplicaContraContexto(requisitoId, DEFINICION_LICENCIA_CONSTRUCCION_PARCIAL, expediente.contexto ?? {});
+    if (errorNoAplica) {
+      return NextResponse.json({ error: errorNoAplica.mensaje }, { status: errorNoAplica.status });
     }
 
     // H-08: allowlist MIME + magic-bytes + tamaño + sanea nombre + hash

@@ -72,7 +72,19 @@ import { join, resolve } from 'node:path';
 
 const RAIZ = resolve(process.cwd());
 const DIRS_ESCANEO = ['app', 'lib'];
-const COLECCION = 'ventanilla_radicados';
+/**
+ * Colecciones vigiladas por el mecanismo REGISTRO (lecturas de nivel
+ * colección vía Admin/Client SDK). Bloque de endurecimiento pre-reunión
+ * (hallazgo QA, ago-2026): el gate original solo vigilaba
+ * `ventanilla_radicados`; `expedientes` (motor de licencias, Bloque A) tiene
+ * el MISMO riesgo O(N) — bandeja sin `.limit()` — y quedaba fuera del radar.
+ * Se añade aquí como una entrada más de este arreglo, no como mecanismo
+ * aparte: el patrón de vigilancia (Admin `.collection('x')…get()` / Client
+ * `collection(db,'x')`) es idéntico para cualquier colección, solo cambia
+ * el nombre literal. Sumar una tercera colección en el futuro es agregar un
+ * string aquí, no duplicar el mecanismo.
+ */
+const COLECCIONES_VIGILADAS = ['ventanilla_radicados', 'expedientes'];
 const VENTANA_LINEAS = 20; // líneas alrededor del ref donde buscar la cota
 
 /** Presupuesto (derivado de la línea base + 2A — ver encabezado). */
@@ -171,6 +183,20 @@ const REGISTRO = [
     cotaRegex: /const LIMITE_CANDIDATOS\s*=\s*(\d+)/,
     cotaMax: 500,
     ref: 'ADR-0011 · Bloque A·A4 (handoff D2)',
+  },
+  {
+    archivo: 'app/api/licencias/expedientes/route.ts',
+    estado: 'ACOTADA',
+    clase: 'INTERACTIVA',
+    descripcion: 'Bandeja de expedientes de licencias del tenant de Planeación: '
+      + 'where por tenantId + limit duro; orden en memoria sobre el lote acotado '
+      + '(sin orderBy para no exigir el índice compuesto aún no desplegado). '
+      + 'Hallazgo QA endurecimiento pre-reunión (ago-2026): la colección '
+      + '`expedientes` estaba fuera del radar del gate — COLECCIONES_VIGILADAS '
+      + 'se amplió para cubrirla.',
+    cotaRegex: /const LIMITE_BANDEJA\s*=\s*(\d+)/,
+    cotaMax: 500,
+    ref: 'ADR-0011 · endurecimiento pre-reunión (hallazgo QA)',
   },
   {
     archivo: 'app/api/reportes/mipg/excel/route.ts',
@@ -287,28 +313,32 @@ function listarFuentes(dir) {
   return out;
 }
 
-// Admin: `.collection('ventanilla_radicados')` NO seguido de `.doc(`.
-const RE_ADMIN = new RegExp(`\\.collection\\(\\s*['"]${COLECCION}['"]\\s*\\)(?!\\s*\\.doc\\()`);
-// Client: `collection(<handle>, 'ventanilla_radicados')` (nombre = último arg).
-const RE_CLIENT = new RegExp(`[^.\\w]collection\\(\\s*[^,]+,\\s*['"]${COLECCION}['"]\\s*\\)`);
+// Alternativa de nombres literales vigilados — ver COLECCIONES_VIGILADAS.
+const ALTERNATIVA_COLECCIONES = COLECCIONES_VIGILADAS.join('|');
+// Admin: `.collection('ventanilla_radicados'|'expedientes')` NO seguido de `.doc(`.
+const RE_ADMIN = new RegExp(`\\.collection\\(\\s*['"](${ALTERNATIVA_COLECCIONES})['"]\\s*\\)(?!\\s*\\.doc\\()`);
+// Client: `collection(<handle>, 'ventanilla_radicados'|'expedientes')` (nombre = último arg).
+const RE_CLIENT = new RegExp(`[^.\\w]collection\\(\\s*[^,]+,\\s*['"](${ALTERNATIVA_COLECCIONES})['"]\\s*\\)`);
 const RE_COTA = /(?:^|[^.\w])limit\(|\.limit\(|startAfter\(|startAt\(/;
 
-/** Encuentra las lecturas de colección (list-read) en un archivo. */
+/** Encuentra las lecturas de colección (list-read) en un archivo, para cualquiera de las COLECCIONES_VIGILADAS. */
 function detectarLecturas(rutaAbs, rel) {
   const contenido = readFileSync(rutaAbs, 'utf8');
   const lineas = contenido.split('\n');
   const lecturas = [];
   for (let i = 0; i < lineas.length; i += 1) {
     const linea = lineas[i];
-    const esAdmin = RE_ADMIN.test(linea);
-    const esClient = RE_CLIENT.test(linea);
-    if (!esAdmin && !esClient) continue;
+    const mAdmin = linea.match(RE_ADMIN);
+    const mClient = linea.match(RE_CLIENT);
+    const m = mAdmin || mClient;
+    if (!m) continue;
+    const coleccion = m[1];
 
     const desde = Math.max(0, i - VENTANA_LINEAS);
     const hasta = Math.min(lineas.length, i + VENTANA_LINEAS + 1);
     const ventana = lineas.slice(desde, hasta).join('\n');
     const acotada = RE_COTA.test(ventana);
-    lecturas.push({ archivo: rel, linea: i + 1, acotada });
+    lecturas.push({ archivo: rel, linea: i + 1, acotada, coleccion });
   }
   return lecturas;
 }
@@ -395,10 +425,12 @@ async function main() {
     const reg = registroPorArchivo.get(archivo);
     const algunaSinCota = lecturas.some((l) => !l.acotada);
 
+    const colecciones = [...new Set(lecturas.map((l) => l.coleccion))].join("', '");
+
     if (!reg) {
       violaciones.push(
         `SUPERFICIE NO REGISTRADA: ${archivo} (líneas ${lecturas.map((l) => l.linea).join(', ')}) `
-        + `lee la colección '${COLECCION}'${algunaSinCota ? ' SIN COTA' : ''}. `
+        + `lee la colección '${colecciones}'${algunaSinCota ? ' SIN COTA' : ''}. `
         + `Clasifícala en el REGISTRO de scripts/laboratorio/presupuesto-rendimiento.mjs.`,
       );
       continue;
@@ -408,7 +440,7 @@ async function main() {
       if (algunaSinCota) {
         violaciones.push(
           `PRESUPUESTO EXCEDIDO (regresión O(N)): ${archivo} declarada ACOTADA pero una lectura de `
-          + `'${COLECCION}' perdió su cota (líneas ${lecturas.filter((l) => !l.acotada).map((l) => l.linea).join(', ')}). `
+          + `'${colecciones}' perdió su cota (líneas ${lecturas.filter((l) => !l.acotada).map((l) => l.linea).join(', ')}). `
           + `Restablece limit()/cursor.`,
         );
       }
@@ -456,8 +488,8 @@ async function main() {
   for (const reg of REGISTRO) {
     if (!porArchivo.has(reg.archivo)) {
       advertencias.push(
-        `REGISTRO OBSOLETO: ${reg.archivo} (${reg.estado}) ya no contiene una lectura de colección `
-        + `de '${COLECCION}'. Elimínala del REGISTRO.`,
+        `REGISTRO OBSOLETO: ${reg.archivo} (${reg.estado}) ya no contiene una lectura de ninguna `
+        + `de las colecciones vigiladas (${COLECCIONES_VIGILADAS.join(', ')}). Elimínala del REGISTRO.`,
       );
     }
   }
