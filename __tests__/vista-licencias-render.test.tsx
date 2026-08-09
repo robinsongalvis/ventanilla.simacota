@@ -102,7 +102,7 @@ describe('VistaLicencias — Bloque B, Licencias embebida en el panel interno', 
     expect(screen.getByRole('heading', { name: 'Bandeja de Licencias' })).toBeTruthy();
   });
 
-  it('sub-pestaña "Libro consecutivo": muestra el placeholder y oculta la bandeja', async () => {
+  it('sub-pestaña "Libro consecutivo" (Bloque C): monta el Libro Consecutivo real y oculta la bandeja', async () => {
     mockAuth();
     vi.stubGlobal('fetch', mockFetchModulo([expedienteBase()]));
     render(<VistaLicencias />);
@@ -112,11 +112,29 @@ describe('VistaLicencias — Bloque B, Licencias embebida en el panel interno', 
     fireEvent.click(screen.getByRole('tab', { name: 'Libro consecutivo' }));
 
     expect(screen.getByRole('heading', { name: 'Libro consecutivo' })).toBeTruthy();
-    expect(screen.getByText(/motor de expedientes de licencias tenga colección propia/i)).toBeTruthy();
     expect(screen.queryByRole('heading', { name: 'Bandeja de Licencias' })).toBeNull();
-    // El placeholder embebido no repite el enlace "Bandeja de Licencias"
-    // de la ruta standalone — aquí es una sub-pestaña, no una página.
+    // El Libro embebido no repite el enlace "Bandeja de Licencias" de la
+    // ruta standalone — aquí es una sub-pestaña, no una página aparte.
     expect(screen.queryByText('Bandeja de Licencias')).toBeNull();
+
+    // Año por defecto = reloj real de la máquina que corre el test, no el
+    // 2026 del fixture — se selecciona explícitamente (siempre disponible,
+    // `añosDisponiblesLibro` lo deriva del dato) para verificar que el
+    // Libro es el componente REAL (con datos), no un cascarón vacío.
+    fireEvent.change(screen.getByLabelText('Año del libro consecutivo'), { target: { value: '2026' } });
+    await waitFor(() => expect(screen.getByText('68745-0-26-0001')).toBeTruthy());
+  });
+
+  it('botón "Exportar libro consecutivo ↓" de la Bandeja cambia a la sub-pestaña Libro consecutivo (sin navegar de ruta)', async () => {
+    mockAuth();
+    vi.stubGlobal('fetch', mockFetchModulo([expedienteBase()]));
+    render(<VistaLicencias />);
+
+    await waitFor(() => expect(screen.getByText('68745-0-26-0001')).toBeTruthy());
+    fireEvent.click(screen.getByRole('button', { name: 'Exportar libro consecutivo ↓' }));
+
+    expect(screen.getByRole('tab', { name: 'Libro consecutivo' }).getAttribute('aria-selected')).toBe('true');
+    expect(screen.getByRole('heading', { name: 'Libro consecutivo' })).toBeTruthy();
   });
 
   it('callback onAbrirExpediente: clic en una fila de la bandeja abre el detalle embebido (sin navegar de ruta)', async () => {

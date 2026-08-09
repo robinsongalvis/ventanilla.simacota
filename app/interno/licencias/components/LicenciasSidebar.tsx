@@ -33,7 +33,7 @@ export function LicenciasSidebar() {
 
   return (
     <aside
-      className="hidden md:flex h-full flex-col shrink-0 w-[250px] overflow-hidden"
+      className="hidden md:flex h-full flex-col shrink-0 w-[250px] overflow-hidden print:hidden"
       style={{ background: '#14532D' }}
     >
       <div
@@ -92,7 +92,7 @@ export function LicenciasSidebar() {
 export function LicenciasTopBarMovil({ titulo }: { titulo: string }) {
   return (
     <header
-      className="md:hidden shrink-0 bg-white px-3 py-2.5 flex items-center gap-2.5"
+      className="md:hidden shrink-0 bg-white px-3 py-2.5 flex items-center gap-2.5 print:hidden"
       style={{ borderBottom: '1px solid #D9E2D9' }}
     >
       <Link

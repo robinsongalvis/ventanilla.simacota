@@ -20,11 +20,13 @@
 
    La sub-navegación local (Bandeja / Libro consecutivo) reemplaza aquí a
    `LicenciasSidebar` (que sigue viva para la ruta standalone, deep-links).
-   El "Libro consecutivo" sigue siendo un placeholder honesto — la
-   colección Firestore propia del libro consecutivo de licencias es Fase
-   1/3 de `docs/planes/PLAN_FASES_MOTOR_EXPEDIENTES.md`, fuera del alcance
-   de este bloque (declarado también en `app/interno/licencias/
-   libro-consecutivo/page.tsx`, que este bloque no toca).
+
+   Bloque C: "Libro consecutivo" monta `LibroConsecutivoClient` — el MISMO
+   Client Component que la ruta standalone (`app/interno/licencias/
+   libro-consecutivo/page.tsx`), patrón dual idéntico al de la Bandeja/
+   Detalle arriba. El botón "Exportar libro consecutivo ↓" del pie de la
+   Bandeja usa `onIrALibroConsecutivo` para cambiar de sub-pestaña LOCAL
+   en vez de navegar de ruta (mismo principio que `onAbrirExpediente`).
 
    NO usa `GuardModuloPlaneacion` (ese guard asume `h-screen`, pensado para
    la ruta standalone con su propio chrome de página completa — lo
@@ -36,6 +38,7 @@
 import { useState } from 'react';
 import { BandejaLicenciasClient } from '@/app/interno/licencias/components/BandejaLicenciasClient';
 import { DetalleLicenciaClient } from '@/app/interno/licencias/[expedienteId]/DetalleLicenciaClient';
+import { LibroConsecutivoClient } from '@/app/interno/licencias/components/LibroConsecutivoClient';
 
 type SubVistaLicencias = 'BANDEJA' | 'LIBRO_CONSECUTIVO';
 
@@ -62,7 +65,7 @@ export function VistaLicencias() {
 
   return (
     <div className="flex flex-col gap-3 h-full">
-      <div className="shrink-0 px-4 md:px-6 pt-4">
+      <div className="shrink-0 px-4 md:px-6 pt-4 print:hidden">
         <div
           className="flex gap-1 p-1 rounded-full w-fit"
           style={{ background: '#EEF4EE' }}
@@ -89,35 +92,13 @@ export function VistaLicencias() {
       </div>
 
       {subVista === 'BANDEJA' ? (
-        <BandejaLicenciasClient onAbrirExpediente={setExpedienteSeleccionado} />
+        <BandejaLicenciasClient
+          onAbrirExpediente={setExpedienteSeleccionado}
+          onIrALibroConsecutivo={() => setSubVista('LIBRO_CONSECUTIVO')}
+        />
       ) : (
-        <LibroConsecutivoPlaceholder />
+        <LibroConsecutivoClient />
       )}
-    </div>
-  );
-}
-
-/**
- * Mismo contenido honesto que `app/interno/licencias/libro-consecutivo/
- * page.tsx` (ruta standalone), sin el enlace "Bandeja de Licencias" — aquí
- * es una sub-pestaña local, no una página aparte a la que haya que volver.
- */
-function LibroConsecutivoPlaceholder() {
-  return (
-    <div className="p-4 md:p-6 max-w-[720px] mx-auto">
-      <div
-        className="rounded-xl p-5 w-full"
-        style={{ background: 'var(--bg-surface)', border: '1px solid var(--color-border)', boxShadow: 'var(--shadow-soft)' }}
-      >
-        <h2 className="font-headline text-xl" style={{ color: 'var(--text-primary)' }}>
-          Libro consecutivo
-        </h2>
-        <p className="text-sm mt-2" style={{ color: 'var(--text-secondary)' }}>
-          Disponible cuando el motor de expedientes de licencias tenga colección propia en Firestore (Fase 1/3 de
-          <code className="font-mono text-[13px] mx-1">docs/planes/PLAN_FASES_MOTOR_EXPEDIENTES.md</code>
-          — fuera del alcance de esta tarea).
-        </p>
-      </div>
     </div>
   );
 }
