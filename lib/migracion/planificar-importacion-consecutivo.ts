@@ -1,0 +1,499 @@
+/**
+ * Planificador PURO de la importación del consecutivo histórico de
+ * licencias (Bloque "Importador de históricos", ago-2026) — Fase 5
+ * (expedientes RECONSTRUIDOS, ADR-0029 DF-9).
+ *
+ * Resuelve el problema "el ejecutor `.mjs` no puede importar TS" separando
+ * el trabajo en dos capas (mismo patrón que el resto del proyecto: "Plan |
+ * Error" puro + route/script que solo orquesta I/O):
+ *  - Esta capa (TS, puro, sin I/O) decide TODO: qué registro se importa,
+ *    con qué datos exactos, y por qué uno se queda afuera.
+ *  - `scripts/migracion/importar-consecutivo-licencias.mjs` es un ejecutor
+ *    TONTO: solo lee un `PlanImportacion` ya serializado a JSON y lo
+ *    escribe (o no) — cero decisiones, cero lógica de negocio, así que no
+ *    necesita importar TypeScript.
+ *
+ * PURO: sin I/O, sin Firestore, sin `new Date()` propio (recibe `ahora`
+ * como parámetro — determinismo para tests).
+ *
+ * Reutiliza (nunca reimplementa) las piezas REALES del motor:
+ *  - `resolverEquivalencia`/`EQUIVALENCIAS_MIGRACION_SEMILLA_LICENCIAS`
+ *    (DF-4) para el CÓDIGO de subtipo (eje P1′).
+ *  - `resolverEstadoOperativo`/`EQUIVALENCIAS_ESTADOS_OPERATIVOS_SEMILLA`
+ *    (`./equivalencia-estados-operativos.ts`, estructura P4′ nueva) para el
+ *    hito jurídico (eje P4′).
+ *
+ * ═══════════════════════════════════════════════════════════════════════
+ * REGLA DURA — por qué HOY el dry-run planifica 0 importables:
+ *
+ * Un registro histórico solo se planifica como expediente si TODAS estas
+ * puertas pasan:
+ *  1. `tipo` resuelve a códigos de subtipo (P1′) — `resolverEquivalencia`.
+ *  2. `estado` resuelve a un hito jurídico (P4′) — `resolverEstadoOperativo`.
+ *  3. `fechaSolicitud` es una fecha calendario válida y reconocible.
+ *  4. El solicitante tiene nombre Y número de documento — HALLAZGO de esta
+ *     implementación, no parte del encargo original: `solicitanteNombre` y
+ *     `solicitanteDocumento` son campos OBLIGATORIOS del modelo
+ *     `Expediente`. El número de documento/cédula NUNCA existió en el
+ *     libro histórico (verificado contra las 202 filas reales, en NINGUNA
+ *     versión del snapshot) — bloquea el 100% de los registros por sí
+ *     solo. El NOMBRE sí existe en el libro real, pero remediación PII
+ *     (ago-2026, Ley 1581/2012): el archivo que corre en CI/se versiona
+ *     (`consecutivo-licencias-snapshot.sanitizado.json`) lo retira a
+ *     propósito — los nombres propios nunca entran a la historia de git,
+ *     ni en un repo privado (la historia es permanente). Contra ESE
+ *     archivo, esta puerta también bloquea el 100% por el lado del
+ *     nombre; contra el `.local.json` (máquina autorizada, con nombres),
+ *     solo bloquea por el lado del documento — el resultado numérico
+ *     (0 planificados) es idéntico en ambos casos, cambia únicamente el
+ *     detalle textual de POR QUÉ. Inventar un valor de relleno (aunque
+ *     fuera `''` o un marcador tipo "[REDACTADO]") sería exactamente lo
+ *     que "sin inventar nada ausente" prohíbe — redactar (omitir) no es
+ *     lo mismo que inventar. Esta puerta seguirá bloqueando incluso
+ *     después de que P1′ y P4′ respondan, salvo que el propietario decida
+ *     una fuente alterna para la identidad o se relaje el modelo. Se
+ *     reporta como advertencia aparte (no se mezcla con P1′/P4′, que sí
+ *     estaban en el encargo).
+ *
+ * Con la semilla PROVISIONAL de hoy (100% CUARENTENA en la tabla de
+ * estados operativos — ver `equivalencia-estados-operativos.ts`), la
+ * puerta 2 por sí sola YA quarentena el 100% del snapshot real. El
+ * resultado esperado y CORRECTO del dry-run: **0 planificados, ~202 en
+ * cuarentena**. El reporte (`generarReporteDryRun`) desglosa CUÁNTOS
+ * registros desbloquea cada respuesta pendiente, para que el propietario y
+ * el ingeniero vean el impacto exacto de responder P1′/P4′ (y, aparte, de
+ * decidir qué hacer con la identidad del solicitante).
+ * ═══════════════════════════════════════════════════════════════════════
+ */
+
+import {
+  EQUIVALENCIAS_MIGRACION_SEMILLA_LICENCIAS,
+} from '@/lib/motor-expedientes/catalogo-subtipos-normativo';
+import { resolverEquivalencia } from '@/lib/motor-expedientes/equivalencia-migracion';
+import {
+  EQUIVALENCIAS_ESTADOS_OPERATIVOS_SEMILLA,
+  resolverEstadoOperativo,
+} from './equivalencia-estados-operativos';
+import type { EstadoJuridicoLicencia } from '@/lib/motor-expedientes/estados-licencia';
+import type { EstadoExpediente } from '@/lib/motor-expedientes/tipos';
+// Import type-only (se borra en compilación, CERO acoplamiento en tiempo de
+// ejecución con `lib/server/`): reutiliza la forma exacta del documento que
+// ya escriben las demás rutas de expedientes, sin duplicar la interfaz.
+import type { ExpedienteLicenciaDoc } from '@/lib/server/expedientes-licencias';
+
+/* ──────────────────────────────────────────────
+   Snapshot de entrada (contrato con el JSON copiado a `scripts/migracion/datos/`)
+────────────────────────────────────────────── */
+
+export interface RegistroConsecutivoHistorico {
+  hoja: string;
+  fila: number;
+  radicado: string;
+  fechaSolicitud: string;
+  tipo: string;
+  direccion?: string;
+  barrioVereda?: string;
+  estado?: string;
+  matricula?: string;
+  area?: string;
+  noLicencia?: string;
+  correcciones?: string;
+  /**
+   * Nombre del solicitante. OPCIONAL (remediación PII, ago-2026): el
+   * archivo que corre en CI/se versiona es `consecutivo-licencias-
+   * snapshot.sanitizado.json`, que retira este campo (Ley 1581/2012 — un
+   * nombre propio nunca entra a la historia de git, ni en un repo
+   * privado). La versión CON nombres (`.local.json`, gitignored) solo
+   * vive en máquinas autorizadas, para la reunión con el propietario. El
+   * planificador es el MISMO código en ambos casos — la puerta
+   * IDENTIDAD_INCOMPLETA (ver más abajo) exige este campo igual que
+   * `solicitanteDocumento`, así que la ausencia (sanitizado) o presencia
+   * (local) no cambia la reconciliación, solo el detalle textual de la
+   * cuarentena.
+   */
+  solicitante?: string;
+  /**
+   * Número de documento del solicitante. Optativo porque el libro
+   * histórico REAL de Simacota (ambas versiones, sanitizada y local) no
+   * tiene esta columna — no existe en ninguna de las 202 filas — así que
+   * para ese snapshot esto siempre es `undefined` y la puerta
+   * IDENTIDAD_INCOMPLETA (ver `planificarImportacion`) los manda a todos
+   * a cuarentena, honestamente. Se declara aquí (en vez de omitirse del
+   * tipo) para que una fuente FUTURA que sí traiga el dato pueda usar el
+   * mismo planificador sin cambios de código — y para que los tests
+   * sintéticos puedan ejercer el camino "importable".
+   */
+  solicitanteDocumento?: string;
+}
+
+export interface ProcedenciaSnapshot {
+  archivoOrigen: string;
+  sha256: string;
+  extraidoEn: string;
+  totalRegistros: number;
+  nota: string;
+}
+
+export interface SnapshotConsecutivoLicencias {
+  _procedencia: ProcedenciaSnapshot;
+  registros: RegistroConsecutivoHistorico[];
+}
+
+/* ──────────────────────────────────────────────
+   Plan de salida
+────────────────────────────────────────────── */
+
+export type MotivoCuarentena =
+  | 'CODIGO_PENDIENTE_P1'
+  | 'ESTADO_PENDIENTE_P4'
+  | 'FECHA_INVALIDA'
+  | 'IDENTIDAD_INCOMPLETA';
+
+export interface RegistroEnCuarentena {
+  radicado: string;
+  hoja: string;
+  fila: number;
+  /**
+   * OPCIONAL (remediación PII, ago-2026): presente solo cuando el
+   * planificador corre contra el `.local.json` (máquina autorizada, con
+   * nombres); ausente cuando corre contra el `.sanitizado.json` (CI, sin
+   * PII). Nunca se rellena con un marcador tipo "[REDACTADO]" — redactar
+   * (omitir) no es lo mismo que inventar un valor.
+   */
+  solicitante?: string;
+  /** Puede tener más de un motivo simultáneo (p. ej. código Y estado sin mapear a la vez) — cada uno se cuenta aparte en el reporte. */
+  motivos: MotivoCuarentena[];
+  /** Explicación legible, un elemento por motivo (mismo orden que `motivos`). */
+  detalle: string[];
+  colision: boolean;
+}
+
+export interface Reconciliacion {
+  totalSnapshot: number;
+  planificados: number;
+  enCuarentena: number;
+  /** Registros (no pares) involucrados en una colisión de `radicado` repetido — el caso 25-0037 real cuenta 2. */
+  colisiones: number;
+}
+
+export interface PlanImportacion {
+  /** Documentos COMPLETOS, listos para `tx.create`/`batch.set` — el ejecutor no decide nada más. */
+  expedientes: ExpedienteLicenciaDoc[];
+  cuarentena: RegistroEnCuarentena[];
+  reconciliacion: Reconciliacion;
+  advertencias: string[];
+}
+
+/* ──────────────────────────────────────────────
+   Utilidades puras de parseo (sin reimplementar `atLocalNoon`)
+────────────────────────────────────────────── */
+
+const RE_FECHA_ISO = /^(\d{4})-(\d{2})-(\d{2})$/;
+
+/**
+ * Parsea `fechaSolicitud` ("YYYY-MM-DD", ya un DÍA CIVIL sin ambigüedad de
+ * huso horario — no un instante) a un ISO 8601 anclado al mediodía de ese
+ * mismo día. Misma CONVENCIÓN de representación que `atLocalNoon`
+ * (`lib/tiempos-radicado.ts`) — de ahí "atLocalNoon-compatible" — pero
+ * deliberadamente SIN llamarla: `atLocalNoon` reinterpreta su entrada como
+ * un INSTANTE (hace `new Date(value)` y vuelve a extraer el día civil vía
+ * `Intl`/America-Bogota); para un string "solo fecha", `new Date(...)` lo
+ * parsea como MEDIANOCHE UTC, y ese instante cae el día CIVIL ANTERIOR en
+ * Bogotá (UTC−5) — verificado empíricamente:
+ * `atLocalNoon('2026-01-06')` da día civil "05", no "06". Como
+ * `fechaSolicitud` YA ES un día civil (no un instante que haya que
+ * reinterpretar), la transformación correcta toma sus tres componentes
+ * literales y los ancla al mediodía directamente — sin ningún paso por
+ * huso horario intermedio.
+ *
+ * Devuelve `null` (nunca lanza, nunca inventa) ante cualquier formato
+ * distinto de "YYYY-MM-DD" o una fecha calendario imposible (p. ej.
+ * "2026-02-30", que `Date` "normalizaría" en vez de rechazar) — el caller
+ * manda el registro a cuarentena en vez de asumir un valor.
+ */
+export function parsearFechaHistoricaANoonISO(texto: string | undefined | null): { iso: string; año: number } | null {
+  if (!texto) return null;
+  const m = RE_FECHA_ISO.exec(texto.trim());
+  if (!m) return null;
+  const year = Number(m[1]);
+  const month = Number(m[2]);
+  const day = Number(m[3]);
+  const fecha = new Date(year, month - 1, day, 12, 0, 0, 0);
+  // Guarda contra fechas calendario imposibles: el constructor de `Date`
+  // "normaliza" en vez de fallar (p. ej. día 30 de febrero se convierte en
+  // 2 de marzo) — comparar contra los componentes originales lo detecta.
+  if (fecha.getFullYear() !== year || fecha.getMonth() !== month - 1 || fecha.getDate() !== day) {
+    return null;
+  }
+  return { iso: fecha.toISOString(), año: year };
+}
+
+/**
+ * Deriva el estado OPERATIVO (panel, `EstadoExpediente`) desde el hito
+ * JURÍDICO resuelto — simplificación DECLARADA (Principio 13): hoy no hay
+ * ninguna fila `MAPEADO` en `EQUIVALENCIAS_ESTADOS_OPERATIVOS_SEMILLA`, así
+ * que esta rama no se ejerce contra datos reales todavía (solo en tests
+ * sintéticos); cuando P4′ responda y se llenen filas `MAPEADO`, esta
+ * heurística puede necesitar revisión humana en vez de asumirse correcta
+ * en producción sin más validación.
+ */
+function estadoOperativoDesdeJuridico(estadoJuridico: EstadoJuridicoLicencia): EstadoExpediente {
+  const CERRADOS: readonly EstadoJuridicoLicencia[] = ['CONCEDIDA', 'NEGADA', 'DESISTIDA', 'NOTIFICADA', 'EN_FIRME'];
+  return CERRADOS.includes(estadoJuridico) ? 'ARCHIVADO' : 'EN_REVISION';
+}
+
+/**
+ * Sentinela para `Expediente.tramiteId` (campo obligatorio del modelo) en
+ * expedientes RECONSTRUIDOS: hoy solo existe UNA Definición de Trámite
+ * sembrada (`DEFINICION_LICENCIA_CONSTRUCCION_PARCIAL`, construcción obra
+ * nueva) y el histórico incluye subtipos que NO son construcción (LSR,
+ * LSU, PH, LR, LU) — forzar esa Definición sobre todos sería mentir sobre
+ * el trámite real. Los expedientes RECONSTRUIDOS tampoco evalúan checklist
+ * (no hay `aportes`/`contexto` que verificar: son registro archivístico,
+ * no intake activo), así que el campo es estructuralmente obligatorio pero
+ * sin consumidor real para este origen — se declara un centinela explícito
+ * en vez de un valor engañoso.
+ */
+export const SIN_DEFINICION_TRAMITE_HISTORICO = 'sin-definicion-tramite-historico';
+
+const FUENTE_PROVENANCE = 'xlsx-consecutivo-2022-2026';
+
+// `resolverEquivalencia` toma `EquivalenciaMigracion[]` (mutable) — la
+// semilla se declara `as const` (DF-4) para que TS la valide como tupla de
+// literales; el spread la vuelve mutable para la llamada sin tocar la
+// semilla ni el tipo del parámetro (mismo idioma ya usado en los tests de
+// DF-4, `__tests__/catalogo-subtipos-normativo.test.ts`).
+const TABLA_EQUIVALENCIAS_CODIGO = [...EQUIVALENCIAS_MIGRACION_SEMILLA_LICENCIAS];
+
+export interface TablasEquivalencia {
+  /** Default: `EQUIVALENCIAS_MIGRACION_SEMILLA_LICENCIAS` (DF-4) — inyectable para tests sintéticos que necesiten ejercer el camino "importable" sin esperar a P1′. */
+  codigos?: Parameters<typeof resolverEquivalencia>[1];
+  /** Default: `EQUIVALENCIAS_ESTADOS_OPERATIVOS_SEMILLA` — inyectable por el mismo motivo, del lado P4′. */
+  estados?: Parameters<typeof resolverEstadoOperativo>[1];
+}
+
+/**
+ * Planifica la importación completa del snapshot — PURA, determinista dado
+ * `ahora` (usada solo para `fechaImportacion` de `provenance`, NUNCA para
+ * `creadoEn`, que sale siempre de `fechaSolicitud`). `tablas` es opcional y
+ * por defecto usa las semillas reales del proyecto — existe para que los
+ * tests sintéticos puedan inyectar una tabla con alguna fila `MAPEADO` y
+ * ejercer el camino "importable" sin depender de que P1′/P4′ ya hayan
+ * respondido (mismo principio de inyección de dependencias que
+ * `resolverEquivalencia`/`resolverEstadoOperativo` ya usan: la tabla es un
+ * parámetro, nunca un import fijo dentro de la función pura).
+ */
+export function planificarImportacion(
+  snapshot: SnapshotConsecutivoLicencias,
+  ahora: Date,
+  tablas: TablasEquivalencia = {},
+): PlanImportacion {
+  const tablaCodigos = tablas.codigos ?? TABLA_EQUIVALENCIAS_CODIGO;
+  const tablaEstados = tablas.estados ?? EQUIVALENCIAS_ESTADOS_OPERATIVOS_SEMILLA;
+  const registros = snapshot.registros;
+
+  // Colisiones de `radicado` — se detectan sobre TODO el snapshot, antes y
+  // con independencia de a dónde termine cada registro (importado o en
+  // cuarentena): DF-9 exige que la colisión se REPORTE siempre, no solo
+  // cuando el registro sea importable.
+  const porRadicado = new Map<string, number>();
+  for (const r of registros) porRadicado.set(r.radicado, (porRadicado.get(r.radicado) ?? 0) + 1);
+  const esColision = (radicado: string) => (porRadicado.get(radicado) ?? 0) > 1;
+  const colisiones = registros.filter((r) => esColision(r.radicado)).length;
+
+  const expedientes: ExpedienteLicenciaDoc[] = [];
+  const cuarentena: RegistroEnCuarentena[] = [];
+  const fechaImportacion = ahora.toISOString();
+
+  let algunoSinDocumento = false;
+  const filasSinFecha: string[] = [];
+
+  for (const r of registros) {
+    const motivos: MotivoCuarentena[] = [];
+    const detalle: string[] = [];
+
+    const equivalenciaCodigo = resolverEquivalencia(r.tipo, tablaCodigos);
+    if (equivalenciaCodigo === null) {
+      motivos.push('CODIGO_PENDIENTE_P1');
+      detalle.push(`El tipo histórico "${r.tipo}" no tiene equivalencia confirmada en el catálogo normativo de subtipos (P1′).`);
+    }
+
+    const resolucionEstado = resolverEstadoOperativo(r.estado, tablaEstados);
+    if (resolucionEstado.resultado === 'CUARENTENA') {
+      motivos.push('ESTADO_PENDIENTE_P4');
+      detalle.push(resolucionEstado.motivo);
+    }
+
+    const fecha = parsearFechaHistoricaANoonISO(r.fechaSolicitud);
+    if (!fecha) {
+      motivos.push('FECHA_INVALIDA');
+      detalle.push(`"fechaSolicitud" ausente o con formato irreconocible: "${r.fechaSolicitud ?? ''}".`);
+      filasSinFecha.push(`hoja ${r.hoja}, fila ${r.fila} (radicado ${r.radicado})`);
+    }
+
+    // IDENTIDAD_INCOMPLETA cubre AMBOS campos de la identidad del
+    // solicitante — nombre Y documento — porque `Expediente.solicitanteNombre`
+    // y `.solicitanteDocumento` son los dos obligatorios del modelo. Cuál de
+    // los dos falta puede variar por ENTORNO (sanitizado en CI retira el
+    // nombre a propósito; el libro histórico REAL nunca tuvo documento, en
+    // ninguna versión) — el detalle distingue cuál, sin inventar ningún
+    // valor de relleno para el que falte (redactar ≠ inventar).
+    const tieneNombre = Boolean(r.solicitante && r.solicitante.trim().length > 0);
+    const tieneDocumento = Boolean(r.solicitanteDocumento && r.solicitanteDocumento.trim().length > 0);
+    if (!tieneNombre || !tieneDocumento) {
+      algunoSinDocumento = true;
+      motivos.push('IDENTIDAD_INCOMPLETA');
+      if (!tieneNombre && !tieneDocumento) {
+        detalle.push('Falta el nombre Y el número de documento del solicitante; ambos son obligatorios en el modelo y no pueden completarse sin inventar un valor.');
+      } else if (!tieneNombre) {
+        detalle.push('Falta el nombre del solicitante (retirado en la versión sanitizada que corre en CI — Ley 1581/2012; presente solo en la versión local con datos personales); "solicitanteNombre" es obligatorio en el modelo.');
+      } else {
+        detalle.push('El libro histórico no registra número de documento del solicitante; "solicitanteDocumento" es obligatorio en el modelo y no puede completarse sin inventar un valor.');
+      }
+    }
+
+    if (motivos.length > 0) {
+      cuarentena.push({
+        radicado: r.radicado,
+        hoja: r.hoja,
+        fila: r.fila,
+        solicitante: r.solicitante,
+        motivos,
+        detalle,
+        colision: esColision(r.radicado),
+      });
+      continue;
+    }
+
+    // Puertas todas pasadas — HOY inalcanzable contra el snapshot real
+    // (ESTADO_PENDIENTE_P4 e IDENTIDAD_INCOMPLETA quarentenan el 100%),
+    // pero el camino existe y lo ejercen los tests sintéticos.
+    const estadoJuridico = (resolucionEstado as Extract<typeof resolucionEstado, { resultado: 'MAPEADO' }>).estadoJuridico;
+    const codigos = equivalenciaCodigo as string[];
+    // Guarda de tipos: `motivos.length === 0` en este punto implica, por
+    // construcción del bucle de arriba, que `fecha` no es null (si lo
+    // fuera, 'FECHA_INVALIDA' habría entrado a `motivos` y ya se habría
+    // hecho `continue`). TS no correlaciona ramas de `if` distintas, así
+    // que se deja explícito en vez de un `!` no comentado.
+    if (!fecha) continue;
+
+    const expediente: ExpedienteLicenciaDoc = {
+      id: `hist-${r.hoja}-${r.fila}`,
+      tenantId: 'SEC_PLANEACION',
+      tramiteId: SIN_DEFINICION_TRAMITE_HISTORICO,
+      estado: estadoOperativoDesdeJuridico(estadoJuridico),
+      estadoJuridico,
+      // No-null por la puerta IDENTIDAD_INCOMPLETA (arriba): si `r.solicitante`
+      // o `r.solicitanteDocumento` estuvieran vacíos/ausentes, ya se habría
+      // entrado a `motivos` y hecho `continue` — ninguno de los dos llega
+      // aquí sin estar presente.
+      solicitanteNombre: r.solicitante!.trim(),
+      solicitanteDocumento: r.solicitanteDocumento!.trim(),
+      contexto: {},
+      aportes: [],
+      radicadoId: null,
+      creadoEn: fecha.iso,
+      actualizadoEn: fecha.iso,
+      numeroExpediente: {
+        numero: r.radicado,
+        serieId: 'historico-consecutivo-planeacion',
+        año: fecha.año,
+        colision: esColision(r.radicado),
+      },
+      subtipos: codigos,
+      origen: 'RECONSTRUIDO',
+      provenance: {
+        fuente: FUENTE_PROVENANCE,
+        fechaImportacion,
+        sha256: snapshot._procedencia.sha256,
+        hoja: r.hoja,
+        fila: r.fila,
+      },
+      actoFinal: { cierreDesconocido: true },
+      esPrueba: false,
+    };
+    expedientes.push(expediente);
+  }
+
+  const advertencias: string[] = [];
+  if (algunoSinDocumento) {
+    advertencias.push(
+      'IDENTIDAD_INCOMPLETA (hallazgo, fuera del encargo original de P1′/P4′): el libro histórico no registra número '
+      + 'de documento del solicitante para NINGÚN registro. Esta puerta seguirá bloqueando el 100% de los registros '
+      + 'incluso después de que P1′ y P4′ respondan, salvo que el propietario decida una fuente alterna para la '
+      + 'identidad o se relaje el modelo — requiere decisión aparte, no se resuelve solo con las dos tablas de equivalencias.',
+    );
+  }
+  if (filasSinFecha.length > 0) {
+    advertencias.push(`FECHA_INVALIDA: ${filasSinFecha.length} registro(s) con "fechaSolicitud" ausente o irreconocible — ${filasSinFecha.join('; ')}.`);
+  }
+
+  return {
+    expedientes,
+    cuarentena,
+    reconciliacion: {
+      totalSnapshot: registros.length,
+      planificados: expedientes.length,
+      enCuarentena: cuarentena.length,
+      colisiones,
+    },
+    advertencias,
+  };
+}
+
+/* ──────────────────────────────────────────────
+   Reporte dry-run (markdown)
+────────────────────────────────────────────── */
+
+/** Genera el reporte markdown legible del plan — reconciliación, cuarentenas agrupadas por motivo con conteos, advertencias. */
+export function generarReporteDryRun(plan: PlanImportacion): string {
+  const lineas: string[] = [];
+  lineas.push('# Reporte dry-run — importador de históricos (consecutivo de licencias)');
+  lineas.push('');
+  lineas.push('## Reconciliación');
+  lineas.push('');
+  lineas.push(`- Total en el snapshot: **${plan.reconciliacion.totalSnapshot}**`);
+  lineas.push(`- Planificados (importables HOY): **${plan.reconciliacion.planificados}**`);
+  lineas.push(`- En cuarentena: **${plan.reconciliacion.enCuarentena}**`);
+  lineas.push(`- Colisiones de radicado detectadas: **${plan.reconciliacion.colisiones}**`);
+  lineas.push('');
+
+  const conteosPorMotivo = new Map<MotivoCuarentena, number>();
+  for (const c of plan.cuarentena) {
+    for (const m of c.motivos) conteosPorMotivo.set(m, (conteosPorMotivo.get(m) ?? 0) + 1);
+  }
+  const ETIQUETAS: Record<MotivoCuarentena, string> = {
+    CODIGO_PENDIENTE_P1: 'Códigos pendientes (P1′)',
+    ESTADO_PENDIENTE_P4: 'Estados pendientes (P4′)',
+    FECHA_INVALIDA: 'Fecha de solicitud inválida/ausente',
+    IDENTIDAD_INCOMPLETA: 'Identidad del solicitante incompleta (hallazgo)',
+  };
+
+  lineas.push('## Cuarentena, agrupada por motivo');
+  lineas.push('');
+  const orden: MotivoCuarentena[] = ['CODIGO_PENDIENTE_P1', 'ESTADO_PENDIENTE_P4', 'FECHA_INVALIDA', 'IDENTIDAD_INCOMPLETA'];
+  for (const motivo of orden) {
+    const n = conteosPorMotivo.get(motivo) ?? 0;
+    lineas.push(`- **${ETIQUETAS[motivo]}**: ${n} registro(s)`);
+  }
+  lineas.push(`- **Colisión de radicado** (ya contadas arriba, no es un motivo de cuarentena aparte): ${plan.cuarentena.filter((c) => c.colision).length} registro(s) en cuarentena que además colisionan`);
+  lineas.push('');
+
+  if (plan.advertencias.length > 0) {
+    lineas.push('## Advertencias');
+    lineas.push('');
+    for (const a of plan.advertencias) lineas.push(`- ${a}`);
+    lineas.push('');
+  }
+
+  lineas.push('## Detalle de cuarentena (por registro)');
+  lineas.push('');
+  lineas.push('| Radicado | Hoja | Fila | Motivos | Colisión |');
+  lineas.push('|---|---|---|---|---|');
+  for (const c of plan.cuarentena) {
+    lineas.push(`| ${c.radicado} | ${c.hoja} | ${c.fila} | ${c.motivos.join(', ')} | ${c.colision ? 'sí' : 'no'} |`);
+  }
+  lineas.push('');
+
+  return lineas.join('\n');
+}
