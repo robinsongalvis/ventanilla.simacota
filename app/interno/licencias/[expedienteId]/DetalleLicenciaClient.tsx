@@ -26,6 +26,7 @@ import { DEFINICION_LICENCIA_CONSTRUCCION_PARCIAL } from '@/lib/motor-expediente
 import { proyectarVencimiento, PLAZO_DIAS } from '../fixtures';
 import { construirTimelineDesdeActuaciones } from '../presentacion-actuaciones';
 import { nombreSubtipo } from '../presentacion-subtipos';
+import { ESTILOS_ESTADO_JURIDICO } from '../estilos-estado-juridico';
 import { ChipEstadoJuridico } from '../components/ChipEstadoJuridico';
 import { ChipPrueba } from '../components/ChipPrueba';
 import { NumeroLegal } from '../components/NumeroLegal';
@@ -214,6 +215,22 @@ export function DetalleLicenciaClient({ expedienteId, onVolver }: DetalleLicenci
   const puedeRegistrarActa = puedeTransicionar(expediente.estadoJuridico, DESTINO_ACTA, { yaHuboActa });
   const puedeRegistrarRespuesta = yaHuboActa && puedeTransicionar(expediente.estadoJuridico, DESTINO_RESPUESTA, { yaHuboActa });
 
+  // Motivo del bloqueo — MISMO patrón que `notaDeshabilitado` de
+  // `BotonAccionPlaceholder` ("Emitir acto final", abajo), pero para
+  // botones de acción REAL: el motivo se deriva del propio estado
+  // jurídico actual (`ESTILOS_ESTADO_JURIDICO[...].label`, la única fuente
+  // de etiquetas legibles del dominio) — nunca se inventa un estado o una
+  // condición que el motor no exprese.
+  const etiquetaEstadoActual = ESTILOS_ESTADO_JURIDICO[expediente.estadoJuridico].label;
+  const notaActaDeshabilitada = puedeRegistrarActa
+    ? undefined
+    : yaHuboActa
+      ? 'El acta procede por una sola vez (D.1077/2015 art. 2.2.6.1.2.2.4) — ya fue registrada en este expediente.'
+      : `El acta solo procede con el expediente en revisión — estado actual: "${etiquetaEstadoActual}".`;
+  const notaRespuestaDeshabilitada = puedeRegistrarRespuesta
+    ? undefined
+    : `La respuesta de subsanación solo procede con el expediente "con acta de observaciones" — estado actual: "${etiquetaEstadoActual}".`;
+
   // Checklist (Bloque A·A3) — solo-lectura para histórico migrado (no se
   // "aporta" a un expediente reconstruido) o expediente ya EN_FIRME (mismo
   // candado que aplica el propio servidor en `POST .../documentos`, 409).
@@ -309,26 +326,42 @@ export function DetalleLicenciaClient({ expedienteId, onVolver }: DetalleLicenci
 
               <AvisoPoliticaSubsanacion eventos={proyeccion.eventos} plazoDias={PLAZO_DIAS} />
 
-              <div className="flex flex-col sm:flex-row gap-2 flex-wrap">
-                <button
-                  type="button"
-                  disabled={!puedeRegistrarActa}
-                  onClick={() => setModalActuacion('acta-observaciones')}
-                  className="inline-flex items-center gap-2 rounded-[10px] px-4 py-2.5 text-sm font-bold transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-1 disabled:opacity-50 disabled:cursor-not-allowed hover:brightness-95 active:scale-[0.98]"
-                  style={{ background: '#D4A017', color: '#14532D', boxShadow: '0 2px 8px rgba(212,160,23,0.25)' }}
-                >
-                  Registrar acta de observaciones
-                </button>
-                {yaHuboActa && (
+              <div className="flex flex-col sm:flex-row gap-2 flex-wrap items-start">
+                <div className="flex flex-col gap-1.5">
                   <button
                     type="button"
-                    disabled={!puedeRegistrarRespuesta}
-                    onClick={() => setModalActuacion('respuesta-subsanacion')}
+                    disabled={!puedeRegistrarActa}
+                    onClick={() => setModalActuacion('acta-observaciones')}
+                    aria-describedby={notaActaDeshabilitada ? 'registrar-acta-nota' : undefined}
                     className="inline-flex items-center gap-2 rounded-[10px] px-4 py-2.5 text-sm font-bold transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-1 disabled:opacity-50 disabled:cursor-not-allowed hover:brightness-95 active:scale-[0.98]"
-                    style={{ background: 'transparent', color: '#14532D', border: '1px solid #14532D' }}
+                    style={{ background: '#D4A017', color: '#14532D', boxShadow: '0 2px 8px rgba(212,160,23,0.25)' }}
                   >
-                    Registrar respuesta de subsanación
+                    Registrar acta de observaciones
                   </button>
+                  {notaActaDeshabilitada && (
+                    <p id="registrar-acta-nota" className="text-xs" style={{ color: '#9A6206' }}>
+                      {notaActaDeshabilitada}
+                    </p>
+                  )}
+                </div>
+                {yaHuboActa && (
+                  <div className="flex flex-col gap-1.5">
+                    <button
+                      type="button"
+                      disabled={!puedeRegistrarRespuesta}
+                      onClick={() => setModalActuacion('respuesta-subsanacion')}
+                      aria-describedby={notaRespuestaDeshabilitada ? 'registrar-respuesta-nota' : undefined}
+                      className="inline-flex items-center gap-2 rounded-[10px] px-4 py-2.5 text-sm font-bold transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-1 disabled:opacity-50 disabled:cursor-not-allowed hover:brightness-95 active:scale-[0.98]"
+                      style={{ background: 'transparent', color: '#14532D', border: '1px solid #14532D' }}
+                    >
+                      Registrar respuesta de subsanación
+                    </button>
+                    {notaRespuestaDeshabilitada && (
+                      <p id="registrar-respuesta-nota" className="text-xs" style={{ color: '#9A6206' }}>
+                        {notaRespuestaDeshabilitada}
+                      </p>
+                    )}
+                  </div>
                 )}
                 <BotonAccionPlaceholder
                   label="Emitir acto final"
