@@ -113,15 +113,28 @@ describe('EQUIVALENCIAS_MIGRACION_SEMILLA_LICENCIAS — combinados evidentes (H8
 describe('EQUIVALENCIAS_MIGRACION_SEMILLA_LICENCIAS — CUARENTENA, JAMÁS se mapean', () => {
   const tabla = [...EQUIVALENCIAS_MIGRACION_SEMILLA_LICENCIAS];
 
-  it.each(['LA', 'LCR VISR', 'LRC', 'LA, PH'])('%s → null (CUARENTENA, no se adivina)', (texto) => {
+  it.each(['LCR VISR', 'LRC'])('%s → null (CUARENTENA, no se adivina)', (texto) => {
     expect(resolverEquivalencia(texto, tabla)).toBeNull();
   });
 
   it('las filas de cuarentena SÍ están en la tabla (constancia de que se vieron) pero con codigos:[] y nota', () => {
-    const fila = tabla.find((f) => f.textoHistorico === 'LA')!;
+    const fila = tabla.find((f) => f.textoHistorico === 'LCR VISR')!;
     expect(fila.estado).toBe('CUARENTENA');
     expect(fila.codigos).toEqual([]);
     expect(fila.nota).toBeTruthy();
+  });
+
+  // P1′ parcial (10-ago-2026): "LA = Licencia de Ampliación" (respuesta del
+  // ingeniero relatada por el propietario) — LA y su combinado salen de
+  // cuarentena hacia construcción (modalidad ampliación).
+  it('"LA" → [CONSTRUCCION] (modalidad ampliación, respuesta del ingeniero 10-ago-2026)', () => {
+    expect(resolverEquivalencia('LA', tabla)).toEqual(['CONSTRUCCION']);
+    const fila = tabla.find((f) => f.textoHistorico === 'LA')!;
+    expect(fila.fundamento).toMatch(/ingeniero/);
+  });
+
+  it('"LA, PH" → [CONSTRUCCION, APROBACION_PH] (combinado desbloqueado por la misma respuesta)', () => {
+    expect(resolverEquivalencia('LA, PH', tabla)).toEqual(['CONSTRUCCION', 'APROBACION_PH']);
   });
 
   it('texto totalmente ausente de la tabla (no LA/LCR VISR/LRC ni nada sembrado) → también null', () => {

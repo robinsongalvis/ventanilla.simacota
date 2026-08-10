@@ -8,7 +8,7 @@
 
 | P | Estado tras la investigación | Ingeniero | Jurídica ⚖️ |
 |---|---|---|---|
-| P1 | **PARCIALMENTE RESUELTA** — mapa código→figura normativo completo | Solo `LA`, `LCR VISR`, `LRC` (significado local) | — |
+| P1 | **RESUELTA SALVO 2 SIGLAS** — mapa normativo completo + respuesta del ingeniero (10-ago-2026): `LA` = ampliación, LC/LSR/LSU/PH/LR/LU ratificadas | Solo `LCR VISR`, `LRC` (1 registro cada una) | — |
 | P2 | **RESUELTA POR NORMA** — 1 expediente, 1 acto, N subtipos | Liquidación de combinadas (→ P9) | — |
 | P3 | **RESUELTA POR NORMA** — formato FUN + identificador transversal; sin series por modalidad | Práctica del nº de resolución (→ P5) | — |
 | P4 | **PARCIALMENTE RESUELTA** — etapas jurídicas completas con artículo | Mapeo de estados operativos; cohorte 2022–2024 | Segunda instancia de apelación cuando expide Planeación |
@@ -23,7 +23,12 @@
 
 ### P1 — Códigos de licencia
 - **CONFIRMADO POR NORMA:** 5 clases (2.2.6.1.1.2); LSR/LSU = subdivisión rural/urbana (2.2.6.1.1.6); LC con 9 modalidades y combinables en una solicitud (2.2.6.1.1.7); LU = urbanización, suelo urbano; LR = acto de reconocimiento (Ley 1848 art. 6 — NO licencia); PH = "otra actuación" (2.2.6.1.3.1 num. 5 — NO licencia); "LCR VISR" NO existe como figura (ausencia verificada); parcelación y espacio público existen y el registro no las usa.
-- **DATO OPERATIVO PENDIENTE DEL INGENIERO:** significado local exacto de `LA`, `LCR VISR`, `LRC`; si maneja parcelación/espacio público con otro nombre. — *Respuesta literal:* `PENDIENTE`
+- **RESPUESTA DEL INGENIERO (10-ago-2026, relatada por el propietario)** — *literal:*
+
+  > LSR 83 licencia de Subdivisión rural · LC 60 ¿Licencia de construcción? · LSU 15 licencia de Subdivisión urbana · PH 11 licencia de Propiedad horizontal · LR 10 Licencia de Reconocimiento · LA 8 Licencia de Ampliación · LU 2 Licencia de Urbanización
+
+  Verificación (Principio 13): los 7 conteos coinciden EXACTAMENTE con la distribución de códigos simples del snapshot (suman 189; los 13 restantes son los combinados/raros que el ingeniero no clasificó) — misma fuente confirmada. El "¿?" de LC es del propio ingeniero; el **propietario la ratificó** el mismo día: *"sí es licencia de construcción sin importar los signos de interrogación"*. Efecto aplicado a la tabla DF-4: `LA` y `LA, PH` pasan de CUARENTENA a MAPEADO (construcción, modalidad ampliación); el conteo `CODIGO_PENDIENTE_P1` del dry-run baja de 13 a 3.
+- **DATO OPERATIVO AÚN PENDIENTE DEL INGENIERO:** significado local de `LCR VISR` y `LRC` (1 registro cada una); si maneja parcelación/espacio público con otro nombre. — *Respuesta literal:* `PENDIENTE`
 - **HUECO ⚖️:** ninguno.
 
 ### P2 — Combinadas
@@ -69,4 +74,4 @@ Ventanilla vs directo; cómo le llegan hoy. — `PENDIENTE`
 
 ## Formulario depurado para el ingeniero (7 preguntas)
 
-Se eliminan P3 y P8 (resueltas por norma); P2 se absorbe en P9. Quedan: **P1′** (solo LA/LCR VISR/LRC y clases con otro nombre) · **P4′** (REVISADO, mapeo, cohorte 2022–2024) · **P5** (libro de resoluciones) · **P6** (25-0037) · **P7′** (¿acta formal o devolución?) · **P9** (fuentes+impuestos+liquidación) · **P10** (canal). El Excel-formulario enviado al propietario debe regenerarse con estas 7 si se reenvía.
+Se eliminan P3 y P8 (resueltas por norma); P2 se absorbe en P9. Quedan: **P1′** (solo LCR VISR/LRC y clases con otro nombre — LA resuelta el 10-ago-2026) · **P4′** (REVISADO, mapeo, cohorte 2022–2024) · **P5** (libro de resoluciones) · **P6** (25-0037) · **P7′** (¿acta formal o devolución?) · **P9** (fuentes+impuestos+liquidación) · **P10** (canal). El Excel-formulario enviado al propietario debe regenerarse con estas 7 si se reenvía.
