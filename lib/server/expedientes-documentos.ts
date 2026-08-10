@@ -10,7 +10,8 @@ import {
   type DocumentoExpedienteDoc,
   type VersionDocumentoExpedienteDoc,
 } from '@/lib/server/expedientes-documentos-tipos';
-import type { AporteRequisito, DefinicionTramite } from '@/lib/motor-expedientes/tipos';
+import { requisitoAplica } from '@/lib/motor-expedientes/completitud';
+import type { AporteRequisito, ContextoEvaluacionRequisito, DefinicionTramite } from '@/lib/motor-expedientes/tipos';
 import type { ErrorExpediente, ActorExpediente } from '@/lib/server/expedientes-licencias';
 
 /* ══════════════════════════════════════════════════════════════
@@ -91,6 +92,63 @@ export function validarRequisitoIdContraDefinicion(
   const existe = definicion.requisitos.some((r) => r.id === requisitoId);
   if (!existe) {
     return { status: 400, mensaje: `El requisito "${requisitoId}" no existe en la Definición de Trámite "${definicion.id}".` };
+  }
+  return null;
+}
+
+/* ──────────────────────────────────────────────
+   Revalidación server de NO_APLICA (defensa en profundidad, endurecimiento
+   pre-reunión — hallazgo QA ago-2026)
+────────────────────────────────────────────── */
+
+/**
+ * Revalida en SERVIDOR que un requisito CONDICIONAL sí aplique al caso
+ * antes de aceptar su documento. La UI ya bloquea la subida de un
+ * requisito que no aplica según el contexto del expediente, pero el
+ * servidor no puede confiar solo en ese bloqueo (validación estricta de
+ * entrada, nunca solo del cliente).
+ *
+ * Reutiliza `requisitoAplica`/`evaluarCondicion` del motor
+ * (`lib/motor-expedientes/completitud.ts`) — NO duplica la evaluación de
+ * condiciones.
+ *
+ * Solo actúa sobre requisitos `CONDICIONAL`: un `OBLIGATORIO` siempre
+ * aplica, y un `OPCIONAL` — aunque `requisitoAplica` también lo resuelve
+ * como `NO_APLICA` (no bloquea completitud) — NO es lo mismo que "no
+ * aplica al caso": el funcionario puede subir un documento opcional
+ * cuando quiera, así que este gate lo ignora.
+ *
+ * Semántica de la decisión, por resultado de `requisitoAplica`:
+ *  - `NO_APLICA`       → 422, rechaza. La condición del checklist ya
+ *    decidió que este caso no lo necesita; aceptar el documento sería
+ *    inconsistente con la propia Definición.
+ *  - `INDETERMINADO`   → permite subir (fail-open DELIBERADO, distinto del
+ *    fail-closed de `completitud.ts`). El contexto de hechos puede llegar
+ *    DESPUÉS que el documento — p. ej. el funcionario adjunta el
+ *    certificado de PH antes de marcar "es PH" en el contexto — bloquear
+ *    aquí penalizaría un orden de trabajo legítimo. El fail-closed de
+ *    completitud sigue vigente para CERRAR el expediente: un requisito
+ *    `INDETERMINADO` nunca deja el checklist "completo", así que subir
+ *    primero no burla el control, solo lo adelanta.
+ *  - `APLICA`, requisito no `CONDICIONAL`, requisito no encontrado, o sin
+ *    `requisitoId` → nada que revalidar aquí (un `requisitoId` inexistente
+ *    ya lo atrapa `validarRequisitoIdContraDefinicion`, llamada antes que
+ *    esta función).
+ */
+export function validarRequisitoAplicaContraContexto(
+  requisitoId: string | undefined,
+  definicion: DefinicionTramite,
+  contexto: ContextoEvaluacionRequisito,
+): ErrorExpediente | null {
+  if (!requisitoId) return null;
+  const requisito = definicion.requisitos.find((r) => r.id === requisitoId);
+  if (!requisito || requisito.tipo !== 'CONDICIONAL') return null;
+
+  if (requisitoAplica(requisito, contexto) === 'NO_APLICA') {
+    return {
+      status: 422,
+      mensaje: 'El requisito no aplica al caso según los hechos registrados; ajuste los hechos del caso si corresponde.',
+    };
   }
   return null;
 }

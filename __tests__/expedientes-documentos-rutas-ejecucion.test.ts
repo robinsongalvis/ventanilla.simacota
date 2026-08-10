@@ -212,6 +212,39 @@ describe('POST .../documentos — subida feliz (v0001 + espejo + aporte en UNA t
   });
 });
 
+describe('POST .../documentos — revalidación server de NO_APLICA (endurecimiento pre-reunión, defensa en profundidad)', () => {
+  // 'poder-apoderado' es CONDICIONAL: IGUAL esApoderado=true (Definición real sembrada).
+  const REQUISITO_CONDICIONAL = 'poder-apoderado';
+
+  it('contexto YA registra que el requisito CONDICIONAL no aplica al caso (esApoderado=false) → 422, no escribe nada', async () => {
+    store.set('expedientes/exp-1', { ...store.get('expedientes/exp-1'), contexto: { esApoderado: false } });
+    const req = multipartRequest({ requisitoId: REQUISITO_CONDICIONAL }, { nombre: 'poder.pdf', buffer: PDF_BUFFER, tipo: 'application/pdf' });
+    const res = await documentosPOST(req, ctx('exp-1'));
+    const data = await res.json();
+
+    expect(res.status).toBe(422);
+    expect(data.error).toBe('El requisito no aplica al caso según los hechos registrados; ajuste los hechos del caso si corresponde.');
+    expect(escrituras).toHaveLength(0);
+  });
+
+  it('contexto SIN el hecho definido aún (esApoderado ausente → INDETERMINADO) → permite subir (fail-open deliberado)', async () => {
+    // contexto: {} por defecto en beforeEach — la clave "esApoderado" no está definida.
+    const req = multipartRequest({ requisitoId: REQUISITO_CONDICIONAL }, { nombre: 'poder.pdf', buffer: PDF_BUFFER, tipo: 'application/pdf' });
+    const res = await documentosPOST(req, ctx('exp-1'));
+    const data = await res.json();
+
+    expect(res.status).toBe(201);
+    expect(data.documentoNuevo).toBe(true);
+  });
+
+  it('contexto SÍ aplica (esApoderado=true) → permite subir normalmente', async () => {
+    store.set('expedientes/exp-1', { ...store.get('expedientes/exp-1'), contexto: { esApoderado: true } });
+    const req = multipartRequest({ requisitoId: REQUISITO_CONDICIONAL }, { nombre: 'poder.pdf', buffer: PDF_BUFFER, tipo: 'application/pdf' });
+    const res = await documentosPOST(req, ctx('exp-1'));
+    expect(res.status).toBe(201);
+  });
+});
+
 describe('PATCH .../contexto', () => {
   it('clave declarada → 200, contexto actualizado', async () => {
     const req = new Request('http://x', { method: 'PATCH', body: JSON.stringify({ esApoderado: true }) });

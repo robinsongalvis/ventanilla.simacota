@@ -136,6 +136,36 @@ describe('Crear desde radicado — envío y errores del servidor', () => {
     expect(body.subtipos).toEqual(['CONSTRUCCION']);
   });
 
+  it('constancia NO enviada: muestra la advertencia explícita (revisión QA 8-ago) en vez de omitirlo', async () => {
+    const fetchMock = vi.fn((url: string, init?: RequestInit) => {
+      if (url === '/api/licencias/radicados-candidatos') {
+        return Promise.resolve({ ok: true, status: 200, json: async () => ({ ok: true, radicados: CANDIDATOS }) });
+      }
+      if (url === '/api/licencias/expedientes/desde-radicado' && init?.method === 'POST') {
+        return Promise.resolve({
+          ok: true,
+          status: 201,
+          json: async () => ({
+            ok: true,
+            expediente: { id: 'exp-2', numeroExpediente: { numero: 'DEMO-26-sinCorreo' } },
+            vinculoExpediente: { expedienteId: 'exp-2', numeroExpediente: 'DEMO-26-sinCorreo', fecha: '2026-08-08T10:00:00.000Z' },
+            constanciaEnviada: false,
+          }),
+        });
+      }
+      throw new Error(`fetch inesperado en el test: ${url}`);
+    });
+    vi.stubGlobal('fetch', fetchMock);
+    render(<CrearDesdeRadicadoModal onCerrar={vi.fn()} />);
+
+    await seleccionarPrimerCandidatoYSubtipo();
+    fireEvent.click(screen.getByRole('button', { name: /^Crear expediente$/i }));
+
+    await waitFor(() => expect(screen.getByText('DEMO-26-sinCorreo')).toBeTruthy());
+    expect(screen.getByRole('alert').textContent).toMatch(/Constancia NO enviada al ciudadano/);
+    expect(screen.queryByText(/Se envió la constancia de radicación al solicitante\./)).toBeNull();
+  });
+
   it('muestra el 409 de "radicado ya vinculado" tal cual llega del servidor', async () => {
     const fetchMock = vi.fn((url: string) => {
       if (url === '/api/licencias/radicados-candidatos') {

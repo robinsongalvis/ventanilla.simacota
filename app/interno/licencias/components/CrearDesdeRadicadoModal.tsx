@@ -183,6 +183,15 @@ export function CrearDesdeRadicadoModal({ onCerrar, onCreado }: CrearDesdeRadica
               <NumeroLegal value={radicadoSeleccionado ?? ''} variant="radicado" size="sm" />.
               {creado.constanciaEnviada && ' Se envió la constancia de radicación al solicitante.'}
             </p>
+            {!creado.constanciaEnviada && (
+              <p
+                role="alert"
+                className="rounded-lg px-3 py-2 text-xs max-w-sm text-left font-semibold"
+                style={{ background: '#FFFBEB', border: '1px solid #FDE68A', color: '#92400E' }}
+              >
+                ⚠ Constancia NO enviada al ciudadano — el radicado no tiene un correo de contacto habilitado (correo no aportado, no válido, o presentación anónima/reservada).
+              </p>
+            )}
             <div className="flex gap-2">
               <button
                 type="button"
