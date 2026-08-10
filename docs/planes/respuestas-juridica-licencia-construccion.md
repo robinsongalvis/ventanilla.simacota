@@ -46,4 +46,4 @@ subdivisión = 12 meses; el "6 meses" histórico era la norma derogada.
 3. ~~Aclaración de los "6 meses"~~ — CERRADA (acta 10-ago: subdivisión 12 meses improrrogable; "6 meses" = norma derogada D.1469/2010).
 4. Referencia normativa exacta del formato del número de expediente (I1).
 5. NUEVA: precisión de firma — ¿el Ingeniero firma como Subsecretario/encargado, o el Secretario? (acta 10-ago vs registro del 6-ago).
-6. NUEVA: apelación — una línea escrita: si el ciudadano apela, ¿quién resuelve, o solo procede reposición?
+6. NUEVA: apelación — ACLARADA por el propietario (10-ago): todo queda en la Secretaría de Planeación, el Alcalde no firma ni resuelve → solo reposición. Falta la línea ESCRITA de Jurídica confirmando la fórmula de recursos para los textos de notificación (vicio de debido proceso si se enuncia mal).

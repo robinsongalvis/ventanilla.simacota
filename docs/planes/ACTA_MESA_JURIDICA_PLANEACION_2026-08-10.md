@@ -108,11 +108,16 @@ mostrar ambas fechas y alertar sobre la MÁS TEMPRANA.
 
 ### ❌ Qué NO respondió la mesa
 
-1. **Apelación (hueco ⚖️ 4)**: "el Alcalde no tiene absolutamente nada que ver" se refirió a la
-   EXPEDICIÓN (radicación/evaluación/firma). La pregunta de RECURSOS quedó sin respuesta:
-   *si el ciudadano apela la decisión, ¿quién la resuelve? ¿o solo procede reposición?*
-   El borrador IA decía "apelación ante el Alcalde" — la mesa parece apuntar lo contrario, pero
-   no lo dijo. Una línea escrita de Jurídica lo cierra.
+1. **Apelación (hueco ⚖️ 4) — ACLARADO por el propietario el mismo 10-ago** (adición posterior
+   al acta): la posición cubre también los recursos — *"el alcalde no firma nada; netamente
+   hace parte y responsabilidades de la secretaría de planeación"*. Consecuencia operativa:
+   contra la decisión procede únicamente **reposición ante la misma Secretaría de Planeación**;
+   no hay apelación ante el Alcalde (el borrador IA decía lo contrario y queda descartado).
+   **Reserva para el concepto escrito:** el CPACA obliga a que cada notificación indique
+   correctamente qué recursos proceden — negar la apelación por error es un vicio de debido
+   proceso. La fórmula exacta de recursos que irá en los textos de notificación debe venir
+   confirmada por escrito por Jurídica (una línea basta); hasta entonces las plantillas siguen
+   parametrizadas.
 2. **Los bloqueadores de la migración NO son jurídicos y siguen abiertos con el ingeniero**:
    P4′ (qué hito jurídico es "TERMINADO"/"REVISADO"/sin estado), `LCR VISR`/`LRC` (1 registro
    c/u), y la **fuente de cédulas** de los solicitantes (decisión del propietario pendiente).
