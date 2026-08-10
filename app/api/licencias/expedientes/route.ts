@@ -35,6 +35,21 @@ export const runtime = 'nodejs';
 /** Tenant de Planeación — dueño de los expedientes de licencias (catálogo real de dependencias, `src/types/reglas-negocio.ts`). */
 const TENANT_LICENCIAS: TenantId = 'SEC_PLANEACION';
 
+/**
+ * Cota dura de lectura (R11, ADR-0011 — endurecimiento pre-reunión, hallazgo
+ * QA ago-2026): la bandeja es INTERACTIVA y no puede crecer con el
+ * histórico del tenant. 300 ≤ el presupuesto interactivo (500). Mismo
+ * patrón que `LIMITE_CANDIDATOS` en `app/api/licencias/radicados-candidatos/route.ts`
+ * (fix R11 anterior, Bloque A·A4): sin `orderBy` en Firestore (evita exigir
+ * el índice compuesto aún no desplegado, ver comentario del `GET` más abajo),
+ * el orden lo aplica el handler en memoria sobre el lote acotado — con más
+ * de LIMITE_BANDEJA expedientes del tenant, la bandeja muestra un
+ * subconjunto (los más recientes dentro del lote leído, no necesariamente
+ * los LIMITE_BANDEJA más recientes globales — deuda aceptada hasta que
+ * exista paginación real).
+ */
+const LIMITE_BANDEJA = 300;
+
 function jsonError(error: unknown) {
   if (error instanceof InternalAuthError) {
     return NextResponse.json({ error: error.message }, { status: error.status });
@@ -106,7 +121,10 @@ export async function GET(): Promise<NextResponse> {
     // combinación where+orderBy lanzaría FAILED_PRECONDITION en producción.
     // N es pequeño (expedientes de licencias, no toda `ventanilla_radicados`):
     // ordenar en el handler es seguro por ahora.
-    const snap = await db.collection('expedientes').where('tenantId', '==', TENANT_LICENCIAS).get();
+    const snap = await db.collection('expedientes')
+      .where('tenantId', '==', TENANT_LICENCIAS)
+      .limit(LIMITE_BANDEJA)
+      .get();
     const expedientes = snap.docs
       .map((d) => d.data())
       .sort((a, b) => String(b.creadoEn ?? '').localeCompare(String(a.creadoEn ?? '')));

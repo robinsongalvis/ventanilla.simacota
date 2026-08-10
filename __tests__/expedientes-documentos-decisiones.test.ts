@@ -4,6 +4,7 @@ import { createHash } from 'node:crypto';
 import {
   validarYPrepararArchivoDocumento,
   validarRequisitoIdContraDefinicion,
+  validarRequisitoAplicaContraContexto,
   planSubirDocumento,
   MAX_DOCUMENTO_SIZE_BYTES,
 } from '@/lib/server/expedientes-documentos';
@@ -81,6 +82,41 @@ describe('validarRequisitoIdContraDefinicion', () => {
   it('requisitoId inexistente en la Definición → 400', () => {
     const resultado = validarRequisitoIdContraDefinicion('requisito-inventado', DEFINICION_LICENCIA_CONSTRUCCION_PARCIAL);
     expect(resultado?.status).toBe(400);
+  });
+});
+
+describe('validarRequisitoAplicaContraContexto (endurecimiento pre-reunión — revalidación server de NO_APLICA)', () => {
+  // 'poder-apoderado' es CONDICIONAL: IGUAL esApoderado=true (Definición real sembrada).
+  const REQUISITO_CONDICIONAL = 'poder-apoderado';
+
+  it('CONDICIONAL cuya condición evalúa NO_APLICA (esApoderado=false) → 422 con el mensaje del hallazgo', () => {
+    const resultado = validarRequisitoAplicaContraContexto(REQUISITO_CONDICIONAL, DEFINICION_LICENCIA_CONSTRUCCION_PARCIAL, { esApoderado: false });
+    expect(resultado?.status).toBe(422);
+    expect(resultado?.mensaje).toBe('El requisito no aplica al caso según los hechos registrados; ajuste los hechos del caso si corresponde.');
+  });
+
+  it('CONDICIONAL cuya condición evalúa APLICA (esApoderado=true) → null (permite subir)', () => {
+    expect(validarRequisitoAplicaContraContexto(REQUISITO_CONDICIONAL, DEFINICION_LICENCIA_CONSTRUCCION_PARCIAL, { esApoderado: true })).toBeNull();
+  });
+
+  it('CONDICIONAL con INDETERMINADO (clave "esApoderado" ausente del contexto) → null, fail-OPEN deliberado (el documento puede llegar antes que el hecho)', () => {
+    expect(validarRequisitoAplicaContraContexto(REQUISITO_CONDICIONAL, DEFINICION_LICENCIA_CONSTRUCCION_PARCIAL, {})).toBeNull();
+  });
+
+  it('requisito OPCIONAL (no CONDICIONAL) → null sin importar el contexto — un opcional siempre se puede subir', () => {
+    expect(validarRequisitoAplicaContraContexto('matricula-profesional-experiencia', DEFINICION_LICENCIA_CONSTRUCCION_PARCIAL, {})).toBeNull();
+  });
+
+  it('requisito OBLIGATORIO → null (siempre aplica, nada que revalidar)', () => {
+    expect(validarRequisitoAplicaContraContexto('certificado-tradicion-libertad', DEFINICION_LICENCIA_CONSTRUCCION_PARCIAL, {})).toBeNull();
+  });
+
+  it('sin requisitoId (documento espontáneo, sin enlazar) → null', () => {
+    expect(validarRequisitoAplicaContraContexto(undefined, DEFINICION_LICENCIA_CONSTRUCCION_PARCIAL, {})).toBeNull();
+  });
+
+  it('requisitoId inexistente en la Definición → null (ya lo atrapa validarRequisitoIdContraDefinicion antes de llegar aquí)', () => {
+    expect(validarRequisitoAplicaContraContexto('no-existe', DEFINICION_LICENCIA_CONSTRUCCION_PARCIAL, {})).toBeNull();
   });
 });
 

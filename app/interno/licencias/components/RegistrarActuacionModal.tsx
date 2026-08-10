@@ -39,6 +39,12 @@ export interface RegistrarActuacionModalProps {
   onRegistrada: (actuacion: ActuacionLicenciaDoc, estadoJuridico: EstadoJuridicoLicencia) => void;
 }
 
+interface ResultadoActa {
+  actuacion: ActuacionLicenciaDoc;
+  estadoJuridico: EstadoJuridicoLicencia;
+  avisoEnviado: boolean;
+}
+
 export function RegistrarActuacionModal({ expedienteId, tipo, onCerrar, onRegistrada }: RegistrarActuacionModalProps) {
   const copia = COPIA[tipo];
   const [detalle, setDetalle] = useState('');
@@ -46,6 +52,15 @@ export function RegistrarActuacionModal({ expedienteId, tipo, onCerrar, onRegist
   const [fechaComunicacion, setFechaComunicacion] = useState('');
   const [guardando, setGuardando] = useState(false);
   const [errorServidor, setErrorServidor] = useState<string | null>(null);
+  /**
+   * Solo se llena para `tipo === 'acta-observaciones'` — es el ÚNICO tipo
+   * para el que la ruta intenta enviar un aviso al ciudadano
+   * (`POST …/actuaciones`, ver `avisoEnviado` en su respuesta). Para
+   * 'respuesta-subsanacion' el servidor nunca intenta enviar nada, así que
+   * mostrar aquí un estado de aviso sería un dato inventado — ese tipo
+   * sigue cerrando el modal de inmediato, sin pantalla de confirmación.
+   */
+  const [resultadoActa, setResultadoActa] = useState<ResultadoActa | null>(null);
 
   useEffect(() => {
     function onKeyDown(e: KeyboardEvent) {
@@ -85,7 +100,17 @@ export function RegistrarActuacionModal({ expedienteId, tipo, onCerrar, onRegist
         setErrorServidor(body.error ?? 'No fue posible registrar la actuación.');
         return;
       }
-      onRegistrada(body.actuacion as ActuacionLicenciaDoc, body.estadoJuridico as EstadoJuridicoLicencia);
+      const actuacion = body.actuacion as ActuacionLicenciaDoc;
+      const estadoJuridico = body.estadoJuridico as EstadoJuridicoLicencia;
+      if (tipo === 'acta-observaciones') {
+        // Pausa en una pantalla de confirmación — el funcionario necesita
+        // ver si el aviso llegó al ciudadano ANTES de que el modal se
+        // cierre solo; `onRegistrada` (que actualiza al padre y cierra)
+        // se dispara cuando el funcionario pulsa "Continuar".
+        setResultadoActa({ actuacion, estadoJuridico, avisoEnviado: Boolean(body.avisoEnviado) });
+        return;
+      }
+      onRegistrada(actuacion, estadoJuridico);
     } catch {
       setErrorServidor('Error de red al registrar la actuación.');
     } finally {
@@ -113,6 +138,40 @@ export function RegistrarActuacionModal({ expedienteId, tipo, onCerrar, onRegist
           <p className="text-xs mt-1" style={{ color: '#5F6F64' }}>{copia.nota}</p>
         </header>
 
+        {resultadoActa ? (
+          <div className="flex-1 min-h-0 overflow-y-auto px-5 py-5 flex flex-col gap-4">
+            <p className="text-xs font-bold uppercase tracking-widest" style={{ color: '#16A34A' }}>
+              Acta registrada
+            </p>
+            {resultadoActa.avisoEnviado ? (
+              <p
+                role="status"
+                className="rounded-lg px-3 py-2.5 text-sm font-semibold"
+                style={{ background: '#ECFDF5', border: '1px solid #A7F3D0', color: '#065F46' }}
+              >
+                Aviso enviado al ciudadano ✓
+              </p>
+            ) : (
+              <p
+                role="alert"
+                className="rounded-lg px-3 py-2.5 text-sm font-semibold"
+                style={{ background: '#FFFBEB', border: '1px solid #FDE68A', color: '#92400E' }}
+              >
+                ⚠ Aviso NO enviado al ciudadano — el expediente no tiene un correo de contacto habilitado (sin radicado vinculado, correo no aportado, o trámite aún no habilitado para avisos por correo).
+              </p>
+            )}
+            <footer className="flex items-center justify-end pt-1">
+              <button
+                type="button"
+                onClick={() => onRegistrada(resultadoActa.actuacion, resultadoActa.estadoJuridico)}
+                className="px-5 py-2 rounded-xl text-sm font-bold text-white"
+                style={{ background: '#14532D' }}
+              >
+                Continuar
+              </button>
+            </footer>
+          </div>
+        ) : (
         <form onSubmit={(e) => { void handleSubmit(e); }} className="flex-1 min-h-0 overflow-y-auto px-5 py-4 space-y-4">
           <label>
             <span className="mb-1 block text-[10px] font-bold uppercase tracking-widest" style={{ color: '#667085' }}>
@@ -169,6 +228,7 @@ export function RegistrarActuacionModal({ expedienteId, tipo, onCerrar, onRegist
             </button>
           </footer>
         </form>
+        )}
       </div>
     </div>
   );

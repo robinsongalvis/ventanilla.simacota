@@ -36,10 +36,18 @@ function collectionRef(basePath: string) {
   const docsBajoEsteBase = () =>
     [...store.entries()].filter(([p]) => p.startsWith(`${basePath}/`) && p.slice(basePath.length + 1).split('/').length === 1);
 
-  const construir = (ordenarPor?: { campo: string; direccion: 'asc' | 'desc' }, filtro?: { campo: string; valor: unknown }) => ({
+  const construir = (
+    ordenarPor?: { campo: string; direccion: 'asc' | 'desc' },
+    filtro?: { campo: string; valor: unknown },
+    limite?: number,
+  ) => ({
     doc: (id: string) => docRef(`${basePath}/${id}`),
-    where: (campo: string, _op: string, valor: unknown) => construir(ordenarPor, { campo, valor }),
-    orderBy: (campo: string, direccion: 'asc' | 'desc' = 'asc') => construir({ campo, direccion }, filtro),
+    where: (campo: string, _op: string, valor: unknown) => construir(ordenarPor, { campo, valor }, limite),
+    orderBy: (campo: string, direccion: 'asc' | 'desc' = 'asc') => construir({ campo, direccion }, filtro, limite),
+    // Cota dura (R11) — el doble refleja el mismo recorte que Firestore real
+    // aplicaría con `.limit(N)`, para que los tests de la bandeja puedan
+    // verificar que la cota efectivamente recorta el lote leído.
+    limit: (n: number) => construir(ordenarPor, filtro, n),
     get: async () => {
       let docs = docsBajoEsteBase().map(([p, data]) => ({ id: p.split('/').pop()!, data: () => data }));
       if (filtro) docs = docs.filter((d) => (d.data() as Record<string, unknown>)[filtro.campo] === filtro.valor);
@@ -50,6 +58,7 @@ function collectionRef(basePath: string) {
           return ordenarPor.direccion === 'asc' ? va.localeCompare(vb) : vb.localeCompare(va);
         });
       }
+      if (typeof limite === 'number') docs = docs.slice(0, limite);
       return { docs, size: docs.length };
     },
   });
@@ -144,6 +153,17 @@ describe('GET /api/licencias/expedientes — bandeja del tenant', () => {
     const data = await res.json();
 
     expect(data.expedientes.map((e: { id: string }) => e.id)).toEqual(['e2', 'e1']); // e3 excluido, e2 (más reciente) primero
+  });
+
+  it('cota dura R11 (endurecimiento pre-reunión): con más de LIMITE_BANDEJA=300 expedientes del tenant, la lectura queda recortada por .limit()', async () => {
+    for (let i = 0; i < 310; i += 1) {
+      store.set(`expedientes/e${i}`, { id: `e${i}`, tenantId: 'SEC_PLANEACION', creadoEn: '2026-01-01T00:00:00.000Z' });
+    }
+    const res = await bandejaGET();
+    const data = await res.json();
+    // Prueba que el .limit(300) llegó hasta Firestore (el doble solo recorta
+    // si alguien llamó `.limit(n)`) — sin la cota, este doble devolvería 310.
+    expect(data.expedientes).toHaveLength(300);
   });
 });
 
