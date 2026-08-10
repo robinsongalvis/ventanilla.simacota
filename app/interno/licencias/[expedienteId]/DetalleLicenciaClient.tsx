@@ -5,11 +5,17 @@
 
    Reemplaza `detalleLicencia()` (fixtures) por el contrato real
    `GET /api/licencias/expedientes/{id}` (expediente + actuaciones reales,
-   asc por fecha). El panel de término reutiliza `proyectarVencimiento`
-   (extraído de `fixtures.ts`, mismo cómputo dual REINICIO_A_CERO /
-   SUSPENSION_REANUDACION que ya usaban los fixtures) — la única
-   diferencia es de dónde vienen las `Actuacion[]`, tal como declaraba el
-   JSDoc original de `fixtures.ts`.
+   asc por fecha).
+
+   Bloque "Términos y vigencias protectores" (10-ago-2026): el panel de
+   término, la vigencia del acto y el estado de plazo de subsanación YA NO
+   se recalculan en el cliente — consumen `computos`/`borradorActoDesistimiento`
+   tal como los devuelve el servidor (`PanelTerminoDual`, `PanelVigenciaActo`,
+   `PanelDesistimientoSemicontrolado`, ver `../tipos-computos.ts`). Antes de
+   este bloque, esta pantalla reutilizaba `proyectarVencimiento` (client-side,
+   `fixtures.ts`) — se retiró para que el servidor sea la ÚNICA fuente de
+   verdad del cómputo (evita que cliente y servidor diverjan sobre la misma
+   fecha legal).
 ══════════════════════════════════════════════════════════════ */
 
 import { useCallback, useEffect, useMemo, useState } from 'react';
@@ -18,20 +24,21 @@ import Link from 'next/link';
 import { useAuth } from '@/lib/hooks/useAuth';
 import type { ActuacionLicenciaDoc, ExpedienteLicenciaDoc } from '@/lib/server/expedientes-licencias';
 import { puedeTransicionar, type EstadoJuridicoLicencia } from '@/lib/motor-expedientes/estados-licencia';
-import { atLocalNoon, diasRestantesHabiles } from '@/lib/tiempos-radicado';
 import { formatFechaColombia } from '@/lib/fecha-colombia';
 import type { ContextoEvaluacionRequisito, DefinicionTramite } from '@/lib/motor-expedientes/tipos';
 import type { DocumentoExpedienteDoc } from '@/lib/server/expedientes-documentos-tipos';
 import { DEFINICION_LICENCIA_CONSTRUCCION_PARCIAL } from '@/lib/motor-expedientes/definiciones/licencia-construccion-parcial';
-import { proyectarVencimiento, PLAZO_DIAS } from '../fixtures';
 import { construirTimelineDesdeActuaciones } from '../presentacion-actuaciones';
 import { nombreSubtipo } from '../presentacion-subtipos';
 import { ESTILOS_ESTADO_JURIDICO } from '../estilos-estado-juridico';
+import type { ComputosExpedienteUI, BorradorActoDesistimiento } from '../tipos-computos';
 import { ChipEstadoJuridico } from '../components/ChipEstadoJuridico';
 import { ChipPrueba } from '../components/ChipPrueba';
 import { NumeroLegal } from '../components/NumeroLegal';
 import { EventoTimeline } from '../components/EventoTimeline';
-import { AvisoPoliticaSubsanacion } from '../components/AvisoPoliticaSubsanacion';
+import { PanelTerminoDual } from '../components/PanelTerminoDual';
+import { PanelVigenciaActo } from '../components/PanelVigenciaActo';
+import { PanelDesistimientoSemicontrolado } from '../components/PanelDesistimientoSemicontrolado';
 import { BotonAccionPlaceholder } from '../components/BotonAccionPlaceholder';
 import { RegistrarActuacionModal } from '../components/RegistrarActuacionModal';
 import { ChecklistRequisitos } from '../components/ChecklistRequisitos';
@@ -81,6 +88,9 @@ export function DetalleLicenciaClient({ expedienteId, onVolver }: DetalleLicenci
   const [definicionId, setDefinicionId] = useState<string | null>(null);
   const [radicadoVinculado, setRadicadoVinculado] = useState<{ id: string; fecha: string } | null>(null);
   const [modalActuacion, setModalActuacion] = useState<'acta-observaciones' | 'respuesta-subsanacion' | null>(null);
+  /** Bloque "Términos y vigencias protectores" (10-ago-2026) — `computos`/`borradorActoDesistimiento` YA CALCULADOS por el servidor (`GET .../[id]`), ver `../tipos-computos.ts`. */
+  const [computos, setComputos] = useState<ComputosExpedienteUI | null>(null);
+  const [borradorActoDesistimiento, setBorradorActoDesistimiento] = useState<BorradorActoDesistimiento | null>(null);
 
   /**
    * `opts.silencioso`: recarga tras una subida de documento (checklist) SIN
@@ -118,6 +128,12 @@ export function DetalleLicenciaClient({ expedienteId, onVolver }: DetalleLicenci
           ? { id: String(body.radicadoVinculado.id), fecha: body.radicadoVinculado.fecha }
           : null,
       );
+      setComputos(body.computos && typeof body.computos === 'object' ? (body.computos as ComputosExpedienteUI) : null);
+      setBorradorActoDesistimiento(
+        body.borradorActoDesistimiento && typeof body.borradorActoDesistimiento === 'object'
+          ? (body.borradorActoDesistimiento as BorradorActoDesistimiento)
+          : null,
+      );
       if (!silencioso) setEstadoCarga('listo');
     } catch {
       if (!silencioso) {
@@ -133,29 +149,26 @@ export function DetalleLicenciaClient({ expedienteId, onVolver }: DetalleLicenci
   }, [cargandoAuth, usuario, cargar]);
 
   const yaHuboActa = actuaciones.some((a) => a.tipo === 'acta-observaciones');
+  const esHistorico = expediente?.origen === 'RECONSTRUIDO';
 
-  const proyeccion = useMemo(() => {
-    if (!expediente || expediente.origen === 'RECONSTRUIDO') return null;
-    const { eventos, vigente, ambiguo } = proyectarVencimiento(actuaciones);
-    if (!vigente) return null;
-    const radicacion = actuaciones.find((a) => a.tipo === 'radicacion-debida-forma');
-    return {
-      eventos,
-      vigente,
-      ambiguo,
-      diasRestantes: diasRestantesHabiles(vigente),
-      ancla: radicacion ? atLocalNoon(radicacion.fecha) : null,
-    };
-  }, [expediente, actuaciones]);
+  /** ISO de la primera `radicacion-debida-forma` — solo referencia del ancla para `PanelTerminoDual`, nunca insumo de cómputo (eso ya lo hizo el servidor). */
+  const fechaRadicacion = actuaciones.find((a) => a.tipo === 'radicacion-debida-forma')?.fecha;
 
-  const timeline = useMemo(
-    () => (expediente ? construirTimelineDesdeActuaciones(actuaciones, expediente.origen, proyeccion?.vigente ?? null) : []),
-    [expediente, actuaciones, proyeccion],
-  );
+  /**
+   * "Vencimiento calculado" del timeline usa `fechaAlertaConservadora`
+   * (`computos.terminoDual`, servidor) — la MISMA fecha que ya destaca
+   * `PanelTerminoDual` con la alerta roja, nunca una recomputada aparte en
+   * el cliente (única fuente de verdad para el término). La dependencia del
+   * `useMemo` es el ISO (primitivo estable), no el `Date` construido abajo
+   * — un `Date` nuevo en cada render invalidaría la memoización.
+   */
+  const fechaAlertaConservadoraIso = computos?.terminoDual.fechaAlertaConservadora ?? null;
 
-  const progreso = proyeccion
-    ? Math.min(100, Math.max(0, ((PLAZO_DIAS - proyeccion.diasRestantes) / PLAZO_DIAS) * 100))
-    : 0;
+  const timeline = useMemo(() => {
+    if (!expediente) return [];
+    const vigenteParaTimeline = fechaAlertaConservadoraIso ? new Date(fechaAlertaConservadoraIso) : null;
+    return construirTimelineDesdeActuaciones(actuaciones, expediente.origen, vigenteParaTimeline);
+  }, [expediente, actuaciones, fechaAlertaConservadoraIso]);
 
   function alRegistrarActuacion(actuacion: ActuacionLicenciaDoc, nuevoEstadoJuridico: EstadoJuridicoLicencia) {
     setActuaciones((prev) => [...prev, actuacion]);
@@ -245,6 +258,11 @@ export function DetalleLicenciaClient({ expedienteId, onVolver }: DetalleLicenci
 
   return (
     <div className="p-4 md:p-6 flex flex-col gap-5 max-w-[1400px] mx-auto">
+      {/* Todo el "chrome" de pantalla vive dentro de este contenedor
+          `print:hidden` — al imprimir (botón "Imprimir" del proyecto de
+          acto de desistimiento, más abajo) solo debe salir la vista limpia
+          del final, nunca la bandeja de botones ni los demás paneles. */}
+      <div className="print:hidden flex flex-col gap-5">
       <VolverBandeja onVolver={onVolver} />
 
       {/* ── Tarjeta encabezado ── */}
@@ -292,92 +310,73 @@ export function DetalleLicenciaClient({ expedienteId, onVolver }: DetalleLicenci
         </div>
       </div>
 
+      {/* ── Estado de plazo de subsanación (desistimiento SEMICONTROLADO) ──
+          Se muestra ANTES del resto del detalle cuando es crítico
+          (POR_ARCHIVAR): el funcionario debe verlo de inmediato. Cuando
+          EN_PLAZO, es una línea discreta; cuando NO_APLICA, no renderiza
+          nada (`PanelDesistimientoSemicontrolado`). */}
+      {computos && (
+        <PanelDesistimientoSemicontrolado
+          plazoSubsanacion={computos.plazoSubsanacion}
+          borrador={borradorActoDesistimiento}
+        />
+      )}
+
       <div className="flex flex-col lg:flex-row gap-5 items-start">
-        {/* ── Panel término (o nota histórica) ── */}
+        {/* ── Panel término (doble fecha) + vigencia + acciones ── */}
         <div className="w-full lg:w-[430px] shrink-0 flex flex-col gap-3">
-          {proyeccion ? (
-            <>
-              <div
-                className="rounded-xl p-4"
-                style={{ background: 'var(--bg-surface)', border: '1px solid var(--color-border)', boxShadow: 'var(--shadow-soft)' }}
-              >
-                <p className="text-[10.5px] font-bold uppercase tracking-widest" style={{ color: 'var(--text-secondary)' }}>
-                  Término para resolver
-                </p>
-                <p className="font-black mt-1" style={{ fontSize: 22, color: 'var(--text-primary)' }}>
-                  Vence el {formatFechaColombia(proyeccion.vigente)}
-                </p>
-                <p className="text-xs mt-1" style={{ color: 'var(--text-secondary)' }}>
-                  Quedan {proyeccion.diasRestantes} días hábiles de {PLAZO_DIAS}
-                  {proyeccion.ancla && <> · ancla: radicación en debida forma ({formatFechaColombia(proyeccion.ancla)})</>}
-                </p>
-                <div
-                  role="progressbar"
-                  aria-valuenow={Math.round(progreso)}
-                  aria-valuemin={0}
-                  aria-valuemax={100}
-                  aria-label={`Progreso del término: ${Math.round(progreso)}%`}
-                  className="mt-3 h-2 rounded-full overflow-hidden"
-                  style={{ background: 'var(--bg-surface-2)' }}
+          <PanelTerminoDual
+            terminoDual={computos?.terminoDual ?? { suspension: null, reinicio: null, fechaAlertaConservadora: null }}
+            origen={expediente.origen}
+            fechaRadicacion={fechaRadicacion}
+          />
+
+          {computos?.vigencia !== undefined && <PanelVigenciaActo vigencia={computos.vigencia} />}
+
+          {!esHistorico && (
+            <div className="flex flex-col sm:flex-row gap-2 flex-wrap items-start">
+              <div className="flex flex-col gap-1.5">
+                <button
+                  type="button"
+                  disabled={!puedeRegistrarActa}
+                  onClick={() => setModalActuacion('acta-observaciones')}
+                  aria-describedby={notaActaDeshabilitada ? 'registrar-acta-nota' : undefined}
+                  className="inline-flex items-center gap-2 rounded-[10px] px-4 py-2.5 text-sm font-bold transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-1 disabled:opacity-50 disabled:cursor-not-allowed hover:brightness-95 active:scale-[0.98]"
+                  style={{ background: '#D4A017', color: '#14532D', boxShadow: '0 2px 8px rgba(212,160,23,0.25)' }}
                 >
-                  <div className="h-full rounded-full" style={{ width: `${progreso}%`, background: '#D97706' }} />
-                </div>
+                  Registrar acta de observaciones
+                </button>
+                {notaActaDeshabilitada && (
+                  <p id="registrar-acta-nota" className="text-xs" style={{ color: '#9A6206' }}>
+                    {notaActaDeshabilitada}
+                  </p>
+                )}
               </div>
-
-              <AvisoPoliticaSubsanacion eventos={proyeccion.eventos} plazoDias={PLAZO_DIAS} />
-
-              <div className="flex flex-col sm:flex-row gap-2 flex-wrap items-start">
+              {yaHuboActa && (
                 <div className="flex flex-col gap-1.5">
                   <button
                     type="button"
-                    disabled={!puedeRegistrarActa}
-                    onClick={() => setModalActuacion('acta-observaciones')}
-                    aria-describedby={notaActaDeshabilitada ? 'registrar-acta-nota' : undefined}
+                    disabled={!puedeRegistrarRespuesta}
+                    onClick={() => setModalActuacion('respuesta-subsanacion')}
+                    aria-describedby={notaRespuestaDeshabilitada ? 'registrar-respuesta-nota' : undefined}
                     className="inline-flex items-center gap-2 rounded-[10px] px-4 py-2.5 text-sm font-bold transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-1 disabled:opacity-50 disabled:cursor-not-allowed hover:brightness-95 active:scale-[0.98]"
-                    style={{ background: '#D4A017', color: '#14532D', boxShadow: '0 2px 8px rgba(212,160,23,0.25)' }}
+                    style={{ background: 'transparent', color: '#14532D', border: '1px solid #14532D' }}
                   >
-                    Registrar acta de observaciones
+                    Registrar respuesta de subsanación
                   </button>
-                  {notaActaDeshabilitada && (
-                    <p id="registrar-acta-nota" className="text-xs" style={{ color: '#9A6206' }}>
-                      {notaActaDeshabilitada}
+                  {notaRespuestaDeshabilitada && (
+                    <p id="registrar-respuesta-nota" className="text-xs" style={{ color: '#9A6206' }}>
+                      {notaRespuestaDeshabilitada}
                     </p>
                   )}
                 </div>
-                {yaHuboActa && (
-                  <div className="flex flex-col gap-1.5">
-                    <button
-                      type="button"
-                      disabled={!puedeRegistrarRespuesta}
-                      onClick={() => setModalActuacion('respuesta-subsanacion')}
-                      aria-describedby={notaRespuestaDeshabilitada ? 'registrar-respuesta-nota' : undefined}
-                      className="inline-flex items-center gap-2 rounded-[10px] px-4 py-2.5 text-sm font-bold transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-1 disabled:opacity-50 disabled:cursor-not-allowed hover:brightness-95 active:scale-[0.98]"
-                      style={{ background: 'transparent', color: '#14532D', border: '1px solid #14532D' }}
-                    >
-                      Registrar respuesta de subsanación
-                    </button>
-                    {notaRespuestaDeshabilitada && (
-                      <p id="registrar-respuesta-nota" className="text-xs" style={{ color: '#9A6206' }}>
-                        {notaRespuestaDeshabilitada}
-                      </p>
-                    )}
-                  </div>
-                )}
-                <BotonAccionPlaceholder
-                  label="Emitir acto final"
-                  variant="outline"
-                  disabled
-                  notaDeshabilitado="⚖️ emisión real pendiente de siembra autorizada (R10) y serie del acto (P3)"
-                />
-              </div>
-            </>
-          ) : (
-            <div className="rounded-xl p-4" style={{ background: 'var(--bg-surface-2)', border: '1px solid var(--color-border)' }}>
-              <p className="text-sm" style={{ color: 'var(--text-secondary)' }}>
-                {expediente.origen === 'RECONSTRUIDO'
-                  ? 'Expediente histórico migrado — sin cómputo de término.'
-                  : 'Sin radicación en debida forma registrada todavía — el término aún no arranca.'}
-              </p>
+              )}
+              <BotonAccionPlaceholder
+                label="Emitir acto final"
+                variant="outline"
+                disabled
+                notaDeshabilitado="⚖️ emisión real pendiente de siembra autorizada (R10) y serie del acto (P3)"
+              />
             </div>
           )}
         </div>
@@ -423,6 +422,28 @@ export function DetalleLicenciaClient({ expedienteId, onVolver }: DetalleLicenci
           onCerrar={() => setModalActuacion(null)}
           onRegistrada={alRegistrarActuacion}
         />
+      )}
+      </div>
+
+      {/* ── Vista SOLO impresión: proyecto de acto de desistimiento ──
+          Sibling del contenedor `print:hidden` de arriba (nunca anidada
+          dentro de él: un ancestro `display:none` oculta cualquier
+          descendiente sin importar su propio `display`). El botón
+          "Imprimir" de `PanelDesistimientoSemicontrolado` dispara
+          `window.print()` sobre ESTA vista limpia — sin sidebar, sin
+          botones, sin el resto de paneles del detalle. */}
+      {borradorActoDesistimiento && (
+        <div className="hidden print:block">
+          <p className="text-xs uppercase tracking-widest font-bold" style={{ color: '#0f172a' }}>
+            Expediente {numero}
+          </p>
+          <h1 className="font-headline text-xl mt-1 mb-4" style={{ color: '#0f172a' }}>
+            {borradorActoDesistimiento.titulo}
+          </h1>
+          <div className="text-sm whitespace-pre-wrap" style={{ color: '#0f172a', lineHeight: 1.6 }}>
+            {borradorActoDesistimiento.cuerpo}
+          </div>
+        </div>
       )}
     </div>
   );

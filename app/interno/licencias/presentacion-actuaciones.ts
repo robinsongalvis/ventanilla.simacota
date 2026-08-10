@@ -9,6 +9,7 @@
 
 import type { Actuacion, OrigenActuacion } from '@/lib/motor-expedientes/tipos';
 import { formatFechaColombia } from '@/lib/fecha-colombia';
+import { PREFIJO_AVISO_ACTA_COMUNICACION } from '@/lib/motor-expedientes/comunicaciones-licencia';
 import type { EventoTimelineItem } from './tipos';
 
 export const TITULO_ACTUACION: Record<string, string> = {
@@ -38,9 +39,15 @@ export const TIPO_TIMELINE: Record<string, EventoTimelineItem['tipo']> = {
  * Si el texto no coincide con ninguno de los dos prefijos conocidos hoy,
  * cae en un título genérico en vez de fallar — un `detalle` inesperado no
  * debe romper el timeline.
+ *
+ * `PREFIJO_AVISO_ACTA_COMUNICACION` viene de `lib/motor-expedientes/
+ * comunicaciones-licencia.ts` — MISMA constante que usa el servidor
+ * (`esComunicacionDelActa`, `lib/server/expedientes-licencias.ts`) para
+ * decidir si una comunicación es el aviso del acta; antes de este fix este
+ * archivo mantenía `'Aviso de acta'` como literal propio, duplicado.
  */
 export function tituloComunicacionEnviada(detalle: string | undefined): string {
-  if (detalle?.startsWith('Aviso de acta')) return 'Aviso de acta enviado';
+  if (detalle?.startsWith(PREFIJO_AVISO_ACTA_COMUNICACION)) return 'Aviso de acta enviado';
   if (detalle?.startsWith('Constancia')) return 'Constancia enviada al ciudadano';
   return 'Comunicación enviada al ciudadano';
 }

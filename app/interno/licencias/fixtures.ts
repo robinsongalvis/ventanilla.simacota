@@ -488,10 +488,14 @@ export function detalleLicencia(id: string): DetalleLicencia | null {
   };
 }
 
-// `PLAZO_DIAS` se reexporta para que la Pantalla 02 real
-// (`[expedienteId]/DetalleLicenciaClient.tsx`) reutilice `proyectarVencimiento`
-// con el MISMO plazo (45 días hábiles, Decreto 1077) sin declarar la cifra
-// una segunda vez.
+// `proyectarVencimiento`/`PLAZO_DIAS` se reexportan para quien quiera
+// reutilizar este cómputo client-side de PREVIEW (Bandeja de fixtures,
+// Pantalla 01). Desde el Bloque "Términos y vigencias protectores"
+// (10-ago-2026) la Pantalla 02 real (`[expedienteId]/DetalleLicenciaClient.tsx`)
+// YA NO los usa — consume `computos.terminoDual`, calculado una sola vez
+// por el servidor (`calcularVencimientoDual`, `lib/motor-expedientes/
+// termino.ts`), para que cliente y servidor nunca diverjan sobre la misma
+// fecha legal.
 export { proyectarVencimiento, PLAZO_DIAS };
 export const totalesUniverso = {
   /** Universo completo del sistema (no solo la muestra renderizada en esta bandeja) — cifra declarada por Planeación, ver pie de la Pantalla 01. */
