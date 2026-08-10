@@ -262,14 +262,25 @@ export interface NumeroExpedienteAsignado {
   colision?: boolean;
 }
 
-/** Procedencia de un expediente importado (Fase 5 — migración, aún sin diseñar). */
+/**
+ * Procedencia de un expediente importado (Fase 5 — migración). Diseño
+ * concretado por el importador de históricos (`lib/migracion/
+ * planificar-importacion-consecutivo.ts`, primer consumidor real de este
+ * tipo — hasta entonces declarado pero sin uso, `filaOrigen` genérico se
+ * reemplaza aquí por `hoja`/`fila` explícitos, más precisos para el reporte
+ * de dry-run que agrupa cuarentenas por origen).
+ */
 export interface ProvenanceExpediente {
-  /** Sistema/archivo de origen del dato migrado. */
+  /** Sistema/archivo de origen del dato migrado, p. ej. `'xlsx-consecutivo-2022-2026'`. */
   fuente: string;
   /** ISO 8601 — cuándo se ejecutó la importación (no cuándo ocurrió el hecho real). */
   fechaImportacion: string;
-  /** Referencia a la fila/registro de origen, para auditar la migración hasta su dato crudo. */
-  filaOrigen?: string;
+  /** SHA-256 del archivo de origen (Excel, PDF...) — procedencia verificable hasta el binario exacto. */
+  sha256?: string;
+  /** Hoja/pestaña del archivo de origen dentro de la que aparece el registro. */
+  hoja?: string;
+  /** Número de fila (1-based) dentro de la hoja, tal como en el archivo de origen. */
+  fila?: number;
 }
 
 /** Acto administrativo que cierra el expediente (resolución de licencia, negación, etc.). */
