@@ -127,8 +127,11 @@ describe('planificarImportacion — camino IMPORTABLE (tablas sintéticas con MA
 });
 
 describe('planificarImportacion — cuarentena por CÓDIGO (P1′)', () => {
-  it('"LA" (no sembrado, JAMÁS se mapea) → CUARENTENA con motivo CODIGO_PENDIENTE_P1', () => {
-    const plan = planificarImportacion(snapshot([registro({ tipo: 'LA', estado: 'CERRADO-SINTETICO', solicitanteDocumento: '1' })]), AHORA, { estados: TABLA_ESTADOS_CON_MAPEADO });
+  it('"LRC" (no sembrado, JAMÁS se mapea) → CUARENTENA con motivo CODIGO_PENDIENTE_P1', () => {
+    // Antes este test usaba "LA"; desde el 10-ago-2026 "LA" está MAPEADO
+    // (respuesta del ingeniero: modalidad ampliación) — "LRC" sigue en
+    // cuarentena y ejerce el mismo camino.
+    const plan = planificarImportacion(snapshot([registro({ tipo: 'LRC', estado: 'CERRADO-SINTETICO', solicitanteDocumento: '1' })]), AHORA, { estados: TABLA_ESTADOS_CON_MAPEADO });
     expect(plan.reconciliacion.planificados).toBe(0);
     expect(plan.cuarentena[0]!.motivos).toContain('CODIGO_PENDIENTE_P1');
   });

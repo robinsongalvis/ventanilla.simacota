@@ -188,9 +188,17 @@ export const EQUIVALENCIAS_MIGRACION_SEMILLA_LICENCIAS = [
   // confirmen, no se adivinan): reconocimiento + construcción (ampliación).
   { textoHistorico: 'LR y LC,A', codigos: ['RECONOCIMIENTO', 'CONSTRUCCION'], estado: 'MAPEADO', fundamento: FUNDAMENTO_RECONOCIMIENTO_CONSTRUCCION_CONJUNTO },
 
-  // ── Cuarentena: JAMÁS mapear (P1′) ───────────────────────────────────
-  { textoHistorico: 'LA', codigos: [], estado: 'CUARENTENA', nota: 'Significado local pendiente del ingeniero (P1′). El anexo solo conjetura "¿ampliación?" con certeza BAJA — una conjetura no es una equivalencia.' },
-  { textoHistorico: 'LCR VISR', codigos: [], estado: 'CUARENTENA', nota: 'Significado local pendiente del ingeniero (P1′). No existe como figura normativa (capítulo de reconocimiento leído completo); el anexo conjetura "¿reconocimiento VIS rural?" con certeza BAJA.' },
-  { textoHistorico: 'LRC', codigos: [], estado: 'CUARENTENA', nota: 'Significado local pendiente del ingeniero (P1′). El anexo conjetura "¿variante de LR/LCR?" con certeza BAJA.' },
-  { textoHistorico: 'LA, PH', codigos: [], estado: 'CUARENTENA', nota: 'Significado local pendiente del ingeniero (P1′) — combinado que incluye "LA" (en cuarentena); no se puede resolver un combinado con un componente desconocido, aunque "PH" por sí solo sí mapearía a APROBACION_PH.' },
+  // ── Resueltas por el ingeniero (P1′ parcial, 10-ago-2026) ────────────
+  // Respuesta del ingeniero de Planeación relatada por el propietario
+  // (10-ago-2026): "LA = Licencia de Ampliación". Con eso deja de ser
+  // conjetura: ampliación es MODALIDAD de la licencia de construcción
+  // (mismo tratamiento que 'LC, A', ya sembrado), no una figura aparte.
+  { textoHistorico: 'LA', codigos: ['CONSTRUCCION'], estado: 'MAPEADO', fundamento: `${FUNDAMENTO_CONSTRUCCION} "LA" = modalidad ampliación — respuesta del ingeniero de Planeación (10-ago-2026, relatada por el propietario).` },
+  // Combinado desbloqueado por la misma respuesta: LA (construcción,
+  // modalidad ampliación) + PH (aprobación de planos PH).
+  { textoHistorico: 'LA, PH', codigos: ['CONSTRUCCION', 'APROBACION_PH'], estado: 'MAPEADO', fundamento: `${FUNDAMENTO_LICENCIA_CONLLEVA_PH} "LA" = modalidad ampliación (respuesta del ingeniero, 10-ago-2026, relatada por el propietario).` },
+
+  // ── Cuarentena: JAMÁS mapear (P1′ restante) ──────────────────────────
+  { textoHistorico: 'LCR VISR', codigos: [], estado: 'CUARENTENA', nota: 'Significado local pendiente del ingeniero (P1′). No existe como figura normativa (capítulo de reconocimiento leído completo); el anexo conjetura "¿reconocimiento VIS rural?" con certeza BAJA. NO está en la respuesta del ingeniero del 10-ago-2026.' },
+  { textoHistorico: 'LRC', codigos: [], estado: 'CUARENTENA', nota: 'Significado local pendiente del ingeniero (P1′). El anexo conjetura "¿variante de LR/LCR?" con certeza BAJA. NO está en la respuesta del ingeniero del 10-ago-2026.' },
 ] as const satisfies readonly EquivalenciaMigracion[];
