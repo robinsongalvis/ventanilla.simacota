@@ -1,6 +1,6 @@
 /* ══════════════════════════════════════════════════════════════
    GET /api/licencias/expedientes/[id]  — detalle: expediente + actuaciones
-   + documentos + definicionId
+   + documentos + definicionId + computos
 
    Bloque "Integración UI y demo" / Bloque A·A2. Dos `orderBy` de un solo
    campo sobre subcolecciones de UN padre — orden natural, sin índice
@@ -12,9 +12,14 @@
 
    NO calcula completitud aquí: `evaluarCompletitud` es pura
    (`lib/motor-expedientes/completitud.ts`) y la ejecuta la UI con
-   `documentos`/`aportes`/`contexto` + la Definición — mismo patrón que el
-   término dual (`lib/motor-expedientes/termino.ts`), que tampoco se
-   calcula en el servidor.
+   `documentos`/`aportes`/`contexto` + la Definición.
+
+   `computos` (Bloque "Términos y vigencias protectores", 10-ago-2026):
+   `{ terminoDual, vigencia?, plazoSubsanacion }`, TODO calculado EN
+   MEMORIA sobre `actuaciones`/`expediente` YA LEÍDOS arriba — CERO
+   lecturas nuevas a Firestore (R11). `borradorActoDesistimiento` viaja
+   junto (no dentro de `computos`: es un documento generado, no un
+   cómputo) — `null` salvo que `plazoSubsanacion.resultado === 'POR_ARCHIVAR'`.
 ══════════════════════════════════════════════════════════════ */
 
 import { NextResponse } from 'next/server';
@@ -27,6 +32,15 @@ import {
 import type { TenantId } from '@/src/types/radicado';
 import { SUBCOLECCION_DOCUMENTOS } from '@/lib/server/expedientes-documentos-tipos';
 import { DEFINICION_LICENCIA_CONSTRUCCION_PARCIAL } from '@/lib/motor-expedientes/definiciones/licencia-construccion-parcial';
+import {
+  evaluarPlazoSubsanacion,
+  generarBorradorActoDesistimiento,
+  PLAZO_DECISION_LICENCIA_DIAS_HABILES,
+  type ExpedienteLicenciaDoc,
+  type ActuacionLicenciaDoc,
+} from '@/lib/server/expedientes-licencias';
+import { calcularVencimientoDual, derivarEventosTermino } from '@/lib/motor-expedientes/termino';
+import { calcularVencimientoVigencia, esErrorVigencia } from '@/lib/motor-expedientes/vigencias';
 import { logError } from '@/lib/logger';
 
 export const runtime = 'nodejs';
@@ -82,6 +96,36 @@ export async function GET(request: Request, context: RouteContext): Promise<Next
       }
     }
 
+    // ── computos (Bloque "Términos y vigencias protectores") — TODO en
+    // memoria sobre `actuaciones`/`expediente` ya leídos arriba, CERO
+    // lecturas nuevas a Firestore (R11).
+    const actuacionesLicencia = actuaciones as unknown as ActuacionLicenciaDoc[];
+    const expedienteLicencia = expediente as unknown as ExpedienteLicenciaDoc;
+
+    const eventos = derivarEventosTermino(actuacionesLicencia);
+    const terminoDual = calcularVencimientoDual(eventos, PLAZO_DECISION_LICENCIA_DIAS_HABILES);
+
+    const plazoSubsanacion = evaluarPlazoSubsanacion(actuacionesLicencia, new Date());
+    const borradorActoDesistimiento = generarBorradorActoDesistimiento(expedienteLicencia, plazoSubsanacion);
+
+    // `vigencia` es OMITIDA (no un error HTTP) si el expediente aún no
+    // tiene `actoFinal.fechaFirmeza` (no está cerrado) o si
+    // `calcularVencimientoVigencia` no puede resolver la regla (p. ej.
+    // CONSTRUCCION sin `modalidadConstruccion` — dato que HOY ningún
+    // expediente captura, ver JSDoc de `seleccionarReglaVigencia`): en
+    // ambos casos es un hueco honesto, no un fallo del cómputo.
+    let vigencia: ReturnType<typeof calcularVencimientoVigencia> | undefined;
+    const fechaFirmeza = expedienteLicencia.actoFinal?.fechaFirmeza;
+    if (fechaFirmeza) {
+      const resultado = calcularVencimientoVigencia({
+        fechaFirmeza,
+        subtipos: expedienteLicencia.subtipos ?? [],
+      });
+      if (!esErrorVigencia(resultado)) {
+        vigencia = resultado;
+      }
+    }
+
     return NextResponse.json({
       ok: true,
       expediente,
@@ -92,6 +136,8 @@ export async function GET(request: Request, context: RouteContext): Promise<Next
       // exista resolución real por `expediente.tramiteId` (persistencia de
       // Fase 1), este campo se resuelve dinámicamente en vez de fijo.
       definicionId: DEFINICION_LICENCIA_CONSTRUCCION_PARCIAL.id,
+      computos: { terminoDual, vigencia, plazoSubsanacion },
+      borradorActoDesistimiento,
     });
   } catch (error) {
     logError({ radicadoId: 'n/a', modulo: 'licencias/expedientes/[id]/GET', error });
