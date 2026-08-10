@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { diasRestantesHabiles, sumarDiasHabiles } from '@/lib/tiempos-radicado';
 import {
   calcularVencimiento,
+  calcularVencimientoDual,
   derivarEventosTermino,
   type EventoTermino,
   type PoliticaTermino,
@@ -203,6 +204,67 @@ describe('DF-7 — exhaustividad del vocabulario de eventos (defensa en tiempo d
       eventoInvalido,
     ];
     expect(() => calcularVencimiento(eventos, POLITICA_SUSPENSION)).toThrow(/no contemplado/);
+  });
+});
+
+/* ══════════════════════════════════════════════════════════════
+   calcularVencimientoDual (Bloque "Términos y vigencias protectores", 10-ago-2026)
+══════════════════════════════════════════════════════════════ */
+
+describe('calcularVencimientoDual — sin default, expone AMBAS fechas + la más temprana', () => {
+  it('sin más eventos que la radicación: suspension === reinicio === fechaAlertaConservadora', () => {
+    const eventos: EventoTermino[] = [{ tipo: 'RADICACION_DEBIDA_FORMA', fecha: RADICACION_FECHA }];
+    const dual = calcularVencimientoDual(eventos, 45);
+    const esperado = sumarDiasHabiles(RADICACION_FECHA, 45);
+    expect(dual.suspension!.getTime()).toBe(esperado.getTime());
+    expect(dual.reinicio!.getTime()).toBe(esperado.getTime());
+    expect(dual.fechaAlertaConservadora!.getTime()).toBe(esperado.getTime());
+  });
+
+  it('con acta+respuesta: reinicio vence DESPUÉS de suspension → fechaAlertaConservadora = suspension (la más temprana)', () => {
+    const actaFecha = sumarDiasHabiles(RADICACION_FECHA, 15);
+    const respuestaFecha = sumarDiasHabiles(actaFecha, 5);
+    const eventos: EventoTermino[] = [
+      { tipo: 'RADICACION_DEBIDA_FORMA', fecha: RADICACION_FECHA },
+      { tipo: 'ACTA_OBSERVACIONES', fecha: actaFecha },
+      { tipo: 'RESPUESTA_SUBSANACION', fecha: respuestaFecha },
+    ];
+    const dual = calcularVencimientoDual(eventos, 45);
+    expect(dual.suspension!.getTime()).toBeLessThan(dual.reinicio!.getTime());
+    expect(dual.fechaAlertaConservadora!.getTime()).toBe(dual.suspension!.getTime());
+  });
+
+  it('sin RADICACION_DEBIDA_FORMA: las tres fechas son null (nada que proyectar, D5)', () => {
+    const dual = calcularVencimientoDual([], 45);
+    expect(dual.suspension).toBeNull();
+    expect(dual.reinicio).toBeNull();
+    expect(dual.fechaAlertaConservadora).toBeNull();
+  });
+
+  it('eventos reales DF-7 (comunicación del acta, renuncia, viabilidad, entrega de pago, prórroga administrativa) siguen INERTES bajo AMBAS políticas del cómputo dual', () => {
+    const eventos: EventoTermino[] = [
+      { tipo: 'RADICACION_DEBIDA_FORMA', fecha: RADICACION_FECHA },
+      { tipo: 'ACTA_OBSERVACIONES', fecha: sumarDiasHabiles(RADICACION_FECHA, 10) },
+      { tipo: 'COMUNICACION_ACTA', fecha: sumarDiasHabiles(RADICACION_FECHA, 11) },
+      { tipo: 'RENUNCIA_PLAZO_RESTANTE', fecha: sumarDiasHabiles(RADICACION_FECHA, 12) },
+      { tipo: 'RESPUESTA_SUBSANACION', fecha: sumarDiasHabiles(RADICACION_FECHA, 15) },
+      { tipo: 'ACTO_VIABILIDAD', fecha: sumarDiasHabiles(RADICACION_FECHA, 20) },
+      { tipo: 'ENTREGA_DOCUMENTOS_PAGO', fecha: sumarDiasHabiles(RADICACION_FECHA, 22) },
+      { tipo: 'PRORROGA_TERMINO_ADMINISTRACION', fecha: sumarDiasHabiles(RADICACION_FECHA, 25) },
+    ];
+    const eventosSinInertes = eventos.filter((e) => e.tipo === 'RADICACION_DEBIDA_FORMA' || e.tipo === 'ACTA_OBSERVACIONES' || e.tipo === 'RESPUESTA_SUBSANACION');
+
+    const dualConInertes = calcularVencimientoDual(eventos, 45);
+    const dualSinInertes = calcularVencimientoDual(eventosSinInertes, 45);
+
+    expect(dualConInertes.suspension!.getTime()).toBe(dualSinInertes.suspension!.getTime());
+    expect(dualConInertes.reinicio!.getTime()).toBe(dualSinInertes.reinicio!.getTime());
+  });
+
+  it('NADA en el resultado indica cuál política "ganó" — ambas fechas están siempre presentes, sin campo de política elegida', () => {
+    const eventos: EventoTermino[] = [{ tipo: 'RADICACION_DEBIDA_FORMA', fecha: RADICACION_FECHA }];
+    const dual = calcularVencimientoDual(eventos, 45);
+    expect(Object.keys(dual).sort()).toEqual(['fechaAlertaConservadora', 'reinicio', 'suspension']);
   });
 });
 

@@ -95,8 +95,21 @@ describe('POST /api/licencias/expedientes/[id]/actuaciones — registro de hecho
   });
 });
 
-describe('ninguna ruta bajo app/api/licencias importa vigencias.ts (⚖️ hueco 3, mismo candado que el test dedicado)', () => {
-  it.each(['route.ts', '[id]/route.ts', '[id]/actuaciones/route.ts'])('%s', (archivo) => {
+describe('consumo de vigencias.ts (Bloque "Términos y vigencias protectores", 10-ago-2026 — contrato ACTUALIZADO)', () => {
+  // El candado original ("ninguna ruta importa vigencias.ts", ⚖️ hueco 3)
+  // se LEVANTÓ para el detalle (ver JSDoc de cabecera de `vigencias.ts` y
+  // `__tests__/vigencias-anti-consumo.test.ts`, contrato nuevo). Las otras
+  // dos rutas de este bloque NO calculan vigencia todavía (la bandeja la
+  // declara fuera de alcance por N+1; actuaciones no cierra expedientes),
+  // así que siguen sin importarlo — se verifica explícitamente que NO se
+  // coló un import fantasma en ninguna de las dos.
+  it('[id]/route.ts (detalle) SÍ importa vigencias.ts — computa `computos.vigencia`', () => {
+    const s = R('[id]/route.ts');
+    expect(s).toContain("from '@/lib/motor-expedientes/vigencias'");
+    expect(s).toContain('calcularVencimientoVigencia');
+  });
+
+  it.each(['route.ts', '[id]/actuaciones/route.ts'])('%s NO importa vigencias.ts (fuera de alcance de este bloque)', (archivo) => {
     const s = R(archivo);
     expect(s).not.toContain('motor-expedientes/vigencias');
   });

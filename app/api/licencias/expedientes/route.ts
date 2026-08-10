@@ -129,6 +129,18 @@ export async function GET(): Promise<NextResponse> {
       .map((d) => d.data())
       .sort((a, b) => String(b.creadoEn ?? '').localeCompare(String(a.creadoEn ?? '')));
 
+    // DECLARADO, NO implementado (Bloque "Términos y vigencias
+    // protectores"): la bandeja NO trae `fechaAlertaConservadora` por
+    // expediente. Calcularla exige `derivarEventosTermino(actuaciones)`
+    // (`lib/motor-expedientes/termino.ts`), y `actuaciones` es una
+    // SUBCOLECCIÓN — traerla aquí sería una lectura extra POR expediente
+    // (N+1, hasta LIMITE_BANDEJA=300 lecturas adicionales en el peor caso),
+    // exactamente el antipatrón que el gate R11 vigila. La bandeja queda
+    // SIN ese badge por ahora; el detalle (`GET .../[id]`, que YA carga
+    // `actuaciones` para otros fines) sí lo calcula gratis. Si se necesita
+    // en la bandeja, la vía correcta es denormalizar `fechaAlertaConservadora`
+    // en el documento raíz del expediente cuando cambie (propuesta para el
+    // Especialista de Firestore, no una lectura N+1 aquí).
     return NextResponse.json({ ok: true, expedientes });
   } catch (error) {
     logError({ radicadoId: 'n/a', modulo: 'licencias/expedientes/GET', error });

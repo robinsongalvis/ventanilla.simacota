@@ -4,8 +4,9 @@ import { CATALOGO_FIGURAS_NORMATIVAS } from '@/lib/motor-expedientes/catalogo-su
 import { puedeTransicionar, type EstadoJuridicoLicencia } from '@/lib/motor-expedientes/estados-licencia';
 import { esEstadoCerrado } from '@/lib/radicado-estados';
 import { DEFINICION_LICENCIA_CONSTRUCCION_PARCIAL } from '@/lib/motor-expedientes/definiciones/licencia-construccion-parcial';
-import { sumarDiasHabiles } from '@/lib/tiempos-radicado';
+import { sumarDiasHabiles, diasRestantesHabiles } from '@/lib/tiempos-radicado';
 import { debeNotificarCiudadano, type CriterioNotificacion } from '@/lib/email/debe-notificar-ciudadano';
+import { PREFIJO_AVISO_ACTA_COMUNICACION } from '@/lib/motor-expedientes/comunicaciones-licencia';
 
 /* ══════════════════════════════════════════════════════════════
    Lógica de DECISIÓN de expedientes de licencias — bloque "Integración UI
@@ -14,6 +15,16 @@ import { debeNotificarCiudadano, type CriterioNotificacion } from '@/lib/email/d
    error `{status, mensaje}`. Las rutas (`app/api/licencias/expedientes/…`)
    SOLO orquestan IO/auth — ningún cómputo de negocio vive ahí.
 ══════════════════════════════════════════════════════════════ */
+
+/**
+ * Plazo de DECISIÓN del trámite de licencias — D.1077/2015 art. 2.2.6.1.2.3.1
+ * inc. 1: "45 días hábiles" (misma cita ya usada en
+ * `estados-licencia.ts` para las transiciones `EN_VIABILIDAD → CONCEDIDA/NEGADA`).
+ * Parámetro OBLIGATORIO de `calcularVencimientoDual` (`./termino.ts`, sin
+ * default) — este es el DATO que la ruta de licencias le pasa; el motor
+ * sigue sin conocer ningún número por defecto.
+ */
+export const PLAZO_DECISION_LICENCIA_DIAS_HABILES = 45;
 
 /**
  * ⚖️ CANDADO DE EMISIÓN — NO NEGOCIABLE. La serie legal `expedientes`
@@ -75,7 +86,45 @@ export interface ExpedienteLicenciaDoc extends Expediente {
  */
 export interface ActuacionLicenciaDoc extends Actuacion {
   tenantId: string;
+  /**
+   * Presente SOLO en actuaciones `tipo: 'comunicacion-enviada'` — el tipo
+   * ESTRUCTURADO de la comunicación (p. ej. "Aviso de acta de observaciones
+   * y correcciones", "Constancia de radicación en legal y debida forma").
+   * Corrección de un hallazgo de revisión cruzada con consecuencia jurídica
+   * (10-ago-2026): `'comunicacion-enviada'` es un tipo COMPARTIDO por la
+   * constancia (`desde-radicado/route.ts`) y el aviso del acta
+   * (`[id]/actuaciones/route.ts`) — antes de este campo, la única forma de
+   * distinguirlas era el PREFIJO de texto libre de `detalle`, y nada
+   * obligaba a `evaluarPlazoSubsanacion` a mirarlo: tomaba CUALQUIER
+   * comunicación posterior al acta, incluida una constancia de OTRO
+   * expediente/evento — un escenario real (no teórico) si el aviso del
+   * acta falla al enviarse (la UI ya contempla "⚠ Aviso NO enviado") y
+   * después sale cualquier otra comunicación. El dato ya llegaba
+   * estructurado a `construirActuacionComunicacionEnviada` (`meta.tipoComunicacion`)
+   * y se perdía al concatenarlo dentro de `detalle` — este campo lo
+   * conserva tal cual, sin tocar `detalle` (compatibilidad con lo ya
+   * escrito).
+   */
+  tipoComunicacion?: string;
 }
+
+/**
+ * Prefijo que identifica una comunicación como "aviso del acta de
+ * observaciones" — fuente de verdad ÚNICA para esa clasificación en el
+ * servidor. Vía PRIMARIA de identificación: `ActuacionLicenciaDoc.tipoComunicacion`
+ * (arriba) empieza con este prefijo. Vía FALLBACK (actuaciones escritas
+ * ANTES de que existiera el campo estructurado): `detalle` empieza con el
+ * mismo prefijo.
+ *
+ * DEUDA SALDADA (10-ago-2026, dev-frontend): la constante vive ahora en
+ * `lib/motor-expedientes/comunicaciones-licencia.ts` (módulo PURO, sin
+ * dependencias de servidor) y `app/interno/licencias/presentacion-actuaciones.ts`
+ * (`tituloComunicacionEnviada`) la importa de ahí directamente en vez de
+ * mantener `'Aviso de acta'` duplicado — este módulo la RE-EXPORTA con el
+ * mismo nombre para no romper a sus consumidores actuales (las rutas
+ * `app/api/licencias/expedientes/...`).
+ */
+export { PREFIJO_AVISO_ACTA_COMUNICACION };
 
 /**
  * Punto de entrada del camino REAL (fuera de demo) — HOY siempre rechaza
@@ -637,6 +686,197 @@ export function construirActuacionComunicacionEnviada(
     actorRol: actor.rol,
     fecha: ahora.toISOString(),
     origen: 'REAL',
+    tipoComunicacion: meta.tipoComunicacion,
     detalle: `${meta.tipoComunicacion} enviada a ${meta.destinatario}. Asunto: "${meta.asunto}".`,
+  };
+}
+
+/* ──────────────────────────────────────────────
+   Desistimiento SEMICONTROLADO (Bloque "Términos y vigencias protectores",
+   10-ago-2026) — art. 2.2.6.1.2.2.4: "se entenderá desistida la solicitud"
+   si el ciudadano no subsana dentro del plazo tras el acta COMUNICADA.
+   NUNCA automático (Principio 9, IA/sistema sugiere — el funcionario
+   decide): `evaluarPlazoSubsanacion` es una lectura derivada, calculada
+   ON-READ, que NO toca la máquina de estados jurídicos (`estados-licencia.ts`)
+   ni escribe nada — el archivo lo decide y firma el funcionario, con el
+   proyecto de acto (`generarBorradorActoDesistimiento`) como insumo.
+
+   ⚠ AMPLIACIÓN DE 15 DÍAS — DECLARADA Y OMITIDA (sin inventar): el acta de
+   la mesa (10-ago) registra "30 días hábiles, ampliables 15" como el dato
+   normativo. Pero NINGÚN `TipoEventoTermino` (`./termino.ts`, DF-7) ni
+   ningún slug de `Actuacion.tipo` conocido en este módulo representa un
+   evento de "ampliación del plazo de subsanación" — no es lo mismo que
+   `PRORROGA_TERMINO_ADMINISTRACION` (esa es la prórroga del TÉRMINO
+   GENERAL del trámite, un concepto distinto, también ⚖️ inerte). Sin una
+   señal real que decir "esto es una ampliación", inventar cuándo aplicar
+   +15 sería fabricar un hecho. `evaluarPlazoSubsanacion` implementa
+   SOLO el plazo base de 30 días hábiles; cuando exista un evento/actuación
+   real de ampliación, esta función debe extenderse para leerlo — no antes.
+────────────────────────────────────────────── */
+
+export type ResultadoPlazoSubsanacion = 'NO_APLICA' | 'EN_PLAZO' | 'POR_ARCHIVAR';
+
+export interface EvaluacionPlazoSubsanacion {
+  resultado: ResultadoPlazoSubsanacion;
+  /** ISO 8601 — presente solo si `resultado !== 'NO_APLICA'`. */
+  fechaVencimientoPlazo?: string;
+  /** Puede ser negativo (plazo ya vencido) — presente solo si `resultado !== 'NO_APLICA'`. */
+  diasHabilesRestantes?: number;
+}
+
+/**
+ * ¿Esta comunicación es identificable como el AVISO DEL ACTA (no la
+ * constancia, ni ninguna otra comunicación futura)? Corrección de un
+ * hallazgo de revisión cruzada con consecuencia jurídica (10-ago-2026):
+ * `'comunicacion-enviada'` es un tipo COMPARTIDO — antes de este fix,
+ * `evaluarPlazoSubsanacion` tomaba CUALQUIER comunicación posterior al
+ * acta, lo que podía arrancar el reloj de desistimiento tácito desde el
+ * envío EQUIVOCADO (p. ej. si el aviso real del acta falló al enviarse y
+ * después salió cualquier otra comunicación) — un vicio de debido proceso.
+ *
+ * Vía PRIMARIA: `tipoComunicacion` (campo estructurado, presente en toda
+ * actuación escrita DESDE este fix). Vía FALLBACK, solo si el campo no
+ * está presente (actuaciones escritas ANTES del fix): el prefijo conocido
+ * de `detalle`, la MISMA constante (`PREFIJO_AVISO_ACTA_COMUNICACION`) que
+ * ya usaba el texto libre. Si NINGUNA de las dos vías identifica la
+ * comunicación como el aviso → `false`, fail-closed (mejor no reconocerla
+ * que reconocerla mal).
+ */
+function esComunicacionDelActa(a: Pick<ActuacionLicenciaDoc, 'tipoComunicacion' | 'detalle'>): boolean {
+  if (a.tipoComunicacion) return a.tipoComunicacion.startsWith(PREFIJO_AVISO_ACTA_COMUNICACION);
+  return Boolean(a.detalle?.startsWith(PREFIJO_AVISO_ACTA_COMUNICACION));
+}
+
+/**
+ * Evalúa si un expediente tiene un plazo de subsanación (desistimiento
+ * tácito, art. 2.2.6.1.2.2.4) EN CURSO o VENCIDO, a partir de su
+ * trazabilidad de actuaciones — PURA, sin I/O, sin escribir nada.
+ *
+ * Aplica (deja de ser `NO_APLICA`) SOLO si las tres condiciones se
+ * cumplen, en este orden:
+ *  1. Existe una actuación `acta-observaciones`.
+ *  2. Existe una actuación `comunicacion-enviada` con `fecha` POSTERIOR (o
+ *     igual) a la del acta Y que `esComunicacionDelActa` identifique como
+ *     EL AVISO DEL ACTA — no cualquier comunicación posterior (ver JSDoc
+ *     de `esComunicacionDelActa`: evidencia de que el acta SÍ se comunicó
+ *     al interesado, CPACA arts. 36/59, sin la cual el plazo no corre —
+ *     due process). Fail-closed: ninguna comunicación identificable como
+ *     el aviso → `NO_APLICA`, aunque exista OTRA comunicación posterior.
+ *  3. NO existe una actuación `respuesta-subsanacion` posterior al acta
+ *     (el ciudadano aún no respondió).
+ *
+ * Con las tres condiciones dadas, el plazo son 30 días hábiles desde la
+ * `fecha` de la comunicación (reutiliza `calcularFechaLimiteRespuestaActa`
+ * — NO reimplementa la suma de días hábiles) — `POR_ARCHIVAR` si `hoy` ya
+ * pasó esa fecha, `EN_PLAZO` si no.
+ */
+export function evaluarPlazoSubsanacion(
+  actuaciones: Pick<ActuacionLicenciaDoc, 'tipo' | 'fecha' | 'tipoComunicacion' | 'detalle'>[],
+  hoy: Date,
+): EvaluacionPlazoSubsanacion {
+  const ordenadas = [...actuaciones].sort((a, b) => new Date(a.fecha).getTime() - new Date(b.fecha).getTime());
+  const acta = [...ordenadas].reverse().find((a) => a.tipo === 'acta-observaciones');
+  if (!acta) return { resultado: 'NO_APLICA' };
+
+  const actaTime = new Date(acta.fecha).getTime();
+
+  const yaRespondio = ordenadas.some((a) => a.tipo === 'respuesta-subsanacion' && new Date(a.fecha).getTime() >= actaTime);
+  if (yaRespondio) return { resultado: 'NO_APLICA' };
+
+  const comunicacion = ordenadas.find((a) => (
+    a.tipo === 'comunicacion-enviada' && new Date(a.fecha).getTime() >= actaTime && esComunicacionDelActa(a)
+  ));
+  if (!comunicacion) return { resultado: 'NO_APLICA' };
+
+  const fechaVencimientoPlazo = calcularFechaLimiteRespuestaActa(comunicacion.fecha);
+  const diasHabilesRestantes = diasRestantesHabiles(fechaVencimientoPlazo, hoy);
+  const resultado: ResultadoPlazoSubsanacion = diasHabilesRestantes < 0 ? 'POR_ARCHIVAR' : 'EN_PLAZO';
+
+  return { resultado, fechaVencimientoPlazo, diasHabilesRestantes };
+}
+
+/**
+ * Fórmula de recursos contra el proyecto de acto de desistimiento tácito.
+ * PARAMETRIZADA a propósito (no un literal inline en `generarBorradorActoDesistimiento`):
+ * el acta de la mesa (10-ago) confirma la SUSTANCIA (recurso de reposición
+ * ante la misma Secretaría de Planeación; sin apelación ante el Alcalde —
+ * aclaración expresa del propietario el mismo día, commit
+ * "docs(juridica): aclaración del propietario — recursos también quedan en
+ * Planeación (solo reposición)") pero deja EXPRESAMENTE reservada la
+ * "fórmula exacta" para el concepto ESCRITO de Jurídica ("una línea
+ * basta"), por el riesgo de vicio de debido proceso si el texto de
+ * notificación de recursos queda mal redactado. Mientras ese concepto no
+ * llegue, este texto es la mejor redacción disponible con la sustancia ya
+ * confirmada — cambiarlo cuando llegue el concepto es editar esta
+ * constante, no la función que la usa.
+ */
+export const TEXTO_RECURSOS_DESISTIMIENTO_TACITO =
+  'Contra este acto procede el recurso de reposición ante la Secretaría de Planeación de Simacota, '
+  + 'dentro de los diez (10) días siguientes a su notificación (CPACA, art. 76). No procede recurso de apelación.';
+
+export interface BorradorActoDesistimiento {
+  titulo: string;
+  /** Texto estructurado, imprimible — párrafos separados por línea en blanco. NO es HTML ni PDF (ver JSDoc de `generarBorradorActoDesistimiento`). */
+  cuerpo: string;
+}
+
+/**
+ * Genera el TEXTO del proyecto de acto administrativo de desistimiento
+ * tácito — PURO, servidor, NO escribe nada ni decide nada por sí mismo: es
+ * un INSUMO para que el funcionario revise, complete los datos que le
+ * falten (motivo específico de lo no subsanado, fecha de firma) y firme.
+ * El sistema JAMÁS declara el desistimiento — Principio 9 (IA/sistema
+ * sugiere, el funcionario decide) aplica aquí con la misma fuerza que a
+ * cualquier sugerencia de IA, aunque este texto no use IA: es lógica
+ * determinista, pero la DECISIÓN administrativa sigue siendo 100% humana.
+ *
+ * Deliberadamente devuelve TEXTO PLANO estructurado (`{titulo, cuerpo}`),
+ * NO monta ninguna generación de PDF nueva — eso es una decisión de
+ * presentación que le corresponde a dev-frontend/UI. Si en el repo ya
+ * existe un patrón de generación de PDF reutilizable para otros documentos
+ * (constancias, oficios), es una pieza que dev-frontend puede aprovechar
+ * DESPUÉS de este entregable — no se investigó ni se acopló aquí a
+ * propósito, para no mezclar la lógica de negocio (qué dice el acto) con
+ * la de presentación (cómo se imprime).
+ *
+ * Solo tiene sentido llamarla cuando `evaluacion.resultado === 'POR_ARCHIVAR'`
+ * — se valida y se devuelve `null` en cualquier otro caso (no hay nada que
+ * proyectar si el plazo no aplica o sigue corriendo).
+ */
+export function generarBorradorActoDesistimiento(
+  expediente: Pick<ExpedienteLicenciaDoc, 'id' | 'solicitanteNombre' | 'solicitanteDocumento' | 'numeroExpediente'>,
+  evaluacion: EvaluacionPlazoSubsanacion,
+): BorradorActoDesistimiento | null {
+  if (evaluacion.resultado !== 'POR_ARCHIVAR') return null;
+
+  const numero = expediente.numeroExpediente?.numero ?? expediente.id;
+  const cuerpo = [
+    `PROYECTO DE ACTO ADMINISTRATIVO — DESISTIMIENTO TÁCITO DE LA SOLICITUD`,
+    ``,
+    `Expediente No. ${numero}`,
+    `Solicitante: ${expediente.solicitanteNombre} (documento ${expediente.solicitanteDocumento})`,
+    ``,
+    `De conformidad con el artículo 2.2.6.1.2.2.4 del Decreto 1077 de 2015: "se entenderá `
+      + `desistida la solicitud" cuando el solicitante no atienda el requerimiento de la `
+      + `Administración dentro del plazo señalado tras la comunicación del acta de observaciones `
+      + `y correcciones, sin que se hubiere aportado la información y/o documentación requerida.`,
+    ``,
+    `Vencido el plazo de subsanación (${evaluacion.fechaVencimientoPlazo ?? 'fecha de vencimiento pendiente de registrar'}) `
+      + `sin respuesta del solicitante, se declara el DESISTIMIENTO TÁCITO de la solicitud y el `
+      + `ARCHIVO del expediente.`,
+    ``,
+    TEXTO_RECURSOS_DESISTIMIENTO_TACITO,
+    ``,
+    `NOTA: este es un PROYECTO — no produce efecto alguno hasta ser revisado, completado y `
+      + `firmado por el funcionario competente.`,
+    ``,
+    `_________________________________`,
+    `Firma del funcionario competente`,
+    `Secretaría de Planeación — Simacota, Santander`,
+  ].join('\n');
+
+  return {
+    titulo: `Proyecto de acto de desistimiento tácito — expediente ${numero}`,
+    cuerpo,
   };
 }

@@ -186,6 +186,71 @@ describe('GET /api/licencias/expedientes/[id] — detalle + actuaciones ordenada
   });
 });
 
+describe('GET /api/licencias/expedientes/[id] — computos (Bloque "Términos y vigencias protectores")', () => {
+  it('solo radicación: terminoDual.suspension === terminoDual.reinicio, plazoSubsanacion NO_APLICA, vigencia ausente (sin firmeza), sin borrador', async () => {
+    store.set('expedientes/e2', { id: 'e2', tenantId: 'SEC_PLANEACION' });
+    store.set('expedientes/e2/actuaciones/a1', { id: 'a1', tipo: 'radicacion-debida-forma', fecha: '2026-06-01T12:00:00.000Z', origen: 'REAL' });
+
+    const res = await detalleGET(req(null, 'GET'), ctx('e2'));
+    const data = await res.json();
+
+    expect(data.computos.terminoDual.suspension).toBe(data.computos.terminoDual.reinicio);
+    expect(data.computos.terminoDual.fechaAlertaConservadora).toBe(data.computos.terminoDual.suspension);
+    expect(data.computos.plazoSubsanacion.resultado).toBe('NO_APLICA');
+    expect(data.computos.vigencia).toBeUndefined();
+    expect(data.borradorActoDesistimiento).toBeNull();
+  });
+
+  it('acta comunicada, plazo de 30 hábiles vencido → plazoSubsanacion POR_ARCHIVAR + borradorActoDesistimiento con los datos del expediente', async () => {
+    store.set('expedientes/e3', {
+      id: 'e3', tenantId: 'SEC_PLANEACION', solicitanteNombre: 'Ana Gómez', solicitanteDocumento: '99999',
+      numeroExpediente: { numero: 'DEMO-26-xxx', serieId: 'demo', año: 2026 },
+    });
+    store.set('expedientes/e3/actuaciones/a1', { id: 'a1', tipo: 'radicacion-debida-forma', fecha: '2026-01-05T12:00:00.000Z', origen: 'REAL' });
+    store.set('expedientes/e3/actuaciones/a2', { id: 'a2', tipo: 'acta-observaciones', fecha: '2026-01-10T12:00:00.000Z', origen: 'REAL' });
+    store.set('expedientes/e3/actuaciones/a3', {
+      id: 'a3', tipo: 'comunicacion-enviada', fecha: '2026-01-11T12:00:00.000Z', origen: 'REAL',
+      // tipoComunicacion identifica esta comunicación como EL AVISO DEL
+      // ACTA (corrección de revisión cruzada, 10-ago-2026) — sin este
+      // campo, evaluarPlazoSubsanacion no la distinguiría de una constancia.
+      tipoComunicacion: 'Aviso de acta de observaciones y correcciones',
+    });
+
+    const res = await detalleGET(req(null, 'GET'), ctx('e3'));
+    const data = await res.json();
+
+    expect(data.computos.plazoSubsanacion.resultado).toBe('POR_ARCHIVAR');
+    expect(data.borradorActoDesistimiento).not.toBeNull();
+    expect(data.borradorActoDesistimiento.cuerpo).toContain('Ana Gómez');
+    expect(data.borradorActoDesistimiento.cuerpo).toContain('DEMO-26-xxx');
+  });
+
+  it('expediente CERRADO con fechaFirmeza + subtipos sin ambigüedad de modalidad (URBANIZACION) → computos.vigencia calculada', async () => {
+    store.set('expedientes/e4', {
+      id: 'e4', tenantId: 'SEC_PLANEACION', subtipos: ['URBANIZACION'],
+      actoFinal: { fechaFirmeza: '2026-08-15T12:00:00.000Z', cierreDesconocido: false },
+    });
+
+    const res = await detalleGET(req(null, 'GET'), ctx('e4'));
+    const data = await res.json();
+
+    expect(data.computos.vigencia).toBeDefined();
+    expect(data.computos.vigencia.configAplicada.meses).toBe(36);
+  });
+
+  it('expediente CERRADO con CONSTRUCCION pero SIN modalidad capturada → computos.vigencia queda OMITIDA (honesto, no un error HTTP)', async () => {
+    store.set('expedientes/e5', {
+      id: 'e5', tenantId: 'SEC_PLANEACION', subtipos: ['CONSTRUCCION'],
+      actoFinal: { fechaFirmeza: '2026-08-15T12:00:00.000Z' },
+    });
+
+    const res = await detalleGET(req(null, 'GET'), ctx('e5'));
+    expect(res.status).toBe(200);
+    const data = await res.json();
+    expect(data.computos.vigencia).toBeUndefined();
+  });
+});
+
 describe('POST /api/licencias/expedientes/[id]/actuaciones — acta única + transición', () => {
   beforeEach(() => {
     store.set('expedientes/e1', {
