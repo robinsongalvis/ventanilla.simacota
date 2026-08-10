@@ -27,9 +27,23 @@ El propietario confirma que Jurídica ya respondió; la transcripción aún no s
 
 Competencia propia del **Secretario de Planeación (Secretario o Subsecretario)**. Sin acto de delegación del Alcalde. El firmante del acto es el Secretario o Subsecretario.
 
+## Actualización 10-ago-2026 — Mesa de trabajo Jurídica + Planeación
+
+Registro completo y análisis en **`ACTA_MESA_JURIDICA_PLANEACION_2026-08-10.md`**. En síntesis:
+la mesa **ratifica** las vigencias (incl. subdivisión 12 meses improrrogable), la antelación
+mínima de la prórroga y que el SAP se evita notificando; **sostiene por segunda vez el
+"reinicio a cero"** (contradicción con el texto literal "se suspenderá/se reanudará" — hueco ⚖️ 1
+sigue abierto y el riesgo del cálculo divergente del SAP queda documentado en el acta);
+**no responde** la pregunta de apelación (habló de expedición, no de recursos) y deja ambigüedades
+nuevas (30 calendario/hábiles; "1 mes" vs "30 días hábiles"; firma del Ingeniero vs Secretario —
+cfr. punto 6 de este registro). La aclaración de los "6 meses" (pendiente 3) queda CERRADA:
+subdivisión = 12 meses; el "6 meses" histórico era la norma derogada.
+
 ## Pendientes del registro
 
-1. Transcripción de la respuesta de silencio positivo (propietario).
-2. Concepto escrito de Jurídica que resuelva suspensión vs. reinicio (única vía para ratificar RN-5).
-3. Aclaración de los "6 meses" con Planeación (¿revalidación de obra avanzada o vigencia de cierto tipo de licencia? — vigencias mencionadas: 3 años / 1 año / 6 meses).
+1. Transcripción de la respuesta de silencio positivo (propietario) — parcialmente cubierta por el acta del 10-ago (activación y prueba de no configuración); persiste la dependencia del hueco ⚖️ 1 para el CÓMPUTO.
+2. Concepto escrito de Jurídica que resuelva suspensión vs. reinicio (única vía para ratificar RN-5) — **guía de preguntas en lenguaje sencillo entregada al propietario el 10-ago**.
+3. ~~Aclaración de los "6 meses"~~ — CERRADA (acta 10-ago: subdivisión 12 meses improrrogable; "6 meses" = norma derogada D.1469/2010).
 4. Referencia normativa exacta del formato del número de expediente (I1).
+5. NUEVA: precisión de firma — ¿el Ingeniero firma como Subsecretario/encargado, o el Secretario? (acta 10-ago vs registro del 6-ago).
+6. NUEVA: apelación — una línea escrita: si el ciudadano apela, ¿quién resuelve, o solo procede reposición?
