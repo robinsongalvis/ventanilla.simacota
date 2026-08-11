@@ -9,6 +9,7 @@ import {
 } from '@/lib/server/expedientes-licencias';
 import { DEFINICION_LICENCIA_CONSTRUCCION_PARCIAL } from '@/lib/motor-expedientes/definiciones/licencia-construccion-parcial';
 import { sumarDiasHabiles } from '@/lib/tiempos-radicado';
+import { calcularVencimientoDual, derivarEventosTermino } from '@/lib/motor-expedientes/termino';
 
 /* Bloque A·A4/A5 — decisiones puras del handoff radicado⇄expediente y las comunicaciones. */
 
@@ -93,6 +94,17 @@ describe('planCrearExpedienteDesdeRadicado — proyección MÍNIMA D2 (sin copia
   it('tramiteId referencia la Definición sembrada real (habilita el gate de comunicaciones)', () => {
     const plan = ok(planCrearExpedienteDesdeRadicado(radicadoBase(), { subtipos: ['CONSTRUCCION'] }, 'SEC_PLANEACION', ACTOR, AHORA));
     expect(plan.expediente.tramiteId).toBe(DEFINICION_LICENCIA_CONSTRUCCION_PARCIAL.id);
+  });
+
+  it('fechaAlertaConservadora (espejo R11): nace poblado y coincide con calcularVencimientoDual sobre la primera actuación', () => {
+    const plan = ok(planCrearExpedienteDesdeRadicado(radicadoBase(), { subtipos: ['CONSTRUCCION'] }, 'SEC_PLANEACION', ACTOR, AHORA));
+    const esperado = calcularVencimientoDual(
+      derivarEventosTermino([plan.primeraActuacion]),
+      45, // PLAZO_DECISION_LICENCIA_DIAS_HABILES — solo como literal de comparación, no reimplementa el cómputo.
+    ).fechaAlertaConservadora?.toISOString() ?? null;
+
+    expect(plan.expediente.fechaAlertaConservadora).not.toBeNull();
+    expect(plan.expediente.fechaAlertaConservadora).toBe(esperado);
   });
 });
 

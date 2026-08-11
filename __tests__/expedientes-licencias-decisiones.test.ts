@@ -9,12 +9,16 @@ import {
   type PlanCrearExpedienteDemo,
   type PlanRegistrarActuacion,
   type ErrorExpediente,
+  type ActuacionLicenciaDoc,
 } from '@/lib/server/expedientes-licencias';
+import { calcularVencimientoDual, derivarEventosTermino } from '@/lib/motor-expedientes/termino';
 
 /* Bloque "Integración UI y demo" — decisiones puras de expedientes de licencias. */
 
 const ACTOR = { uid: 'u1', nombre: 'María', rol: 'FUNCIONARIO' };
 const AHORA = new Date(2026, 7, 10, 12, 0, 0, 0);
+/** Plazo real del módulo (`PLAZO_DECISION_LICENCIA_DIAS_HABILES`) — duplicado aquí solo como literal de comparación en las aserciones de anti-divergencia, nunca reimplementa el cómputo. */
+const PLAZO_DIAS = 45;
 
 function planOk(x: PlanCrearExpedienteDemo | ErrorExpediente): PlanCrearExpedienteDemo {
   if (esErrorExpediente(x)) throw new Error(`esperaba plan, recibí error ${x.status}: ${x.mensaje}`);
@@ -27,6 +31,23 @@ function err(x: unknown): ErrorExpediente {
 function actuacionOk(x: PlanRegistrarActuacion | ErrorExpediente): PlanRegistrarActuacion {
   if (esErrorExpediente(x)) throw new Error(`esperaba plan, recibí error ${x.status}: ${x.mensaje}`);
   return x;
+}
+
+/** Fixture de actuación EXISTENTE completa (id/tenantId/fecha/origen…) — desde el bloque "Términos y vigencias protectores" `planRegistrarActuacion` exige la actuación COMPLETA, no solo `tipo`, para recalcular el espejo `fechaAlertaConservadora`. */
+function actuacionExistente(over: Partial<ActuacionLicenciaDoc>): ActuacionLicenciaDoc {
+  return {
+    id: 'a-existente',
+    expedienteId: 'exp-1',
+    tenantId: 'SEC_PLANEACION',
+    tipo: 'acta-observaciones',
+    etapa: 'revision',
+    actorUid: 'u0',
+    actorNombre: 'Otro Funcionario',
+    actorRol: 'FUNCIONARIO',
+    fecha: '2026-07-01T12:00:00.000Z',
+    origen: 'REAL',
+    ...over,
+  };
 }
 
 const INPUT_BASE = { solicitanteNombre: 'Juan Pérez', solicitanteDocumento: '12345678', subtipos: ['CONSTRUCCION'] };
@@ -140,7 +161,7 @@ describe('planRegistrarActuacion — guards y transiciones', () => {
 
   it('acta ÚNICA: si ya existe una acta-observaciones → 409, cita el art. 2.2.6.1.2.2.4', () => {
     const e = err(planRegistrarActuacion(
-      'EN_REVISION', [{ tipo: 'acta-observaciones' }], EXPEDIENTE_ID, TENANT,
+      'EN_REVISION', [actuacionExistente({ tipo: 'acta-observaciones' })], EXPEDIENTE_ID, TENANT,
       { tipo: 'acta-observaciones', detalle: DETALLE_OK }, ACTOR, AHORA,
     ));
     expect(e.status).toBe(409);
@@ -149,7 +170,7 @@ describe('planRegistrarActuacion — guards y transiciones', () => {
 
   it('respuesta-subsanacion desde CON_ACTA_DE_OBSERVACIONES, con acta previa → EN_VIABILIDAD', () => {
     const plan = actuacionOk(planRegistrarActuacion(
-      'CON_ACTA_DE_OBSERVACIONES', [{ tipo: 'acta-observaciones' }], EXPEDIENTE_ID, TENANT,
+      'CON_ACTA_DE_OBSERVACIONES', [actuacionExistente({ tipo: 'acta-observaciones' })], EXPEDIENTE_ID, TENANT,
       { tipo: 'respuesta-subsanacion', detalle: DETALLE_OK }, ACTOR, AHORA,
     ));
     expect(plan.nuevoEstadoJuridico).toBe('EN_VIABILIDAD');
@@ -189,5 +210,92 @@ describe('planRegistrarActuacion — guards y transiciones', () => {
       'EN_REVISION', [], EXPEDIENTE_ID, TENANT, { tipo: 'acta-observaciones', detalle: '' }, ACTOR, AHORA,
     ));
     expect(e.status).toBe(400);
+  });
+});
+
+/* ──────────────────────────────────────────────
+   fechaAlertaConservadora — espejo denormalizado (R11, Bloque "Términos y
+   vigencias protectores"). `planCrearExpedienteDemo` y `planRegistrarActuacion`
+   son 2 de los 3 puntos que lo calculan (el tercero, `planCrearExpedienteDesdeRadicado`,
+   se prueba en `expedientes-licencias-handoff-decisiones.test.ts`, que ya
+   trae su propio fixture de radicado). Todas las aserciones aquí comparan
+   contra `calcularVencimientoDual(derivarEventosTermino(...))` invocado
+   DIRECTAMENTE en el test — anti-divergencia: el valor que persiste el plan
+   debe coincidir EXACTAMENTE con el cómputo on-read para la misma serie.
+────────────────────────────────────────────── */
+describe('planCrearExpedienteDemo — fechaAlertaConservadora (espejo R11)', () => {
+  it('nace poblado (no null, no undefined): coincide con calcularVencimientoDual sobre la primera actuación', () => {
+    const plan = planOk(planCrearExpedienteDemo(INPUT_BASE, 'SEC_PLANEACION', ACTOR, AHORA));
+    const esperado = calcularVencimientoDual(
+      derivarEventosTermino([plan.primeraActuacion]),
+      PLAZO_DIAS,
+    ).fechaAlertaConservadora?.toISOString() ?? null;
+
+    expect(plan.expediente.fechaAlertaConservadora).not.toBeNull();
+    expect(plan.expediente.fechaAlertaConservadora).toBe(esperado);
+  });
+});
+
+describe('planRegistrarActuacion — fechaAlertaConservadora (espejo R11)', () => {
+  const EXPEDIENTE_ID = 'exp-1';
+  const TENANT = 'SEC_PLANEACION';
+  const DETALLE_OK = 'Se observó que falta el certificado de tradición y libertad vigente.';
+  const RADICACION_REAL = actuacionExistente({
+    tipo: 'radicacion-debida-forma', etapa: 'radicacion', fecha: '2026-06-01T12:00:00.000Z', origen: 'REAL',
+  });
+
+  it('se recalcula sobre existentes + la actuación nueva — coincide con el cómputo on-read de la MISMA serie', () => {
+    const existentes = [RADICACION_REAL];
+    const plan = actuacionOk(planRegistrarActuacion(
+      'EN_REVISION', existentes, EXPEDIENTE_ID, TENANT, { tipo: 'acta-observaciones', detalle: DETALLE_OK }, ACTOR, AHORA,
+    ));
+
+    const esperado = calcularVencimientoDual(
+      derivarEventosTermino([...existentes, plan.actuacion]),
+      PLAZO_DIAS,
+    ).fechaAlertaConservadora?.toISOString() ?? null;
+
+    expect(plan.fechaAlertaConservadora).not.toBeNull();
+    expect(plan.fechaAlertaConservadora).toBe(esperado);
+  });
+
+  it('se ACTUALIZA al registrar una segunda actuación (respuesta-subsanacion tras el acta) — distinto del valor tras la primera', () => {
+    const trasActa = actuacionOk(planRegistrarActuacion(
+      'EN_REVISION', [RADICACION_REAL], EXPEDIENTE_ID, TENANT, { tipo: 'acta-observaciones', detalle: DETALLE_OK }, ACTOR, AHORA,
+    ));
+    const existentesTrasActa = [RADICACION_REAL, trasActa.actuacion];
+
+    const fechaRespuesta = new Date(2026, 7, 20, 12, 0, 0, 0); // varios días hábiles después del acta
+    const trasRespuesta = actuacionOk(planRegistrarActuacion(
+      'CON_ACTA_DE_OBSERVACIONES', existentesTrasActa, EXPEDIENTE_ID, TENANT,
+      { tipo: 'respuesta-subsanacion', detalle: DETALLE_OK }, ACTOR, fechaRespuesta,
+    ));
+
+    expect(trasRespuesta.fechaAlertaConservadora).not.toBe(trasActa.fechaAlertaConservadora);
+
+    const esperado = calcularVencimientoDual(
+      derivarEventosTermino([...existentesTrasActa, trasRespuesta.actuacion]),
+      PLAZO_DIAS,
+    ).fechaAlertaConservadora?.toISOString() ?? null;
+    expect(trasRespuesta.fechaAlertaConservadora).toBe(esperado);
+  });
+
+  it('R9: si TODAS las actuaciones relevantes (incl. la radicación) son RECONSTRUIDO → null, sin ancla REAL que proyectar', () => {
+    const radicacionReconstruida = actuacionExistente({
+      tipo: 'radicacion-debida-forma', etapa: 'radicacion', fecha: '2020-01-10T12:00:00.000Z', origen: 'RECONSTRUIDO',
+    });
+    const actaReconstruida = actuacionExistente({
+      tipo: 'acta-observaciones', etapa: 'revision', fecha: '2020-02-01T12:00:00.000Z', origen: 'RECONSTRUIDO',
+    });
+
+    const plan = actuacionOk(planRegistrarActuacion(
+      'CON_ACTA_DE_OBSERVACIONES', [radicacionReconstruida, actaReconstruida], EXPEDIENTE_ID, TENANT,
+      { tipo: 'respuesta-subsanacion', detalle: DETALLE_OK }, ACTOR, AHORA,
+    ));
+
+    // Sin RADICACION_DEBIDA_FORMA real que ancle la proyección (R9 excluye
+    // las RECONSTRUIDO), calcularVencimiento no tiene desde dónde proyectar
+    // — null bajo AMBAS políticas, exactamente igual que on-read.
+    expect(plan.fechaAlertaConservadora).toBeNull();
   });
 });
