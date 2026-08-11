@@ -1,6 +1,7 @@
 /**
  * Importador de históricos — planificador puro, snapshot SINTÉTICO.
- * (Bloque "Importador de históricos", ago-2026.)
+ * (Bloque "Importador de históricos", ago-2026; rediseñado por DF-10,
+ * decisión del propietario 11-ago-2026 — "históricos sin resolver".)
  */
 import { describe, it, expect } from 'vitest';
 import {
@@ -8,10 +9,10 @@ import {
   parsearFechaHistoricaANoonISO,
   mapearPredioHistorico,
   SIN_DEFINICION_TRAMITE_HISTORICO,
+  ESTADO_JURIDICO_HISTORICO_SIN_RESOLVER,
   type SnapshotConsecutivoLicencias,
   type RegistroConsecutivoHistorico,
 } from '@/lib/migracion/planificar-importacion-consecutivo';
-import type { EquivalenciaEstadoOperativo } from '@/lib/migracion/equivalencia-estados-operativos';
 
 const AHORA = new Date(2026, 7, 9, 10, 0, 0, 0);
 
@@ -34,12 +35,6 @@ function registro(overrides: Partial<RegistroConsecutivoHistorico>): RegistroCon
     ...overrides,
   };
 }
-
-// Tabla de estados SINTÉTICA con una fila MAPEADO — para ejercer el camino
-// "importable" sin esperar a que P4′ responda de verdad.
-const TABLA_ESTADOS_CON_MAPEADO: EquivalenciaEstadoOperativo[] = [
-  { textoHistorico: 'CERRADO-SINTETICO', estado: 'MAPEADO', estadoJuridico: 'EN_FIRME', fundamento: 'Fundamento sintético de test.' },
-];
 
 describe('parsearFechaHistoricaANoonISO', () => {
   it('"YYYY-MM-DD" válido → ISO anclado al MISMO día civil (no se corre un día por TZ)', () => {
@@ -69,12 +64,11 @@ describe('parsearFechaHistoricaANoonISO', () => {
   });
 });
 
-describe('planificarImportacion — camino IMPORTABLE (tablas sintéticas con MAPEADO)', () => {
-  it('código MAPEADO + estado MAPEADO + fecha válida + documento presente → se planifica como expediente', () => {
+describe('planificarImportacion — DF-10: TODO registro con fecha válida se planifica como "histórico sin resolver"', () => {
+  it('código MAPEADO + fecha válida + documento presente → se planifica, con la marca DF-10 completa', () => {
     const plan = planificarImportacion(
-      snapshot([registro({ tipo: 'LC', estado: 'CERRADO-SINTETICO', solicitanteDocumento: '12345678' })]),
+      snapshot([registro({ tipo: 'LC', estado: 'terminado', solicitanteDocumento: '12345678' })]),
       AHORA,
-      { estados: TABLA_ESTADOS_CON_MAPEADO },
     );
 
     expect(plan.reconciliacion.planificados).toBe(1);
@@ -84,18 +78,28 @@ describe('planificarImportacion — camino IMPORTABLE (tablas sintéticas con MA
     const exp = plan.expedientes[0]!;
     expect(exp.origen).toBe('RECONSTRUIDO');
     expect(exp.esPrueba).toBe(false);
-    expect(exp.estadoJuridico).toBe('EN_FIRME');
+    expect(exp.estado).toBe('ARCHIVADO'); // DF-10: nunca EN_REVISION — no es trabajo pendiente del panel.
+    expect(exp.estadoJuridico).toBe(ESTADO_JURIDICO_HISTORICO_SIN_RESOLVER);
+    // Estado PROPIO del enum (DF-10): no reutiliza ningún hito del ciclo —
+    // ver el JSDoc de `HISTORICO_SIN_RESOLVER` en `estados-licencia.ts`.
+    expect(exp.estadoJuridico).toBe('HISTORICO_SIN_RESOLVER');
     expect(exp.tramiteId).toBe(SIN_DEFINICION_TRAMITE_HISTORICO);
     expect(exp.subtipos).toEqual(['CONSTRUCCION']);
     expect(exp.solicitanteDocumento).toBe('12345678');
     expect(exp.radicadoId).toBeNull();
+
+    // Marca DF-10.
+    expect(exp.revisionHistorica).toEqual({
+      pendiente: true,
+      pendientesAlImportar: ['ESTADO_JURIDICO', 'ACTO_FINAL'],
+    });
+    expect(exp.estadoOriginalHistorico).toBe('terminado');
   });
 
   it('numeroExpediente como ATRIBUTO: usa el radicado histórico verbatim, nunca lo formatea/reserva', () => {
     const plan = planificarImportacion(
-      snapshot([registro({ radicado: '68745-0-26-0099', tipo: 'PH', estado: 'CERRADO-SINTETICO', solicitanteDocumento: '999' })]),
+      snapshot([registro({ radicado: '68745-0-26-0099', tipo: 'PH', solicitanteDocumento: '999' })]),
       AHORA,
-      { estados: TABLA_ESTADOS_CON_MAPEADO },
     );
     expect(plan.expedientes[0]!.numeroExpediente).toEqual({
       numero: '68745-0-26-0099', serieId: 'historico-consecutivo-planeacion', año: 2026, colision: false,
@@ -104,18 +108,16 @@ describe('planificarImportacion — camino IMPORTABLE (tablas sintéticas con MA
 
   it('actoFinal.cierreDesconocido: true (DF-6/DF-9 — nunca se inventa una fecha de firmeza)', () => {
     const plan = planificarImportacion(
-      snapshot([registro({ tipo: 'PH', estado: 'CERRADO-SINTETICO', solicitanteDocumento: '999' })]),
+      snapshot([registro({ tipo: 'PH', solicitanteDocumento: '999' })]),
       AHORA,
-      { estados: TABLA_ESTADOS_CON_MAPEADO },
     );
     expect(plan.expedientes[0]!.actoFinal).toEqual({ cierreDesconocido: true });
   });
 
   it('provenance: {fuente, sha256, hoja, fila} tal como exige el importador', () => {
     const plan = planificarImportacion(
-      snapshot([registro({ hoja: '2024', fila: 17, tipo: 'LR', estado: 'CERRADO-SINTETICO', solicitanteDocumento: '111' })], 'sha-real-del-xlsx'),
+      snapshot([registro({ hoja: '2024', fila: 17, tipo: 'LR', solicitanteDocumento: '111' })], 'sha-real-del-xlsx'),
       AHORA,
-      { estados: TABLA_ESTADOS_CON_MAPEADO },
     );
     expect(plan.expedientes[0]!.provenance).toEqual({
       fuente: 'xlsx-consecutivo-2022-2026',
@@ -125,38 +127,82 @@ describe('planificarImportacion — camino IMPORTABLE (tablas sintéticas con MA
       fila: 17,
     });
   });
-});
 
-describe('planificarImportacion — cuarentena por CÓDIGO (P1′)', () => {
-  it('"LRC" (no sembrado, JAMÁS se mapea) → CUARENTENA con motivo CODIGO_PENDIENTE_P1', () => {
-    // Antes este test usaba "LA"; desde el 10-ago-2026 "LA" está MAPEADO
-    // (respuesta del ingeniero: modalidad ampliación) — "LRC" sigue en
-    // cuarentena y ejerce el mismo camino.
-    const plan = planificarImportacion(snapshot([registro({ tipo: 'LRC', estado: 'CERRADO-SINTETICO', solicitanteDocumento: '1' })]), AHORA, { estados: TABLA_ESTADOS_CON_MAPEADO });
-    expect(plan.reconciliacion.planificados).toBe(0);
-    expect(plan.cuarentena[0]!.motivos).toContain('CODIGO_PENDIENTE_P1');
+  it('R9 END-TO-END: fechaAlertaConservadora siempre null — la actuación de radicación reconstruida se excluye del término', () => {
+    const plan = planificarImportacion(
+      snapshot([registro({ tipo: 'LC', solicitanteDocumento: '1' })]),
+      AHORA,
+    );
+    expect(plan.expedientes[0]!.fechaAlertaConservadora).toBeNull();
   });
 });
 
-describe('planificarImportacion — cuarentena por ESTADO (P4′, semilla REAL)', () => {
-  it('con la tabla REAL (default, sin inyección) — "terminado"/"revisado" → CUARENTENA con motivo ESTADO_PENDIENTE_P4', () => {
-    const plan = planificarImportacion(snapshot([
-      registro({ tipo: 'LC', estado: 'terminado', solicitanteDocumento: '1' }),
-      registro({ hoja: '2026', fila: 3, radicado: '68745-0-26-0002', tipo: 'PH', estado: 'revisado', solicitanteDocumento: '2' }),
-    ]), AHORA);
-    expect(plan.reconciliacion.planificados).toBe(0);
-    expect(plan.cuarentena.every((c) => c.motivos.includes('ESTADO_PENDIENTE_P4'))).toBe(true);
+describe('planificarImportacion — estadoOriginalHistorico se conserva verbatim (DF-10)', () => {
+  it.each([
+    ['terminado', 'terminado'],
+    ['REVISADO', 'REVISADO'],
+    ['  TERMINADA  ', 'TERMINADA'], // trim de espacios incidentales, no altera contenido sustantivo (mismo criterio que barrioVereda/noLicencia)
+  ])('estado histórico %j → estadoOriginalHistorico %j', (original, esperado) => {
+    const plan = planificarImportacion(snapshot([registro({ estado: original, solicitanteDocumento: '1' })]), AHORA);
+    expect(plan.expedientes[0]!.estadoOriginalHistorico).toBe(esperado);
   });
 
-  it('ausencia total de "estado" (cohorte 2022-2024) → CUARENTENA (R9: sin evidencia de cierre)', () => {
+  it('ausencia total de "estado" (cohorte 2022-2024) → estadoOriginalHistorico: null (ausencia declarada, no omitida)', () => {
     const plan = planificarImportacion(snapshot([registro({ estado: undefined, solicitanteDocumento: '1' })]), AHORA);
-    expect(plan.cuarentena[0]!.motivos).toContain('ESTADO_PENDIENTE_P4');
-    expect(plan.cuarentena[0]!.detalle.join(' ')).toMatch(/R9/);
+    expect(plan.expedientes[0]!.estadoOriginalHistorico).toBeNull();
+  });
+
+  it('string vacío/solo espacios también cuenta como ausencia → null', () => {
+    const plan = planificarImportacion(snapshot([registro({ estado: '   ', solicitanteDocumento: '1' })]), AHORA);
+    expect(plan.expedientes[0]!.estadoOriginalHistorico).toBeNull();
+  });
+
+  it('ningún texto de "estado" hace que el registro deje de ser "histórico sin resolver" (nunca se infiere un desenlace)', () => {
+    const plan = planificarImportacion(snapshot([
+      registro({ hoja: '2026', fila: 2, radicado: '68745-0-26-0001', estado: 'terminado', solicitanteDocumento: '1' }),
+      registro({ hoja: '2026', fila: 3, radicado: '68745-0-26-0002', estado: 'revisado', solicitanteDocumento: '2' }),
+      registro({ hoja: '2026', fila: 4, radicado: '68745-0-26-0003', estado: undefined, solicitanteDocumento: '3' }),
+    ]), AHORA);
+    expect(plan.reconciliacion.planificados).toBe(3);
+    expect(plan.expedientes.every((e) => e.estadoJuridico === ESTADO_JURIDICO_HISTORICO_SIN_RESOLVER)).toBe(true);
+    expect(plan.expedientes.every((e) => e.revisionHistorica?.pendiente === true)).toBe(true);
   });
 });
 
-describe('planificarImportacion — COLISIÓN de radicado (DF-9)', () => {
-  it('dos filas con el MISMO radicado → colision:true en AMBAS, aunque terminen en cuarentena', () => {
+describe('planificarImportacion — "histórico sin resolver" NUNCA infla "en trámite" del panel', () => {
+  it('estado operativo (EstadoExpediente) siempre ARCHIVADO, nunca EN_REVISION', () => {
+    const plan = planificarImportacion(snapshot([
+      registro({ estado: 'terminado', solicitanteDocumento: '1' }),
+      registro({ hoja: '2026', fila: 3, radicado: '68745-0-26-0002', estado: undefined, solicitanteDocumento: '2' }),
+    ]), AHORA);
+    expect(plan.expedientes.every((e) => e.estado === 'ARCHIVADO')).toBe(true);
+  });
+});
+
+describe('planificarImportacion — código sin resolver (P1′) se IMPORTA con el texto crudo (DF-10)', () => {
+  it('"LRC" (no sembrado, JAMÁS se mapea por norma) → se planifica con subtipos: ["LRC"], reportado en subtiposSinResolver', () => {
+    const plan = planificarImportacion(snapshot([registro({ tipo: 'LRC', solicitanteDocumento: '1' })]), AHORA);
+    expect(plan.reconciliacion.planificados).toBe(1);
+    expect(plan.cuarentena).toHaveLength(0);
+    expect(plan.expedientes[0]!.subtipos).toEqual(['LRC']);
+    expect(plan.subtiposSinResolver).toEqual([{ radicado: '68745-0-26-0001', hoja: '2026', fila: 2, tipoOriginal: 'LRC' }]);
+    expect(plan.expedientes[0]!.revisionHistorica?.pendientesAlImportar).toContain('SUBTIPO');
+  });
+
+  it('código MAPEADO → NO aparece en subtiposSinResolver ni en pendientesAlImportar', () => {
+    const plan = planificarImportacion(snapshot([registro({ tipo: 'LC', solicitanteDocumento: '1' })]), AHORA);
+    expect(plan.subtiposSinResolver).toHaveLength(0);
+    expect(plan.expedientes[0]!.revisionHistorica?.pendientesAlImportar).not.toContain('SUBTIPO');
+  });
+
+  it('advertencias incluye una nota SUBTIPO SIN RESOLVER cuando aplica', () => {
+    const plan = planificarImportacion(snapshot([registro({ tipo: 'LCR VISR', solicitanteDocumento: '1' })]), AHORA);
+    expect(plan.advertencias.some((a) => a.startsWith('SUBTIPO SIN RESOLVER'))).toBe(true);
+  });
+});
+
+describe('planificarImportacion — COLISIÓN de radicado (DF-9) — NO bloquea (DF-10)', () => {
+  it('dos filas con el MISMO radicado → colision:true en AMBAS, AMBAS se planifican (ya no van a cuarentena)', () => {
     const plan = planificarImportacion(snapshot([
       // Nombres SINTÉTICOS a propósito (no los reales del caso 25-0037):
       // ningún dato personal del libro entra al repo, ni siquiera en tests.
@@ -165,47 +211,116 @@ describe('planificarImportacion — COLISIÓN de radicado (DF-9)', () => {
     ]), AHORA);
 
     expect(plan.reconciliacion.colisiones).toBe(2);
-    expect(plan.cuarentena.filter((c) => c.colision)).toHaveLength(2);
+    expect(plan.reconciliacion.planificados).toBe(2);
+    expect(plan.cuarentena).toHaveLength(0);
+    expect(plan.expedientes.every((e) => e.numeroExpediente?.colision === true)).toBe(true);
+    expect(plan.filasColision).toEqual([
+      { radicado: '68745-0-25-0037', hoja: '2025', fila: 38 },
+      { radicado: '68745-0-25-0037', hoja: '2025', fila: 39 },
+    ]);
   });
 
-  it('sin repetidos → colisiones = 0', () => {
+  it('sin repetidos → colisiones = 0, filasColision vacío', () => {
     const plan = planificarImportacion(snapshot([
       registro({ radicado: '68745-0-26-0001' }),
       registro({ hoja: '2026', fila: 3, radicado: '68745-0-26-0002' }),
     ]), AHORA);
     expect(plan.reconciliacion.colisiones).toBe(0);
+    expect(plan.filasColision).toEqual([]);
+  });
+
+  it('una fila en colisión que ADEMÁS tiene fecha inválida sí va a cuarentena — la colisión se reporta igual', () => {
+    const plan = planificarImportacion(snapshot([
+      registro({ hoja: '2025', fila: 38, radicado: '68745-0-25-0037', fechaSolicitud: 'no-es-fecha' }),
+      registro({ hoja: '2025', fila: 39, radicado: '68745-0-25-0037' }),
+    ]), AHORA);
+    expect(plan.reconciliacion.colisiones).toBe(2);
+    expect(plan.filasColision).toHaveLength(2);
+    expect(plan.cuarentena).toHaveLength(1);
+    expect(plan.cuarentena[0]!.colision).toBe(true);
+    expect(plan.reconciliacion.planificados).toBe(1);
   });
 });
 
-describe('planificarImportacion — cuarentena por FECHA e IDENTIDAD (hallazgos)', () => {
+describe('planificarImportacion — ÚNICA cuarentena real: FECHA_INVALIDA', () => {
   it('fechaSolicitud vacía → CUARENTENA con motivo FECHA_INVALIDA', () => {
-    const plan = planificarImportacion(snapshot([registro({ fechaSolicitud: '', estado: 'CERRADO-SINTETICO', solicitanteDocumento: '1' })]), AHORA, { estados: TABLA_ESTADOS_CON_MAPEADO });
-    expect(plan.cuarentena[0]!.motivos).toContain('FECHA_INVALIDA');
+    const plan = planificarImportacion(snapshot([registro({ fechaSolicitud: '', solicitanteDocumento: '1' })]), AHORA);
+    expect(plan.cuarentena[0]!.motivos).toEqual(['FECHA_INVALIDA']);
+    expect(plan.reconciliacion.enCuarentena).toBe(1);
+    expect(plan.reconciliacion.planificados).toBe(0);
   });
 
-  it('sin solicitanteDocumento (el caso REAL de las 202 filas) → CUARENTENA con motivo IDENTIDAD_INCOMPLETA', () => {
-    const plan = planificarImportacion(snapshot([registro({ estado: 'CERRADO-SINTETICO', solicitanteDocumento: undefined })]), AHORA, { estados: TABLA_ESTADOS_CON_MAPEADO });
-    expect(plan.cuarentena[0]!.motivos).toContain('IDENTIDAD_INCOMPLETA');
-    expect(plan.advertencias.some((a) => a.startsWith('IDENTIDAD_INCOMPLETA'))).toBe(true);
+  it('fecha calendario imposible → CUARENTENA', () => {
+    const plan = planificarImportacion(snapshot([registro({ fechaSolicitud: '2026-02-30' })]), AHORA);
+    expect(plan.cuarentena[0]!.motivos).toEqual(['FECHA_INVALIDA']);
+  });
+});
+
+describe('planificarImportacion — identidad (nombre/documento) ya NO bloquea a un RECONSTRUIDO (DF-10)', () => {
+  it('sin solicitanteDocumento (el caso REAL de las 202 filas) → se planifica con solicitanteDocumento: "" (dato faltante honesto, nunca inventado)', () => {
+    const plan = planificarImportacion(snapshot([registro({ solicitanteDocumento: undefined })]), AHORA);
+    expect(plan.reconciliacion.planificados).toBe(1);
+    expect(plan.cuarentena).toHaveLength(0);
+    expect(plan.expedientes[0]!.solicitanteDocumento).toBe('');
+    expect(plan.expedientes[0]!.solicitanteNombre).toBe('SOLICITANTE SINTETICO BASE');
+    expect(plan.expedientes[0]!.revisionHistorica?.pendientesAlImportar).toContain('IDENTIDAD');
+    expect(plan.pendientesHistorico.sinIdentidad).toBe(1);
+    expect(plan.advertencias.some((a) => a.startsWith('IDENTIDAD PENDIENTE'))).toBe(true);
   });
 
-  it('un registro puede acumular VARIOS motivos a la vez (no se detiene en el primero)', () => {
+  it('sin solicitante (nombre) NI documento (caso del snapshot .sanitizado.json en CI) → AMBOS quedan en ""', () => {
+    const plan = planificarImportacion(snapshot([registro({ solicitante: undefined, solicitanteDocumento: undefined })]), AHORA);
+    expect(plan.reconciliacion.planificados).toBe(1);
+    expect(plan.expedientes[0]!.solicitanteNombre).toBe('');
+    expect(plan.expedientes[0]!.solicitanteDocumento).toBe('');
+    expect(plan.expedientes[0]!.revisionHistorica?.pendientesAlImportar).toContain('IDENTIDAD');
+  });
+
+  it('con nombre Y documento presentes → pendientesAlImportar NO incluye IDENTIDAD y sinIdentidad no lo cuenta', () => {
+    const plan = planificarImportacion(snapshot([registro({ solicitante: 'ALGUIEN', solicitanteDocumento: '123' })]), AHORA);
+    expect(plan.expedientes[0]!.revisionHistorica?.pendientesAlImportar).not.toContain('IDENTIDAD');
+    expect(plan.pendientesHistorico.sinIdentidad).toBe(0);
+  });
+});
+
+describe('planificarImportacion — un registro puede acumular varios ejes pendientes a la vez, sin bloquear (salvo fecha)', () => {
+  it('código sin resolver + sin identidad → se planifica igual, con AMBOS ejes en pendientesAlImportar', () => {
+    const plan = planificarImportacion(snapshot([registro({ tipo: 'LCR VISR', estado: 'revisado', solicitanteDocumento: undefined })]), AHORA);
+    expect(plan.reconciliacion.planificados).toBe(1);
+    expect(plan.cuarentena).toHaveLength(0);
+    const pendientes = plan.expedientes[0]!.revisionHistorica?.pendientesAlImportar ?? [];
+    expect(pendientes.sort()).toEqual(['ACTO_FINAL', 'ESTADO_JURIDICO', 'IDENTIDAD', 'SUBTIPO'].sort());
+  });
+
+  it('solo fecha inválida bloquea; el resto de ejes pendientes no impide reportarla igual como cuarentena', () => {
     const plan = planificarImportacion(snapshot([registro({ tipo: 'LCR VISR', estado: 'revisado', fechaSolicitud: 'no-es-fecha', solicitanteDocumento: undefined })]), AHORA);
-    expect(plan.cuarentena[0]!.motivos.sort()).toEqual(
-      ['CODIGO_PENDIENTE_P1', 'ESTADO_PENDIENTE_P4', 'FECHA_INVALIDA', 'IDENTIDAD_INCOMPLETA'].sort(),
-    );
+    expect(plan.cuarentena[0]!.motivos).toEqual(['FECHA_INVALIDA']);
+    expect(plan.reconciliacion.planificados).toBe(0);
   });
 });
 
 describe('planificarImportacion — reconciliación siempre cuadra', () => {
   it('totalSnapshot === planificados + enCuarentena', () => {
     const plan = planificarImportacion(snapshot([
-      registro({ tipo: 'LC', estado: 'CERRADO-SINTETICO', solicitanteDocumento: '1' }),
-      registro({ hoja: '2026', fila: 3, radicado: '68745-0-26-0002', tipo: 'LA' }), // cuarentena por código (y más)
-      registro({ hoja: '2026', fila: 4, radicado: '68745-0-26-0003', tipo: 'PH', estado: 'terminado' }), // cuarentena por estado
-    ]), AHORA, { estados: TABLA_ESTADOS_CON_MAPEADO });
+      registro({ tipo: 'LC', solicitanteDocumento: '1' }),
+      registro({ hoja: '2026', fila: 3, radicado: '68745-0-26-0002', tipo: 'LA' }), // sin documento — se planifica igual (DF-10)
+      registro({ hoja: '2026', fila: 4, radicado: '68745-0-26-0003', tipo: 'PH', fechaSolicitud: 'no-es-fecha' }), // única cuarentena real
+    ]), AHORA);
     expect(plan.reconciliacion.totalSnapshot).toBe(3);
     expect(plan.reconciliacion.planificados + plan.reconciliacion.enCuarentena).toBe(3);
+    expect(plan.reconciliacion.planificados).toBe(2);
+    expect(plan.reconciliacion.enCuarentena).toBe(1);
+  });
+});
+
+describe('planificarImportacion — pendientesHistorico (conteos grupales, DF-10)', () => {
+  it('sinEstadoJuridico y sinActoFinal cuentan TODOS los planificados — ninguno tiene desenlace verificable', () => {
+    const plan = planificarImportacion(snapshot([
+      registro({ tipo: 'LC', solicitanteDocumento: '1' }),
+      registro({ hoja: '2026', fila: 3, radicado: '68745-0-26-0002', tipo: 'PH', solicitanteDocumento: '2' }),
+    ]), AHORA);
+    expect(plan.pendientesHistorico.sinEstadoJuridico).toBe(2);
+    expect(plan.pendientesHistorico.sinActoFinal).toBe(2);
   });
 });
 
@@ -292,11 +407,10 @@ describe('planificarImportacion — predio en el expediente y reconciliación am
   it('un registro importable con predio aprovechable propaga `expediente.predio`', () => {
     const plan = planificarImportacion(
       snapshot([registro({
-        tipo: 'LC', estado: 'CERRADO-SINTETICO', solicitanteDocumento: '1',
+        tipo: 'LC', solicitanteDocumento: '1',
         matricula: '321-51890', barrioVereda: 'VEREDA SINTETICA', direccion: 'SIMACOTA', area: '290 M2',
       })]),
       AHORA,
-      { estados: TABLA_ESTADOS_CON_MAPEADO },
     );
     expect(plan.expedientes[0]!.predio).toEqual({
       matriculaInmobiliaria: '321-51890',
@@ -308,33 +422,31 @@ describe('planificarImportacion — predio en el expediente y reconciliación am
 
   it('un registro importable SIN ningún dato de predio no trae `predio` en el expediente', () => {
     const plan = planificarImportacion(
-      snapshot([registro({ tipo: 'LC', estado: 'CERRADO-SINTETICO', solicitanteDocumento: '1' })]),
+      snapshot([registro({ tipo: 'LC', solicitanteDocumento: '1' })]),
       AHORA,
-      { estados: TABLA_ESTADOS_CON_MAPEADO },
     );
     expect(plan.expedientes[0]!.predio).toBeUndefined();
   });
 
   it('noLicencia se mapea a actoFinal.numero; cierreDesconocido sigue true (falta fecha/fechaFirmeza)', () => {
     const plan = planificarImportacion(
-      snapshot([registro({ tipo: 'LC', estado: 'CERRADO-SINTETICO', solicitanteDocumento: '1', noLicencia: '002-2025' })]),
+      snapshot([registro({ tipo: 'LC', solicitanteDocumento: '1', noLicencia: '002-2025' })]),
       AHORA,
-      { estados: TABLA_ESTADOS_CON_MAPEADO },
     );
     expect(plan.expedientes[0]!.actoFinal).toEqual({ cierreDesconocido: true, numero: '002-2025' });
   });
 
-  it('datosPredio cuenta sobre TODO el snapshot, incluidos los registros en cuarentena por otro motivo', () => {
+  it('datosPredio cuenta sobre TODO el snapshot, incluidos los registros en cuarentena por fecha', () => {
     const plan = planificarImportacion(snapshot([
-      // Importable, con matrícula válida.
-      registro({ tipo: 'LC', estado: 'CERRADO-SINTETICO', solicitanteDocumento: '1', matricula: '321-51890' }),
-      // En cuarentena por código (P1′), pero SU predio igual se cuenta.
-      registro({ hoja: '2026', fila: 3, radicado: '68745-0-26-0002', tipo: 'LRC', barrioVereda: 'VEREDA SINTETICA' }),
-      // En cuarentena, con área desalineada.
-      registro({ hoja: '2026', fila: 4, radicado: '68745-0-26-0003', tipo: 'LRC', area: 'CRA 4 # 2-21' }),
-      // En cuarentena, con dirección = municipio (descartada).
-      registro({ hoja: '2026', fila: 5, radicado: '68745-0-26-0004', tipo: 'LRC', direccion: 'SIMACOTA' }),
-    ]), AHORA, { estados: TABLA_ESTADOS_CON_MAPEADO });
+      // Planificado, con matrícula válida.
+      registro({ tipo: 'LC', solicitanteDocumento: '1', matricula: '321-51890' }),
+      // En cuarentena por fecha, pero SU predio igual se cuenta.
+      registro({ hoja: '2026', fila: 3, radicado: '68745-0-26-0002', fechaSolicitud: 'no-es-fecha', barrioVereda: 'VEREDA SINTETICA' }),
+      // En cuarentena por fecha, con área desalineada.
+      registro({ hoja: '2026', fila: 4, radicado: '68745-0-26-0003', fechaSolicitud: 'no-es-fecha', area: 'CRA 4 # 2-21' }),
+      // En cuarentena por fecha, con dirección = municipio (descartada).
+      registro({ hoja: '2026', fila: 5, radicado: '68745-0-26-0004', fechaSolicitud: 'no-es-fecha', direccion: 'SIMACOTA' }),
+    ]), AHORA);
 
     expect(plan.datosPredio.conMatriculaInmobiliaria).toBe(1);
     expect(plan.datosPredio.conBarrioVereda).toBe(1);
@@ -345,11 +457,10 @@ describe('planificarImportacion — predio en el expediente y reconciliación am
     ]);
   });
 
-  it('AREA_DESALINEADA NUNCA es motivo de cuarentena por sí sola (predio es ortogonal a P1′/P4′/fecha/identidad)', () => {
+  it('AREA_DESALINEADA NUNCA es motivo de cuarentena por sí sola (predio es ortogonal a la puerta de fecha)', () => {
     const plan = planificarImportacion(
-      snapshot([registro({ tipo: 'LC', estado: 'CERRADO-SINTETICO', solicitanteDocumento: '1', area: 'CRA 4 # 2-21' })]),
+      snapshot([registro({ tipo: 'LC', solicitanteDocumento: '1', area: 'CRA 4 # 2-21' })]),
       AHORA,
-      { estados: TABLA_ESTADOS_CON_MAPEADO },
     );
     expect(plan.reconciliacion.planificados).toBe(1);
     expect(plan.cuarentena).toHaveLength(0);

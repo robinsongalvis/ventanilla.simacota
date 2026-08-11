@@ -33,7 +33,27 @@ export type EstadoJuridicoLicencia =
   | 'NEGADA'
   | 'DESISTIDA'
   | 'NOTIFICADA'
-  | 'EN_FIRME';
+  | 'EN_FIRME'
+  /**
+   * DF-10 — expediente MIGRADO del libro histórico de Planeación cuyo
+   * desenlace NO consta (decisión del propietario, 11-ago-2026, tras
+   * consultar al ingeniero: *"No conviertas 'terminado' en 'Concedida' sin
+   * acto final verificable"*).
+   *
+   * NO es un hito del ciclo de vida: es la ausencia declarada de uno. Existe
+   * como valor propio —en vez de reutilizar `RADICADA_EN_DEBIDA_FORMA`, que
+   * era la alternativa considerada— porque ese hito AFIRMA un hecho jurídico
+   * que en un histórico no consta: que la solicitud se presentó con la
+   * documentación completa verificada (art. 2.2.6.1.2.1.1 par. 1), lo que
+   * además ancla el término. Del libro solo consta que hubo un radicado.
+   *
+   * Consecuencia buscada: al no pertenecer a ninguna lista de estados
+   * activos (p. ej. `ESTADOS_EN_TRAMITE_LIBRO`), estos expedientes no
+   * aparecen como trabajo pendiente ni inflan los contadores de la Bandeja
+   * y el Libro — el ingeniero fue explícito en que "revisado" significaba
+   * que se revisó y ahí quedó, no que siga en trámite.
+   */
+  | 'HISTORICO_SIN_RESOLVER';
 
 export interface OpcionesTransicionLicencia {
   /**
@@ -91,6 +111,17 @@ interface TransicionPermitida {
  * - `NOTIFICADA → EN_FIRME`: firmeza del acto administrativo (CPACA art. 87).
  */
 const TRANSICIONES: Readonly<Record<EstadoJuridicoLicencia, readonly TransicionPermitida[]>> = {
+  /**
+   * DF-10 — desde "histórico sin resolver" NO hay transición automática: la
+   * salida es un acto humano. Cuando un funcionario revise el expediente
+   * FÍSICO y establezca qué pasó, asigna el estado que corresponda con su
+   * fundamento documental (y queda registrado quién y cuándo, ver
+   * `completarRevisionHistorica`). Dejarlo VACÍO es la garantía de que
+   * ningún flujo del sistema pueda sacarlo de aquí por su cuenta e
+   * inventarle un desenlace — fail-closed, mismo criterio que el resto del
+   * motor.
+   */
+  HISTORICO_SIN_RESOLVER: [],
   RADICADA_EN_DEBIDA_FORMA: [
     { hacia: 'EN_REVISION', fundamento: 'D.1077/2015 art. 2.2.6.1.2.1.1 par. 1 (ancla del término); art. 2.2.6.1.2.2.1-2 (citación/valla).' },
     { hacia: 'DESISTIDA', fundamento: 'D.1077/2015 art. 2.2.6.1.2.3.4 — desistimiento expreso, procede antes de la decisión.' },
@@ -200,4 +231,142 @@ export function validarCierreExpediente(
   if (!actoFinal?.fecha) errores.push('actoFinal.fecha es obligatoria para cerrar un expediente REAL.');
   if (!actoFinal?.fechaFirmeza) errores.push('actoFinal.fechaFirmeza es obligatoria para cerrar un expediente REAL (DF-6, ADR-0029: dispara vigencias y el reporte ELIC).');
   return { valido: errores.length === 0, errores };
+}
+
+/* ──────────────────────────────────────────────
+   "Histórico sin resolver" (DF-10) — decisión del propietario, 11-ago-2026,
+   tras consultar al ingeniero de Planeación (bloque "Históricos sin
+   resolver").
+────────────────────────────────────────────── */
+
+/**
+ * Ejes de completitud que un expediente RECONSTRUIDO del importador de
+ * históricos puede tener pendientes AL MOMENTO DE IMPORTAR (`lib/migracion/
+ * planificar-importacion-consecutivo.ts`). No es un catálogo cerrado de
+ * "todo lo que puede faltar" en cualquier expediente — es específico de la
+ * migración Fase 5 (DF-9):
+ *  - `IDENTIDAD`: falta el nombre y/o el número de documento del
+ *    solicitante (el libro histórico NUNCA registró documento; el nombre
+ *    falta solo en la versión sanitizada de PII que corre en CI).
+ *  - `ESTADO_JURIDICO`: no hay acto final verificable que sustente un hito
+ *    de `EstadoJuridicoLicencia` — el caso de TODO expediente migrado hoy
+ *    (ver `RevisionHistoricaLicencia` más abajo).
+ *  - `ACTO_FINAL`: `actoFinal.cierreDesconocido === true` — mismo criterio
+ *    que DF-6 (`validarCierreExpediente`).
+ *  - `SUBTIPO`: el texto histórico de "tipo" no resolvió contra el catálogo
+ *    normativo (P1′, `equivalencia-migracion.ts`) — se importó con el texto
+ *    crudo en `subtipos` en vez de un código de `CATALOGO_FIGURAS_NORMATIVAS`.
+ */
+export type EjeCompletitudHistorico = 'IDENTIDAD' | 'ESTADO_JURIDICO' | 'ACTO_FINAL' | 'SUBTIPO';
+
+/**
+ * Marca "histórico sin resolver" — DF-10. Representa un expediente
+ * RECONSTRUIDO (Fase 5, migración del libro de consecutivo de Planeación)
+ * para el que NINGÚN acto final verificable respalda un desenlace jurídico
+ * — ni siquiera cuando el libro dice "terminado" o "revisado": esos textos
+ * son estado OPERATIVO del panel legado, sin fecha de resolución que los
+ * sustente (verificado contra las 202 filas reales: NINGUNA la trae). El
+ * propietario RECTIFICÓ expresamente un intento previo de mapear
+ * "terminado" → `CONCEDIDA`: *"No conviertas 'terminado' en 'Concedida' sin
+ * acto final verificable"* — este tipo existe para que esa regla sea
+ * IMPOSIBLE de violar por accidente, no solo una convención de buena fe.
+ *
+ * DELIBERADAMENTE NO es un valor de `EstadoJuridicoLicencia`, por dos
+ * razones independientes, cada una suficiente por sí sola:
+ *  1. **Semántica**: ese enum son HITOS del ciclo (D.1077/2015), cada uno
+ *     con fundamento normativo verificado — "histórico sin resolver" no es
+ *     un hito jurídico, es la ausencia declarada de evidencia para asignar
+ *     uno. Mezclar los dos ejes obligaría a inventar cuál hito real
+ *     corresponde, exactamente lo que el propietario prohibió.
+ *  2. **Blast radius**: `ESTILOS_ESTADO_JURIDICO` (`app/interno/licencias/
+ *     estilos-estado-juridico.ts`) es un `Record<EstadoJuridicoLicencia,
+ *     EstiloChipEstado>` EXHAUSTIVO — añadir un valor nuevo al enum rompe
+ *     esa tabla (y todo switch/Record exhaustivo que dependa de él) en un
+ *     directorio (`app/interno/**`) que este rol tiene prohibido tocar.
+ *
+ * Como marca APARTE, el importador (`planificar-importacion-consecutivo.ts`)
+ * asigna a `estadoJuridico` el hito MENOS comprometido de los 9 —
+ * `RADICADA_EN_DEBIDA_FORMA` — porque es el único hecho verificable (el
+ * libro SÍ acredita que hubo una solicitud con radicado asignado) sin
+ * afirmar ningún desenlace. Esto tiene un costo conocido y DECLARADO (no
+ * oculto): hoy `ESTADOS_EN_TRAMITE_LIBRO`/`ESTADOS_EN_TRAMITE`
+ * (`app/interno/licencias`) clasifican por `estadoJuridico` sin mirar
+ * `origen`/esta marca, así que el KPI "En trámite" del Libro Consecutivo SÍ
+ * contará estos expedientes hasta que ese archivo (fuera del alcance de
+ * este rol) excluya `revisionHistorica?.pendiente === true` — MISMO patrón
+ * que `BandejaLicenciasClient.tsx` ya aplica hoy vía `esReconstruido`/
+ * `contables` para sus propios KPIs. Se prefiere este costo, TRANSPARENTE y
+ * corregible en una capa que no es la mía, a la alternativa de asignar
+ * `CONCEDIDA`/`NEGADA`/`DESISTIDA`/`NOTIFICADA`/`EN_FIRME` (los 5 valores
+ * que SÍ evitarían el KPI) — cualquiera de esos cinco MENTIRÍA sobre un
+ * desenlace, violando la instrucción explícita y más importante del
+ * propietario.
+ *
+ * Fail-closed (criterio (c) del encargo): un expediente con `pendiente:
+ * true` no se toca por ningún cómputo de plazo — R9 ya excluye del término
+ * toda `Actuacion` con `origen: 'RECONSTRUIDO'` (`derivarEventosTermino`,
+ * `./termino.ts`), y el importador solo produce actuaciones con ese origen
+ * para estos expedientes — ni por ninguna transición de `puedeTransicionar`:
+ * completar la revisión es un acto EDITORIAL del funcionario (ver
+ * `completarRevisionHistorica`), nunca una transición del ciclo jurídico.
+ * Transiciones fuera de la marca son SIEMPRE explícitas (criterio (b)):
+ * `completarRevisionHistorica` es la ÚNICA función de este módulo que la
+ * retira; nada en el importador, ni en ningún otro punto de este archivo,
+ * la muta automáticamente.
+ */
+export interface RevisionHistoricaLicencia {
+  /**
+   * `true`: el expediente migrado sigue sin desenlace jurídico verificable
+   * — "histórico sin resolver". `false`: un funcionario ya completó la
+   * revisión (ver `completarRevisionHistorica`).
+   */
+  pendiente: boolean;
+  /**
+   * Qué ejes seguían sin completar AL MOMENTO DE IMPORTAR — para que el
+   * panel pueda filtrar "faltan cédulas" o "falta acto final" sin inspeccionar
+   * cada campo del documento. Se congela en la importación; `completarRevisionHistorica`
+   * no lo recalcula (una vez `pendiente: false`, el detalle de qué faltaba
+   * queda como historial de la brecha original, no se borra).
+   */
+  pendientesAlImportar: EjeCompletitudHistorico[];
+  /**
+   * Presente SOLO cuando `pendiente === false` — quién completó la revisión
+   * y cuándo (decisión del propietario, 11-ago-2026: "cada registro editable
+   * y trazable"). Mismo trío `{actorUid, actorNombre, fecha}` ya usado en
+   * `Actuacion`/`ActuacionLicenciaDoc` — no se inventa un formato de
+   * auditoría nuevo.
+   */
+  completadoPor?: { actorUid: string; actorNombre: string; fecha: string };
+}
+
+/**
+ * Retira la marca "histórico sin resolver" — la ÚNICA función de este
+ * módulo (o de cualquier otro consumido por el importador) autorizada a
+ * hacerlo; es SIEMPRE una acción explícita de un funcionario (vía una ruta
+ * futura, fuera de esta tanda — este módulo solo declara el soporte de
+ * datos, no la UI ni la API).
+ *
+ * Fail-closed (criterio (c) del encargo): `null` si `revision.pendiente`
+ * YA es `false` — no tiene sentido "completar" dos veces, y permitirlo
+ * pisaría en silencio el `completadoPor` de la primera vez, perdiendo quién
+ * la completó realmente. `null` (no una excepción) por el mismo criterio
+ * que el resto del motor usa para "no se puede resolver esto, decide el
+ * caller" (`resolverEquivalencia`, `calcularVencimiento`) en vez de lanzar.
+ *
+ * PURA: no decide QUÉ cambió en el expediente (cédula/estado/acto final) —
+ * eso lo escribe el caller en los campos correspondientes de
+ * `ExpedienteLicenciaDoc`, en la MISMA operación que llama a esta función;
+ * `pendientesAlImportar` no se recalcula (ver su JSDoc).
+ */
+export function completarRevisionHistorica(
+  revision: RevisionHistoricaLicencia,
+  actor: { uid: string; nombre: string },
+  ahora: Date,
+): RevisionHistoricaLicencia | null {
+  if (!revision.pendiente) return null;
+  return {
+    ...revision,
+    pendiente: false,
+    completadoPor: { actorUid: actor.uid, actorNombre: actor.nombre, fecha: ahora.toISOString() },
+  };
 }

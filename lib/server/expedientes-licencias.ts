@@ -1,7 +1,7 @@
 import type { TenantId } from '@/src/types/radicado';
 import type { Expediente, Actuacion, ContextoEvaluacionRequisito, DefinicionTramite } from '@/lib/motor-expedientes/tipos';
 import { CATALOGO_FIGURAS_NORMATIVAS } from '@/lib/motor-expedientes/catalogo-subtipos-normativo';
-import { puedeTransicionar, type EstadoJuridicoLicencia } from '@/lib/motor-expedientes/estados-licencia';
+import { puedeTransicionar, type EstadoJuridicoLicencia, type RevisionHistoricaLicencia } from '@/lib/motor-expedientes/estados-licencia';
 import { esEstadoCerrado } from '@/lib/radicado-estados';
 import { DEFINICION_LICENCIA_CONSTRUCCION_PARCIAL } from '@/lib/motor-expedientes/definiciones/licencia-construccion-parcial';
 import { sumarDiasHabiles, diasRestantesHabiles } from '@/lib/tiempos-radicado';
@@ -110,6 +110,32 @@ export interface ExpedienteLicenciaDoc extends Expediente {
    * correcto, no un error.
    */
   fechaAlertaConservadora?: string | null;
+  /**
+   * DF-10 (decisión del propietario, 11-ago-2026): texto EXACTO del campo
+   * "estado" del libro histórico de Planeación al momento de migrar —
+   * verbatim, ANTES de cualquier normalización o interpretación
+   * ("terminado", "REVISADO", "TERMINADA"...). `null` cuando el libro NO
+   * traía ningún estado para esa fila (la cohorte 2022-2024) — la ausencia
+   * es información y se declara explícitamente, nunca se omite en silencio
+   * (mismo principio que `predio`/`DatosPredio`: ausencia declarada, nunca
+   * inventada). Ausente (`undefined`) en cualquier expediente que NO
+   * provenga de esa migración (`lib/migracion/planificar-importacion-
+   * consecutivo.ts`, único escritor de este campo).
+   *
+   * NUNCA se usa para inferir `estadoJuridico` — es evidencia de
+   * procedencia archivística, no un dato operable (ver
+   * `RevisionHistoricaLicencia`, `../motor-expedientes/estados-licencia.ts`).
+   */
+  estadoOriginalHistorico?: string | null;
+  /**
+   * DF-10: presente en TODO expediente RECONSTRUIDO importado del
+   * consecutivo histórico de licencias — ver `RevisionHistoricaLicencia`
+   * (`../motor-expedientes/estados-licencia.ts`) para el contrato completo
+   * (marca "histórico sin resolver", fail-closed, transición solo
+   * explícita vía `completarRevisionHistorica`). Ausente en expedientes que
+   * no provienen de esa migración.
+   */
+  revisionHistorica?: RevisionHistoricaLicencia;
 }
 
 /**

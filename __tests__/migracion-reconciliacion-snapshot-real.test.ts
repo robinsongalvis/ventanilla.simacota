@@ -11,6 +11,13 @@
  * los reales, no un ejemplo — asévera la reconciliación EXACTA contra el
  * snapshot de verdad.
  *
+ * DF-10 (decisión del propietario, 11-ago-2026 — "históricos sin
+ * resolver"): reescrito frente a la versión anterior. La ÚNICA cuarentena
+ * real que queda es fecha inválida (6/202, sin cambio) — TODO lo demás
+ * (código sin resolver, identidad, estado jurídico, acto final) se importa
+ * y se reporta como pendiente de completar. Reconciliación esperada:
+ * **196 planificados, 6 en cuarentena**.
+ *
  * NOTA (TAREA 4, ago-2026 — datos de predio): `direccion`/`barrioVereda`/
  * `matricula`/`area` son datos identificables por doctrina PII de este
  * directorio (ver `scripts/migracion/datos/README.md`) — el
@@ -42,9 +49,10 @@ const DIR_DATOS = join(process.cwd(), 'scripts/migracion/datos');
  * archivo se usa si existe; en CUALQUIER OTRO entorno (CI, un clon nuevo del
  * repo) no existe (está gitignored) y el test cae al `.sanitizado.json`
  * versionado (sin nombres). El PLANIFICADOR es el mismo código en ambos
- * casos y la reconciliación (202/0/202/2) es IDÉNTICA por diseño — la única
- * diferencia es si `RegistroEnCuarentena.solicitante` viene poblado o
- * `undefined`. Ningún assert de este archivo depende de `solicitante`.
+ * casos y la reconciliación (196/6) es IDÉNTICA por diseño — la única
+ * diferencia es si `solicitanteNombre`/`RegistroEnCuarentena.solicitante`
+ * vienen poblados o `''`/`undefined`. Ningún assert de este archivo depende
+ * del nombre real.
  */
 const RUTA_SNAPSHOT_LOCAL = join(DIR_DATOS, 'consecutivo-licencias-snapshot.local.json');
 const RUTA_SNAPSHOT_SANITIZADO = join(DIR_DATOS, 'consecutivo-licencias-snapshot.sanitizado.json');
@@ -67,33 +75,31 @@ describe('Puente PLAN→ARCHIVO — snapshot REAL (202 registros, libro de conse
     expect(snap._procedencia.sha256).toMatch(/^[0-9a-f]{64,}$/i);
   });
 
-  it('reconciliación EXACTA: 202 = planificados + enCuarentena (hoy: 0 planificados, 202 en cuarentena — es el resultado CORRECTO, ver JSDoc del planificador)', () => {
+  it('reconciliación EXACTA (DF-10): 196 planificados, 6 en cuarentena (única puerta real: fecha inválida)', () => {
     const plan = planificarImportacion(cargarSnapshotReal(), AHORA);
 
     expect(plan.reconciliacion.totalSnapshot).toBe(202);
     expect(plan.reconciliacion.planificados + plan.reconciliacion.enCuarentena).toBe(202);
     expect(plan.reconciliacion.enCuarentena).toBe(plan.cuarentena.length);
 
-    // Estado HOY de la semilla provisional (100% CUARENTENA en
-    // EQUIVALENCIAS_ESTADOS_OPERATIVOS_SEMILLA): 0 importables. Si este
-    // número cambia porque alguien llenó la tabla con filas MAPEADO, este
-    // assert debe actualizarse a propósito (no es un valor mágico: es la
-    // consecuencia documentada del diseño).
-    expect(plan.reconciliacion.planificados).toBe(0);
+    expect(plan.reconciliacion.planificados).toBe(196);
+    expect(plan.reconciliacion.enCuarentena).toBe(6);
+    expect(plan.cuarentena.every((c) => c.motivos.length === 1 && c.motivos[0] === 'FECHA_INVALIDA')).toBe(true);
   });
 
-  it('colisión 25-0037: AMBAS filas detectadas (colisiones = 2), aunque las dos terminen en cuarentena', () => {
+  it('colisión 25-0037: AMBAS filas detectadas (colisiones = 2) y AMBAS se planifican (DF-10, ya no bloquea)', () => {
     const plan = planificarImportacion(cargarSnapshotReal(), AHORA);
     expect(plan.reconciliacion.colisiones).toBe(2);
+    expect(plan.filasColision).toHaveLength(2);
 
-    const filasColision = plan.cuarentena.filter((c) => c.radicado === '68745-0-25-0037');
-    expect(filasColision).toHaveLength(2);
-    expect(filasColision.every((c) => c.colision)).toBe(true);
+    const expedientesColision = plan.expedientes.filter((e) => e.numeroExpediente?.numero === '68745-0-25-0037');
+    expect(expedientesColision).toHaveLength(2);
+    expect(expedientesColision.every((e) => e.numeroExpediente?.colision === true)).toBe(true);
     // Las dos filas reales del duplicado (fila 38 = LA/revisado, fila 39 = LR/revisado).
-    expect(filasColision.map((c) => c.fila).sort()).toEqual([38, 39]);
+    expect(plan.filasColision.map((f) => f.fila).sort()).toEqual([38, 39]);
   });
 
-  it('las 6 filas con fecha vacía/irreconocible/imposible del snapshot real quedan en FECHA_INVALIDA', () => {
+  it('las 6 filas con fecha vacía/irreconocible/imposible del snapshot real quedan en FECHA_INVALIDA (única cuarentena real)', () => {
     // 4 por formato (2 vacías en la hoja "CONSECUTIVO" fila 18/19, 1 vacía en
     // "2026" fila 4, 1 con typo "27/01/20206" en "2026" fila 3) + 2 por
     // fecha CALENDARIO IMPOSIBLE ("2023-11-31" — noviembre no tiene 31 días
@@ -104,11 +110,42 @@ describe('Puente PLAN→ARCHIVO — snapshot REAL (202 registros, libro de conse
     // de rechazar fechas imposibles — sin esa guarda, "2023-11-31" se
     // habría importado silenciosamente como "2023-12-01").
     const plan = planificarImportacion(cargarSnapshotReal(), AHORA);
-    const conFechaInvalida = plan.cuarentena.filter((c) => c.motivos.includes('FECHA_INVALIDA'));
-    expect(conFechaInvalida).toHaveLength(6);
-    expect(conFechaInvalida.map((c) => `${c.hoja}:${c.fila}`).sort()).toEqual(
+    expect(plan.cuarentena).toHaveLength(6);
+    expect(plan.cuarentena.map((c) => `${c.hoja}:${c.fila}`).sort()).toEqual(
       ['2026:3', '2026:4', 'CONSECUTIVO:18', 'CONSECUTIVO:19', 'CONSECUTIVO:87', 'CONSECUTIVO:88'].sort(),
     );
+  });
+
+  it('DF-10: los 196 planificados entran "histórico sin resolver" — estado propio del enum, marca pendiente, operativo ARCHIVADO', () => {
+    const plan = planificarImportacion(cargarSnapshotReal(), AHORA);
+    expect(plan.expedientes).toHaveLength(196);
+    expect(plan.expedientes.every((e) => e.estadoJuridico === 'HISTORICO_SIN_RESOLVER')).toBe(true);
+    expect(plan.expedientes.every((e) => e.estado === 'ARCHIVADO')).toBe(true);
+    expect(plan.expedientes.every((e) => e.revisionHistorica?.pendiente === true)).toBe(true);
+    expect(plan.expedientes.every((e) => e.fechaAlertaConservadora === null)).toBe(true); // R9 end-to-end
+  });
+
+  it('DF-10: 3 registros con código de "tipo" sin resolver (P1′) se importan con el texto crudo — hallazgo: no son solo los 2 que trajo el encargo', () => {
+    // El encargo nombró "LCR VISR"/"LRC"; esta implementación encontró una
+    // TERCERA variante de espaciado ("LR y  LC, A", doble espacio antes de
+    // "LC") que tampoco normaliza al mismo texto que la fila sembrada
+    // ("LR y LC,A") — mismo criterio general (código sin resolver → se
+    // importa con el texto crudo), sin caso especial para esta variante.
+    const plan = planificarImportacion(cargarSnapshotReal(), AHORA);
+    expect(plan.subtiposSinResolver).toHaveLength(3);
+    expect(plan.subtiposSinResolver).toEqual(expect.arrayContaining([
+      expect.objectContaining({ radicado: '68745-0-24-0002', hoja: 'CONSECUTIVO', fila: 103, tipoOriginal: 'LCR VISR' }),
+      expect.objectContaining({ radicado: '68745-0-24-0021', hoja: 'CONSECUTIVO', fila: 122, tipoOriginal: 'LRC' }),
+      expect.objectContaining({ radicado: '68745-0-22-0044', hoja: 'CONSECUTIVO', fila: 48, tipoOriginal: 'LR y  LC, A' }),
+    ]));
+  });
+
+  it('DF-10: pendientesHistorico — sinIdentidad/sinEstadoJuridico/sinActoFinal cuentan los 196 planificados', () => {
+    const plan = planificarImportacion(cargarSnapshotReal(), AHORA);
+    // El libro histórico NUNCA registró número de documento (ninguna versión) — los 196 planificados están sin cédula.
+    expect(plan.pendientesHistorico.sinIdentidad).toBe(196);
+    expect(plan.pendientesHistorico.sinEstadoJuridico).toBe(196);
+    expect(plan.pendientesHistorico.sinActoFinal).toBe(196);
   });
 
   it('genera plan-importacion.generado.json + reporte-dry-run.generado.md (artefactos gitignored, para el ejecutor .mjs)', () => {
@@ -120,9 +157,11 @@ describe('Puente PLAN→ARCHIVO — snapshot REAL (202 registros, libro de conse
 
     const planRelefdo = JSON.parse(readFileSync(RUTA_PLAN_GENERADO, 'utf8'));
     expect(planRelefdo.reconciliacion.totalSnapshot).toBe(202);
+    expect(planRelefdo.reconciliacion.planificados).toBe(196);
 
     expect(reporte).toContain('# Reporte dry-run');
     expect(reporte).toContain('Total en el snapshot: **202**');
+    expect(reporte).toContain('Planificados (se importan): **196**');
   });
 
   it('el reporte es ESTABLE: misma entrada (mismo snapshot, mismo "ahora") produce el mismo texto byte a byte', () => {
@@ -131,11 +170,13 @@ describe('Puente PLAN→ARCHIVO — snapshot REAL (202 registros, libro de conse
     expect(generarReporteDryRun(planA)).toBe(generarReporteDryRun(planB));
   });
 
-  it('el reporte desglosa correctamente los conteos por motivo (suma de motivos ≥ enCuarentena, porque un registro puede tener varios)', () => {
+  it('el reporte desglosa correctamente los pendientes por completar y el subtipo sin resolver', () => {
     const plan = planificarImportacion(cargarSnapshotReal(), AHORA);
     const reporte = generarReporteDryRun(plan);
-    expect(reporte).toMatch(/Estados pendientes \(P4′\)\*\*: \d+ registro\(s\)/);
-    expect(reporte).toMatch(/Códigos pendientes \(P1′\)\*\*: \d+ registro\(s\)/);
+    expect(reporte).toMatch(/Sin cédula del solicitante: \*\*196\*\*/);
+    expect(reporte).toMatch(/Sin estado jurídico verificable[^:]*: \*\*196\*\*/);
+    expect(reporte).toMatch(/Sin acto final completo: \*\*196\*\*/);
+    expect(reporte).toMatch(/Con subtipo sin resolver \(texto crudo, P1′\): \*\*3\*\*/);
   });
 
   it('datos de predio contra el .sanitizado.json (SIEMPRE, sin fallback): 0 en los 4 conteos y en los 3 motivos de descarte — el campo de origen no existe en ese archivo (doctrina PII, ver JSDoc de arriba)', () => {

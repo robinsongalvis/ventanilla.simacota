@@ -51,10 +51,12 @@ import { TarjetaKpiLibro } from './TarjetaKpiLibro';
 import { ChipFiltroLibro } from './ChipFiltroLibro';
 import { EtiquetaDatoFaltante } from './EtiquetaDatoFaltante';
 import { PanelDetalleExpediente } from './PanelDetalleExpediente';
+import { BuscadorRapidoLibro } from './BuscadorRapidoLibro';
 import {
   añosDisponiblesLibro,
   calcularConteosKpiLibro,
   calcularConteosPorFiltroLibro,
+  coincideBusquedaLibro,
   COLOR_URGENCIA_LIBRO,
   construirFilasLibroConsecutivo,
   FILTROS_LIBRO_CONSECUTIVO,
@@ -67,6 +69,8 @@ import {
   type FiltroLibroConsecutivo,
 } from '../presentacion-libro-consecutivo';
 
+const ID_TABLA_LIBRO_CONSECUTIVO = 'tabla-libro-consecutivo';
+
 export function LibroConsecutivoClient() {
   const { usuario, cargando: cargandoAuth } = useAuth();
   const [expedientes, setExpedientes] = useState<ExpedienteLicenciaDoc[]>([]);
@@ -76,6 +80,7 @@ export function LibroConsecutivoClient() {
   // reales en cuanto llega la respuesta (`añosDisponiblesLibro`).
   const [año, setAño] = useState<number>(() => new Date().getFullYear());
   const [filtro, setFiltro] = useState<FiltroLibroConsecutivo>('TODOS');
+  const [busqueda, setBusqueda] = useState('');
   const [expedienteSeleccionadoId, setExpedienteSeleccionadoId] = useState<string | null>(null);
 
   const cargar = useCallback(async () => {
@@ -103,9 +108,25 @@ export function LibroConsecutivoClient() {
 
   const años = useMemo(() => añosDisponiblesLibro(expedientes), [expedientes]);
   const filas = useMemo(() => construirFilasLibroConsecutivo(expedientes, año), [expedientes, año]);
+  // KPIs y conteos de chips SIEMPRE sobre `filas` (el año completo) — la
+  // búsqueda nunca los distorsiona, mismo criterio que ya aplicaba el
+  // filtro de chip (ver JSDoc de `filasVisibles` abajo).
   const conteosKpi = useMemo(() => calcularConteosKpiLibro(filas), [filas]);
   const conteosFiltro = useMemo(() => calcularConteosPorFiltroLibro(filas), [filas]);
-  const filasVisibles = useMemo(() => filtrarFilasLibro(filas, filtro), [filas, filtro]);
+  const filasPorFiltro = useMemo(() => filtrarFilasLibro(filas, filtro), [filas, filtro]);
+  const terminoBusqueda = busqueda.trim();
+  /**
+   * Buscador rápido — corre DENTRO del filtro de chip activo (sobre
+   * `filasPorFiltro`, no sobre `filas`), para que "buscar" y "filtrar" se
+   * combinen en vez de pelearse: si el chip "Vencidos" está activo, buscar
+   * "galvis" solo encuentra vencidos de Galvis. `coincideBusquedaLibro` es
+   * PURA (`../presentacion-libro-consecutivo.ts`) — `FilaLibroConsecutivo`
+   * calza su forma sin adaptador.
+   */
+  const filasVisibles = useMemo(() => {
+    if (!terminoBusqueda) return filasPorFiltro;
+    return filasPorFiltro.filter((f) => coincideBusquedaLibro(f, busqueda));
+  }, [filasPorFiltro, busqueda, terminoBusqueda]);
   const conteos = useMemo(
     () => ({
       total: filas.length,
@@ -235,6 +256,19 @@ export function LibroConsecutivoClient() {
         />
       </div>
 
+      {/* ── Buscador rápido ── */}
+      <div className="print:hidden">
+        <BuscadorRapidoLibro
+          id="busqueda-libro-consecutivo"
+          etiqueta="Buscar en el libro consecutivo por expediente, radicado, solicitante, documento, matrícula inmobiliaria, tipo o estado"
+          placeholder="Buscar por expediente, radicado, nombre, documento, matrícula, tipo o estado…"
+          valor={busqueda}
+          onChange={setBusqueda}
+          idTabla={ID_TABLA_LIBRO_CONSECUTIVO}
+          totalVisible={filasVisibles.length}
+        />
+      </div>
+
       {/* ── Chips de filtro ── */}
       <div role="group" aria-label="Filtrar libro consecutivo" className="flex flex-wrap gap-2 print:hidden">
         {FILTROS_LIBRO_CONSECUTIVO.map(({ id, etiqueta }) => (
@@ -248,8 +282,8 @@ export function LibroConsecutivoClient() {
         style={{ background: 'var(--bg-surface)', border: '1px solid var(--color-border)', boxShadow: 'var(--shadow-soft)' }}
       >
         <div className="overflow-x-auto">
-          <table className="w-full border-collapse text-sm">
-            <caption className="sr-only">{`Libro consecutivo de licencias, año ${año}, filtro ${filtro}`}</caption>
+          <table id={ID_TABLA_LIBRO_CONSECUTIVO} className="w-full border-collapse text-sm">
+            <caption className="sr-only">{`Libro consecutivo de licencias, año ${año}, filtro ${filtro}${terminoBusqueda ? `, búsqueda "${terminoBusqueda}"` : ''}`}</caption>
             <thead>
               <tr style={{ borderBottom: '1px solid var(--color-border)' }}>
                 <Th ancho={190}>N.° expediente</Th>
@@ -279,8 +313,24 @@ export function LibroConsecutivoClient() {
               )}
               {!cargando && filas.length > 0 && filasVisibles.length === 0 && (
                 <tr>
-                  <td colSpan={8} className="px-3 py-10 text-center text-sm font-medium" style={{ color: 'var(--text-primary)' }}>
-                    Ningún expediente de {año} coincide con este filtro
+                  <td colSpan={8} className="px-3 py-10 text-center text-sm" style={{ color: 'var(--text-primary)' }}>
+                    {terminoBusqueda ? (
+                      <div className="flex flex-col items-center gap-2">
+                        <p className="font-medium">
+                          Sin resultados para &quot;{terminoBusqueda}&quot;{filtro !== 'TODOS' ? ' en el filtro activo' : ''}
+                        </p>
+                        <button
+                          type="button"
+                          onClick={() => setBusqueda('')}
+                          className="text-xs font-bold underline focus-visible:outline-none focus-visible:ring-2 rounded"
+                          style={{ color: 'var(--color-primary)' }}
+                        >
+                          Limpiar búsqueda
+                        </button>
+                      </div>
+                    ) : (
+                      <p className="font-medium">Ningún expediente de {año} coincide con este filtro</p>
+                    )}
                   </td>
                 </tr>
               )}
@@ -374,10 +424,13 @@ export function LibroConsecutivoClient() {
         </div>
       </div>
 
-      {/* ── Pie: conteos de reconciliación (sobre el TOTAL del año, no del filtro activo) ── */}
+      {/* ── Pie: conteos de reconciliación (sobre el TOTAL del año, no del filtro/búsqueda activos) ── */}
       <p className="text-xs print:hidden" style={{ color: 'var(--text-secondary)' }}>
         {conteos.total} expediente{conteos.total === 1 ? '' : 's'} en {año} · {conteos.prueba} de prueba · {conteos.conActoFinal} con acto final
-        {filtro !== 'TODOS' && ` · ${filasVisibles.length} visible${filasVisibles.length === 1 ? '' : 's'} con el filtro activo`}
+        {(filtro !== 'TODOS' || terminoBusqueda) &&
+          ` · ${filasVisibles.length} visible${filasVisibles.length === 1 ? '' : 's'} con ${
+            filtro !== 'TODOS' && terminoBusqueda ? 'el filtro y la búsqueda activos' : filtro !== 'TODOS' ? 'el filtro activo' : 'la búsqueda activa'
+          }`}
       </p>
 
       {expedienteSeleccionadoId && (

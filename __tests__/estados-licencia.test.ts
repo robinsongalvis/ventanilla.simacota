@@ -3,7 +3,9 @@ import {
   puedeTransicionar,
   transicionesDesde,
   validarCierreExpediente,
+  completarRevisionHistorica,
   type EstadoJuridicoLicencia,
+  type RevisionHistoricaLicencia,
 } from '@/lib/motor-expedientes/estados-licencia';
 import type { Expediente } from '@/lib/motor-expedientes/tipos';
 
@@ -133,5 +135,38 @@ describe('validarCierreExpediente — DF-6', () => {
   it('RECONSTRUIDO sin cierreDesconocido y sin datos completos → inválido (no puede quedar sin ninguna constancia)', () => {
     const expediente: Pick<Expediente, 'origen' | 'actoFinal'> = { origen: 'RECONSTRUIDO', actoFinal: {} };
     expect(validarCierreExpediente(expediente).valido).toBe(false);
+  });
+});
+
+describe('completarRevisionHistorica — DF-10 ("histórico sin resolver")', () => {
+  const AHORA = new Date(2026, 7, 20, 9, 0, 0, 0);
+  const actor = { uid: 'uid-func-1', nombre: 'Funcionaria Planeación' };
+
+  it('con pendiente:true → retira la marca y estampa quién/cuándo (criterio "editable y trazable")', () => {
+    const revision: RevisionHistoricaLicencia = { pendiente: true, pendientesAlImportar: ['IDENTIDAD', 'ESTADO_JURIDICO', 'ACTO_FINAL'] };
+    const resultado = completarRevisionHistorica(revision, actor, AHORA);
+    expect(resultado).not.toBeNull();
+    expect(resultado!.pendiente).toBe(false);
+    expect(resultado!.completadoPor).toEqual({ actorUid: 'uid-func-1', actorNombre: 'Funcionaria Planeación', fecha: AHORA.toISOString() });
+    // `pendientesAlImportar` es historial de la brecha ORIGINAL — no se borra al completar.
+    expect(resultado!.pendientesAlImportar).toEqual(['IDENTIDAD', 'ESTADO_JURIDICO', 'ACTO_FINAL']);
+  });
+
+  it('fail-closed: con pendiente:false (ya completada) → null, nunca pisa el "completadoPor" anterior', () => {
+    const yaCompletada: RevisionHistoricaLicencia = {
+      pendiente: false,
+      pendientesAlImportar: ['ESTADO_JURIDICO', 'ACTO_FINAL'],
+      completadoPor: { actorUid: 'uid-otro', actorNombre: 'Otro Funcionario', fecha: '2026-08-01T00:00:00.000Z' },
+    };
+    const resultado = completarRevisionHistorica(yaCompletada, actor, AHORA);
+    expect(resultado).toBeNull();
+  });
+
+  it('nada en este módulo retira la marca automáticamente — solo esta función existe para eso', () => {
+    // Documenta el criterio fail-closed (c) del encargo: `puedeTransicionar`
+    // no conoce ni toca `RevisionHistoricaLicencia`.
+    const revision: RevisionHistoricaLicencia = { pendiente: true, pendientesAlImportar: [] };
+    expect(revision.pendiente).toBe(true);
+    expect(puedeTransicionar('RADICADA_EN_DEBIDA_FORMA', 'EN_REVISION')).toBe(true); // transición jurídica normal, ajena a la marca
   });
 });

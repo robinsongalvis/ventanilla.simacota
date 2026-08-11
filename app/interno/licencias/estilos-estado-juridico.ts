@@ -31,6 +31,18 @@ import type { EstiloChipEstado } from './estilos-chip-estado';
  * en el chip anterior de la trazabilidad.
  */
 export const ESTILOS_ESTADO_JURIDICO: Record<EstadoJuridicoLicencia, EstiloChipEstado> = {
+  /**
+   * DF-10 — gris deliberado: es el ÚNICO estado sin color de significado.
+   * Los demás comunican algo (verde = avanza, ámbar = requiere acción, azul
+   * = hito cumplido); este comunica *no sabemos*, y darle cualquier color
+   * del semáforo institucional sugeriría un desenlace que no consta.
+   */
+  HISTORICO_SIN_RESOLVER: {
+    dot: '#94A3B8',
+    texto: '#475569',
+    fondo: '#F1F5F9',
+    label: 'Histórico sin resolver',
+  },
   RADICADA_EN_DEBIDA_FORMA: {
     dot: '#2563EB',
     texto: '#1E4FA0',

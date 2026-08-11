@@ -4,6 +4,8 @@ import {
   añosDisponiblesLibro,
   calcularConteosKpiLibro,
   calcularConteosPorFiltroLibro,
+  camposBusquedaDesdeExpediente,
+  coincideBusquedaLibro,
   coincideFiltroLibro,
   construirFilasLibroConsecutivo,
   esHistoricoIncompletoLibro,
@@ -15,6 +17,7 @@ import {
   textoDiasVencimientoLibro,
   UMBRAL_POR_VENCER_DIAS_HABILES_LIBRO,
   urgenciaFilaLibro,
+  type CamposBusquedaLibro,
   type FilaLibroConsecutivo,
 } from '@/app/interno/licencias/presentacion-libro-consecutivo';
 import type { ExpedienteLicenciaDoc } from '@/lib/server/expedientes-licencias';
@@ -487,5 +490,138 @@ describe('generarCsvLibroConsecutivo', () => {
     const csv = generarCsvLibroConsecutivo([filaSintetica({ id: 'a' }), filaSintetica({ id: 'b', numeroExpediente: '68745-0-26-0002' })]);
     const lineas = csv.replace(/^﻿/, '').split('\r\n');
     expect(lineas).toHaveLength(3); // encabezado + 2 filas
+  });
+});
+
+/* ══════════════════════════════════════════════════════════════
+   Buscador rápido (Libro consecutivo + Bandeja) — pedido explícito del
+   propietario ante la importación de los 202 históricos. `coincideBusquedaLibro`
+   es la ÚNICA fuente de verdad de la coincidencia; `FilaLibroConsecutivo`
+   ya calza `CamposBusquedaLibro` estructuralmente (se prueba pasando filas
+   reales, sin adaptador), y `camposBusquedaDesdeExpediente` se prueba
+   aparte como el mapeo que necesita la Bandeja.
+══════════════════════════════════════════════════════════════ */
+
+describe('coincideBusquedaLibro', () => {
+  function camposBase(overrides: Partial<CamposBusquedaLibro> = {}): CamposBusquedaLibro {
+    return {
+      numeroExpediente: '68745-0-26-0007',
+      radicadoId: '1-110-202603-00042',
+      fechaRadicacion: '2026-03-10T15:00:00.000Z',
+      solicitanteNombre: 'María Fernanda Gálvez',
+      solicitanteDocumento: '91234567',
+      matriculaInmobiliaria: '321-51890',
+      subtipoCodigos: ['CONSTRUCCION'],
+      subtipos: ['Licencia de construcción'],
+      estadoJuridico: 'EN_REVISION',
+      ...overrides,
+    };
+  }
+
+  it('término vacío o solo espacios coincide con todo (mismo criterio que el filtro "TODOS")', () => {
+    expect(coincideBusquedaLibro(camposBase(), '')).toBe(true);
+    expect(coincideBusquedaLibro(camposBase(), '   ')).toBe(true);
+  });
+
+  it('coincide por número de expediente', () => {
+    expect(coincideBusquedaLibro(camposBase(), '26-0007')).toBe(true);
+    expect(coincideBusquedaLibro(camposBase(), '99-9999')).toBe(false);
+  });
+
+  it('coincide por número de radicado', () => {
+    expect(coincideBusquedaLibro(camposBase(), '00042')).toBe(true);
+  });
+
+  it('radicadoId ausente (null/undefined): no rompe, simplemente no coincide por ese campo', () => {
+    expect(coincideBusquedaLibro(camposBase({ radicadoId: null }), '00042')).toBe(false);
+    expect(coincideBusquedaLibro(camposBase({ radicadoId: undefined }), 'gálvez')).toBe(true);
+  });
+
+  it('coincide por documento', () => {
+    expect(coincideBusquedaLibro(camposBase(), '91234567')).toBe(true);
+  });
+
+  it('coincide por matrícula inmobiliaria; ausente no rompe', () => {
+    expect(coincideBusquedaLibro(camposBase(), '321-51890')).toBe(true);
+    expect(coincideBusquedaLibro(camposBase({ matriculaInmobiliaria: undefined }), '321-51890')).toBe(false);
+    expect(coincideBusquedaLibro(camposBase({ matriculaInmobiliaria: null }), 'gálvez')).toBe(true);
+  });
+
+  it('coincide por código de subtipo Y por su nombre legible', () => {
+    expect(coincideBusquedaLibro(camposBase(), 'CONSTRUCCION')).toBe(true);
+    expect(coincideBusquedaLibro(camposBase(), 'construcción')).toBe(true);
+  });
+
+  it('coincide por estado: código crudo y etiqueta legible', () => {
+    expect(coincideBusquedaLibro(camposBase(), 'EN_REVISION')).toBe(true);
+    expect(coincideBusquedaLibro(camposBase({ estadoJuridico: 'CON_ACTA_DE_OBSERVACIONES' }), 'acta de observaciones')).toBe(true);
+  });
+
+  it('estado corrupto/legado (no está en las 9 claves conocidas): no rompe, se busca solo por el código crudo', () => {
+    expect(coincideBusquedaLibro(camposBase({ estadoJuridico: 'NO_EXISTE' }), 'NO_EXISTE')).toBe(true);
+    expect(coincideBusquedaLibro(camposBase({ estadoJuridico: 'NO_EXISTE' }), 'en revisión')).toBe(false);
+  });
+
+  it('insensible a mayúsculas y a acentos — "MARIA" encuentra a "María", sin mapa de acentos a mano', () => {
+    expect(coincideBusquedaLibro(camposBase(), 'MARIA')).toBe(true);
+    expect(coincideBusquedaLibro(camposBase(), 'maria')).toBe(true);
+    expect(coincideBusquedaLibro(camposBase(), 'gAlVeZ')).toBe(true);
+  });
+
+  it('término con varios fragmentos: TODOS deben coincidir, en cualquier campo (no en el mismo campo)', () => {
+    // "gálvez" vive en el solicitante; "2026" solo aparece en la fecha de
+    // radicación formateada (10/03/2026) — el ejemplo textual del pedido.
+    expect(coincideBusquedaLibro(camposBase(), 'galvez 2026')).toBe(true);
+    expect(coincideBusquedaLibro(camposBase(), 'galvez 2099')).toBe(false);
+  });
+
+  it('nombre societario largo (dato feo real) sigue siendo buscable por fragmento parcial', () => {
+    const campos = camposBase({ solicitanteNombre: 'Comercializadora y Distribuidora El Roble S.A.S.' });
+    expect(coincideBusquedaLibro(campos, 'roble')).toBe(true);
+    expect(coincideBusquedaLibro(campos, 'comercializadora roble')).toBe(true);
+  });
+
+  it('fecha de radicación inválida: no lanza, simplemente no aporta coincidencia por fecha', () => {
+    const campos = camposBase({ fechaRadicacion: 'no-es-fecha' });
+    expect(() => coincideBusquedaLibro(campos, 'maria')).not.toThrow();
+    expect(coincideBusquedaLibro(campos, 'maria')).toBe(true);
+  });
+
+  it('sin coincidencia en ningún campo: false', () => {
+    expect(coincideBusquedaLibro(camposBase(), 'xyz-no-existe')).toBe(false);
+  });
+});
+
+describe('camposBusquedaDesdeExpediente', () => {
+  it('mapea número de expediente, radicado, matrícula y subtipos (código + nombre legible) desde ExpedienteLicenciaDoc', () => {
+    const exp = expedienteBase({
+      radicadoId: '1-110-202603-00042',
+      predio: { matriculaInmobiliaria: '321-51890' },
+      subtipos: ['CONSTRUCCION'],
+    });
+    const campos = camposBusquedaDesdeExpediente(exp);
+    expect(campos.numeroExpediente).toBe('68745-0-26-0002');
+    expect(campos.radicadoId).toBe('1-110-202603-00042');
+    expect(campos.matriculaInmobiliaria).toBe('321-51890');
+    expect(campos.subtipoCodigos).toEqual(['CONSTRUCCION']);
+    expect(campos.subtipos).toEqual(['Licencia de construcción']);
+  });
+
+  it('usa el id del documento como número de expediente cuando numeroExpediente está ausente (mismo criterio que construirFilasLibroConsecutivo)', () => {
+    const campos = camposBusquedaDesdeExpediente(expedienteBase({ id: 'exp-sin-numero', numeroExpediente: undefined }));
+    expect(campos.numeroExpediente).toBe('exp-sin-numero');
+  });
+
+  it('predio/radicadoId ausentes: matriculaInmobiliaria y radicadoId quedan null, sin inventar nada', () => {
+    const campos = camposBusquedaDesdeExpediente(expedienteBase({ predio: undefined, radicadoId: null }));
+    expect(campos.matriculaInmobiliaria).toBeNull();
+    expect(campos.radicadoId).toBeNull();
+  });
+
+  it('el resultado del mapeo es buscable con coincideBusquedaLibro (integración de ambas funciones)', () => {
+    const exp = expedienteBase({ solicitanteNombre: 'Ana María Vargas', predio: { matriculaInmobiliaria: '900-12345' } });
+    const campos = camposBusquedaDesdeExpediente(exp);
+    expect(coincideBusquedaLibro(campos, 'maria')).toBe(true);
+    expect(coincideBusquedaLibro(campos, '900-12345')).toBe(true);
   });
 });

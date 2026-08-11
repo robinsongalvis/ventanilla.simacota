@@ -100,6 +100,24 @@ export interface FilaLibroConsecutivo {
   faltaCedula: boolean;
   /** `true` si `estadoJuridico` no es uno de los 9 valores conocidos (`ESTILOS_ESTADO_JURIDICO`) — defensivo: el documento real puede no cumplir el tipo TS en tiempo de ejecución (dato legado/corrupto). */
   faltaEstadoJuridico: boolean;
+  /**
+   * `Expediente.radicadoId` — número de radicado Ventanilla vinculado,
+   * `null` si el expediente aún no tiene handoff. Insumo del buscador
+   * rápido (ver sección "Buscador rápido" más abajo). Opcional en el TIPO
+   * (a diferencia del resto de campos de esta interfaz) para no romper los
+   * fixtures que ya construyen `FilaLibroConsecutivo` a mano en
+   * `__tests__/presentacion-libro-consecutivo.test.ts` sin pasar por
+   * `construirFilasLibroConsecutivo` — el buscador trata "ausente" igual
+   * que `null`.
+   */
+  radicadoId?: string | null;
+  /**
+   * `predio?.matriculaInmobiliaria` del expediente (`DatosPredio`,
+   * `lib/motor-expedientes/tipos.ts`) — insumo del buscador rápido, no se
+   * pinta como columna propia (no lo pidió el rediseño de la tabla).
+   * MISMA razón de opcionalidad que `radicadoId`.
+   */
+  matriculaInmobiliaria?: string | null;
 }
 
 /** `true` si el valor es un string vacío/solo espacios (o no es string) — mismo criterio de "faltante" para cédula y demás campos de texto de la fila. */
@@ -256,6 +274,8 @@ export function construirFilasLibroConsecutivo(
         vigenciaHastaError: vigencia.error,
         faltaCedula: estaVacio(exp.solicitanteDocumento),
         faltaEstadoJuridico: estaVacio(exp.estadoJuridico) || !((exp.estadoJuridico as string) in ESTILOS_ESTADO_JURIDICO),
+        radicadoId: exp.radicadoId ?? null,
+        matriculaInmobiliaria: exp.predio?.matriculaInmobiliaria ?? null,
       };
     })
     .sort((a, b) => a.numeroExpediente.localeCompare(b.numeroExpediente, 'es', { numeric: true }));
@@ -476,4 +496,120 @@ export function generarCsvLibroConsecutivo(filas: readonly FilaLibroConsecutivo[
     return celdas.map(celdaCsv).join(';');
   });
   return '﻿' + [encabezado, ...filasTexto].join('\r\n');
+}
+
+/* ══════════════════════════════════════════════════════════════
+   Buscador rápido (Libro consecutivo + Bandeja de Licencias) — pedido
+   explícito del propietario ante los ~202 expedientes históricos por
+   importar (pasarán de 3 a ~205 filas reales): sin buscador, localizar un
+   expediente por radicado/nombre/matrícula/estado sería inviable para
+   quien tenga que completar cédulas y estados desde el expediente físico.
+
+   Función PURA, compartida por ambas pantallas vía `CamposBusquedaLibro`:
+   `FilaLibroConsecutivo` ya calza esa forma ESTRUCTURALMENTE (por eso el
+   Libro llama `coincideBusquedaLibro(fila, termino)` directo, sin
+   adaptador); la Bandeja trabaja con `ExpedienteLicenciaDoc` crudo (no
+   construye filas), así que pasa por `camposBusquedaDesdeExpediente`
+   primero.
+══════════════════════════════════════════════════════════════ */
+
+/**
+ * Campos sobre los que corre el buscador rápido — los 6 que pidió el
+ * propietario (número de expediente/radicado, nombre del solicitante,
+ * documento, matrícula, código de subtipo y estado) más `fechaRadicacion`.
+ * SUPUESTO EXPLÍCITO (Principio 13, no estaba en la lista literal del
+ * pedido): sin la fecha formateada, el propio ejemplo del encargo —
+ * "buscar 'galvis 2025' encuentra al solicitante Galvis del año 2025" —
+ * no se cumple, porque el número de expediente vigente (`68745-0-AA-CCCC`)
+ * no lleva un año de 4 dígitos.
+ */
+export interface CamposBusquedaLibro {
+  numeroExpediente: string;
+  radicadoId?: string | null;
+  fechaRadicacion: string;
+  solicitanteNombre: string;
+  solicitanteDocumento: string;
+  matriculaInmobiliaria?: string | null;
+  subtipoCodigos: readonly string[];
+  subtipos: readonly string[];
+  estadoJuridico: string;
+}
+
+/**
+ * Normaliza texto para comparar en la búsqueda: minúsculas + sin marcas
+ * diacríticas vía descomposición NFD (así "MARÍA"/"María"/"maria" son el
+ * mismo término) — sin mantener un mapa de acentos a mano, mismo espíritu
+ * que `normalizarTextoHistorico` (`lib/motor-expedientes/
+ * equivalencia-migracion.ts`) pero de propósito general.
+ */
+function normalizarBusqueda(texto: string): string {
+  return texto
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .toLowerCase()
+    .trim();
+}
+
+/**
+ * `true` si CADA fragmento del término (separado por espacios) aparece en
+ * ALGUNO de los campos buscables de `campos` — los fragmentos NO tienen
+ * que coincidir en el mismo campo, así "galvis 2025" encuentra a un
+ * solicitante Galvis cuya fecha de radicación cae en 2025, aunque
+ * "galvis" viva en la columna Solicitante y "2025" en la de Fecha.
+ *
+ * Término vacío/solo espacios: coincide con todo — mismo criterio que el
+ * filtro "TODOS", y permite que el caller (componente) llame esto sin
+ * condicional propia cuando el campo de búsqueda está vacío.
+ */
+export function coincideBusquedaLibro(campos: CamposBusquedaLibro, termino: string): boolean {
+  const fragmentos = normalizarBusqueda(termino).split(/\s+/).filter(Boolean);
+  if (fragmentos.length === 0) return true;
+
+  // Mismo patrón defensivo que `faltaEstadoJuridico` (arriba): el estado
+  // puede no ser una de las 9 claves conocidas (dato legado/corrupto) — en
+  // ese caso solo se busca por el código crudo, sin `label` inventado.
+  const estadoLabel =
+    (campos.estadoJuridico as string) in ESTILOS_ESTADO_JURIDICO
+      ? ESTILOS_ESTADO_JURIDICO[campos.estadoJuridico as EstadoJuridicoLicencia].label
+      : '';
+
+  const haystack = normalizarBusqueda(
+    [
+      campos.numeroExpediente,
+      campos.radicadoId ?? '',
+      formatFechaColombia(campos.fechaRadicacion),
+      campos.solicitanteNombre,
+      campos.solicitanteDocumento,
+      campos.matriculaInmobiliaria ?? '',
+      ...campos.subtipoCodigos,
+      ...campos.subtipos,
+      campos.estadoJuridico,
+      estadoLabel,
+    ].join(' '),
+  );
+
+  return fragmentos.every((fragmento) => haystack.includes(fragmento));
+}
+
+/**
+ * Adapta un `ExpedienteLicenciaDoc` crudo — lo que consume la Bandeja, que
+ * NO construye `FilaLibroConsecutivo` — a `CamposBusquedaLibro`. Mismo
+ * criterio de mapeo que usa `construirFilasLibroConsecutivo` para los
+ * campos equivalentes (número de expediente, matrícula, radicado), sin
+ * repetir el resto de esa función (vigencia, urgencia, año…) que la
+ * Bandeja no necesita.
+ */
+export function camposBusquedaDesdeExpediente(exp: ExpedienteLicenciaDoc): CamposBusquedaLibro {
+  const subtipoCodigos = exp.subtipos ?? [];
+  return {
+    numeroExpediente: numeroExpedienteTexto(exp),
+    radicadoId: exp.radicadoId ?? null,
+    fechaRadicacion: exp.creadoEn,
+    solicitanteNombre: exp.solicitanteNombre,
+    solicitanteDocumento: exp.solicitanteDocumento,
+    matriculaInmobiliaria: exp.predio?.matriculaInmobiliaria ?? null,
+    subtipoCodigos,
+    subtipos: subtipoCodigos.map(nombreSubtipo),
+    estadoJuridico: exp.estadoJuridico,
+  };
 }
