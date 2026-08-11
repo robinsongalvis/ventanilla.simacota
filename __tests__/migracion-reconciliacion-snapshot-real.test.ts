@@ -10,6 +10,20 @@
  * Este es el REPORTE que verá el propietario: los números aquí abajo son
  * los reales, no un ejemplo — asévera la reconciliación EXACTA contra el
  * snapshot de verdad.
+ *
+ * NOTA (TAREA 4, ago-2026 — datos de predio): `direccion`/`barrioVereda`/
+ * `matricula`/`area` son datos identificables por doctrina PII de este
+ * directorio (ver `scripts/migracion/datos/README.md`) — el
+ * `.sanitizado.json` versionado NUNCA los incluye. Consecuencia DECLARADA
+ * (no un bug): en CUALQUIER entorno que corra contra el sanitizado (CI, un
+ * clon nuevo del repo), `PlanImportacion.datosPredio` da 0 en los cuatro
+ * conteos "con..." y 0 en los tres motivos de descarte — no hay nada que
+ * mapear porque el campo de origen no está presente. Solo la máquina del
+ * propietario (`.local.json`) ejerce el camino con datos reales; el test de
+ * abajo ("datos de predio contra el .sanitizado.json") lo verifica de forma
+ * explícita, DIRECTA contra ese archivo (sin el fallback `RUTA_SNAPSHOT`),
+ * para que la aserción se cumpla en ambos entornos sin depender de cuál
+ * archivo tomó el resto de la suite.
  */
 import { describe, it, expect } from 'vitest';
 import { existsSync, readFileSync, writeFileSync } from 'node:fs';
@@ -122,5 +136,48 @@ describe('Puente PLAN→ARCHIVO — snapshot REAL (202 registros, libro de conse
     const reporte = generarReporteDryRun(plan);
     expect(reporte).toMatch(/Estados pendientes \(P4′\)\*\*: \d+ registro\(s\)/);
     expect(reporte).toMatch(/Códigos pendientes \(P1′\)\*\*: \d+ registro\(s\)/);
+  });
+
+  it('datos de predio contra el .sanitizado.json (SIEMPRE, sin fallback): 0 en los 4 conteos y en los 3 motivos de descarte — el campo de origen no existe en ese archivo (doctrina PII, ver JSDoc de arriba)', () => {
+    const snapSanitizado = JSON.parse(readFileSync(RUTA_SNAPSHOT_SANITIZADO, 'utf8')) as SnapshotConsecutivoLicencias;
+    const plan = planificarImportacion(snapSanitizado, AHORA);
+    expect(plan.datosPredio).toEqual({
+      conDireccion: 0,
+      conBarrioVereda: 0,
+      conMatriculaInmobiliaria: 0,
+      conAreaTexto: 0,
+      descartes: { direccionEsMunicipio: 0, matriculaFormatoInvalido: 0, areaDesalineada: 0 },
+      filasAreaDesalineada: [],
+    });
+  });
+
+  it('datos de predio contra el snapshot REAL en uso (`.local.json` si existe, si no `.sanitizado.json`): conteos exactos verificados contra las 202 filas', () => {
+    const plan = planificarImportacion(cargarSnapshotReal(), AHORA);
+    if (RUTA_SNAPSHOT === RUTA_SNAPSHOT_LOCAL) {
+      // Máquina del propietario: verificado manualmente contra las 202 filas
+      // reales (ago-2026) — 54/202 traen "direccion" y las 54 valen
+      // literalmente "SIMACOTA" (descartadas); 13/202 traen "barrioVereda";
+      // 11/202 traen "matricula", todas con formato válido; 16/202 traen
+      // "area", de las cuales 5 son áreas reconocibles y 11 están
+      // desalineadas (veredas/direcciones coladas en la columna).
+      expect(plan.datosPredio).toEqual({
+        conDireccion: 0,
+        conBarrioVereda: 13,
+        conMatriculaInmobiliaria: 11,
+        conAreaTexto: 5,
+        descartes: { direccionEsMunicipio: 54, matriculaFormatoInvalido: 0, areaDesalineada: 11 },
+        filasAreaDesalineada: expect.arrayContaining([
+          expect.objectContaining({ radicado: '68745-0-25-0029', hoja: '2025', fila: 30, valorOriginal: 'EL CHANCE' }),
+        ]) as unknown as typeof plan.datosPredio.filasAreaDesalineada,
+      });
+      expect(plan.datosPredio.filasAreaDesalineada).toHaveLength(11);
+    } else {
+      // CI / clon nuevo: mismo resultado que el test anterior, contra el
+      // MISMO archivo que ya está usando el resto de la suite.
+      expect(plan.datosPredio.conDireccion).toBe(0);
+      expect(plan.datosPredio.conBarrioVereda).toBe(0);
+      expect(plan.datosPredio.conMatriculaInmobiliaria).toBe(0);
+      expect(plan.datosPredio.conAreaTexto).toBe(0);
+    }
   });
 });

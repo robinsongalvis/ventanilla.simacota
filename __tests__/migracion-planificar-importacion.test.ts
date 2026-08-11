@@ -6,6 +6,7 @@ import { describe, it, expect } from 'vitest';
 import {
   planificarImportacion,
   parsearFechaHistoricaANoonISO,
+  mapearPredioHistorico,
   SIN_DEFINICION_TRAMITE_HISTORICO,
   type SnapshotConsecutivoLicencias,
   type RegistroConsecutivoHistorico,
@@ -205,5 +206,154 @@ describe('planificarImportacion — reconciliación siempre cuadra', () => {
     ]), AHORA, { estados: TABLA_ESTADOS_CON_MAPEADO });
     expect(plan.reconciliacion.totalSnapshot).toBe(3);
     expect(plan.reconciliacion.planificados + plan.reconciliacion.enCuarentena).toBe(3);
+  });
+});
+
+/* ──────────────────────────────────────────────
+   mapearPredioHistorico — mapeo HONESTO del predio (TAREAS 1-3)
+   Valores sintéticos que replican los patrones REALES verificados contra
+   las 202 filas del snapshot (ninguno es un dato personal ni real).
+────────────────────────────────────────────── */
+
+describe('mapearPredioHistorico', () => {
+  it('matrícula con formato "NNN-NNNNN" válido → se aprovecha verbatim', () => {
+    const r = mapearPredioHistorico(registro({ matricula: '321-51890' }));
+    expect(r.predio?.matriculaInmobiliaria).toBe('321-51890');
+    expect(r.descartes).toHaveLength(0);
+  });
+
+  it('matrícula con folio corto (4 dígitos, caso REAL "321-4939") también calza', () => {
+    const r = mapearPredioHistorico(registro({ matricula: '321-4939' }));
+    expect(r.predio?.matriculaInmobiliaria).toBe('321-4939');
+  });
+
+  it('matrícula con formato irreconocible → se descarta con MATRICULA_FORMATO_INVALIDO, nunca se fuerza', () => {
+    const r = mapearPredioHistorico(registro({ matricula: 'sin-formato-de-matricula' }));
+    expect(r.predio?.matriculaInmobiliaria).toBeUndefined();
+    expect(r.descartes).toEqual([
+      { campo: 'matriculaInmobiliaria', motivo: 'MATRICULA_FORMATO_INVALIDO', valorOriginal: 'sin-formato-de-matricula' },
+    ]);
+  });
+
+  it('barrioVereda se conserva VERBATIM, texto libre, sin normalizar', () => {
+    const r = mapearPredioHistorico(registro({ barrioVereda: 'VEREDA SINTETICA' }));
+    expect(r.predio?.barrioVereda).toBe('VEREDA SINTETICA');
+    expect(r.descartes).toHaveLength(0);
+  });
+
+  it('dirección = "SIMACOTA" (insensible a mayúsculas/espacios) → se descarta con DIRECCION_ES_MUNICIPIO', () => {
+    const r1 = mapearPredioHistorico(registro({ direccion: 'SIMACOTA' }));
+    expect(r1.predio?.direccion).toBeUndefined();
+    expect(r1.descartes).toEqual([{ campo: 'direccion', motivo: 'DIRECCION_ES_MUNICIPIO', valorOriginal: 'SIMACOTA' }]);
+
+    const r2 = mapearPredioHistorico(registro({ direccion: '  simacota  ' }));
+    expect(r2.predio?.direccion).toBeUndefined();
+    expect(r2.descartes[0]!.motivo).toBe('DIRECCION_ES_MUNICIPIO');
+  });
+
+  it('dirección distinta de "SIMACOTA" → se conserva (el campo no está roto en sí, solo su único valor observado hoy)', () => {
+    const r = mapearPredioHistorico(registro({ direccion: 'CALLE 10 # 5-20' }));
+    expect(r.predio?.direccion).toBe('CALLE 10 # 5-20');
+    expect(r.descartes).toHaveLength(0);
+  });
+
+  it('área con unidad reconocible (HA/M2, con o sin mezcla de unidades) → se aprovecha como TEXTO', () => {
+    expect(mapearPredioHistorico(registro({ area: '48 HA 2469 M2' })).predio?.areaTexto).toBe('48 HA 2469 M2');
+    expect(mapearPredioHistorico(registro({ area: '290 M2' })).predio?.areaTexto).toBe('290 M2');
+    expect(mapearPredioHistorico(registro({ area: '7 ha' })).predio?.areaTexto).toBe('7 ha');
+  });
+
+  it('área DESALINEADA (parece dirección o vereda, no área) → se descarta con AREA_DESALINEADA', () => {
+    const r = mapearPredioHistorico(registro({ area: 'CRA 4 # 2-21' }));
+    expect(r.predio?.areaTexto).toBeUndefined();
+    expect(r.descartes).toEqual([{ campo: 'areaTexto', motivo: 'AREA_DESALINEADA', valorOriginal: 'CRA 4 # 2-21' }]);
+  });
+
+  it('"EL CHANCE" (vereda real que contiene la subcadena "HA") NO se confunde con un área — regresión del hallazgo de \\b', () => {
+    const r = mapearPredioHistorico(registro({ area: 'EL CHANCE' }));
+    expect(r.predio?.areaTexto).toBeUndefined();
+    expect(r.descartes[0]!.motivo).toBe('AREA_DESALINEADA');
+  });
+
+  it('sin ningún campo de predio aprovechable → predio undefined (ausencia declarada, NUNCA penalizada)', () => {
+    const r = mapearPredioHistorico(registro({ direccion: 'SIMACOTA' }));
+    expect(r.predio).toBeUndefined();
+    expect(r.descartes).toHaveLength(1);
+  });
+
+  it('registro sin ningún campo de predio en absoluto → predio undefined, sin descartes', () => {
+    const r = mapearPredioHistorico(registro({}));
+    expect(r.predio).toBeUndefined();
+    expect(r.descartes).toHaveLength(0);
+  });
+});
+
+describe('planificarImportacion — predio en el expediente y reconciliación ampliada (TAREAS 1-3)', () => {
+  it('un registro importable con predio aprovechable propaga `expediente.predio`', () => {
+    const plan = planificarImportacion(
+      snapshot([registro({
+        tipo: 'LC', estado: 'CERRADO-SINTETICO', solicitanteDocumento: '1',
+        matricula: '321-51890', barrioVereda: 'VEREDA SINTETICA', direccion: 'SIMACOTA', area: '290 M2',
+      })]),
+      AHORA,
+      { estados: TABLA_ESTADOS_CON_MAPEADO },
+    );
+    expect(plan.expedientes[0]!.predio).toEqual({
+      matriculaInmobiliaria: '321-51890',
+      barrioVereda: 'VEREDA SINTETICA',
+      areaTexto: '290 M2',
+      // direccion ausente: "SIMACOTA" se descartó.
+    });
+  });
+
+  it('un registro importable SIN ningún dato de predio no trae `predio` en el expediente', () => {
+    const plan = planificarImportacion(
+      snapshot([registro({ tipo: 'LC', estado: 'CERRADO-SINTETICO', solicitanteDocumento: '1' })]),
+      AHORA,
+      { estados: TABLA_ESTADOS_CON_MAPEADO },
+    );
+    expect(plan.expedientes[0]!.predio).toBeUndefined();
+  });
+
+  it('noLicencia se mapea a actoFinal.numero; cierreDesconocido sigue true (falta fecha/fechaFirmeza)', () => {
+    const plan = planificarImportacion(
+      snapshot([registro({ tipo: 'LC', estado: 'CERRADO-SINTETICO', solicitanteDocumento: '1', noLicencia: '002-2025' })]),
+      AHORA,
+      { estados: TABLA_ESTADOS_CON_MAPEADO },
+    );
+    expect(plan.expedientes[0]!.actoFinal).toEqual({ cierreDesconocido: true, numero: '002-2025' });
+  });
+
+  it('datosPredio cuenta sobre TODO el snapshot, incluidos los registros en cuarentena por otro motivo', () => {
+    const plan = planificarImportacion(snapshot([
+      // Importable, con matrícula válida.
+      registro({ tipo: 'LC', estado: 'CERRADO-SINTETICO', solicitanteDocumento: '1', matricula: '321-51890' }),
+      // En cuarentena por código (P1′), pero SU predio igual se cuenta.
+      registro({ hoja: '2026', fila: 3, radicado: '68745-0-26-0002', tipo: 'LRC', barrioVereda: 'VEREDA SINTETICA' }),
+      // En cuarentena, con área desalineada.
+      registro({ hoja: '2026', fila: 4, radicado: '68745-0-26-0003', tipo: 'LRC', area: 'CRA 4 # 2-21' }),
+      // En cuarentena, con dirección = municipio (descartada).
+      registro({ hoja: '2026', fila: 5, radicado: '68745-0-26-0004', tipo: 'LRC', direccion: 'SIMACOTA' }),
+    ]), AHORA, { estados: TABLA_ESTADOS_CON_MAPEADO });
+
+    expect(plan.datosPredio.conMatriculaInmobiliaria).toBe(1);
+    expect(plan.datosPredio.conBarrioVereda).toBe(1);
+    expect(plan.datosPredio.descartes.areaDesalineada).toBe(1);
+    expect(plan.datosPredio.descartes.direccionEsMunicipio).toBe(1);
+    expect(plan.datosPredio.filasAreaDesalineada).toEqual([
+      { radicado: '68745-0-26-0003', hoja: '2026', fila: 4, valorOriginal: 'CRA 4 # 2-21' },
+    ]);
+  });
+
+  it('AREA_DESALINEADA NUNCA es motivo de cuarentena por sí sola (predio es ortogonal a P1′/P4′/fecha/identidad)', () => {
+    const plan = planificarImportacion(
+      snapshot([registro({ tipo: 'LC', estado: 'CERRADO-SINTETICO', solicitanteDocumento: '1', area: 'CRA 4 # 2-21' })]),
+      AHORA,
+      { estados: TABLA_ESTADOS_CON_MAPEADO },
+    );
+    expect(plan.reconciliacion.planificados).toBe(1);
+    expect(plan.cuarentena).toHaveLength(0);
+    expect(plan.expedientes[0]!.predio).toBeUndefined();
+    expect(plan.datosPredio.descartes.areaDesalineada).toBe(1);
   });
 });

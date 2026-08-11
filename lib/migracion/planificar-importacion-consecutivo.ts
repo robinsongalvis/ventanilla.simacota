@@ -69,13 +69,13 @@
 import {
   EQUIVALENCIAS_MIGRACION_SEMILLA_LICENCIAS,
 } from '@/lib/motor-expedientes/catalogo-subtipos-normativo';
-import { resolverEquivalencia } from '@/lib/motor-expedientes/equivalencia-migracion';
+import { resolverEquivalencia, normalizarTextoHistorico } from '@/lib/motor-expedientes/equivalencia-migracion';
 import {
   EQUIVALENCIAS_ESTADOS_OPERATIVOS_SEMILLA,
   resolverEstadoOperativo,
 } from './equivalencia-estados-operativos';
 import type { EstadoJuridicoLicencia } from '@/lib/motor-expedientes/estados-licencia';
-import type { EstadoExpediente } from '@/lib/motor-expedientes/tipos';
+import type { EstadoExpediente, DatosPredio } from '@/lib/motor-expedientes/tipos';
 // Import type-only (se borra en compilación, CERO acoplamiento en tiempo de
 // ejecución con `lib/server/`): reutiliza la forma exacta del documento que
 // ya escriben las demás rutas de expedientes, sin duplicar la interfaz.
@@ -91,12 +91,32 @@ export interface RegistroConsecutivoHistorico {
   radicado: string;
   fechaSolicitud: string;
   tipo: string;
+  /** Ver `mapearPredioHistorico` — descartado si, normalizado, vale literalmente el nombre del municipio ("SIMACOTA"), que es el 100% de lo observado en las 54/202 filas reales que traen este campo. */
   direccion?: string;
+  /** Ver `mapearPredioHistorico` — texto libre, se conserva verbatim (el libro mezcla veredas reales y al menos una dirección urbana bajo esta misma columna). */
   barrioVereda?: string;
   estado?: string;
+  /** Ver `mapearPredioHistorico` — solo se aprovecha si calza el patrón de matrícula inmobiliaria; el resto se descarta. */
   matricula?: string;
+  /** Ver `mapearPredioHistorico` — la columna real está DESALINEADA con direcciones y veredas; solo se aprovecha lo que contiene una unidad de área reconocible. */
   area?: string;
   noLicencia?: string;
+  /**
+   * Marca de "tiene correcciones" del libro histórico (3/202 filas, valores
+   * observados: `"X"`/`"x"` — un checkbox sin contenido textual, nunca una
+   * nota explicativa). FUERA DE ALCANCE de este planificador a propósito:
+   * modelarlo de forma útil (una nota histórica real) exigiría escribir a
+   * la subcolección `observaciones` del expediente, lo que cambiaría la
+   * FORMA de `PlanImportacion` (hoy solo produce `expedientes:
+   * ExpedienteLicenciaDoc[]`, documentos raíz) y del ejecutor `.mjs` que lo
+   * consume — una ampliación estructural que no se justifica hoy para un
+   * campo presente en el 1.5% de los registros y sin contenido más allá de
+   * "sí/no". Se conserva el campo en el tipo (fidelidad con la fuente) pero
+   * NINGUNA función de este archivo lo lee; decisión a revisar si el
+   * ingeniero de Planeación confirma que el libro SÍ tiene el detalle de la
+   * corrección en otra parte (p. ej. el Excel original, fuera de este
+   * snapshot).
+   */
   correcciones?: string;
   /**
    * Nombre del solicitante. OPCIONAL (remediación PII, ago-2026): el
@@ -176,11 +196,52 @@ export interface Reconciliacion {
   colisiones: number;
 }
 
+/**
+ * Una fila cuya columna "area" del libro histórico NO parece un área (no
+ * contiene una unidad reconocible) — se reporta con hoja/fila/radicado para
+ * que el ingeniero de Planeación la ubique y corrija en el origen. NO es
+ * motivo de cuarentena del registro (ver `mapearPredioHistorico`).
+ */
+export interface FilaAreaDesalineada {
+  radicado: string;
+  hoja: string;
+  fila: number;
+  /** Valor original tal como venía en la columna "area", sin normalizar. */
+  valorOriginal: string;
+}
+
+/**
+ * Reconciliación AMPLIADA (TAREA 3) de los datos de predio, calculada sobre
+ * TODO el snapshot (`totalSnapshot` registros) — el predio es ortogonal a
+ * las puertas P1′/P4′/fecha/identidad, así que estos conteos se acumulan
+ * sin importar si el registro terminó importado o en cuarentena. Ver
+ * `mapearPredioHistorico` para la decisión campo por campo.
+ */
+export interface ReconciliacionPredio {
+  /** Cuántos de `totalSnapshot` registros aportan cada campo de predio APROVECHABLE (tras el mapeo honesto, no crudo). */
+  conDireccion: number;
+  conBarrioVereda: number;
+  conMatriculaInmobiliaria: number;
+  conAreaTexto: number;
+  descartes: {
+    /** `direccion` presente pero descartada por valer literalmente el nombre del municipio. */
+    direccionEsMunicipio: number;
+    /** `matricula` presente pero con formato que no calza `NNN-NNNNN`. */
+    matriculaFormatoInvalido: number;
+    /** `area` presente pero sin unidad de área reconocible (columna desalineada). */
+    areaDesalineada: number;
+  };
+  /** Detalle de cada descarte AREA_DESALINEADA, con ubicación en el libro. */
+  filasAreaDesalineada: FilaAreaDesalineada[];
+}
+
 export interface PlanImportacion {
   /** Documentos COMPLETOS, listos para `tx.create`/`batch.set` — el ejecutor no decide nada más. */
   expedientes: ExpedienteLicenciaDoc[];
   cuarentena: RegistroEnCuarentena[];
   reconciliacion: Reconciliacion;
+  /** Reconciliación ampliada de datos de predio (TAREA 3) — ver `ReconciliacionPredio`. */
+  datosPredio: ReconciliacionPredio;
   advertencias: string[];
 }
 
@@ -240,6 +301,128 @@ export function parsearFechaHistoricaANoonISO(texto: string | undefined | null):
 function estadoOperativoDesdeJuridico(estadoJuridico: EstadoJuridicoLicencia): EstadoExpediente {
   const CERRADOS: readonly EstadoJuridicoLicencia[] = ['CONCEDIDA', 'NEGADA', 'DESISTIDA', 'NOTIFICADA', 'EN_FIRME'];
   return CERRADOS.includes(estadoJuridico) ? 'ARCHIVADO' : 'EN_REVISION';
+}
+
+/* ──────────────────────────────────────────────
+   Mapeo HONESTO del predio histórico (TAREAS 1-3)
+────────────────────────────────────────────── */
+
+/**
+ * Círculo registral (3 dígitos) + folio de matrícula inmobiliaria (4 a 8
+ * dígitos). Verificado contra las 11/202 matrículas reales del snapshot
+ * (círculo `321` de Simacota, folios de 4 a 5 dígitos) — el techo de 8 da
+ * margen sin inventar una cota arbitraria más laxa que "cualquier número
+ * con un guion". Cualquier valor que no calce (vacío, texto, u otro
+ * formato) se descarta con `MATRICULA_FORMATO_INVALIDO`, nunca se fuerza.
+ */
+const RE_MATRICULA_INMOBILIARIA = /^\d{3}-\d{4,8}$/;
+
+/**
+ * El texto trae una unidad de área reconocible (hectáreas "HA" o metros
+ * cuadrados "M2") como TOKEN completo. `\b` es deliberado: sin él, la
+ * subcadena "HA" aparece dentro de "EL CHANCE" (un valor REAL de la columna
+ * "area" del snapshot, hoja "2025") y lo clasificaría como área por error;
+ * con límites de palabra, "CHANCE" no calza porque la "H" está pegada a la
+ * "C" anterior (no hay frontera de palabra ahí). Insensible a mayúsculas y
+ * a la cantidad de espacios alrededor del token.
+ */
+const RE_UNIDAD_AREA = /\b(HA|M2)\b/i;
+
+/** Único valor observado en las 54/202 filas reales que traen `direccion` — es el nombre del MUNICIPIO, no una dirección (ver `mapearPredioHistorico`). */
+const MUNICIPIO_SIN_DIRECCION = 'SIMACOTA';
+
+export type MotivoDescartePredio = 'MATRICULA_FORMATO_INVALIDO' | 'DIRECCION_ES_MUNICIPIO' | 'AREA_DESALINEADA';
+
+export interface DescartePredio {
+  campo: 'matriculaInmobiliaria' | 'direccion' | 'areaTexto';
+  motivo: MotivoDescartePredio;
+  /** Valor original tal como venía en el histórico, verbatim (sin normalizar) — para que el ingeniero lo ubique en su libro. */
+  valorOriginal: string;
+}
+
+export interface ResultadoMapeoPredio {
+  /**
+   * `undefined` si NINGÚN campo resultó aprovechable — ausencia declarada,
+   * NUNCA penalizada (no es motivo de cuarentena). Cuando al menos un campo
+   * se aprovecha, el objeto solo trae esos campos — nada se rellena por los
+   * descartados.
+   */
+  predio?: DatosPredio;
+  descartes: DescartePredio[];
+}
+
+/**
+ * Mapeo HONESTO del predio de UN registro histórico — PURA, sin I/O, sin
+ * normalizar ni inventar ningún valor ausente. Decide, campo por campo, si
+ * el dato del libro es aprovechable tal cual o se descarta con un motivo
+ * explícito (ver `MotivoDescartePredio`):
+ *
+ *  - `matricula` → `matriculaInmobiliaria` SOLO si calza
+ *    `RE_MATRICULA_INMOBILIARIA`. Las 11/202 matrículas reales del
+ *    snapshot son consistentes con ese patrón; cualquier otra cosa se
+ *    descarta (`MATRICULA_FORMATO_INVALIDO`) en vez de forzarla.
+ *  - `barrioVereda` → `barrioVereda` VERBATIM, texto libre. El libro
+ *    mezcla veredas reales ("SANTA BARBARA", "LA AGUADA") con al menos una
+ *    dirección urbana ("CRA 3 No. 4") bajo la misma columna — no hay señal
+ *    estructural para separarlas sin inventar una regla, así que se
+ *    conserva tal cual (el nombre del campo ya declara que es mixto).
+ *  - `direccion` → SE DESCARTA (`DIRECCION_ES_MUNICIPIO`) si, normalizado
+ *    (`normalizarTextoHistorico`), es exactamente "SIMACOTA": el 100% de
+ *    las 54/202 filas reales que traen este campo valen literalmente eso
+ *    — es el MUNICIPIO, no una dirección, dato inútil. Si algún registro
+ *    trajera otra cosa, se conserva verbatim (el campo no está roto en sí
+ *    mismo, solo su único valor observado hasta hoy lo es).
+ *  - `area` → `areaTexto` SOLO si el texto contiene una unidad de área
+ *    reconocible (`RE_UNIDAD_AREA`). La columna real está DESALINEADA
+ *    (16/202): unos valores son áreas de verdad ("48 HA 2469 M2") y otros
+ *    son direcciones ("CRA 4 # 2-21") o veredas ("AGUA BLANCA") que se
+ *    colaron en la columna equivocada. Lo que no parece área se descarta
+ *    (`AREA_DESALINEADA`) — `planificarImportacion` acumula estos descartes
+ *    con hoja/fila en `PlanImportacion.datosPredio.filasAreaDesalineada`
+ *    para que el ingeniero corrija su libro en el origen. Esto NUNCA es
+ *    motivo de cuarentena del registro: el predio es ortogonal a las
+ *    puertas P1′/P4′/fecha/identidad.
+ *
+ * `noLicencia` y `correcciones` NO se mapean aquí — `noLicencia` alimenta
+ * `actoFinal.numero` (un dato del ACTO, no del predio; ver
+ * `planificarImportacion`) y `correcciones` queda fuera de alcance (ver su
+ * JSDoc en `RegistroConsecutivoHistorico`).
+ */
+export function mapearPredioHistorico(registro: RegistroConsecutivoHistorico): ResultadoMapeoPredio {
+  const descartes: DescartePredio[] = [];
+  const predio: DatosPredio = {};
+
+  if (registro.matricula && registro.matricula.trim().length > 0) {
+    const valor = registro.matricula.trim();
+    if (RE_MATRICULA_INMOBILIARIA.test(valor)) {
+      predio.matriculaInmobiliaria = valor;
+    } else {
+      descartes.push({ campo: 'matriculaInmobiliaria', motivo: 'MATRICULA_FORMATO_INVALIDO', valorOriginal: registro.matricula });
+    }
+  }
+
+  if (registro.barrioVereda && registro.barrioVereda.trim().length > 0) {
+    predio.barrioVereda = registro.barrioVereda.trim();
+  }
+
+  if (registro.direccion && registro.direccion.trim().length > 0) {
+    if (normalizarTextoHistorico(registro.direccion) === MUNICIPIO_SIN_DIRECCION) {
+      descartes.push({ campo: 'direccion', motivo: 'DIRECCION_ES_MUNICIPIO', valorOriginal: registro.direccion });
+    } else {
+      predio.direccion = registro.direccion.trim();
+    }
+  }
+
+  if (registro.area && registro.area.trim().length > 0) {
+    const valor = registro.area.trim();
+    if (RE_UNIDAD_AREA.test(valor)) {
+      predio.areaTexto = valor;
+    } else {
+      descartes.push({ campo: 'areaTexto', motivo: 'AREA_DESALINEADA', valorOriginal: registro.area });
+    }
+  }
+
+  return { predio: Object.keys(predio).length > 0 ? predio : undefined, descartes };
 }
 
 /**
@@ -308,6 +491,18 @@ export function planificarImportacion(
   let algunoSinDocumento = false;
   const filasSinFecha: string[] = [];
 
+  // Reconciliación ampliada de predio (TAREA 3) — acumulada sobre TODO el
+  // snapshot, sin importar si el registro termina importado o en
+  // cuarentena (ver JSDoc de `ReconciliacionPredio`).
+  let conDireccion = 0;
+  let conBarrioVereda = 0;
+  let conMatriculaInmobiliaria = 0;
+  let conAreaTexto = 0;
+  let descartesDireccionEsMunicipio = 0;
+  let descartesMatriculaFormatoInvalido = 0;
+  let descartesAreaDesalineada = 0;
+  const filasAreaDesalineada: FilaAreaDesalineada[] = [];
+
   for (const r of registros) {
     const motivos: MotivoCuarentena[] = [];
     const detalle: string[] = [];
@@ -349,6 +544,22 @@ export function planificarImportacion(
         detalle.push('Falta el nombre del solicitante (retirado en la versión sanitizada que corre en CI — Ley 1581/2012; presente solo en la versión local con datos personales); "solicitanteNombre" es obligatorio en el modelo.');
       } else {
         detalle.push('El libro histórico no registra número de documento del solicitante; "solicitanteDocumento" es obligatorio en el modelo y no puede completarse sin inventar un valor.');
+      }
+    }
+
+    // Predio (TAREA 3): se calcula para TODO registro, sin importar el
+    // destino (importado o cuarentena) — ortogonal a las puertas de arriba.
+    const { predio, descartes: descartesPredio } = mapearPredioHistorico(r);
+    if (predio?.direccion) conDireccion++;
+    if (predio?.barrioVereda) conBarrioVereda++;
+    if (predio?.matriculaInmobiliaria) conMatriculaInmobiliaria++;
+    if (predio?.areaTexto) conAreaTexto++;
+    for (const d of descartesPredio) {
+      if (d.motivo === 'DIRECCION_ES_MUNICIPIO') descartesDireccionEsMunicipio++;
+      if (d.motivo === 'MATRICULA_FORMATO_INVALIDO') descartesMatriculaFormatoInvalido++;
+      if (d.motivo === 'AREA_DESALINEADA') {
+        descartesAreaDesalineada++;
+        filasAreaDesalineada.push({ radicado: r.radicado, hoja: r.hoja, fila: r.fila, valorOriginal: d.valorOriginal });
       }
     }
 
@@ -409,7 +620,16 @@ export function planificarImportacion(
         hoja: r.hoja,
         fila: r.fila,
       },
-      actoFinal: { cierreDesconocido: true },
+      // `cierreDesconocido: true` se mantiene aunque `numero` esté presente:
+      // `validarCierreExpediente` (`./estados-licencia.ts`) exige numero Y
+      // fecha Y fechaFirmeza para considerar el acto COMPLETO — el libro
+      // histórico nunca trae las dos últimas, así que el acto sigue
+      // incompleto aunque conozcamos el número de licencia.
+      actoFinal: {
+        cierreDesconocido: true,
+        ...(r.noLicencia && r.noLicencia.trim().length > 0 ? { numero: r.noLicencia.trim() } : {}),
+      },
+      ...(predio ? { predio } : {}),
       esPrueba: false,
     };
     expedientes.push(expediente);
@@ -436,6 +656,18 @@ export function planificarImportacion(
       planificados: expedientes.length,
       enCuarentena: cuarentena.length,
       colisiones,
+    },
+    datosPredio: {
+      conDireccion,
+      conBarrioVereda,
+      conMatriculaInmobiliaria,
+      conAreaTexto,
+      descartes: {
+        direccionEsMunicipio: descartesDireccionEsMunicipio,
+        matriculaFormatoInvalido: descartesMatriculaFormatoInvalido,
+        areaDesalineada: descartesAreaDesalineada,
+      },
+      filasAreaDesalineada,
     },
     advertencias,
   };
@@ -478,6 +710,35 @@ export function generarReporteDryRun(plan: PlanImportacion): string {
   }
   lineas.push(`- **Colisión de radicado** (ya contadas arriba, no es un motivo de cuarentena aparte): ${plan.cuarentena.filter((c) => c.colision).length} registro(s) en cuarentena que además colisionan`);
   lineas.push('');
+
+  lineas.push('## Datos de predio');
+  lineas.push('');
+  lineas.push(
+    `Calculado sobre los **${plan.reconciliacion.totalSnapshot}** registros del snapshot completo — el predio es `
+    + 'ortogonal a las puertas P1′/P4′/fecha/identidad, así que un registro en cuarentena por otro motivo igual '
+    + 'cuenta aquí si su columna de predio es aprovechable. Ningún dato de predio ausente o descartado es motivo '
+    + 'de cuarentena por sí mismo.',
+  );
+  lineas.push('');
+  lineas.push(`- Con dirección aprovechable: **${plan.datosPredio.conDireccion}**`);
+  lineas.push(`- Con barrio/vereda: **${plan.datosPredio.conBarrioVereda}**`);
+  lineas.push(`- Con matrícula inmobiliaria válida: **${plan.datosPredio.conMatriculaInmobiliaria}**`);
+  lineas.push(`- Con área (texto) reconocible: **${plan.datosPredio.conAreaTexto}**`);
+  lineas.push(`- Descartados — dirección = nombre del municipio, no es una dirección real: **${plan.datosPredio.descartes.direccionEsMunicipio}**`);
+  lineas.push(`- Descartados — matrícula con formato irreconocible: **${plan.datosPredio.descartes.matriculaFormatoInvalido}**`);
+  lineas.push(`- Descartados — área desalineada (columna con dirección/vereda en vez de área): **${plan.datosPredio.descartes.areaDesalineada}**`);
+  lineas.push('');
+
+  if (plan.datosPredio.filasAreaDesalineada.length > 0) {
+    lineas.push('### Filas con AREA_DESALINEADA (corregir la columna "area" en el libro de origen)');
+    lineas.push('');
+    lineas.push('| Radicado | Hoja | Fila | Valor original |');
+    lineas.push('|---|---|---|---|');
+    for (const f of plan.datosPredio.filasAreaDesalineada) {
+      lineas.push(`| ${f.radicado} | ${f.hoja} | ${f.fila} | ${f.valorOriginal} |`);
+    }
+    lineas.push('');
+  }
 
   if (plan.advertencias.length > 0) {
     lineas.push('## Advertencias');
