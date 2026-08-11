@@ -21,9 +21,42 @@
 
 import type { ExpedienteLicenciaDoc } from '@/lib/server/expedientes-licencias';
 import type { EstadoJuridicoLicencia } from '@/lib/motor-expedientes/estados-licencia';
+import type { OrigenActuacion } from '@/lib/motor-expedientes/tipos';
+import { calcularVencimientoVigencia, esErrorVigencia } from '@/lib/motor-expedientes/vigencias';
+import { EQUIVALENCIAS_MIGRACION_SEMILLA_LICENCIAS } from '@/lib/motor-expedientes/catalogo-subtipos-normativo';
+import { normalizarTextoHistorico } from '@/lib/motor-expedientes/equivalencia-migracion';
+import { diasRestantesHabiles } from '@/lib/tiempos-radicado';
 import { ESTILOS_ESTADO_JURIDICO } from './estilos-estado-juridico';
 import { nombreSubtipo } from './presentacion-subtipos';
 import { formatFechaColombia, safeDate, TIMEZONE_COLOMBIA } from '@/lib/fecha-colombia';
+
+/**
+ * Umbral "por vencer" del Libro — MISMO valor y MISMA justificación que
+ * `UMBRAL_POR_VENCER_DIAS_HABILES` (`./fixtures.ts`, SUPUESTO EXPLÍCITO
+ * Principio 13, sin validar con Planeación todavía). Se declara aparte en
+ * vez de importarlo: `fixtures.ts` es el módulo de los FIXTURES de la
+ * Fase 1 (Actuacion[] de juguete) — importarlo desde aquí acoplaría este
+ * módulo de datos reales a ese archivo de demo por una sola constante.
+ * Mismo número, mismo criterio; si Planeación valida un umbral distinto,
+ * este es el único punto a cambiar para el Libro.
+ */
+export const UMBRAL_POR_VENCER_DIAS_HABILES_LIBRO = 5;
+
+/**
+ * Partición de `EstadoJuridicoLicencia` para el KPI/filtro "En trámite" del
+ * Libro — MISMO criterio que `ESTADOS_EN_TRAMITE` de `BandejaLicenciasClient.tsx`
+ * (no importado desde ahí a propósito: ese archivo es un Client Component
+ * que arrastra sus propios modales/imports; este módulo debe seguir siendo
+ * PURO, sin React — mismo principio que ya declara el JSDoc de cabecera).
+ * SUPUESTO EXPLÍCITO (Principio 13), igual que en la Bandeja: sin guía
+ * operativa validada con Planeación para agrupar los 9 estados jurídicos.
+ */
+const ESTADOS_EN_TRAMITE_LIBRO: readonly EstadoJuridicoLicencia[] = [
+  'RADICADA_EN_DEBIDA_FORMA',
+  'EN_REVISION',
+  'CON_ACTA_DE_OBSERVACIONES',
+  'EN_VIABILIDAD',
+];
 
 /** Fila de presentación del Libro Consecutivo — una por expediente. */
 export interface FilaLibroConsecutivo {
@@ -34,14 +67,115 @@ export interface FilaLibroConsecutivo {
   fechaRadicacion: string;
   solicitanteNombre: string;
   solicitanteDocumento: string;
-  /** Nombres legibles de los subtipos declarados, en el orden del expediente — p. ej. `['Licencia de construcción']`. */
+  /** Nombres legibles de los subtipos declarados, en el orden del expediente — p. ej. `['Licencia de construcción']`. INTOCADO (fuente del CSV, `generarCsvLibroConsecutivo`) — para códigos crudos usar `subtipoCodigos`. */
   subtipos: string[];
+  /** Códigos crudos de `exp.subtipos`, MISMO orden que `subtipos` — insumo del rediseño (chip de cuarentena, cómputo de vigencia); el CSV nunca lee este campo. */
+  subtipoCodigos: string[];
   estadoJuridico: EstadoJuridicoLicencia;
   /** `actoFinal.numero` — `null` si el expediente aún no cierra (H5: hoy la норма, no la excepción). */
   numeroLicencia: string | null;
   /** ISO 8601 de `actoFinal.fechaFirmeza` — `null` si no hay (DF-6: dispara vigencias, casi siempre ausente hoy). */
   fechaFirmeza: string | null;
   esPrueba: boolean;
+  /** `Expediente.origen` (`REAL` por defecto — mismo default que usa `DetalleLicenciaClient`). */
+  origen: OrigenActuacion;
+  /**
+   * Espejo denormalizado que el servidor persiste en el documento raíz del
+   * expediente, en la MISMA transacción que cada actuación (ver su JSDoc en
+   * `lib/server/expedientes-licencias.ts`): así la bandeja lo trae sin
+   * lecturas extra de la subcolección `actuaciones` (R11, evita N+1).
+   * `null` cuando el servidor no pudo proyectar término — expedientes
+   * escritos antes de que el campo existiera, y RECONSTRUIDOS, cuyas
+   * actuaciones no mueven relojes legales (R9). En ambos casos la columna
+   * se ve honestamente vacía ("—"): NUNCA se recalcula aquí (el cómputo
+   * real es `derivarEventosTermino`/`calcularVencimientoDual`, del
+   * servidor) ni se inventa un valor.
+   */
+  fechaAlertaConservadora: string | null;
+  /** Vencimiento de la vigencia del acto — ver `calcularVigenciaHastaLibro`. `null` sin `actoFinal.fechaFirmeza` (la vigencia no corre todavía) o si el régimen no se puede resolver (p. ej. falta modalidad). */
+  vigenciaHasta: string | null;
+  /** Motivo técnico cuando `fechaFirmeza` existe pero `vigenciaHasta` no se pudo calcular — solo para tooltip, nunca se imprime como dato. */
+  vigenciaHastaError?: string;
+  /** `true` si `solicitanteDocumento` viene vacío/en blanco — dato faltante honesto (histórico reconstruido, R6), nunca inventado. */
+  faltaCedula: boolean;
+  /** `true` si `estadoJuridico` no es uno de los 9 valores conocidos (`ESTILOS_ESTADO_JURIDICO`) — defensivo: el documento real puede no cumplir el tipo TS en tiempo de ejecución (dato legado/corrupto). */
+  faltaEstadoJuridico: boolean;
+}
+
+/** `true` si el valor es un string vacío/solo espacios (o no es string) — mismo criterio de "faltante" para cédula y demás campos de texto de la fila. */
+function estaVacio(valor: unknown): boolean {
+  return typeof valor !== 'string' || valor.trim().length === 0;
+}
+
+/**
+ * Vencimiento de la vigencia del acto para una fila del Libro:
+ *  1. Sin `fechaFirmeza` → `null` (la vigencia no corre todavía — nunca se
+ *     promete un plazo sin firmeza).
+ *  2. Con `actoFinal.vigenciaHasta` YA persistido (`ActoFinalExpediente.
+ *     vigenciaHasta`, `lib/motor-expedientes/tipos.ts`) → se usa tal cual,
+ *     es el dato real más autorizado que existe.
+ *  3. `actoFinal.cierreDesconocido` (migración sin detalle confiable) → no
+ *     se calcula: el JSDoc de `calcularVencimientoVigencia` es explícito en
+ *     que esos casos "no tienen fechaFirmeza confiable".
+ *  4. En cualquier otro caso, se deriva con la MISMA función pura que ya
+ *     usa el servidor para `computos.vigencia` (`GET .../[id]/route.ts`) y
+ *     con los MISMOS insumos (`fechaFirmeza` + `subtipos`, sin
+ *     `modalidadConstruccion` — dato que ningún expediente captura hoy) —
+ *     cero divergencia posible entre lo que ve el Libro y lo que ve el
+ *     Detalle, porque es literalmente la misma llamada.
+ */
+function calcularVigenciaHastaLibro(exp: ExpedienteLicenciaDoc): { fecha: string | null; error?: string } {
+  const fechaFirmeza = exp.actoFinal?.fechaFirmeza;
+  if (!fechaFirmeza) return { fecha: null };
+  if (exp.actoFinal?.vigenciaHasta) return { fecha: exp.actoFinal.vigenciaHasta };
+  if (exp.actoFinal?.cierreDesconocido) return { fecha: null };
+
+  const resultado = calcularVencimientoVigencia({ fechaFirmeza, subtipos: exp.subtipos ?? [] });
+  if (esErrorVigencia(resultado)) {
+    return { fecha: null, error: resultado.mensaje };
+  }
+  return { fecha: resultado.vencimiento.toISOString() };
+}
+
+/**
+ * Textos históricos en CUARENTENA (`EQUIVALENCIAS_MIGRACION_SEMILLA_LICENCIAS`,
+ * `lib/motor-expedientes/catalogo-subtipos-normativo.ts`, DF-4/ADR-0029) —
+ * normalizados una sola vez a nivel de módulo. `resolverEquivalencia` de
+ * `lib/motor-expedientes/equivalencia-migracion.ts` no distingue "en
+ * cuarentena" de "no está en la tabla" (ambos devuelven `null`, correcto
+ * para SU propósito: ninguno de los dos se resuelve); el Libro sí necesita
+ * esa distinción para marcar visualmente "pendiente de identificar" en vez
+ * de tratarlo como un código cualquiera — de ahí este set aparte, en vez de
+ * reutilizar `resolverEquivalencia` directamente.
+ */
+const TEXTOS_HISTORICOS_EN_CUARENTENA = new Set(
+  EQUIVALENCIAS_MIGRACION_SEMILLA_LICENCIAS.filter((f) => f.estado === 'CUARENTENA').map((f) =>
+    normalizarTextoHistorico(f.textoHistorico),
+  ),
+);
+
+/**
+ * `true` si `codigo` (un elemento de `Expediente.subtipos`) coincide con un
+ * texto histórico marcado en CUARENTENA — HOY (antes de la migración
+ * Fase 5) ningún expediente real puede tener esto, porque una fila en
+ * cuarentena mapea a `codigos: []` (nada que guardar); es una defensa hacia
+ * adelante para cuando la migración exista, y lo que este bloque pide
+ * probar explícitamente con datos sintéticos ("datos feos").
+ */
+export function esSubtipoEnCuarentena(codigo: string): boolean {
+  return TEXTOS_HISTORICOS_EN_CUARENTENA.has(normalizarTextoHistorico(codigo));
+}
+
+/** Un subtipo de la fila, ya resuelto a nombre legible + bandera de cuarentena — insumo directo de la columna "Tipo" compacta. */
+export interface SubtipoLibro {
+  codigo: string;
+  nombre: string;
+  enCuarentena: boolean;
+}
+
+/** Resuelve `subtipoCodigos` de una fila a la forma que consume la tabla — separado de `FilaLibroConsecutivo.subtipos` (que debe seguir siendo `string[]` para no tocar el CSV). */
+export function subtiposConEstadoLibro(codigos: readonly string[]): SubtipoLibro[] {
+  return codigos.map((codigo) => ({ codigo, nombre: nombreSubtipo(codigo), enCuarentena: esSubtipoEnCuarentena(codigo) }));
 }
 
 /**
@@ -94,19 +228,154 @@ export function construirFilasLibroConsecutivo(
 ): FilaLibroConsecutivo[] {
   return expedientes
     .filter((exp) => añoRadicacionColombia(exp.creadoEn) === año)
-    .map((exp) => ({
-      id: exp.id,
-      numeroExpediente: numeroExpedienteTexto(exp),
-      fechaRadicacion: exp.creadoEn,
-      solicitanteNombre: exp.solicitanteNombre,
-      solicitanteDocumento: exp.solicitanteDocumento,
-      subtipos: (exp.subtipos ?? []).map(nombreSubtipo),
-      estadoJuridico: exp.estadoJuridico,
-      numeroLicencia: exp.actoFinal?.numero ?? null,
-      fechaFirmeza: exp.actoFinal?.fechaFirmeza ?? null,
-      esPrueba: exp.esPrueba === true,
-    }))
+    .map((exp) => {
+      const subtipoCodigos = [...(exp.subtipos ?? [])];
+      const vigencia = calcularVigenciaHastaLibro(exp);
+      // Espejo denormalizado que el servidor persiste en el documento raíz
+      // (ver su JSDoc en `lib/server/expedientes-licencias.ts`): la bandeja
+      // lo trae sin lecturas extra (R11). Tres casos, colapsados aquí a
+      // `null` porque la presentación los muestra igual ("—"): ausente
+      // (expediente escrito antes del campo), `null` (sin ancla de
+      // radicación real — típicamente RECONSTRUIDO, R9) y fecha ISO.
+      const fechaAlertaConservadora = exp.fechaAlertaConservadora ?? null;
+      return {
+        id: exp.id,
+        numeroExpediente: numeroExpedienteTexto(exp),
+        fechaRadicacion: exp.creadoEn,
+        solicitanteNombre: exp.solicitanteNombre,
+        solicitanteDocumento: exp.solicitanteDocumento,
+        subtipos: subtipoCodigos.map(nombreSubtipo),
+        subtipoCodigos,
+        estadoJuridico: exp.estadoJuridico,
+        numeroLicencia: exp.actoFinal?.numero ?? null,
+        fechaFirmeza: exp.actoFinal?.fechaFirmeza ?? null,
+        esPrueba: exp.esPrueba === true,
+        origen: exp.origen ?? 'REAL',
+        fechaAlertaConservadora,
+        vigenciaHasta: vigencia.fecha,
+        vigenciaHastaError: vigencia.error,
+        faltaCedula: estaVacio(exp.solicitanteDocumento),
+        faltaEstadoJuridico: estaVacio(exp.estadoJuridico) || !((exp.estadoJuridico as string) in ESTILOS_ESTADO_JURIDICO),
+      };
+    })
     .sort((a, b) => a.numeroExpediente.localeCompare(b.numeroExpediente, 'es', { numeric: true }));
+}
+
+/* ══════════════════════════════════════════════════════════════
+   KPIs, filtros y urgencia — rediseño del Libro (tabla densa + panel
+   lateral). Funciones PURAS, todas deterministas sobre `FilaLibroConsecutivo[]`
+   ya construidas; ninguna hace fetch ni depende de React.
+══════════════════════════════════════════════════════════════ */
+
+export type UrgenciaFilaLibro = 'VENCIDO' | 'POR_VENCER' | 'EN_TERMINO' | 'NEUTRO';
+
+/**
+ * Banda de urgencia de una fila, por `fechaAlertaConservadora` — MISMO
+ * criterio de umbral que el resto del módulo (`diasRestantesHabiles` +
+ * `UMBRAL_POR_VENCER_DIAS_HABILES_LIBRO`). `NEUTRO` cubre tanto "sin dato"
+ * (campo ausente/no implementado todavía) como cualquier expediente sin
+ * ancla de término — nunca se distingue una cosa de la otra con un color de
+ * urgencia, ambas se ven igual de neutras ("—"). `hoy` es parámetro (no
+ * `new Date()` implícito) para que el cálculo sea determinista en pruebas,
+ * mismo patrón que `diasRestantesHabiles`.
+ */
+export function urgenciaFilaLibro(
+  fila: Pick<FilaLibroConsecutivo, 'fechaAlertaConservadora'>,
+  hoy: Date = new Date(),
+): UrgenciaFilaLibro {
+  if (!fila.fechaAlertaConservadora) return 'NEUTRO';
+  const dias = diasRestantesHabiles(fila.fechaAlertaConservadora, hoy);
+  if (dias < 0) return 'VENCIDO';
+  if (dias <= UMBRAL_POR_VENCER_DIAS_HABILES_LIBRO) return 'POR_VENCER';
+  return 'EN_TERMINO';
+}
+
+/** Token de color (`app/globals.css`) por banda de urgencia — franja lateral de la fila y color del texto de la columna "Vence". */
+export const COLOR_URGENCIA_LIBRO: Record<UrgenciaFilaLibro, string> = {
+  VENCIDO: 'var(--color-danger)',
+  POR_VENCER: 'var(--color-warning)',
+  EN_TERMINO: 'var(--color-success)',
+  NEUTRO: 'var(--color-border)',
+};
+
+/**
+ * "Histórico incompleto" = expediente `RECONSTRUIDO` (migrado) al que le
+ * falta cédula o estado jurídico — SUPUESTO EXPLÍCITO (Principio 13, mismo
+ * criterio que `ESTADOS_EN_TRAMITE_LIBRO`): el KPI se llama "Históricos
+ * incompletos", no "Filas incompletas" — un expediente `REAL` con un dato
+ * vacío (anomalía, no lo esperado) igual se marca en la fila con
+ * `EtiquetaDatoFaltante` (honestidad universal), pero no infla este
+ * conteo, que es específicamente sobre la calidad del histórico migrado.
+ */
+export function esHistoricoIncompletoLibro(
+  fila: Pick<FilaLibroConsecutivo, 'origen' | 'faltaCedula' | 'faltaEstadoJuridico'>,
+): boolean {
+  return fila.origen === 'RECONSTRUIDO' && (fila.faltaCedula || fila.faltaEstadoJuridico);
+}
+
+export type FiltroLibroConsecutivo = 'TODOS' | 'EN_TRAMITE' | 'POR_VENCER' | 'VENCIDOS' | 'HISTORICOS_INCOMPLETOS';
+
+export const FILTROS_LIBRO_CONSECUTIVO: readonly { id: FiltroLibroConsecutivo; etiqueta: string }[] = [
+  { id: 'TODOS', etiqueta: 'Todos' },
+  { id: 'EN_TRAMITE', etiqueta: 'En trámite' },
+  { id: 'POR_VENCER', etiqueta: 'Por vencer' },
+  { id: 'VENCIDOS', etiqueta: 'Vencidos' },
+  { id: 'HISTORICOS_INCOMPLETOS', etiqueta: 'Históricos incompletos' },
+];
+
+/** `true` si `fila` pertenece al balde `filtro` — única fuente de verdad que comparten el filtrado en memoria y los conteos de KPIs/chips (nunca se duplica el criterio). */
+export function coincideFiltroLibro(fila: FilaLibroConsecutivo, filtro: FiltroLibroConsecutivo, hoy: Date = new Date()): boolean {
+  switch (filtro) {
+    case 'TODOS':
+      return true;
+    case 'EN_TRAMITE':
+      return ESTADOS_EN_TRAMITE_LIBRO.includes(fila.estadoJuridico);
+    case 'POR_VENCER':
+      return urgenciaFilaLibro(fila, hoy) === 'POR_VENCER';
+    case 'VENCIDOS':
+      return urgenciaFilaLibro(fila, hoy) === 'VENCIDO';
+    case 'HISTORICOS_INCOMPLETOS':
+      return esHistoricoIncompletoLibro(fila);
+  }
+}
+
+/** Filtrado en memoria (la API ya trae hasta 300 expedientes del tenant, R11 — no hay una segunda llamada por filtro). */
+export function filtrarFilasLibro(
+  filas: readonly FilaLibroConsecutivo[],
+  filtro: FiltroLibroConsecutivo,
+  hoy: Date = new Date(),
+): FilaLibroConsecutivo[] {
+  return filas.filter((f) => coincideFiltroLibro(f, filtro, hoy));
+}
+
+/** Conteo por cada filtro — alimenta el número de cada chip (`ChipFiltroLibro`) sin recorrer `filas` una vez por chip por separado en el componente. */
+export function calcularConteosPorFiltroLibro(
+  filas: readonly FilaLibroConsecutivo[],
+  hoy: Date = new Date(),
+): Record<FiltroLibroConsecutivo, number> {
+  const conteos = {} as Record<FiltroLibroConsecutivo, number>;
+  for (const { id } of FILTROS_LIBRO_CONSECUTIVO) {
+    conteos[id] = filtrarFilasLibro(filas, id, hoy).length;
+  }
+  return conteos;
+}
+
+/** Las 4 cifras de la fila de KPIs — reutiliza `calcularConteosPorFiltroLibro` (mismo criterio que los chips, nunca un segundo cálculo paralelo que pudiera desincronizarse). */
+export interface ConteosKpiLibro {
+  total: number;
+  enTramite: number;
+  porVencer: number;
+  historicosIncompletos: number;
+}
+
+export function calcularConteosKpiLibro(filas: readonly FilaLibroConsecutivo[], hoy: Date = new Date()): ConteosKpiLibro {
+  const porFiltro = calcularConteosPorFiltroLibro(filas, hoy);
+  return {
+    total: porFiltro.TODOS,
+    enTramite: porFiltro.EN_TRAMITE,
+    porVencer: porFiltro.POR_VENCER,
+    historicosIncompletos: porFiltro.HISTORICOS_INCOMPLETOS,
+  };
 }
 
 /** Nombre de archivo del CSV exportado — `libro-consecutivo-licencias-{año}.csv`. */

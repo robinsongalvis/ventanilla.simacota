@@ -5,7 +5,13 @@
    un expediente de licencias y transiciona su `estadoJuridico` según el
    mapa de `lib/motor-expedientes/estados-licencia.ts`. El EFECTO sobre el
    término sigue ⚖️ dual/bloqueado (`lib/motor-expedientes/termino.ts`,
-   hueco 1 ADR-0029) — esta ruta NO calcula ni persiste ningún vencimiento.
+   hueco 1 ADR-0029) — esta ruta NO decide ni persiste ningún vencimiento
+   real, ninguna de las dos políticas. Lo que SÍ recalcula y persiste, en el
+   MISMO batch que la actuación, es el espejo denormalizado
+   `fechaAlertaConservadora` (R11, ver JSDoc en `lib/server/expedientes-
+   licencias.ts`) — la fecha MÁS TEMPRANA entre ambas políticas, para que la
+   bandeja la lea sin N+1. Ese espejo tampoco elige una política: expone la
+   MÁS CONSERVADORA de las dos, el hueco 1 sigue sin default.
 
    Bloque "Integración UI y demo" / Bloque A·A5. Para 'acta-observaciones'
    el body admite el campo opcional `fechaComunicacion` (ISO): si viene, se
@@ -30,6 +36,7 @@ import {
   calcularFechaLimiteRespuestaActa,
   construirActuacionComunicacionEnviada,
   type ExpedienteLicenciaDoc,
+  type ActuacionLicenciaDoc,
 } from '@/lib/server/expedientes-licencias';
 import { buildAvisoActaHtml, buildAvisoActaSubject } from '@/lib/email/templates/aviso-acta-observaciones';
 import { enviarEmail } from '@/lib/email/mailer';
@@ -67,10 +74,12 @@ export async function POST(request: Request, context: RouteContext): Promise<Nex
 
     const body = await request.json().catch(() => null) as { tipo?: string; detalle?: string; fechaComunicacion?: string } | null;
 
-    // Solo se necesita el `tipo` de cada actuación existente para el guard
-    // de acta única — no se traen los documentos completos.
+    // Se traen los documentos COMPLETOS (no solo `tipo`): además del guard
+    // de acta única, `planRegistrarActuacion` recalcula el espejo
+    // `fechaAlertaConservadora` (R11) sobre esta serie + la actuación nueva,
+    // y ese cómputo necesita `fecha`/`origen` de cada actuación previa.
     const actuacionesSnap = await expedienteRef.collection('actuaciones').get();
-    const actuacionesExistentes = actuacionesSnap.docs.map((d) => ({ tipo: String(d.data().tipo ?? '') }));
+    const actuacionesExistentes = actuacionesSnap.docs.map((d) => d.data() as ActuacionLicenciaDoc);
 
     const ahora = new Date();
     const plan = planRegistrarActuacion(
@@ -91,6 +100,10 @@ export async function POST(request: Request, context: RouteContext): Promise<Nex
     batch.update(expedienteRef, {
       estadoJuridico: plan.nuevoEstadoJuridico,
       actualizadoEn: ahora.toISOString(),
+      // Espejo denormalizado (R11) — MISMO batch que la actuación: si la
+      // actuación se escribe, el espejo se actualiza; si el batch falla,
+      // ninguna de las dos queda escrita. Nunca una escritura suelta.
+      fechaAlertaConservadora: plan.fechaAlertaConservadora,
     });
     await batch.commit();
 

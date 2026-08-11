@@ -307,3 +307,100 @@ describe('POST /api/licencias/expedientes/[id]/actuaciones — acta única + tra
     expect(res.status).toBe(403);
   });
 });
+
+/* ══════════════════════════════════════════════════════════════
+   fechaAlertaConservadora — espejo denormalizado (R11, Bloque "Términos y
+   vigencias protectores"). Las aserciones puras de cómputo (coincide con
+   calcularVencimientoDual, se actualiza entre actuaciones, null bajo R9)
+   ya están cubiertas en `expedientes-licencias-decisiones.test.ts` y
+   `expedientes-licencias-handoff-decisiones.test.ts` con `ahora` inyectado
+   y controlado. Aquí, con las rutas REALES corriendo, se cubre lo que solo
+   se puede probar a este nivel: que la escritura queda en el MISMO batch,
+   que la bandeja la expone sin lectura extra, y que — de punta a punta —
+   el valor persistido nunca diverge del cómputo on-read del detalle.
+══════════════════════════════════════════════════════════════ */
+describe('POST /api/licencias/expedientes/[id]/actuaciones — espejo fechaAlertaConservadora, MISMO batch que la actuación', () => {
+  const DETALLE_OK = 'Falta el certificado de tradición y libertad actualizado del predio.';
+
+  beforeEach(() => {
+    store.set('expedientes/e1', { id: 'e1', tenantId: 'SEC_PLANEACION', estadoJuridico: 'EN_REVISION', estado: 'EN_REVISION' });
+    store.set('expedientes/e1/actuaciones/a0', {
+      id: 'a0', expedienteId: 'e1', tenantId: 'SEC_PLANEACION', tipo: 'radicacion-debida-forma', etapa: 'radicacion',
+      actorUid: 'u0', actorNombre: 'Otro Funcionario', actorRol: 'FUNCIONARIO', fecha: '2026-06-01T12:00:00.000Z', origen: 'REAL',
+    });
+  });
+
+  it('la actuación y el espejo se escriben en el MISMO batch: un solo update a expedientes/e1, con fechaAlertaConservadora', async () => {
+    const res = await actuacionPOST(req({ tipo: 'acta-observaciones', detalle: DETALLE_OK }), ctx('e1'));
+    expect(res.status).toBe(200);
+
+    const escriturasExpediente = escrituras.filter((e) => e.path === 'expedientes/e1');
+    const escrituraActuacion = escrituras.find((e) => e.path.startsWith('expedientes/e1/actuaciones/'));
+    // Un ÚNICO write al documento raíz (el `batch.update` de la ruta) — si
+    // el espejo se escribiera aparte, aquí habría 2. Nunca una escritura
+    // suelta que pueda desincronizarse del origen real.
+    expect(escriturasExpediente).toHaveLength(1);
+    expect(escriturasExpediente[0].tipo).toBe('update');
+    expect(escriturasExpediente[0].data).toHaveProperty('fechaAlertaConservadora');
+    expect(typeof escriturasExpediente[0].data.fechaAlertaConservadora).toBe('string');
+    expect(escrituraActuacion).toBeDefined();
+    expect(store.get('expedientes/e1')?.fechaAlertaConservadora).toBe(escriturasExpediente[0].data.fechaAlertaConservadora);
+  });
+
+  it('R9: si la única actuación previa es RECONSTRUIDO (expediente histórico), el espejo persiste NULL, no un dato fabricado', async () => {
+    store.set('expedientes/e9', { id: 'e9', tenantId: 'SEC_PLANEACION', estadoJuridico: 'EN_REVISION', estado: 'EN_REVISION' });
+    store.set('expedientes/e9/actuaciones/hist1', {
+      id: 'hist1', expedienteId: 'e9', tenantId: 'SEC_PLANEACION', tipo: 'radicacion-debida-forma', etapa: 'radicacion',
+      actorUid: 'sistema', actorNombre: 'Importador', actorRol: 'SISTEMA', fecha: '2020-01-10T12:00:00.000Z', origen: 'RECONSTRUIDO',
+    });
+
+    const res = await actuacionPOST(req({ tipo: 'acta-observaciones', detalle: DETALLE_OK }), ctx('e9'));
+    expect(res.status).toBe(200);
+    expect(store.get('expedientes/e9')?.fechaAlertaConservadora).toBeNull();
+  });
+});
+
+describe('GET /api/licencias/expedientes — bandeja expone fechaAlertaConservadora SIN lectura extra (R11 resuelto)', () => {
+  it('devuelve el espejo tal como está persistido en el documento raíz', async () => {
+    store.set('expedientes/eA', { id: 'eA', tenantId: 'SEC_PLANEACION', creadoEn: '2026-01-01T00:00:00.000Z', fechaAlertaConservadora: '2026-03-01T17:00:00.000Z' });
+
+    const res = await bandejaGET();
+    const data = await res.json();
+    const item = data.expedientes.find((e: { id: string }) => e.id === 'eA');
+
+    expect(item.fechaAlertaConservadora).toBe('2026-03-01T17:00:00.000Z');
+  });
+
+  it('expediente escrito ANTES de este campo → ausente en la respuesta, nunca un valor fabricado', async () => {
+    store.set('expedientes/eB', { id: 'eB', tenantId: 'SEC_PLANEACION', creadoEn: '2026-01-01T00:00:00.000Z' });
+
+    const res = await bandejaGET();
+    const data = await res.json();
+    const item = data.expedientes.find((e: { id: string }) => e.id === 'eB');
+
+    expect(item.fechaAlertaConservadora).toBeUndefined();
+  });
+});
+
+describe('Anti-divergencia: fechaAlertaConservadora persistido === cómputo on-read (mismo motor, misma serie)', () => {
+  it('crear + acta + respuesta → el valor persistido (store) y el de la bandeja coinciden EXACTO con computos.terminoDual.fechaAlertaConservadora del detalle', async () => {
+    const creado = await crearPOST(req(BODY_VALIDO));
+    const dataCreado = await creado.json();
+    const id = dataCreado.expediente.id as string;
+
+    await actuacionPOST(req({ tipo: 'acta-observaciones', detalle: 'Falta el certificado de tradición y libertad actualizado del predio.' }), ctx(id));
+    await actuacionPOST(req({ tipo: 'respuesta-subsanacion', detalle: 'Se aporta el certificado de tradición y libertad solicitado en el acta.' }), ctx(id));
+
+    const detalleRes = await detalleGET(req(null, 'GET'), ctx(id));
+    const dataDetalle = await detalleRes.json();
+
+    const bandejaRes = await bandejaGET();
+    const dataBandeja = await bandejaRes.json();
+    const itemBandeja = dataBandeja.expedientes.find((e: { id: string }) => e.id === id);
+
+    const persistido = store.get(`expedientes/${id}`)?.fechaAlertaConservadora;
+    expect(persistido).not.toBeUndefined();
+    expect(persistido).toBe(dataDetalle.computos.terminoDual.fechaAlertaConservadora);
+    expect(itemBandeja.fechaAlertaConservadora).toBe(dataDetalle.computos.terminoDual.fechaAlertaConservadora);
+  });
+});

@@ -7,6 +7,7 @@ import { DEFINICION_LICENCIA_CONSTRUCCION_PARCIAL } from '@/lib/motor-expediente
 import { sumarDiasHabiles, diasRestantesHabiles } from '@/lib/tiempos-radicado';
 import { debeNotificarCiudadano, type CriterioNotificacion } from '@/lib/email/debe-notificar-ciudadano';
 import { PREFIJO_AVISO_ACTA_COMUNICACION } from '@/lib/motor-expedientes/comunicaciones-licencia';
+import { calcularVencimientoDual, derivarEventosTermino } from '@/lib/motor-expedientes/termino';
 
 /* ══════════════════════════════════════════════════════════════
    Lógica de DECISIÓN de expedientes de licencias — bloque "Integración UI
@@ -73,6 +74,42 @@ export interface ExpedienteLicenciaDoc extends Expediente {
   estadoJuridico: EstadoJuridicoLicencia;
   /** `true` en TODO expediente creado en esta fase (candado de emisión) — nunca `undefined` en un documento real de esta colección. */
   esPrueba?: boolean;
+  /**
+   * ESPEJO denormalizado de `calcularVencimientoDual(...).fechaAlertaConservadora`
+   * (`lib/motor-expedientes/termino.ts`, ISO 8601) — la fecha MÁS TEMPRANA
+   * entre las dos políticas de efecto de subsanación (⚖️ hueco 1 sigue SIN
+   * default, ver JSDoc de `VencimientoDual`). La fuente de verdad SIGUE
+   * SIENDO la serie de actuaciones del expediente (`derivarEventosTermino`);
+   * este campo es una PROYECCIÓN escrita en el documento raíz — nada lo lee
+   * para decidir nada, existe únicamente para que la bandeja lo muestre sin
+   * pagar una lectura extra.
+   *
+   * Por qué existe (R11, `app/api/licencias/expedientes/route.ts`): la
+   * bandeja lista expedientes sin traer su subcolección `actuaciones` —
+   * traerla por expediente sería N+1 (hasta `LIMITE_BANDEJA` lecturas
+   * adicionales por carga). Denormalizar esta fecha en el documento raíz le
+   * permite a la bandeja mostrarla SIN esa lectura extra; el detalle
+   * (`GET .../[id]`) sigue calculándola on-read porque de todos modos ya
+   * carga `actuaciones` para otros fines (cómputo, no persistencia).
+   *
+   * Se recalcula y persiste en la MISMA transacción/batch que escribe la
+   * actuación que puede haberla movido — nunca una escritura suelta que
+   * pueda desincronizarse del origen real: `planCrearExpedienteDemo`,
+   * `planCrearExpedienteDesdeRadicado` y `planRegistrarActuacion` (todos en
+   * este módulo) son los ÚNICOS puntos que la calculan, vía el helper
+   * privado `calcularFechaAlertaConservadoraMirror`.
+   *
+   * Ausente (`undefined`): expedientes escritos ANTES de este campo — la UI
+   * debe mostrar "—", nunca asumir vigente ni vencido.
+   * `null`: expedientes SIN ningún evento de término reconocible en su
+   * serie REAL de actuaciones — el caso esperado es un expediente histórico
+   * reconstruido (Fase 5, D6) cuyas actuaciones son TODAS
+   * `origen: 'RECONSTRUIDO'` y quedan excluidas por R9
+   * (`derivarEventosTermino`): un expediente reconstruido no tiene un
+   * término legal VIVO que proyectar, así que `null` es el resultado
+   * correcto, no un error.
+   */
+  fechaAlertaConservadora?: string | null;
 }
 
 /**
@@ -156,6 +193,27 @@ export function evaluarCandadoEmisionReal(
   return { candadoAbierto: true };
 }
 
+/**
+ * Punto ÚNICO donde este módulo invoca `derivarEventosTermino` +
+ * `calcularVencimientoDual` para obtener el valor a escribir en
+ * `ExpedienteLicenciaDoc.fechaAlertaConservadora` (ver su JSDoc para el
+ * contrato completo). Reutilizado por los 3 caminos que crean o mutan la
+ * serie de actuaciones relevante para el término —
+ * `planCrearExpedienteDemo`, `planCrearExpedienteDesdeRadicado` y
+ * `planRegistrarActuacion` — así el cómputo nunca diverge entre ellos ni se
+ * reimplementa (R11, requisito 5 del bloque).
+ *
+ * `actuaciones` debe ser la serie COMPLETA vigente tras la escritura que se
+ * está planeando (existentes + la nueva, si aplica) — el caller es
+ * responsable de pasar el conjunto correcto; esta función no sabe nada de
+ * Firestore ni de qué actuación es "nueva".
+ */
+function calcularFechaAlertaConservadoraMirror(actuaciones: ActuacionLicenciaDoc[]): string | null {
+  const eventos = derivarEventosTermino(actuaciones);
+  const { fechaAlertaConservadora } = calcularVencimientoDual(eventos, PLAZO_DECISION_LICENCIA_DIAS_HABILES);
+  return fechaAlertaConservadora ? fechaAlertaConservadora.toISOString() : null;
+}
+
 /* ──────────────────────────────────────────────
    Creación (camino DEMO)
 ────────────────────────────────────────────── */
@@ -228,6 +286,20 @@ export function planCrearExpedienteDemo(
   const id = crypto.randomUUID();
   const nowIso = ahora.toISOString();
 
+  const primeraActuacion: ActuacionLicenciaDoc = {
+    id: crypto.randomUUID(),
+    expedienteId: id,
+    tenantId,
+    tipo: 'radicacion-debida-forma',
+    etapa: 'radicacion',
+    actorUid: actor.uid,
+    actorNombre: actor.nombre,
+    actorRol: actor.rol,
+    fecha: nowIso,
+    origen: 'REAL',
+    detalle: 'Expediente de demostración creado (esPrueba: true) — candado de emisión real cerrado (R10).',
+  };
+
   const expediente: ExpedienteLicenciaDoc = {
     id,
     tenantId,
@@ -254,20 +326,10 @@ export function planCrearExpedienteDemo(
       año: ahora.getFullYear(),
     },
     esPrueba: true,
-  };
-
-  const primeraActuacion: ActuacionLicenciaDoc = {
-    id: crypto.randomUUID(),
-    expedienteId: id,
-    tenantId,
-    tipo: 'radicacion-debida-forma',
-    etapa: 'radicacion',
-    actorUid: actor.uid,
-    actorNombre: actor.nombre,
-    actorRol: actor.rol,
-    fecha: nowIso,
-    origen: 'REAL',
-    detalle: 'Expediente de demostración creado (esPrueba: true) — candado de emisión real cerrado (R10).',
+    // Espejo denormalizado (R11, ver JSDoc del campo) — nace ya poblado
+    // porque el expediente nace CON su actuación de radicación en la MISMA
+    // escritura (`app/api/licencias/expedientes/route.ts`, un solo batch).
+    fechaAlertaConservadora: calcularFechaAlertaConservadoraMirror([primeraActuacion]),
   };
 
   return { expediente, primeraActuacion };
@@ -289,6 +351,8 @@ export interface RegistrarActuacionInput {
 export interface PlanRegistrarActuacion {
   actuacion: ActuacionLicenciaDoc;
   nuevoEstadoJuridico: EstadoJuridicoLicencia;
+  /** Espejo recalculado sobre `actuacionesExistentes + actuacion` — ver JSDoc de `ExpedienteLicenciaDoc.fechaAlertaConservadora`. El caller lo persiste en el MISMO batch que escribe `actuacion`. */
+  fechaAlertaConservadora: string | null;
 }
 
 /**
@@ -334,10 +398,17 @@ function esTipoActuacionPermitida(tipo: string): tipo is TipoActuacionPermitida 
  *     `puedeTransicionar(estadoActual, estadoDestino, {yaHuboActa})` — el
  *     MAPA de `estados-licencia.ts` es la autoridad final, esta función no
  *     lo duplica.
+ *
+ * `actuacionesExistentes` debe traer la actuación COMPLETA (no solo
+ * `tipo`) — a partir del bloque "Términos y vigencias protectores"
+ * (denormalización R11) esta función también recalcula el espejo
+ * `fechaAlertaConservadora` sobre `actuacionesExistentes + actuacion`
+ * (`calcularFechaAlertaConservadoraMirror`), y ese cómputo necesita
+ * `fecha`/`origen` de cada actuación previa, no solo su `tipo`.
  */
 export function planRegistrarActuacion(
   estadoJuridicoActual: EstadoJuridicoLicencia,
-  actuacionesExistentes: Pick<ActuacionLicenciaDoc, 'tipo'>[],
+  actuacionesExistentes: ActuacionLicenciaDoc[],
   expedienteId: string,
   tenantId: string,
   input: RegistrarActuacionInput,
@@ -384,7 +455,9 @@ export function planRegistrarActuacion(
     detalle: detalleLimpio,
   };
 
-  return { actuacion, nuevoEstadoJuridico: estadoDestino };
+  const fechaAlertaConservadora = calcularFechaAlertaConservadoraMirror([...actuacionesExistentes, actuacion]);
+
+  return { actuacion, nuevoEstadoJuridico: estadoDestino, fechaAlertaConservadora };
 }
 
 /* ──────────────────────────────────────────────
@@ -549,6 +622,20 @@ export function planCrearExpedienteDesdeRadicado(
   const nowIso = ahora.toISOString();
   const numero = formatearNumeroExpedienteDemo(ahora);
 
+  const primeraActuacion: ActuacionLicenciaDoc = {
+    id: crypto.randomUUID(),
+    expedienteId: id,
+    tenantId,
+    tipo: 'radicacion-debida-forma',
+    etapa: 'radicacion',
+    actorUid: actor.uid,
+    actorNombre: actor.nombre,
+    actorRol: actor.rol,
+    fecha: nowIso,
+    origen: 'REAL',
+    detalle: `Expediente creado a partir del radicado de ventanilla ${radicado.radicadoId} (handoff D2). Demostración (esPrueba: true) — candado de emisión real cerrado (R10, ADR-0026 precondición #4).`,
+  };
+
   const expediente: ExpedienteLicenciaDoc = {
     id,
     tenantId,
@@ -566,20 +653,10 @@ export function planCrearExpedienteDesdeRadicado(
     origen: 'REAL',
     numeroExpediente: { numero, serieId: 'demo', año: ahora.getFullYear() },
     esPrueba: true,
-  };
-
-  const primeraActuacion: ActuacionLicenciaDoc = {
-    id: crypto.randomUUID(),
-    expedienteId: id,
-    tenantId,
-    tipo: 'radicacion-debida-forma',
-    etapa: 'radicacion',
-    actorUid: actor.uid,
-    actorNombre: actor.nombre,
-    actorRol: actor.rol,
-    fecha: nowIso,
-    origen: 'REAL',
-    detalle: `Expediente creado a partir del radicado de ventanilla ${radicado.radicadoId} (handoff D2). Demostración (esPrueba: true) — candado de emisión real cerrado (R10, ADR-0026 precondición #4).`,
+    // Espejo denormalizado (R11, ver JSDoc del campo) — mismo criterio que
+    // `planCrearExpedienteDemo`: nace ya poblado porque el expediente nace
+    // CON su actuación de radicación en la MISMA transacción.
+    fechaAlertaConservadora: calcularFechaAlertaConservadoraMirror([primeraActuacion]),
   };
 
   return {
