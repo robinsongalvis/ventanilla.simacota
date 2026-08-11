@@ -129,18 +129,20 @@ export async function GET(): Promise<NextResponse> {
       .map((d) => d.data())
       .sort((a, b) => String(b.creadoEn ?? '').localeCompare(String(a.creadoEn ?? '')));
 
-    // DECLARADO, NO implementado (Bloque "Términos y vigencias
-    // protectores"): la bandeja NO trae `fechaAlertaConservadora` por
-    // expediente. Calcularla exige `derivarEventosTermino(actuaciones)`
-    // (`lib/motor-expedientes/termino.ts`), y `actuaciones` es una
-    // SUBCOLECCIÓN — traerla aquí sería una lectura extra POR expediente
-    // (N+1, hasta LIMITE_BANDEJA=300 lecturas adicionales en el peor caso),
-    // exactamente el antipatrón que el gate R11 vigila. La bandeja queda
-    // SIN ese badge por ahora; el detalle (`GET .../[id]`, que YA carga
-    // `actuaciones` para otros fines) sí lo calcula gratis. Si se necesita
-    // en la bandeja, la vía correcta es denormalizar `fechaAlertaConservadora`
-    // en el documento raíz del expediente cuando cambie (propuesta para el
-    // Especialista de Firestore, no una lectura N+1 aquí).
+    // RESUELTO (Bloque "Términos y vigencias protectores", 10-ago-2026):
+    // la bandeja SÍ trae `fechaAlertaConservadora` por expediente, sin
+    // ninguna lectura nueva — viene incluida en `expedientes` porque cada
+    // `d.data()` ya trae el documento raíz completo. El valor NO se calcula
+    // aquí (eso seguiría siendo N+1, el antipatrón que R11 vigila): es un
+    // ESPEJO denormalizado que `lib/server/expedientes-licencias.ts`
+    // recalcula y persiste en el documento raíz, en el MISMO batch/tx que
+    // cada escritura que puede moverlo (creación del expediente,
+    // `POST .../[id]/actuaciones`) — ver el JSDoc de
+    // `ExpedienteLicenciaDoc.fechaAlertaConservadora` para el contrato
+    // completo (incluye por qué puede ser `undefined` en expedientes
+    // anteriores a este campo, o `null` en expedientes reconstruidos, R9).
+    // El detalle (`GET .../[id]`) sigue calculándolo on-read además —
+    // ambos caminos comparten el mismo cómputo puro, no pueden divergir.
     return NextResponse.json({ ok: true, expedientes });
   } catch (error) {
     logError({ radicadoId: 'n/a', modulo: 'licencias/expedientes/GET', error });
