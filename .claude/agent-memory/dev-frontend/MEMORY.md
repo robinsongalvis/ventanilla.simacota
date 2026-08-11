@@ -8,3 +8,4 @@
 - [Bloque B — Licencias como VistaActual](project_bloque_b_licencias_vistaactual.md) — 'LICENCIAS' embebida vía VistaLicencias; props aditivas onAbrirExpediente/onVolver; ruta standalone/layout/guard viva a propósito
 - [Bloque C — Libro Consecutivo](project_bloque_c_libro_consecutivo.md) — reemplaza el Excel; lógica pura en presentacion-libro-consecutivo.ts; 11-ago: buscador rápido (coincideBusquedaLibro) compartido con la Bandeja; `predio` SÍ existe ya en tipos.ts
 - [Testing sin fake timers](feedback_testing_libro_consecutivo_sin_fake_timers.md) — vi.useFakeTimers()+waitFor() se cuelgan; leer el valor real del control, seleccionar el año del fixture, o pasar `hoy` explícito a la función pura en vez de fijar el reloj
+- [RTL getByText y elementos anidados](feedback_rtl_gettext_elementos_anidados.md) — getByText solo une nodos de texto DIRECTOS; un `<strong>` interpolado "esconde" el número del matcher del contenedor

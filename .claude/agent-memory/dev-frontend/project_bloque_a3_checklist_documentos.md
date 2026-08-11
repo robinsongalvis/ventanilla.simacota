@@ -56,3 +56,24 @@ fail-closed de `evaluarCondicion` (lógica de Kleene,
 
 Ver [[project_sistema_subagentes]] para el marco de roles/ADR (ADR-0026,
 ADR-0029) que gobierna este bloque.
+
+**11-ago-2026 — lenguaje natural en "Hechos del caso":** el propietario vio
+en producción que `prettyClave()` sola exponía jerga técnica cruda
+("Sujeto Titulo ENSR10", "Categoria Complejidad") sin decir qué se
+pregunta ni para qué. `ClaveContextoDeclarada` gana 3 campos opcionales
+ADITIVOS (`pregunta`, `ayuda`, `efecto` — contrato en construcción en
+paralelo por otro agente en `lib/motor-expedientes/tipos.ts`).
+`PanelHechosCaso.tsx` los lee de forma DEFENSIVA vía un tipo local
+(`ClaveContextoLegible = ClaveContextoDeclarada & {pregunta?; ayuda?;
+efecto?}`) para no bloquearse mientras `lib/` termina de declararlos —
+funciona igual si el tipo real ya los tiene o todavía no. Reglas de UI
+fijadas: `ayuda` siempre visible (nunca tooltip) y asociada por
+`aria-describedby`; `efecto` SOLO mientras el hecho está "Sin definir"
+(deja de mostrarse tras responder, para no acumular ruido); aviso de
+"Faltan N hechos" en un ÚNICO nodo `role="status" aria-live="polite"`
+estable (nunca se desmonta/remonta, solo cambia el contenido interno) para
+que el lector de pantalla anuncie la transición a "Todos definidos" de
+forma confiable. El delta real de requisitos agregados/retirados al
+guardar un hecho vive en `evaluarCompletitud` (`lib/`) — el panel NO lo
+calcula ni lo inventa; solo confirma honestamente "Guardado — el checklist
+puede haber cambiado".

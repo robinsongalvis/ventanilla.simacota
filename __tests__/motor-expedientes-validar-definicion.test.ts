@@ -58,6 +58,26 @@ describe('validarDefinicionTramite — Definición válida', () => {
     expect(resultado).toEqual({ valida: true, errores: [] });
   });
 
+  it('una Definición donde algunas clavesContexto declaran pregunta/ayuda/efecto y otras no es válida (opcionalidad aditiva)', () => {
+    const definicion = definicionBase({
+      clavesContexto: [
+        {
+          nombre: 'esRepresentante',
+          tipo: 'boolean',
+          pregunta: '¿Actúa como representante?',
+          ayuda: 'Marque "Sí" si quien radica no es el titular.',
+          efecto: 'Si responde "Sí", se exige el poder.',
+        },
+        { nombre: 'categoria', tipo: 'string', dominio: ['A', 'B', 'C'] },
+        { nombre: 'puntaje', tipo: 'number' },
+      ],
+    });
+
+    const resultado = validarDefinicionTramite(definicion);
+
+    expect(resultado).toEqual({ valida: true, errores: [] });
+  });
+
   it('una Definición con condicionales correctamente declaradas y coherentes es válida', () => {
     const definicion = definicionBase({
       requisitos: [

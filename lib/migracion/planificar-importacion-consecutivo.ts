@@ -95,20 +95,18 @@
  * así que el resultado es `null` sin excepción — ningún histórico genera
  * vencimientos ni alertas.
  *
- * COSTO CONOCIDO, DECLARADO (no oculto): `estadoJuridico` se fija en
- * `RADICADA_EN_DEBIDA_FORMA` (ver `ESTADO_JURIDICO_HISTORICO_SIN_RESOLVER`)
- * — el único hito de los 9 que no afirma ningún desenlace. Hoy,
- * `ESTADOS_EN_TRAMITE_LIBRO` (`app/interno/licencias/presentacion-libro-
- * consecutivo.ts`) clasifica "En trámite" solo por `estadoJuridico`, sin
- * mirar `origen`/`revisionHistorica` — así que el KPI "En trámite" del
- * Libro SÍ va a contar estos expedientes hasta que ese archivo (fuera del
- * alcance de este rol) aplique el MISMO criterio que
- * `BandejaLicenciasClient.tsx` ya usa hoy para sus propios KPIs
- * (`esReconstruido`/`contables`, excluye RECONSTRUIDOS por completo). Ver
- * JSDoc de `RevisionHistoricaLicencia` para el análisis completo de por qué
- * NINGÚN valor de `EstadoJuridicoLicencia` evita este costo sin mentir
- * sobre un desenlace — se prefiere este costo transparente, corregible en
- * una capa ajena, a la alternativa prohibida.
+ * `estadoJuridico` se fija en `HISTORICO_SIN_RESOLVER` (ver
+ * `ESTADO_JURIDICO_HISTORICO_SIN_RESOLVER`), un valor PROPIO del enum. La
+ * primera versión reutilizaba `RADICADA_EN_DEBIDA_FORMA` "por ser el hito
+ * menos comprometido", con el costo declarado de inflar el KPI "En
+ * trámite"; se corrigió porque ese hito **afirma** un hecho que en un
+ * histórico no consta —que la solicitud se presentó con documentación
+ * completa verificada (art. 2.2.6.1.2.1.1 par. 1), lo que además ancla el
+ * término— cuando del libro solo consta que hubo un radicado. Con valor
+ * propio desaparece el costo: no pertenece a `ESTADOS_EN_TRAMITE_LIBRO`
+ * (`app/interno/licencias/presentacion-libro-consecutivo.ts`) ni a ninguna
+ * otra lista de estados activos, así que no infla contador alguno ni
+ * aparece como trabajo pendiente.
  * ═══════════════════════════════════════════════════════════════════════
  */
 
@@ -812,12 +810,12 @@ export function planificarImportacion(
   if (expedientes.length > 0) {
     advertencias.push(
       `HISTÓRICO SIN RESOLVER (DF-10): los ${expedientes.length} expediente(s) planificados entran con `
-      + '"estadoJuridico": "RADICADA_EN_DEBIDA_FORMA" (el hito menos comprometido) y "revisionHistorica.pendiente": '
-      + 'true — NINGUNO afirma un desenlace jurídico verificable, sin importar lo que dijera el campo "estado" del '
-      + 'libro (conservado verbatim en "estadoOriginalHistorico"). Costo conocido: el KPI "En trámite" del Libro '
-      + 'Consecutivo (app/interno/licencias/presentacion-libro-consecutivo.ts, ESTADOS_EN_TRAMITE_LIBRO) hoy no '
-      + 'excluye por origen/revisionHistorica, así que va a contarlos hasta que ese archivo aplique el mismo '
-      + 'criterio que ya usa BandejaLicenciasClient.tsx (esReconstruido/contables) — pendiente del rol de frontend.',
+      + `"estadoJuridico": "${ESTADO_JURIDICO_HISTORICO_SIN_RESOLVER}" y "revisionHistorica.pendiente": true — `
+      + 'NINGUNO afirma un desenlace jurídico verificable, sin importar lo que dijera el campo "estado" del libro '
+      + '(conservado verbatim en "estadoOriginalHistorico"). Al ser un estado PROPIO del enum, no pertenece a '
+      + 'ninguna lista de estados activos (ESTADOS_EN_TRAMITE_LIBRO), así que no infla el KPI "En trámite" del '
+      + 'Libro Consecutivo ni aparece como trabajo pendiente. Salir de este estado exige un acto humano: no hay '
+      + 'transición automática declarada (ver TRANSICIONES en lib/motor-expedientes/estados-licencia.ts).',
     );
   }
   if (filasSinFecha.length > 0) {

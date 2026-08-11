@@ -46,4 +46,20 @@ describe('DEFINICION_LICENCIA_CONSTRUCCION_PARCIAL', () => {
     const r16 = DEFINICION_LICENCIA_CONSTRUCCION_PARCIAL.requisitos.find((r) => r.id === 'matricula-profesional-experiencia')!;
     expect(r16.tipo).toBe('OPCIONAL');
   });
+
+  /* Textos de cara al funcionario (`pregunta`/`ayuda`/`efecto`) — reemplazan
+     la etiqueta técnica derivada (`prettyClave`, p. ej. "Sujeto Titulo
+     ENSR10") por lenguaje natural. Redacción PROVISIONAL del equipo de
+     desarrollo, ver JSDoc junto a `clavesContexto` en la propia Definición. */
+  describe('textos de las 4 clavesContexto (pregunta/ayuda/efecto)', () => {
+    it.each(['esApoderado', 'categoriaComplejidad', 'sujetoTituloENSR10', 'predioRodeadoEspacioPublico'])(
+      '"%s" declara pregunta, ayuda y efecto, ninguno vacío',
+      (nombre) => {
+        const clave = DEFINICION_LICENCIA_CONSTRUCCION_PARCIAL.clavesContexto!.find((c) => c.nombre === nombre)!;
+        expect(clave.pregunta).toBeTruthy();
+        expect(clave.ayuda).toBeTruthy();
+        expect(clave.efecto).toBeTruthy();
+      },
+    );
+  });
 });

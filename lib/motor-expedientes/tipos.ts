@@ -136,6 +136,29 @@ export interface ClaveContextoDeclarada {
   tipo: TipoClaveContexto;
   /** Dominio cerrado de valores permitidos (opcional). Si se omite, cualquier valor del `tipo` declarado es válido. */
   dominio?: Array<string | number | boolean>;
+  /**
+   * Texto de cara al funcionario para los tres campos siguientes
+   * (`pregunta`, `ayuda`, `efecto`) — TODOS OPCIONALES a propósito, mismo
+   * patrón aditivo que `dominio`: una Definición que no los declare sigue
+   * funcionando igual que hoy, con el panel derivando una etiqueta del
+   * `nombre` camelCase (`prettyClave` en
+   * `app/interno/licencias/components/PanelHechosCaso.tsx`). Cuando SÍ se
+   * declaran, existen para reemplazar esa derivación técnica por lenguaje
+   * natural pensado para quien diligencia el checklist, no para quien lee
+   * el código.
+   */
+  /** La pregunta tal como se le muestra al funcionario, en español natural y con tildes (p. ej. "¿La solicitud la presenta un apoderado?"), en vez de derivarla del nombre técnico de la clave. */
+  pregunta?: string;
+  /**
+   * Qué significa el hecho, en el idioma del funcionario. Si aplica una
+   * referencia normativa, va como apoyo AL FINAL del texto — nunca como
+   * título ni como primera palabra — porque quien llena el panel necesita
+   * primero entender la pregunta y solo después, si quiere, verificar la
+   * norma.
+   */
+  ayuda?: string;
+  /** Qué pasa con el checklist según la respuesta (p. ej. "Si responde Sí, se exigirá el poder del apoderado."). */
+  efecto?: string;
 }
 
 interface RequisitoBase {
