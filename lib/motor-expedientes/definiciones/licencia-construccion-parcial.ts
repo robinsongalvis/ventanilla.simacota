@@ -52,11 +52,77 @@ export const DEFINICION_LICENCIA_CONSTRUCCION_PARCIAL: DefinicionTramite = {
   },
   requiereVisita: true,
   generaResolucion: true,
+  /**
+   * `pregunta` / `ayuda` / `efecto` de las 4 claves siguientes son
+   * REDACCIÓN PROVISIONAL del equipo de desarrollo — sustituyen la etiqueta
+   * técnica que hoy deriva el panel (`prettyClave` en
+   * `app/interno/licencias/components/PanelHechosCaso.tsx`, p. ej.
+   * "Sujeto Titulo ENSR10") por lenguaje dirigido al funcionario, pero NO
+   * son concepto de Planeación. Cada texto está derivado de lo que el
+   * propio requisito activado dice en su `descripcion` (ver más abajo en
+   * este archivo) — no se inventó ningún efecto que el blueprint
+   * (`docs/blueprints/requisitos-licencia-construccion-obra-nueva.md`) no
+   * declare. PENDIENTES de validación por el ingeniero de Planeación: si
+   * él los corrige, se edita SOLO el texto — ninguna condición ni
+   * requisito depende de `pregunta`/`ayuda`/`efecto` (son puramente
+   * informativos, no evaluables).
+   *
+   * Caso `categoriaComplejidad`: los plazos legales diferenciados por
+   * categoría de complejidad fueron DEROGADOS (D.1783/2021 art. 37, ver
+   * `docs/planes/INVESTIGACION_NORMATIVA_LICENCIAS.md`). Esta clave NO se
+   * usa aquí para plazos — solo para decidir qué planos técnicos exige el
+   * requisito #12 (`planos-hidraulicos-sanitarios-estructurales`), uso que
+   * el blueprint sí sustenta. Punto A CONFIRMAR con el ingeniero: ¿la
+   * categoría Baja/Media/Alta sigue siendo un criterio vigente para
+   * clasificar la complejidad técnica de la obra, o también quedó sin
+   * base tras la derogatoria de plazos?
+   *
+   * Caso `sujetoTituloENSR10`: el requisito #13 que activa
+   * (`estudio-suelos-geotecnico`) dice literalmente "proyectos NO sujetos
+   * al Título E de la NSR-10" (mismo texto en el blueprint, fila 13) — es
+   * el Título E (procedimiento simplificado para vivienda de uno y dos
+   * pisos), no el Título H. La `ayuda` redactada menciona el Título H
+   * (Estudios Geotécnicos de la NSR-10) SOLO como la parte del reglamento
+   * que regula el contenido del estudio exigido — no como el título al
+   * que se refiere `sujetoTituloENSR10`, que sigue siendo el E. Punto A
+   * CONFIRMAR con el ingeniero: que esta lectura (Título E = vía
+   * simplificada que exime del estudio; fuera de esa vía = estudio
+   * geotécnico completo) sea la interpretación correcta del requisito.
+   */
   clavesContexto: [
-    { nombre: 'esApoderado', tipo: 'boolean' },
-    { nombre: 'categoriaComplejidad', tipo: 'string', dominio: ['BAJA', 'MEDIA', 'ALTA'] },
-    { nombre: 'sujetoTituloENSR10', tipo: 'boolean' },
-    { nombre: 'predioRodeadoEspacioPublico', tipo: 'boolean' },
+    {
+      nombre: 'esApoderado',
+      tipo: 'boolean',
+      pregunta: '¿La solicitud la presenta un apoderado o autorizado, en representación del titular?',
+      ayuda: 'Marque "Sí" si quien radica la solicitud no es el propietario o titular del predio, sino una persona que actúa en su nombre mediante poder o autorización escrita.',
+      efecto: 'Si responde "Sí", se exigirá el poder o autorización del apoderado, con presentación personal de quien lo otorga y copia de la cédula del apoderado.',
+    },
+    {
+      nombre: 'categoriaComplejidad',
+      tipo: 'string',
+      dominio: ['BAJA', 'MEDIA', 'ALTA'],
+      pregunta: '¿Cuál es la categoría de complejidad de la obra?',
+      ayuda: 'Clasificación técnica del proyecto en Baja, Media o Alta complejidad. No determina el plazo legal de respuesta (los plazos diferenciados por categoría de complejidad fueron derogados, D.1783/2021 art. 37) — aquí solo decide qué planos técnicos se exigen en el checklist.',
+      efecto: 'Si la categoría es "Baja" o "Media", se exigirán los planos hidráulicos, sanitarios y estructurales firmados por Ingeniero Civil.',
+    },
+    {
+      nombre: 'sujetoTituloENSR10',
+      tipo: 'boolean',
+      // La pregunta abre con lo que el funcionario reconoce a simple vista
+      // (vivienda de uno o dos pisos) y deja la referencia normativa al
+      // final: quien llena el formulario sabe cuántos pisos tiene la obra,
+      // no si "está sujeta al Título E".
+      pregunta: '¿Es una vivienda de uno o dos pisos que se acoge al procedimiento simplificado (Título E de la NSR-10)?',
+      ayuda: 'El Título E del Reglamento Colombiano de Construcción Sismo Resistente (NSR-10) define un procedimiento simplificado para viviendas de uno y dos pisos que cumplan ciertas condiciones. Si el proyecto NO se acoge a ese procedimiento simplificado, debe sustentarse con un estudio de suelos y geotécnico completo, cuyo contenido regula el Título H (Estudios Geotécnicos) de la misma norma.',
+      efecto: 'Si responde "No" (el proyecto no está sujeto al Título E), se exigirá el estudio de suelos y geotécnico, con memorias de cálculo estructural.',
+    },
+    {
+      nombre: 'predioRodeadoEspacioPublico',
+      tipo: 'boolean',
+      pregunta: '¿El predio está completamente rodeado por espacio público (vías, parques, zonas verdes)?',
+      ayuda: 'Se refiere a que el lote no tenga predios colindantes porque todo su perímetro linda con espacio público. La norma también exime de este requisito a los predios en zona rural no suburbana, pero esa condición no está disponible todavía en este formulario.',
+      efecto: 'Si responde "No" (el predio sí tiene colindantes), se exigirá la relación de direcciones de los predios colindantes y el acta de colindancia.',
+    },
   ],
   requisitos: [
     // #1
