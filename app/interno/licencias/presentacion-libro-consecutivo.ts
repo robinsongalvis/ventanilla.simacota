@@ -25,7 +25,7 @@ import type { OrigenActuacion } from '@/lib/motor-expedientes/tipos';
 import { calcularVencimientoVigencia, esErrorVigencia } from '@/lib/motor-expedientes/vigencias';
 import { EQUIVALENCIAS_MIGRACION_SEMILLA_LICENCIAS } from '@/lib/motor-expedientes/catalogo-subtipos-normativo';
 import { normalizarTextoHistorico } from '@/lib/motor-expedientes/equivalencia-migracion';
-import { diasRestantesHabiles } from '@/lib/tiempos-radicado';
+import { atLocalNoon, diasRestantesHabiles } from '@/lib/tiempos-radicado';
 import { ESTILOS_ESTADO_JURIDICO } from './estilos-estado-juridico';
 import { nombreSubtipo } from './presentacion-subtipos';
 import { formatFechaColombia, safeDate, TIMEZONE_COLOMBIA } from '@/lib/fecha-colombia';
@@ -270,24 +270,62 @@ export function construirFilasLibroConsecutivo(
 export type UrgenciaFilaLibro = 'VENCIDO' | 'POR_VENCER' | 'EN_TERMINO' | 'NEUTRO';
 
 /**
- * Banda de urgencia de una fila, por `fechaAlertaConservadora` — MISMO
- * criterio de umbral que el resto del módulo (`diasRestantesHabiles` +
- * `UMBRAL_POR_VENCER_DIAS_HABILES_LIBRO`). `NEUTRO` cubre tanto "sin dato"
- * (campo ausente/no implementado todavía) como cualquier expediente sin
- * ancla de término — nunca se distingue una cosa de la otra con un color de
- * urgencia, ambas se ven igual de neutras ("—"). `hoy` es parámetro (no
- * `new Date()` implícito) para que el cálculo sea determinista en pruebas,
- * mismo patrón que `diasRestantesHabiles`.
+ * Banda de urgencia de una fila, por `fechaAlertaConservadora`. `NEUTRO`
+ * cubre tanto "sin dato" como cualquier expediente sin ancla de término —
+ * nunca se distingue una cosa de la otra con un color de urgencia, ambas se
+ * ven igual de neutras ("—"). `hoy` es parámetro (no `new Date()`
+ * implícito) para que el cálculo sea determinista en pruebas.
+ *
+ * VENCIDO se decide comparando el DÍA CIVIL del vencimiento contra el de
+ * hoy, NO por el signo de `diasRestantesHabiles` — corrección de un defecto
+ * encontrado en la verificación visual del 11-ago-2026: entre un
+ * vencimiento y hoy puede no haber NINGÚN día hábil (p. ej. venció el
+ * viernes 7-ago-2026, festivo de la Batalla de Boyacá, y hoy es lunes 10:
+ * 8 y 9 son fin de semana), así que `diasRestantesHabiles` devuelve 0 y el
+ * expediente —ya vencido— caía en POR_VENCER. Consecuencia real: no se
+ * contaba en el filtro/KPI "Vencidos" y la franja salía ámbar en vez de
+ * roja, justo lo contrario del propósito protector del módulo. El conteo
+ * de días hábiles sigue gobernando el umbral de POR_VENCER (que sí es una
+ * pregunta de plazo hábil), pero "¿ya pasó la fecha?" es una pregunta de
+ * CALENDARIO.
  */
 export function urgenciaFilaLibro(
   fila: Pick<FilaLibroConsecutivo, 'fechaAlertaConservadora'>,
   hoy: Date = new Date(),
 ): UrgenciaFilaLibro {
   if (!fila.fechaAlertaConservadora) return 'NEUTRO';
+  // Ambos extremos anclados al mediodía de su día civil (`atLocalNoon`, ya
+  // usada por todo el módulo): comparar sus instantes compara días civiles,
+  // sin que la hora del dato pueda desplazar el resultado.
+  const vencimiento = atLocalNoon(fila.fechaAlertaConservadora);
+  const referencia = atLocalNoon(hoy);
+  if (Number.isNaN(vencimiento.getTime())) return 'NEUTRO';
+  if (vencimiento.getTime() < referencia.getTime()) return 'VENCIDO';
+
   const dias = diasRestantesHabiles(fila.fechaAlertaConservadora, hoy);
-  if (dias < 0) return 'VENCIDO';
   if (dias <= UMBRAL_POR_VENCER_DIAS_HABILES_LIBRO) return 'POR_VENCER';
   return 'EN_TERMINO';
+}
+
+/**
+ * Texto de apoyo bajo la fecha en la columna "Vence" — PURO y derivado de
+ * `urgenciaFilaLibro`, no del signo de `diasRestantesHabiles`: cuando un
+ * expediente vencido no tiene días hábiles de por medio (ver JSDoc de
+ * arriba), decir "0 días hábiles" sería engañoso. En ese caso se dice
+ * "Vencido" a secas — sin inventar un número que no significa nada.
+ */
+export function textoDiasVencimientoLibro(
+  fila: Pick<FilaLibroConsecutivo, 'fechaAlertaConservadora'>,
+  hoy: Date = new Date(),
+): string | null {
+  if (!fila.fechaAlertaConservadora) return null;
+  const urgencia = urgenciaFilaLibro(fila, hoy);
+  if (urgencia === 'NEUTRO') return null;
+  const dias = diasRestantesHabiles(fila.fechaAlertaConservadora, hoy);
+  if (urgencia === 'VENCIDO') {
+    return dias < 0 ? `Vencido hace ${Math.abs(dias)} días hábiles` : 'Vencido';
+  }
+  return `${dias} días hábiles`;
 }
 
 /** Token de color (`app/globals.css`) por banda de urgencia — franja lateral de la fila y color del texto de la columna "Vence". */
