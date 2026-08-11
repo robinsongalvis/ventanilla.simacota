@@ -29,18 +29,20 @@
    ANALISIS_INSUMO_CONSECUTIVO_LICENCIAS.md`): "N.° LICENCIA" muestra "—"
    cuando `actoFinal` está ausente — HOY la norma, no la excepción (0/202
    expedientes del Excel histórico tienen fecha de resolución). Nunca se
-   calcula ni se infiere ese dato. "Vence" depende de `fechaAlertaConservadora`
-   — campo OPCIONAL todavía no denormalizado por el backend en este
-   endpoint (ver JSDoc de `FilaLibroConsecutivo.fechaAlertaConservadora`):
-   mientras no llegue, la columna se ve honestamente vacía, nunca se
-   recalcula aquí (exigiría `actuaciones`, que esta lista no trae, R11).
+   calcula ni se infiere ese dato. "Vence" sale de `fechaAlertaConservadora`,
+   espejo que el servidor YA persiste en el documento raíz del expediente
+   en la misma transacción que cada actuación (ver su JSDoc en
+   `lib/server/expedientes-licencias.ts`): llega gratis en esta lista, sin
+   leer la subcolección `actuaciones` (R11). Cuando el servidor no pudo
+   proyectar término — expedientes anteriores al campo, y RECONSTRUIDOS,
+   cuyas actuaciones no mueven relojes legales (R9) — la columna se ve
+   honestamente vacía; jamás se recalcula aquí.
 ══════════════════════════════════════════════════════════════ */
 
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useAuth } from '@/lib/hooks/useAuth';
 import type { ExpedienteLicenciaDoc } from '@/lib/server/expedientes-licencias';
 import { formatFechaColombia } from '@/lib/fecha-colombia';
-import { diasRestantesHabiles } from '@/lib/tiempos-radicado';
 import { InstitucionalHeader } from '@/app/components/institucional/InstitucionalHeader';
 import { ChipEstadoJuridico } from './ChipEstadoJuridico';
 import { ChipPrueba } from './ChipPrueba';
@@ -60,6 +62,7 @@ import {
   generarCsvLibroConsecutivo,
   nombreArchivoCsvLibroConsecutivo,
   subtiposConEstadoLibro,
+  textoDiasVencimientoLibro,
   urgenciaFilaLibro,
   type FiltroLibroConsecutivo,
 } from '../presentacion-libro-consecutivo';
@@ -285,7 +288,7 @@ export function LibroConsecutivoClient() {
                 filasVisibles.map((fila) => {
                   const urgencia = urgenciaFilaLibro(fila);
                   const colorUrgencia = COLOR_URGENCIA_LIBRO[urgencia];
-                  const diasRestantes = fila.fechaAlertaConservadora ? diasRestantesHabiles(fila.fechaAlertaConservadora) : null;
+                  const textoDias = textoDiasVencimientoLibro(fila);
                   const subtipos = subtiposConEstadoLibro(fila.subtipoCodigos);
                   const tituloSubtipos = fila.subtipos.join(', ');
 
@@ -347,9 +350,9 @@ export function LibroConsecutivoClient() {
                             <p className="font-bold" style={{ color: colorUrgencia }}>
                               {formatFechaColombia(fila.fechaAlertaConservadora)}
                             </p>
-                            {diasRestantes !== null && (
+                            {textoDias !== null && (
                               <p className="text-[11px]" style={{ color: colorUrgencia }}>
-                                {diasRestantes < 0 ? `Vencido hace ${Math.abs(diasRestantes)} días` : `${diasRestantes} días hábiles`}
+                                {textoDias}
                               </p>
                             )}
                           </>
