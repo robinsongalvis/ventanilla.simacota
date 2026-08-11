@@ -148,6 +148,19 @@ html {
   scroll-behavior: smooth;
 }
 
+/*
+ * El panel interno (Dashboard y Licencias) gestiona su PROPIO scroll: su
+ * raíz tiene altura fija y el desplazamiento ocurre dentro de `<main>`. Con
+ * esta clase el `<body>` no puede desplazarse, de modo que un crecimiento
+ * momentáneo del documento (cambio de vista, hidratación) no pueda dejar la
+ * página corrida — defecto de producción del 11-ago-2026: `scrollY` quedaba
+ * en 420 px con media pantalla en blanco. La aplica `app/interno/layout.tsx`
+ * SOLO en esas rutas (Recepción y Login sí usan scroll de página).
+ */
+body.sin-scroll-de-pagina {
+  overflow: hidden;
+}
+
 body {
   /* Fondo institucional claro — portal público lo sobreescribe con .bg-obsidian-gradient */
   background-color: var(--bg-base);
