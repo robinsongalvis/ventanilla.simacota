@@ -283,6 +283,53 @@ export interface ProvenanceExpediente {
   fila?: number;
 }
 
+/* ──────────────────────────────────────────────
+   Predio (datos del inmueble sobre el que se solicita la licencia)
+────────────────────────────────────────────── */
+
+/**
+ * Datos del predio/inmueble asociado a una licencia urbanística —
+ * información esencial de CUALQUIER radicación de este tipo de trámite.
+ *
+ * TODOS los campos son OPCIONALES, por dos razones distintas según el
+ * origen del expediente:
+ *  - Expedientes NUEVOS (`origen: 'REAL'`): el sistema debe capturar el
+ *    predio en el intake (es información esencial), pero es el checklist de
+ *    la `DefinicionTramite` (`RequisitoDefinicion`) quien decide qué es
+ *    obligatorio aportar y cuándo — este tipo solo declara la FORMA del
+ *    dato. Forzar aquí un campo `required` acoplaría el núcleo del motor a
+ *    una regla de negocio de un trámite concreto (D9).
+ *  - Expedientes RECONSTRUIDOS (Fase 5, migración de históricos): el libro
+ *    de la Secretaría de Planeación trae estos datos de forma PARCIAL y a
+ *    veces sucia (verificado contra las 202 filas reales, ago-2026:
+ *    `direccion` casi siempre vale literalmente el nombre del municipio,
+ *    no una dirección; la columna `area` está desalineada con veredas y
+ *    direcciones coladas). Exigir cualquiera de estos campos bloquearía la
+ *    migración entera sin aportar nada, y completar el faltante inventaría
+ *    un dato que nadie registró — por eso NADA se normaliza en la
+ *    importación; `lib/migracion/planificar-importacion-consecutivo.ts`
+ *    (`mapearPredioHistorico`) decide, registro por registro, cuáles de
+ *    estos campos se pueden poblar honestamente desde el histórico.
+ */
+export interface DatosPredio {
+  /** Dirección urbana del predio, texto libre. */
+  direccion?: string;
+  /** Barrio (zona urbana) o vereda (zona rural), texto libre — el modelo no distingue entre ambos porque el origen tampoco lo hace de forma consistente. */
+  barrioVereda?: string;
+  /** Número de matrícula inmobiliaria (folio de matrícula), p. ej. `321-51890` (321 = código del círculo registral). */
+  matriculaInmobiliaria?: string;
+  /**
+   * Área del predio, EN TEXTO — deliberadamente NO numérico. El origen
+   * histórico trae unidades mixtas sin normalizar en el MISMO valor (p. ej.
+   * `"48 HA 2469 M2"`, hectáreas + metros cuadrados juntos); convertir esto
+   * a un número en una unidad única (m², por ejemplo) sin una regla de
+   * conversión validada por el propietario/ingeniero sería INVENTAR
+   * precisión que el dato de origen no tiene. Se conserva verbatim — una
+   * eventual normalización a número es una decisión de negocio aparte.
+   */
+  areaTexto?: string;
+}
+
 /** Acto administrativo que cierra el expediente (resolución de licencia, negación, etc.). */
 export interface ActoFinalExpediente {
   numero?: string;
@@ -339,6 +386,8 @@ export interface Expediente {
   provenance?: ProvenanceExpediente;
   /** Presente solo si el expediente está cerrado. */
   actoFinal?: ActoFinalExpediente;
+  /** Datos del inmueble sobre el que se solicita el trámite — ver JSDoc de `DatosPredio`. Ausente si no se capturó (intake nuevo pendiente) o si el histórico migrado no trajo ningún campo aprovechable (ausencia declarada, nunca inventada). */
+  predio?: DatosPredio;
 }
 
 /* ──────────────────────────────────────────────

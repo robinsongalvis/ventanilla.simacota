@@ -44,6 +44,28 @@ solo cambia si `RegistroEnCuarentena.solicitante` viene poblado (local) o
 libro histórico, en ninguna versión) antes de esta remediación, así que el
 resultado numérico del dry-run no cambió.
 
+**Excepción declarada — datos de PREDIO (ago-2026, `mapearPredioHistorico`):**
+`PlanImportacion.datosPredio` (conteos de `direccion`/`barrioVereda`/
+`matricula`/`area` aprovechables + descartes) NO es idéntico entre los dos
+archivos, a diferencia de la reconciliación general de arriba. Los cuatro
+campos de predio están en la lista de columnas que el `.sanitizado.json`
+retira a propósito (misma doctrina PII de esta sección) — así que contra
+ESE archivo `datosPredio` siempre da **0** en los cuatro conteos "con..." y
+en los tres motivos de descarte, sin excepción; solo contra el
+`.local.json` (máquina del propietario) se ven los conteos reales: 0/202
+con dirección aprovechable (las 54/202 que la traen valen literalmente
+"SIMACOTA", el municipio, no una dirección — se descartan), 13/202 con
+barrio/vereda, 11/202 con matrícula inmobiliaria válida, 5/202 con área
+reconocible (11/202 más están en la columna "area" pero DESALINEADAS —
+veredas o direcciones coladas ahí, reportadas en la sección "Datos de
+predio" del reporte dry-run para que el ingeniero corrija su libro). Esto
+es CORRECTO y ESPERADO, no una regresión de la doctrina de dos archivos:
+verificado por
+`__tests__/migracion-reconciliacion-snapshot-real.test.ts` ("datos de
+predio contra el `.sanitizado.json`" corre SIEMPRE, sin el fallback de
+archivo, para que la aserción "0 en CI" no dependa de qué snapshot usó el
+resto de la suite).
+
 ### Nota R8 — datos personales (PII)
 
 - **`*.local.json` JAMÁS se commitea.** Si alguna vez aparece en
@@ -68,7 +90,10 @@ resultado numérico del dry-run no cambió.
 `lib/migracion/planificar-importacion-consecutivo.ts` (`planificarImportacion`)
 consume el snapshot (cualquiera de los dos archivos — mismo tipo
 `SnapshotConsecutivoLicencias`) y produce un `PlanImportacion` — PURO, sin
-escribir nada. `__tests__/migracion-reconciliacion-snapshot-real.test.ts` usa
+escribir nada. Dentro, `mapearPredioHistorico` decide campo por campo qué
+datos de predio (dirección, barrio/vereda, matrícula, área) son
+aprovechables sin inventar ni normalizar nada; ver su JSDoc y la excepción
+declarada arriba para el detalle por archivo. `__tests__/migracion-reconciliacion-snapshot-real.test.ts` usa
 `.local.json` si existe (máquina del propietario, para artefactos con
 fidelidad completa antes de la reunión) y cae a `.sanitizado.json` en
 cualquier otro entorno (CI, un clon nuevo). La escritura real (fuera del
