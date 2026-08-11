@@ -1,7 +1,15 @@
 # Checklist oficial — Licencia de Construcción · Modalidad Obra Nueva (Simacota)
 
 > Insumo real entregado por el propietario (levantamiento con Secretaría de Planeación). Es la **parametrización de la primera "Definición de Trámite"** del motor genérico de expedientes (no código: dato configurable desde administración).
-> ⚠️ **Es "Página 1 de 2" — falta la página 2.** Pendiente de recibir para completar el catálogo.
+> ✅ **COMPLETO — páginas 1 y 2** (11-ago-2026). El propietario aportó el formato oficial íntegro:
+> **`F-PGD-009`, versión 02, aprobado el 15-01-2024**, archivado junto a este documento como
+> `F-PGD-009-requisitos-licencia-construccion-obra-nueva-v02.pdf`.
+>
+> Los 6 requisitos de la página 2 (proyecto arquitectónico, disponibilidad de servicios públicos,
+> matrícula y experiencia profesional, memorial de responsabilidad, valla de citación a vecinos y
+> cancelación de expensas) YA estaban sembrados en la Definición de Trámite y se verificaron uno a
+> uno contra el PDF; lo que faltaba era retirar la marca de "parcial", que la pantalla repetía al
+> funcionario. Cubre la precondición #2 del ADR-0026.
 
 ## Requisitos (marcar tipo: OBLIGATORIO / CONDICIONAL / con regla)
 
@@ -33,4 +41,4 @@
 
 También confirma, del análisis normativo: **citación a colindantes con 5 días hábiles** (#18), **expensas** (#19), y **Decreto 1203 de 2017** como norma vigente del contenido de la licencia (además del Decreto 1077).
 
-**Pendiente:** página 2 del checklist + validación del listado completo con la Secretaría de Planeación.
+**Pendiente:** validación del listado completo con la Secretaría de Planeación (el catálogo ya cubre las dos páginas del formato oficial; falta que el ingeniero confirme que no hay exigencias adicionales de la práctica local no recogidas en el formato).
