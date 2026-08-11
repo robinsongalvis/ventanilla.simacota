@@ -18,6 +18,7 @@ import {
 } from '@/app/interno/licencias/presentacion-libro-consecutivo';
 import type { ExpedienteLicenciaDoc } from '@/lib/server/expedientes-licencias';
 import { sumarDiasHabiles } from '@/lib/tiempos-radicado';
+import { formatFechaColombia } from '@/lib/fecha-colombia';
 
 /* ══════════════════════════════════════════════════════════════
    Bloque C — Libro consecutivo. Pruebas de las funciones PURAS que
@@ -186,7 +187,16 @@ describe('construirFilasLibroConsecutivo', () => {
         2026,
       );
       // 12 meses improrrogables desde la firmeza (Código Civil art. 67).
-      expect(fila.vigenciaHasta).toBe('2027-04-20T17:00:00.000Z');
+      //
+      // Se asevera el DÍA CIVIL en Colombia, NO el instante ISO exacto: la
+      // vigencia es un día del calendario, y `sumarMesCalendario` ancla al
+      // mediodía del runtime (mediodía Bogotá en local = 17:00Z; mediodía
+      // UTC en CI = 12:00Z). Ambos instantes son el MISMO día civil en
+      // Bogotá — que es lo único que el usuario ve y lo único que la norma
+      // define. Comparar el ISO crudo haría que el test pasara en Colombia
+      // y fallara en CI (ocurrió: PR #180) sin que nada estuviera roto.
+      expect(fila.vigenciaHasta).not.toBeNull();
+      expect(formatFechaColombia(fila.vigenciaHasta!)).toBe(formatFechaColombia('2027-04-20T17:00:00.000Z'));
     });
 
     it('cierreDesconocido (migración sin detalle confiable): no calcula, aunque fechaFirmeza esté presente', () => {
