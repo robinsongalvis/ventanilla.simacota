@@ -56,6 +56,28 @@
  * que el plan pase de 0 a ~190 importables SIN tocar el planificador ni el
  * ejecutor — son datos, no código.
  * ═══════════════════════════════════════════════════════════════════════
+ *
+ * SUPERSEDIDO como puerta de bloqueo (DF-10, decisión del propietario,
+ * 11-ago-2026): `planificar-importacion-consecutivo.ts` YA NO llama a
+ * `resolverEstadoOperativo` para decidir si un registro se importa —
+ * decisión distinta y más simple reemplazó a la de arriba: TODO registro
+ * histórico con fecha válida entra como "histórico sin resolver"
+ * (`RevisionHistoricaLicencia`, `lib/motor-expedientes/estados-licencia.ts`,
+ * DF-10), sin importar lo que diga su campo "estado" — adivinar CUÁL de los
+ * 9 hitos jurídicos corresponde a "terminado"/"revisado" seguía siendo
+ * exactamente lo que este módulo existía para evitar, y esperar P4′
+ * indefinidamente bloqueaba el libro completo que el propietario pidió
+ * importar. El texto crudo del campo "estado" SÍ se conserva (verbatim, ver
+ * `ExpedienteLicenciaDoc.estadoOriginalHistorico`), solo que ya no pasa por
+ * ESTA tabla para decidir nada.
+ *
+ * Este archivo NO se elimina: `resolverEstadoOperativo`/`validarTablaEstadosOperativos`
+ * siguen siendo lógica PURA y correcta, reutilizable el día que exista un
+ * mecanismo real (interactivo, no de migración masiva) para que un
+ * funcionario resuelva un estado operativo puntual contra un hito jurídico
+ * — ese es un problema distinto al de "importar 202 registros sin inventar
+ * un desenlace", que es el que resolvió DF-10.
+ * ═══════════════════════════════════════════════════════════════════════
  */
 
 import { normalizarTextoHistorico } from '@/lib/motor-expedientes/equivalencia-migracion';

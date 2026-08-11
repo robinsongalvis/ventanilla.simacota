@@ -445,4 +445,150 @@ describe('LibroConsecutivoClient', () => {
       expect(document.activeElement).toBe(boton);
     });
   });
+
+  /* ── Buscador rápido (localizar por radicado, nombre, matrícula, código,
+     estado y abrir desde ahí) ── */
+
+  it('buscador rápido: campo accesible por su etiqueta, enlazado a la tabla', async () => {
+    mockAuth();
+    vi.stubGlobal('fetch', mockFetchExpedientes([expedienteBase()]));
+    render(<LibroConsecutivoClient />);
+    await seleccionarAño2026();
+
+    const campo = await screen.findByLabelText(
+      'Buscar en el libro consecutivo por expediente, radicado, solicitante, documento, matrícula inmobiliaria, tipo o estado',
+    );
+    expect(campo.getAttribute('type')).toBe('search');
+    expect(campo.getAttribute('aria-controls')).toBe('tabla-libro-consecutivo');
+  });
+
+  it('buscador rápido: filtra por nombre del solicitante, insensible a acentos/mayúsculas', async () => {
+    mockAuth();
+    vi.stubGlobal(
+      'fetch',
+      mockFetchExpedientes([
+        expedienteBase({ id: 'exp-a', numeroExpediente: { numero: '68745-0-26-0001', serieId: 'demo', año: 2026 }, solicitanteNombre: 'María Gálvez' }),
+        expedienteBase({ id: 'exp-b', numeroExpediente: { numero: '68745-0-26-0002', serieId: 'demo', año: 2026 }, solicitanteNombre: 'Pedro Ruiz' }),
+      ]),
+    );
+    render(<LibroConsecutivoClient />);
+    await seleccionarAño2026();
+    await waitFor(() => expect(screen.getByText('68745-0-26-0002')).toBeTruthy());
+
+    const campo = screen.getByLabelText(
+      'Buscar en el libro consecutivo por expediente, radicado, solicitante, documento, matrícula inmobiliaria, tipo o estado',
+    );
+    fireEvent.change(campo, { target: { value: 'MARIA GALVEZ' } });
+
+    await waitFor(() => expect(screen.queryByText('68745-0-26-0002')).toBeNull());
+    expect(screen.getByText('68745-0-26-0001')).toBeTruthy();
+    expect(screen.getByText('1 resultado para "MARIA GALVEZ"')).toBeTruthy();
+  });
+
+  it('buscador rápido: se combina con el filtro de chip activo (busca DENTRO del filtro, no lo reemplaza)', async () => {
+    mockAuth();
+    vi.stubGlobal(
+      'fetch',
+      mockFetchExpedientes([
+        expedienteBase({ id: 'exp-tramite', numeroExpediente: { numero: '68745-0-26-0010', serieId: 'demo', año: 2026 }, solicitanteNombre: 'Ana Vencido' }),
+        conAlertaConservadora(
+          expedienteBase({ id: 'exp-vencido', numeroExpediente: { numero: '68745-0-26-0020', serieId: 'demo', año: 2026 }, solicitanteNombre: 'Ana Vencido' }),
+          FECHA_ALERTA_VENCIDA,
+        ),
+      ]),
+    );
+    render(<LibroConsecutivoClient />);
+    await seleccionarAño2026();
+    await waitFor(() => expect(screen.getByText('68745-0-26-0020')).toBeTruthy());
+
+    fireEvent.click(screen.getByRole('button', { name: /Vencidos/ }));
+    await waitFor(() => expect(screen.queryByText('68745-0-26-0010')).toBeNull());
+
+    // "Ana Vencido" aparece en ambos expedientes, pero solo uno está en el
+    // filtro "Vencidos" activo — el buscador no debe traer de vuelta al
+    // que el chip ya excluyó.
+    const campo = screen.getByLabelText(
+      'Buscar en el libro consecutivo por expediente, radicado, solicitante, documento, matrícula inmobiliaria, tipo o estado',
+    );
+    fireEvent.change(campo, { target: { value: 'Ana Vencido' } });
+
+    await waitFor(() => expect(screen.getByText('68745-0-26-0020')).toBeTruthy());
+    expect(screen.queryByText('68745-0-26-0010')).toBeNull();
+  });
+
+  it('buscador rápido: KPIs y conteos de los chips NO cambian con la búsqueda activa (siguen reflejando el año completo)', async () => {
+    mockAuth();
+    vi.stubGlobal(
+      'fetch',
+      mockFetchExpedientes([
+        expedienteBase({ id: 'a', numeroExpediente: { numero: '68745-0-26-0001', serieId: 'demo', año: 2026 }, solicitanteNombre: 'Alguien Distinto' }),
+        expedienteBase({ id: 'b', numeroExpediente: { numero: '68745-0-26-0002', serieId: 'demo', año: 2026 }, solicitanteNombre: 'Alguien Más' }),
+      ]),
+    );
+    render(<LibroConsecutivoClient />);
+    await seleccionarAño2026();
+    await waitFor(() => expect(within(tarjetaKpi('Total')).getByText('2')).toBeTruthy());
+
+    const campo = screen.getByLabelText(
+      'Buscar en el libro consecutivo por expediente, radicado, solicitante, documento, matrícula inmobiliaria, tipo o estado',
+    );
+    fireEvent.change(campo, { target: { value: 'Distinto' } });
+
+    await waitFor(() => expect(screen.queryByText('68745-0-26-0002')).toBeNull());
+    expect(within(tarjetaKpi('Total')).getByText('2')).toBeTruthy();
+  });
+
+  it('buscador rápido: sin coincidencias muestra el término buscado y un botón para limpiar (nunca una tabla vacía muda)', async () => {
+    mockAuth();
+    vi.stubGlobal('fetch', mockFetchExpedientes([expedienteBase()]));
+    render(<LibroConsecutivoClient />);
+    await seleccionarAño2026();
+    await waitFor(() => expect(screen.getByText('68745-0-26-0001')).toBeTruthy());
+
+    const campo = screen.getByLabelText(
+      'Buscar en el libro consecutivo por expediente, radicado, solicitante, documento, matrícula inmobiliaria, tipo o estado',
+    );
+    fireEvent.change(campo, { target: { value: 'no-existe-este-termino' } });
+
+    await waitFor(() => expect(screen.getByText('Sin resultados para "no-existe-este-termino"')).toBeTruthy());
+    fireEvent.click(screen.getByRole('button', { name: 'Limpiar búsqueda' }));
+
+    await waitFor(() => expect(screen.getByText('68745-0-26-0001')).toBeTruthy());
+    expect((campo as HTMLInputElement).value).toBe('');
+  });
+
+  it('buscador rápido: encuentra por matrícula inmobiliaria (dato del predio, no una columna de la tabla)', async () => {
+    mockAuth();
+    vi.stubGlobal('fetch', mockFetchExpedientes([expedienteBase({ predio: { matriculaInmobiliaria: '321-51890' } })]));
+    render(<LibroConsecutivoClient />);
+    await seleccionarAño2026();
+    await waitFor(() => expect(screen.getByText('68745-0-26-0001')).toBeTruthy());
+
+    const campo = screen.getByLabelText(
+      'Buscar en el libro consecutivo por expediente, radicado, solicitante, documento, matrícula inmobiliaria, tipo o estado',
+    );
+    fireEvent.change(campo, { target: { value: '321-51890' } });
+
+    await waitFor(() => expect(screen.getByText('68745-0-26-0001')).toBeTruthy());
+  });
+
+  it('buscador rápido: expediente sin cédula (histórico feo) sigue siendo localizable por nombre/expediente', async () => {
+    mockAuth();
+    vi.stubGlobal(
+      'fetch',
+      mockFetchExpedientes([
+        expedienteBase({ solicitanteDocumento: '', solicitanteNombre: 'Comercializadora y Distribuidora El Roble S.A.S.' }),
+      ]),
+    );
+    render(<LibroConsecutivoClient />);
+    await seleccionarAño2026();
+    await waitFor(() => expect(screen.getByText('68745-0-26-0001')).toBeTruthy());
+
+    const campo = screen.getByLabelText(
+      'Buscar en el libro consecutivo por expediente, radicado, solicitante, documento, matrícula inmobiliaria, tipo o estado',
+    );
+    fireEvent.change(campo, { target: { value: 'roble' } });
+
+    await waitFor(() => expect(screen.getByText('68745-0-26-0001')).toBeTruthy());
+  });
 });

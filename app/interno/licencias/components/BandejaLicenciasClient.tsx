@@ -35,12 +35,16 @@ import type { ExpedienteLicenciaDoc } from '@/lib/server/expedientes-licencias';
 import type { EstadoJuridicoLicencia } from '@/lib/motor-expedientes/estados-licencia';
 import { formatFechaColombia } from '@/lib/fecha-colombia';
 import { nombreSubtipo } from '../presentacion-subtipos';
+import { camposBusquedaDesdeExpediente, coincideBusquedaLibro } from '../presentacion-libro-consecutivo';
 import { ChipEstadoJuridico } from './ChipEstadoJuridico';
 import { ChipPrueba } from './ChipPrueba';
 import { NumeroLegal } from './NumeroLegal';
 import { TarjetaKPI } from './TarjetaKPI';
 import { RadicarSolicitudModal } from './RadicarSolicitudModal';
 import { CrearDesdeRadicadoModal } from './CrearDesdeRadicadoModal';
+import { BuscadorRapidoLibro } from './BuscadorRapidoLibro';
+
+const ID_TABLA_BANDEJA_LICENCIAS = 'tabla-bandeja-licencias';
 
 /**
  * Partición del dominio de `EstadoJuridicoLicencia` en 3 baldes
@@ -118,6 +122,7 @@ export function BandejaLicenciasClient({ onAbrirExpediente, onIrALibroConsecutiv
   const [error, setError] = useState<string | null>(null);
   const [modalAbierto, setModalAbierto] = useState(false);
   const [modalDesdeRadicadoAbierto, setModalDesdeRadicadoAbierto] = useState(false);
+  const [busqueda, setBusqueda] = useState('');
 
   const cargar = useCallback(async () => {
     setCargando(true);
@@ -161,6 +166,22 @@ export function BandejaLicenciasClient({ onAbrirExpediente, onIrALibroConsecutiv
   }, [expedientes]);
 
   const totalPrueba = useMemo(() => expedientes.filter((e) => e.esPrueba).length, [expedientes]);
+
+  const terminoBusqueda = busqueda.trim();
+  /**
+   * Buscador rápido (mismo pedido/función pura que el Libro Consecutivo —
+   * ver JSDoc de `coincideBusquedaLibro`, `../presentacion-libro-
+   * consecutivo.ts`). A diferencia del Libro, la Bandeja NO construye
+   * `FilaLibroConsecutivo` (solo pinta `ExpedienteLicenciaDoc` crudo), así
+   * que cada expediente pasa primero por `camposBusquedaDesdeExpediente`.
+   * Los KPIs de arriba (`kpis`, `totalPrueba`) siguen sobre `expedientes`
+   * completo — mismo criterio que en el Libro: buscar no debe distorsionar
+   * el panorama general.
+   */
+  const expedientesVisibles = useMemo(() => {
+    if (!terminoBusqueda) return expedientes;
+    return expedientes.filter((exp) => coincideBusquedaLibro(camposBusquedaDesdeExpediente(exp), busqueda));
+  }, [expedientes, busqueda, terminoBusqueda]);
 
   return (
     <div className="p-4 md:p-6 flex flex-col gap-5 max-w-[1400px] mx-auto">
@@ -240,13 +261,25 @@ export function BandejaLicenciasClient({ onAbrirExpediente, onIrALibroConsecutiv
         />
       </div>
 
+      {/* ── Buscador rápido ── */}
+      <BuscadorRapidoLibro
+        id="busqueda-bandeja-licencias"
+        etiqueta="Buscar en la bandeja de licencias por expediente, radicado, solicitante, documento, matrícula inmobiliaria, tipo o estado"
+        placeholder="Buscar por expediente, radicado, nombre, documento, matrícula, tipo o estado…"
+        valor={busqueda}
+        onChange={setBusqueda}
+        idTabla={ID_TABLA_BANDEJA_LICENCIAS}
+        totalVisible={expedientesVisibles.length}
+      />
+
       {/* ── Tabla ── */}
       <div
         className="rounded-xl overflow-hidden"
         style={{ background: 'var(--bg-surface)', border: '1px solid var(--color-border)', boxShadow: 'var(--shadow-soft)' }}
       >
         <div className="overflow-x-auto">
-          <table className="w-full border-collapse text-sm">
+          <table id={ID_TABLA_BANDEJA_LICENCIAS} className="w-full border-collapse text-sm">
+            <caption className="sr-only">{`Bandeja de licencias${terminoBusqueda ? `, búsqueda "${terminoBusqueda}"` : ''}`}</caption>
             <thead>
               <tr style={{ borderBottom: '1px solid var(--color-border)' }}>
                 <Th ancho={210}>Expediente</Th>
@@ -281,7 +314,24 @@ export function BandejaLicenciasClient({ onAbrirExpediente, onIrALibroConsecutiv
                   </td>
                 </tr>
               )}
-              {!cargando && expedientes.map((exp) => {
+              {!cargando && expedientes.length > 0 && expedientesVisibles.length === 0 && (
+                <tr>
+                  <td colSpan={5} className="px-3 py-10 text-center text-sm" style={{ color: 'var(--text-primary)' }}>
+                    <div className="flex flex-col items-center gap-2">
+                      <p className="font-medium">Sin resultados para &quot;{terminoBusqueda}&quot;</p>
+                      <button
+                        type="button"
+                        onClick={() => setBusqueda('')}
+                        className="text-xs font-bold underline focus-visible:outline-none focus-visible:ring-2 rounded"
+                        style={{ color: 'var(--color-primary)' }}
+                      >
+                        Limpiar búsqueda
+                      </button>
+                    </div>
+                  </td>
+                </tr>
+              )}
+              {!cargando && expedientesVisibles.map((exp) => {
                 const numero = exp.numeroExpediente?.numero ?? exp.id;
                 return (
                   <tr key={exp.id} className="micro-row" style={{ borderBottom: '1px solid var(--color-border)' }}>
@@ -329,10 +379,12 @@ export function BandejaLicenciasClient({ onAbrirExpediente, onIrALibroConsecutiv
         </div>
       </div>
 
-      {/* ── Pie ── */}
+      {/* ── Pie: conteos de reconciliación (sobre el TOTAL, no de la búsqueda activa) ── */}
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 text-xs" style={{ color: 'var(--text-secondary)' }}>
         <p>
           {kpis.totalContable} expediente{kpis.totalContable === 1 ? '' : 's'} · {totalPrueba} de prueba visible{totalPrueba === 1 ? '' : 's'}
+          {terminoBusqueda &&
+            ` · ${expedientesVisibles.length} visible${expedientesVisibles.length === 1 ? '' : 's'} con la búsqueda activa`}
         </p>
         <BotonIrALibroConsecutivo onIrALibroConsecutivo={onIrALibroConsecutivo} />
       </div>

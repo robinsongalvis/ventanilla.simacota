@@ -1,7 +1,9 @@
 /**
  * Planificador PURO de la importación del consecutivo histórico de
  * licencias (Bloque "Importador de históricos", ago-2026) — Fase 5
- * (expedientes RECONSTRUIDOS, ADR-0029 DF-9).
+ * (expedientes RECONSTRUIDOS, ADR-0029 DF-9), rediseñado por DF-10
+ * (decisión del propietario, 11-ago-2026, tras consultar al ingeniero de
+ * Planeación — bloque "Históricos sin resolver").
  *
  * Resuelve el problema "el ejecutor `.mjs` no puede importar TS" separando
  * el trabajo en dos capas (mismo patrón que el resto del proyecto: "Plan |
@@ -19,50 +21,94 @@
  * Reutiliza (nunca reimplementa) las piezas REALES del motor:
  *  - `resolverEquivalencia`/`EQUIVALENCIAS_MIGRACION_SEMILLA_LICENCIAS`
  *    (DF-4) para el CÓDIGO de subtipo (eje P1′).
- *  - `resolverEstadoOperativo`/`EQUIVALENCIAS_ESTADOS_OPERATIVOS_SEMILLA`
- *    (`./equivalencia-estados-operativos.ts`, estructura P4′ nueva) para el
- *    hito jurídico (eje P4′).
+ *  - `derivarEventosTermino`/`calcularVencimientoDual` (`./termino.ts`) para
+ *    verificar R9 END-TO-END (ver más abajo) — no se asume el resultado, se
+ *    CALCULA con las mismas funciones que usa el servidor.
  *
  * ═══════════════════════════════════════════════════════════════════════
- * REGLA DURA — por qué HOY el dry-run planifica 0 importables:
+ * DF-10 — POR QUÉ CAMBIÓ EL DISEÑO (11-ago-2026):
  *
- * Un registro histórico solo se planifica como expediente si TODAS estas
- * puertas pasan:
- *  1. `tipo` resuelve a códigos de subtipo (P1′) — `resolverEquivalencia`.
- *  2. `estado` resuelve a un hito jurídico (P4′) — `resolverEstadoOperativo`.
- *  3. `fechaSolicitud` es una fecha calendario válida y reconocible.
- *  4. El solicitante tiene nombre Y número de documento — HALLAZGO de esta
- *     implementación, no parte del encargo original: `solicitanteNombre` y
- *     `solicitanteDocumento` son campos OBLIGATORIOS del modelo
- *     `Expediente`. El número de documento/cédula NUNCA existió en el
- *     libro histórico (verificado contra las 202 filas reales, en NINGUNA
- *     versión del snapshot) — bloquea el 100% de los registros por sí
- *     solo. El NOMBRE sí existe en el libro real, pero remediación PII
- *     (ago-2026, Ley 1581/2012): el archivo que corre en CI/se versiona
- *     (`consecutivo-licencias-snapshot.sanitizado.json`) lo retira a
- *     propósito — los nombres propios nunca entran a la historia de git,
- *     ni en un repo privado (la historia es permanente). Contra ESE
- *     archivo, esta puerta también bloquea el 100% por el lado del
- *     nombre; contra el `.local.json` (máquina autorizada, con nombres),
- *     solo bloquea por el lado del documento — el resultado numérico
- *     (0 planificados) es idéntico en ambos casos, cambia únicamente el
- *     detalle textual de POR QUÉ. Inventar un valor de relleno (aunque
- *     fuera `''` o un marcador tipo "[REDACTADO]") sería exactamente lo
- *     que "sin inventar nada ausente" prohíbe — redactar (omitir) no es
- *     lo mismo que inventar. Esta puerta seguirá bloqueando incluso
- *     después de que P1′ y P4′ respondan, salvo que el propietario decida
- *     una fuente alterna para la identidad o se relaje el modelo. Se
- *     reporta como advertencia aparte (no se mezcla con P1′/P4′, que sí
- *     estaban en el encargo).
+ * La versión anterior de este planificador esperaba que dos preguntas
+ * (P1′: códigos de subtipo sin mapear; P4′: qué hito jurídico corresponde a
+ * cada texto de "estado" del libro) se respondieran ANTES de poder importar
+ * nada — con la semilla provisional 100% en cuarentena, el resultado real
+ * eran 0 importables. El propietario, tras consultar al ingeniero de
+ * Planeación, decidió lo contrario para el eje P4′: el libro se llevaba a
+ * mano, "revisado" significa que se revisó y ahí quedó (no es trámite
+ * activo), 132 de los 202 registros ni siquiera tienen "estado", y NINGUNO
+ * de los 202 trae fecha de resolución — así que NINGÚN texto histórico de
+ * "estado" alcanza a sustentar un hito jurídico verificable, sin importar
+ * cuál sea. Un intento previo de mapear "terminado" → `CONCEDIDA` fue
+ * RECTIFICADO expresamente por el propietario: *"No conviertas 'terminado'
+ * en 'Concedida' sin acto final verificable"*.
  *
- * Con la semilla PROVISIONAL de hoy (100% CUARENTENA en la tabla de
- * estados operativos — ver `equivalencia-estados-operativos.ts`), la
- * puerta 2 por sí sola YA quarentena el 100% del snapshot real. El
- * resultado esperado y CORRECTO del dry-run: **0 planificados, ~202 en
- * cuarentena**. El reporte (`generarReporteDryRun`) desglosa CUÁNTOS
- * registros desbloquea cada respuesta pendiente, para que el propietario y
- * el ingeniero vean el impacto exacto de responder P1′/P4′ (y, aparte, de
- * decidir qué hacer con la identidad del solicitante).
+ * Consecuencia: el eje P4′ (`equivalencia-estados-operativos.ts`) queda
+ * SUPERSEDIDO como puerta de bloqueo (ver su JSDoc actualizado) — TODO
+ * registro con fecha válida entra como "histórico sin resolver"
+ * (`RevisionHistoricaLicencia`, `lib/motor-expedientes/estados-licencia.ts`,
+ * DF-10), preservando el texto original del libro
+ * (`estadoOriginalHistorico`) como evidencia de procedencia, nunca como
+ * insumo para adivinar un desenlace.
+ *
+ * El eje P1′ (códigos) SIGUE resolviendo por norma cuando puede — pero ya
+ * NO bloquea cuando no puede: los 3 códigos que hoy no resuelven ("LCR
+ * VISR", "LRC", y la variante de espaciado "LR y  LC, A" — HALLAZGO de esta
+ * implementación, no estaba en la lista que trajo el encargo, pero el
+ * mismo criterio general la cubre sin caso especial) se importan con el
+ * texto histórico CRUDO como único elemento de `subtipos` — decisión
+ * alineada con la MISMA convención que ya anticipa `esSubtipoEnCuarentena`
+ * (`app/interno/licencias/presentacion-libro-consecutivo.ts`): un código de
+ * subtipo que no está en el catálogo normativo se pinta como "pendiente de
+ * identificar" en vez de tratarse como un dato cualquiera, y
+ * `nombreSubtipo` ya degrada con gracia a mostrar el código crudo si no lo
+ * reconoce. Se reporta aparte (`PlanImportacion.subtiposSinResolver`), NUNCA
+ * se mezcla en silencio con un código real.
+ *
+ * La identidad del solicitante (nombre/documento) tampoco bloquea más para
+ * RECONSTRUIDOS (decisión del propietario: "entran SIN cédula"; se
+ * completan después desde la plataforma, los originales físicos están en la
+ * Alcaldía) — el campo requerido se deja en STRING VACÍO cuando falta, NO
+ * un sentinel inventado: `app/interno/licencias/presentacion-libro-
+ * consecutivo.ts` YA declara `faltaCedula: estaVacio(exp.solicitanteDocumento)`
+ * con JSDoc "dato faltante honesto (histórico reconstruido, R6)" — ese
+ * contrato existía ANTES de esta implementación, así que reutilizarlo (en
+ * vez de inventar un texto tipo "sin-documento-historico") es la opción que
+ * no rompe nada y que el rediseño del Libro ya sabe leer.
+ *
+ * Con esto, la CUARENTENA real (que bloquea la importación) queda SOLO para
+ * lo que de verdad no se puede importar: fechas calendario imposibles o
+ * irreconocibles (6/202, sin cambio frente a la versión anterior). Todo lo
+ * demás que sigue faltando (cédula, estado jurídico verificable, acto
+ * final, subtipo) se IMPORTA de todas formas y se reporta como "pendiente
+ * de completar" (`PlanImportacion.pendientesHistorico`,
+ * `ExpedienteLicenciaDoc.revisionHistorica`) — editable y trazable después
+ * (decisión del propietario #5: "cada registro editable y trazable"), nunca
+ * un motivo para dejar el registro fuera del libro.
+ *
+ * R9 END-TO-END: cada expediente importado recibe, en el MISMO cálculo que
+ * hace el servidor (`derivarEventosTermino` + `calcularVencimientoDual`,
+ * `./termino.ts`), `fechaAlertaConservadora: null` — se VERIFICA, no se
+ * asume: se construye la actuación de radicación `origen: 'RECONSTRUIDO'`
+ * que el ejecutor `.mjs` escribirá de verdad
+ * (`construirActuacionRadicacion`) y se corre por las funciones reales; R9
+ * (`derivarEventosTermino`) la excluye ANTES de que haya ancla de término,
+ * así que el resultado es `null` sin excepción — ningún histórico genera
+ * vencimientos ni alertas.
+ *
+ * COSTO CONOCIDO, DECLARADO (no oculto): `estadoJuridico` se fija en
+ * `RADICADA_EN_DEBIDA_FORMA` (ver `ESTADO_JURIDICO_HISTORICO_SIN_RESOLVER`)
+ * — el único hito de los 9 que no afirma ningún desenlace. Hoy,
+ * `ESTADOS_EN_TRAMITE_LIBRO` (`app/interno/licencias/presentacion-libro-
+ * consecutivo.ts`) clasifica "En trámite" solo por `estadoJuridico`, sin
+ * mirar `origen`/`revisionHistorica` — así que el KPI "En trámite" del
+ * Libro SÍ va a contar estos expedientes hasta que ese archivo (fuera del
+ * alcance de este rol) aplique el MISMO criterio que
+ * `BandejaLicenciasClient.tsx` ya usa hoy para sus propios KPIs
+ * (`esReconstruido`/`contables`, excluye RECONSTRUIDOS por completo). Ver
+ * JSDoc de `RevisionHistoricaLicencia` para el análisis completo de por qué
+ * NINGÚN valor de `EstadoJuridicoLicencia` evita este costo sin mentir
+ * sobre un desenlace — se prefiere este costo transparente, corregible en
+ * una capa ajena, a la alternativa prohibida.
  * ═══════════════════════════════════════════════════════════════════════
  */
 
@@ -71,11 +117,12 @@ import {
 } from '@/lib/motor-expedientes/catalogo-subtipos-normativo';
 import { resolverEquivalencia, normalizarTextoHistorico } from '@/lib/motor-expedientes/equivalencia-migracion';
 import {
-  EQUIVALENCIAS_ESTADOS_OPERATIVOS_SEMILLA,
-  resolverEstadoOperativo,
-} from './equivalencia-estados-operativos';
-import type { EstadoJuridicoLicencia } from '@/lib/motor-expedientes/estados-licencia';
-import type { EstadoExpediente, DatosPredio } from '@/lib/motor-expedientes/tipos';
+  type EstadoJuridicoLicencia,
+  type RevisionHistoricaLicencia,
+  type EjeCompletitudHistorico,
+} from '@/lib/motor-expedientes/estados-licencia';
+import { derivarEventosTermino, calcularVencimientoDual } from '@/lib/motor-expedientes/termino';
+import type { DatosPredio, Actuacion } from '@/lib/motor-expedientes/tipos';
 // Import type-only (se borra en compilación, CERO acoplamiento en tiempo de
 // ejecución con `lib/server/`): reutiliza la forma exacta del documento que
 // ya escriben las demás rutas de expedientes, sin duplicar la interfaz.
@@ -125,23 +172,25 @@ export interface RegistroConsecutivoHistorico {
    * nombre propio nunca entra a la historia de git, ni en un repo
    * privado). La versión CON nombres (`.local.json`, gitignored) solo
    * vive en máquinas autorizadas, para la reunión con el propietario. El
-   * planificador es el MISMO código en ambos casos — la puerta
-   * IDENTIDAD_INCOMPLETA (ver más abajo) exige este campo igual que
-   * `solicitanteDocumento`, así que la ausencia (sanitizado) o presencia
-   * (local) no cambia la reconciliación, solo el detalle textual de la
-   * cuarentena.
+   * planificador es el MISMO código en ambos casos — cuando falta (DF-10:
+   * ya NO bloquea, ver `planificarImportacion`), `solicitanteNombre` queda
+   * en `''` (string vacío, "dato faltante honesto" — mismo criterio que
+   * `faltaCedula` en `app/interno/licencias/presentacion-libro-consecutivo.ts`),
+   * nunca un nombre inventado.
    */
   solicitante?: string;
   /**
    * Número de documento del solicitante. Optativo porque el libro
    * histórico REAL de Simacota (ambas versiones, sanitizada y local) no
    * tiene esta columna — no existe en ninguna de las 202 filas — así que
-   * para ese snapshot esto siempre es `undefined` y la puerta
-   * IDENTIDAD_INCOMPLETA (ver `planificarImportacion`) los manda a todos
-   * a cuarentena, honestamente. Se declara aquí (en vez de omitirse del
-   * tipo) para que una fuente FUTURA que sí traiga el dato pueda usar el
-   * mismo planificador sin cambios de código — y para que los tests
-   * sintéticos puedan ejercer el camino "importable".
+   * para ese snapshot esto siempre es `undefined`. DF-10: la ausencia ya NO
+   * bloquea la importación de un RECONSTRUIDO (decisión del propietario,
+   * 11-ago-2026: "entran SIN cédula, se completan después desde la
+   * plataforma") — `solicitanteDocumento` queda en `''` cuando falta. Se
+   * declara aquí (en vez de omitirse del tipo) para que una fuente FUTURA
+   * que sí traiga el dato pueda usar el mismo planificador sin cambios de
+   * código — y para que los tests sintéticos puedan ejercer el camino con
+   * documento presente.
    */
   solicitanteDocumento?: string;
 }
@@ -163,11 +212,17 @@ export interface SnapshotConsecutivoLicencias {
    Plan de salida
 ────────────────────────────────────────────── */
 
-export type MotivoCuarentena =
-  | 'CODIGO_PENDIENTE_P1'
-  | 'ESTADO_PENDIENTE_P4'
-  | 'FECHA_INVALIDA'
-  | 'IDENTIDAD_INCOMPLETA';
+/**
+ * DF-10: único motivo de cuarentena REAL que queda — todo lo demás que
+ * antes bloqueaba (`CODIGO_PENDIENTE_P1`, `ESTADO_PENDIENTE_P4`,
+ * `IDENTIDAD_INCOMPLETA`) ahora se IMPORTA con el dato pendiente marcado
+ * (ver `PlanImportacion.pendientesHistorico`/`subtiposSinResolver` y
+ * `ExpedienteLicenciaDoc.revisionHistorica`), nunca se deja fuera del
+ * libro. Se mantiene como unión (no un valor único suelto) para no romper
+ * la forma de `RegistroEnCuarentena.motivos`/`generarReporteDryRun` si una
+ * cuarentena real futura se vuelve a necesitar.
+ */
+export type MotivoCuarentena = 'FECHA_INVALIDA';
 
 export interface RegistroEnCuarentena {
   radicado: string;
@@ -181,7 +236,6 @@ export interface RegistroEnCuarentena {
    * (omitir) no es lo mismo que inventar un valor.
    */
   solicitante?: string;
-  /** Puede tener más de un motivo simultáneo (p. ej. código Y estado sin mapear a la vez) — cada uno se cuenta aparte en el reporte. */
   motivos: MotivoCuarentena[];
   /** Explicación legible, un elemento por motivo (mismo orden que `motivos`). */
   detalle: string[];
@@ -192,8 +246,56 @@ export interface Reconciliacion {
   totalSnapshot: number;
   planificados: number;
   enCuarentena: number;
-  /** Registros (no pares) involucrados en una colisión de `radicado` repetido — el caso 25-0037 real cuenta 2. */
+  /** Registros (no pares) involucrados en una colisión de `radicado` repetido — el caso 25-0037 real cuenta 2. NO bloquea la importación (DF-9): ambas filas se planifican, cada una con `numeroExpediente.colision: true`. */
   colisiones: number;
+}
+
+/**
+ * Un registro cuyo `radicado` colisiona con otro del mismo snapshot — lista
+ * PLANA (hoja/fila/radicado) para que el propietario/ingeniero la revise,
+ * sin importar si el registro terminó planificado o en cuarentena por otro
+ * motivo (misma filosofía que `datosPredio`: reporte ortogonal a la
+ * cuarentena).
+ */
+export interface RegistroColision {
+  radicado: string;
+  hoja: string;
+  fila: number;
+}
+
+/**
+ * Un registro cuyo texto histórico de "tipo" NO resolvió contra el catálogo
+ * normativo (P1′) y se importó con ese texto CRUDO como único elemento de
+ * `subtipos` — ver JSDoc de cabecera del archivo (DF-10) para la decisión
+ * completa de por qué se importa en vez de bloquear.
+ */
+export interface RegistroSubtipoSinResolver {
+  radicado: string;
+  hoja: string;
+  fila: number;
+  /** Texto tal como aparece en el libro, verbatim (mismo valor que termina en `ExpedienteLicenciaDoc.subtipos[0]`). */
+  tipoOriginal: string;
+}
+
+/**
+ * Conteos GRUPALES (no por registro) de qué falta por completar entre los
+ * `reconciliacion.planificados` — DELIBERADAMENTE sin listar cada radicado
+ * individual (a diferencia de `cuarentena`/`subtiposSinResolver`/
+ * `filasColision`, que sí son listas accionables de pocas filas): estos
+ * tres ejes aplican hoy a la CASI TOTALIDAD de los planificados (202/202
+ * sin estado jurídico verificable ni acto final; 202/202 sin cédula en el
+ * snapshot real) — una lista de 196 radicados no sería más útil que el
+ * conteo, y el detalle POR REGISTRO ya vive en
+ * `ExpedienteLicenciaDoc.revisionHistorica.pendientesAlImportar` (DF-10) una
+ * vez importado.
+ */
+export interface ResumenPendientesHistorico {
+  /** Cuántos planificados tienen `solicitanteNombre` y/o `solicitanteDocumento` en `''` (dato faltante honesto). */
+  sinIdentidad: number;
+  /** Cuántos planificados siguen "histórico sin resolver" (`revisionHistorica.pendiente === true`) — hoy, TODOS los planificados, por decisión del propietario (DF-10): ningún texto de "estado" del libro alcanza a sustentar un hito jurídico verificable. */
+  sinEstadoJuridico: number;
+  /** Cuántos planificados tienen `actoFinal.cierreDesconocido === true` (DF-6/DF-9: sin fecha de firmeza confiable en el libro). */
+  sinActoFinal: number;
 }
 
 /**
@@ -213,7 +315,8 @@ export interface FilaAreaDesalineada {
 /**
  * Reconciliación AMPLIADA (TAREA 3) de los datos de predio, calculada sobre
  * TODO el snapshot (`totalSnapshot` registros) — el predio es ortogonal a
- * las puertas P1′/P4′/fecha/identidad, así que estos conteos se acumulan
+ * la única puerta de cuarentena real (fecha) y a los ejes de completitud
+ * (identidad/estado/acto final/subtipo), así que estos conteos se acumulan
  * sin importar si el registro terminó importado o en cuarentena. Ver
  * `mapearPredioHistorico` para la decisión campo por campo.
  */
@@ -240,6 +343,12 @@ export interface PlanImportacion {
   expedientes: ExpedienteLicenciaDoc[];
   cuarentena: RegistroEnCuarentena[];
   reconciliacion: Reconciliacion;
+  /** DF-10: conteos grupales de qué falta por completar entre los planificados — ver `ResumenPendientesHistorico`. */
+  pendientesHistorico: ResumenPendientesHistorico;
+  /** DF-10: detalle por registro de los códigos de "tipo" que no resolvieron (P1′) y se importaron con el texto crudo — ver `RegistroSubtipoSinResolver`. */
+  subtiposSinResolver: RegistroSubtipoSinResolver[];
+  /** Detalle por registro de TODA fila involucrada en una colisión de radicado, planificada o no — ver `RegistroColision`. */
+  filasColision: RegistroColision[];
   /** Reconciliación ampliada de datos de predio (TAREA 3) — ver `ReconciliacionPredio`. */
   datosPredio: ReconciliacionPredio;
   advertencias: string[];
@@ -287,20 +396,6 @@ export function parsearFechaHistoricaANoonISO(texto: string | undefined | null):
     return null;
   }
   return { iso: fecha.toISOString(), año: year };
-}
-
-/**
- * Deriva el estado OPERATIVO (panel, `EstadoExpediente`) desde el hito
- * JURÍDICO resuelto — simplificación DECLARADA (Principio 13): hoy no hay
- * ninguna fila `MAPEADO` en `EQUIVALENCIAS_ESTADOS_OPERATIVOS_SEMILLA`, así
- * que esta rama no se ejerce contra datos reales todavía (solo en tests
- * sintéticos); cuando P4′ responda y se llenen filas `MAPEADO`, esta
- * heurística puede necesitar revisión humana en vez de asumirse correcta
- * en producción sin más validación.
- */
-function estadoOperativoDesdeJuridico(estadoJuridico: EstadoJuridicoLicencia): EstadoExpediente {
-  const CERRADOS: readonly EstadoJuridicoLicencia[] = ['CONCEDIDA', 'NEGADA', 'DESISTIDA', 'NOTIFICADA', 'EN_FIRME'];
-  return CERRADOS.includes(estadoJuridico) ? 'ARCHIVADO' : 'EN_REVISION';
 }
 
 /* ──────────────────────────────────────────────
@@ -380,8 +475,8 @@ export interface ResultadoMapeoPredio {
  *    (`AREA_DESALINEADA`) — `planificarImportacion` acumula estos descartes
  *    con hoja/fila en `PlanImportacion.datosPredio.filasAreaDesalineada`
  *    para que el ingeniero corrija su libro en el origen. Esto NUNCA es
- *    motivo de cuarentena del registro: el predio es ortogonal a las
- *    puertas P1′/P4′/fecha/identidad.
+ *    motivo de cuarentena del registro: el predio es ortogonal a la puerta
+ *    de fecha y a los ejes de completitud (identidad/estado/acto final/subtipo).
  *
  * `noLicencia` y `correcciones` NO se mapean aquí — `noLicencia` alimenta
  * `actoFinal.numero` (un dato del ACTO, no del predio; ver
@@ -439,7 +534,58 @@ export function mapearPredioHistorico(registro: RegistroConsecutivoHistorico): R
  */
 export const SIN_DEFINICION_TRAMITE_HISTORICO = 'sin-definicion-tramite-historico';
 
+/**
+ * DF-10: valor de `estadoJuridico` para TODO expediente importado del
+ * histórico (decisión del propietario, 11-ago-2026: *"ninguno afirma
+ * desenlace jurídico"*).
+ *
+ * Es un estado PROPIO del enum, no un hito reutilizado. La primera
+ * implementación fijaba `RADICADA_EN_DEBIDA_FORMA` por ser "el menos
+ * comprometido de los 9", con el costo declarado de inflar el KPI "En
+ * trámite"; se corrigió porque ese hito **afirma** un hecho que en un
+ * histórico no consta —que la solicitud se presentó con documentación
+ * completa verificada (art. 2.2.6.1.2.1.1 par. 1), lo que además ancla el
+ * término— cuando del libro solo consta que hubo un radicado. Con valor
+ * propio no hay nada que afirmar ni contador que inflar: no pertenece a
+ * ninguna lista de estados activos. Ver su JSDoc en
+ * `lib/motor-expedientes/estados-licencia.ts`.
+ */
+export const ESTADO_JURIDICO_HISTORICO_SIN_RESOLVER: EstadoJuridicoLicencia = 'HISTORICO_SIN_RESOLVER';
+
 const FUENTE_PROVENANCE = 'xlsx-consecutivo-2022-2026';
+
+/**
+ * `plazoDias` arbitrario, usado SOLO para verificar R9 end-to-end (ver
+ * `fechaAlertaConservadoraHistorico` más abajo) — con una ÚNICA actuación
+ * de radicación `origen: 'RECONSTRUIDO'`, `derivarEventosTermino` la
+ * EXCLUYE (R9) antes de que `calcularVencimientoDual` vea ningún evento: el
+ * resultado es `fechaAlertaConservadora: null` sin importar qué plazo se le
+ * pase (no hay ancla `RADICACION_DEBIDA_FORMA` reconocida — ver
+ * `calcularVencimiento`, `./termino.ts`). El valor exacto es irrelevante A
+ * PROPÓSITO: se declara aparte de `PLAZO_DECISION_LICENCIA_DIAS_HABILES`
+ * (`lib/server/expedientes-licencias.ts`) para NO importar ESE módulo aquí
+ * — el planificador debe seguir con CERO acoplamiento en tiempo de
+ * ejecución con `lib/server/` (ver JSDoc de cabecera del archivo).
+ */
+const PLAZO_IRRELEVANTE_PARA_VERIFICAR_R9 = 45;
+
+/**
+ * Calcula `fechaAlertaConservadora` para UN expediente histórico —
+ * VERIFICACIÓN REAL de R9 (no una suposición): construye la MISMA actuación
+ * de radicación reconstruida que `scripts/migracion/importar-consecutivo-
+ * licencias.mjs` (`construirActuacionRadicacion`) escribirá de verdad, y la
+ * corre por las funciones REALES del motor (`derivarEventosTermino` +
+ * `calcularVencimientoDual`) — exactamente el mismo camino que
+ * `lib/server/expedientes-licencias.ts` usa para expedientes reales
+ * (`calcularFechaAlertaConservadoraMirror`), sin reimplementarlo. Siempre
+ * `null` para estos expedientes: R9 excluye la única actuación (RECONSTRUIDA)
+ * antes de que exista un ancla de término.
+ */
+function fechaAlertaConservadoraHistorico(actuacionRadicacion: Actuacion): string | null {
+  const eventos = derivarEventosTermino([actuacionRadicacion]);
+  const { fechaAlertaConservadora } = calcularVencimientoDual(eventos, PLAZO_IRRELEVANTE_PARA_VERIFICAR_R9);
+  return fechaAlertaConservadora ? fechaAlertaConservadora.toISOString() : null;
+}
 
 // `resolverEquivalencia` toma `EquivalenciaMigracion[]` (mutable) — la
 // semilla se declara `as const` (DF-4) para que TS la valide como tupla de
@@ -449,22 +595,24 @@ const FUENTE_PROVENANCE = 'xlsx-consecutivo-2022-2026';
 const TABLA_EQUIVALENCIAS_CODIGO = [...EQUIVALENCIAS_MIGRACION_SEMILLA_LICENCIAS];
 
 export interface TablasEquivalencia {
-  /** Default: `EQUIVALENCIAS_MIGRACION_SEMILLA_LICENCIAS` (DF-4) — inyectable para tests sintéticos que necesiten ejercer el camino "importable" sin esperar a P1′. */
+  /** Default: `EQUIVALENCIAS_MIGRACION_SEMILLA_LICENCIAS` (DF-4) — inyectable para tests sintéticos que necesiten ejercer un código MAPEADO distinto sin tocar la semilla real. */
   codigos?: Parameters<typeof resolverEquivalencia>[1];
-  /** Default: `EQUIVALENCIAS_ESTADOS_OPERATIVOS_SEMILLA` — inyectable por el mismo motivo, del lado P4′. */
-  estados?: Parameters<typeof resolverEstadoOperativo>[1];
 }
 
 /**
  * Planifica la importación completa del snapshot — PURA, determinista dado
  * `ahora` (usada solo para `fechaImportacion` de `provenance`, NUNCA para
  * `creadoEn`, que sale siempre de `fechaSolicitud`). `tablas` es opcional y
- * por defecto usa las semillas reales del proyecto — existe para que los
- * tests sintéticos puedan inyectar una tabla con alguna fila `MAPEADO` y
- * ejercer el camino "importable" sin depender de que P1′/P4′ ya hayan
- * respondido (mismo principio de inyección de dependencias que
- * `resolverEquivalencia`/`resolverEstadoOperativo` ya usan: la tabla es un
- * parámetro, nunca un import fijo dentro de la función pura).
+ * por defecto usa la semilla real del proyecto — existe para que los tests
+ * sintéticos puedan inyectar una tabla de códigos distinta (mismo principio
+ * de inyección de dependencias que `resolverEquivalencia` ya usa: la tabla
+ * es un parámetro, nunca un import fijo dentro de la función pura).
+ *
+ * DF-10: la ÚNICA puerta que manda un registro a `cuarentena` (no se
+ * importa) es `FECHA_INVALIDA` — ver JSDoc de cabecera del archivo para la
+ * decisión completa. Todo lo demás que falte (identidad, estado jurídico
+ * verificable, acto final, subtipo sin resolver) se importa igual y se
+ * reporta en `pendientesHistorico`/`subtiposSinResolver`/`filasColision`.
  */
 export function planificarImportacion(
   snapshot: SnapshotConsecutivoLicencias,
@@ -472,23 +620,24 @@ export function planificarImportacion(
   tablas: TablasEquivalencia = {},
 ): PlanImportacion {
   const tablaCodigos = tablas.codigos ?? TABLA_EQUIVALENCIAS_CODIGO;
-  const tablaEstados = tablas.estados ?? EQUIVALENCIAS_ESTADOS_OPERATIVOS_SEMILLA;
   const registros = snapshot.registros;
 
   // Colisiones de `radicado` — se detectan sobre TODO el snapshot, antes y
   // con independencia de a dónde termine cada registro (importado o en
   // cuarentena): DF-9 exige que la colisión se REPORTE siempre, no solo
-  // cuando el registro sea importable.
+  // cuando el registro sea importable. NO bloquea (nunca lo hizo).
   const porRadicado = new Map<string, number>();
   for (const r of registros) porRadicado.set(r.radicado, (porRadicado.get(r.radicado) ?? 0) + 1);
   const esColision = (radicado: string) => (porRadicado.get(radicado) ?? 0) > 1;
-  const colisiones = registros.filter((r) => esColision(r.radicado)).length;
+  const filasColision: RegistroColision[] = registros
+    .filter((r) => esColision(r.radicado))
+    .map((r) => ({ radicado: r.radicado, hoja: r.hoja, fila: r.fila }));
 
   const expedientes: ExpedienteLicenciaDoc[] = [];
   const cuarentena: RegistroEnCuarentena[] = [];
+  const subtiposSinResolver: RegistroSubtipoSinResolver[] = [];
   const fechaImportacion = ahora.toISOString();
 
-  let algunoSinDocumento = false;
   const filasSinFecha: string[] = [];
 
   // Reconciliación ampliada de predio (TAREA 3) — acumulada sobre TODO el
@@ -503,52 +652,14 @@ export function planificarImportacion(
   let descartesAreaDesalineada = 0;
   const filasAreaDesalineada: FilaAreaDesalineada[] = [];
 
+  // Conteos grupales DF-10 (ver JSDoc de `ResumenPendientesHistorico`).
+  let sinIdentidad = 0;
+  let sinEstadoJuridico = 0;
+  let sinActoFinal = 0;
+
   for (const r of registros) {
-    const motivos: MotivoCuarentena[] = [];
-    const detalle: string[] = [];
-
-    const equivalenciaCodigo = resolverEquivalencia(r.tipo, tablaCodigos);
-    if (equivalenciaCodigo === null) {
-      motivos.push('CODIGO_PENDIENTE_P1');
-      detalle.push(`El tipo histórico "${r.tipo}" no tiene equivalencia confirmada en el catálogo normativo de subtipos (P1′).`);
-    }
-
-    const resolucionEstado = resolverEstadoOperativo(r.estado, tablaEstados);
-    if (resolucionEstado.resultado === 'CUARENTENA') {
-      motivos.push('ESTADO_PENDIENTE_P4');
-      detalle.push(resolucionEstado.motivo);
-    }
-
-    const fecha = parsearFechaHistoricaANoonISO(r.fechaSolicitud);
-    if (!fecha) {
-      motivos.push('FECHA_INVALIDA');
-      detalle.push(`"fechaSolicitud" ausente o con formato irreconocible: "${r.fechaSolicitud ?? ''}".`);
-      filasSinFecha.push(`hoja ${r.hoja}, fila ${r.fila} (radicado ${r.radicado})`);
-    }
-
-    // IDENTIDAD_INCOMPLETA cubre AMBOS campos de la identidad del
-    // solicitante — nombre Y documento — porque `Expediente.solicitanteNombre`
-    // y `.solicitanteDocumento` son los dos obligatorios del modelo. Cuál de
-    // los dos falta puede variar por ENTORNO (sanitizado en CI retira el
-    // nombre a propósito; el libro histórico REAL nunca tuvo documento, en
-    // ninguna versión) — el detalle distingue cuál, sin inventar ningún
-    // valor de relleno para el que falte (redactar ≠ inventar).
-    const tieneNombre = Boolean(r.solicitante && r.solicitante.trim().length > 0);
-    const tieneDocumento = Boolean(r.solicitanteDocumento && r.solicitanteDocumento.trim().length > 0);
-    if (!tieneNombre || !tieneDocumento) {
-      algunoSinDocumento = true;
-      motivos.push('IDENTIDAD_INCOMPLETA');
-      if (!tieneNombre && !tieneDocumento) {
-        detalle.push('Falta el nombre Y el número de documento del solicitante; ambos son obligatorios en el modelo y no pueden completarse sin inventar un valor.');
-      } else if (!tieneNombre) {
-        detalle.push('Falta el nombre del solicitante (retirado en la versión sanitizada que corre en CI — Ley 1581/2012; presente solo en la versión local con datos personales); "solicitanteNombre" es obligatorio en el modelo.');
-      } else {
-        detalle.push('El libro histórico no registra número de documento del solicitante; "solicitanteDocumento" es obligatorio en el modelo y no puede completarse sin inventar un valor.');
-      }
-    }
-
     // Predio (TAREA 3): se calcula para TODO registro, sin importar el
-    // destino (importado o cuarentena) — ortogonal a las puertas de arriba.
+    // destino (importado o cuarentena) — ortogonal a las demás puertas.
     const { predio, descartes: descartesPredio } = mapearPredioHistorico(r);
     if (predio?.direccion) conDireccion++;
     if (predio?.barrioVereda) conBarrioVereda++;
@@ -563,43 +674,89 @@ export function planificarImportacion(
       }
     }
 
-    if (motivos.length > 0) {
+    const fecha = parsearFechaHistoricaANoonISO(r.fechaSolicitud);
+    if (!fecha) {
+      filasSinFecha.push(`hoja ${r.hoja}, fila ${r.fila} (radicado ${r.radicado})`);
       cuarentena.push({
         radicado: r.radicado,
         hoja: r.hoja,
         fila: r.fila,
         solicitante: r.solicitante,
-        motivos,
-        detalle,
+        motivos: ['FECHA_INVALIDA'],
+        detalle: [`"fechaSolicitud" ausente o con formato irreconocible: "${r.fechaSolicitud ?? ''}".`],
         colision: esColision(r.radicado),
       });
       continue;
     }
 
-    // Puertas todas pasadas — HOY inalcanzable contra el snapshot real
-    // (ESTADO_PENDIENTE_P4 e IDENTIDAD_INCOMPLETA quarentenan el 100%),
-    // pero el camino existe y lo ejercen los tests sintéticos.
-    const estadoJuridico = (resolucionEstado as Extract<typeof resolucionEstado, { resultado: 'MAPEADO' }>).estadoJuridico;
-    const codigos = equivalenciaCodigo as string[];
-    // Guarda de tipos: `motivos.length === 0` en este punto implica, por
-    // construcción del bucle de arriba, que `fecha` no es null (si lo
-    // fuera, 'FECHA_INVALIDA' habría entrado a `motivos` y ya se habría
-    // hecho `continue`). TS no correlaciona ramas de `if` distintas, así
-    // que se deja explícito en vez de un `!` no comentado.
-    if (!fecha) continue;
+    // P1′ (código de subtipo): resuelve por norma cuando puede; si no,
+    // se importa con el texto histórico CRUDO (DF-10) — nunca bloquea.
+    const equivalenciaCodigo = resolverEquivalencia(r.tipo, tablaCodigos);
+    const subtipoSinResolver = equivalenciaCodigo === null;
+    const subtipos = subtipoSinResolver ? [r.tipo] : equivalenciaCodigo;
+    if (subtipoSinResolver) {
+      subtiposSinResolver.push({ radicado: r.radicado, hoja: r.hoja, fila: r.fila, tipoOriginal: r.tipo });
+    }
+
+    // Identidad (DF-10): ya NO bloquea para RECONSTRUIDOS. `''` (string
+    // vacío) cuando falta — MISMO criterio que `faltaCedula` en
+    // `app/interno/licencias/presentacion-libro-consecutivo.ts` ("dato
+    // faltante honesto"), nunca un sentinel de texto inventado.
+    const tieneNombre = Boolean(r.solicitante && r.solicitante.trim().length > 0);
+    const tieneDocumento = Boolean(r.solicitanteDocumento && r.solicitanteDocumento.trim().length > 0);
+    const nombre = tieneNombre ? r.solicitante!.trim() : '';
+    const documento = tieneDocumento ? r.solicitanteDocumento!.trim() : '';
+    const identidadPendiente = !tieneNombre || !tieneDocumento;
+    if (identidadPendiente) sinIdentidad++;
+
+    // DF-10: TODO planificado entra "histórico sin resolver" — ningún
+    // texto de "estado" del libro alcanza a sustentar un hito jurídico
+    // verificable (ver JSDoc de cabecera). El texto ORIGINAL se conserva
+    // verbatim (trim únicamente — mismo criterio que `barrioVereda`/
+    // `noLicencia`, no altera contenido sustantivo); `null` cuando el
+    // libro no traía ningún estado (cohorte 2022-2024) — ausencia
+    // declarada, nunca omitida en silencio.
+    const estadoOriginalHistorico = r.estado && r.estado.trim().length > 0 ? r.estado.trim() : null;
+    sinEstadoJuridico++;
+    sinActoFinal++; // ninguno de los 202 trae fechaFirmeza (H5) — cierreDesconocido siempre true.
+
+    const pendientesAlImportar: EjeCompletitudHistorico[] = ['ESTADO_JURIDICO', 'ACTO_FINAL'];
+    if (identidadPendiente) pendientesAlImportar.unshift('IDENTIDAD');
+    if (subtipoSinResolver) pendientesAlImportar.push('SUBTIPO');
+
+    const revisionHistorica: RevisionHistoricaLicencia = { pendiente: true, pendientesAlImportar };
+
+    const id = `hist-${r.hoja}-${r.fila}`;
+
+    // R9 END-TO-END (ver JSDoc de `fechaAlertaConservadoraHistorico`): se
+    // CALCULA con las funciones reales, no se asume `null`.
+    const actuacionRadicacionReconstruida: Actuacion = {
+      id: `${id}-radicacion`,
+      expedienteId: id,
+      tipo: 'radicacion-debida-forma',
+      etapa: 'radicacion',
+      actorUid: 'sistema-migracion-historicos',
+      actorNombre: 'Importador de históricos (migración)',
+      actorRol: 'SISTEMA',
+      fecha: fecha.iso,
+      origen: 'RECONSTRUIDO',
+    };
 
     const expediente: ExpedienteLicenciaDoc = {
-      id: `hist-${r.hoja}-${r.fila}`,
+      id,
       tenantId: 'SEC_PLANEACION',
       tramiteId: SIN_DEFINICION_TRAMITE_HISTORICO,
-      estado: estadoOperativoDesdeJuridico(estadoJuridico),
-      estadoJuridico,
-      // No-null por la puerta IDENTIDAD_INCOMPLETA (arriba): si `r.solicitante`
-      // o `r.solicitanteDocumento` estuvieran vacíos/ausentes, ya se habría
-      // entrado a `motivos` y hecho `continue` — ninguno de los dos llega
-      // aquí sin estar presente.
-      solicitanteNombre: r.solicitante!.trim(),
-      solicitanteDocumento: r.solicitanteDocumento!.trim(),
+      // DF-10: NUNCA `EN_REVISION` — un histórico sin resolver no es
+      // trabajo pendiente del panel; `ARCHIVADO` no infla ningún KPI de
+      // "en trámite" basado en `EstadoExpediente` (hoy ninguno lo usa,
+      // ver `app/interno/licencias`, pero el valor sigue siendo el
+      // honesto: este expediente no tiene una cola de trabajo activa).
+      estado: 'ARCHIVADO',
+      estadoJuridico: ESTADO_JURIDICO_HISTORICO_SIN_RESOLVER,
+      estadoOriginalHistorico,
+      revisionHistorica,
+      solicitanteNombre: nombre,
+      solicitanteDocumento: documento,
       contexto: {},
       aportes: [],
       radicadoId: null,
@@ -611,7 +768,7 @@ export function planificarImportacion(
         año: fecha.año,
         colision: esColision(r.radicado),
       },
-      subtipos: codigos,
+      subtipos,
       origen: 'RECONSTRUIDO',
       provenance: {
         fuente: FUENTE_PROVENANCE,
@@ -621,27 +778,46 @@ export function planificarImportacion(
         fila: r.fila,
       },
       // `cierreDesconocido: true` se mantiene aunque `numero` esté presente:
-      // `validarCierreExpediente` (`./estados-licencia.ts`) exige numero Y
-      // fecha Y fechaFirmeza para considerar el acto COMPLETO — el libro
-      // histórico nunca trae las dos últimas, así que el acto sigue
-      // incompleto aunque conozcamos el número de licencia.
+      // `validarCierreExpediente` (`../motor-expedientes/estados-licencia.ts`)
+      // exige numero Y fecha Y fechaFirmeza para considerar el acto
+      // COMPLETO — el libro histórico nunca trae las dos últimas, así que
+      // el acto sigue incompleto aunque conozcamos el número de licencia.
       actoFinal: {
         cierreDesconocido: true,
         ...(r.noLicencia && r.noLicencia.trim().length > 0 ? { numero: r.noLicencia.trim() } : {}),
       },
       ...(predio ? { predio } : {}),
       esPrueba: false,
+      fechaAlertaConservadora: fechaAlertaConservadoraHistorico(actuacionRadicacionReconstruida),
     };
     expedientes.push(expediente);
   }
 
   const advertencias: string[] = [];
-  if (algunoSinDocumento) {
+  if (sinIdentidad > 0) {
     advertencias.push(
-      'IDENTIDAD_INCOMPLETA (hallazgo, fuera del encargo original de P1′/P4′): el libro histórico no registra número '
-      + 'de documento del solicitante para NINGÚN registro. Esta puerta seguirá bloqueando el 100% de los registros '
-      + 'incluso después de que P1′ y P4′ respondan, salvo que el propietario decida una fuente alterna para la '
-      + 'identidad o se relaje el modelo — requiere decisión aparte, no se resuelve solo con las dos tablas de equivalencias.',
+      `IDENTIDAD PENDIENTE (DF-10): ${sinIdentidad} de ${expedientes.length} planificado(s) tienen "solicitanteNombre" `
+      + 'y/o "solicitanteDocumento" en blanco (dato faltante honesto, nunca inventado) — el libro histórico no registra '
+      + 'número de documento para NINGÚN registro; se completan después desde la plataforma, cuando el funcionario '
+      + 'ubique el expediente físico (decisión del propietario, 11-ago-2026).',
+    );
+  }
+  if (subtiposSinResolver.length > 0) {
+    advertencias.push(
+      `SUBTIPO SIN RESOLVER (P1′, DF-10): ${subtiposSinResolver.length} registro(s) con un texto de "tipo" que no `
+      + 'resuelve contra el catálogo normativo (EQUIVALENCIAS_MIGRACION_SEMILLA_LICENCIAS) se importaron igual, con '
+      + 'ese texto crudo como único subtipo — ver detalle en "subtiposSinResolver".',
+    );
+  }
+  if (expedientes.length > 0) {
+    advertencias.push(
+      `HISTÓRICO SIN RESOLVER (DF-10): los ${expedientes.length} expediente(s) planificados entran con `
+      + '"estadoJuridico": "RADICADA_EN_DEBIDA_FORMA" (el hito menos comprometido) y "revisionHistorica.pendiente": '
+      + 'true — NINGUNO afirma un desenlace jurídico verificable, sin importar lo que dijera el campo "estado" del '
+      + 'libro (conservado verbatim en "estadoOriginalHistorico"). Costo conocido: el KPI "En trámite" del Libro '
+      + 'Consecutivo (app/interno/licencias/presentacion-libro-consecutivo.ts, ESTADOS_EN_TRAMITE_LIBRO) hoy no '
+      + 'excluye por origen/revisionHistorica, así que va a contarlos hasta que ese archivo aplique el mismo '
+      + 'criterio que ya usa BandejaLicenciasClient.tsx (esReconstruido/contables) — pendiente del rol de frontend.',
     );
   }
   if (filasSinFecha.length > 0) {
@@ -655,8 +831,11 @@ export function planificarImportacion(
       totalSnapshot: registros.length,
       planificados: expedientes.length,
       enCuarentena: cuarentena.length,
-      colisiones,
+      colisiones: filasColision.length,
     },
+    pendientesHistorico: { sinIdentidad, sinEstadoJuridico, sinActoFinal },
+    subtiposSinResolver,
+    filasColision,
     datosPredio: {
       conDireccion,
       conBarrioVereda,
@@ -677,7 +856,7 @@ export function planificarImportacion(
    Reporte dry-run (markdown)
 ────────────────────────────────────────────── */
 
-/** Genera el reporte markdown legible del plan — reconciliación, cuarentenas agrupadas por motivo con conteos, advertencias. */
+/** Genera el reporte markdown legible del plan — reconciliación, pendientes por completar, subtipos sin resolver, colisiones, cuarentena y datos de predio. */
 export function generarReporteDryRun(plan: PlanImportacion): string {
   const lineas: string[] = [];
   lineas.push('# Reporte dry-run — importador de históricos (consecutivo de licencias)');
@@ -685,37 +864,56 @@ export function generarReporteDryRun(plan: PlanImportacion): string {
   lineas.push('## Reconciliación');
   lineas.push('');
   lineas.push(`- Total en el snapshot: **${plan.reconciliacion.totalSnapshot}**`);
-  lineas.push(`- Planificados (importables HOY): **${plan.reconciliacion.planificados}**`);
-  lineas.push(`- En cuarentena: **${plan.reconciliacion.enCuarentena}**`);
-  lineas.push(`- Colisiones de radicado detectadas: **${plan.reconciliacion.colisiones}**`);
+  lineas.push(`- Planificados (se importan): **${plan.reconciliacion.planificados}**`);
+  lineas.push(`- En cuarentena (NO se importan): **${plan.reconciliacion.enCuarentena}**`);
+  lineas.push(`- Colisiones de radicado detectadas (no bloquean, se marcan): **${plan.reconciliacion.colisiones}**`);
   lineas.push('');
 
-  const conteosPorMotivo = new Map<MotivoCuarentena, number>();
-  for (const c of plan.cuarentena) {
-    for (const m of c.motivos) conteosPorMotivo.set(m, (conteosPorMotivo.get(m) ?? 0) + 1);
-  }
-  const ETIQUETAS: Record<MotivoCuarentena, string> = {
-    CODIGO_PENDIENTE_P1: 'Códigos pendientes (P1′)',
-    ESTADO_PENDIENTE_P4: 'Estados pendientes (P4′)',
-    FECHA_INVALIDA: 'Fecha de solicitud inválida/ausente',
-    IDENTIDAD_INCOMPLETA: 'Identidad del solicitante incompleta (hallazgo)',
-  };
-
-  lineas.push('## Cuarentena, agrupada por motivo');
+  lineas.push('## Pendientes por completar (DF-10) — entre los planificados');
   lineas.push('');
-  const orden: MotivoCuarentena[] = ['CODIGO_PENDIENTE_P1', 'ESTADO_PENDIENTE_P4', 'FECHA_INVALIDA', 'IDENTIDAD_INCOMPLETA'];
-  for (const motivo of orden) {
-    const n = conteosPorMotivo.get(motivo) ?? 0;
-    lineas.push(`- **${ETIQUETAS[motivo]}**: ${n} registro(s)`);
+  lineas.push(
+    'Ningún registro se deja fuera del libro por faltarle esto — se importa con el dato en blanco/marcado y queda '
+    + 'trazable para que un funcionario lo complete después (`ExpedienteLicenciaDoc.revisionHistorica`).',
+  );
+  lineas.push('');
+  lineas.push(`- Sin cédula del solicitante: **${plan.pendientesHistorico.sinIdentidad}**`);
+  lineas.push(`- Sin estado jurídico verificable ("histórico sin resolver"): **${plan.pendientesHistorico.sinEstadoJuridico}**`);
+  lineas.push(`- Sin acto final completo: **${plan.pendientesHistorico.sinActoFinal}**`);
+  lineas.push(`- Con subtipo sin resolver (texto crudo, P1′): **${plan.subtiposSinResolver.length}**`);
+  lineas.push('');
+
+  if (plan.subtiposSinResolver.length > 0) {
+    lineas.push('### Filas con subtipo sin resolver (P1′ — texto crudo importado como subtipo)');
+    lineas.push('');
+    lineas.push('| Radicado | Hoja | Fila | Tipo original |');
+    lineas.push('|---|---|---|---|');
+    for (const f of plan.subtiposSinResolver) {
+      lineas.push(`| ${f.radicado} | ${f.hoja} | ${f.fila} | ${f.tipoOriginal} |`);
+    }
+    lineas.push('');
   }
-  lineas.push(`- **Colisión de radicado** (ya contadas arriba, no es un motivo de cuarentena aparte): ${plan.cuarentena.filter((c) => c.colision).length} registro(s) en cuarentena que además colisionan`);
+
+  if (plan.filasColision.length > 0) {
+    lineas.push('### Filas en colisión de radicado (no bloquean; ambas se importan con `numeroExpediente.colision: true`)');
+    lineas.push('');
+    lineas.push('| Radicado | Hoja | Fila |');
+    lineas.push('|---|---|---|');
+    for (const f of plan.filasColision) {
+      lineas.push(`| ${f.radicado} | ${f.hoja} | ${f.fila} |`);
+    }
+    lineas.push('');
+  }
+
+  lineas.push('## Cuarentena (única puerta real: fecha inválida)');
+  lineas.push('');
+  lineas.push(`- **Fecha de solicitud inválida/ausente**: ${plan.cuarentena.length} registro(s)`);
   lineas.push('');
 
   lineas.push('## Datos de predio');
   lineas.push('');
   lineas.push(
     `Calculado sobre los **${plan.reconciliacion.totalSnapshot}** registros del snapshot completo — el predio es `
-    + 'ortogonal a las puertas P1′/P4′/fecha/identidad, así que un registro en cuarentena por otro motivo igual '
+    + 'ortogonal a la cuarentena y a los pendientes de completar, así que un registro en cuarentena por fecha igual '
     + 'cuenta aquí si su columna de predio es aprovechable. Ningún dato de predio ausente o descartado es motivo '
     + 'de cuarentena por sí mismo.',
   );
