@@ -12,12 +12,13 @@ import {
   generarCsvLibroConsecutivo,
   nombreArchivoCsvLibroConsecutivo,
   subtiposConEstadoLibro,
+  textoDiasVencimientoLibro,
   UMBRAL_POR_VENCER_DIAS_HABILES_LIBRO,
   urgenciaFilaLibro,
   type FilaLibroConsecutivo,
 } from '@/app/interno/licencias/presentacion-libro-consecutivo';
 import type { ExpedienteLicenciaDoc } from '@/lib/server/expedientes-licencias';
-import { sumarDiasHabiles } from '@/lib/tiempos-radicado';
+import { diasRestantesHabiles, sumarDiasHabiles } from '@/lib/tiempos-radicado';
 import { formatFechaColombia } from '@/lib/fecha-colombia';
 
 /* ══════════════════════════════════════════════════════════════
@@ -270,6 +271,71 @@ describe('urgenciaFilaLibro', () => {
   it('EN_TERMINO si faltan más días hábiles que el umbral', () => {
     const fecha = sumarDiasHabiles(HOY, UMBRAL_POR_VENCER_DIAS_HABILES_LIBRO + 1).toISOString();
     expect(urgenciaFilaLibro({ fechaAlertaConservadora: fecha }, HOY)).toBe('EN_TERMINO');
+  });
+
+  // ── REGRESIÓN: vencido SIN días hábiles de por medio ────────────────
+  // Defecto encontrado en la verificación visual del 11-ago-2026 (caso
+  // REAL, no sintético): el término venció el viernes 7-ago-2026 —
+  // festivo de la Batalla de Boyacá — y "hoy" es lunes 10; el 8 y 9 son
+  // fin de semana. `diasRestantesHabiles` devuelve 0 (no hay NINGÚN día
+  // hábil entre ambas fechas), así que la versión anterior, que decidía
+  // por el signo de ese conteo, clasificaba como POR_VENCER un expediente
+  // YA VENCIDO: franja ámbar en vez de roja, fuera del filtro y del KPI
+  // "Vencidos". Justo lo contrario del propósito protector del módulo.
+  describe('vencido sin días hábiles intermedios (festivo + fin de semana)', () => {
+    const LUNES_10_AGO = new Date('2026-08-10T12:00:00-05:00');
+    const VIERNES_7_AGO_FESTIVO = '2026-08-07T12:00:00-05:00';
+
+    it('el conteo de días hábiles entre ambas fechas es 0 — la premisa del defecto', () => {
+      expect(diasRestantesHabiles(VIERNES_7_AGO_FESTIVO, LUNES_10_AGO)).toBe(0);
+    });
+
+    it('aun así es VENCIDO: la pregunta "¿ya pasó la fecha?" es de CALENDARIO, no de días hábiles', () => {
+      expect(urgenciaFilaLibro({ fechaAlertaConservadora: VIERNES_7_AGO_FESTIVO }, LUNES_10_AGO)).toBe('VENCIDO');
+    });
+
+    it('entra en el filtro VENCIDOS y NO en POR_VENCER', () => {
+      const [fila] = construirFilasLibroConsecutivo(
+        [expedienteBase({ creadoEn: '2026-02-01T10:00:00.000Z' })],
+        2026,
+      );
+      const filaVencida = { ...fila, fechaAlertaConservadora: VIERNES_7_AGO_FESTIVO };
+      expect(coincideFiltroLibro(filaVencida, 'VENCIDOS', LUNES_10_AGO)).toBe(true);
+      expect(coincideFiltroLibro(filaVencida, 'POR_VENCER', LUNES_10_AGO)).toBe(false);
+    });
+
+    it('el texto dice "Vencido", no "0 días hábiles" (que sería engañoso)', () => {
+      expect(textoDiasVencimientoLibro({ fechaAlertaConservadora: VIERNES_7_AGO_FESTIVO }, LUNES_10_AGO)).toBe('Vencido');
+    });
+
+    it('el MISMO día del vencimiento todavía NO está vencido (el plazo corre hasta el final del día)', () => {
+      expect(urgenciaFilaLibro({ fechaAlertaConservadora: VIERNES_7_AGO_FESTIVO }, new Date('2026-08-07T08:00:00-05:00'))).not.toBe('VENCIDO');
+    });
+  });
+});
+
+describe('textoDiasVencimientoLibro', () => {
+  const HOY = new Date('2026-03-10T12:00:00-05:00');
+
+  it('null sin fecha (nada que decir)', () => {
+    expect(textoDiasVencimientoLibro({ fechaAlertaConservadora: null }, HOY)).toBeNull();
+  });
+
+  it('cuenta los días hábiles cuando el plazo sigue corriendo', () => {
+    const fecha = sumarDiasHabiles(HOY, 4).toISOString();
+    expect(textoDiasVencimientoLibro({ fechaAlertaConservadora: fecha }, HOY)).toBe('4 días hábiles');
+  });
+
+  it('dice hace cuántos días hábiles venció cuando sí los hubo', () => {
+    // Fecha pasada explícita (`sumarDiasHabiles` no retrocede con negativos)
+    // y expectativa DERIVADA con la misma utilidad que usa el código — nunca
+    // un número a mano, que se rompería con cualquier festivo del tramo.
+    const fecha = '2026-03-03T12:00:00-05:00';
+    const habilesTranscurridos = Math.abs(diasRestantesHabiles(fecha, HOY));
+    expect(habilesTranscurridos).toBeGreaterThan(0);
+    expect(textoDiasVencimientoLibro({ fechaAlertaConservadora: fecha }, HOY)).toBe(
+      `Vencido hace ${habilesTranscurridos} días hábiles`,
+    );
   });
 });
 
