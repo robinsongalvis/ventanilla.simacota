@@ -30,7 +30,19 @@ export default function LicenciasLayout({ children }: { children: ReactNode }) {
     <GuardModuloPlaneacion>
       <div className="h-screen flex overflow-hidden print:h-auto print:overflow-visible print:block" style={{ background: 'var(--bg-base)' }}>
         <LicenciasSidebar />
-        <div className="flex-1 flex flex-col min-w-0 overflow-hidden print:overflow-visible print:block">
+        {/* `min-h-0` NO es decorativo: sin él, un hijo flex con `flex-1` no
+            puede contraerse por debajo de su contenido (su `min-height`
+            implícito es `auto`), así que `<main>` crecía con la pantalla
+            larga —el Detalle con su checklist completo— empujaba el
+            documento más allá de `h-screen` y el SCROLL SE IBA AL BODY: la
+            página bajaba, el sidebar de altura fija se quedaba arriba y
+            debajo aparecía una franja en blanco (reportado en producción
+            el 11-ago-2026). Con `min-h-0`, `<main>` recupera su scroll
+            interno y el documento nunca desborda el viewport. Es el mismo
+            patrón que el resto del proyecto ya aplica (ver los
+            contenedores equivalentes de `app/interno/dashboard/page.tsx`);
+            este layout era el único que lo omitía. */}
+        <div className="flex-1 flex flex-col min-w-0 min-h-0 overflow-hidden print:overflow-visible print:block">
           <LicenciasTopBarMovil titulo="Licencias" />
           <main className="flex-1 overflow-y-auto print:overflow-visible">{children}</main>
         </div>
