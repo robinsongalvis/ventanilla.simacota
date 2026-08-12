@@ -104,11 +104,24 @@ const CASOS = [
     revisionHistorica: { pendiente: true, pendientesAlImportar: ['IDENTIDAD', 'ESTADO_JURIDICO', 'ACTO_FINAL', 'SUBTIPO'] },
   },
   {
-    id: `${PREFIJO}colision`, caso: 'Radicado en COLISIÓN (número repetido en el libro)',
+    id: `${PREFIJO}colision`, caso: 'Radicado en COLISIÓN (número repetido) — primera de las dos filas',
     solicitanteNombre: 'Ana Lucía Avilés Pérez', solicitanteDocumento: '',
     estadoJuridico: 'HISTORICO_SIN_RESOLVER', estado: 'ARCHIVADO', origen: 'RECONSTRUIDO',
     numero: '68745-0-25-9007', subtipos: ['CONSTRUCCION'], colision: true,
     creadoEn: dias(-470), fechaAlertaConservadora: null,
+    actoFinal: { cierreDesconocido: true },
+    estadoOriginalHistorico: 'REVISADO',
+    revisionHistorica: { pendiente: true, pendientesAlImportar: ['IDENTIDAD', 'ESTADO_JURIDICO', 'ACTO_FINAL'] },
+  },
+  {
+    // Gemela de la anterior: MISMO número legal, otro solicitante. Reproduce
+    // el caso real `68745-0-25-0037` que ya vive en producción — es lo que
+    // permite verificar que el libro dice CON QUIÉN colisiona.
+    id: `${PREFIJO}colision-gemela`, caso: 'Radicado en COLISIÓN — segunda fila con el MISMO número',
+    solicitanteNombre: 'Pedro Nel Rojas Peña', solicitanteDocumento: '',
+    estadoJuridico: 'HISTORICO_SIN_RESOLVER', estado: 'ARCHIVADO', origen: 'RECONSTRUIDO',
+    numero: '68745-0-25-9007', subtipos: ['RECONOCIMIENTO'], colision: true,
+    creadoEn: dias(-457), fechaAlertaConservadora: null,
     actoFinal: { cierreDesconocido: true },
     estadoOriginalHistorico: 'REVISADO',
     revisionHistorica: { pendiente: true, pendientesAlImportar: ['IDENTIDAD', 'ESTADO_JURIDICO', 'ACTO_FINAL'] },

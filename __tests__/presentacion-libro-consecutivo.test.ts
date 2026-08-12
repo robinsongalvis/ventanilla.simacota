@@ -16,6 +16,7 @@ import {
   generarCsvLibroConsecutivo,
   nombreArchivoCsvLibroConsecutivo,
   subtiposConEstadoLibro,
+  textoColisionLibro,
   textoDiasVencimientoLibro,
   UMBRAL_POR_VENCER_DIAS_HABILES_LIBRO,
   urgenciaFilaLibro,
@@ -418,6 +419,8 @@ describe('coincideFiltroLibro / filtrarFilasLibro / conteos', () => {
       vigenciaHasta: null,
       faltaCedula: false,
       faltaEstadoJuridico: false,
+      colision: false,
+      otrosConMismoNumero: [],
       ...overrides,
     };
   }
@@ -454,7 +457,7 @@ describe('coincideFiltroLibro / filtrarFilasLibro / conteos', () => {
 
   it('calcularConteosPorFiltroLibro: un conteo por cada filtro, coherente con filtrarFilasLibro', () => {
     const conteos = calcularConteosPorFiltroLibro(filas, HOY);
-    expect(conteos).toEqual({ TODOS: 4, EN_TRAMITE: 2, POR_VENCER: 0, VENCIDOS: 1, HISTORICOS_INCOMPLETOS: 1 });
+    expect(conteos).toEqual({ TODOS: 4, EN_TRAMITE: 2, POR_VENCER: 0, VENCIDOS: 1, HISTORICOS_INCOMPLETOS: 1, COLISIONES: 0 });
   });
 
   it('calcularConteosKpiLibro: las 4 cifras de la fila de KPIs, mismo criterio que los chips', () => {
@@ -490,6 +493,8 @@ describe('generarCsvLibroConsecutivo', () => {
       vigenciaHasta: null,
       faltaCedula: false,
       faltaEstadoJuridico: false,
+      colision: false,
+      otrosConMismoNumero: [],
       ...overrides,
     };
   }
@@ -503,14 +508,14 @@ describe('generarCsvLibroConsecutivo', () => {
     const csv = generarCsvLibroConsecutivo([]);
     const [encabezado] = csv.replace(/^﻿/, '').split('\r\n');
     expect(encabezado).toBe(
-      'N. EXPEDIENTE;FECHA RADICACION;SOLICITANTE;DOCUMENTO;SUBTIPOS;ESTADO JURIDICO;N. LICENCIA;FECHA FIRMEZA;PRUEBA',
+      'N. EXPEDIENTE;FECHA RADICACION;SOLICITANTE;DOCUMENTO;SUBTIPOS;ESTADO JURIDICO;N. LICENCIA;FECHA FIRMEZA;PRUEBA;COLISION',
     );
   });
 
   it('una fila con acto final ausente muestra "—" en N. LICENCIA y FECHA FIRMEZA, y "NO" en PRUEBA', () => {
     const csv = generarCsvLibroConsecutivo([filaSintetica()]);
     const [, filaTexto] = csv.replace(/^﻿/, '').split('\r\n');
-    expect(filaTexto).toBe('68745-0-26-0001;10/03/2026;Carlos Alberto Rojas;91234567;Licencia de construcción;En revisión;—;—;NO');
+    expect(filaTexto).toBe('68745-0-26-0001;10/03/2026;Carlos Alberto Rojas;91234567;Licencia de construcción;En revisión;—;—;NO;NO');
   });
 
   it('una fila con acto final y esPrueba=true muestra los valores reales y "SI"', () => {
@@ -688,5 +693,123 @@ describe('COLOR_TEXTO_URGENCIA_LIBRO — el dato del expediente resuelto se aten
     for (const urgencia of ['VENCIDO', 'POR_VENCER', 'EN_TERMINO', 'NEUTRO'] as const) {
       expect(COLOR_TEXTO_URGENCIA_LIBRO[urgencia]).toMatch(/^var\(--[a-z-]+\)$/);
     }
+  });
+});
+
+describe('colisión de radicado — el Libro delata la anomalía que el importador declaró', () => {
+  // Caso REAL en producción desde el 11-ago-2026: `68745-0-25-0037`, dos
+  // solicitantes distintos con el mismo número (H4/R1 del análisis del
+  // insumo). No se renumera: la serie legal histórica es intocable.
+  function expColision(overrides: Partial<ExpedienteLicenciaDoc> = {}): ExpedienteLicenciaDoc {
+    return expedienteBase({
+      creadoEn: '2025-09-17T15:00:00.000Z',
+      numeroExpediente: { numero: '68745-0-25-0037', serieId: 'historico', año: 2025, colision: true },
+      ...overrides,
+    });
+  }
+
+  it('mapea `numeroExpediente.colision` tal cual, y colapsa ausente/false a `false` (nunca undefined)', () => {
+    const [conFlag] = construirFilasLibroConsecutivo([expColision()], 2025);
+    expect(conFlag.colision).toBe(true);
+
+    const sinFlag = construirFilasLibroConsecutivo(
+      [expColision({ id: 'b', numeroExpediente: { numero: '68745-0-25-0040', serieId: 'h', año: 2025, colision: false } })],
+      2025,
+    );
+    expect(sinFlag[0].colision).toBe(false);
+
+    const ausente = construirFilasLibroConsecutivo(
+      [expColision({ id: 'c', numeroExpediente: { numero: '68745-0-25-0041', serieId: 'h', año: 2025 } })],
+      2025,
+    );
+    expect(ausente[0].colision).toBe(false);
+
+    const sinNumero = construirFilasLibroConsecutivo([expColision({ id: 'd', numeroExpediente: undefined })], 2025);
+    expect(sinNumero[0].colision).toBe(false);
+  });
+
+  it('LA PRUEBA CLAVE: dos filas con el MISMO número pero SIN flag NO se marcan — el Libro no diagnostica, solo delata', () => {
+    const mismoNumero = { numero: '68745-0-25-0099', serieId: 'h', año: 2025 };
+    const filas = construirFilasLibroConsecutivo(
+      [
+        expColision({ id: 'x', numeroExpediente: { ...mismoNumero } }),
+        expColision({ id: 'y', numeroExpediente: { ...mismoNumero } }),
+      ],
+      2025,
+    );
+    expect(filas.map((f) => f.colision)).toEqual([false, false]);
+    // …aunque el derivado SÍ los ve: son cosas distintas a propósito.
+    expect(filas[0].otrosConMismoNumero).toHaveLength(1);
+  });
+
+  it('`otrosConMismoNumero` identifica al gemelo del mismo año (con quién colisiona, que es lo que se necesita para resolver)', () => {
+    const filas = construirFilasLibroConsecutivo(
+      [
+        expColision({ id: 'primera', solicitanteNombre: 'Ana Lucía Avilés' }),
+        expColision({ id: 'segunda', solicitanteNombre: 'Pedro Rojas Peña', creadoEn: '2025-09-30T15:00:00.000Z' }),
+      ],
+      2025,
+    );
+    const primera = filas.find((f) => f.id === 'primera')!;
+    expect(primera.otrosConMismoNumero).toHaveLength(1);
+    expect(primera.otrosConMismoNumero[0]).toMatchObject({ id: 'segunda', solicitanteNombre: 'Pedro Rojas Peña' });
+    // Nunca se incluye a sí misma.
+    expect(primera.otrosConMismoNumero.some((o) => o.id === 'primera')).toBe(false);
+  });
+
+  it('gemelo fuera de la vista (otro año): la marca SIGUE encendida y la lista queda vacía — el alcance declarado no apaga el flag', () => {
+    const [fila] = construirFilasLibroConsecutivo([expColision()], 2025);
+    expect(fila.colision).toBe(true);
+    expect(fila.otrosConMismoNumero).toEqual([]);
+  });
+
+  it('el fallback al id del documento no fabrica falsos positivos', () => {
+    const filas = construirFilasLibroConsecutivo(
+      [expColision({ id: 'sin-num-1', numeroExpediente: undefined }), expColision({ id: 'sin-num-2', numeroExpediente: undefined })],
+      2025,
+    );
+    expect(filas.every((f) => f.otrosConMismoNumero.length === 0)).toBe(true);
+  });
+
+  it('textoColisionLibro: null sin marca; nombra al gemelo cuando lo ve; habla del DATO cuando no', () => {
+    const limpia = { colision: false, numeroExpediente: '68745-0-25-0001', otrosConMismoNumero: [] };
+    expect(textoColisionLibro(limpia)).toBeNull();
+
+    const conGemelo = textoColisionLibro({
+      colision: true,
+      numeroExpediente: '68745-0-25-0037',
+      otrosConMismoNumero: [{ id: 'y', solicitanteNombre: 'Pedro Rojas Peña', fechaRadicacion: '2025-09-30T15:00:00.000Z' }],
+    })!;
+    expect(conGemelo).toContain('Pedro Rojas Peña');
+    expect(conGemelo).toContain('30/09/2025');
+    expect(conGemelo).toContain('No se renumera');
+
+    // Sin gemelo a la vista NO se afirma que exista: `colision` es una
+    // aserción del importador en el pasado, no un invariante vivo.
+    const sinGemelo = textoColisionLibro({ colision: true, numeroExpediente: '68745-0-25-0037', otrosConMismoNumero: [] })!;
+    expect(sinGemelo).toContain('El importador marcó');
+    expect(sinGemelo).toContain('no aparece en esta vista');
+    expect(sinGemelo).not.toMatch(/otro expediente comparte/i);
+  });
+
+  it('filtro COLISIONES: aísla las marcadas y NO las saca del resto de baldes (la colisión es un atributo, no un estado)', () => {
+    const filas = construirFilasLibroConsecutivo(
+      [expColision({ id: 'a' }), expColision({ id: 'b', creadoEn: '2025-09-30T15:00:00.000Z' }), expedienteBase({ id: 'c', creadoEn: '2025-04-01T15:00:00.000Z', numeroExpediente: { numero: '68745-0-25-0010', serieId: 'h', año: 2025 } })],
+      2025,
+    );
+    expect(filtrarFilasLibro(filas, 'COLISIONES')).toHaveLength(2);
+    // Siguen contando en Total y en su estado.
+    expect(filtrarFilasLibro(filas, 'TODOS')).toHaveLength(3);
+    expect(calcularConteosKpiLibro(filas).total).toBe(3);
+  });
+
+  it('el CSV lleva la colisión: sin ella, la anomalía seguiría invisible una capa más abajo', () => {
+    const filas = construirFilasLibroConsecutivo([expColision()], 2025);
+    const csv = generarCsvLibroConsecutivo(filas);
+    const [encabezado, primera] = csv.replace('﻿', '').split('\r\n');
+    expect(encabezado.endsWith(';COLISION')).toBe(true);
+    expect(primera.endsWith(';SI')).toBe(true);
+    // Guardián de alineación: cabecera y fila con el mismo número de celdas.
+    expect(primera.split(';')).toHaveLength(encabezado.split(';').length);
   });
 });

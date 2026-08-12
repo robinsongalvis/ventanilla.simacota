@@ -158,14 +158,14 @@ export function PanelDetalleExpediente({ expedienteId, onCerrar }: PanelDetalleE
           por Tab (mismo patrón que `BusquedaAvanzadaPanel`) para que el
           trampolín de foco de abajo no tenga que lidiar con un elemento
           enfocable FUERA del panel. Escape ya cubre el cierre por teclado. */}
-      <div aria-hidden="true" onClick={onCerrar} className="fixed inset-0 z-40" style={{ background: 'rgba(15,23,20,0.45)' }} />
+      <div aria-hidden="true" onClick={onCerrar} className="fixed inset-0 z-40 print:hidden" style={{ background: 'rgba(15,23,20,0.45)' }} />
 
       <div
         ref={panelRef}
         role="dialog"
         aria-modal="true"
         aria-labelledby={tituloId}
-        className="fixed inset-y-0 right-0 z-50 w-full sm:w-[420px] md:w-[460px] flex flex-col"
+        className="fixed inset-y-0 right-0 z-50 w-full sm:w-[420px] md:w-[460px] flex flex-col print:hidden"
         style={{ background: 'var(--bg-surface)', borderLeft: '1px solid var(--color-border)', boxShadow: 'var(--shadow-elevated)' }}
       >
         <header className="flex items-start justify-between gap-3 px-4 py-3.5 shrink-0" style={{ borderBottom: '1px solid var(--color-border)' }}>

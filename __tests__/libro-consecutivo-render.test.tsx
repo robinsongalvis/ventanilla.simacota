@@ -1,4 +1,6 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
+import { readFileSync } from 'node:fs';
+import { join } from 'node:path';
 import { cleanup, render, screen, fireEvent, waitFor, within } from '@testing-library/react';
 import { LibroConsecutivoClient } from '@/app/interno/licencias/components/LibroConsecutivoClient';
 import { useAuth, type UsuarioAutenticado, type UseAuthReturn } from '@/lib/hooks/useAuth';
@@ -148,11 +150,16 @@ function tarjetaKpi(overline: string): HTMLElement {
   return el.parentElement!;
 }
 
-/** Espera a que cargue y selecciona el año 2026 (siempre disponible: viene de los fixtures, no del reloj real). */
-async function seleccionarAño2026(): Promise<void> {
+/** Espera a que cargue y selecciona el año pedido (siempre disponible: viene de los fixtures, no del reloj real). */
+async function seleccionarAño(año: number): Promise<void> {
   const select = await screen.findByLabelText('Año del libro consecutivo');
   await waitFor(() => expect(screen.queryByText('Cargando libro consecutivo…')).toBeNull());
-  fireEvent.change(select, { target: { value: '2026' } });
+  fireEvent.change(select, { target: { value: String(año) } });
+}
+
+/** Envoltorio histórico — las ~10 pruebas que ya lo usaban no cambian ni una letra. */
+async function seleccionarAño2026(): Promise<void> {
+  await seleccionarAño(2026);
 }
 
 describe('LibroConsecutivoClient', () => {
@@ -596,5 +603,179 @@ describe('LibroConsecutivoClient', () => {
     fireEvent.change(campo, { target: { value: 'roble' } });
 
     await waitFor(() => expect(screen.getByText('68745-0-26-0001')).toBeTruthy());
+  });
+});
+
+/* ══════════════════════════════════════════════════════════════
+   Colisión de radicado e impresión del libro (12-ago-2026).
+══════════════════════════════════════════════════════════════ */
+
+/** Las dos filas del caso real: mismo número legal, distinto solicitante. */
+function parEnColision(): ExpedienteLicenciaDoc[] {
+  const numero = { numero: '68745-0-25-0037', serieId: 'historico', año: 2025, colision: true };
+  return [
+    expedienteBase({
+      id: 'col-a',
+      solicitanteNombre: 'Ana Lucía Avilés Pérez',
+      creadoEn: '2025-09-17T15:00:00.000Z',
+      numeroExpediente: { ...numero },
+    }),
+    expedienteBase({
+      id: 'col-b',
+      solicitanteNombre: 'Pedro Nel Rojas Peña',
+      creadoEn: '2025-09-30T15:00:00.000Z',
+      numeroExpediente: { ...numero },
+    }),
+  ];
+}
+
+describe('Libro consecutivo — colisión de radicado visible', () => {
+  it('marca ambas filas y dice CON QUIÉN colisiona cada una (es lo que se necesita para resolver)', async () => {
+    mockAuth();
+    vi.stubGlobal('fetch', mockFetchExpedientes(parEnColision()));
+    render(<LibroConsecutivoClient />);
+    await seleccionarAño(2025);
+
+    const marcas = await screen.findAllByRole('note', { name: /Colisión de número de expediente/ });
+    expect(marcas).toHaveLength(2);
+    const nombresAccesibles = marcas.map((m) => m.getAttribute('aria-label') ?? '');
+    // Cada una nombra a la OTRA, nunca a sí misma.
+    expect(nombresAccesibles.some((t) => t.includes('Pedro Nel Rojas Peña') && !t.includes('Ana Lucía'))).toBe(true);
+    expect(nombresAccesibles.some((t) => t.includes('Ana Lucía Avilés Pérez') && !t.includes('Pedro Nel'))).toBe(true);
+    // La regla de negocio viaja con la marca, no en un banner que se aprende a ignorar.
+    expect(nombresAccesibles.every((t) => t.includes('No se renumera'))).toBe(true);
+  });
+
+  it('el chip "Colisiones" aparece con su conteo y aísla las filas marcadas', async () => {
+    mockAuth();
+    vi.stubGlobal('fetch', mockFetchExpedientes(parEnColision()));
+    render(<LibroConsecutivoClient />);
+    await seleccionarAño(2025);
+
+    const chip = await screen.findByRole('button', { name: /Colisiones/ });
+    expect(chip.textContent).toContain('2');
+    fireEvent.click(chip);
+    await waitFor(() => expect(screen.getAllByRole('note', { name: /Colisión/ })).toHaveLength(2));
+  });
+
+  it('sin colisiones el chip NO se renderiza (un control permanente en 0 es ruido)', async () => {
+    mockAuth();
+    vi.stubGlobal('fetch', mockFetchExpedientes([expedienteBase()]));
+    render(<LibroConsecutivoClient />);
+    await seleccionarAño2026();
+
+    await waitFor(() => expect(screen.queryByText('Cargando libro consecutivo…')).toBeNull());
+    expect(screen.queryByRole('button', { name: /Colisiones/ })).toBeNull();
+    expect(screen.queryByRole('note', { name: /Colisión/ })).toBeNull();
+  });
+
+  it('el filtro se resetea si el conteo de colisiones cae a 0 al cambiar de año (no deja la tabla filtrada por un control invisible)', async () => {
+    mockAuth();
+    vi.stubGlobal('fetch', mockFetchExpedientes([...parEnColision(), expedienteBase()]));
+    render(<LibroConsecutivoClient />);
+    await seleccionarAño(2025);
+
+    fireEvent.click(await screen.findByRole('button', { name: /Colisiones/ }));
+    await waitFor(() => expect(screen.getAllByRole('note', { name: /Colisión/ })).toHaveLength(2));
+
+    await seleccionarAño(2026);
+    await waitFor(() => expect(screen.queryByRole('button', { name: /Colisiones/ })).toBeNull());
+    // La fila de 2026 sigue visible: el filtro volvió a "Todos", no quedó vacía.
+    expect(screen.getByText('Carlos Alberto Rojas')).toBeTruthy();
+  });
+});
+
+describe('Libro consecutivo — impresión A4 horizontal', () => {
+  /** Hoja de otra pantalla que persiste con `body * { visibility: hidden }` — ver `HOJAS_IMPRESION_AJENAS`. */
+  function inyectarHojaAjena(id: string): HTMLStyleElement {
+    const tag = document.createElement('style');
+    tag.id = id;
+    tag.textContent = '@media print { body * { visibility: hidden !important; } }';
+    document.head.appendChild(tag);
+    return tag;
+  }
+
+  it('inyecta @page landscape y marca el body SOLO durante la impresión, y lo retira después', async () => {
+    mockAuth();
+    vi.stubGlobal('fetch', mockFetchExpedientes([expedienteBase()]));
+    const observado: { landscape: boolean; clase: boolean }[] = [];
+    vi.stubGlobal('print', vi.fn(() => {
+      observado.push({
+        landscape: (document.getElementById('libro-consecutivo-print-styles')?.textContent ?? '').includes('landscape'),
+        clase: document.body.classList.contains('imprimiendo-libro-consecutivo'),
+      });
+    }));
+    render(<LibroConsecutivoClient />);
+    await seleccionarAño2026();
+
+    fireEvent.click(screen.getByRole('button', { name: 'Imprimir' }));
+
+    expect(observado).toEqual([{ landscape: true, clase: true }]);
+    // Dejar la hoja viva pondría horizontal la SIGUIENTE constancia.
+    expect(document.getElementById('libro-consecutivo-print-styles')).toBeNull();
+    expect(document.body.classList.contains('imprimiendo-libro-consecutivo')).toBe(false);
+  });
+
+  it('REGRESIÓN: apaga las hojas de impresión ajenas que dejarían el libro EN BLANCO, y las restaura', async () => {
+    // Camino real: radicar → imprimir constancia (su hoja queda viva para
+    // siempre, con `body * { visibility: hidden }`) → pestaña Licencias →
+    // Libro → Imprimir. Sin esto salen N hojas vacías.
+    const ajena = inyectarHojaAjena('comprobante-print-styles');
+    mockAuth();
+    vi.stubGlobal('fetch', mockFetchExpedientes([expedienteBase()]));
+    let apagadaDurante: boolean | null = null;
+    vi.stubGlobal('print', vi.fn(() => {
+      apagadaDurante = (document.getElementById('comprobante-print-styles') as HTMLStyleElement).disabled;
+    }));
+    render(<LibroConsecutivoClient />);
+    await seleccionarAño2026();
+
+    fireEvent.click(screen.getByRole('button', { name: 'Imprimir' }));
+
+    expect(apagadaDurante).toBe(true);
+    // …y restaurada, para no romper la impresión de la constancia después.
+    expect(ajena.disabled).toBe(false);
+    ajena.remove();
+  });
+
+  it('cada fila expone `data-urgencia` — gancho que el CSS de impresión necesita para oscurecer "Vence" (en papel el ámbar rinde 2,15:1)', async () => {
+    mockAuth();
+    vi.stubGlobal('fetch', mockFetchExpedientes([conAlertaConservadora(expedienteBase(), FECHA_ALERTA_VENCIDA)]));
+    render(<LibroConsecutivoClient />);
+    await seleccionarAño2026();
+
+    const fila = await waitFor(() => document.querySelector('#tabla-libro-consecutivo tbody tr')!);
+    expect(fila.getAttribute('data-urgencia')).toBe('VENCIDO');
+  });
+});
+
+describe('Contrato del CSS de impresión del libro', () => {
+  const CSS = readFileSync(join(process.cwd(), 'app/globals.css'), 'utf8');
+
+  it('globals.css NO declara una @page global — voltearía las OTRAS 9 superficies que imprimen', () => {
+    // La constancia de radicación (190 mm), los sellos, la planilla de
+    // reparto y el acto de desistimiento son verticales por diseño. `@page`
+    // no admite selectores, así que una regla anónima aquí es global.
+    // La forma con NOMBRE (`@page libro { … }`) sí sería acotada y se
+    // permite a propósito, por si algún día se añade como refuerzo.
+    expect(CSS).not.toMatch(/@page\s*(:[a-z]+\s*)?\{/);
+  });
+
+  it('desrecorta la cadena del libro: sin esto la tabla se recorta a la caja de página', () => {
+    for (const clase of ['.libro-consecutivo', '.libro-consecutivo__tarjeta', '.libro-consecutivo__scroll']) {
+      expect(CSS).toContain(clase);
+    }
+    expect(CSS).toMatch(/#tabla-libro-consecutivo thead \{\s*display: table-header-group;/);
+  });
+
+  it('la franja de urgencia se imprime como BORDE, no como sombra (Chrome no imprime fondos por defecto)', () => {
+    expect(CSS).toMatch(/#tabla-libro-consecutivo tbody td:first-child \{[^}]*box-shadow: none/);
+    expect(CSS).toMatch(/#tabla-libro-consecutivo tbody td:first-child \{[^}]*border-left-width/);
+  });
+
+  it('el texto de "Vence" se oscurece por banda al imprimir (el ámbar rinde 2,15:1)', () => {
+    for (const urgencia of ['VENCIDO', 'POR_VENCER', 'EN_TERMINO', 'NEUTRO']) {
+      expect(CSS).toContain(`tr[data-urgencia='${urgencia}'] .libro-consecutivo__vence p`);
+    }
   });
 });

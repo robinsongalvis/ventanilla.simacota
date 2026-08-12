@@ -802,4 +802,129 @@ body {
     break-inside: avoid;
     page-break-inside: avoid;
   }
+
+  /* ═══════════════════════════════════════════════════════════════
+     LIBRO CONSECUTIVO DE LICENCIAS — impresión íntegra (12-ago-2026)
+     `app/interno/licencias/components/LibroConsecutivoClient.tsx`
+
+     DEFECTO MEDIDO en stage: a 190 mm de ancho útil salían 5 de 8 columnas
+     — se perdían «Vence», «Vigencia hasta» y «N.° licencia», es decir el
+     número de licencia, el dato más importante de un libro consecutivo.
+     CAUSA: la tabla vive dentro de un `overflow-x-auto` sobre una tarjeta
+     `overflow-hidden`, y en medio paginado un contenedor de desplazamiento
+     NO se fragmenta: se RECORTA a la caja de página. Ninguna regla de
+     impresión le devolvía `overflow: visible`.
+
+     Estas reglas son PERMANENTES y están acotadas a las clases propias del
+     libro, así que valen tanto si se imprime con el botón (que además pone
+     la hoja horizontal) como con Ctrl+P: en vertical la tabla sale COMPLETA
+     y más densa, nunca recortada.
+
+     Se asume que el navegador NO imprime fondos (en Chrome «Gráficos de
+     fondo» viene desmarcado): la urgencia viaja por BORDE y por TEXTO, no
+     por sombra ni relleno. Por eso la franja `box-shadow: inset` de
+     pantalla se convierte aquí en `border-left`.
+     ═══════════════════════════════════════════════════════════════ */
+
+  /* 1. Desrecortar la cadena: sin esto solo sale la primera página. */
+  .libro-consecutivo,
+  .libro-consecutivo__tarjeta,
+  .libro-consecutivo__scroll {
+    overflow: visible !important;
+    max-width: none !important;
+    width: auto !important;
+  }
+
+  /* `display: block` y no flex: el repo ya aprendió que el medio paginado
+     no fragmenta bien dentro de contenedores flex — `app/interno/licencias/
+     layout.tsx` añade `print:block` a su propia cadena por esta razón. */
+  .libro-consecutivo {
+    display: block !important;
+    padding: 0 !important;
+  }
+  .libro-consecutivo > * + * {
+    margin-top: 8pt;
+  }
+  .libro-consecutivo__tarjeta {
+    border: none !important;
+    box-shadow: none !important;
+    border-radius: 0 !important;
+  }
+
+  /* 2. La tabla: todas las columnas, encabezado repetido en cada hoja y
+        filas que no se parten por la mitad. */
+  #tabla-libro-consecutivo {
+    width: 100% !important;
+    table-layout: auto;
+    font-size: 8.5pt;
+  }
+  /* Los descendientes fijan su propio tamaño con utilidades de Tailwind
+     (`text-[13px]` en `NumeroLegal`, `text-[11px]` en `ChipEstadoJuridico`,
+     `text-xs` en los subtipos) — sin esto la compactación no los alcanza y
+     son justo las celdas más anchas. */
+  #tabla-libro-consecutivo :is(span, p, div) {
+    font-size: inherit !important;
+  }
+  #tabla-libro-consecutivo thead {
+    display: table-header-group;
+  }
+  #tabla-libro-consecutivo tr {
+    break-inside: avoid;
+    page-break-inside: avoid;
+  }
+  #tabla-libro-consecutivo th,
+  #tabla-libro-consecutivo td {
+    padding: 2.5pt 3.5pt !important;
+    white-space: normal !important;
+  }
+  /* «Tipo» se trunca en pantalla por espacio; en papel no hay hover ni
+     tooltip, así que el texto completo tiene que salir. */
+  #tabla-libro-consecutivo .truncate {
+    overflow: visible !important;
+    text-overflow: clip !important;
+    white-space: normal !important;
+  }
+
+  /* 3. La franja de urgencia, en borde (la sombra no se imprime). El COLOR
+        lo aporta `borderLeftColor` del estilo en línea de la celda —
+        invisible en pantalla, donde el ancho del borde es 0. */
+  #tabla-libro-consecutivo tbody td:first-child {
+    box-shadow: none !important;
+    border-left-width: 3pt !important;
+    border-left-style: solid !important;
+  }
+
+  /* 3-bis. El texto de «Vence» en papel. En pantalla usa los tokens
+     semánticos, que como TEXTO rinden 2,15:1 (ámbar) y 3,30:1 (verde) —
+     ilegibles impresos y peor en blanco y negro (ADR-0030). Se sustituyen
+     por los tonos oscuros que ya existen en `estilos-estado-juridico.ts`:
+     cero hex nuevo, todos ≥6:1. `!important` porque el color de pantalla
+     viene de un estilo en línea. La distinción real en B/N la aporta el
+     texto que ya se pinta («Vencido hace N días hábiles»). */
+  #tabla-libro-consecutivo tr[data-urgencia='VENCIDO'] .libro-consecutivo__vence p {
+    color: #911111 !important;
+  }
+  #tabla-libro-consecutivo tr[data-urgencia='POR_VENCER'] .libro-consecutivo__vence p {
+    color: #7a4f0a !important;
+  }
+  #tabla-libro-consecutivo tr[data-urgencia='EN_TERMINO'] .libro-consecutivo__vence p {
+    color: #116932 !important;
+  }
+  #tabla-libro-consecutivo tr[data-urgencia='NEUTRO'] .libro-consecutivo__vence p {
+    color: #475569 !important;
+  }
+
+  /* 4. El armazón de pantalla, solo mientras el libro imprime (la clase la
+        pone y quita `LibroConsecutivoClient`). `sin-scroll-de-pagina` deja
+        el raíz recortado, y un raíz recortado emite UNA sola página. */
+  body.imprimiendo-libro-consecutivo,
+  body.imprimiendo-libro-consecutivo .overflow-hidden,
+  body.imprimiendo-libro-consecutivo .overflow-y-auto {
+    overflow: visible !important;
+    height: auto !important;
+    max-height: none !important;
+  }
+  body.imprimiendo-libro-consecutivo aside {
+    display: none !important;
+  }
 }

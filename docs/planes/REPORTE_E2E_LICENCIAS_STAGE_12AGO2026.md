@@ -1,4 +1,4 @@
-# Reporte E2E — Módulo de Licencias en STAGE (2.ª pasada)
+# Reporte E2E — Módulo de Licencias en STAGE (2.ª y 3.ª pasada)
 
 **Fecha:** 12-ago-2026
 **Entorno:** stage exclusivamente (`ventanilla-stage`). **Producción NO se tocó** — ni lectura ni escritura.
@@ -196,3 +196,131 @@ Otras verificaciones: `tsc --noEmit` limpio, `eslint` limpio sobre las áreas to
 2. **N-2 (colisiones)** — ¿se expone en el libro en esta entrega o entra al backlog?
 3. **N-3 (contraste ámbar/verde)** — requiere ADR por tocar tokens globales.
 4. **Merge** — a la espera de su visto bueno, según su instrucción.
+
+
+---
+
+# 3.ª pasada — las tres decisiones del propietario (12-ago-2026)
+
+Instrucción: (1) A4 horizontal para que no se recorten columnas, (2) incluir las
+colisiones en esta entrega, (3) ADR de contraste sin bloquear el PR.
+
+## N-1 · Impresión A4 horizontal — RESUELTO
+
+**El problema no era solo la orientación.** `@page` no admite selectores: su gramática
+solo acepta pseudo-clases de página o un nombre, así que cualquier `@page` cargado en el
+documento gobierna TODA la impresión. Poner `landscape` en `globals.css` habría volteado
+las otras **9 superficies** que imprimen — constancia de radicación (190 mm), sello de
+recibido, comprobante, sello de despacho, planilla de reparto, acto de desistimiento…
+
+**Solución en dos capas independientes:**
+
+1. **Reglas permanentes** en `globals.css`, acotadas a las clases del libro: desrecortan
+   la cadena (`overflow: visible`), pasan el contenedor a `display: block` (el medio
+   paginado no fragmenta bien dentro de flex — el propio repo ya lo aprendió en
+   `layout.tsx`), repiten el `<thead>` en cada hoja, evitan partir filas y compactan a
+   8,5 pt alcanzando también a los descendientes que fijan su tamaño.
+2. **`@page { size: A4 landscape }` acotado en el TIEMPO**: se inyecta al pulsar Imprimir
+   y se retira al terminar. Es el patrón que el repo ya usa cinco veces.
+
+**Medido simulando el medio paginado (copiando las 21 reglas `@media print` y midiendo):**
+
+| Escenario | Ancho útil | Columnas impresas | Recortadas |
+|---|---|---|---|
+| A4 horizontal (botón Imprimir) | 1047 px | **8 de 8** | ninguna |
+| A4 vertical (Ctrl+P / Safari) | 733 px | **8 de 8** | ninguna |
+
+La capa 1 hace que **incluso Ctrl+P salga completo** (tabla compactada a 728 px): la
+corrección no depende de que la funcionaria use el botón.
+
+**Dos defectos que aparecieron al verificar y que también se corrigieron:**
+
+- **La franja de urgencia desaparecía en papel.** Es un `box-shadow: inset`, y Chrome no
+  imprime sombras si «Gráficos de fondo» está desmarcado (el valor por defecto). Ahora se
+  imprime como `border-left` con el color de urgencia. Verificado: `4px solid rgb(220,38,38)`
+  en la fila vencida, con la sombra apagada.
+- **El texto de «Vence» era ilegible impreso** (ámbar 2,15:1). Se oscurece por banda con
+  tonos que ya existen en el módulo. Medido tras el cambio: **6,79 / 7,12 / 9,16 / 7,58**.
+
+**Y un fallo ALTA que la revisión adversarial encontró antes de codear:** `Comprobante
+Radicado` y `PanelReparto` inyectan su hoja de impresión UNA sola vez y **nunca la
+retiran** — y contienen `body * { visibility: hidden !important; }`. Como el Libro se monta
+también dentro de `/interno/dashboard`, el camino real *radicar → imprimir constancia →
+pestaña Licencias → Libro → Imprimir* habría producido **hojas en blanco**. Ahora se apagan
+antes de imprimir y se restauran después. Verificado en la aplicación real y con prueba de
+regresión.
+
+## N-2 · Colisiones de radicado — RESUELTO
+
+El flag `numeroExpediente.colision` existía, lo escribe el importador y llega íntegro al
+cliente: **moría en `construirFilasLibroConsecutivo`**, que no lo mapeaba.
+
+- Marca roja **«Colisión»** junto al número, reutilizando el trío de
+  `ESTILOS_ESTADO_JURIDICO.NEGADA` (7,95:1, cero hex nuevo). Con `role="note"` para que el
+  `aria-label` sea válido — ARIA lo prohíbe sobre un `<span>` genérico, y una prueba con
+  `getByLabelText` habría dado verde igualmente.
+- **Dice con QUIÉN colisiona**, que es lo que se necesita para resolver: cada fila nombra a
+  la otra. Verificado en stage — Ana nombra a Pedro y Pedro nombra a Ana.
+- Chip de filtro **«Colisiones»** con conteo, visible solo cuando hay alguna, con guarda que
+  resetea el filtro si el conteo cae a 0.
+- Columna **`COLISION`** en el CSV (aditiva, al final): sin ella la anomalía seguiría
+  invisible una capa más abajo. Verificado: 10 columnas alineadas, 2 filas en `SI`.
+
+**Disciplina de honestidad mantenida:** la marca se enciende SOLO con el flag persistido,
+nunca comparando números repetidos en la vista — hay una prueba dedicada a que dos filas con
+el mismo número pero sin flag NO se marquen. Y cuando el gemelo no está a la vista, el texto
+habla del dato («el importador marcó este número como duplicado») en vez de afirmar una
+existencia que el libro no puede verificar.
+
+### Corrección de fondo incluida
+
+El JSDoc de `colision` decía que el flag significa choque contra un expediente REAL. Es
+falso: `esColision` cuenta repeticiones dentro del snapshot del Excel y nunca consulta
+`unicidad_expedientes`. Se corrigió antes de construir una marca legal encima de una
+descripción equivocada.
+
+### Riesgo ABIERTO que descubrió la revisión (no cubierto por esta entrega)
+
+Ningún control detecta hoy duplicados de `numeroExpediente` entre expedientes **REAL**:
+`verificarColisionNumeroExpediente` no tiene ningún caller de producción, y el cron
+`auditoria-consecutivos` no barre la colección `expedientes`. La marca del libro solo delata
+lo que el importador declaró. **Queda sin dueño y conviene registrarlo en el registro de
+riesgos.**
+
+## N-3 · Contraste — ADR-0030 abierto, sin tocar tokens
+
+`docs/adr/0030-tokens-de-texto-accesibles-wcag-aa.md`. Verifiqué sus valores con cálculo
+independiente y **coinciden exactamente**:
+
+| Token propuesto | Valor | s/ blanco | s/ bg-base | s/ bg-surface-2 |
+|---|---|---|---|---|
+| `--color-warning-text` | `#8E5C06` | 5,70 | 5,43 | 5,11 |
+| `--color-success-text` | `#117937` | 5,51 | 5,25 | 4,93 |
+| `--color-danger-text` | `#B91C1C` | 6,47 | 6,16 | 5,80 |
+
+El ADR encontró además dos cosas que yo no había medido:
+
+- **`--color-danger` tampoco está a salvo**: 4,33:1 sobre `--bg-surface-2`. No estaba
+  «salvado», estaba al borde — cualquier fondo que no sea blanco puro lo tumba.
+- **El código ya parcheó el problema tres veces**, con tres ámbares ad-hoc distintos
+  (`#D97706` en 10 sitios, `#B45309` en 9, `#92400E` en 16), uno de ellos igualmente
+  inaccesible. El vacío del token no era teórico.
+
+Alcance de la migración: **82 sitios en 28 archivos**. Trabajo separado, como usted indicó.
+
+## Verificación de la 3.ª pasada
+
+| Comprobación | Resultado |
+|---|---|
+| Suite `TZ=UTC` | **2068/2068** (1 fallo = flake de timeout en `radicacion-interna-magic-bytes`, 5288 ms contra 5000; verde aislado en 2,8 s, no toca este código) |
+| `tsc --noEmit` | limpio |
+| `eslint` | limpio |
+| Impresión A4 horizontal y vertical | 8/8 columnas |
+| Franja de urgencia en papel | borde con color, sombra apagada |
+| Hojas de impresión ajenas | apagadas durante, restauradas después |
+| Colisiones en pantalla | 2 marcas, cada una nombra a la otra |
+| CSV | 10 columnas alineadas, 2 en `SI` |
+| Buscador | intacto (por número y por nombre del gemelo) |
+| Responsive 375 px | contenedor 375, 0 desbordes, 8 columnas, marca visible |
+| Detalle y términos | sin regresión (resuelto: 0 alertas; en trámite: 1) |
+| Producción | **no se tocó** |

@@ -281,7 +281,16 @@ export interface NumeroExpedienteAsignado {
   serieId: string;
   /** Año (4 dígitos) usado para el consecutivo — NO el `AA` de 2 dígitos del número formateado. */
   año: number;
-  /** `true` si, al reservar unicidad, el número YA existía (Fase 5: importación reconstruida que choca con uno REAL). */
+  /**
+   * `true` cuando la FUENTE del número declara que ese número aparece más de
+   * una vez en ella misma — hoy lo escribe el importador de históricos:
+   * `esColision` en `lib/migracion/planificar-importacion-consecutivo.ts`
+   * cuenta repeticiones del radicado DENTRO del snapshot del Excel (caso real
+   * `68745-0-25-0037`, dos solicitantes). NO significa que choque contra un
+   * expediente REAL: el importador nunca consulta `unicidad_expedientes`.
+   * No bloquea la importación (DF-9): ambas filas entran marcadas y la
+   * resolución es humana — la serie legal histórica no se renumera.
+   */
   colision?: boolean;
 }
 
