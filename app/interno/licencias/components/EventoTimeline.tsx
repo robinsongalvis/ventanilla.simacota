@@ -8,7 +8,7 @@ const COLOR_POR_TIPO: Record<EventoTimelineItem['tipo'], string> = {
   // una comunicación enviada es informativa, deliberadamente NO el verde de
   // éxito (Bloque A·A4/A5): no es un logro del trámite, es un aviso.
   COMUNICACION: 'var(--color-info)',
-  VENCIMIENTO_CALCULADO: '#DC2626', // rojo — es una proyección, nunca un hecho
+  VENCIMIENTO_CALCULADO: 'var(--color-danger)', // rojo — es una proyección, nunca un hecho
 };
 
 /**

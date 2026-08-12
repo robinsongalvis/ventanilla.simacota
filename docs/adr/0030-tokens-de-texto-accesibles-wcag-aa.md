@@ -1,7 +1,7 @@
 # ADR-0030 — Variantes de TEXTO para los tokens semánticos de color (WCAG AA)
 
 - **Fecha:** 2026-08-12
-- **Estado:** propuesto — decisión de ejecución tomada por el propietario (ver §Decisión del propietario); la implementación es trabajo separado y aún no ejecutado
+- **Estado:** ACEPTADO y PARCIALMENTE EJECUTADO — el propietario revirtió el 12-ago-2026 su decisión de aplazar y ordenó corregir el contraste en el mismo PR. Tokens creados y módulo Licencias migrado; el resto del inventario queda como trabajo separado (ver §Estado de ejecución)
 - **Responsable:** arquitecto-principal (diseño de la solución). La decisión de producto —documentar sin bloquear el PR #189— es del **propietario del proyecto (12-ago-2026)**
 - **Roles consultados:** ux (jerarquía visual e identidad institucional), frontend (alcance de migración), calidad (prueba de regresión), normativo (NTC 5854 / Gobierno Digital)
 - **Nivel de triaje:** 2 — cambio dentro del sistema de diseño: añade tokens al `:root` de `app/globals.css` y sustituye valores en sitios de uso. No crea módulo ni colección, no cambia flujo ni modelo de datos. La migración es amplia (82 sitios) pero mecánica y sin efecto sobre la lógica.
@@ -178,3 +178,64 @@ Concentración: `app/interno/dashboard/page.tsx` reúne 11 sitios; el resto se r
 ## Referencias
 
 `app/globals.css` (definición de tokens) · `app/interno/licencias/presentacion-libro-consecutivo.ts` (precedente `COLOR_TEXTO_URGENCIA_LIBRO`, PR #189) · `__tests__/presentacion-libro-consecutivo.test.ts` · WCAG 2.1 criterios 1.4.3 (AA) y 1.4.11 (AA) · NTC 5854 · Resolución MinTIC 1519 de 2020, anexo 1 · Decreto 1078/2015 Título 9 (Gobierno Digital), act. Decreto 767/2022 · ADR-0014 (ritmo vs. calidad) · ADR-0015 (estándar de evidencia) · ADR-0028 (reserva de numeración).
+
+
+---
+
+## Estado de ejecución (12-ago-2026, posterior a la aprobación)
+
+El propietario cambió de decisión el mismo día: en vez de aplazar la migración completa,
+ordenó **corregir las bandas ámbar y verde en este PR**, usando los tokens globales y sin
+crear estilos paralelos.
+
+### Ejecutado y verificado en la aplicación real (stage)
+
+Los tres tokens existen en `app/globals.css` (en `@theme` y en `:root`). Migrado el módulo
+**Licencias**, midiendo el contraste antes y después en el navegador:
+
+| Sitio | Antes | Después |
+|---|---|---|
+| Banda «En término» del Libro | 3,30 | **5,51** |
+| Banda «Por vencer» del Libro | **2,15** | **5,70** |
+| Banda «Vencido» del Libro | 4,83 | **6,47** |
+| Cifra del KPI (`TarjetaKpiLibro`) | **2,15** | **5,70** |
+| Textos en verde de `PanelHechosCaso` (2) | 3,30 | **5,51** |
+| Verde de confirmación en 3 modales | 3,30 | **5,51** |
+| Chip `ASIGNADO` (`estilos-chip-estado.ts`) | **4,37** | **5,12** |
+| Chip de subtipo en cuarentena (`PanelDetalleExpediente`) | **4,13** | **5,81** |
+
+Las FRANJAS conservan sus tokens base y su color saturado: la identidad visual del tablero
+no cambia. Verificado en el navegador — franja `rgb(245,158,11)` con texto `rgb(142,92,6)`.
+
+### Cuatro correcciones que la auditoría le hizo a ESTE ADR
+
+1. **La «excepción vigente y válida» era falsa.** El ADR declaraba seguro el patrón de
+   texto oscuro `#4A2E02` sobre chip `--color-warning` con 5,81:1. Ese objeto lleva además
+   `opacity: 0.85`, que compone texto y fondo contra el panel blanco: el contraste REAL era
+   **4,13:1 — incumple**. Se corrigió quitando la opacidad, que era decorativa; ahora sí
+   rinde los 5,81:1 que el ADR suponía. **Lección: medir el color compuesto, no el declarado.**
+2. **Existe un CUARTO ámbar ad hoc no inventariado:** `#EA580C` (3,56:1) en
+   `app/interno/dashboard/page.tsx:1321` (KPI «Por vencer» del resumen MIPG),
+   `simi/JefeAprobacionesPanel.tsx:28` y `analytics/VistaAlertas.tsx:52`.
+3. **El inventario real es de ~118 sitios, no 82.**
+4. **Los correos NO pueden usar `var()`.** `lib/simi-juridico/emailNotifications.ts` genera
+   HTML para Gmail/Outlook, donde las variables CSS no se resuelven de forma fiable: ahí la
+   migración debe llevar el **hex literal**. Y contiene un incumplimiento operativamente
+   grave: la alerta «Próximo a vencer» va en `#D97706` (**3,07:1**) — un aviso de término
+   legal que el destinatario puede no llegar a leer.
+
+### Pendiente — trabajo separado, con dueño
+
+Fuera del módulo Licencias quedan ~100 sitios (Dashboard, SIMI, analytics, admin,
+recepción). **La mayoría ya cumple AA** (`#92400E` rinde 6,37–7,09): migrarlos es
+consolidación contra la duplicación, no corrección de accesibilidad, y por eso no entra en
+un PR que debe poder revisarse. Los que SÍ incumplen y deben priorizarse:
+
+| Prioridad | Qué | Contraste |
+|---|---|---|
+| **1** | Correo «Próximo a vencer» (`emailNotifications.ts:236`) — hex literal | 3,07 |
+| **2** | Los ~20 usos de `#D97706` como texto en paneles SIMI y analytics | 3,04–3,19 |
+| **3** | `#EA580C` en los 3 KPIs | 3,56 |
+| **4** | Los `#16A34A`/`#DC2626` restantes como texto fuera de Licencias | 3,30 / 4,41 |
+
+El **portal público** (fondo oscuro) sigue fuera de alcance y sin medir.

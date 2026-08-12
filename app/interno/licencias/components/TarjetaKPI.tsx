@@ -37,7 +37,7 @@ export function TarjetaKPI({
       className="rounded-xl p-4 flex flex-col gap-1"
       style={{
         background: 'var(--bg-surface)',
-        border: `${critico ? 2 : 1}px solid ${critico ? '#DC2626' : 'var(--color-border)'}`,
+        border: `${critico ? 2 : 1}px solid ${critico ? 'var(--color-danger)' : 'var(--color-border)'}`,
         boxShadow: 'var(--shadow-soft)',
       }}
     >
@@ -49,7 +49,7 @@ export function TarjetaKPI({
       </p>
       <p
         className="font-black leading-none tabular-nums"
-        style={{ fontSize: 40, color: critico ? '#DC2626' : 'var(--text-primary)' }}
+        style={{ fontSize: 40, color: critico ? 'var(--color-danger-text)' : 'var(--text-primary)' }}
       >
         {valor}
       </p>

@@ -768,14 +768,105 @@ describe('Contrato del CSS de impresión del libro', () => {
     expect(CSS).toMatch(/#tabla-libro-consecutivo thead \{\s*display: table-header-group;/);
   });
 
+  it('REGRESIÓN: suelta los anchos fijos de columna al imprimir — si no, la tabla no cabe en la hoja', () => {
+    // Los `<Th ancho={…}>` fijan anchos en línea que SUMAN 1220 px, más que
+    // los ~1047 útiles de una A4 horizontal. En pantalla no se nota (hay
+    // scroll lateral); en papel se recortaban «Vigencia hasta» y «N.°
+    // licencia». Medido el 12-ago-2026 simulando el ancho de la hoja.
+    expect(CSS).toMatch(/#tabla-libro-consecutivo th \{\s*width: auto !important;/);
+  });
+
   it('la franja de urgencia se imprime como BORDE, no como sombra (Chrome no imprime fondos por defecto)', () => {
     expect(CSS).toMatch(/#tabla-libro-consecutivo tbody td:first-child \{[^}]*box-shadow: none/);
     expect(CSS).toMatch(/#tabla-libro-consecutivo tbody td:first-child \{[^}]*border-left-width/);
   });
 
-  it('el texto de "Vence" se oscurece por banda al imprimir (el ámbar rinde 2,15:1)', () => {
-    for (const urgencia of ['VENCIDO', 'POR_VENCER', 'EN_TERMINO', 'NEUTRO']) {
-      expect(CSS).toContain(`tr[data-urgencia='${urgencia}'] .libro-consecutivo__vence p`);
+  it('el texto de "Vence" se pinta por banda al imprimir, con los MISMOS tokens de la pantalla (sin fuente paralela)', () => {
+    for (const [urgencia, token] of [
+      ['VENCIDO', '--color-danger-text'],
+      ['POR_VENCER', '--color-warning-text'],
+      ['EN_TERMINO', '--color-success-text'],
+      ['NEUTRO', '--text-secondary'],
+    ] as const) {
+      const regla = new RegExp(
+        `tr\\[data-urgencia='${urgencia}'\\] \\.libro-consecutivo__vence p \\{\\s*color: var\\(${token}\\)`,
+      );
+      expect(CSS).toMatch(regla);
     }
+  });
+
+  it('los tokens de TEXTO existen en el sistema de diseño y NO reutilizan el valor de su token base (ADR-0030)', () => {
+    for (const [base, texto] of [
+      ['--color-success', '--color-success-text'],
+      ['--color-warning', '--color-warning-text'],
+      ['--color-danger', '--color-danger-text'],
+    ] as const) {
+      const valorBase = CSS.match(new RegExp(`${base}:\\s*(#[0-9A-Fa-f]{6})`))?.[1]?.toUpperCase();
+      const valorTexto = CSS.match(new RegExp(`${texto}:\\s*(#[0-9A-Fa-f]{6})`))?.[1]?.toUpperCase();
+      expect(valorBase).toBeTruthy();
+      expect(valorTexto).toBeTruthy();
+      expect(valorTexto).not.toBe(valorBase);
+    }
+  });
+});
+
+describe('Colisión en el PANEL de detalle — "acceso al detalle" (12-ago-2026)', () => {
+  it('el panel delata la colisión y nombra al gemelo cuando el Libro se lo puede decir', async () => {
+    mockAuth();
+    const par = parEnColision();
+    vi.stubGlobal('fetch', mockFetchExpedientes(par, {
+      'col-a': detalleExpediente(par[0]),
+    }));
+    render(<LibroConsecutivoClient />);
+    await seleccionarAño(2025);
+
+    const filas = await screen.findAllByRole('button', { name: /68745-0-25-0037/ });
+    fireEvent.click(filas[0]);
+
+    const dialogo = await screen.findByRole('dialog');
+    const marca = await waitFor(() =>
+      within(dialogo).getByRole('note', { name: /Colisión de número de expediente/ }),
+    );
+    // El panel se abre sobre 'col-a' (Ana), así que debe nombrar a Pedro.
+    expect(marca.getAttribute('aria-label')).toContain('Pedro Nel Rojas Peña');
+  });
+
+  it('un expediente SIN colisión no muestra marca en el panel', async () => {
+    mockAuth();
+    const limpio = expedienteBase();
+    vi.stubGlobal('fetch', mockFetchExpedientes([limpio], { 'exp-1': detalleExpediente(limpio) }));
+    render(<LibroConsecutivoClient />);
+    await seleccionarAño2026();
+
+    fireEvent.click(await screen.findByRole('button', { name: /68745-0-26-0001/ }));
+    const dialogo = await screen.findByRole('dialog');
+    await waitFor(() => expect(within(dialogo).queryByText('Cargando…')).toBeNull());
+    expect(within(dialogo).queryByRole('note', { name: /Colisión/ })).toBeNull();
+  });
+});
+
+describe('PanelDetalleExpediente — honestidad cuando no puede ver al gemelo', () => {
+  it('sin `textoColision` del caller sigue delatando la colisión, pero NO inventa un gemelo', async () => {
+    // El flag sale del fetch propio del panel (dato persistido), así que la
+    // marca aparece aunque lo monten fuera del Libro. Lo que NO puede saber
+    // ahí es con quién colisiona — y no debe fingirlo.
+    const { PanelDetalleExpediente } = await import('@/app/interno/licencias/components/PanelDetalleExpediente');
+    const exp = expedienteBase({
+      id: 'suelto',
+      numeroExpediente: { numero: '68745-0-25-0037', serieId: 'historico', año: 2025, colision: true },
+    });
+    mockAuth();
+    vi.stubGlobal('fetch', vi.fn(() =>
+      Promise.resolve({ ok: true, status: 200, json: async () => detalleExpediente(exp) }),
+    ));
+
+    render(<PanelDetalleExpediente expedienteId="suelto" onCerrar={() => {}} />);
+
+    const marca = await screen.findByRole('note', { name: /Colisión de número de expediente/ });
+    const texto = marca.getAttribute('aria-label') ?? '';
+    expect(texto).toContain('El importador marcó');
+    expect(texto).toContain('No se renumera');
+    // Ningún nombre de solicitante inventado.
+    expect(texto).not.toMatch(/Ana Lucía|Pedro Nel|Carlos Alberto/);
   });
 });

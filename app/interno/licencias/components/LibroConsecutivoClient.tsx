@@ -574,7 +574,16 @@ export function LibroConsecutivoClient() {
       </p>
 
       {expedienteSeleccionadoId && (
-        <PanelDetalleExpediente expedienteId={expedienteSeleccionadoId} onCerrar={() => setExpedienteSeleccionadoId(null)} />
+        <PanelDetalleExpediente
+          expedienteId={expedienteSeleccionadoId}
+          onCerrar={() => setExpedienteSeleccionadoId(null)}
+          // El panel sabe SOLO si hay colisión (viaja en su propio fetch);
+          // con quién colisiona se deriva del índice de filas del año, que
+          // vive aquí. Se le pasa ya redactado por la misma función pura.
+          textoColision={textoColisionLibro(
+            filas.find((f) => f.id === expedienteSeleccionadoId) ?? { colision: false, numeroExpediente: '', otrosConMismoNumero: [] },
+          )}
+        />
       )}
     </div>
   );

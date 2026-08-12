@@ -1,4 +1,4 @@
-# Reporte E2E — Módulo de Licencias en STAGE (2.ª y 3.ª pasada)
+# Reporte E2E — Módulo de Licencias en STAGE (2.ª, 3.ª y 4.ª pasada)
 
 **Fecha:** 12-ago-2026
 **Entorno:** stage exclusivamente (`ventanilla-stage`). **Producción NO se tocó** — ni lectura ni escritura.
@@ -323,4 +323,126 @@ Alcance de la migración: **82 sitios en 28 archivos**. Trabajo separado, como u
 | Buscador | intacto (por número y por nombre del gemelo) |
 | Responsive 375 px | contenedor 375, 0 desbordes, 8 columnas, marca visible |
 | Detalle y términos | sin regresión (resuelto: 0 alertas; en trámite: 1) |
+| Producción | **no se tocó** |
+
+
+---
+
+# 4.ª pasada — cierre de los tres puntos (12-ago-2026)
+
+Los puntos 1 (impresión) y 2 (colisiones) ya habían quedado implementados y verificados en
+`f2c614a`. De la nueva instrucción salieron dos trabajos realmente nuevos: el **acceso al
+detalle** de la colisión y el **contraste**, que el propietario decidió corregir ahora en
+lugar de aplazarlo.
+
+## 1 · Impresión — un defecto REAL que la 3.ª pasada no vio
+
+**Mi verificación anterior era insuficiente y lo digo claro:** medí sobre el año 2025, cuyo
+contenido es más corto, y di por bueno «8 de 8 columnas». Al repetir sobre 2026 se
+recortaban **«Vigencia hasta» y «N.° licencia»** en horizontal, y cuatro columnas en vertical.
+
+**Causa:** los `<Th ancho={…}>` fijan anchos en línea que **suman 1220 px**, más que los
+~1047 útiles de una A4 horizontal. En pantalla no se nota porque hay desplazamiento
+lateral; en papel no hay adónde desplazarse. Ninguna de las reglas anteriores los soltaba.
+
+**Corrección:** `#tabla-libro-consecutivo th { width: auto !important }` en impresión, para
+que `table-layout: auto` reparta el ancho real de la hoja y el contenido envuelva.
+
+**Y corregí también el método de verificación**, que era la raíz del error: acotar el
+contenedor no sirve (la propia regla de impresión lo pone en `width: auto`). Ahora se acota
+el **viewport**, que es lo que de verdad hace de caja de página.
+
+| Escenario | Ancho de hoja | Ancho de tabla | Columnas | Recortadas |
+|---|---|---|---|---|
+| A4 horizontal (botón) | 1047 px | 1047 px | 8 | **ninguna** |
+| A4 vertical (Ctrl+P) | 757 px | 757 px | 8 | **ninguna** |
+
+Regresión añadida para que el ancho fijo no vuelva a colarse.
+
+## 2 · Colisiones — «acceso al detalle»
+
+Faltaba lo que la revisión ya había anotado: quien abría el panel lateral desde el número
+**perdía por completo** la información de la colisión.
+
+**Diseño (verificado, no supuesto):** el flag `colision` YA viaja en el fetch que el panel
+hace — el endpoint devuelve el documento sin proyección. Cero consultas nuevas. Lo que el
+panel NO puede saber es *con quién* colisiona, porque eso se deriva del índice de filas del
+año, que solo existe en el Libro. La solución es **asimétrica a propósito**:
+
+- El flag que DECIDE si hay aviso → del propio fetch del panel (dato persistido).
+- El texto que dice QUIÉN es el gemelo → prop opcional, redactada por la MISMA función pura
+  que usa la fila (`textoColisionLibro`), sin duplicar una línea.
+
+Así el panel sigue delatando la colisión aunque lo monten desde otra pantalla, y **no
+inventa un gemelo** que no puede ver. Hay prueba dedicada a esa honestidad.
+
+Verificado en stage: al abrir el panel del 9007 aparece la marca con
+«Comparte el número 68745-0-25-9007 con: Ana Lucía Avilés Pérez (29/04/2025)».
+
+## 3 · Contraste — ADR-0030 ejecutado en el módulo
+
+Tres tokens nuevos en `app/globals.css` (`--color-success-text`, `--color-warning-text`,
+`--color-danger-text`), y **cero hex semánticos sueltos** en todo el módulo de Licencias.
+Los tokens base **no cambian de valor**: siguen pintando fondos, franjas, bordes y puntos,
+así que la identidad visual del tablero es la misma.
+
+Medido en la aplicación real, antes → después:
+
+| Sitio | Antes | Después |
+|---|---|---|
+| Banda «Por vencer» | **2,15** | **5,70** |
+| Banda «En término» | **3,30** | **5,51** |
+| Banda «Vencido» | 4,83 | **6,47** |
+| Cifra de KPI (Libro y Bandeja) | **2,15** | **5,70** |
+| Textos verdes de `PanelHechosCaso` (2) | **3,30** | **5,51** |
+| Verde de confirmación en 3 modales | **3,30** | **5,51** |
+| Chip `ASIGNADO` | **4,37** | **5,12** |
+| Chip de subtipo en cuarentena | **4,13** | **5,81** |
+
+**Barrido final sobre la pantalla real: 0 textos por debajo del umbral** (aplicando 3:1 a
+texto grande y 4,5:1 al resto).
+
+### Cuatro correcciones que la auditoría le hizo al ADR que aprobé ayer
+
+1. **La «excepción vigente y válida» del ADR era falsa.** Declaraba seguro el chip de
+   cuarentena con 5,81:1, pero ese objeto lleva `opacity: 0.85`, que compone texto y fondo
+   contra el panel: el valor real era **4,13:1 — incumplía**. Se corrigió quitando la
+   opacidad, que era decorativa. Lección: medir el color compuesto, no el declarado.
+2. **Existe un CUARTO ámbar ad hoc** no inventariado, `#EA580C` (3,56:1), en tres sitios del
+   Dashboard.
+3. **El inventario real es de ~118-180 sitios, no 82.**
+4. **Los correos no pueden usar `var()`**: `emailNotifications.ts` genera HTML para
+   Gmail/Outlook, donde las variables CSS no resuelven. Ahí la migración exige hex literal.
+
+### Un error mío que la auditoría evitó que se colara
+
+Al migrar `TarjetaKPI.tsx` cambié de golpe los dos usos de `#DC2626`, y **uno era un
+borde**, no texto — exactamente la confusión contra la que advertía la auditoría. Revertido:
+el borde conserva el token base, solo la cifra usa la variante de texto.
+
+### Fuera de alcance, con prioridades
+
+~100 sitios en Dashboard, SIMI, analytics y admin. **La mayoría ya cumple AA**: migrarlos es
+consolidación, no corrección, y por eso no entran en un PR que debe poder revisarse. Los que
+sí incumplen, por prioridad, quedan listados en el ADR. El más urgente: el correo
+**«Próximo a vencer» a 3,07:1** — un aviso de término legal que el destinatario puede no
+llegar a leer.
+
+## Verificación de la 4.ª pasada
+
+| Comprobación | Resultado |
+|---|---|
+| Suite `TZ=UTC` | **2073/2073 — verde total, sin flakes** |
+| `tsc --noEmit` / `eslint` | limpios |
+| Impresión A4 horizontal | 8/8 columnas, 0 recortadas |
+| Impresión A4 vertical | 8/8 columnas, 0 recortadas |
+| Franja de urgencia en papel | borde con color, sombra apagada |
+| Texto «Vence» en papel | 5,51 / 5,70 / 6,47 / 4,97 |
+| Contraste en pantalla | 0 textos bajo el umbral |
+| Colisión en la fila | 2 marcas, cada una nombra a la otra |
+| Colisión en el detalle | marca + gemelo identificado |
+| Búsqueda | nombre, matrícula, número, estado vacío |
+| Históricos 2025 | 4 sin reloj legal, filtro 4/4, cuarentena marcada |
+| Expedientes resueltos | banda NEUTRO, sin conteo de mora, vigencia calculada |
+| Responsive 375 px | contenedor 375, 0 desbordes, 8 columnas, marcas visibles |
 | Producción | **no se tocó** |

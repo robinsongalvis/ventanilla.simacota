@@ -671,25 +671,33 @@ describe('camposBusquedaDesdeExpediente', () => {
   });
 });
 
-describe('COLOR_TEXTO_URGENCIA_LIBRO — el dato del expediente resuelto se atenúa, no desaparece', () => {
-  // Segundo defecto de la misma verificación en stage: al pasar el expediente
-  // resuelto a la banda NEUTRO, la fecha quedó pintada con `--color-border`,
-  // que es un token de filete de 4 px. Medido en la aplicación real daba
-  // 1.33:1 sobre blanco — la funcionaria no podía leer la fecha. "No es
-  // incumplimiento" no puede degenerar en "no se ve".
-  it('la franja y el texto comparten color en las bandas con plazo vivo', () => {
-    for (const urgencia of ['VENCIDO', 'POR_VENCER', 'EN_TERMINO'] as const) {
-      expect(COLOR_TEXTO_URGENCIA_LIBRO[urgencia]).toBe(COLOR_URGENCIA_LIBRO[urgencia]);
+describe('COLOR_TEXTO_URGENCIA_LIBRO — franja y texto NUNCA comparten token (ADR-0030)', () => {
+  // Los tokens semánticos están calibrados para pintar un filete de 4 px, no
+  // para leerse: medidos en la aplicación real daban 2,15:1 (ámbar), 3,30:1
+  // (verde) y 4,83:1 (rojo, que cae a 4,33:1 sobre fila atenuada). El peor
+  // caso era la alerta «quedan pocos días hábiles», que es justo la que la
+  // funcionaria más necesita leer.
+  it('NINGUNA banda reutiliza como texto el token de su franja', () => {
+    for (const urgencia of ['VENCIDO', 'POR_VENCER', 'EN_TERMINO', 'NEUTRO'] as const) {
+      expect(COLOR_TEXTO_URGENCIA_LIBRO[urgencia]).not.toBe(COLOR_URGENCIA_LIBRO[urgencia]);
     }
   });
 
-  it('en NEUTRO el texto NO usa el token de borde (contraste insuficiente)', () => {
+  it('las tres bandas con plazo vivo usan la variante `-text` del token de su franja (mismo tono, no un color nuevo)', () => {
+    expect(COLOR_URGENCIA_LIBRO.VENCIDO).toBe('var(--color-danger)');
+    expect(COLOR_TEXTO_URGENCIA_LIBRO.VENCIDO).toBe('var(--color-danger-text)');
+    expect(COLOR_URGENCIA_LIBRO.POR_VENCER).toBe('var(--color-warning)');
+    expect(COLOR_TEXTO_URGENCIA_LIBRO.POR_VENCER).toBe('var(--color-warning-text)');
+    expect(COLOR_URGENCIA_LIBRO.EN_TERMINO).toBe('var(--color-success)');
+    expect(COLOR_TEXTO_URGENCIA_LIBRO.EN_TERMINO).toBe('var(--color-success-text)');
+  });
+
+  it('NEUTRO usa `--text-secondary`: `--color-border` es un token de borde sin variante de texto', () => {
     expect(COLOR_URGENCIA_LIBRO.NEUTRO).toBe('var(--color-border)');
-    expect(COLOR_TEXTO_URGENCIA_LIBRO.NEUTRO).not.toBe(COLOR_URGENCIA_LIBRO.NEUTRO);
     expect(COLOR_TEXTO_URGENCIA_LIBRO.NEUTRO).toBe('var(--text-secondary)');
   });
 
-  it('toda banda tiene color de texto definido', () => {
+  it('ningún color de texto es un hex suelto — todo pasa por el sistema de diseño (sin estilos paralelos)', () => {
     for (const urgencia of ['VENCIDO', 'POR_VENCER', 'EN_TERMINO', 'NEUTRO'] as const) {
       expect(COLOR_TEXTO_URGENCIA_LIBRO[urgencia]).toMatch(/^var\(--[a-z-]+\)$/);
     }

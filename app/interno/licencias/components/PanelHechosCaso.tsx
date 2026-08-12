@@ -155,7 +155,7 @@ export function PanelHechosCaso({ expedienteId, clavesContexto, contexto, soloLe
         style={
           sinDefinir.length > 0
             ? { background: '#FDF2E2', border: '1px solid rgba(217,119,6,0.30)', color: '#7A4F0A' }
-            : { background: 'transparent', border: '1px solid transparent', color: 'var(--color-success)' }
+            : { background: 'transparent', border: '1px solid transparent', color: 'var(--color-success-text)' }
         }
       >
         {sinDefinir.length > 0 ? (
@@ -266,7 +266,7 @@ export function PanelHechosCaso({ expedienteId, clavesContexto, contexto, soloLe
                 </span>
               )}
               {claveRecienGuardada === clave.nombre && claveGuardando !== clave.nombre && (
-                <span role="status" className="text-[11px]" style={{ color: 'var(--color-success)' }}>
+                <span role="status" className="text-[11px]" style={{ color: 'var(--color-success-text)' }}>
                   Guardado — el checklist de requisitos puede haber cambiado.
                 </span>
               )}

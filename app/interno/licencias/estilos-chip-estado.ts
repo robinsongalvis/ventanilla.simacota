@@ -56,7 +56,7 @@ export const ESTILOS_CHIP_ESTADO: Record<EstadoLicenciaUI, EstiloChipEstado> = {
   },
   ASIGNADO: {
     dot: '#D4A017',
-    texto: '#8A6414',
+    texto: '#7D5A12',
     fondo: '#F5E8B7',
     label: 'Asignado',
   },

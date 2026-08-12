@@ -428,16 +428,25 @@ export const COLOR_URGENCIA_LIBRO: Record<UrgenciaFilaLibro, string> = {
 };
 
 /**
- * Token de color del TEXTO de la columna "Vence". Idéntico al de la franja
- * salvo en `NEUTRO`: `--color-border` está pensado para un filete de 4 px y
- * como texto rinde 1.33:1 sobre blanco — muy por debajo del 4.5:1 que exige
- * WCAG AA (medido en stage el 12-ago-2026). Un expediente ya resuelto debe
- * dejar de leerse como incumplimiento, pero su fecha sigue siendo un dato que
- * la funcionaria necesita ver: `--text-secondary` la baja de jerarquía sin
- * volverla invisible (4.97:1).
+ * Token de color del TEXTO de la columna "Vence" — NINGUNA banda comparte
+ * valor con su franja, porque franja y texto tienen requisitos distintos.
+ *
+ * Los tokens base (`--color-warning`, `--color-success`, `--color-danger`)
+ * están calibrados para pintar un filete de 4 px, no para leerse: medidos en
+ * la aplicación real rendían 2,15:1, 3,30:1 y 4,83:1 sobre blanco, y el rojo
+ * bajaba a 4,33:1 sobre fila atenuada. Las variantes `-text` de ADR-0030
+ * conservan el tono y solo bajan la luminosidad — el ámbar sigue siendo
+ * ámbar — y cumplen ≥4,5:1 sobre las tres superficies institucionales.
+ *
+ * `NEUTRO` no tiene variante `-text` porque `--color-border` es un token de
+ * borde sin equivalente de texto: se usa `--text-secondary` (4,97:1), que es
+ * exactamente lo que se quiere para un expediente ya resuelto — visible pero
+ * bajado de jerarquía, sin leerse como incumplimiento.
  */
 export const COLOR_TEXTO_URGENCIA_LIBRO: Record<UrgenciaFilaLibro, string> = {
-  ...COLOR_URGENCIA_LIBRO,
+  VENCIDO: 'var(--color-danger-text)',
+  POR_VENCER: 'var(--color-warning-text)',
+  EN_TERMINO: 'var(--color-success-text)',
   NEUTRO: 'var(--text-secondary)',
 };
 
