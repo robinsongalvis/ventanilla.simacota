@@ -43,7 +43,22 @@ Para evitar la pérdida de información en formularios largos en caso de descone
 
 El activo de información más valioso del municipio son los documentos de `radicados` y su `trazabilidad`. Se establecen las siguientes políticas oficiales de DR:
 
-### 3.1. Respaldos Automáticos Diarios (Backups) — OPERATIVO (primer export verificado 2026-08-06)
+### 3.1. Respaldos Automáticos Diarios (Backups) — OPERATIVO y VERIFICADO DE VERDAD (12-08-2026)
+
+> **Corrección de un "verificado" que no lo era (12-ago-2026).** Esta sección
+> declaraba el export "verificado" desde el 6-ago y el workflow venía en verde
+> todos los días. Al revisar los logs apareció que el job marcaba SUCCESS
+> **cuando la copia apenas había empezado**: `gcloud firestore export` retorna en
+> cuanto la operación queda registrada — el log del 12-ago muestra
+> `operationState: PROCESSING` y salida exitosa 4 segundos después, con el
+> respaldo todavía en curso del lado de GCP. Si fallaba a mitad (cuota, permisos,
+> indisponibilidad) **nadie se habría enterado**, y el verde diario daba una
+> falsa tranquilidad. Corregido: el workflow ahora espera a que la operación
+> llegue a `SUCCESSFUL` y además comprueba que el destino contenga objetos con
+> bytes > 0, publicando el tamaño en el resumen para vigilar la tendencia.
+>
+> Lección: *un respaldo que nadie verifica no es un respaldo, es una promesa* — y
+> el verde de un pipeline puede ser exactamente esa promesa.
 
 **Estado (Roadmap P2.4):** el mecanismo de respaldo está **implementado y
 versionado** en el repositorio. Antes esta sección describía un export

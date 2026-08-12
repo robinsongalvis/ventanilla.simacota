@@ -97,17 +97,81 @@ jobs:
       - name: Configurar gcloud
         uses: google-github-actions/setup-gcloud@v3
 
-      - name: Ejecutar export gestionado de Firestore
+      # ── Export + ESPERA REAL + verificación del resultado ──────────────
+      #
+      # Por qué no basta con `gcloud firestore export` a secas (hallazgo del
+      # 12-ago-2026): aunque se invoque SIN `--async`, gcloud retorna en
+      # cuanto la operación queda registrada — los logs del backup del
+      # 12-ago muestran "Waiting for [operations/...] to finish..." seguido
+      # de `operationState: PROCESSING` y salida exitosa 4 segundos después,
+      # con la copia todavía en curso del lado de GCP. Es decir: el job
+      # marcaba SUCCESS cuando el respaldo apenas había EMPEZADO, y si
+      # fallaba a mitad (cuota, permisos, indisponibilidad) nadie se
+      # enteraba. Un respaldo que nadie verifica no es un respaldo: es una
+      # promesa.
+      #
+      # Ahora: se captura el nombre de la operación, se ESPERA a que termine
+      # de verdad, y solo se declara éxito si además el destino contiene
+      # objetos con bytes > 0. Cualquiera de las tres condiciones que falle
+      # pone el job en rojo.
+      - name: Ejecutar export de Firestore y ESPERAR a que termine
+        id: export
         run: |
           set -euo pipefail
           FECHA="$(date -u +%F)"                      # p.ej. 2026-07-20
           DESTINO="gs://${BACKUP_BUCKET}/diario/${FECHA}"
+          echo "DESTINO=${DESTINO}" >> "$GITHUB_OUTPUT"
           echo "Exportando Firestore de ${GCP_PROJECT} -> ${DESTINO}"
-          # Sin --async: el paso refleja el resultado real del export (verde/rojo).
-          gcloud firestore export "${DESTINO}" \
+
+          OPERACION="$(gcloud firestore export "${DESTINO}" \
             --project="${GCP_PROJECT}" \
-            --database='(default)'
-          echo "Export solicitado y completado. Retención: la aplica el lifecycle del bucket."
+            --database='(default)' \
+            --async --format='value(name)')"
+          echo "Operación: ${OPERACION}"
+
+          # Espera activa: hasta 25 min (el job tiene timeout de 30).
+          for _ in $(seq 1 150); do
+            ESTADO="$(gcloud firestore operations describe "${OPERACION}" \
+              --project="${GCP_PROJECT}" --format='value(metadata.operationState)')"
+            echo "  estado: ${ESTADO}"
+            case "${ESTADO}" in
+              SUCCESSFUL) echo "Export COMPLETADO."; exit 0 ;;
+              FAILED|CANCELLED)
+                echo "::error::El export terminó en estado ${ESTADO}."
+                gcloud firestore operations describe "${OPERACION}" --project="${GCP_PROJECT}"
+                exit 1 ;;
+            esac
+            sleep 10
+          done
+          echo "::error::El export no terminó dentro de la ventana de espera."
+          exit 1
+
+      # Un export puede reportar SUCCESSFUL y aun así dejar un destino vacío
+      # (p. ej. si la base estuviera vacía). Se verifica el resultado en el
+      # bucket: debe haber objetos y pesar algo. El tamaño se publica en el
+      # resumen para poder VIGILAR la tendencia — una caída brusca de un día
+      # a otro es la señal temprana de que algo se rompió.
+      - name: Verificar que el respaldo existe y tiene datos
+        run: |
+          set -euo pipefail
+          DESTINO="${{ steps.export.outputs.DESTINO }}"
+          OBJETOS="$(gcloud storage ls --recursive "${DESTINO}/**" 2>/dev/null | wc -l | tr -d ' ')"
+          if [ "${OBJETOS}" -eq 0 ]; then
+            echo "::error::El destino ${DESTINO} está VACÍO tras un export marcado como exitoso."
+            exit 1
+          fi
+          BYTES="$(gcloud storage du --summarize "${DESTINO}" --format='value(size)' 2>/dev/null || echo 0)"
+          if [ -z "${BYTES}" ] || [ "${BYTES}" -eq 0 ]; then
+            echo "::error::El respaldo en ${DESTINO} pesa 0 bytes."
+            exit 1
+          fi
+          MB=$(( BYTES / 1024 / 1024 ))
+          echo "Respaldo verificado: ${OBJETOS} objeto(s), ${MB} MiB."
+          {
+            echo "OBJETOS=${OBJETOS}"
+            echo "BYTES=${BYTES}"
+            echo "MB=${MB}"
+          } >> "$GITHUB_ENV"
 
       - name: Resumen
         if: ${{ always() }}
@@ -116,3 +180,11 @@ jobs:
           echo "- Proyecto: \`${GCP_PROJECT}\`" >> "$GITHUB_STEP_SUMMARY"
           echo "- Destino: \`gs://${BACKUP_BUCKET}/diario/$(date -u +%F)\`" >> "$GITHUB_STEP_SUMMARY"
           echo "- Resultado del job: \`${{ job.status }}\`" >> "$GITHUB_STEP_SUMMARY"
+          # Tamaño verificado del respaldo — vigilar la TENDENCIA: una caída
+          # brusca respecto a días anteriores delata un export incompleto
+          # aunque el job esté en verde.
+          if [ -n "${MB:-}" ]; then
+            echo "- Contenido verificado: \`${OBJETOS} objeto(s)\`, \`${MB} MiB\`" >> "$GITHUB_STEP_SUMMARY"
+          else
+            echo "- ⚠️ Contenido NO verificado (el job no llegó al paso de verificación)." >> "$GITHUB_STEP_SUMMARY"
+          fi
