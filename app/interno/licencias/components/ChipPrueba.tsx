@@ -1,3 +1,9 @@
+import { ESTILOS_ESTADO_JURIDICO } from '../estilos-estado-juridico';
+import { EtiquetaMarcaFila } from './EtiquetaMarcaFila';
+
+/** Mismo trío ámbar que `EtiquetaDatoFaltante` — antes estaba copiado a mano como `#FAEEDA`/`#7A4F0A`/`#D97706`, que son literalmente estos valores. */
+const AMBAR = ESTILOS_ESTADO_JURIDICO.CON_ACTA_DE_OBSERVACIONES;
+
 /**
  * Badge "PRUEBA" — marca expedientes creados con `esPrueba: true`
  * (candado de emisión real cerrado, R10; ver `lib/server/
@@ -12,13 +18,12 @@
  */
 export function ChipPrueba() {
   return (
-    <span
-      className="inline-flex items-center gap-1.5 rounded-full px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider whitespace-nowrap"
-      style={{ background: '#FAEEDA', color: '#7A4F0A' }}
+    <EtiquetaMarcaFila
+      texto="Prueba"
+      colorFondo={AMBAR.fondo}
+      colorTexto={AMBAR.texto}
+      colorDot={AMBAR.dot}
       title="Expediente de demostración — la emisión real está bloqueada hasta autorizar la siembra del consecutivo (R10)."
-    >
-      <span aria-hidden="true" className="inline-block h-1.5 w-1.5 shrink-0 rounded-full" style={{ background: '#D97706' }} />
-      Prueba
-    </span>
+    />
   );
 }

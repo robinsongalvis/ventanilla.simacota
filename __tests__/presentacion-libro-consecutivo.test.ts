@@ -5,6 +5,8 @@ import {
   calcularConteosKpiLibro,
   calcularConteosPorFiltroLibro,
   camposBusquedaDesdeExpediente,
+  COLOR_TEXTO_URGENCIA_LIBRO,
+  COLOR_URGENCIA_LIBRO,
   coincideBusquedaLibro,
   coincideFiltroLibro,
   construirFilasLibroConsecutivo,
@@ -14,6 +16,7 @@ import {
   generarCsvLibroConsecutivo,
   nombreArchivoCsvLibroConsecutivo,
   subtiposConEstadoLibro,
+  textoColisionLibro,
   textoDiasVencimientoLibro,
   UMBRAL_POR_VENCER_DIAS_HABILES_LIBRO,
   urgenciaFilaLibro,
@@ -258,22 +261,22 @@ describe('urgenciaFilaLibro', () => {
   const HOY = new Date('2026-03-10T12:00:00-05:00');
 
   it('NEUTRO sin fechaAlertaConservadora', () => {
-    expect(urgenciaFilaLibro({ fechaAlertaConservadora: null }, HOY)).toBe('NEUTRO');
+    expect(urgenciaFilaLibro({ fechaAlertaConservadora: null, estadoJuridico: 'EN_REVISION' }, HOY)).toBe('NEUTRO');
   });
 
   it('VENCIDO si la fecha ya pasó', () => {
     const pasada = new Date(HOY.getTime() - 30 * 24 * 60 * 60 * 1000).toISOString();
-    expect(urgenciaFilaLibro({ fechaAlertaConservadora: pasada }, HOY)).toBe('VENCIDO');
+    expect(urgenciaFilaLibro({ fechaAlertaConservadora: pasada, estadoJuridico: 'EN_REVISION' }, HOY)).toBe('VENCIDO');
   });
 
   it(`POR_VENCER si faltan exactamente ${UMBRAL_POR_VENCER_DIAS_HABILES_LIBRO} días hábiles (el umbral incluye el límite)`, () => {
     const fecha = sumarDiasHabiles(HOY, UMBRAL_POR_VENCER_DIAS_HABILES_LIBRO).toISOString();
-    expect(urgenciaFilaLibro({ fechaAlertaConservadora: fecha }, HOY)).toBe('POR_VENCER');
+    expect(urgenciaFilaLibro({ fechaAlertaConservadora: fecha, estadoJuridico: 'EN_REVISION' }, HOY)).toBe('POR_VENCER');
   });
 
   it('EN_TERMINO si faltan más días hábiles que el umbral', () => {
     const fecha = sumarDiasHabiles(HOY, UMBRAL_POR_VENCER_DIAS_HABILES_LIBRO + 1).toISOString();
-    expect(urgenciaFilaLibro({ fechaAlertaConservadora: fecha }, HOY)).toBe('EN_TERMINO');
+    expect(urgenciaFilaLibro({ fechaAlertaConservadora: fecha, estadoJuridico: 'EN_REVISION' }, HOY)).toBe('EN_TERMINO');
   });
 
   // ── REGRESIÓN: vencido SIN días hábiles de por medio ────────────────
@@ -294,7 +297,7 @@ describe('urgenciaFilaLibro', () => {
     });
 
     it('aun así es VENCIDO: la pregunta "¿ya pasó la fecha?" es de CALENDARIO, no de días hábiles', () => {
-      expect(urgenciaFilaLibro({ fechaAlertaConservadora: VIERNES_7_AGO_FESTIVO }, LUNES_10_AGO)).toBe('VENCIDO');
+      expect(urgenciaFilaLibro({ fechaAlertaConservadora: VIERNES_7_AGO_FESTIVO, estadoJuridico: 'EN_REVISION' }, LUNES_10_AGO)).toBe('VENCIDO');
     });
 
     it('entra en el filtro VENCIDOS y NO en POR_VENCER', () => {
@@ -308,12 +311,50 @@ describe('urgenciaFilaLibro', () => {
     });
 
     it('el texto dice "Vencido", no "0 días hábiles" (que sería engañoso)', () => {
-      expect(textoDiasVencimientoLibro({ fechaAlertaConservadora: VIERNES_7_AGO_FESTIVO }, LUNES_10_AGO)).toBe('Vencido');
+      expect(textoDiasVencimientoLibro({ fechaAlertaConservadora: VIERNES_7_AGO_FESTIVO, estadoJuridico: 'EN_REVISION' }, LUNES_10_AGO)).toBe('Vencido');
     });
 
     it('el MISMO día del vencimiento todavía NO está vencido (el plazo corre hasta el final del día)', () => {
-      expect(urgenciaFilaLibro({ fechaAlertaConservadora: VIERNES_7_AGO_FESTIVO }, new Date('2026-08-07T08:00:00-05:00'))).not.toBe('VENCIDO');
+      expect(urgenciaFilaLibro({ fechaAlertaConservadora: VIERNES_7_AGO_FESTIVO, estadoJuridico: 'EN_REVISION' }, new Date('2026-08-07T08:00:00-05:00'))).not.toBe('VENCIDO');
     });
+  });
+});
+
+describe('urgenciaFilaLibro — expediente YA RESUELTO no está en mora (regresión E2E 12-ago-2026)', () => {
+  // Defecto encontrado verificando la aplicación REAL en stage: un expediente
+  // EN FIRME mostraba «Vencido hace 88 días hábiles». El plazo de los 45 días
+  // hábiles dejó de correr cuando la Administración decidió; medirlo contra
+  // "hoy" convierte el paso del tiempo en un incumplimiento inexistente.
+  const HOY = new Date('2026-08-12T12:00:00-05:00');
+  const FECHA_VIEJA = '2026-03-30T12:00:00-05:00'; // muy anterior a HOY
+
+  it.each(['CONCEDIDA', 'NEGADA', 'DESISTIDA', 'NOTIFICADA', 'EN_FIRME'] as const)(
+    '%s → NEUTRO aunque la fecha proyectada ya pasó (el trámite se resolvió)',
+    (estadoJuridico) => {
+      expect(urgenciaFilaLibro({ fechaAlertaConservadora: FECHA_VIEJA, estadoJuridico }, HOY)).toBe('NEUTRO');
+    },
+  );
+
+  it('HISTORICO_SIN_RESOLVER → NEUTRO: nunca tuvo término proyectable (R9)', () => {
+    expect(urgenciaFilaLibro({ fechaAlertaConservadora: FECHA_VIEJA, estadoJuridico: 'HISTORICO_SIN_RESOLVER' }, HOY)).toBe('NEUTRO');
+  });
+
+  it.each(['RADICADA_EN_DEBIDA_FORMA', 'EN_REVISION', 'CON_ACTA_DE_OBSERVACIONES', 'EN_VIABILIDAD'] as const)(
+    '%s → VENCIDO: el término SÍ sigue corriendo y la fecha ya pasó',
+    (estadoJuridico) => {
+      expect(urgenciaFilaLibro({ fechaAlertaConservadora: FECHA_VIEJA, estadoJuridico }, HOY)).toBe('VENCIDO');
+    },
+  );
+
+  it('un expediente resuelto tampoco entra en el filtro/KPI "Vencidos"', () => {
+    const [base] = construirFilasLibroConsecutivo([expedienteBase({ creadoEn: '2026-02-01T10:00:00.000Z' })], 2026);
+    const resuelto = { ...base, fechaAlertaConservadora: FECHA_VIEJA, estadoJuridico: 'EN_FIRME' as const };
+    expect(coincideFiltroLibro(resuelto, 'VENCIDOS', HOY)).toBe(false);
+    expect(coincideFiltroLibro(resuelto, 'POR_VENCER', HOY)).toBe(false);
+  });
+
+  it('el texto de apoyo tampoco anuncia mora en un expediente resuelto', () => {
+    expect(textoDiasVencimientoLibro({ fechaAlertaConservadora: FECHA_VIEJA, estadoJuridico: 'EN_FIRME' }, HOY)).toBeNull();
   });
 });
 
@@ -321,12 +362,12 @@ describe('textoDiasVencimientoLibro', () => {
   const HOY = new Date('2026-03-10T12:00:00-05:00');
 
   it('null sin fecha (nada que decir)', () => {
-    expect(textoDiasVencimientoLibro({ fechaAlertaConservadora: null }, HOY)).toBeNull();
+    expect(textoDiasVencimientoLibro({ fechaAlertaConservadora: null, estadoJuridico: 'EN_REVISION' }, HOY)).toBeNull();
   });
 
   it('cuenta los días hábiles cuando el plazo sigue corriendo', () => {
     const fecha = sumarDiasHabiles(HOY, 4).toISOString();
-    expect(textoDiasVencimientoLibro({ fechaAlertaConservadora: fecha }, HOY)).toBe('4 días hábiles');
+    expect(textoDiasVencimientoLibro({ fechaAlertaConservadora: fecha, estadoJuridico: 'EN_REVISION' }, HOY)).toBe('4 días hábiles');
   });
 
   it('dice hace cuántos días hábiles venció cuando sí los hubo', () => {
@@ -336,7 +377,7 @@ describe('textoDiasVencimientoLibro', () => {
     const fecha = '2026-03-03T12:00:00-05:00';
     const habilesTranscurridos = Math.abs(diasRestantesHabiles(fecha, HOY));
     expect(habilesTranscurridos).toBeGreaterThan(0);
-    expect(textoDiasVencimientoLibro({ fechaAlertaConservadora: fecha }, HOY)).toBe(
+    expect(textoDiasVencimientoLibro({ fechaAlertaConservadora: fecha, estadoJuridico: 'EN_REVISION' }, HOY)).toBe(
       `Vencido hace ${habilesTranscurridos} días hábiles`,
     );
   });
@@ -378,6 +419,8 @@ describe('coincideFiltroLibro / filtrarFilasLibro / conteos', () => {
       vigenciaHasta: null,
       faltaCedula: false,
       faltaEstadoJuridico: false,
+      colision: false,
+      otrosConMismoNumero: [],
       ...overrides,
     };
   }
@@ -414,7 +457,7 @@ describe('coincideFiltroLibro / filtrarFilasLibro / conteos', () => {
 
   it('calcularConteosPorFiltroLibro: un conteo por cada filtro, coherente con filtrarFilasLibro', () => {
     const conteos = calcularConteosPorFiltroLibro(filas, HOY);
-    expect(conteos).toEqual({ TODOS: 4, EN_TRAMITE: 2, POR_VENCER: 0, VENCIDOS: 1, HISTORICOS_INCOMPLETOS: 1 });
+    expect(conteos).toEqual({ TODOS: 4, EN_TRAMITE: 2, POR_VENCER: 0, VENCIDOS: 1, HISTORICOS_INCOMPLETOS: 1, COLISIONES: 0 });
   });
 
   it('calcularConteosKpiLibro: las 4 cifras de la fila de KPIs, mismo criterio que los chips', () => {
@@ -450,6 +493,8 @@ describe('generarCsvLibroConsecutivo', () => {
       vigenciaHasta: null,
       faltaCedula: false,
       faltaEstadoJuridico: false,
+      colision: false,
+      otrosConMismoNumero: [],
       ...overrides,
     };
   }
@@ -463,14 +508,14 @@ describe('generarCsvLibroConsecutivo', () => {
     const csv = generarCsvLibroConsecutivo([]);
     const [encabezado] = csv.replace(/^﻿/, '').split('\r\n');
     expect(encabezado).toBe(
-      'N. EXPEDIENTE;FECHA RADICACION;SOLICITANTE;DOCUMENTO;SUBTIPOS;ESTADO JURIDICO;N. LICENCIA;FECHA FIRMEZA;PRUEBA',
+      'N. EXPEDIENTE;FECHA RADICACION;SOLICITANTE;DOCUMENTO;SUBTIPOS;ESTADO JURIDICO;N. LICENCIA;FECHA FIRMEZA;PRUEBA;COLISION',
     );
   });
 
   it('una fila con acto final ausente muestra "—" en N. LICENCIA y FECHA FIRMEZA, y "NO" en PRUEBA', () => {
     const csv = generarCsvLibroConsecutivo([filaSintetica()]);
     const [, filaTexto] = csv.replace(/^﻿/, '').split('\r\n');
-    expect(filaTexto).toBe('68745-0-26-0001;10/03/2026;Carlos Alberto Rojas;91234567;Licencia de construcción;En revisión;—;—;NO');
+    expect(filaTexto).toBe('68745-0-26-0001;10/03/2026;Carlos Alberto Rojas;91234567;Licencia de construcción;En revisión;—;—;NO;NO');
   });
 
   it('una fila con acto final y esPrueba=true muestra los valores reales y "SI"', () => {
@@ -623,5 +668,156 @@ describe('camposBusquedaDesdeExpediente', () => {
     const campos = camposBusquedaDesdeExpediente(exp);
     expect(coincideBusquedaLibro(campos, 'maria')).toBe(true);
     expect(coincideBusquedaLibro(campos, '900-12345')).toBe(true);
+  });
+});
+
+describe('COLOR_TEXTO_URGENCIA_LIBRO — franja y texto NUNCA comparten token (ADR-0030)', () => {
+  // Los tokens semánticos están calibrados para pintar un filete de 4 px, no
+  // para leerse: medidos en la aplicación real daban 2,15:1 (ámbar), 3,30:1
+  // (verde) y 4,83:1 (rojo, que cae a 4,33:1 sobre fila atenuada). El peor
+  // caso era la alerta «quedan pocos días hábiles», que es justo la que la
+  // funcionaria más necesita leer.
+  it('NINGUNA banda reutiliza como texto el token de su franja', () => {
+    for (const urgencia of ['VENCIDO', 'POR_VENCER', 'EN_TERMINO', 'NEUTRO'] as const) {
+      expect(COLOR_TEXTO_URGENCIA_LIBRO[urgencia]).not.toBe(COLOR_URGENCIA_LIBRO[urgencia]);
+    }
+  });
+
+  it('las tres bandas con plazo vivo usan la variante `-text` del token de su franja (mismo tono, no un color nuevo)', () => {
+    expect(COLOR_URGENCIA_LIBRO.VENCIDO).toBe('var(--color-danger)');
+    expect(COLOR_TEXTO_URGENCIA_LIBRO.VENCIDO).toBe('var(--color-danger-text)');
+    expect(COLOR_URGENCIA_LIBRO.POR_VENCER).toBe('var(--color-warning)');
+    expect(COLOR_TEXTO_URGENCIA_LIBRO.POR_VENCER).toBe('var(--color-warning-text)');
+    expect(COLOR_URGENCIA_LIBRO.EN_TERMINO).toBe('var(--color-success)');
+    expect(COLOR_TEXTO_URGENCIA_LIBRO.EN_TERMINO).toBe('var(--color-success-text)');
+  });
+
+  it('NEUTRO usa `--text-secondary`: `--color-border` es un token de borde sin variante de texto', () => {
+    expect(COLOR_URGENCIA_LIBRO.NEUTRO).toBe('var(--color-border)');
+    expect(COLOR_TEXTO_URGENCIA_LIBRO.NEUTRO).toBe('var(--text-secondary)');
+  });
+
+  it('ningún color de texto es un hex suelto — todo pasa por el sistema de diseño (sin estilos paralelos)', () => {
+    for (const urgencia of ['VENCIDO', 'POR_VENCER', 'EN_TERMINO', 'NEUTRO'] as const) {
+      expect(COLOR_TEXTO_URGENCIA_LIBRO[urgencia]).toMatch(/^var\(--[a-z-]+\)$/);
+    }
+  });
+});
+
+describe('colisión de radicado — el Libro delata la anomalía que el importador declaró', () => {
+  // Caso REAL en producción desde el 11-ago-2026: `68745-0-25-0037`, dos
+  // solicitantes distintos con el mismo número (H4/R1 del análisis del
+  // insumo). No se renumera: la serie legal histórica es intocable.
+  function expColision(overrides: Partial<ExpedienteLicenciaDoc> = {}): ExpedienteLicenciaDoc {
+    return expedienteBase({
+      creadoEn: '2025-09-17T15:00:00.000Z',
+      numeroExpediente: { numero: '68745-0-25-0037', serieId: 'historico', año: 2025, colision: true },
+      ...overrides,
+    });
+  }
+
+  it('mapea `numeroExpediente.colision` tal cual, y colapsa ausente/false a `false` (nunca undefined)', () => {
+    const [conFlag] = construirFilasLibroConsecutivo([expColision()], 2025);
+    expect(conFlag.colision).toBe(true);
+
+    const sinFlag = construirFilasLibroConsecutivo(
+      [expColision({ id: 'b', numeroExpediente: { numero: '68745-0-25-0040', serieId: 'h', año: 2025, colision: false } })],
+      2025,
+    );
+    expect(sinFlag[0].colision).toBe(false);
+
+    const ausente = construirFilasLibroConsecutivo(
+      [expColision({ id: 'c', numeroExpediente: { numero: '68745-0-25-0041', serieId: 'h', año: 2025 } })],
+      2025,
+    );
+    expect(ausente[0].colision).toBe(false);
+
+    const sinNumero = construirFilasLibroConsecutivo([expColision({ id: 'd', numeroExpediente: undefined })], 2025);
+    expect(sinNumero[0].colision).toBe(false);
+  });
+
+  it('LA PRUEBA CLAVE: dos filas con el MISMO número pero SIN flag NO se marcan — el Libro no diagnostica, solo delata', () => {
+    const mismoNumero = { numero: '68745-0-25-0099', serieId: 'h', año: 2025 };
+    const filas = construirFilasLibroConsecutivo(
+      [
+        expColision({ id: 'x', numeroExpediente: { ...mismoNumero } }),
+        expColision({ id: 'y', numeroExpediente: { ...mismoNumero } }),
+      ],
+      2025,
+    );
+    expect(filas.map((f) => f.colision)).toEqual([false, false]);
+    // …aunque el derivado SÍ los ve: son cosas distintas a propósito.
+    expect(filas[0].otrosConMismoNumero).toHaveLength(1);
+  });
+
+  it('`otrosConMismoNumero` identifica al gemelo del mismo año (con quién colisiona, que es lo que se necesita para resolver)', () => {
+    const filas = construirFilasLibroConsecutivo(
+      [
+        expColision({ id: 'primera', solicitanteNombre: 'Ana Lucía Avilés' }),
+        expColision({ id: 'segunda', solicitanteNombre: 'Pedro Rojas Peña', creadoEn: '2025-09-30T15:00:00.000Z' }),
+      ],
+      2025,
+    );
+    const primera = filas.find((f) => f.id === 'primera')!;
+    expect(primera.otrosConMismoNumero).toHaveLength(1);
+    expect(primera.otrosConMismoNumero[0]).toMatchObject({ id: 'segunda', solicitanteNombre: 'Pedro Rojas Peña' });
+    // Nunca se incluye a sí misma.
+    expect(primera.otrosConMismoNumero.some((o) => o.id === 'primera')).toBe(false);
+  });
+
+  it('gemelo fuera de la vista (otro año): la marca SIGUE encendida y la lista queda vacía — el alcance declarado no apaga el flag', () => {
+    const [fila] = construirFilasLibroConsecutivo([expColision()], 2025);
+    expect(fila.colision).toBe(true);
+    expect(fila.otrosConMismoNumero).toEqual([]);
+  });
+
+  it('el fallback al id del documento no fabrica falsos positivos', () => {
+    const filas = construirFilasLibroConsecutivo(
+      [expColision({ id: 'sin-num-1', numeroExpediente: undefined }), expColision({ id: 'sin-num-2', numeroExpediente: undefined })],
+      2025,
+    );
+    expect(filas.every((f) => f.otrosConMismoNumero.length === 0)).toBe(true);
+  });
+
+  it('textoColisionLibro: null sin marca; nombra al gemelo cuando lo ve; habla del DATO cuando no', () => {
+    const limpia = { colision: false, numeroExpediente: '68745-0-25-0001', otrosConMismoNumero: [] };
+    expect(textoColisionLibro(limpia)).toBeNull();
+
+    const conGemelo = textoColisionLibro({
+      colision: true,
+      numeroExpediente: '68745-0-25-0037',
+      otrosConMismoNumero: [{ id: 'y', solicitanteNombre: 'Pedro Rojas Peña', fechaRadicacion: '2025-09-30T15:00:00.000Z' }],
+    })!;
+    expect(conGemelo).toContain('Pedro Rojas Peña');
+    expect(conGemelo).toContain('30/09/2025');
+    expect(conGemelo).toContain('No se renumera');
+
+    // Sin gemelo a la vista NO se afirma que exista: `colision` es una
+    // aserción del importador en el pasado, no un invariante vivo.
+    const sinGemelo = textoColisionLibro({ colision: true, numeroExpediente: '68745-0-25-0037', otrosConMismoNumero: [] })!;
+    expect(sinGemelo).toContain('El importador marcó');
+    expect(sinGemelo).toContain('no aparece en esta vista');
+    expect(sinGemelo).not.toMatch(/otro expediente comparte/i);
+  });
+
+  it('filtro COLISIONES: aísla las marcadas y NO las saca del resto de baldes (la colisión es un atributo, no un estado)', () => {
+    const filas = construirFilasLibroConsecutivo(
+      [expColision({ id: 'a' }), expColision({ id: 'b', creadoEn: '2025-09-30T15:00:00.000Z' }), expedienteBase({ id: 'c', creadoEn: '2025-04-01T15:00:00.000Z', numeroExpediente: { numero: '68745-0-25-0010', serieId: 'h', año: 2025 } })],
+      2025,
+    );
+    expect(filtrarFilasLibro(filas, 'COLISIONES')).toHaveLength(2);
+    // Siguen contando en Total y en su estado.
+    expect(filtrarFilasLibro(filas, 'TODOS')).toHaveLength(3);
+    expect(calcularConteosKpiLibro(filas).total).toBe(3);
+  });
+
+  it('el CSV lleva la colisión: sin ella, la anomalía seguiría invisible una capa más abajo', () => {
+    const filas = construirFilasLibroConsecutivo([expColision()], 2025);
+    const csv = generarCsvLibroConsecutivo(filas);
+    const [encabezado, primera] = csv.replace('﻿', '').split('\r\n');
+    expect(encabezado.endsWith(';COLISION')).toBe(true);
+    expect(primera.endsWith(';SI')).toBe(true);
+    // Guardián de alineación: cabecera y fila con el mismo número de celdas.
+    expect(primera.split(';')).toHaveLength(encabezado.split(';').length);
   });
 });

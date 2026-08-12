@@ -20,7 +20,7 @@
  */
 
 import type { ExpedienteLicenciaDoc } from '@/lib/server/expedientes-licencias';
-import type { EstadoJuridicoLicencia } from '@/lib/motor-expedientes/estados-licencia';
+import { terminoResolucionSigueCorriendo, type EstadoJuridicoLicencia } from '@/lib/motor-expedientes/estados-licencia';
 import type { OrigenActuacion } from '@/lib/motor-expedientes/tipos';
 import { calcularVencimientoVigencia, esErrorVigencia } from '@/lib/motor-expedientes/vigencias';
 import { EQUIVALENCIAS_MIGRACION_SEMILLA_LICENCIAS } from '@/lib/motor-expedientes/catalogo-subtipos-normativo';
@@ -118,6 +118,34 @@ export interface FilaLibroConsecutivo {
    * MISMA razón de opcionalidad que `radicadoId`.
    */
   matriculaInmobiliaria?: string | null;
+  /**
+   * `numeroExpediente.colision` tal cual viene del documento — NUNCA se
+   * deriva aquí. Es la declaración del importador: ese número legal aparecía
+   * más de una vez en su propia fuente (ver el JSDoc del campo en
+   * `lib/motor-expedientes/tipos.ts`). Caso REAL en producción desde el
+   * 11-ago-2026: `68745-0-25-0037`, dos solicitantes distintos (17-sep y
+   * 30-sep-2025, modalidades LA y LR) — H4/R1 de
+   * `docs/planes/ANALISIS_INSUMO_CONSECUTIVO_LICENCIAS.md`.
+   *
+   * Por qué no se deriva comparando números repetidos en la vista: dos filas
+   * con el mismo texto podrían venir de un fallback al `id` del documento o
+   * de un lote truncado, y el Libro inventaría una infracción que nadie
+   * declaró. El Libro DELATA la anomalía que el importador marcó; no la
+   * diagnostica.
+   */
+  colision: boolean;
+  /**
+   * Los OTROS expedientes del mismo año cargado que comparten este número
+   * legal — para que la funcionaria sepa con cuál colisiona, que es lo que
+   * necesita para resolver (pregunta P6 a Planeación).
+   *
+   * ALCANCE DECLARADO (Principio 13): se deriva de las filas del año que la
+   * vista tiene en memoria, acotadas por `LIMITE_BANDEJA` (300). Una lista
+   * vacía NO significa "no hay gemelo" — significa "no está en esta vista"
+   * (otro año, o fuera del lote). Por eso jamás enciende la marca: eso solo
+   * lo hace `colision`, que sí es dato persistido.
+   */
+  otrosConMismoNumero: { id: string; solicitanteNombre: string; fechaRadicacion: string }[];
 }
 
 /** `true` si el valor es un string vacío/solo espacios (o no es string) — mismo criterio de "faltante" para cédula y demás campos de texto de la fila. */
@@ -244,8 +272,18 @@ export function construirFilasLibroConsecutivo(
   expedientes: readonly ExpedienteLicenciaDoc[],
   año: number,
 ): FilaLibroConsecutivo[] {
-  return expedientes
-    .filter((exp) => añoRadicacionColombia(exp.creadoEn) === año)
+  const delAño = expedientes.filter((exp) => añoRadicacionColombia(exp.creadoEn) === año);
+  // Índice número legal → expedientes que lo llevan, para resolver `otros
+  // ConMismoNumero`. Se construye SOLO con lo que la vista tiene cargado; ver
+  // el alcance declarado en el JSDoc del campo. Nunca decide `colision`.
+  const porNumero = new Map<string, { id: string; solicitanteNombre: string; fechaRadicacion: string }[]>();
+  for (const exp of delAño) {
+    const numero = numeroExpedienteTexto(exp);
+    const lista = porNumero.get(numero) ?? [];
+    lista.push({ id: exp.id, solicitanteNombre: exp.solicitanteNombre, fechaRadicacion: exp.creadoEn });
+    porNumero.set(numero, lista);
+  }
+  return delAño
     .map((exp) => {
       const subtipoCodigos = [...(exp.subtipos ?? [])];
       const vigencia = calcularVigenciaHastaLibro(exp);
@@ -276,6 +314,8 @@ export function construirFilasLibroConsecutivo(
         faltaEstadoJuridico: estaVacio(exp.estadoJuridico) || !((exp.estadoJuridico as string) in ESTILOS_ESTADO_JURIDICO),
         radicadoId: exp.radicadoId ?? null,
         matriculaInmobiliaria: exp.predio?.matriculaInmobiliaria ?? null,
+        colision: exp.numeroExpediente?.colision === true,
+        otrosConMismoNumero: (porNumero.get(numeroExpedienteTexto(exp)) ?? []).filter((o) => o.id !== exp.id),
       };
     })
     .sort((a, b) => a.numeroExpediente.localeCompare(b.numeroExpediente, 'es', { numeric: true }));
@@ -310,10 +350,17 @@ export type UrgenciaFilaLibro = 'VENCIDO' | 'POR_VENCER' | 'EN_TERMINO' | 'NEUTR
  * CALENDARIO.
  */
 export function urgenciaFilaLibro(
-  fila: Pick<FilaLibroConsecutivo, 'fechaAlertaConservadora'>,
+  fila: Pick<FilaLibroConsecutivo, 'fechaAlertaConservadora' | 'estadoJuridico'>,
   hoy: Date = new Date(),
 ): UrgenciaFilaLibro {
   if (!fila.fechaAlertaConservadora) return 'NEUTRO';
+  // Un expediente YA RESUELTO no está en mora: el término de resolución dejó
+  // de correr cuando la Administración decidió (ver
+  // `terminoResolucionSigueCorriendo`). Sin esta guarda, el simple paso del
+  // tiempo pintaba de rojo expedientes cerrados y los sumaba a "Vencidos" —
+  // defecto encontrado en la verificación E2E del 12-ago-2026, donde un
+  // expediente EN FIRME anunciaba "Vencido hace 88 días hábiles".
+  if (!terminoResolucionSigueCorriendo(fila.estadoJuridico)) return 'NEUTRO';
   // Ambos extremos anclados al mediodía de su día civil (`atLocalNoon`, ya
   // usada por todo el módulo): comparar sus instantes compara días civiles,
   // sin que la hora del dato pueda desplazar el resultado.
@@ -335,7 +382,7 @@ export function urgenciaFilaLibro(
  * "Vencido" a secas — sin inventar un número que no significa nada.
  */
 export function textoDiasVencimientoLibro(
-  fila: Pick<FilaLibroConsecutivo, 'fechaAlertaConservadora'>,
+  fila: Pick<FilaLibroConsecutivo, 'fechaAlertaConservadora' | 'estadoJuridico'>,
   hoy: Date = new Date(),
 ): string | null {
   if (!fila.fechaAlertaConservadora) return null;
@@ -348,12 +395,59 @@ export function textoDiasVencimientoLibro(
   return `${dias} días hábiles`;
 }
 
-/** Token de color (`app/globals.css`) por banda de urgencia — franja lateral de la fila y color del texto de la columna "Vence". */
+/**
+ * Explicación de la colisión para el `title`/nombre accesible de la marca.
+ * `null` cuando la fila no está marcada — la marca no se pinta.
+ *
+ * REDACCIÓN DELIBERADA (misma disciplina que `fechaAlertaConservadora` y
+ * `numeroLicencia`: no afirmar lo que no se puede sostener). `colision` es
+ * una aserción del importador en el instante de la migración, no un
+ * invariante vivo: si el gemelo se corrigiera, se borrara, o quedara fuera
+ * del lote de 300, decir "otro expediente comparte el número" sería afirmar
+ * como hecho presente algo que el Libro no ve. Por eso, sin gemelo a la
+ * vista, se habla del DATO ("el importador lo marcó"), no del mundo.
+ */
+export function textoColisionLibro(fila: Pick<FilaLibroConsecutivo, 'colision' | 'numeroExpediente' | 'otrosConMismoNumero'>): string | null {
+  if (!fila.colision) return null;
+  const cierre = 'No se renumera: la serie legal histórica es intocable — la resolución es humana, con acta.';
+  if (fila.otrosConMismoNumero.length === 0) {
+    return `El importador marcó el número ${fila.numeroExpediente} como duplicado en el histórico. El otro expediente no aparece en esta vista (otro año, o fuera del lote cargado). ${cierre}`;
+  }
+  const otros = fila.otrosConMismoNumero
+    .map((o) => `${o.solicitanteNombre || 'sin nombre registrado'} (${formatFechaColombia(o.fechaRadicacion)})`)
+    .join('; ');
+  return `Comparte el número ${fila.numeroExpediente} con: ${otros}. ${cierre}`;
+}
+
+/** Token de color (`app/globals.css`) por banda de urgencia — franja lateral de 4 px de la fila. */
 export const COLOR_URGENCIA_LIBRO: Record<UrgenciaFilaLibro, string> = {
   VENCIDO: 'var(--color-danger)',
   POR_VENCER: 'var(--color-warning)',
   EN_TERMINO: 'var(--color-success)',
   NEUTRO: 'var(--color-border)',
+};
+
+/**
+ * Token de color del TEXTO de la columna "Vence" — NINGUNA banda comparte
+ * valor con su franja, porque franja y texto tienen requisitos distintos.
+ *
+ * Los tokens base (`--color-warning`, `--color-success`, `--color-danger`)
+ * están calibrados para pintar un filete de 4 px, no para leerse: medidos en
+ * la aplicación real rendían 2,15:1, 3,30:1 y 4,83:1 sobre blanco, y el rojo
+ * bajaba a 4,33:1 sobre fila atenuada. Las variantes `-text` de ADR-0030
+ * conservan el tono y solo bajan la luminosidad — el ámbar sigue siendo
+ * ámbar — y cumplen ≥4,5:1 sobre las tres superficies institucionales.
+ *
+ * `NEUTRO` no tiene variante `-text` porque `--color-border` es un token de
+ * borde sin equivalente de texto: se usa `--text-secondary` (4,97:1), que es
+ * exactamente lo que se quiere para un expediente ya resuelto — visible pero
+ * bajado de jerarquía, sin leerse como incumplimiento.
+ */
+export const COLOR_TEXTO_URGENCIA_LIBRO: Record<UrgenciaFilaLibro, string> = {
+  VENCIDO: 'var(--color-danger-text)',
+  POR_VENCER: 'var(--color-warning-text)',
+  EN_TERMINO: 'var(--color-success-text)',
+  NEUTRO: 'var(--text-secondary)',
 };
 
 /**
@@ -371,7 +465,7 @@ export function esHistoricoIncompletoLibro(
   return fila.origen === 'RECONSTRUIDO' && (fila.faltaCedula || fila.faltaEstadoJuridico);
 }
 
-export type FiltroLibroConsecutivo = 'TODOS' | 'EN_TRAMITE' | 'POR_VENCER' | 'VENCIDOS' | 'HISTORICOS_INCOMPLETOS';
+export type FiltroLibroConsecutivo = 'TODOS' | 'EN_TRAMITE' | 'POR_VENCER' | 'VENCIDOS' | 'HISTORICOS_INCOMPLETOS' | 'COLISIONES';
 
 export const FILTROS_LIBRO_CONSECUTIVO: readonly { id: FiltroLibroConsecutivo; etiqueta: string }[] = [
   { id: 'TODOS', etiqueta: 'Todos' },
@@ -379,6 +473,7 @@ export const FILTROS_LIBRO_CONSECUTIVO: readonly { id: FiltroLibroConsecutivo; e
   { id: 'POR_VENCER', etiqueta: 'Por vencer' },
   { id: 'VENCIDOS', etiqueta: 'Vencidos' },
   { id: 'HISTORICOS_INCOMPLETOS', etiqueta: 'Históricos incompletos' },
+  { id: 'COLISIONES', etiqueta: 'Colisiones' },
 ];
 
 /** `true` si `fila` pertenece al balde `filtro` — única fuente de verdad que comparten el filtrado en memoria y los conteos de KPIs/chips (nunca se duplica el criterio). */
@@ -394,6 +489,8 @@ export function coincideFiltroLibro(fila: FilaLibroConsecutivo, filtro: FiltroLi
       return urgenciaFilaLibro(fila, hoy) === 'VENCIDO';
     case 'HISTORICOS_INCOMPLETOS':
       return esHistoricoIncompletoLibro(fila);
+    case 'COLISIONES':
+      return fila.colision;
   }
 }
 
@@ -451,6 +548,9 @@ const ENCABEZADOS_CSV = [
   'N. LICENCIA',
   'FECHA FIRMEZA',
   'PRUEBA',
+  // Aditiva y AL FINAL, igual que 'PRUEBA' en su momento: Excel abre el
+  // archivo sin cambios y nada aguas abajo se desplaza de columna.
+  'COLISION',
 ] as const;
 
 /**
@@ -492,6 +592,7 @@ export function generarCsvLibroConsecutivo(filas: readonly FilaLibroConsecutivo[
       f.numeroLicencia ?? '—',
       f.fechaFirmeza ? formatFechaColombia(f.fechaFirmeza) : '—',
       f.esPrueba ? 'SI' : 'NO',
+      f.colision ? 'SI' : 'NO',
     ];
     return celdas.map(celdaCsv).join(';');
   });

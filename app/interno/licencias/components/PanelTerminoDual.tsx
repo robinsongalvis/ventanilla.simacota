@@ -1,6 +1,7 @@
 import { formatFechaColombia } from '@/lib/fecha-colombia';
 import { diasRestantesHabiles } from '@/lib/tiempos-radicado';
 import type { OrigenActuacion } from '@/lib/motor-expedientes/tipos';
+import { terminoResolucionSigueCorriendo, type EstadoJuridicoLicencia } from '@/lib/motor-expedientes/estados-licencia';
 import type { TerminoDualUI } from '../tipos-computos';
 
 /**
@@ -20,14 +21,30 @@ import type { TerminoDualUI } from '../tipos-computos';
  */
 export interface PanelTerminoDualProps {
   terminoDual: TerminoDualUI;
+  /**
+   * Estado jurídico del expediente. Decide si el término SIGUE CORRIENDO:
+   * en un expediente ya resuelto (concedido, negado, desistido, notificado
+   * o en firme) el plazo de los 45 días hábiles dejó de correr cuando la
+   * Administración decidió — seguir midiéndolo contra "hoy" mostraba
+   * «Vencido hace 88 días hábiles» en un expediente EN FIRME (defecto de la
+   * verificación E2E del 12-ago-2026), sugiriendo una mora inexistente.
+   * La fecha se sigue mostrando como REFERENCIA de cuándo vencía; lo que
+   * cambia es que deja de leerse como alerta.
+   */
+  estadoJuridico?: EstadoJuridicoLicencia;
   /** Solo decide el texto del estado vacío (histórico migrado vs. real sin radicar aún) — ver R9 (`derivarEventosTermino`), que excluye toda actuación `RECONSTRUIDO` del cómputo. */
   origen?: OrigenActuacion;
   /** ISO de la actuación `radicacion-debida-forma`, si existe — se muestra solo como referencia del ancla, nunca altera el cómputo. */
   fechaRadicacion?: string;
 }
 
-export function PanelTerminoDual({ terminoDual, origen, fechaRadicacion }: PanelTerminoDualProps) {
+export function PanelTerminoDual({ terminoDual, origen, fechaRadicacion, estadoJuridico }: PanelTerminoDualProps) {
   const { suspension, reinicio, fechaAlertaConservadora } = terminoDual;
+  // Sin estado declarado se asume que el término corre (comportamiento
+  // previo): este componente no puede adivinar, y errar hacia "mostrar la
+  // alerta" es el lado seguro para un módulo cuyo fin es que no se pase un
+  // plazo.
+  const terminoCorriendo = estadoJuridico ? terminoResolucionSigueCorriendo(estadoJuridico) : true;
 
   if (!suspension && !reinicio) {
     return (
@@ -65,7 +82,27 @@ export function PanelTerminoDual({ terminoDual, origen, fechaRadicacion }: Panel
         </p>
       </div>
 
-      {fechaAlertaConservadora && (
+      {/* Expediente YA RESUELTO: el plazo dejó de correr con la decisión.
+          La fecha se conserva como REFERENCIA (cuándo vencía), en gris y sin
+          `role="alert"` — no es una alerta porque no hay nada que atender. */}
+      {fechaAlertaConservadora && !terminoCorriendo && (
+        <div
+          className="rounded-[10px] p-3 flex flex-col gap-1"
+          style={{ background: 'var(--bg-surface-2)', border: '1px solid var(--color-border)' }}
+        >
+          <p className="text-[10px] font-bold uppercase tracking-widest" style={{ color: 'var(--text-secondary)' }}>
+            Término ya cerrado
+          </p>
+          <p className="font-bold" style={{ fontSize: 18, color: 'var(--text-primary)' }}>
+            {formatFechaColombia(fechaAlertaConservadora)}
+          </p>
+          <p className="text-xs" style={{ color: 'var(--text-secondary)' }}>
+            El expediente ya fue resuelto — el plazo para decidir dejó de correr con la decisión. Esta fecha queda solo como referencia de cuándo vencía.
+          </p>
+        </div>
+      )}
+
+      {fechaAlertaConservadora && terminoCorriendo && (
         <div
           role="alert"
           aria-describedby="panel-termino-dual-detalle"

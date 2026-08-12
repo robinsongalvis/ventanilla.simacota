@@ -70,7 +70,7 @@ export function PanelDesistimientoSemicontrolado({ plazoSubsanacion, borrador }:
       <div className="flex flex-wrap items-center gap-2">
         <span
           className="inline-flex items-center rounded-full px-2.5 py-1 text-[11px] font-bold whitespace-nowrap"
-          style={{ background: '#DC2626', color: '#FFFFFF' }}
+          style={{ background: 'var(--color-danger)', color: '#FFFFFF' }}
         >
           Por archivar
         </span>

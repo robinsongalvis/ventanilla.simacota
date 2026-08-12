@@ -66,7 +66,7 @@ export function SelectorSubtiposNormativos({ seleccionados, onAlternar, error }:
         })}
       </div>
       {error && (
-        <p role="alert" className="text-xs mt-2" style={{ color: '#DC2626' }}>
+        <p role="alert" className="text-xs mt-2" style={{ color: 'var(--color-danger-text)' }}>
           {error}
         </p>
       )}

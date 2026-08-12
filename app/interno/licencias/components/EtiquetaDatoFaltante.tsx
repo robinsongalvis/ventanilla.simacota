@@ -1,4 +1,5 @@
 import { ESTILOS_ESTADO_JURIDICO } from '../estilos-estado-juridico';
+import { EtiquetaMarcaFila } from './EtiquetaMarcaFila';
 
 /**
  * Trío ámbar REUTILIZADO de `ESTILOS_ESTADO_JURIDICO.CON_ACTA_DE_OBSERVACIONES`
@@ -13,16 +14,18 @@ const AMBAR = ESTILOS_ESTADO_JURIDICO.CON_ACTA_DE_OBSERVACIONES;
  * cédula", "Sin estado") — histórico reconstruido con hueco real, NUNCA un
  * valor inventado para rellenar la celda. Mismo lenguaje visual que
  * `ChipPrueba` (dot + etiqueta compacta), en ámbar de advertencia.
+ *
+ * El marcado vive ahora en `EtiquetaMarcaFila`, compartido con `ChipPrueba` y
+ * `EtiquetaColisionNumero`; la salida DOM es idéntica a la anterior.
  */
 export function EtiquetaDatoFaltante({ texto }: { texto: string }) {
   return (
-    <span
-      className="inline-flex items-center gap-1.5 rounded-full px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider whitespace-nowrap"
-      style={{ background: AMBAR.fondo, color: AMBAR.texto }}
+    <EtiquetaMarcaFila
+      texto={texto}
+      colorFondo={AMBAR.fondo}
+      colorTexto={AMBAR.texto}
+      colorDot={AMBAR.dot}
       title={`Dato faltante: ${texto}`}
-    >
-      <span aria-hidden="true" className="inline-block h-1.5 w-1.5 shrink-0 rounded-full" style={{ background: AMBAR.dot }} />
-      {texto}
-    </span>
+    />
   );
 }

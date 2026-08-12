@@ -37,6 +37,13 @@
   --color-danger:     #DC2626;
   --color-info:       #2563EB;
 
+  /* Variantes de TEXTO (ADR-0030) — mismos valores que en `:root`, donde
+     está la justificación y la tabla de contrastes. Se declaran también
+     aquí, como los tokens base, para que Tailwind genere sus utilidades. */
+  --color-success-text: #117937;
+  --color-warning-text: #8E5C06;
+  --color-danger-text:  #B91C1C;
+
   /* ── Sidebar oscuro (verde institucional) ── */
   --color-sidebar-bg:        #14532D;
   --color-sidebar-border:    rgba(255,255,255,0.10);
@@ -81,11 +88,37 @@
   --color-border:        #D9E2D9;
   --color-border-strong: #BDD3BD;
 
-  /* Estados semánticos */
+  /* Estados semánticos — FONDO, franja, borde, punto. NO cambian de valor. */
   --color-success:  #16A34A;
   --color-warning:  #F59E0B;
   --color-danger:   #DC2626;
   --color-info:     #2563EB;
+
+  /* ── Estados semánticos — TEXTO (ADR-0030) ──────────────────────
+     Los tokens de arriba INCUMPLEN WCAG 1.4.3 AA usados como color de
+     texto: medido en la aplicación real (stage, 12-ago-2026) el ámbar da
+     2,15:1 y el verde 3,30:1 sobre blanco, contra el mínimo de 4,5:1. El
+     peor caso era justo la alerta «quedan pocos días hábiles» del Libro y
+     de la Bandeja — el aviso que la funcionaria MÁS necesita leer. Ni
+     siquiera el rojo estaba a salvo: 4,33:1 sobre `--bg-surface-2`.
+
+     Estas variantes conservan el TONO y la SATURACIÓN de su token base y
+     solo bajan la luminosidad, así que el ámbar sigue leyéndose ámbar y el
+     verde verde. Cumplen ≥4,5:1 sobre las TRES superficies institucionales
+     (#FFFFFF, #F8FAF7 y #EEF4EE), no solo sobre blanco:
+
+       token                    #FFFFFF   #F8FAF7   #EEF4EE
+       --color-success-text      5,51      5,25      4,93
+       --color-warning-text      5,70      5,43      5,11
+       --color-danger-text       6,47      6,16      5,80
+
+     Regla: si el color pinta TEXTO, se usa la variante `-text`. Si pinta
+     fondo, franja, borde o punto, se usa el token base. La excepción
+     legítima —texto oscuro propio sobre chip de color saturado— se
+     conserva donde ya existe. */
+  --color-success-text: #117937;
+  --color-warning-text: #8E5C06;
+  --color-danger-text:  #B91C1C;
 
   /* Sombras */
   --shadow-soft:     0 1px 2px rgba(20, 83, 45, 0.06), 0 1px 3px rgba(20, 83, 45, 0.04);
@@ -801,5 +834,139 @@ body {
   .sello-radicado {
     break-inside: avoid;
     page-break-inside: avoid;
+  }
+
+  /* ═══════════════════════════════════════════════════════════════
+     LIBRO CONSECUTIVO DE LICENCIAS — impresión íntegra (12-ago-2026)
+     `app/interno/licencias/components/LibroConsecutivoClient.tsx`
+
+     DEFECTO MEDIDO en stage: a 190 mm de ancho útil salían 5 de 8 columnas
+     — se perdían «Vence», «Vigencia hasta» y «N.° licencia», es decir el
+     número de licencia, el dato más importante de un libro consecutivo.
+     CAUSA: la tabla vive dentro de un `overflow-x-auto` sobre una tarjeta
+     `overflow-hidden`, y en medio paginado un contenedor de desplazamiento
+     NO se fragmenta: se RECORTA a la caja de página. Ninguna regla de
+     impresión le devolvía `overflow: visible`.
+
+     Estas reglas son PERMANENTES y están acotadas a las clases propias del
+     libro, así que valen tanto si se imprime con el botón (que además pone
+     la hoja horizontal) como con Ctrl+P: en vertical la tabla sale COMPLETA
+     y más densa, nunca recortada.
+
+     Se asume que el navegador NO imprime fondos (en Chrome «Gráficos de
+     fondo» viene desmarcado): la urgencia viaja por BORDE y por TEXTO, no
+     por sombra ni relleno. Por eso la franja `box-shadow: inset` de
+     pantalla se convierte aquí en `border-left`.
+     ═══════════════════════════════════════════════════════════════ */
+
+  /* 1. Desrecortar la cadena: sin esto solo sale la primera página. */
+  .libro-consecutivo,
+  .libro-consecutivo__tarjeta,
+  .libro-consecutivo__scroll {
+    overflow: visible !important;
+    max-width: none !important;
+    width: auto !important;
+  }
+
+  /* `display: block` y no flex: el repo ya aprendió que el medio paginado
+     no fragmenta bien dentro de contenedores flex — `app/interno/licencias/
+     layout.tsx` añade `print:block` a su propia cadena por esta razón. */
+  .libro-consecutivo {
+    display: block !important;
+    padding: 0 !important;
+  }
+  .libro-consecutivo > * + * {
+    margin-top: 8pt;
+  }
+  .libro-consecutivo__tarjeta {
+    border: none !important;
+    box-shadow: none !important;
+    border-radius: 0 !important;
+  }
+
+  /* 2. La tabla: todas las columnas, encabezado repetido en cada hoja y
+        filas que no se parten por la mitad. */
+  #tabla-libro-consecutivo {
+    width: 100% !important;
+    table-layout: auto;
+    font-size: 8.5pt;
+  }
+  /* Los descendientes fijan su propio tamaño con utilidades de Tailwind
+     (`text-[13px]` en `NumeroLegal`, `text-[11px]` en `ChipEstadoJuridico`,
+     `text-xs` en los subtipos) — sin esto la compactación no los alcanza y
+     son justo las celdas más anchas. */
+  #tabla-libro-consecutivo :is(span, p, div) {
+    font-size: inherit !important;
+  }
+  /* Los `<Th ancho={…}>` fijan anchos en línea que SUMAN 1220 px — más que
+     los ~1047 útiles de una A4 horizontal, así que en papel la tabla no
+     podía encogerse y se recortaban «Vigencia hasta» y «N.° licencia»
+     (medido el 12-ago-2026; en pantalla no se nota porque ahí hay scroll
+     lateral). Al soltarlos, `table-layout: auto` reparte el ancho real de
+     la hoja y el contenido envuelve —que para eso las celdas ya llevan
+     `white-space: normal` arriba— en vez de desbordar. */
+  #tabla-libro-consecutivo th {
+    width: auto !important;
+  }
+  #tabla-libro-consecutivo thead {
+    display: table-header-group;
+  }
+  #tabla-libro-consecutivo tr {
+    break-inside: avoid;
+    page-break-inside: avoid;
+  }
+  #tabla-libro-consecutivo th,
+  #tabla-libro-consecutivo td {
+    padding: 2.5pt 3.5pt !important;
+    white-space: normal !important;
+  }
+  /* «Tipo» se trunca en pantalla por espacio; en papel no hay hover ni
+     tooltip, así que el texto completo tiene que salir. */
+  #tabla-libro-consecutivo .truncate {
+    overflow: visible !important;
+    text-overflow: clip !important;
+    white-space: normal !important;
+  }
+
+  /* 3. La franja de urgencia, en borde (la sombra no se imprime). El COLOR
+        lo aporta `borderLeftColor` del estilo en línea de la celda —
+        invisible en pantalla, donde el ancho del borde es 0. */
+  #tabla-libro-consecutivo tbody td:first-child {
+    box-shadow: none !important;
+    border-left-width: 3pt !important;
+    border-left-style: solid !important;
+  }
+
+  /* 3-bis. El texto de «Vence» en papel. Usa las MISMAS variantes de texto
+     que la pantalla (ADR-0030) — una sola fuente de verdad, cero hex suelto
+     aquí. La regla existe igualmente porque en pantalla el color llega por
+     estilo en línea y sin `!important` no habría forma de garantizarlo en
+     medio paginado. La distinción real en blanco y negro la aporta el texto
+     que ya se pinta («Vencido hace N días hábiles»), no el color. */
+  #tabla-libro-consecutivo tr[data-urgencia='VENCIDO'] .libro-consecutivo__vence p {
+    color: var(--color-danger-text) !important;
+  }
+  #tabla-libro-consecutivo tr[data-urgencia='POR_VENCER'] .libro-consecutivo__vence p {
+    color: var(--color-warning-text) !important;
+  }
+  #tabla-libro-consecutivo tr[data-urgencia='EN_TERMINO'] .libro-consecutivo__vence p {
+    color: var(--color-success-text) !important;
+  }
+  #tabla-libro-consecutivo tr[data-urgencia='NEUTRO'] .libro-consecutivo__vence p {
+    color: var(--text-secondary) !important;
+  }
+
+  /* 4. El armazón de pantalla, solo mientras el libro imprime (la clase la
+        pone y quita `LibroConsecutivoClient`). `sin-scroll-de-pagina` deja
+        el raíz recortado, y un raíz recortado emite UNA sola página. */
+  body.imprimiendo-libro-consecutivo,
+  body.imprimiendo-libro-consecutivo .overflow-hidden,
+  body.imprimiendo-libro-consecutivo .overflow-y-auto {
+    overflow: visible !important;
+    height: auto !important;
+    max-height: none !important;
+  }
+  body.imprimiendo-libro-consecutivo aside {
+    display: none !important;
   }
 }

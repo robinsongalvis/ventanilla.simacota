@@ -156,6 +156,41 @@ const TRANSICIONES: Readonly<Record<EstadoJuridicoLicencia, readonly TransicionP
 };
 
 /**
+ * Estados en los que la solicitud YA FUE RESUELTA — la Administración se
+ * pronunció y el trámite salió de su escritorio (D.1077/2015 art.
+ * 2.2.6.1.2.3.1: la decisión es lo que cierra el plazo de los 45 días
+ * hábiles; NOTIFICADA y EN_FIRME son hitos POSTERIORES a esa decisión).
+ *
+ * Vivía duplicada como constante local en `BandejaLicenciasClient.tsx`.
+ * Es una regla de DOMINIO, no de presentación: sube al motor para que el
+ * Libro, la Bandeja y el panel de término la lean del mismo sitio.
+ */
+export const ESTADOS_RESUELTOS_LICENCIA: readonly EstadoJuridicoLicencia[] = [
+  'CONCEDIDA', 'NEGADA', 'DESISTIDA', 'NOTIFICADA', 'EN_FIRME',
+];
+
+/**
+ * ¿El término legal para RESOLVER sigue corriendo en este estado?
+ *
+ * Corrige un defecto encontrado en la verificación E2E del 12-ago-2026: un
+ * expediente `EN_FIRME` —ya resuelto— mostraba «Vencido hace 88 días
+ * hábiles». El plazo de los 45 días hábiles dejó de correr cuando la
+ * Administración decidió; seguir midiéndolo contra "hoy" convierte el paso
+ * del tiempo en un incumplimiento que no existe, y le dice al funcionario
+ * exactamente lo contrario de lo que el módulo existe para hacer:
+ * protegerlo. Lo mismo aplica a los históricos migrados, que nunca tuvieron
+ * un término proyectable (R9).
+ *
+ * NO se limita a ocultar el dato: cambia la interpretación. La fecha
+ * proyectada se sigue mostrando como referencia de cuándo VENCÍA el plazo,
+ * pero deja de leerse como una alerta de mora.
+ */
+export function terminoResolucionSigueCorriendo(estado: EstadoJuridicoLicencia): boolean {
+  if (estado === 'HISTORICO_SIN_RESOLVER') return false;
+  return !ESTADOS_RESUELTOS_LICENCIA.includes(estado);
+}
+
+/**
  * ¿Es válida la transición `desde → hacia`? Incluye el guard de acta única
  * (`opciones.yaHuboActa`) — si la transición exige "no hubo acta previa" y
  * `yaHuboActa` es `true`, se rechaza aunque el par de estados esté en el

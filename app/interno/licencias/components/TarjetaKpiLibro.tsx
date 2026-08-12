@@ -26,7 +26,7 @@ export function TarjetaKpiLibro({
   tono?: TonoKpiLibro;
 }) {
   const colorCifra =
-    tono === 'peligro' ? 'var(--color-danger)' : tono === 'advertencia' ? 'var(--color-warning)' : 'var(--text-primary)';
+    tono === 'peligro' ? 'var(--color-danger-text)' : tono === 'advertencia' ? 'var(--color-warning-text)' : 'var(--text-primary)';
 
   return (
     <div

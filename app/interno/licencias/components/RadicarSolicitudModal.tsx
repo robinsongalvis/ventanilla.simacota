@@ -108,7 +108,7 @@ export function RadicarSolicitudModal({ onCerrar, onCreado }: RadicarSolicitudMo
 
         {creado ? (
           <div className="flex flex-col items-center gap-4 px-6 py-10 text-center">
-            <p className="text-xs font-bold uppercase tracking-widest" style={{ color: '#16A34A' }}>
+            <p className="text-xs font-bold uppercase tracking-widest" style={{ color: 'var(--color-success-text)' }}>
               Expediente creado
             </p>
             <p className="text-2xl font-black font-mono" style={{ color: '#12261A' }}>

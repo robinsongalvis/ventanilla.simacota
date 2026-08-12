@@ -42,6 +42,7 @@ import { subtiposConEstadoLibro } from '../presentacion-libro-consecutivo';
 import { ChipEstadoJuridico } from './ChipEstadoJuridico';
 import { ChipPrueba } from './ChipPrueba';
 import { NumeroLegal } from './NumeroLegal';
+import { EtiquetaColisionNumero } from './EtiquetaColisionNumero';
 import { EventoTimeline } from './EventoTimeline';
 import { PanelTerminoDual } from './PanelTerminoDual';
 import { PanelVigenciaActo } from './PanelVigenciaActo';
@@ -49,6 +50,21 @@ import { PanelVigenciaActo } from './PanelVigenciaActo';
 export interface PanelDetalleExpedienteProps {
   expedienteId: string;
   onCerrar: () => void;
+  /**
+   * Explicación de la colisión de número, ya redactada por
+   * `textoColisionLibro` — la MISMA función pura que usa la fila del Libro,
+   * para no reimplementar aquí ni una línea (Principio 3).
+   *
+   * OPCIONAL a propósito, y la asimetría es deliberada: el flag que DECIDE
+   * si hay aviso sale del propio `fetch` de este panel
+   * (`expediente.numeroExpediente.colision`, dato persistido y autoritativo),
+   * mientras que saber CON QUIÉN colisiona se deriva en el cliente del índice
+   * de filas del año cargado, que solo existe en `LibroConsecutivoClient`.
+   * Así el panel sigue delatando la colisión aunque lo monten desde otra
+   * pantalla —con la redacción honesta de "el gemelo no está a la vista"— y
+   * dentro del Libro además nombra al gemelo.
+   */
+  textoColision?: string | null;
 }
 
 type EstadoCargaPanel = 'cargando' | 'error' | 'listo';
@@ -56,7 +72,7 @@ type EstadoCargaPanel = 'cargando' | 'error' | 'listo';
 /** Selector de elementos enfocables dentro del panel — mismo criterio estándar usado por implementaciones de focus-trap (enlaces con `href`, controles no deshabilitados, `tabindex` explícito no-negativo). */
 const SELECTOR_FOCUSABLES = 'a[href], button:not([disabled]), textarea, input, select, [tabindex]:not([tabindex="-1"])';
 
-export function PanelDetalleExpediente({ expedienteId, onCerrar }: PanelDetalleExpedienteProps) {
+export function PanelDetalleExpediente({ expedienteId, onCerrar, textoColision = null }: PanelDetalleExpedienteProps) {
   const [estadoCarga, setEstadoCarga] = useState<EstadoCargaPanel>('cargando');
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
   const [expediente, setExpediente] = useState<ExpedienteLicenciaDoc | null>(null);
@@ -150,6 +166,12 @@ export function PanelDetalleExpediente({ expedienteId, onCerrar }: PanelDetalleE
   const contextoEntradas = useMemo(() => Object.entries(expediente?.contexto ?? {}), [expediente]);
 
   const numero = expediente?.numeroExpediente?.numero ?? expediente?.id ?? expedienteId;
+  const hayColision = expediente?.numeroExpediente?.colision === true;
+  // Sin texto del caller NO se inventa un gemelo: se dice lo único que este
+  // panel puede sostener — que el importador marcó el número como duplicado.
+  const explicacionColision =
+    textoColision ??
+    `El importador marcó el número ${numero} como duplicado en el histórico. Los expedientes que lo comparten se ven en el Libro consecutivo, con el filtro «Colisiones». No se renumera: la serie legal histórica es intocable — la resolución es humana, con acta.`;
   const tituloId = 'panel-detalle-expediente-titulo';
 
   return (
@@ -158,14 +180,14 @@ export function PanelDetalleExpediente({ expedienteId, onCerrar }: PanelDetalleE
           por Tab (mismo patrón que `BusquedaAvanzadaPanel`) para que el
           trampolín de foco de abajo no tenga que lidiar con un elemento
           enfocable FUERA del panel. Escape ya cubre el cierre por teclado. */}
-      <div aria-hidden="true" onClick={onCerrar} className="fixed inset-0 z-40" style={{ background: 'rgba(15,23,20,0.45)' }} />
+      <div aria-hidden="true" onClick={onCerrar} className="fixed inset-0 z-40 print:hidden" style={{ background: 'rgba(15,23,20,0.45)' }} />
 
       <div
         ref={panelRef}
         role="dialog"
         aria-modal="true"
         aria-labelledby={tituloId}
-        className="fixed inset-y-0 right-0 z-50 w-full sm:w-[420px] md:w-[460px] flex flex-col"
+        className="fixed inset-y-0 right-0 z-50 w-full sm:w-[420px] md:w-[460px] flex flex-col print:hidden"
         style={{ background: 'var(--bg-surface)', borderLeft: '1px solid var(--color-border)', boxShadow: 'var(--shadow-elevated)' }}
       >
         <header className="flex items-start justify-between gap-3 px-4 py-3.5 shrink-0" style={{ borderBottom: '1px solid var(--color-border)' }}>
@@ -176,6 +198,10 @@ export function PanelDetalleExpediente({ expedienteId, onCerrar }: PanelDetalleE
             <div className="flex flex-wrap items-center gap-1.5">
               <NumeroLegal value={numero} variant="expediente" size="md" />
               {expediente?.esPrueba && <ChipPrueba />}
+              {/* La marca la enciende el dato PERSISTIDO que este panel ya
+                  trae en su propio fetch — no depende de que el caller pase
+                  `textoColision`, que solo enriquece la explicación. */}
+              {hayColision && <EtiquetaColisionNumero explicacion={explicacionColision} />}
               {expediente && <ChipEstadoJuridico estado={expediente.estadoJuridico} />}
             </div>
             {subtipos.length > 0 && (
@@ -186,7 +212,7 @@ export function PanelDetalleExpediente({ expedienteId, onCerrar }: PanelDetalleE
                     className="text-[11px] font-semibold px-2 py-0.5 rounded-full"
                     style={
                       s.enCuarentena
-                        ? { background: 'var(--color-warning)', color: '#4A2E02', opacity: 0.85 }
+                        ? { background: 'var(--color-warning)', color: '#4A2E02' }
                         : { background: 'var(--bg-surface-2)', color: 'var(--text-secondary)' }
                     }
                     title={s.enCuarentena ? 'Subtipo histórico pendiente de identificar' : undefined}
@@ -269,6 +295,7 @@ export function PanelDetalleExpediente({ expedienteId, onCerrar }: PanelDetalleE
               <PanelTerminoDual
                 terminoDual={computos?.terminoDual ?? { suspension: null, reinicio: null, fechaAlertaConservadora: null }}
                 origen={expediente.origen}
+                estadoJuridico={expediente.estadoJuridico}
                 fechaRadicacion={fechaRadicacion}
               />
 
