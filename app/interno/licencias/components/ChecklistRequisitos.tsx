@@ -117,17 +117,6 @@ export function ChecklistRequisitos({
           <p className="text-xs mt-1.5" style={{ color: 'var(--text-secondary)' }}>{motivoSoloLectura}</p>
         )}
 
-        <div
-          role="note"
-          aria-label="Aviso: checklist parcial"
-          className="mt-3 rounded-lg px-3 py-2 text-xs flex gap-2"
-          style={{ background: '#FDF2E2', border: '1px solid rgba(217,119,6,0.30)', color: '#7A4F0A' }}
-        >
-          <span aria-hidden="true" className="leading-none">⚠️</span>
-          <span>
-            <strong>Checklist PARCIAL</strong> — página 1 de 2 del formato oficial de Planeación; se completa cuando llegue la página 2.
-          </span>
-        </div>
       </div>
 
       {definicion.clavesContexto && definicion.clavesContexto.length > 0 && (

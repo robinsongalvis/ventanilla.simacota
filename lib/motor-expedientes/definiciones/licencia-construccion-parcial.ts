@@ -2,14 +2,25 @@
  * Definición de Trámite sembrada — Licencia de Construcción, modalidad
  * Obra Nueva — Bloque A·A2.
  *
- * CONTENIDO PARCIAL (pág. 1/2) — el checklist oficial completo es
- * precondición #2 del ADR-0026, pendiente de Planeación. Esta constante
- * transcribe ÚNICAMENTE los 19 requisitos de
- * `docs/blueprints/requisitos-licencia-construccion-obra-nueva.md`
- * ("Página 1 de 2" — el propio documento declara que falta la página 2).
- * Al llegar esa página, esta constante se completa como DATO — nunca se
- * inventan requisitos que el blueprint no liste (regla de gobierno de
- * este bloque).
+ * CONTENIDO COMPLETO (11-ago-2026). Transcribe los 19 requisitos de las
+ * DOS páginas del formato oficial de la Alcaldía de Simacota
+ * (`F-PGD-009`, versión 02, aprobado el 15-01-2024), aportado por el
+ * propietario y archivado en `docs/blueprints/`. Cubre la precondición #2
+ * del ADR-0026.
+ *
+ * Nota de historia, para que nadie la reintroduzca: hasta hoy esta
+ * constante se anunciaba como "PARCIAL (página 1 de 2)" y la pantalla lo
+ * repetía al funcionario. Era FALSO desde antes: los 6 requisitos de la
+ * página 2 (proyecto arquitectónico, disponibilidad de servicios
+ * públicos, matrícula y experiencia profesional, memorial de
+ * responsabilidad, valla de citación y expensas) ya estaban sembrados y
+ * verificados uno a uno contra el PDF oficial — lo que faltó fue retirar
+ * la marca cuando llegaron. El nombre del símbolo conserva el sufijo
+ * `_PARCIAL` por compatibilidad con sus 13 consumidores; ya no describe
+ * el contenido.
+ *
+ * Se mantiene la regla de gobierno del bloque: nunca se inventan
+ * requisitos que el formato oficial no liste.
  *
  * `terminos` (45 días hábiles) y el eje `dias`/`prorrogaDias` de
  * `regimenSubsanacion` (30 hábiles + 15 de prórroga) están confirmados
@@ -40,7 +51,7 @@ import type { DefinicionTramite } from '../tipos';
 export const DEFINICION_LICENCIA_CONSTRUCCION_PARCIAL: DefinicionTramite = {
   id: 'licencia-construccion-obra-nueva',
   nombre: 'Licencia de Construcción · Obra Nueva',
-  descripcion: 'Checklist PARCIAL (página 1 de 2) — docs/blueprints/requisitos-licencia-construccion-obra-nueva.md',
+  descripcion: 'Checklist COMPLETO — formato oficial F-PGD-009 v02 (15-01-2024) de la Alcaldía de Simacota, páginas 1 y 2.',
   activo: true,
   terminos: { dias: 45, unidad: 'HABILES' },
   regimenSubsanacion: {
