@@ -58,6 +58,7 @@ import {
   calcularConteosPorFiltroLibro,
   coincideBusquedaLibro,
   COLOR_URGENCIA_LIBRO,
+  COLOR_TEXTO_URGENCIA_LIBRO,
   construirFilasLibroConsecutivo,
   FILTROS_LIBRO_CONSECUTIVO,
   filtrarFilasLibro,
@@ -158,7 +159,17 @@ export function LibroConsecutivoClient() {
   }, [filas, año]);
 
   return (
-    <div className="p-4 md:p-6 flex flex-col gap-5 max-w-[1400px] mx-auto">
+    // `w-full min-w-0` es el simétrico horizontal del `min-h-0` del layout
+    // (ver `app/interno/licencias/layout.tsx`). Este contenedor es un hijo
+    // flex, y un hijo flex tiene `min-width: auto` implícito: sin anchura
+    // definida se dimensiona por su contenido, y la tabla del libro (~1036 px)
+    // lo estiraba a 1070 px. En un teléfono de 375 px eso cortaba el
+    // subtítulo, el aviso de migración y el buscador, y además dejaba muerto
+    // el `overflow-x-auto` de la tabla — el contenedor crecía en vez de que
+    // la tabla se desplazara (medido en la verificación E2E del 12-ago-2026).
+    // `w-full` le da anchura definida = la del viewport; `min-w-0` impide que
+    // el mínimo automático la vuelva a inflar.
+    <div className="w-full min-w-0 p-4 md:p-6 flex flex-col gap-5 max-w-[1400px] mx-auto">
       {/* ── Encabezado de pantalla (oculto al imprimir) ── */}
       <div className="flex flex-col md:flex-row md:items-end md:justify-between gap-4 print:hidden">
         <div>
@@ -234,7 +245,10 @@ export function LibroConsecutivoClient() {
         style={{ background: '#E9F0FC', border: '1px solid rgba(37,99,235,0.25)' }}
       >
         <p className="text-[13px] leading-relaxed" style={{ color: '#1E4FA0' }}>
-          <strong>Libro del sistema</strong> — los expedientes históricos del Excel (2022–2026) se incorporarán con la migración (Fase 5).
+          <strong>Libro del sistema</strong> — incluye los expedientes históricos del Excel de Planeación (2022–2026),
+          migrados el 11-ago-2026. Entraron como <em>Histórico sin resolver</em>: conservan lo que decía el libro,
+          pero les falta completar cédula y estado desde los expedientes físicos — el filtro
+          «Históricos incompletos» los agrupa.
         </p>
       </div>
 
@@ -276,9 +290,15 @@ export function LibroConsecutivoClient() {
         ))}
       </div>
 
-      {/* ── Tabla ── */}
+      {/* ── Tabla ──
+          `min-w-0`: esta tarjeta también es hija flex, así que necesita la
+          misma protección que el contenedor de página (ver arriba) para no
+          re-inflarse por el mínimo automático. Con ella, el desbordamiento de
+          la tabla se queda DENTRO del `overflow-x-auto` de abajo: conserva
+          todas sus columnas y se desplaza de lado, sin sacrificar
+          información ni romper la página. */}
       <div
-        className="rounded-xl overflow-hidden"
+        className="rounded-xl overflow-hidden min-w-0"
         style={{ background: 'var(--bg-surface)', border: '1px solid var(--color-border)', boxShadow: 'var(--shadow-soft)' }}
       >
         <div className="overflow-x-auto">
@@ -338,6 +358,7 @@ export function LibroConsecutivoClient() {
                 filasVisibles.map((fila) => {
                   const urgencia = urgenciaFilaLibro(fila);
                   const colorUrgencia = COLOR_URGENCIA_LIBRO[urgencia];
+                  const colorTextoUrgencia = COLOR_TEXTO_URGENCIA_LIBRO[urgencia];
                   const textoDias = textoDiasVencimientoLibro(fila);
                   const subtipos = subtiposConEstadoLibro(fila.subtipoCodigos);
                   const tituloSubtipos = fila.subtipos.join(', ');
@@ -397,11 +418,11 @@ export function LibroConsecutivoClient() {
                       <td className="px-3 py-2.5 align-top whitespace-nowrap">
                         {fila.fechaAlertaConservadora ? (
                           <>
-                            <p className="font-bold" style={{ color: colorUrgencia }}>
+                            <p className="font-bold" style={{ color: colorTextoUrgencia }}>
                               {formatFechaColombia(fila.fechaAlertaConservadora)}
                             </p>
                             {textoDias !== null && (
-                              <p className="text-[11px]" style={{ color: colorUrgencia }}>
+                              <p className="text-[11px]" style={{ color: colorTextoUrgencia }}>
                                 {textoDias}
                               </p>
                             )}

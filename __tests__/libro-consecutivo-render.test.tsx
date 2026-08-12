@@ -285,12 +285,18 @@ describe('LibroConsecutivoClient', () => {
     expect(screen.getByText('Tu rol no permite consultar expedientes de licencias.')).toBeTruthy();
   });
 
-  it('aviso permanente de alcance histórico siempre visible', async () => {
+  it('aviso permanente de alcance histórico siempre visible, en tiempo PASADO (la migración ya ocurrió el 11-ago-2026)', async () => {
     mockAuth();
     vi.stubGlobal('fetch', mockFetchExpedientes([]));
     render(<LibroConsecutivoClient />);
 
-    expect(screen.getByText(/los expedientes históricos del Excel \(2022–2026\) se incorporarán con la migración/)).toBeTruthy();
+    // El aviso anunciaba una migración FUTURA («se incorporarán»). Se ejecutó el
+    // 11-ago-2026 y el texto quedó mintiendo — hallazgo 3 de la verificación E2E
+    // en stage. Esta prueba fija el tiempo verbal: si alguien reintroduce la
+    // promesa a futuro, falla aquí.
+    expect(screen.getByText(/migrados el 11-ago-2026/)).toBeTruthy();
+    expect(screen.getByText(/Históricos incompletos.*los agrupa/)).toBeTruthy();
+    expect(screen.queryByText(/se incorporarán con la migración/)).toBeNull();
   });
 
   /* ── Rediseño (10-ago-2026): KPIs, filtros, urgencia, datos faltantes,

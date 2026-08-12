@@ -20,7 +20,7 @@
  */
 
 import type { ExpedienteLicenciaDoc } from '@/lib/server/expedientes-licencias';
-import type { EstadoJuridicoLicencia } from '@/lib/motor-expedientes/estados-licencia';
+import { terminoResolucionSigueCorriendo, type EstadoJuridicoLicencia } from '@/lib/motor-expedientes/estados-licencia';
 import type { OrigenActuacion } from '@/lib/motor-expedientes/tipos';
 import { calcularVencimientoVigencia, esErrorVigencia } from '@/lib/motor-expedientes/vigencias';
 import { EQUIVALENCIAS_MIGRACION_SEMILLA_LICENCIAS } from '@/lib/motor-expedientes/catalogo-subtipos-normativo';
@@ -310,10 +310,17 @@ export type UrgenciaFilaLibro = 'VENCIDO' | 'POR_VENCER' | 'EN_TERMINO' | 'NEUTR
  * CALENDARIO.
  */
 export function urgenciaFilaLibro(
-  fila: Pick<FilaLibroConsecutivo, 'fechaAlertaConservadora'>,
+  fila: Pick<FilaLibroConsecutivo, 'fechaAlertaConservadora' | 'estadoJuridico'>,
   hoy: Date = new Date(),
 ): UrgenciaFilaLibro {
   if (!fila.fechaAlertaConservadora) return 'NEUTRO';
+  // Un expediente YA RESUELTO no está en mora: el término de resolución dejó
+  // de correr cuando la Administración decidió (ver
+  // `terminoResolucionSigueCorriendo`). Sin esta guarda, el simple paso del
+  // tiempo pintaba de rojo expedientes cerrados y los sumaba a "Vencidos" —
+  // defecto encontrado en la verificación E2E del 12-ago-2026, donde un
+  // expediente EN FIRME anunciaba "Vencido hace 88 días hábiles".
+  if (!terminoResolucionSigueCorriendo(fila.estadoJuridico)) return 'NEUTRO';
   // Ambos extremos anclados al mediodía de su día civil (`atLocalNoon`, ya
   // usada por todo el módulo): comparar sus instantes compara días civiles,
   // sin que la hora del dato pueda desplazar el resultado.
@@ -335,7 +342,7 @@ export function urgenciaFilaLibro(
  * "Vencido" a secas — sin inventar un número que no significa nada.
  */
 export function textoDiasVencimientoLibro(
-  fila: Pick<FilaLibroConsecutivo, 'fechaAlertaConservadora'>,
+  fila: Pick<FilaLibroConsecutivo, 'fechaAlertaConservadora' | 'estadoJuridico'>,
   hoy: Date = new Date(),
 ): string | null {
   if (!fila.fechaAlertaConservadora) return null;
@@ -348,12 +355,26 @@ export function textoDiasVencimientoLibro(
   return `${dias} días hábiles`;
 }
 
-/** Token de color (`app/globals.css`) por banda de urgencia — franja lateral de la fila y color del texto de la columna "Vence". */
+/** Token de color (`app/globals.css`) por banda de urgencia — franja lateral de 4 px de la fila. */
 export const COLOR_URGENCIA_LIBRO: Record<UrgenciaFilaLibro, string> = {
   VENCIDO: 'var(--color-danger)',
   POR_VENCER: 'var(--color-warning)',
   EN_TERMINO: 'var(--color-success)',
   NEUTRO: 'var(--color-border)',
+};
+
+/**
+ * Token de color del TEXTO de la columna "Vence". Idéntico al de la franja
+ * salvo en `NEUTRO`: `--color-border` está pensado para un filete de 4 px y
+ * como texto rinde 1.33:1 sobre blanco — muy por debajo del 4.5:1 que exige
+ * WCAG AA (medido en stage el 12-ago-2026). Un expediente ya resuelto debe
+ * dejar de leerse como incumplimiento, pero su fecha sigue siendo un dato que
+ * la funcionaria necesita ver: `--text-secondary` la baja de jerarquía sin
+ * volverla invisible (4.97:1).
+ */
+export const COLOR_TEXTO_URGENCIA_LIBRO: Record<UrgenciaFilaLibro, string> = {
+  ...COLOR_URGENCIA_LIBRO,
+  NEUTRO: 'var(--text-secondary)',
 };
 
 /**

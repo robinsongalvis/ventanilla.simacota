@@ -5,6 +5,8 @@ import {
   calcularConteosKpiLibro,
   calcularConteosPorFiltroLibro,
   camposBusquedaDesdeExpediente,
+  COLOR_TEXTO_URGENCIA_LIBRO,
+  COLOR_URGENCIA_LIBRO,
   coincideBusquedaLibro,
   coincideFiltroLibro,
   construirFilasLibroConsecutivo,
@@ -258,22 +260,22 @@ describe('urgenciaFilaLibro', () => {
   const HOY = new Date('2026-03-10T12:00:00-05:00');
 
   it('NEUTRO sin fechaAlertaConservadora', () => {
-    expect(urgenciaFilaLibro({ fechaAlertaConservadora: null }, HOY)).toBe('NEUTRO');
+    expect(urgenciaFilaLibro({ fechaAlertaConservadora: null, estadoJuridico: 'EN_REVISION' }, HOY)).toBe('NEUTRO');
   });
 
   it('VENCIDO si la fecha ya pasó', () => {
     const pasada = new Date(HOY.getTime() - 30 * 24 * 60 * 60 * 1000).toISOString();
-    expect(urgenciaFilaLibro({ fechaAlertaConservadora: pasada }, HOY)).toBe('VENCIDO');
+    expect(urgenciaFilaLibro({ fechaAlertaConservadora: pasada, estadoJuridico: 'EN_REVISION' }, HOY)).toBe('VENCIDO');
   });
 
   it(`POR_VENCER si faltan exactamente ${UMBRAL_POR_VENCER_DIAS_HABILES_LIBRO} días hábiles (el umbral incluye el límite)`, () => {
     const fecha = sumarDiasHabiles(HOY, UMBRAL_POR_VENCER_DIAS_HABILES_LIBRO).toISOString();
-    expect(urgenciaFilaLibro({ fechaAlertaConservadora: fecha }, HOY)).toBe('POR_VENCER');
+    expect(urgenciaFilaLibro({ fechaAlertaConservadora: fecha, estadoJuridico: 'EN_REVISION' }, HOY)).toBe('POR_VENCER');
   });
 
   it('EN_TERMINO si faltan más días hábiles que el umbral', () => {
     const fecha = sumarDiasHabiles(HOY, UMBRAL_POR_VENCER_DIAS_HABILES_LIBRO + 1).toISOString();
-    expect(urgenciaFilaLibro({ fechaAlertaConservadora: fecha }, HOY)).toBe('EN_TERMINO');
+    expect(urgenciaFilaLibro({ fechaAlertaConservadora: fecha, estadoJuridico: 'EN_REVISION' }, HOY)).toBe('EN_TERMINO');
   });
 
   // ── REGRESIÓN: vencido SIN días hábiles de por medio ────────────────
@@ -294,7 +296,7 @@ describe('urgenciaFilaLibro', () => {
     });
 
     it('aun así es VENCIDO: la pregunta "¿ya pasó la fecha?" es de CALENDARIO, no de días hábiles', () => {
-      expect(urgenciaFilaLibro({ fechaAlertaConservadora: VIERNES_7_AGO_FESTIVO }, LUNES_10_AGO)).toBe('VENCIDO');
+      expect(urgenciaFilaLibro({ fechaAlertaConservadora: VIERNES_7_AGO_FESTIVO, estadoJuridico: 'EN_REVISION' }, LUNES_10_AGO)).toBe('VENCIDO');
     });
 
     it('entra en el filtro VENCIDOS y NO en POR_VENCER', () => {
@@ -308,12 +310,50 @@ describe('urgenciaFilaLibro', () => {
     });
 
     it('el texto dice "Vencido", no "0 días hábiles" (que sería engañoso)', () => {
-      expect(textoDiasVencimientoLibro({ fechaAlertaConservadora: VIERNES_7_AGO_FESTIVO }, LUNES_10_AGO)).toBe('Vencido');
+      expect(textoDiasVencimientoLibro({ fechaAlertaConservadora: VIERNES_7_AGO_FESTIVO, estadoJuridico: 'EN_REVISION' }, LUNES_10_AGO)).toBe('Vencido');
     });
 
     it('el MISMO día del vencimiento todavía NO está vencido (el plazo corre hasta el final del día)', () => {
-      expect(urgenciaFilaLibro({ fechaAlertaConservadora: VIERNES_7_AGO_FESTIVO }, new Date('2026-08-07T08:00:00-05:00'))).not.toBe('VENCIDO');
+      expect(urgenciaFilaLibro({ fechaAlertaConservadora: VIERNES_7_AGO_FESTIVO, estadoJuridico: 'EN_REVISION' }, new Date('2026-08-07T08:00:00-05:00'))).not.toBe('VENCIDO');
     });
+  });
+});
+
+describe('urgenciaFilaLibro — expediente YA RESUELTO no está en mora (regresión E2E 12-ago-2026)', () => {
+  // Defecto encontrado verificando la aplicación REAL en stage: un expediente
+  // EN FIRME mostraba «Vencido hace 88 días hábiles». El plazo de los 45 días
+  // hábiles dejó de correr cuando la Administración decidió; medirlo contra
+  // "hoy" convierte el paso del tiempo en un incumplimiento inexistente.
+  const HOY = new Date('2026-08-12T12:00:00-05:00');
+  const FECHA_VIEJA = '2026-03-30T12:00:00-05:00'; // muy anterior a HOY
+
+  it.each(['CONCEDIDA', 'NEGADA', 'DESISTIDA', 'NOTIFICADA', 'EN_FIRME'] as const)(
+    '%s → NEUTRO aunque la fecha proyectada ya pasó (el trámite se resolvió)',
+    (estadoJuridico) => {
+      expect(urgenciaFilaLibro({ fechaAlertaConservadora: FECHA_VIEJA, estadoJuridico }, HOY)).toBe('NEUTRO');
+    },
+  );
+
+  it('HISTORICO_SIN_RESOLVER → NEUTRO: nunca tuvo término proyectable (R9)', () => {
+    expect(urgenciaFilaLibro({ fechaAlertaConservadora: FECHA_VIEJA, estadoJuridico: 'HISTORICO_SIN_RESOLVER' }, HOY)).toBe('NEUTRO');
+  });
+
+  it.each(['RADICADA_EN_DEBIDA_FORMA', 'EN_REVISION', 'CON_ACTA_DE_OBSERVACIONES', 'EN_VIABILIDAD'] as const)(
+    '%s → VENCIDO: el término SÍ sigue corriendo y la fecha ya pasó',
+    (estadoJuridico) => {
+      expect(urgenciaFilaLibro({ fechaAlertaConservadora: FECHA_VIEJA, estadoJuridico }, HOY)).toBe('VENCIDO');
+    },
+  );
+
+  it('un expediente resuelto tampoco entra en el filtro/KPI "Vencidos"', () => {
+    const [base] = construirFilasLibroConsecutivo([expedienteBase({ creadoEn: '2026-02-01T10:00:00.000Z' })], 2026);
+    const resuelto = { ...base, fechaAlertaConservadora: FECHA_VIEJA, estadoJuridico: 'EN_FIRME' as const };
+    expect(coincideFiltroLibro(resuelto, 'VENCIDOS', HOY)).toBe(false);
+    expect(coincideFiltroLibro(resuelto, 'POR_VENCER', HOY)).toBe(false);
+  });
+
+  it('el texto de apoyo tampoco anuncia mora en un expediente resuelto', () => {
+    expect(textoDiasVencimientoLibro({ fechaAlertaConservadora: FECHA_VIEJA, estadoJuridico: 'EN_FIRME' }, HOY)).toBeNull();
   });
 });
 
@@ -321,12 +361,12 @@ describe('textoDiasVencimientoLibro', () => {
   const HOY = new Date('2026-03-10T12:00:00-05:00');
 
   it('null sin fecha (nada que decir)', () => {
-    expect(textoDiasVencimientoLibro({ fechaAlertaConservadora: null }, HOY)).toBeNull();
+    expect(textoDiasVencimientoLibro({ fechaAlertaConservadora: null, estadoJuridico: 'EN_REVISION' }, HOY)).toBeNull();
   });
 
   it('cuenta los días hábiles cuando el plazo sigue corriendo', () => {
     const fecha = sumarDiasHabiles(HOY, 4).toISOString();
-    expect(textoDiasVencimientoLibro({ fechaAlertaConservadora: fecha }, HOY)).toBe('4 días hábiles');
+    expect(textoDiasVencimientoLibro({ fechaAlertaConservadora: fecha, estadoJuridico: 'EN_REVISION' }, HOY)).toBe('4 días hábiles');
   });
 
   it('dice hace cuántos días hábiles venció cuando sí los hubo', () => {
@@ -336,7 +376,7 @@ describe('textoDiasVencimientoLibro', () => {
     const fecha = '2026-03-03T12:00:00-05:00';
     const habilesTranscurridos = Math.abs(diasRestantesHabiles(fecha, HOY));
     expect(habilesTranscurridos).toBeGreaterThan(0);
-    expect(textoDiasVencimientoLibro({ fechaAlertaConservadora: fecha }, HOY)).toBe(
+    expect(textoDiasVencimientoLibro({ fechaAlertaConservadora: fecha, estadoJuridico: 'EN_REVISION' }, HOY)).toBe(
       `Vencido hace ${habilesTranscurridos} días hábiles`,
     );
   });
@@ -623,5 +663,30 @@ describe('camposBusquedaDesdeExpediente', () => {
     const campos = camposBusquedaDesdeExpediente(exp);
     expect(coincideBusquedaLibro(campos, 'maria')).toBe(true);
     expect(coincideBusquedaLibro(campos, '900-12345')).toBe(true);
+  });
+});
+
+describe('COLOR_TEXTO_URGENCIA_LIBRO — el dato del expediente resuelto se atenúa, no desaparece', () => {
+  // Segundo defecto de la misma verificación en stage: al pasar el expediente
+  // resuelto a la banda NEUTRO, la fecha quedó pintada con `--color-border`,
+  // que es un token de filete de 4 px. Medido en la aplicación real daba
+  // 1.33:1 sobre blanco — la funcionaria no podía leer la fecha. "No es
+  // incumplimiento" no puede degenerar en "no se ve".
+  it('la franja y el texto comparten color en las bandas con plazo vivo', () => {
+    for (const urgencia of ['VENCIDO', 'POR_VENCER', 'EN_TERMINO'] as const) {
+      expect(COLOR_TEXTO_URGENCIA_LIBRO[urgencia]).toBe(COLOR_URGENCIA_LIBRO[urgencia]);
+    }
+  });
+
+  it('en NEUTRO el texto NO usa el token de borde (contraste insuficiente)', () => {
+    expect(COLOR_URGENCIA_LIBRO.NEUTRO).toBe('var(--color-border)');
+    expect(COLOR_TEXTO_URGENCIA_LIBRO.NEUTRO).not.toBe(COLOR_URGENCIA_LIBRO.NEUTRO);
+    expect(COLOR_TEXTO_URGENCIA_LIBRO.NEUTRO).toBe('var(--text-secondary)');
+  });
+
+  it('toda banda tiene color de texto definido', () => {
+    for (const urgencia of ['VENCIDO', 'POR_VENCER', 'EN_TERMINO', 'NEUTRO'] as const) {
+      expect(COLOR_TEXTO_URGENCIA_LIBRO[urgencia]).toMatch(/^var\(--[a-z-]+\)$/);
+    }
   });
 });

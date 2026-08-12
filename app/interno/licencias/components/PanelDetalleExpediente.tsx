@@ -269,6 +269,7 @@ export function PanelDetalleExpediente({ expedienteId, onCerrar }: PanelDetalleE
               <PanelTerminoDual
                 terminoDual={computos?.terminoDual ?? { suspension: null, reinicio: null, fechaAlertaConservadora: null }}
                 origen={expediente.origen}
+                estadoJuridico={expediente.estadoJuridico}
                 fechaRadicacion={fechaRadicacion}
               />
 
