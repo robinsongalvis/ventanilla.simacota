@@ -163,7 +163,7 @@ export function buildAvisoActaHtml(p: TemplateAvisoActaParams): string {
               <p style="margin:6px 0 0 0;font-size:11px;color:#667085;">
                 ${escapeHtml(INSTITUCION.telefono)} · <a href="mailto:${escapeHtml(INSTITUCION.correo)}" style="color:#14532D;text-decoration:none;">${escapeHtml(INSTITUCION.correo)}</a>
               </p>
-              <p style="margin:6px 0 0 0;font-size:10px;color:#94A3B8;">
+              <p style="margin:6px 0 0 0;font-size:10px;color:#5A6B5D;">
                 ${escapeHtml(INSTITUCION.municipio)}, ${escapeHtml(INSTITUCION.departamento)} · ${escapeHtml(INSTITUCION.pais)}
               </p>
             </td>

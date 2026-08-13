@@ -59,6 +59,6 @@ export function buildDesistimientoHtml(p: TemplateDesistimientoParams): string {
       artículos 74 y 76). Podrá presentar una nueva solicitud cuando cuente con la información
       completa.
     </p>
-    <p style="margin:16px 0 0;font-size:12px;color:#90a4ae;">${escapeHtml(INSTITUCION.nombre)}</p>
+    <p style="margin:16px 0 0;font-size:12px;color:#5A6B5D;">${escapeHtml(INSTITUCION.nombre)}</p>
   </div>`;
 }

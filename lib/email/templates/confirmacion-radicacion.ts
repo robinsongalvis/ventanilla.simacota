@@ -137,7 +137,7 @@ export function buildConfirmacionRadicacionHtml(
                           <p style="margin:0;color:#37474f;font-size:13px;font-weight:600;">${formatearFechaCorta(p.fechaRadicado)}</p>
                         </td>
                         <td style="width:50%;padding-left:8px;">
-                          <p style="margin:0 0 4px;color:#e65100;font-size:10px;font-weight:700;letter-spacing:1.5px;text-transform:uppercase;">Fecha límite de respuesta</p>
+                          <p style="margin:0 0 4px;color:#C24400;font-size:10px;font-weight:700;letter-spacing:1.5px;text-transform:uppercase;">Fecha límite de respuesta</p>
                           <p style="margin:0;color:#bf360c;font-size:13px;font-weight:700;">${fechaVencimientoFmt}</p>
                         </td>
                       </tr>
@@ -150,7 +150,7 @@ export function buildConfirmacionRadicacionHtml(
               <table width="100%" cellpadding="0" cellspacing="0" style="background:#fff8e1;border:1px solid #ffe082;border-radius:8px;margin-bottom:24px;">
                 <tr>
                   <td style="padding:14px 18px;">
-                    <p style="margin:0;color:#e65100;font-size:13px;line-height:1.5;">
+                    <p style="margin:0;color:#C24400;font-size:13px;line-height:1.5;">
                       <strong>📬 Canal de respuesta seleccionado:</strong><br/>
                       <span style="color:#bf360c;">${escapeHtml(canalLabel)}</span>
                     </p>
@@ -170,7 +170,7 @@ export function buildConfirmacionRadicacionHtml(
                 </tr>
               </table>
 
-              <p style="margin:0;color:#78909c;font-size:12px;line-height:1.6;text-align:center;">
+              <p style="margin:0;color:#5A6B5D;font-size:12px;line-height:1.6;text-align:center;">
                 Guarde este número de radicado para hacer seguimiento a su solicitud.<br/>
                 Si tiene preguntas, puede comunicarse con la Alcaldía Municipal de Simacota.
               </p>
@@ -181,7 +181,7 @@ export function buildConfirmacionRadicacionHtml(
           <!-- Footer -->
           <tr>
             <td style="background:#eceff1;padding:20px 32px;text-align:center;">
-              <p style="margin:0 0 4px;color:#90a4ae;font-size:11px;">
+              <p style="margin:0 0 4px;color:#5A6B5D;font-size:11px;">
                 Este mensaje fue generado automáticamente por el sistema de
               </p>
               <p style="margin:0;color:#546e7a;font-size:12px;font-weight:600;">

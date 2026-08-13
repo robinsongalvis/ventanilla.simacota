@@ -53,20 +53,20 @@ export function buildAsignacionInternaHtml(p: TemplateAsignacionInternaParams): 
       asignado una nueva solicitud para su gestión.
     </p>
     <table style="width:100%;border-collapse:collapse;margin:0 0 16px;font-size:14px;">
-      <tr><td style="padding:6px 0;color:#78909c;">Radicado</td>
+      <tr><td style="padding:6px 0;color:#5A6B5D;">Radicado</td>
           <td style="padding:6px 0;font-weight:700;color:#1a237e;">${escapeHtml(p.radicadoId)}</td></tr>
-      <tr><td style="padding:6px 0;color:#78909c;">Asunto</td>
+      <tr><td style="padding:6px 0;color:#5A6B5D;">Asunto</td>
           <td style="padding:6px 0;">${escapeHtml(p.asunto)}</td></tr>
-      <tr><td style="padding:6px 0;color:#78909c;">Tipo</td>
+      <tr><td style="padding:6px 0;color:#5A6B5D;">Tipo</td>
           <td style="padding:6px 0;">${tipo}</td></tr>
-      <tr><td style="padding:6px 0;color:#78909c;">Vence</td>
+      <tr><td style="padding:6px 0;color:#5A6B5D;">Vence</td>
           <td style="padding:6px 0;font-weight:700;">${escapeHtml(vencimiento)}</td></tr>
-      <tr><td style="padding:6px 0;color:#78909c;">Asignado por</td>
+      <tr><td style="padding:6px 0;color:#5A6B5D;">Asignado por</td>
           <td style="padding:6px 0;">${escapeHtml(p.asignadoPor)}</td></tr>
     </table>
-    <p style="margin:0 0 6px;font-size:13px;color:#607d8b;">
+    <p style="margin:0 0 6px;font-size:13px;color:#5A6B5D;">
       Ingrese al panel de la Ventanilla Única para atender la solicitud dentro del término.
     </p>
-    <p style="margin:18px 0 0;font-size:12px;color:#90a4ae;">${escapeHtml(INSTITUCION.nombre)}</p>
+    <p style="margin:18px 0 0;font-size:12px;color:#5A6B5D;">${escapeHtml(INSTITUCION.nombre)}</p>
   </div>`;
 }

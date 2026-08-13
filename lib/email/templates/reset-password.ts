@@ -58,7 +58,7 @@ export function buildResetPasswordHtml(
           <!-- Aviso de seguridad -->
           <tr>
             <td style="background:#fff8e1;padding:14px 32px;border-bottom:1px solid #ffe082;">
-              <p style="margin:0;color:#e65100;font-size:12px;font-weight:600;">
+              <p style="margin:0;color:#C24400;font-size:12px;font-weight:600;">
                 🔒 Enlace de uso único — Expira en 1 hora
               </p>
             </td>
@@ -107,7 +107,7 @@ export function buildResetPasswordHtml(
                 </tr>
               </table>
 
-              <p style="margin:0;color:#78909c;font-size:12px;line-height:1.6;text-align:center;">
+              <p style="margin:0;color:#5A6B5D;font-size:12px;line-height:1.6;text-align:center;">
                 Por razones de seguridad, este enlace es de uso único y expira en 1 hora.<br/>
                 Nunca comparta este enlace con terceros.
               </p>
@@ -118,7 +118,7 @@ export function buildResetPasswordHtml(
           <!-- Footer -->
           <tr>
             <td style="background:#eceff1;padding:20px 32px;text-align:center;">
-              <p style="margin:0 0 4px;color:#90a4ae;font-size:11px;">
+              <p style="margin:0 0 4px;color:#5A6B5D;font-size:11px;">
                 Este mensaje fue generado automáticamente por el sistema de
               </p>
               <p style="margin:0;color:#546e7a;font-size:12px;font-weight:600;">

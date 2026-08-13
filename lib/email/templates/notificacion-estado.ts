@@ -95,7 +95,7 @@ function resolverConfigEvento(p: TemplateNotificacionEstadoParams): ConfigEvento
     : 'tiempo adicional';
   return {
     badgeLabel:   '⏳ PRÓRROGA',
-    badgeBgColor: '#ef6c00',
+    badgeBgColor: '#C24400',
     badgeFgColor: '#ffffff',
     banderaBg:    '#fff8e1',
     banderaBorde: '#ffe082',
@@ -109,10 +109,10 @@ function resolverConfigEvento(p: TemplateNotificacionEstadoParams): ConfigEvento
     detalleHtml: `
       <table width="100%" cellpadding="0" cellspacing="0" style="background:#fff8e1;border:1px solid #ffe082;border-radius:8px;margin-bottom:24px;">
         <tr><td style="padding:18px 22px;">
-          <p style="margin:0 0 4px;color:#e65100;font-size:10px;font-weight:700;letter-spacing:1.5px;text-transform:uppercase;">Nueva fecha límite de respuesta</p>
+          <p style="margin:0 0 4px;color:#C24400;font-size:10px;font-weight:700;letter-spacing:1.5px;text-transform:uppercase;">Nueva fecha límite de respuesta</p>
           <p style="margin:0 0 ${p.motivo ? '14' : '0'}px;color:#bf360c;font-size:16px;font-weight:800;">${escapeHtml(nuevaFecha)}</p>
           ${p.motivo ? `
-            <p style="margin:0 0 4px;color:#e65100;font-size:10px;font-weight:700;letter-spacing:1.5px;text-transform:uppercase;">Motivo</p>
+            <p style="margin:0 0 4px;color:#C24400;font-size:10px;font-weight:700;letter-spacing:1.5px;text-transform:uppercase;">Motivo</p>
             <p style="margin:0;color:#37474f;font-size:13px;line-height:1.5;">${escapeHtml(p.motivo)}</p>
           ` : ''}
         </td></tr>
@@ -202,7 +202,7 @@ export function buildNotificacionEstadoHtml(
                 </tr>
               </table>
 
-              <p style="margin:0;color:#78909c;font-size:12px;line-height:1.6;text-align:center;">
+              <p style="margin:0;color:#5A6B5D;font-size:12px;line-height:1.6;text-align:center;">
                 Este mensaje es una notificación informativa del estado de tu solicitud.<br/>
                 Para preguntas, comunícate con la ${INSTITUCION.nombre}.
               </p>
@@ -212,7 +212,7 @@ export function buildNotificacionEstadoHtml(
 
           <tr>
             <td style="background:#eceff1;padding:20px 32px;text-align:center;">
-              <p style="margin:0 0 4px;color:#90a4ae;font-size:11px;">
+              <p style="margin:0 0 4px;color:#5A6B5D;font-size:11px;">
                 Este mensaje fue generado automáticamente por el sistema de
               </p>
               <p style="margin:0;color:#546e7a;font-size:12px;font-weight:600;">
