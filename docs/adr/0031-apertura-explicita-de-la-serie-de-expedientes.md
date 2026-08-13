@@ -109,6 +109,39 @@ incidente, y ahora distingue en el texto lo declarado de lo no declarado.
 Se conserva el invariante de honestidad: el Libro **no fabrica** la bandera
 persistida — solo cambia lo que muestra, no lo que afirma del dato.
 
+## Relación con el guard D9 — por qué abrir la serie no lo viola
+
+D9 (ADR-0026) prohíbe que **un consecutivo de origen `RECONSTRUIDO` avance el
+contador vigente**: las actuaciones reconstruidas se marcan como tales pero
+no consumen la serie legal. `verificarAvanceCounter` lo implementa
+rechazando `origen: 'RECONSTRUIDO'`.
+
+Una lectura literal podría concluir que abrir la serie en 19 —un valor
+derivado de números históricos— viola D9. **No es así, y conviene dejarlo
+escrito porque bajo esa lectura el riesgo sería irreparable**: nunca se
+podría sembrar el contador y la colisión sería inevitable.
+
+La diferencia es qué operación se hace:
+
+| | Lo que D9 prohíbe | Abrir la serie |
+|---|---|---|
+| Qué ocurre | Un expediente RECONSTRUIDO **consume** un número de la serie viva | Se declara el **piso** de la serie: cuántos números consumió ya el libro |
+| Quién emite | El flujo de emisión, con un origen falseado | Nadie. No se emite ningún expediente |
+| Efecto sobre los históricos | Les daría un número de la serie vigente | Ninguno: siguen exactamente como están |
+| Efecto sobre la serie | La haría avanzar por un hecho que no ocurrió | Refleja un hecho que **sí** ocurrió: el libro de papel |
+
+Dicho de otro modo: D9 impide que el pasado **consuma** la serie; abrir la
+serie es reconocer lo que el pasado **ya consumió** fuera del sistema. Es un
+acto archivístico de apertura, autorizado y trazable, no una emisión.
+
+Las tres invariantes de `verificarAvanceCounter` se cumplen igualmente en la
+apertura: el valor es un entero ≥ 0; es estrictamente mayor que el estado
+anterior (que no existe, luego 0); y no hay `origen` porque no hay emisión.
+El script no invoca el guard —vive en TypeScript y el ejecutor es `.mjs`—
+pero aplica comprobaciones **más estrictas**: escribe con `create`, de modo
+que es imposible tocar una serie ya abierta, y rechaza cualquier valor que no
+coincida con el máximo del libro.
+
 ## Consecuencias
 
 - **Positivas.**
@@ -122,7 +155,7 @@ persistida — solo cambia lo que muestra, no lo que afirma del dato.
   - **El cierre real sigue pendiente y es un acto de datos**: sembrar
     `counters/expedientes-{año}` por encima del máximo del libro, autorizado
     por el propietario, ANTES de levantar R10. Este ADR lo hace imposible de
-    olvidar, no lo ejecuta. Registrado como **R12** en
+    olvidar, no lo ejecuta. Registrado como **R16** en
     `docs/REGISTRO_RIESGOS.md`.
   - Los 2 números en cuarentena (`26-0002`, `26-0003`) están ocupados en el
     libro de papel y ausentes de Firestore. **Ninguna** protección basada en
@@ -144,4 +177,4 @@ persistida — solo cambia lo que muestra, no lo que afirma del dato.
 
 ## Referencias
 
-`lib/server/consecutivo-legal.ts` (`exigeAperturaExplicita`, `SerieNoAbiertaError`) · `lib/server/emitir-numero-expediente.ts` · `app/interno/licencias/presentacion-libro-consecutivo.ts` (`textoColisionLibro`) · `__tests__/emitir-numero-expediente.test.ts` · `docs/REGISTRO_RIESGOS.md` (R12) · Acuerdo AGN 060/2001 art. 5 · ADR-0026 (motor de expedientes, D6/D9) · ADR-0029 (DF-9).
+`lib/server/consecutivo-legal.ts` (`exigeAperturaExplicita`, `SerieNoAbiertaError`) · `lib/server/emitir-numero-expediente.ts` · `app/interno/licencias/presentacion-libro-consecutivo.ts` (`textoColisionLibro`) · `__tests__/emitir-numero-expediente.test.ts` · `docs/REGISTRO_RIESGOS.md` (R16) · Acuerdo AGN 060/2001 art. 5 · ADR-0026 (motor de expedientes, D6/D9) · ADR-0029 (DF-9).
