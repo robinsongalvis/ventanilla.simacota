@@ -74,7 +74,7 @@ export function buildAlertaVencimientoHtml(p: TemplateAlertaVencimientoParams): 
 
   <!-- Cinta de urgencia -->
   <tr><td style="background:#FDF6E3;padding:14px 32px;">
-    <span style="background:#D4A017;color:#fff;font-size:11px;font-weight:700;letter-spacing:1px;padding:5px 14px;border-radius:20px;">${textoUrgencia}</span>
+    <span style="background:#D4A017;color:#1F2933;font-size:11px;font-weight:700;letter-spacing:1px;padding:5px 14px;border-radius:20px;">${textoUrgencia}</span>
     <span style="color:#5A4A16;font-size:12px;font-weight:600;margin-left:10px;">Fecha límite: ${fechaFmt}</span>
   </td></tr>
 
@@ -90,17 +90,17 @@ export function buildAlertaVencimientoHtml(p: TemplateAlertaVencimientoParams): 
     <!-- Tarjeta radicado -->
     <table width="100%" style="background:#F6F9F6;border-left:4px solid #14532D;border-radius:4px;margin-bottom:22px;">
     <tr><td style="padding:18px 22px;">
-      <p style="margin:0 0 3px;color:#6B7A6E;font-size:10px;font-weight:700;letter-spacing:1.5px;text-transform:uppercase;">Radicado</p>
+      <p style="margin:0 0 3px;color:#5A6B5D;font-size:10px;font-weight:700;letter-spacing:1.5px;text-transform:uppercase;">Radicado</p>
       <p style="margin:0 0 14px;color:#14532D;font-size:15px;font-weight:800;font-family:monospace;word-break:break-word;">${escapeHtml(p.radicadoId)}</p>
-      <p style="margin:0 0 3px;color:#6B7A6E;font-size:10px;font-weight:700;letter-spacing:1.5px;text-transform:uppercase;">Asunto</p>
+      <p style="margin:0 0 3px;color:#5A6B5D;font-size:10px;font-weight:700;letter-spacing:1.5px;text-transform:uppercase;">Asunto</p>
       <p style="margin:0 0 14px;color:#37474f;font-size:14px;">${escapeHtml(p.asunto)}</p>
-      <p style="margin:0 0 3px;color:#6B7A6E;font-size:10px;font-weight:700;letter-spacing:1.5px;text-transform:uppercase;">Dependencia responsable</p>
+      <p style="margin:0 0 3px;color:#5A6B5D;font-size:10px;font-weight:700;letter-spacing:1.5px;text-transform:uppercase;">Dependencia responsable</p>
       <p style="margin:0 0 14px;color:#37474f;font-size:14px;">${escapeHtml(p.dependenciaNombre)}</p>
-      <p style="margin:0 0 3px;color:#6B7A6E;font-size:10px;font-weight:700;letter-spacing:1.5px;text-transform:uppercase;">Fecha límite de respuesta</p>
+      <p style="margin:0 0 3px;color:#5A6B5D;font-size:10px;font-weight:700;letter-spacing:1.5px;text-transform:uppercase;">Fecha límite de respuesta</p>
       <p style="margin:0 0 14px;color:#37474f;font-size:14px;">${fechaFmt}</p>
-      <p style="margin:0 0 3px;color:#6B7A6E;font-size:10px;font-weight:700;letter-spacing:1.5px;text-transform:uppercase;">Ciudadano</p>
+      <p style="margin:0 0 3px;color:#5A6B5D;font-size:10px;font-weight:700;letter-spacing:1.5px;text-transform:uppercase;">Ciudadano</p>
       <p style="margin:0 0 14px;color:#37474f;font-size:14px;">${escapeHtml(p.ciudadanoNombre)}</p>
-      <p style="margin:0 0 3px;color:#6B7A6E;font-size:10px;font-weight:700;letter-spacing:1.5px;text-transform:uppercase;">Tipo solicitud</p>
+      <p style="margin:0 0 3px;color:#5A6B5D;font-size:10px;font-weight:700;letter-spacing:1.5px;text-transform:uppercase;">Tipo solicitud</p>
       <p style="margin:0;color:#37474f;font-size:14px;">${escapeHtml(p.tipoSolicitud)}</p>
     </td></tr>
     </table>
@@ -115,9 +115,9 @@ export function buildAlertaVencimientoHtml(p: TemplateAlertaVencimientoParams): 
 
   <!-- Pie institucional -->
   <tr><td style="background:#F3F6F3;padding:20px 32px;text-align:center;">
-    <p style="margin:0 0 4px;color:#6B7A6E;font-size:12px;font-weight:600;">Alcaldía Municipal de Simacota, Santander · Ventanilla Única Digital</p>
-    <p style="margin:0 0 4px;color:#6B7A6E;font-size:11px;">Mensaje automático del sistema — por favor no responda a este correo.</p>
-    <p style="margin:0;color:#6B7A6E;font-size:11px;">Sus datos personales se tratan conforme a la Ley 1581 de 2012.</p>
+    <p style="margin:0 0 4px;color:#5A6B5D;font-size:12px;font-weight:600;">Alcaldía Municipal de Simacota, Santander · Ventanilla Única Digital</p>
+    <p style="margin:0 0 4px;color:#5A6B5D;font-size:11px;">Mensaje automático del sistema — por favor no responda a este correo.</p>
+    <p style="margin:0;color:#5A6B5D;font-size:11px;">Sus datos personales se tratan conforme a la Ley 1581 de 2012.</p>
   </td></tr>
 
 </table>

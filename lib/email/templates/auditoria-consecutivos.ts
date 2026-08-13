@@ -56,7 +56,7 @@ function filaSerie(s: SerieHallazgoAuditoria): string {
 
   return `
     <tr><td style="padding:16px 22px;border-bottom:1px solid #E3E8E3;">
-      <p style="margin:0 0 4px;color:#6B7A6E;font-size:10px;font-weight:700;letter-spacing:1.5px;text-transform:uppercase;">
+      <p style="margin:0 0 4px;color:#5A6B5D;font-size:10px;font-weight:700;letter-spacing:1.5px;text-transform:uppercase;">
         Serie · ${escapeHtml(s.serie)}
       </p>
       <p style="margin:0 0 8px;color:${colorEstado};font-size:13px;font-weight:800;">${textoEstado}</p>
@@ -98,7 +98,7 @@ export function buildAuditoriaConsecutivosHtml(p: TemplateAuditoriaConsecutivosP
 
   <!-- Cinta de estado -->
   <tr><td style="background:#FDF6E3;padding:14px 32px;">
-    <span style="background:#D4A017;color:#fff;font-size:11px;font-weight:700;letter-spacing:1px;padding:5px 14px;border-radius:20px;">
+    <span style="background:#D4A017;color:#1F2933;font-size:11px;font-weight:700;letter-spacing:1px;padding:5px 14px;border-radius:20px;">
       ${totalHallazgos} HALLAZGO${totalHallazgos === 1 ? '' : 'S'}
     </span>
     <span style="color:#5A4A16;font-size:12px;font-weight:600;margin-left:10px;">Barrida: ${fechaFmt}</span>
@@ -126,9 +126,9 @@ export function buildAuditoriaConsecutivosHtml(p: TemplateAuditoriaConsecutivosP
 
   <!-- Pie institucional -->
   <tr><td style="background:#F3F6F3;padding:20px 32px;text-align:center;">
-    <p style="margin:0 0 4px;color:#6B7A6E;font-size:12px;font-weight:600;">Alcaldía Municipal de Simacota, Santander · Ventanilla Única Digital</p>
-    <p style="margin:0 0 4px;color:#6B7A6E;font-size:11px;">Mensaje automático del sistema — por favor no responda a este correo.</p>
-    <p style="margin:0;color:#6B7A6E;font-size:11px;">Sus datos personales se tratan conforme a la Ley 1581 de 2012.</p>
+    <p style="margin:0 0 4px;color:#5A6B5D;font-size:12px;font-weight:600;">Alcaldía Municipal de Simacota, Santander · Ventanilla Única Digital</p>
+    <p style="margin:0 0 4px;color:#5A6B5D;font-size:11px;">Mensaje automático del sistema — por favor no responda a este correo.</p>
+    <p style="margin:0;color:#5A6B5D;font-size:11px;">Sus datos personales se tratan conforme a la Ley 1581 de 2012.</p>
   </td></tr>
 
 </table>

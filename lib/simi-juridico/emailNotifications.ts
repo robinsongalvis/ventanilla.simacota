@@ -11,6 +11,24 @@ import type { ApprovalStatus } from '@/src/types/simi-approval';
 
 const BASE_URL = process.env.NEXT_PUBLIC_APP_URL ?? 'https://ventanilla.simacota.gov.co';
 
+/* ── Colores de alerta — HEX LITERAL a propósito (ADR-0030) ─────────
+   Son los mismos valores que `--color-danger-text` y `--color-warning-text`
+   de `app/globals.css`, pero escritos a mano: los clientes de correo
+   (Gmail, Outlook) NO resuelven variables CSS de forma fiable, así que un
+   `var(--color-danger-text)` aquí se quedaría sin color. Es la única
+   excepción legítima a "sin estilos paralelos" — y por eso se declara.
+
+   Si esos tokens cambian en `globals.css`, hay que cambiarlos también aquí;
+   la prueba `__tests__/email-notificaciones-contraste.test.ts` lo verifica.
+
+   POR QUÉ SE CAMBIARON (medido el 12-ago-2026): los tonos anteriores no se
+   leían sobre el fondo tintado de su propia caja de aviso. «Próximo a
+   vencer» daba 3,07:1 y «¡VENCE HOY!» 4,41:1, ambos por debajo del 4,5:1
+   que exige WCAG AA. Un aviso de término legal que el destinatario no puede
+   leer no cumple su única función. */
+const COLOR_TEXTO_PELIGRO = '#B91C1C';
+const COLOR_TEXTO_ADVERTENCIA = '#8E5C06';
+
 /* ── Templates HTML minimalistas ──────────────────────────── */
 
 function wrapLayout(titulo: string, cuerpo: string): string {
@@ -114,7 +132,7 @@ export async function emailEscaladoJuridica(params: {
   try {
     const motivosList = params.motivos.map((m) => `<li>${m}</li>`).join('');
     const cuerpo = `
-      <p style="font-size:14px;color:#DC2626;font-weight:700;margin:0 0 12px;">
+      <p style="font-size:14px;color:${COLOR_TEXTO_PELIGRO};font-weight:700;margin:0 0 12px;">
         🚨 Revisión jurídica obligatoria
       </p>
       <p style="font-size:13px;color:#667085;margin:0 0 16px;">
@@ -163,7 +181,7 @@ export async function emailBorradorDevuelto(params: {
         ${row('Devuelto por', params.devueltoPor)}
       </table>
       <div style="padding:12px;background:#FFFBEB;border-radius:8px;border:1px solid #FDE68A;margin-bottom:16px;">
-        <p style="margin:0;font-size:12px;color:#B45309;font-weight:600;">Motivo de la devolución:</p>
+        <p style="margin:0;font-size:12px;color:${COLOR_TEXTO_ADVERTENCIA};font-weight:600;">Motivo de la devolución:</p>
         <p style="margin:6px 0 0;font-size:12px;color:#1F2933;">${params.motivoDevolucion}</p>
       </div>
       ${btnVerde(`${BASE_URL}/interno/dashboard`, 'Ajustar el borrador')}
@@ -233,7 +251,7 @@ export async function emailVencimientoProximo(params: {
 }): Promise<void> {
   try {
     const urgente = params.diasRestantes <= 1;
-    const colorAlerta = urgente ? '#DC2626' : '#D97706';
+    const colorAlerta = urgente ? COLOR_TEXTO_PELIGRO : COLOR_TEXTO_ADVERTENCIA;
     const bgAlerta = urgente ? '#FEF2F2' : '#FFFBEB';
     const borderAlerta = urgente ? '#FECACA' : '#FDE68A';
 

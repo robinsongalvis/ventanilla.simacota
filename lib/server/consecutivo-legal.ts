@@ -77,6 +77,52 @@ export interface SolicitudSerie {
    * jamás consume la serie legal vigente.
    */
   origen?: OrigenConsecutivo;
+  /**
+   * Si `true`, un `counters/{serie}-{año}` INEXISTENTE es un error, no una
+   * serie que empieza en cero.
+   *
+   * POR QUÉ EXISTE (medido el 13-ago-2026). `leerConsecutivosLegales` hacía
+   * `?? 0` para todas las series, así que "no hay contador" y "la serie va
+   * por cero" eran indistinguibles. Para las series nacidas digitales
+   * (radicados, salidas, planillas) eso es correcto: el 1 de enero no hay
+   * documento y el primer radicado del año debe ser el 0001.
+   *
+   * Para `expedientes` NO lo es, y ahí estaba el agujero: existe un libro de
+   * papel anterior al sistema, y sus números ya se importaron como
+   * `numeroExpediente.numero` SIN reservar unicidad y SIN avanzar el
+   * contador (el importador lo tiene prohibido por DF-9). Con `?? 0`, la
+   * primera emisión real de 2026 produciría `68745-0-26-0001`, que ya lo
+   * ocupa un histórico en producción; `tx.create` sobre
+   * `unicidad_expedientes` NO lo impediría, porque los históricos nunca
+   * reservaron. Resultado: dos actos administrativos con el mismo número
+   * legal, en silencio — justo lo que prohíbe el Acuerdo AGN 060/2001 art. 5.
+   *
+   * Con esta bandera, ABRIR la serie pasa a ser un acto explícito: alguien
+   * decide con qué número arranca, por encima de lo que el libro ya consumió.
+   * Convierte un duplicado silencioso en un fallo ruidoso — fail-closed.
+   */
+  exigeAperturaExplicita?: boolean;
+}
+
+/**
+ * Lanzada cuando se pide un consecutivo de una serie que exige apertura
+ * explícita y su contador anual todavía no existe. NO es un error de
+ * programación: es la negativa deliberada a inventar el punto de partida de
+ * una serie legal que puede venir de un libro de papel.
+ */
+export class SerieNoAbiertaError extends Error {
+  readonly serie: SerieConsecutivo;
+  readonly anio: number;
+  constructor(serie: SerieConsecutivo, anio: number) {
+    super(
+      `La serie "${serie}" no está abierta para ${anio}: no existe counters/${serie}-${anio}. ` +
+        'Abrir la serie es un acto explícito — debe sembrarse con el último número que el libro ' +
+        'ya consumió, para que la primera emisión no duplique un número histórico.',
+    );
+    this.name = 'SerieNoAbiertaError';
+    this.serie = serie;
+    this.anio = anio;
+  }
 }
 
 /** Consecutivo leído (aún no confirmado) para una serie. */
@@ -118,6 +164,11 @@ export async function leerConsecutivosLegales(
   const snaps = await Promise.all(refs.map((ref) => tx.get(ref)));
 
   const pendientes: ConsecutivoPendiente[] = solicitudes.map((s, i) => {
+    // Fail-closed para las series con libro previo: sin documento de
+    // contador no se inventa el punto de partida (ver `exigeAperturaExplicita`).
+    if (s.exigeAperturaExplicita && !snaps[i].exists) {
+      throw new SerieNoAbiertaError(s.serie, anio);
+    }
     const ultimoActual = Number(snaps[i].data()?.ultimo ?? 0);
     const consecutivo = ultimoActual + 1;
     return {

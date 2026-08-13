@@ -133,7 +133,7 @@ export function buildConstanciaRadicacionHtml(p: TemplateConstanciaParams): stri
               <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:#EEF4EE;border:1px solid #D9E2D9;border-radius:8px;">
                 <tr>
                   <td style="padding:16px;text-align:center;">
-                    <p style="margin:0;font-size:10px;letter-spacing:2px;text-transform:uppercase;color:#667085;">N.° de Radicado</p>
+                    <p style="margin:0;font-size:10px;letter-spacing:2px;text-transform:uppercase;color:#5A6B5D;">N.° de Radicado</p>
                     <p style="margin:6px 0 0 0;font-size:22px;font-weight:bold;letter-spacing:2px;color:#14532D;font-family:'Courier New',monospace;">
                       ${escapeHtml(p.radicadoId)}
                     </p>
@@ -146,7 +146,7 @@ export function buildConstanciaRadicacionHtml(p: TemplateConstanciaParams): stri
           <!-- Datos del solicitante -->
           <tr>
             <td style="padding:12px 24px;">
-              <p style="margin:0 0 8px 0;font-size:11px;font-weight:bold;letter-spacing:1.5px;text-transform:uppercase;color:#667085;">
+              <p style="margin:0 0 8px 0;font-size:11px;font-weight:bold;letter-spacing:1.5px;text-transform:uppercase;color:#5A6B5D;">
                 Datos del solicitante
               </p>
               <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="font-size:13px;color:#1F2933;">
@@ -174,7 +174,7 @@ export function buildConstanciaRadicacionHtml(p: TemplateConstanciaParams): stri
           <!-- Datos del radicado -->
           <tr>
             <td style="padding:12px 24px;">
-              <p style="margin:0 0 8px 0;font-size:11px;font-weight:bold;letter-spacing:1.5px;text-transform:uppercase;color:#667085;">
+              <p style="margin:0 0 8px 0;font-size:11px;font-weight:bold;letter-spacing:1.5px;text-transform:uppercase;color:#5A6B5D;">
                 Datos del radicado
               </p>
               <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="font-size:13px;color:#1F2933;">
@@ -218,7 +218,7 @@ export function buildConstanciaRadicacionHtml(p: TemplateConstanciaParams): stri
               <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:#F8FAF7;border:1px solid #D9E2D9;border-radius:8px;">
                 <tr>
                   <td style="padding:14px 16px;">
-                    <p style="margin:0 0 6px 0;font-size:11px;font-weight:bold;letter-spacing:1.5px;text-transform:uppercase;color:#667085;">
+                    <p style="margin:0 0 6px 0;font-size:11px;font-weight:bold;letter-spacing:1.5px;text-transform:uppercase;color:#5A6B5D;">
                       Consulta pública
                     </p>
                     <p style="margin:0;font-size:13px;line-height:1.4;color:#1F2933;">
@@ -250,7 +250,7 @@ export function buildConstanciaRadicacionHtml(p: TemplateConstanciaParams): stri
               <p style="margin:6px 0 0 0;font-size:11px;color:#667085;">
                 ${escapeHtml(INSTITUCION.telefono)} · <a href="mailto:${escapeHtml(INSTITUCION.correo)}" style="color:#14532D;text-decoration:none;">${escapeHtml(INSTITUCION.correo)}</a>
               </p>
-              <p style="margin:6px 0 0 0;font-size:10px;color:#94A3B8;">
+              <p style="margin:6px 0 0 0;font-size:10px;color:#5A6B5D;">
                 ${escapeHtml(INSTITUCION.municipio)}, ${escapeHtml(INSTITUCION.departamento)} · ${escapeHtml(INSTITUCION.pais)}
               </p>
             </td>

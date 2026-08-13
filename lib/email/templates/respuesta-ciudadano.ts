@@ -123,7 +123,7 @@ export function buildRespuestaCiudadanoHtml(
               <table width="100%" cellpadding="0" cellspacing="0" style="background:#fff8e1;border:1px solid #ffe082;border-radius:8px;margin-bottom:24px;">
                 <tr>
                   <td style="padding:14px 18px;">
-                    <p style="margin:0;color:#e65100;font-size:13px;line-height:1.5;">
+                    <p style="margin:0;color:#C24400;font-size:13px;line-height:1.5;">
                       <strong>📎 Oficio de respuesta disponible</strong><br/>
                       <span style="color:#bf360c;">Se adjuntó un oficio firmado a su expediente. Para descargarlo, comuníquese con la dependencia indicada a continuación o preséntese en las instalaciones de la Alcaldía.</span>
                     </p>
@@ -141,7 +141,7 @@ export function buildRespuestaCiudadanoHtml(
           <!-- Datos de la dependencia -->
           <tr>
             <td style="background:#f8f9fa;border-top:1px solid #e9ecef;padding:20px 32px;">
-              <p style="margin:0 0 4px;color:#6c757d;font-size:11px;font-weight:700;letter-spacing:1px;text-transform:uppercase;">
+              <p style="margin:0 0 4px;color:#5A6B5D;font-size:11px;font-weight:700;letter-spacing:1px;text-transform:uppercase;">
                 Dependencia que atendió su caso
               </p>
               <p style="margin:0 0 8px;color:#1a237e;font-size:15px;font-weight:700;">
@@ -156,7 +156,7 @@ export function buildRespuestaCiudadanoHtml(
           <!-- Footer -->
           <tr>
             <td style="background:#eceff1;padding:20px 32px;text-align:center;">
-              <p style="margin:0 0 4px;color:#90a4ae;font-size:11px;">
+              <p style="margin:0 0 4px;color:#5A6B5D;font-size:11px;">
                 Este mensaje fue generado automáticamente por el sistema de
               </p>
               <p style="margin:0;color:#546e7a;font-size:12px;font-weight:600;">

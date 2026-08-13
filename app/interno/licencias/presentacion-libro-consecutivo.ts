@@ -408,15 +408,37 @@ export function textoDiasVencimientoLibro(
  * vista, se habla del DATO ("el importador lo marcó"), no del mundo.
  */
 export function textoColisionLibro(fila: Pick<FilaLibroConsecutivo, 'colision' | 'numeroExpediente' | 'otrosConMismoNumero'>): string | null {
-  if (!fila.colision) return null;
   const cierre = 'No se renumera: la serie legal histórica es intocable — la resolución es humana, con acta.';
-  if (fila.otrosConMismoNumero.length === 0) {
+
+  // CASO 1 — el Libro VE el duplicado con sus propios ojos. Manda sobre la
+  // bandera del importador: aquí no se está afirmando nada que no se pueda
+  // sostener, están las dos filas cargadas y se pueden nombrar.
+  //
+  // Este es además el ÚNICO detector de una colisión NO declarada, y por eso
+  // no está condicionado a `colision`. Un duplicado que el importador no
+  // marcó —por ejemplo, una emisión real que aterrice sobre un número
+  // histórico— sería invisible si esta rama exigiera esa bandera. El cálculo
+  // de `otrosConMismoNumero` ya se paga en `construirFilasLibroConsecutivo`;
+  // hasta el 13-ago-2026 se descartaba.
+  if (fila.otrosConMismoNumero.length > 0) {
+    const otros = fila.otrosConMismoNumero
+      .map((o) => `${o.solicitanteNombre || 'sin nombre registrado'} (${formatFechaColombia(o.fechaRadicacion)})`)
+      .join('; ');
+    const preludio = fila.colision
+      ? `Comparte el número ${fila.numeroExpediente} con`
+      : `DUPLICADO NO DECLARADO: dos expedientes de este libro llevan el número ${fila.numeroExpediente}`;
+    return `${preludio}: ${otros}. ${cierre}`;
+  }
+
+  // CASO 2 — el Libro NO ve al gemelo, pero el importador dejó constancia.
+  // Se habla del DATO, no del mundo: `colision` es una aserción del pasado,
+  // no un invariante vivo (el gemelo pudo corregirse, borrarse, o quedar
+  // fuera del lote de 300).
+  if (fila.colision) {
     return `El importador marcó el número ${fila.numeroExpediente} como duplicado en el histórico. El otro expediente no aparece en esta vista (otro año, o fuera del lote cargado). ${cierre}`;
   }
-  const otros = fila.otrosConMismoNumero
-    .map((o) => `${o.solicitanteNombre || 'sin nombre registrado'} (${formatFechaColombia(o.fechaRadicacion)})`)
-    .join('; ');
-  return `Comparte el número ${fila.numeroExpediente} con: ${otros}. ${cierre}`;
+
+  return null;
 }
 
 /** Token de color (`app/globals.css`) por banda de urgencia — franja lateral de 4 px de la fila. */
@@ -490,7 +512,10 @@ export function coincideFiltroLibro(fila: FilaLibroConsecutivo, filtro: FiltroLi
     case 'HISTORICOS_INCOMPLETOS':
       return esHistoricoIncompletoLibro(fila);
     case 'COLISIONES':
-      return fila.colision;
+      // Ambas fuentes: la declarada por el importador y la que el propio
+      // Libro detecta al ver dos filas con el mismo número. La segunda es la
+      // que atraparía una colisión nueva, que nadie declaró.
+      return fila.colision || fila.otrosConMismoNumero.length > 0;
   }
 }
 

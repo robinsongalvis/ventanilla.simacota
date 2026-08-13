@@ -65,6 +65,6 @@ export function buildRequerimientoHtml(p: TemplateRequerimientoParams): string {
       <strong>desistido</strong> de su solicitud y esta será archivada mediante acto
       administrativo motivado (${escapeHtml(p.textos.fundamentoLegal)}).
     </p>
-    <p style="margin:16px 0 0;font-size:12px;color:#90a4ae;">${escapeHtml(INSTITUCION.nombre)}</p>
+    <p style="margin:16px 0 0;font-size:12px;color:#5A6B5D;">${escapeHtml(INSTITUCION.nombre)}</p>
   </div>`;
 }
