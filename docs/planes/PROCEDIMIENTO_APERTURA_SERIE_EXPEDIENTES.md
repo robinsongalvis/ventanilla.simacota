@@ -119,7 +119,27 @@ procedimiento hay que rehacerlo.
 
 ## 5. Ejecución
 
-Requiere el service account de **producción** en `FIREBASE_SERVICE_ACCOUNT`.
+### Las credenciales — importante, esto falló en el ensayo
+
+`FIREBASE_SERVICE_ACCOUNT` contiene un JSON con comillas. **`source .env` no
+sirve**: el shell se come las comillas y el script recibe `{type:service_account…}`
+en vez de JSON válido. En el ensayo del 13-ago-2026 abortó con código 9 por
+esta razón — sin escribir nada, que es lo correcto, pero perdiendo el intento.
+
+Cárguelas así:
+
+```bash
+export FIREBASE_SERVICE_ACCOUNT="$(grep '^FIREBASE_SERVICE_ACCOUNT=' .env.produccion | cut -d= -f2-)"
+```
+
+Compruebe antes de seguir que apunta a donde cree:
+
+```bash
+node -e "console.log(JSON.parse(process.env.FIREBASE_SERVICE_ACCOUNT).project_id)"
+```
+
+Debe imprimir `ventanilla-unica-f31b1`. Si imprime otra cosa —o falla— pare:
+la guarda 3 lo detendría igualmente, pero es mejor descubrirlo aquí.
 
 ```bash
 CONFIRMO_ESCRITURA=si node scripts/migracion/abrir-serie-expedientes.mjs --anio 2026 --proyecto ventanilla-unica-f31b1 --ultimo 19 --libro-confirmado-el AAAA-MM-DD --ejecutar
@@ -195,9 +215,29 @@ Los expedientes de prueba (`68745-0-26-9001`…) **se ignoran** en el contraste,
 así que no disparan la guarda 8. Después, `--verificar` debe decir `ABIERTA`,
 y repetir la escritura debe dar código **7**.
 
-> Si stage no tiene los históricos importados, la guarda 8 abortará con
-> código 6 («0 del año 2026»). Es correcto: en ese caso el ensayo no valida
-> el camino completo y hay que decirlo, no saltárselo.
+> Si stage no tiene los históricos importados, la guarda 8 aborta con código
+> 6 («0 del año 2026»). Es correcto, pero entonces el ensayo NO valida el
+> camino de escritura. Para un ensayo fiel hay que sembrar antes en stage los
+> históricos del año, sin marcarlos como prueba (el contraste ignora
+> `esPrueba` y `loteVerificacion`).
+
+### Resultado del ensayo del 13-ago-2026
+
+Ejecutado contra `ventanilla-simacota-stage` con los 17 históricos de 2026
+sembrados. Las nueve guardas verificadas **contra Firestore real**:
+
+| Comprobación | Código | Resultado |
+|---|---|---|
+| Verificación en seco | 0 | propone `ultimo=19` |
+| Escritura | 0 | contraste `17 · 17 · máximo 19`; evidencia releída correcta |
+| `--verificar` | 0 | `ABIERTA` con el documento |
+| Reintento de escritura | **7** | «ya estaba abierta» — benigno, no pisó nada |
+| Proyecto equivocado | **4** | detectó que el service account era de stage |
+| Base sin históricos | **6** | «el libro dice 19 y Firestore no muestra ninguno» |
+| Credenciales mal cargadas | **9** | «NO se escribió nada» |
+| `--ultimo` equivocado / flag repetido / año cerrado / confirmación vieja | 5 / 1 / 1 / 1 | abortan antes de conectar |
+
+Stage quedó limpio: se retiraron los 17 expedientes sembrados y el contador.
 
 ## 7. Si sale mal
 
