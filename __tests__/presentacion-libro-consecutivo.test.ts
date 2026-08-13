@@ -821,3 +821,62 @@ describe('colisión de radicado — el Libro delata la anomalía que el importad
     expect(primera.split(';')).toHaveLength(encabezado.split(';').length);
   });
 });
+
+describe('duplicado NO DECLARADO — el único detector de una colisión que nadie marcó', () => {
+  // Hasta el 13-ago-2026 el aviso exigía `colision === true`, la bandera que
+  // solo escribe el importador. Una colisión NUEVA —por ejemplo una emisión
+  // real que aterrizara sobre un número histórico— habría sido invisible,
+  // aunque `otrosConMismoNumero` ya la calculaba y se descartaba.
+  function conNumero(id: string, numero: string, nombre: string, colision = false): ExpedienteLicenciaDoc {
+    return expedienteBase({
+      id, solicitanteNombre: nombre, creadoEn: '2026-03-10T15:00:00.000Z',
+      numeroExpediente: { numero, serieId: 'expedientes', año: 2026, colision },
+    });
+  }
+
+  it('dos filas con el mismo número y SIN bandera: el aviso aparece y dice que NADIE lo declaró', () => {
+    const filas = construirFilasLibroConsecutivo(
+      [conNumero('a', '68745-0-26-0007', 'Ana Lucía Avilés'), conNumero('b', '68745-0-26-0007', 'Pedro Nel Rojas')],
+      2026,
+    );
+    const texto = textoColisionLibro(filas[0])!;
+    expect(texto).toContain('DUPLICADO NO DECLARADO');
+    expect(texto).toContain('Pedro Nel Rojas');
+    expect(texto).toContain('No se renumera');
+  });
+
+  it('el Libro sigue SIN fabricar la bandera persistida — solo la presentación cambia', () => {
+    const filas = construirFilasLibroConsecutivo(
+      [conNumero('a', '68745-0-26-0007', 'Ana'), conNumero('b', '68745-0-26-0007', 'Pedro')],
+      2026,
+    );
+    expect(filas.map((f) => f.colision)).toEqual([false, false]);
+  });
+
+  it('con bandera del importador el texto NO dice "no declarado" (son dos cosas distintas)', () => {
+    const filas = construirFilasLibroConsecutivo(
+      [conNumero('a', '68745-0-26-0007', 'Ana', true), conNumero('b', '68745-0-26-0007', 'Pedro', true)],
+      2026,
+    );
+    const texto = textoColisionLibro(filas[0])!;
+    expect(texto).toContain('Comparte el número');
+    expect(texto).not.toContain('NO DECLARADO');
+  });
+
+  it('el filtro COLISIONES atrapa también las no declaradas', () => {
+    const filas = construirFilasLibroConsecutivo(
+      [
+        conNumero('a', '68745-0-26-0007', 'Ana'),
+        conNumero('b', '68745-0-26-0007', 'Pedro'),
+        conNumero('c', '68745-0-26-0008', 'Sin duplicado'),
+      ],
+      2026,
+    );
+    expect(filtrarFilasLibro(filas, 'COLISIONES').map((f) => f.id).sort()).toEqual(['a', 'b']);
+  });
+
+  it('una fila limpia sigue sin aviso', () => {
+    const [fila] = construirFilasLibroConsecutivo([conNumero('solo', '68745-0-26-0009', 'Única')], 2026);
+    expect(textoColisionLibro(fila)).toBeNull();
+  });
+});

@@ -100,6 +100,11 @@ export async function emitirNumeroExpedienteReal(
       serie: 'expedientes',
       formatear: (consecutivo, f) => formatearNumeroExpediente(consecutivo, f, codigos),
       // origen omitido → default 'REAL' (ver JSDoc de SolicitudSerie.origen).
+      // La serie de expedientes viene de un libro de papel cuyos números ya
+      // se importaron sin reservar unicidad: si el contador del año no
+      // existe, emitir arrancaría en 0001 y duplicaría un histórico. Se
+      // exige abrir la serie a propósito (ver `exigeAperturaExplicita`).
+      exigeAperturaExplicita: true,
     },
   ]);
   const pendiente = pendientes[0];

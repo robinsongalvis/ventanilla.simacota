@@ -11,11 +11,10 @@ const CODIGOS = { codigoDane: '68745', codigoCuraduria: '0' };
 const TENANT = 'SEC_PLANEACION' as const;
 
 /** Doble de Firestore: `doc(path)` devuelve una ref con su path como id. */
-function fakeDb(existentes: Set<string> = new Set()): Firestore {
+function fakeDb(): Firestore {
   return {
     doc: (path: string) => ({ path, id: path.split('/').pop() }),
     // Usado solo por verificarColisionNumeroExpediente (lectura directa, sin tx).
-    // eslint-disable-next-line @typescript-eslint/no-unused-vars
   } as unknown as Firestore;
 }
 
@@ -31,7 +30,10 @@ function fakeTx(contadores: Record<string, number | undefined>, existentes: Set<
   const tx = {
     get: vi.fn(async (ref: { path: string }) => {
       const ultimo = contadores[ref.path];
-      return { data: () => (ultimo === undefined ? undefined : { ultimo }) };
+      // `exists` importa: la serie `expedientes` exige apertura explícita, y
+      // un contador ausente ya no significa "serie en cero" (ver
+      // `SerieNoAbiertaError`).
+      return { exists: ultimo !== undefined, data: () => (ultimo === undefined ? undefined : { ultimo }) };
     }),
     set: vi.fn((ref: { path: string }, data: Record<string, unknown>) => {
       escrituras.push({ tipo: 'set', path: ref.path, data });
@@ -47,9 +49,12 @@ function fakeTx(contadores: Record<string, number | undefined>, existentes: Set<
 }
 
 describe('emitirNumeroExpedienteReal — flujo feliz', () => {
-  it('counter inexistente (→ consecutivo 1): reserva unicidad Y confirma el contador, en orden', async () => {
+  it('serie ABIERTA en 0 (→ consecutivo 1): reserva unicidad Y confirma el contador, en orden', async () => {
+    // Antes este caso se llamaba "counter inexistente". Ya no: la serie
+    // `expedientes` exige apertura explícita, así que el contador tiene que
+    // existir — aunque valga 0. Ver `SerieNoAbiertaError`.
     const FECHA = new Date(2026, 0, 15, 12, 0, 0, 0);
-    const doble = fakeTx({});
+    const doble = fakeTx({ 'counters/expedientes-2026': 0 });
     const resultado = await emitirNumeroExpedienteReal({
       tx: doble.tx, db: fakeDb(), fecha: FECHA, tenantId: TENANT, codigos: CODIGOS, expedienteId: 'exp-sintetico-001',
     });
@@ -88,7 +93,7 @@ describe('emitirNumeroExpedienteReal — colisión de unicidad aborta TODO (ni r
   it('si el número YA está reservado, tx.create lanza y confirmarConsecutivosLegales NUNCA se ejecuta (el counter no avanza)', async () => {
     const FECHA = new Date(2026, 0, 15, 12, 0, 0, 0);
     const existentes = new Set(['unicidad_expedientes/68745-0-26-0001']);
-    const doble = fakeTx({}, existentes);
+    const doble = fakeTx({ 'counters/expedientes-2026': 0 }, existentes);
 
     await expect(
       emitirNumeroExpedienteReal({ tx: doble.tx, db: fakeDb(), fecha: FECHA, tenantId: TENANT, codigos: CODIGOS, expedienteId: 'exp-sintetico-col' }),
@@ -109,5 +114,56 @@ describe('verificarColisionNumeroExpediente — read-only, para Fase 5', () => {
     } as unknown as Firestore;
     expect(await verificarColisionNumeroExpediente(db, '68745-0-26-0001')).toBe(true);
     expect(await verificarColisionNumeroExpediente(db, '68745-0-26-9999')).toBe(false);
+  });
+});
+
+describe('serie no abierta — la guarda que impide duplicar un número del libro de papel', () => {
+  // El agujero medido el 13-ago-2026: el importador de históricos tiene
+  // PROHIBIDO tocar `counters/` y `unicidad_expedientes/` (DF-9), así que los
+  // 196 expedientes migrados ocupan números legales sin reserva y sin avanzar
+  // la serie. Con el viejo `?? 0`, la primera emisión real de 2026 habría
+  // producido `68745-0-26-0001` — que un histórico ya ocupa — y el
+  // `tx.create` de unicidad NO lo habría impedido, porque los históricos
+  // nunca reservaron. Dos actos administrativos con el mismo número, en
+  // silencio (Acuerdo AGN 060/2001 art. 5).
+  const FECHA = new Date(2026, 0, 15, 12, 0, 0, 0);
+
+  it('sin contador del año, NO emite: falla ruidosamente en vez de duplicar en silencio', async () => {
+    const doble = fakeTx({});
+    await expect(
+      emitirNumeroExpedienteReal({
+        tx: doble.tx, db: fakeDb(), fecha: FECHA, tenantId: TENANT, codigos: CODIGOS, expedienteId: 'exp-1',
+      }),
+    ).rejects.toThrow(/no está abierta para 2026/);
+  });
+
+  it('el error nombra la serie, el año y qué hacer — un 500 que se puede accionar', async () => {
+    const doble = fakeTx({});
+    await expect(
+      emitirNumeroExpedienteReal({
+        tx: doble.tx, db: fakeDb(), fecha: FECHA, tenantId: TENANT, codigos: CODIGOS, expedienteId: 'exp-1',
+      }),
+    ).rejects.toThrow(/counters\/expedientes-2026/);
+  });
+
+  it('NO escribe nada cuando se niega a emitir (ni reserva, ni contador)', async () => {
+    const doble = fakeTx({});
+    await expect(
+      emitirNumeroExpedienteReal({
+        tx: doble.tx, db: fakeDb(), fecha: FECHA, tenantId: TENANT, codigos: CODIGOS, expedienteId: 'exp-1',
+      }),
+    ).rejects.toThrow();
+    expect(doble.escrituras).toEqual([]);
+  });
+
+  it('con la serie abierta POR ENCIMA del libro histórico, emite el siguiente y no colisiona', async () => {
+    // Los históricos de 2026 ocupan {1, 4..19}; abriendo en 19 la próxima
+    // emisión es la 20, que es libre.
+    const doble = fakeTx({ 'counters/expedientes-2026': 19 });
+    const r = await emitirNumeroExpedienteReal({
+      tx: doble.tx, db: fakeDb(), fecha: FECHA, tenantId: TENANT, codigos: CODIGOS, expedienteId: 'exp-1',
+    });
+    expect(r.numeroExpediente).toBe('68745-0-26-0020');
+    expect(r.consecutivo).toBe(20);
   });
 });
