@@ -151,3 +151,47 @@ describe('calcularFechaLimiteRespuestaActa — 30 días hábiles desde la COMUNI
     expect(resultado).toBe(sumarDiasHabiles(fechaComunicacion, 30).toISOString());
   });
 });
+
+describe('constancia al ciudadano — NUNCA con un número de demostración', () => {
+  // Hallazgo del 13-ago-2026, verificando el flujo de punta a punta antes de
+  // una demostración: la plantilla de la constancia afirma al ciudadano que
+  // el número "identifica su trámite de manera única y permanente", y no
+  // distingue el origen del número. Con el candado R10 cerrado, todo
+  // expediente nace con `DEMO-{AA}-{8hex}`. Demostrar «Crear desde radicado»
+  // en producción con el radicado de un ciudadano real le habría enviado, con
+  // membrete de la Alcaldía, una constancia oficial de un número falso — y no
+  // hay ruta de reenvío ni de corrección.
+  const radicadoConCorreo = {
+    solicitante: { email: 'ciudadano@ejemplo.com', tipoDocumento: 'CC', datosNoAportados: {} },
+  } as unknown as Parameters<typeof debeEnviarComunicacionExpediente>[1];
+
+  it('con número DEMO no se envía, y el motivo lo dice', () => {
+    const gate = debeEnviarComunicacionExpediente(
+      'licencia-construccion-obra-nueva',
+      radicadoConCorreo,
+      'DEMO-26-a1b2c3d4',
+    );
+    expect(gate.debeEnviar).toBe(false);
+    expect(gate.motivo).toMatch(/DEMOSTRACIÓN/i);
+  });
+
+  it('el corte es ANTES que cualquier otra condición: ni siquiera mira el trámite', () => {
+    // Un trámite no habilitado y un número demo darían ambos `false`; lo que
+    // se fija aquí es CUÁL manda, para que el día que se habiliten más
+    // trámites el demo siga cortando primero.
+    const gate = debeEnviarComunicacionExpediente('tramite-cualquiera', radicadoConCorreo, 'DEMO-26-ffffffff');
+    expect(gate.motivo).toMatch(/DEMOSTRACIÓN/i);
+  });
+
+  it('sin número (llamador antiguo) el comportamiento no cambia', () => {
+    const conNumero = debeEnviarComunicacionExpediente('licencia-construccion-obra-nueva', radicadoConCorreo, '68745-0-26-0020');
+    const sinNumero = debeEnviarComunicacionExpediente('licencia-construccion-obra-nueva', radicadoConCorreo);
+    expect(sinNumero.debeEnviar).toBe(conNumero.debeEnviar);
+  });
+
+  it('con un número LEGAL sí se envía', () => {
+    expect(
+      debeEnviarComunicacionExpediente('licencia-construccion-obra-nueva', radicadoConCorreo, '68745-0-26-0020').debeEnviar,
+    ).toBe(true);
+  });
+});

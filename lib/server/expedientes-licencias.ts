@@ -736,7 +736,25 @@ export interface GateComunicacionExpediente {
 export function debeEnviarComunicacionExpediente(
   tramiteId: string,
   radicado: RadicadoParaComunicacion | null | undefined,
+  numeroExpediente?: string,
 ): GateComunicacionExpediente {
+  // NUNCA se envía una constancia oficial con un número de DEMOSTRACIÓN.
+  //
+  // La plantilla afirma al ciudadano que ese número "identifica su trámite de
+  // manera única y permanente" (`lib/email/templates/constancia-expediente-
+  // licencia.ts`) y no distingue el origen del número. Con el candado R10
+  // cerrado, todo expediente nace con `DEMO-{AA}-{8hex}`: enviar esa
+  // constancia sería afirmarle por escrito a un ciudadano, con membrete de la
+  // Alcaldía, algo falso — y no existe ruta de reenvío ni de corrección.
+  //
+  // Se corta AQUÍ y no en la plantilla a propósito: la decisión de comunicar
+  // es del dominio, no de la maqueta del correo.
+  if (numeroExpediente?.startsWith('DEMO-')) {
+    return {
+      debeEnviar: false,
+      motivo: 'El expediente tiene un número de DEMOSTRACIÓN (candado R10): no se comunica al ciudadano una constancia oficial con un número que no es el consecutivo legal.',
+    };
+  }
   if (!DEFINICIONES_HABILITADAS_COMUNICACION_EXPEDIENTE.has(tramiteId)) {
     return { debeEnviar: false, motivo: 'La Definición de este expediente no está habilitada para comunicaciones por correo en v1 (solo licencia de construcción).' };
   }

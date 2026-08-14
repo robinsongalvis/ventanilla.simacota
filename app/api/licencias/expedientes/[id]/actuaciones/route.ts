@@ -115,7 +115,7 @@ export async function POST(request: Request, context: RouteContext): Promise<Nex
     if (body?.tipo === 'acta-observaciones' && expediente.radicadoId) {
       const radicadoSnap = await db.doc(`ventanilla_radicados/${expediente.radicadoId}`).get();
       const radicado = radicadoSnap.exists ? (radicadoSnap.data() as VentanillaRadicado) : null;
-      const gate = debeEnviarComunicacionExpediente(expediente.tramiteId, radicado);
+      const gate = debeEnviarComunicacionExpediente(expediente.tramiteId, radicado, expediente.numeroExpediente?.numero);
       if (gate.debeEnviar && radicado) {
         const email = radicado.solicitante.email!;
         const numero = expediente.numeroExpediente?.numero ?? id;

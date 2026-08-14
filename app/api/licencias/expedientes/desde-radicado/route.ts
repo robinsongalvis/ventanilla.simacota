@@ -128,7 +128,7 @@ export async function POST(request: Request): Promise<NextResponse> {
     // confirmada. SOLO se emite aquí, en el acto de creación — no existe
     // ninguna ruta de reenvío.
     let constanciaEnviada = false;
-    const gate = debeEnviarComunicacionExpediente(plan.expediente.tramiteId, radicado);
+    const gate = debeEnviarComunicacionExpediente(plan.expediente.tramiteId, radicado, plan.expediente.numeroExpediente?.numero);
     if (gate.debeEnviar) {
       const email = radicado.solicitante.email!;
       const numero = plan.expediente.numeroExpediente!.numero;
