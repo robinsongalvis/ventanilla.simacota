@@ -52,7 +52,7 @@ jobs:
     env:
       # Ajustar en Settings -> Secrets and variables -> Actions -> Variables.
       GCP_PROJECT: ${{ vars.GCP_BACKUP_PROJECT || 'ventanilla-unica-f31b1' }}
-      BACKUP_BUCKET: bucket-inexistente-prueba-de-alerta
+      BACKUP_BUCKET: ${{ vars.GCP_BACKUP_BUCKET || 'ventanilla-simacota-backups' }}
       # Secrets izados a env: el contexto secrets NO esta permitido en los if:
       # de pasos — GitHub invalidaba el workflow completo (runs failure/0-jobs,
       # hallazgo G6 del ADR-0025). Los if: condicionan sobre env, que si lo esta.
