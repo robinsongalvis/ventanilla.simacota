@@ -1,0 +1,221 @@
+# ══════════════════════════════════════════════════════════════════════
+# Ensayo de restauración (drill) — Firestore
+#
+# POR QUÉ EXISTE. `docs/RUNBOOK_RESTAURACION.md` describe cómo restaurar,
+# pero hasta el 17-ago-2026 NUNCA se había ejecutado: el propio runbook lo
+# declaraba pendiente. Un respaldo que nadie ha restaurado no es un
+# respaldo, es una esperanza — y con 196 expedientes históricos y radicados
+# reales de ciudadanos dentro, esa esperanza era el único plan de
+# continuidad del municipio.
+#
+# QUÉ TOCA Y QUÉ NO. Todo lo que ESCRIBE ocurre en STAGE, en una base de
+# datos desechable que se crea y se borra en la misma corrida. De
+# producción solo se LEE el bucket de respaldos. Producción no se modifica
+# en ningún paso — no hay un solo comando de escritura contra ella.
+#
+# PRECONDICIÓN (una sola vez, la hace el propietario). El *service agent*
+# de Firestore de stage debe poder leer el bucket de respaldos:
+#
+#   gcloud storage buckets add-iam-policy-binding gs://ventanilla-simacota-backups \
+#     --member="serviceAccount:service-<NUM_PROYECTO_STAGE>@gcp-sa-firestore.iam.gserviceaccount.com" \
+#     --role=roles/storage.objectViewer --project=ventanilla-unica-f31b1
+#
+# Sin eso, el import falla con PERMISSION_DENIED y este workflow lo dice
+# con esas palabras en vez de dejar un error opaco.
+#
+# NUNCA se programa: se dispara a mano. Crea y borra bases de datos, y eso
+# no debe pasar solo.
+# ══════════════════════════════════════════════════════════════════════
+name: Ensayo de restauración (stage)
+
+on:
+  workflow_dispatch:
+    inputs:
+      confirmar:
+        description: 'Escriba exactamente "ensayo" para confirmar'
+        required: true
+        default: ''
+      fecha:
+        description: 'Respaldo a restaurar (AAAA-MM-DD). Vacío = el más reciente.'
+        required: false
+        default: ''
+
+permissions:
+  contents: read
+  id-token: write
+
+concurrency:
+  group: drill-restauracion
+  cancel-in-progress: false
+
+jobs:
+  drill:
+    name: Restaurar un respaldo en una base desechable de stage
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    env:
+      BACKUP_BUCKET: ventanilla-simacota-backups
+      PROYECTO_PROD: ventanilla-unica-f31b1
+      PROYECTO_STAGE: ventanilla-simacota-stage
+      WIF_PROVIDER_STAGE: ${{ secrets.GCP_STAGE_WORKLOAD_IDENTITY_PROVIDER }}
+      SA_KEY_STAGE: ${{ secrets.GCP_STAGE_SA_KEY }}
+
+    steps:
+      - name: Confirmación explícita
+        if: ${{ github.event.inputs.confirmar != 'ensayo' }}
+        run: |
+          echo "::error::Escriba exactamente 'ensayo' en el campo de confirmación. Nada se ejecutó."
+          exit 1
+
+      - uses: actions/checkout@v4
+
+      - name: Comprobar que hay credenciales de stage
+        run: |
+          if [ -z "${WIF_PROVIDER_STAGE}" ] && [ -z "${SA_KEY_STAGE}" ]; then
+            echo "::error::Falta el secret GCP_STAGE_WORKLOAD_IDENTITY_PROVIDER (o GCP_STAGE_SA_KEY)."
+            echo "::error::El ensayo escribe en STAGE, así que necesita una credencial de STAGE — nunca la de producción."
+            exit 1
+          fi
+
+      - name: Autenticar a STAGE (WIF)
+        if: ${{ env.WIF_PROVIDER_STAGE != '' }}
+        uses: google-github-actions/auth@v3
+        with:
+          workload_identity_provider: ${{ secrets.GCP_STAGE_WORKLOAD_IDENTITY_PROVIDER }}
+          service_account: ${{ secrets.GCP_STAGE_SA }}
+
+      - name: Autenticar a STAGE (clave JSON)
+        if: ${{ env.WIF_PROVIDER_STAGE == '' && env.SA_KEY_STAGE != '' }}
+        uses: google-github-actions/auth@v3
+        with:
+          credentials_json: ${{ secrets.GCP_STAGE_SA_KEY }}
+
+      - uses: google-github-actions/setup-gcloud@v3
+
+      # ── 1. Elegir el respaldo y comprobar que está ÍNTEGRO ────────────
+      - name: Elegir respaldo
+        id: elegir
+        run: |
+          set -euo pipefail
+          FECHA="${{ github.event.inputs.fecha }}"
+          if [ -z "${FECHA}" ]; then
+            # El más reciente que tenga marcador de export COMPLETADO. Un
+            # export a medias no sirve para un ensayo: daría un falso
+            # negativo y haría desconfiar de un respaldo que sí está bien.
+            FECHA="$(gcloud storage ls "gs://${BACKUP_BUCKET}/diario/" 2>/dev/null \
+              | sed 's#.*/diario/##; s#/$##' | grep -E '^[0-9]{4}-[0-9]{2}-[0-9]{2}$' | sort | tail -1)"
+          fi
+          if [ -z "${FECHA}" ]; then
+            echo "::error::No hay ningún respaldo en gs://${BACKUP_BUCKET}/diario/."
+            exit 1
+          fi
+          URI="gs://${BACKUP_BUCKET}/diario/${FECHA}"
+          MARCADOR="${URI}/${FECHA}.overall_export_metadata"
+          if ! gcloud storage ls "${MARCADOR}" >/dev/null 2>&1; then
+            echo "::error::El respaldo de ${FECHA} NO tiene marcador de export completado (${MARCADOR}). Está incompleto: no sirve para el ensayo ni para una restauración real."
+            exit 1
+          fi
+          BYTES="$(gcloud storage du --summarize "${URI}/**" 2>/dev/null | awk 'NR==1{print $1}')"
+          echo "Respaldo elegido: ${URI} (${BYTES} bytes)"
+          {
+            echo "FECHA=${FECHA}"
+            echo "URI=${URI}"
+            echo "BYTES=${BYTES}"
+          } >> "$GITHUB_OUTPUT"
+
+      # ── 2. Base DESECHABLE en stage ──────────────────────────────────
+      - name: Crear base de ensayo
+        id: crear
+        run: |
+          set -euo pipefail
+          # El id lleva la fecha del respaldo y el número de corrida: si algo
+          # queda sin borrar, se sabe de qué ensayo salió.
+          DEST_DB="drill-${{ steps.elegir.outputs.FECHA }}-${{ github.run_number }}"
+          echo "DEST_DB=${DEST_DB}" >> "$GITHUB_OUTPUT"
+          gcloud firestore databases create \
+            --database="${DEST_DB}" \
+            --location=nam5 \
+            --type=firestore-native \
+            --project="${PROYECTO_STAGE}"
+          echo "Base de ensayo creada: ${DEST_DB} (stage)"
+
+      # ── 3. Importar ──────────────────────────────────────────────────
+      - name: Importar el respaldo
+        id: importar
+        run: |
+          set -euo pipefail
+          if ! OPERACION="$(gcloud firestore import "${{ steps.elegir.outputs.URI }}" \
+              --database="${{ steps.crear.outputs.DEST_DB }}" \
+              --project="${PROYECTO_STAGE}" \
+              --async --format='value(name)' 2>&1)"; then
+            echo "${OPERACION}"
+            if printf '%s' "${OPERACION}" | grep -qi 'permission\|denied\|403'; then
+              echo "::error::PERMISSION_DENIED al leer el bucket. Falta la precondición: el service agent de Firestore de STAGE necesita roles/storage.objectViewer sobre gs://${BACKUP_BUCKET} (ver la cabecera de este workflow)."
+            fi
+            exit 1
+          fi
+          echo "Operación: ${OPERACION}"
+          for _ in $(seq 1 180); do
+            ESTADO="$(gcloud firestore operations describe "${OPERACION}" \
+              --database="${{ steps.crear.outputs.DEST_DB }}" \
+              --project="${PROYECTO_STAGE}" --format='value(metadata.operationState)')"
+            echo "  estado: ${ESTADO}"
+            case "${ESTADO}" in
+              SUCCESSFUL) echo "Import COMPLETADO."; exit 0 ;;
+              FAILED|CANCELLED)
+                echo "::error::El import terminó en estado ${ESTADO}."
+                exit 1 ;;
+            esac
+            sleep 10
+          done
+          echo "::error::El import no terminó dentro de la ventana de espera."
+          exit 1
+
+      # ── 4. Verificar que lo restaurado SIRVE ─────────────────────────
+      #
+      # No basta con que el import diga SUCCESSFUL: eso solo dice que los
+      # bytes se movieron. El criterio es que los datos estén completos y
+      # sean coherentes — si no, el ensayo pasa y la restauración real
+      # fracasaría el día que importe.
+      - name: Verificar el contenido restaurado
+        id: verificar
+        run: |
+          set -euo pipefail
+          RESUMEN="$(gcloud firestore databases describe \
+            --database="${{ steps.crear.outputs.DEST_DB }}" \
+            --project="${PROYECTO_STAGE}" --format='value(name)')"
+          echo "Base restaurada: ${RESUMEN}"
+          node scripts/backups/verificar-restauracion.mjs \
+            --proyecto "${PROYECTO_STAGE}" \
+            --base "${{ steps.crear.outputs.DEST_DB }}" \
+            | tee /tmp/verificacion.txt
+          {
+            echo 'VERIFICACION<<EOF'
+            cat /tmp/verificacion.txt
+            echo 'EOF'
+          } >> "$GITHUB_ENV"
+
+      # ── 5. Limpieza — SIEMPRE, incluso si algo falló ─────────────────
+      - name: Borrar la base de ensayo
+        if: ${{ always() && steps.crear.outputs.DEST_DB != '' }}
+        run: |
+          echo "Borrando ${{ steps.crear.outputs.DEST_DB }} de stage…"
+          gcloud firestore databases delete \
+            --database="${{ steps.crear.outputs.DEST_DB }}" \
+            --project="${PROYECTO_STAGE}" --quiet || \
+            echo "::warning::No se pudo borrar la base de ensayo ${{ steps.crear.outputs.DEST_DB }}. Bórrela a mano para no acumular costo."
+
+      - name: Resumen
+        if: ${{ always() }}
+        run: |
+          {
+            echo "### Ensayo de restauración"
+            echo "- Respaldo: \`${{ steps.elegir.outputs.URI }}\`"
+            echo "- Tamaño: \`${{ steps.elegir.outputs.BYTES }}\` bytes"
+            echo "- Base de ensayo: \`${{ steps.crear.outputs.DEST_DB }}\` (stage, ya borrada)"
+            echo "- Resultado: \`${{ job.status }}\`"
+            echo ""
+            echo '```'
+            echo "${VERIFICACION:-Sin verificación: el ensayo no llegó a ese paso.}"
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
