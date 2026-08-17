@@ -160,9 +160,25 @@ jobs:
             echo "::error::El destino ${DESTINO} está VACÍO tras un export marcado como exitoso."
             exit 1
           fi
-          BYTES="$(gcloud storage du --summarize "${DESTINO}" --format='value(size)' 2>/dev/null || echo 0)"
-          if [ -z "${BYTES}" ] || [ "${BYTES}" -eq 0 ]; then
-            echo "::error::El respaldo en ${DESTINO} pesa 0 bytes."
+          # `du` sobre el PREFIJO (sin glob) y con `--format=value(size)` no
+          # devolvía nada: entre el 13 y el 17-ago-2026 el job falló cinco
+          # días seguidos con "pesa 0 bytes" mientras el respaldo se estaba
+          # escribiendo bien — la comprobación de arriba (OBJETOS) pasaba.
+          # Una alarma que grita en falso cinco días seguidos deja de leerse,
+          # y habría tapado un fallo real. Se usa el mismo glob que la
+          # comprobación de objetos y se toma el primer campo, que es robusto
+          # a cambios de formato de salida entre versiones de gcloud.
+          BYTES="$(gcloud storage du --summarize "${DESTINO}/**" 2>/dev/null | awk 'NR==1{print $1}')"
+          if ! printf '%s' "${BYTES:-}" | grep -qE '^[0-9]+$'; then
+            # NO se pudo medir. Distinto de "pesa cero": hay objetos, así que
+            # el respaldo existe, pero el control no puede acreditar su
+            # tamaño. Se falla igual —el control no acredita a medias— pero
+            # el mensaje dice cuál de los dos problemas es.
+            echo "::error::Hay ${OBJETOS} objeto(s) en ${DESTINO}, pero NO se pudo medir su tamaño (salida de 'gcloud storage du': '${BYTES:-vacía}'). El respaldo probablemente existe; lo que falla es la verificación."
+            exit 1
+          fi
+          if [ "${BYTES}" -eq 0 ]; then
+            echo "::error::El respaldo en ${DESTINO} tiene ${OBJETOS} objeto(s) pero pesa 0 bytes."
             exit 1
           fi
           MB=$(( BYTES / 1024 / 1024 ))
