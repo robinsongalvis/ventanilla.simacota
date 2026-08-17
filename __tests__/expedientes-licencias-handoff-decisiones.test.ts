@@ -6,6 +6,7 @@ import {
   esErrorExpediente,
   type RadicadoParaHandoff,
   type PlanCrearExpedienteDesdeRadicado,
+  planVincularRadicado,
 } from '@/lib/server/expedientes-licencias';
 import { DEFINICION_LICENCIA_CONSTRUCCION_PARCIAL } from '@/lib/motor-expedientes/definiciones/licencia-construccion-parcial';
 import { sumarDiasHabiles } from '@/lib/tiempos-radicado';
@@ -149,5 +150,122 @@ describe('calcularFechaLimiteRespuestaActa — 30 días hábiles desde la COMUNI
     const fechaComunicacion = '2026-06-01T15:00:00.000Z';
     const resultado = calcularFechaLimiteRespuestaActa(fechaComunicacion);
     expect(resultado).toBe(sumarDiasHabiles(fechaComunicacion, 30).toISOString());
+  });
+});
+
+describe('constancia al ciudadano — NUNCA con un número de demostración', () => {
+  // Hallazgo del 13-ago-2026, verificando el flujo de punta a punta antes de
+  // una demostración: la plantilla de la constancia afirma al ciudadano que
+  // el número "identifica su trámite de manera única y permanente", y no
+  // distingue el origen del número. Con el candado R10 cerrado, todo
+  // expediente nace con `DEMO-{AA}-{8hex}`. Demostrar «Crear desde radicado»
+  // en producción con el radicado de un ciudadano real le habría enviado, con
+  // membrete de la Alcaldía, una constancia oficial de un número falso — y no
+  // hay ruta de reenvío ni de corrección.
+  const radicadoConCorreo = {
+    solicitante: { email: 'ciudadano@ejemplo.com', tipoDocumento: 'CC', datosNoAportados: {} },
+  } as unknown as Parameters<typeof debeEnviarComunicacionExpediente>[1];
+
+  it('con número DEMO no se envía, y el motivo lo dice', () => {
+    const gate = debeEnviarComunicacionExpediente(
+      'licencia-construccion-obra-nueva',
+      radicadoConCorreo,
+      'DEMO-26-a1b2c3d4',
+    );
+    expect(gate.debeEnviar).toBe(false);
+    expect(gate.motivo).toMatch(/DEMOSTRACIÓN/i);
+  });
+
+  it('el corte es ANTES que cualquier otra condición: ni siquiera mira el trámite', () => {
+    // Un trámite no habilitado y un número demo darían ambos `false`; lo que
+    // se fija aquí es CUÁL manda, para que el día que se habiliten más
+    // trámites el demo siga cortando primero.
+    const gate = debeEnviarComunicacionExpediente('tramite-cualquiera', radicadoConCorreo, 'DEMO-26-ffffffff');
+    expect(gate.motivo).toMatch(/DEMOSTRACIÓN/i);
+  });
+
+  it('sin número (llamador antiguo) el comportamiento no cambia', () => {
+    const conNumero = debeEnviarComunicacionExpediente('licencia-construccion-obra-nueva', radicadoConCorreo, '68745-0-26-0020');
+    const sinNumero = debeEnviarComunicacionExpediente('licencia-construccion-obra-nueva', radicadoConCorreo);
+    expect(sinNumero.debeEnviar).toBe(conNumero.debeEnviar);
+  });
+
+  it('con un número LEGAL sí se envía', () => {
+    expect(
+      debeEnviarComunicacionExpediente('licencia-construccion-obra-nueva', radicadoConCorreo, '68745-0-26-0020').debeEnviar,
+    ).toBe(true);
+  });
+});
+
+describe('planVincularRadicado — el expediente huérfano deja de ser un callejón sin salida', () => {
+  // Hasta el 13-ago-2026, un expediente creado con «Radicar solicitud»
+  // nacía con radicadoId null y NO había forma de vincularlo después. El
+  // botón que lo creaba estaba al lado del correcto, en la misma barra:
+  // equivocarse era irreversible y el expediente no podía llegar a ser un
+  // trámite real.
+  const ACTOR = { uid: 'u1', nombre: 'Funcionaria', rol: 'FUNCIONARIO' };
+  const AHORA = new Date('2026-08-14T15:00:00.000Z');
+
+  function expedienteHuerfano(overrides: Record<string, unknown> = {}) {
+    return {
+      id: 'exp-1',
+      tenantId: 'SEC_PLANEACION',
+      radicadoId: null,
+      numeroExpediente: { numero: 'DEMO-26-aaaa1111', serieId: 'demo', año: 2026 },
+      ...overrides,
+    } as Parameters<typeof planVincularRadicado>[0];
+  }
+
+  function radicadoElegible(overrides: Record<string, unknown> = {}) {
+    return {
+      radicadoId: '1-110-202608-00000042',
+      estadoActual: 'RADICADO',
+      clasificacion: { oficinaDestino: 'SEC_PLANEACION' },
+      solicitante: { nombreCompleto: 'Juan Pérez', numeroDocumento: '91234567' },
+      ...overrides,
+    } as Parameters<typeof planVincularRadicado>[1];
+  }
+
+  it('vincula: devuelve el vínculo del radicado y la actuación que lo deja trazado', () => {
+    const plan = planVincularRadicado(expedienteHuerfano(), radicadoElegible(), ACTOR, AHORA);
+    expect(esErrorExpediente(plan)).toBe(false);
+    if (esErrorExpediente(plan)) return;
+    expect(plan.vinculoRadicado).toMatchObject({ expedienteId: 'exp-1', numeroExpediente: 'DEMO-26-aaaa1111' });
+    expect(plan.actuacion.tipo).toBe('vinculacion-radicado');
+    expect(plan.actuacion.origen).toBe('REAL');
+    expect(plan.actuacion.detalle).toContain('1-110-202608-00000042');
+  });
+
+  it('un expediente que YA tiene radicado no se re-vincula', () => {
+    const plan = planVincularRadicado(
+      expedienteHuerfano({ radicadoId: '1-110-202608-00000001' }),
+      radicadoElegible(),
+      ACTOR,
+      AHORA,
+    );
+    expect(esErrorExpediente(plan)).toBe(true);
+    if (!esErrorExpediente(plan)) return;
+    expect(plan.status).toBe(409);
+  });
+
+  it('APLICA LA MISMA elegibilidad que el handoff: otra dependencia, cerrado, o ya vinculado', () => {
+    // Es lo que impide que la unicidad del vínculo dependa de por dónde se
+    // entró: las dos puertas comparten `verificarRadicadoVinculable`.
+    const otraOficina = planVincularRadicado(
+      expedienteHuerfano(), radicadoElegible({ clasificacion: { oficinaDestino: 'SEC_SALUD' } }), ACTOR, AHORA);
+    expect(esErrorExpediente(otraOficina) && otraOficina.status).toBe(400);
+
+    const yaVinculado = planVincularRadicado(
+      expedienteHuerfano(),
+      radicadoElegible({ vinculoExpediente: { expedienteId: 'otro', numeroExpediente: 'X', fecha: '2026-01-01' } }),
+      ACTOR, AHORA);
+    expect(esErrorExpediente(yaVinculado) && yaVinculado.status).toBe(409);
+  });
+
+  it('sin numeroExpediente cae al id, nunca deja el vínculo sin identificar', () => {
+    const plan = planVincularRadicado(expedienteHuerfano({ numeroExpediente: undefined }), radicadoElegible(), ACTOR, AHORA);
+    expect(esErrorExpediente(plan)).toBe(false);
+    if (esErrorExpediente(plan)) return;
+    expect(plan.vinculoRadicado.numeroExpediente).toBe('exp-1');
   });
 });

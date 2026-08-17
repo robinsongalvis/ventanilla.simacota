@@ -128,7 +128,7 @@ beforeEach(() => {
 });
 
 describe('POST .../expedientes/desde-radicado', () => {
-  it('feliz: crea expediente + actuación + vínculo del radicado en la MISMA tx, y envía la constancia', async () => {
+  it('feliz: crea expediente + actuación + vínculo del radicado en la MISMA tx', async () => {
     store.set('ventanilla_radicados/1-110-202608-00000042', radicadoDoc());
 
     const res = await desdeRadicadoPOST(req({ radicadoId: '1-110-202608-00000042', subtipos: ['CONSTRUCCION'] }));
@@ -136,14 +136,30 @@ describe('POST .../expedientes/desde-radicado', () => {
 
     expect(res.status).toBe(201);
     expect(data.expediente.radicadoId).toBe('1-110-202608-00000042');
-    expect(data.constanciaEnviada).toBe(true);
 
     const radicadoActualizado = store.get('ventanilla_radicados/1-110-202608-00000042') as { vinculoExpediente?: { expedienteId: string } };
     expect(radicadoActualizado.vinculoExpediente?.expedienteId).toBe(data.expediente.id);
+  });
 
-    expect(correosEnviados).toHaveLength(1);
-    expect(correosEnviados[0]!.to).toBe('juan@example.com');
-    expect(correosEnviados[0]!.subject).toContain(data.expediente.numeroExpediente.numero);
+  it('CON EL CANDADO R10 CERRADO no se comunica al ciudadano: el número es de demostración', async () => {
+    // Hasta el 13-ago-2026 esta prueba aseveraba lo contrario —que la
+    // constancia SÍ salía— y por tanto codificaba el defecto. La plantilla
+    // afirma al ciudadano que el número "identifica su trámite de manera
+    // única y permanente", y con el candado cerrado ese número es
+    // `DEMO-{AA}-{8hex}`: se le estaría enviando, con membrete de la
+    // Alcaldía, una constancia oficial de un número que no existe. Y no hay
+    // ruta de reenvío ni de corrección.
+    //
+    // Cuando se abra la serie y se levante R10, el número pasa a ser legal y
+    // la constancia vuelve a salir sola, sin tocar este código.
+    store.set('ventanilla_radicados/1-110-202608-00000042', radicadoDoc());
+
+    const res = await desdeRadicadoPOST(req({ radicadoId: '1-110-202608-00000042', subtipos: ['CONSTRUCCION'] }));
+    const data = await res.json();
+
+    expect(data.expediente.numeroExpediente.numero).toMatch(/^DEMO-/);
+    expect(data.constanciaEnviada).toBe(false);
+    expect(correosEnviados).toHaveLength(0);
   });
 
   it('SEGUNDA vinculación sobre el mismo radicado → 409, sin crear un segundo expediente', async () => {
@@ -200,7 +216,10 @@ describe('POST .../actuaciones — aviso de acta con/sin fechaComunicacion', () 
     store.set('expedientes/exp-1', {
       id: 'exp-1', tenantId: 'SEC_PLANEACION', estadoJuridico: 'EN_REVISION', estado: 'EN_REVISION',
       radicadoId: '1-110-202608-00000042', tramiteId: DEFINICION_LICENCIA_CONSTRUCCION_PARCIAL.id,
-      solicitanteNombre: 'Juan Pérez', numeroExpediente: { numero: 'DEMO-26-aaaa1111', serieId: 'demo', año: 2026 },
+            // Número LEGAL a propósito: estas pruebas verifican el CONTENIDO del
+      // aviso (si imprime o no la fecha límite). Con un número de
+      // demostración no saldría ningún correo — eso se prueba aparte, abajo.
+      solicitanteNombre: 'Juan Pérez', numeroExpediente: { numero: '68745-0-26-0020', serieId: 'expedientes', año: 2026 },
     });
     store.set('ventanilla_radicados/1-110-202608-00000042', radicadoDoc());
   });
@@ -223,6 +242,26 @@ describe('POST .../actuaciones — aviso de acta con/sin fechaComunicacion', () 
     expect(res.status).toBe(200);
     expect(data.avisoEnviado).toBe(true);
     expect(correosEnviados[0]!.html).not.toContain('su plazo vence el');
+  });
+
+  it('CON NÚMERO DE DEMOSTRACIÓN no se avisa al ciudadano, aunque el acta se registre', async () => {
+    // Mismo criterio que la constancia: mientras el candado R10 esté cerrado,
+    // el expediente no existe legalmente y su número es `DEMO-…`. Avisarle al
+    // ciudadano de un acta de observaciones sobre ese expediente le abriría
+    // un plazo de respuesta que no es real. La actuación SÍ se registra: lo
+    // que se corta es la comunicación al ciudadano, no el trabajo interno.
+    store.set('expedientes/exp-demo', {
+      id: 'exp-demo', tenantId: 'SEC_PLANEACION', estado: 'RADICADO', estadoJuridico: 'EN_REVISION',
+      radicadoId: '1-110-202608-00000042', tramiteId: DEFINICION_LICENCIA_CONSTRUCCION_PARCIAL.id,
+      solicitanteNombre: 'Juan Pérez', numeroExpediente: { numero: 'DEMO-26-aaaa1111', serieId: 'demo', año: 2026 },
+    });
+    correosEnviados = [];
+
+    const res = await actuacionPOST(req({ tipo: 'acta-observaciones', detalle: DETALLE_OK }), ctx('exp-demo'));
+
+    expect(res.status).toBe(200);
+    expect((await res.json()).avisoEnviado).toBe(false);
+    expect(correosEnviados).toHaveLength(0);
   });
 
   it('respuesta-subsanacion NO dispara el aviso de acta (solo acta-observaciones lo hace)', async () => {
