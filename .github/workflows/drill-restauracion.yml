@@ -13,15 +13,28 @@
 # producción solo se LEE el bucket de respaldos. Producción no se modifica
 # en ningún paso — no hay un solo comando de escritura contra ella.
 #
-# PRECONDICIÓN (una sola vez, la hace el propietario). El *service agent*
-# de Firestore de stage debe poder leer el bucket de respaldos:
+# PRECONDICIÓN (una sola vez, la hace el propietario). El bucket de
+# respaldos vive en el proyecto de PRODUCCIÓN y aquí se lee desde stage, así
+# que hay que concederle lectura a DOS identidades distintas — es el error
+# que costó la corrida 32079164053, donde se concedió solo la segunda:
 #
-#   gcloud storage buckets add-iam-policy-binding gs://ventanilla-simacota-backups \
-#     --member="serviceAccount:service-<NUM_PROYECTO_STAGE>@gcp-sa-firestore.iam.gserviceaccount.com" \
-#     --role=roles/storage.objectViewer --project=ventanilla-unica-f31b1
+#   1. La cuenta de servicio de ACTIONS (la del secret GCP_STAGE_SA_KEY):
+#      es la que LISTA el bucket para elegir qué respaldo restaurar.
 #
-# Sin eso, el import falla con PERMISSION_DENIED y este workflow lo dice
-# con esas palabras en vez de dejar un error opaco.
+#   2. El *service agent* de Firestore de stage: es quien de verdad LEE los
+#      archivos durante el import. No es la misma identidad que la anterior
+#      y no hereda sus permisos.
+#
+#   for M in "serviceAccount:<SA_DE_ACTIONS_DE_STAGE>" \
+#            "serviceAccount:service-<NUM_PROYECTO_STAGE>@gcp-sa-firestore.iam.gserviceaccount.com"; do
+#     gcloud storage buckets add-iam-policy-binding gs://ventanilla-simacota-backups \
+#       --member="$M" --role=roles/storage.objectViewer \
+#       --project=ventanilla-unica-f31b1
+#   done
+#
+# Es acceso de SOLO LECTURA sobre los respaldos: no da ningún permiso sobre
+# la base de producción. Si falta cualquiera de las dos, el workflow dice
+# cuál y con qué identidad falló, en vez de dejar un error opaco.
 #
 # NUNCA se programa: se dispara a mano. Crea y borra bases de datos, y eso
 # no debe pasar solo.
@@ -97,16 +110,39 @@ jobs:
         id: elegir
         run: |
           set -euo pipefail
+          # NOTA (17-ago-2026): las tuberías con `grep` van con `|| true`
+          # DENTRO de la sustitución. Sin eso, un listado vacío hace que
+          # `grep` devuelva 1, `pipefail` lo propague y `set -e` mate el
+          # paso ANTES de los mensajes de error de abajo — que es
+          # exactamente lo que pasó en la corrida 32079164053: exit 1 pelado,
+          # sin una sola línea que dijera por qué.
+          CUENTA="$(gcloud auth list --filter=status:ACTIVE --format='value(account)' 2>/dev/null || true)"
+          echo "Identidad activa: ${CUENTA:-desconocida}"
+
           FECHA="${{ github.event.inputs.fecha }}"
           if [ -z "${FECHA}" ]; then
             # El más reciente que tenga marcador de export COMPLETADO. Un
             # export a medias no sirve para un ensayo: daría un falso
             # negativo y haría desconfiar de un respaldo que sí está bien.
-            FECHA="$(gcloud storage ls "gs://${BACKUP_BUCKET}/diario/" 2>/dev/null \
-              | sed 's#.*/diario/##; s#/$##' | grep -E '^[0-9]{4}-[0-9]{2}-[0-9]{2}$' | sort | tail -1)"
+            #
+            # El stderr se CAPTURA, no se descarta: distinguir "no tengo
+            # permiso" de "no hay respaldos" es la diferencia entre saber
+            # qué arreglar y adivinar.
+            if ! LISTADO="$(gcloud storage ls "gs://${BACKUP_BUCKET}/diario/" 2>&1)"; then
+              echo "${LISTADO}"
+              if printf '%s' "${LISTADO}" | grep -qiE 'denied|forbidden|403|does not have|not authorized'; then
+                echo "::error::La identidad de stage (${CUENTA:-desconocida}) no puede LEER gs://${BACKUP_BUCKET}, que vive en el proyecto de producción."
+                echo "::error::Concédale roles/storage.objectViewer sobre ese bucket. OJO: son DOS identidades (la de Actions y el service agent de Firestore) — ver la cabecera de este workflow."
+              else
+                echo "::error::No fue posible listar gs://${BACKUP_BUCKET}/diario/."
+              fi
+              exit 1
+            fi
+            FECHA="$(printf '%s\n' "${LISTADO}" \
+              | sed 's#.*/diario/##; s#/$##' | grep -E '^[0-9]{4}-[0-9]{2}-[0-9]{2}$' | sort | tail -1 || true)"
           fi
           if [ -z "${FECHA}" ]; then
-            echo "::error::No hay ningún respaldo en gs://${BACKUP_BUCKET}/diario/."
+            echo "::error::No hay ningún respaldo con formato AAAA-MM-DD en gs://${BACKUP_BUCKET}/diario/."
             exit 1
           fi
           URI="gs://${BACKUP_BUCKET}/diario/${FECHA}"
