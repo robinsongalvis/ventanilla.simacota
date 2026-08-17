@@ -42,6 +42,7 @@ concurrency:
 permissions:
   contents: read
   id-token: write   # requerido por la federación de identidad (WIF, keyless).
+  issues: write     # para el aviso de fallo (ver el paso "Avisar si el respaldo falló").
 
 jobs:
   export:
@@ -223,3 +224,68 @@ jobs:
           else
             echo "- ⚠️ Contenido NO verificado (el job no llegó al paso de verificación)." >> "$GITHUB_STEP_SUMMARY"
           fi
+
+      # ── AVISO DE FALLO ────────────────────────────────────────────────
+      #
+      # POR QUÉ EXISTE. Entre el 21-jul y el 17-ago-2026 este workflow falló
+      # 73 veces de 82 y NADIE se enteró: no había ningún aviso, y la única
+      # forma de saberlo era entrar a mano a la pestaña Actions — que es
+      # justo lo que nadie hace a diario. El fallo se descubrió por una
+      # auditoría, no por el control.
+      #
+      # Se abre un aviso en el repositorio, que no necesita ningún secret ni
+      # servicio externo. Si ya hay uno abierto, se COMENTA en vez de abrir
+      # otro: 73 avisos habrían sido tan invisibles como ninguno.
+      - name: Avisar si el respaldo falló
+        if: ${{ failure() }}
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          TITULO="⚠️ El respaldo diario de Firestore está fallando"
+          CUERPO="$(printf '%s\n' \
+            "El respaldo diario falló el $(date -u +%F) a las $(date -u +%H:%M) UTC." \
+            "" \
+            "- Ejecución: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}" \
+            "- Destino: \`gs://${BACKUP_BUCKET}/diario/$(date -u +%F)\`" \
+            "" \
+            "**Por qué importa:** la retención del bucket es de 30 días. Si los respaldos" \
+            "siguen fallando, los que ya existen se borran solos y el municipio se queda" \
+            "sin plan de continuidad." \
+            "" \
+            "**Qué mirar primero:** en el registro de la ejecución, si el mensaje dice" \
+            "\"NO se pudo medir su tamaño\" el respaldo probablemente existe y lo que" \
+            "falla es la verificación; si dice \"pesa 0 bytes\", falla el respaldo." \
+            "" \
+            "Este aviso se cierra solo cuando un respaldo vuelva a salir bien.")"
+
+          ABIERTO="$(gh issue list --repo "${{ github.repository }}" --state open \
+            --label respaldo --json number --jq '.[0].number // empty')"
+          if [ -n "${ABIERTO}" ]; then
+            gh issue comment "${ABIERTO}" --repo "${{ github.repository }}" --body "${CUERPO}"
+            echo "Comentado en el aviso #${ABIERTO} (ya estaba abierto)."
+          else
+            gh label create respaldo --repo "${{ github.repository }}" \
+              --color B60205 --description "Fallos del respaldo diario" 2>/dev/null || true
+            gh issue create --repo "${{ github.repository }}" \
+              --title "${TITULO}" --label respaldo --body "${CUERPO}"
+            echo "Aviso abierto."
+          fi
+
+      # Cerrar el aviso cuando el respaldo vuelve a salir bien: si no, queda
+      # abierto para siempre y se convierte en ruido de fondo — el mismo
+      # defecto que este aviso viene a corregir.
+      - name: Cerrar el aviso si el respaldo salió bien
+        if: ${{ success() }}
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          ABIERTO="$(gh issue list --repo "${{ github.repository }}" --state open \
+            --label respaldo --json number --jq '.[0].number // empty')"
+          if [ -n "${ABIERTO}" ]; then
+            gh issue close "${ABIERTO}" --repo "${{ github.repository }}" \
+              --comment "Respaldo correcto el $(date -u +%F): ${OBJETOS:-?} objeto(s), ${KB:-?} KiB. Se cierra el aviso."
+            echo "Aviso #${ABIERTO} cerrado."
+          fi
+
