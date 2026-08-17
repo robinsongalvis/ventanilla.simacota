@@ -123,6 +123,19 @@ jobs:
           echo "DESTINO=${DESTINO}" >> "$GITHUB_OUTPUT"
           echo "Exportando Firestore de ${GCP_PROJECT} -> ${DESTINO}"
 
+          # Un export ya COMPLETADO deja este marcador. Si existe, el
+          # respaldo del día ya está hecho: se salta el export y se pasa a
+          # verificarlo. Sin esto, reintentar un día que falló es imposible —
+          # `gcloud firestore export` responde "Path already exists" y el job
+          # vuelve a caer, ahora por una razón distinta y confusa
+          # (comprobado el 17-ago-2026 al intentar justamente eso).
+          MARCADOR="${DESTINO}/${FECHA}.overall_export_metadata"
+          if gcloud storage ls "${MARCADOR}" >/dev/null 2>&1; then
+            echo "El respaldo de ${FECHA} YA existe (marcador de export completado presente)."
+            echo "Se salta el export y se verifica el existente."
+            exit 0
+          fi
+
           OPERACION="$(gcloud firestore export "${DESTINO}" \
             --project="${GCP_PROJECT}" \
             --database='(default)' \
