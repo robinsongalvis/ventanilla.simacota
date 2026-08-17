@@ -37,6 +37,7 @@ import { ChipPrueba } from '../components/ChipPrueba';
 import { NumeroLegal } from '../components/NumeroLegal';
 import { EventoTimeline } from '../components/EventoTimeline';
 import { PanelTerminoDual } from '../components/PanelTerminoDual';
+import { VincularRadicadoModal } from '../components/VincularRadicadoModal';
 import { PanelVigenciaActo } from '../components/PanelVigenciaActo';
 import { PanelDesistimientoSemicontrolado } from '../components/PanelDesistimientoSemicontrolado';
 import { BotonAccionPlaceholder } from '../components/BotonAccionPlaceholder';
@@ -87,6 +88,7 @@ export function DetalleLicenciaClient({ expedienteId, onVolver }: DetalleLicenci
   const [documentos, setDocumentos] = useState<DocumentoExpedienteDoc[]>([]);
   const [definicionId, setDefinicionId] = useState<string | null>(null);
   const [radicadoVinculado, setRadicadoVinculado] = useState<{ id: string; fecha: string } | null>(null);
+  const [vinculando, setVinculando] = useState(false);
   const [modalActuacion, setModalActuacion] = useState<'acta-observaciones' | 'respuesta-subsanacion' | null>(null);
   /** Bloque "Términos y vigencias protectores" (10-ago-2026) — `computos`/`borradorActoDesistimiento` YA CALCULADOS por el servidor (`GET .../[id]`), ver `../tipos-computos.ts`. */
   const [computos, setComputos] = useState<ComputosExpedienteUI | null>(null);
@@ -302,7 +304,20 @@ export function DetalleLicenciaClient({ expedienteId, onVolver }: DetalleLicenci
                 </span>
               </span>
             ) : (
-              'Sin vincular aún'
+              // El expediente nació sin radicado («Radicar solicitud»).
+              // Antes esto era un callejón sin salida permanente; ahora se
+              // puede reparar desde aquí mismo.
+              <span className="flex flex-col items-start gap-1">
+                <span>Sin vincular aún</span>
+                <button
+                  type="button"
+                  onClick={() => setVinculando(true)}
+                  className="text-xs font-bold underline focus-visible:outline-none focus-visible:ring-2 rounded"
+                  style={{ color: 'var(--color-primary)' }}
+                >
+                  Vincular radicado de Ventanilla
+                </button>
+              </span>
             )}
           </Metadato>
           <Metadato label="Origen">{expediente.origen ?? 'REAL'}</Metadato>
@@ -445,6 +460,18 @@ export function DetalleLicenciaClient({ expedienteId, onVolver }: DetalleLicenci
             {borradorActoDesistimiento.cuerpo}
           </div>
         </div>
+      )}
+
+      {/* Reparación del expediente huérfano — ver `VincularRadicadoModal`. */}
+      {vinculando && (
+        <VincularRadicadoModal
+          expedienteId={expedienteId}
+          onCerrar={() => setVinculando(false)}
+          onVinculado={() => {
+            setVinculando(false);
+            void cargar({ silencioso: true });
+          }}
+        />
       )}
     </div>
   );

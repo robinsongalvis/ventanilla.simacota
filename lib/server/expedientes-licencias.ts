@@ -610,13 +610,14 @@ export interface PlanCrearExpedienteDesdeRadicado {
  * siempre construye el camino DEMO (`esPrueba: true`, prefijo `DEMO-`) —
  * no referencia `emitirNumeroExpedienteReal` en ninguna rama.
  */
-export function planCrearExpedienteDesdeRadicado(
-  radicado: RadicadoParaHandoff,
-  input: CrearExpedienteDesdeRadicadoInput,
-  tenantId: TenantId,
-  actor: ActorExpediente,
-  ahora: Date,
-): PlanCrearExpedienteDesdeRadicado | ErrorExpediente {
+/**
+ * Elegibilidad de un radicado para recibir vínculo con un expediente.
+ * Compartida por las DOS puertas que lo vinculan —crear desde radicado y
+ * vincular a uno existente— para que no puedan divergir: si una aceptara
+ * un radicado que la otra rechaza, la unicidad del vínculo dejaría de ser
+ * una propiedad del sistema y pasaría a depender de por dónde se entró.
+ */
+export function verificarRadicadoVinculable(radicado: RadicadoParaHandoff): ErrorExpediente | null {
   if (radicado.clasificacion.oficinaDestino !== 'SEC_PLANEACION') {
     return {
       status: 400,
@@ -632,6 +633,73 @@ export function planCrearExpedienteDesdeRadicado(
       mensaje: `El radicado ya está vinculado al expediente "${radicado.vinculoExpediente.expedienteId}" (${radicado.vinculoExpediente.numeroExpediente}); no procede vincular otro.`,
     };
   }
+  return null;
+}
+
+export interface PlanVincularRadicado {
+  vinculoRadicado: VinculoExpedienteRadicado;
+  actuacion: ActuacionLicenciaDoc;
+}
+
+/**
+ * Plan para vincular un radicado a un expediente que YA existe.
+ *
+ * POR QUÉ EXISTE. Hasta el 13-ago-2026 un expediente creado con «Radicar
+ * solicitud» nacía con `radicadoId: null` y NO había forma de vincularlo
+ * después: quedaba huérfano para siempre, y el botón que lo creaba estaba
+ * al lado del correcto en la misma barra. Una funcionaria que se
+ * equivocara de botón no tenía marcha atrás y el expediente no podía llegar
+ * a ser un trámite real. Esto lo hace reversible.
+ *
+ * Función PURA, y con la MISMA disciplina transaccional que el handoff: el
+ * caller debe leer el radicado DENTRO de la transacción en la que luego
+ * escribe, para que "sin vínculo previo" y la escritura del vínculo sean
+ * atómicos frente a dos vinculaciones concurrentes.
+ */
+export function planVincularRadicado(
+  expediente: Pick<ExpedienteLicenciaDoc, 'id' | 'tenantId' | 'radicadoId' | 'numeroExpediente'>,
+  radicado: RadicadoParaHandoff,
+  actor: ActorExpediente,
+  ahora: Date,
+): PlanVincularRadicado | ErrorExpediente {
+  if (expediente.radicadoId) {
+    return {
+      status: 409,
+      mensaje: `El expediente ya tiene vinculado el radicado "${expediente.radicadoId}"; un expediente no se re-vincula.`,
+    };
+  }
+  const inelegible = verificarRadicadoVinculable(radicado);
+  if (inelegible) return inelegible;
+
+  const nowIso = ahora.toISOString();
+  const numero = expediente.numeroExpediente?.numero ?? expediente.id;
+  return {
+    vinculoRadicado: { expedienteId: expediente.id, numeroExpediente: numero, fecha: nowIso },
+    actuacion: {
+      id: crypto.randomUUID(),
+      expedienteId: expediente.id,
+      tenantId: expediente.tenantId,
+      tipo: 'vinculacion-radicado',
+      etapa: 'radicacion',
+      actorUid: actor.uid,
+      actorNombre: actor.nombre,
+      actorRol: actor.rol,
+      fecha: nowIso,
+      origen: 'REAL',
+      detalle: `Se vinculó el radicado de ventanilla ${radicado.radicadoId} a este expediente, que se había creado sin radicado.`,
+    },
+  };
+}
+
+export function planCrearExpedienteDesdeRadicado(
+  radicado: RadicadoParaHandoff,
+  input: CrearExpedienteDesdeRadicadoInput,
+  tenantId: TenantId,
+  actor: ActorExpediente,
+  ahora: Date,
+): PlanCrearExpedienteDesdeRadicado | ErrorExpediente {
+  const inelegible = verificarRadicadoVinculable(radicado);
+  if (inelegible) return inelegible;
   if (!Array.isArray(input.subtipos) || input.subtipos.length === 0) {
     return { status: 400, mensaje: 'Debe indicar al menos un subtipo (figura normativa) para el expediente.' };
   }
