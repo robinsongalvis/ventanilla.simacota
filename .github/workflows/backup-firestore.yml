@@ -194,11 +194,17 @@ jobs:
             echo "::error::El respaldo en ${DESTINO} tiene ${OBJETOS} objeto(s) pero pesa 0 bytes."
             exit 1
           fi
+          # En KiB, no en MiB: la base cabe hoy en menos de 1 MiB, así que
+          # redondear a MiB imprimía "0" todos los días y anulaba justo lo
+          # que este número existe para dar — la TENDENCIA. Una caída brusca
+          # respecto a ayer es la señal temprana de un export incompleto.
+          KB=$(( BYTES / 1024 ))
           MB=$(( BYTES / 1024 / 1024 ))
-          echo "Respaldo verificado: ${OBJETOS} objeto(s), ${MB} MiB."
+          echo "Respaldo verificado: ${OBJETOS} objeto(s), ${KB} KiB (${BYTES} bytes)."
           {
             echo "OBJETOS=${OBJETOS}"
             echo "BYTES=${BYTES}"
+            echo "KB=${KB}"
             echo "MB=${MB}"
           } >> "$GITHUB_ENV"
 
@@ -213,7 +219,7 @@ jobs:
           # brusca respecto a días anteriores delata un export incompleto
           # aunque el job esté en verde.
           if [ -n "${MB:-}" ]; then
-            echo "- Contenido verificado: \`${OBJETOS} objeto(s)\`, \`${MB} MiB\`" >> "$GITHUB_STEP_SUMMARY"
+            echo "- Contenido verificado: \`${OBJETOS} objeto(s)\`, \`${KB} KiB\`" >> "$GITHUB_STEP_SUMMARY"
           else
             echo "- ⚠️ Contenido NO verificado (el job no llegó al paso de verificación)." >> "$GITHUB_STEP_SUMMARY"
           fi
