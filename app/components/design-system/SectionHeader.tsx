@@ -20,6 +20,18 @@ interface SectionHeaderProps {
   indicador?: ReactNode;
   /** Contador de elementos junto al título (ej: "5 resultados"). */
   contador?: string;
+  /**
+   * Aclaración normativa o de alcance, bajo el subtítulo.
+   *
+   * POR QUÉ EXISTE. Al migrar el Centro de Control Interno a este
+   * componente el 18-ago-2026 se perdió la frase «No reemplaza al
+   * funcionario que responde el radicado» — la única en pantalla que
+   * delimitaba la autoridad de Control Interno frente a quien tramita.
+   * El encabezado solo admitía título y subtítulo, así que el párrafo se
+   * cayó sin que nadie lo notara. No es texto decorativo: en una entidad
+   * pública, decir quién NO decide es parte del control.
+   */
+  nota?: ReactNode;
   /** Variante visual. */
   variante?: 'default' | 'compact' | 'highlight';
   /** Clases adicionales. */
@@ -32,6 +44,7 @@ export function SectionHeader({
   acciones,
   indicador,
   contador,
+  nota,
   variante = 'default',
   className = '',
 }: SectionHeaderProps) {
@@ -61,6 +74,14 @@ export function SectionHeader({
           {subtitulo && (
             <p className="text-[10px] mt-0.5" style={{ color: '#94A3B8' }}>
               {subtitulo}
+            </p>
+          )}
+          {/* --text-secondary, no --text-muted: una aclaración de alcance que
+              no se puede leer no delimita nada. #667085 sobre blanco rinde
+              5,3:1; el gris muted del proyecto se queda en 2,5:1. */}
+          {nota && (
+            <p className="text-[10px] mt-1 font-medium" style={{ color: 'var(--text-secondary)' }}>
+              {nota}
             </p>
           )}
         </div>

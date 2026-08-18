@@ -48,6 +48,7 @@ export function CentroControlInterno() {
       <SectionHeader
         titulo="Centro de Control Interno"
         subtitulo="Seguimiento a riesgos, hallazgos, planes de mejora y cumplimiento de las dependencias."
+        nota="Este módulo le permite revisar, registrar hallazgos y solicitar planes de mejora. No reemplaza al funcionario que responde el radicado."
         indicador={<span className="text-[10px] font-bold uppercase tracking-widest" style={{ color: '#14532D' }}>Oficina de Control Interno</span>}
       />
 
