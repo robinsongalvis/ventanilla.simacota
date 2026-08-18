@@ -22,7 +22,26 @@ import type { ReactNode } from 'react';
 interface MetricaItem {
   label: string;
   valor: number;
+  /**
+   * Color del FONDO tintado y del realce de activo. Es el tono que
+   * identifica el KPI (el mismo del riel de las tarjetas), no un color
+   * legible: al 7% sobre blanco sirve de fondo, como texto no.
+   */
   color: string;
+  /**
+   * Color del TEXTO, obligatorio y distinto de `color` a propósito.
+   *
+   * POR QUÉ ESTÁ SEPARADO Y POR QUÉ NO ES OPCIONAL. El 18-ago-2026 este
+   * componente pintaba el texto con `color`, que le llegaba como el tono
+   * del riel. «Por Vencer» quedó en 2,95:1 y «Devueltas / Prórroga» en
+   * 2,75:1, contra los 4,5:1 que exige WCAG AA — y son los avisos de
+   * vencimiento de términos (Ley 1755/2015), justo lo que la funcionaria
+   * necesita leer. ADR-0030 ya prohíbe esa confusión: si el color pinta
+   * TEXTO se usa la variante -text; si pinta fondo, franja o punto, el
+   * token base. Se deja OBLIGATORIO para que el compilador impida la
+   * tercera reincidencia, no solo la revisión humana.
+   */
+  colorTexto: string;
   /** Prioridad visual: crítica aparece siempre, demás se ocultan. */
   prioridad?: 'critica' | 'normal';
   onClick?: () => void;
@@ -74,7 +93,7 @@ export function MetricsSummary({
               } ${m.activo ? 'ring-2 ring-offset-1' : ''}`}
               style={{
                 background: `${m.color}12`,
-                color: m.color,
+                color: m.colorTexto,
                 boxShadow: m.activo ? `0 0 0 2px ${m.color}40` : undefined,
               }}
               aria-pressed={m.activo}
@@ -131,7 +150,7 @@ export function MetricsSummary({
               } ${m.activo ? 'ring-2 ring-offset-1' : ''}`}
               style={{
                 background: `${m.color}08`,
-                color: m.color,
+                color: m.colorTexto,
                 boxShadow: m.activo ? `0 0 0 2px ${m.color}40` : undefined,
               }}
               aria-pressed={m.activo}

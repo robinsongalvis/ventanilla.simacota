@@ -1178,16 +1178,18 @@ function TarjetasMIPG({
           label: t.label,
           valor: t.valor,
           color: t.rielColor,
+          colorTexto: t.textoColor,
           activo: filtroActivo === filtro,
           onClick: () => onFiltroChange(filtro),
         };
-      }).filter(Boolean) as { label: string; valor: number; color: string; activo: boolean; onClick: () => void }[]}
+      }).filter(Boolean) as { label: string; valor: number; color: string; colorTexto: string; activo: boolean; onClick: () => void }[]}
       secundarias={tarjetas
         .filter((t) => !FILTROS_GRANDES.includes(t.filtro as FiltroGrande))
         .map((t) => ({
           label: t.label,
           valor: t.valor,
           color: t.rielColor,
+          colorTexto: t.textoColor,
           activo: filtroActivo === t.filtro,
           onClick: () => onFiltroChange(t.filtro),
         }))}
