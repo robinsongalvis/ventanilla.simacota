@@ -86,12 +86,11 @@ import {
 import { puedeVerTodosLosTenants } from '@/lib/permisos/alcance-tenants';
 import { BarraFiltrosActivos } from '@/app/interno/dashboard/components/BarraFiltrosActivos';
 import type { EstadoFiltros, DimensionFiltro } from '@/lib/filtros-activos/resumir-filtros-activos';
-import { TarjetaMIPGGrande } from '@/app/interno/dashboard/components/TarjetaMIPGGrande';
+import { MetricsSummary } from '@/app/components/design-system/MetricsSummary';
+import { PriorityBanner } from '@/app/components/design-system/PriorityBanner';
 import {
-  radicadoMasCriticoPorFiltro,
   type FiltroGrande,
 } from '@/lib/kpis-mipg/radicado-mas-critico';
-import { tokensEstadoKpi } from '@/lib/kpis-mipg/tokens-estado-kpi';
 import { useFuncionariosTenant }              from '@/lib/hooks/useFuncionariosTenant';
 import type { FuncionarioTenant }             from '@/lib/hooks/useFuncionariosTenant';
 import type { ResponsableFuncionario }        from '@/lib/actions/asignarRadicado';
@@ -268,18 +267,6 @@ function calcularResumenBandeja(radicados: VentanillaRadicado[]): ResumenBandeja
     prioridadAlta: activos.filter((r) => r.prioridad === 'ROJO').length,
     siguiente: priorizados[0] ?? null,
   };
-}
-
-function mensajeSiguienteAccion(radicado: VentanillaRadicado | null): string {
-  if (!radicado) return 'No hay casos activos en esta bandeja.';
-
-  const dias = calcDiasRestantes(radicado);
-  if (dias < 0) return `Atender de inmediato: vencido hace ${Math.abs(dias)} dia${Math.abs(dias) !== 1 ? 's' : ''}.`;
-  if (dias === 0) return 'Atender hoy: vence durante la jornada actual.';
-  if (dias <= 2) return `Atender pronto: vence en ${dias} dia${dias !== 1 ? 's' : ''}.`;
-  if (radicado.prioridad === 'ROJO') return 'Revisar primero: prioridad MIPG alta.';
-  if (!radicado.clasificacion.funcionarioResponsableUid) return 'Asignar responsable funcional antes de iniciar gestion.';
-  return 'Caso activo con termino vigente.';
 }
 
 function puedeRadicar(usuario: UsuarioAutenticado): boolean {
@@ -924,12 +911,6 @@ interface TarjetaMIPGItem {
 
 /** Panel Op Nivel 3B — los 4 KPIs accionables van como tarjetas grandes. */
 const FILTROS_GRANDES: FiltroGrande[] = ['VENCIDAS', 'POR_VENCER', 'RADICADAS', 'ASIGNADAS'];
-const CRITICO_LABEL: Record<FiltroGrande, string> = {
-  VENCIDAS:   'Más crítico',
-  POR_VENCER: 'Más crítico',
-  RADICADAS:  'Más antiguo sin asignar',
-  ASIGNADAS:  'Más próximo a vencer',
-};
 
 /** Paleta operativa institucional: fondos claros + números y labels en
  *  tonos de alto contraste (-700/-800). Cada KPI se identifica por el
@@ -1074,8 +1055,6 @@ function TarjetasMIPG({
   onToggleCompacto,
   soloDatosIncompletos = false,
   onToggleDatosIncompletos,
-  radicados,
-  onAbrirRadicado,
 }: {
   metricas:       MetricasMIPGData;
   filtroActivo:   FiltroMIPG;
@@ -1089,10 +1068,6 @@ function TarjetasMIPG({
   onToggleCompacto?: () => void;
   soloDatosIncompletos?: boolean;
   onToggleDatosIncompletos?: () => void;
-  /** Panel Op Nivel 3B — lista completa para calcular el radicado
-   *  crítico de cada tarjeta grande. */
-  radicados:      VentanillaRadicado[];
-  onAbrirRadicado: (id: string) => void;
 }) {
   const tarjetas: TarjetaMIPGItem[] = construirTarjetasMIPG(metricas);
 
@@ -1189,279 +1164,35 @@ function TarjetasMIPG({
     );
   }
 
-  // Modo expandido (default): 4 tarjetas grandes con radicado crítico.
-  // Jerarquía por severidad (sprint tablero-jerarquia): Vencidas > 0 es
-  // la única tarjeta dominante; cualquier tarjeta en 0 se atenúa. Los
-  // 4 KPIs restantes se fusionaron en la banda "Estado operativo".
+  // Modo expandido (default): barra compacta de métricas (design system).
+  // Reemplaza las 4 tarjetas grandes por una fila horizontal que reduce
+  // la saturación visual y deja más espacio para la tabla principal.
+  // El detalle del radicado crítico se accede desde la tabla directamente.
   return (
-    <div className={`${cls.wrap} shrink-0 bg-white`} style={{ borderBottom: '1px solid #D9E2D9' }}>
-      <div className="flex gap-2 items-center mb-1.5">
-        {controlesTop}
-      </div>
-
-      <div className="flex gap-2 overflow-x-auto pb-1 items-stretch">
-        {FILTROS_GRANDES.map((filtro) => {
-          const t = porFiltro.get(filtro);
-          if (!t) return null;
-          return (
-            <TarjetaMIPGGrande
-              key={filtro}
-              label={t.label}
-              valor={t.valor}
-              icono={t.icono ?? null}
-              tokens={tokensEstadoKpi(filtro)}
-              criticoLabel={CRITICO_LABEL[filtro]}
-              activo={filtroActivo === filtro}
-              critico={radicadoMasCriticoPorFiltro(radicados, filtro)}
-              onFiltrar={() => onFiltroChange(filtro)}
-              onAbrirRadicado={onAbrirRadicado}
-              dominante={filtro === 'VENCIDAS' && t.valor > 0}
-              atenuada={t.valor === 0}
-            />
-          );
-        })}
-      </div>
-    </div>
-  );
-}
-
-function PanelOperacionDependencia({
-  usuario,
-  radicados,
-  onSeleccionar,
-  onFiltroChange,
-  bandejaMinimizada,
-  siguienteMinimizada,
-  onToggleBandeja,
-  onToggleSiguiente,
-}: {
-  usuario: UsuarioAutenticado;
-  radicados: VentanillaRadicado[];
-  onSeleccionar: (r: VentanillaRadicado) => void;
-  onFiltroChange: (f: FiltroMIPG) => void;
-  bandejaMinimizada: boolean;
-  siguienteMinimizada: boolean;
-  onToggleBandeja: () => void;
-  onToggleSiguiente: () => void;
-}) {
-  const resumen = useMemo(() => calcularResumenBandeja(radicados), [radicados]);
-  const siguiente = resumen.siguiente;
-  // Panel Op Nivel 1 — si el rol ve todos los tenants, los números del
-  // widget son municipales y la etiqueta debe decirlo (antes decía
-  // "Ventanilla Única" para la recepcionista, lo cual mentiría ahora).
-  const nombreAmbito = puedeVerTodosLosTenants(usuario.rol)
-    ? usuario.rol === 'RECEPCIONISTA' ? 'Vista municipal' : 'Vista institucional'
-    : NOMBRES_TENANT[usuario.tenantId];
-  const dias = siguiente ? calcDiasRestantes(siguiente) : null;
-
-  const ambosMinimizados = bandejaMinimizada && siguienteMinimizada;
-  return (
-    <section
-      className={`shrink-0 bg-[#F8FAF7] px-3 sm:px-4 ${ambosMinimizados ? 'py-1.5' : 'py-2'}`}
-      style={{ borderBottom: '1px solid #D9E2D9' }}
-    >
-      {/* Sprint tablero-jerarquia — la Bandeja operativa se compacta
-          (1fr) para que el hero de Siguiente atención (2fr) domine el
-          panorama visual, tal como pide la referencia Figma. */}
-      <div className="grid grid-cols-1 lg:grid-cols-[minmax(0,1fr)_minmax(0,2fr)] gap-2 sm:gap-3">
-        {/* Panel bandeja */}
-        {bandejaMinimizada ? (
-          <div
-            className="min-h-12 rounded-xl bg-white px-3 py-2 flex items-center justify-between gap-3 overflow-hidden"
-            style={{ border: '1px solid #D9E2D9' }}
-          >
-            <p className="min-w-0 truncate text-xs font-semibold" style={{ color: '#1F2933' }}>
-              <span className="font-black" style={{ color: '#14532D' }}>{nombreAmbito}</span>
-              <span style={{ color: '#667085' }}> · {resumen.totalActivos} activos · </span>
-              <span style={{ color: resumen.vencidos > 0 ? '#B91C1C' : '#667085' }}>{resumen.vencidos} vencidos</span>
-            </p>
-            <button
-              type="button"
-              onClick={onToggleBandeja}
-              className="shrink-0 min-h-9 rounded-lg border px-3 text-xs font-bold focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-700/30"
-              style={{ borderColor: '#D9E2D9', color: '#14532D', background: '#F8FAF7' }}
-              aria-expanded="false"
-            >
-              Mostrar
-            </button>
-          </div>
-        ) : (
-        <div className="micro-card-read rounded-xl px-3 py-2.5 bg-white" style={{ border: '1px solid #D9E2D9', boxShadow: '0 1px 3px rgba(20,83,45,0.06)' }}>
-          <div className="flex items-start justify-between gap-3">
-            <div className="min-w-0">
-              <p className="text-[10px] font-black uppercase tracking-widest" style={{ color: '#667085' }}>
-                Bandeja operativa
-              </p>
-              <h2 className="mt-0.5 text-sm font-black truncate" style={{ color: '#1F2933' }}>
-                {nombreAmbito}
-              </h2>
-            </div>
-            <div className="shrink-0 flex items-center gap-2">
-              <span className="rounded-full px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider border"
-                    style={{ background: '#EEF4EE', color: '#14532D', borderColor: '#D9E2D9' }}>
-                {usuario.rol}
-              </span>
-              <button
-                type="button"
-                onClick={onToggleBandeja}
-                className="min-h-9 rounded-lg px-2.5 text-[11px] font-bold"
-                style={{ color: '#14532D', background: '#F8FAF7', border: '1px solid #D9E2D9' }}
-                aria-expanded="true"
-              >
-                Minimizar
-              </button>
-            </div>
-          </div>
-
-          <div className="mt-2 grid grid-cols-3 sm:grid-cols-5 gap-2">
-            {[
-              { label: 'Activos',    value: resumen.totalActivos,    color: '#1F2933',  filtro: 'TODOS' as FiltroMIPG },
-              { label: 'Sin resp.',  value: resumen.sinResponsable,  color: '#B45309',  filtro: 'ASIGNADAS' as FiltroMIPG },
-              { label: 'Prioridad', value: resumen.prioridadAlta,   color: '#DC2626',  filtro: 'PRIORIDAD_MIPG' as FiltroMIPG },
-              { label: 'Por vencer', value: resumen.porVencer,      color: '#EA580C',  filtro: 'POR_VENCER' as FiltroMIPG },
-              { label: 'Vencidos',  value: resumen.vencidos,        color: '#DC2626',  filtro: 'VENCIDAS' as FiltroMIPG },
-            ].map((item) => (
-              <button
-                key={item.label}
-                type="button"
-                onClick={() => onFiltroChange(item.filtro)}
-                className="micro-card rounded-lg px-2 py-1.5 text-left focus-visible:outline-none"
-                style={{ border: '1px solid #D9E2D9', background: '#F8FAF7' }}
-                onMouseEnter={(e) => { (e.currentTarget as HTMLElement).style.background = '#EEF4EE'; }}
-                onMouseLeave={(e) => { (e.currentTarget as HTMLElement).style.background = '#F8FAF7'; }}
-              >
-                <p className="text-lg font-black tabular-nums leading-none" style={{ color: item.color }}>{item.value}</p>
-                <p className="mt-1 text-[9px] font-bold uppercase tracking-wider truncate" style={{ color: '#94A3B8' }}>
-                  {item.label}
-                </p>
-              </button>
-            ))}
-          </div>
-        </div>
-        )}
-
-        {/* Panel siguiente acción */}
-        {siguienteMinimizada ? (
-          <div
-            className="min-h-12 rounded-xl bg-white px-3 py-2 flex items-center justify-between gap-3 overflow-hidden"
-            style={{ border: '1px solid #D9E2D9' }}
-          >
-            <p className="min-w-0 truncate text-xs font-semibold" style={{ color: '#1F2933' }}>
-              <span className="font-black" style={{ color: '#14532D' }}>Siguiente atención</span>
-              <span style={{ color: dias !== null && dias < 0 ? '#B91C1C' : '#667085' }}>
-                {' · '}{mensajeSiguienteAccion(siguiente)}
-              </span>
-              {siguiente && <span className="font-mono" style={{ color: '#667085' }}> · {siguiente.radicadoId}</span>}
-            </p>
-            <button
-              type="button"
-              onClick={onToggleSiguiente}
-              className="shrink-0 min-h-9 rounded-lg border px-3 text-xs font-bold focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-700/30"
-              style={{ borderColor: '#D9E2D9', color: '#14532D', background: '#F8FAF7' }}
-              aria-expanded="false"
-            >
-              Mostrar
-            </button>
-          </div>
-        ) : (
-        <div
-          className="micro-card-read rounded-[14px] px-4 py-3 bg-white"
-          style={{ border: '1px solid #E3EAE3', borderLeft: '5px solid #14532D', boxShadow: '0 1px 3px rgba(20,50,30,0.06)' }}
-        >
-          <div className="flex items-start justify-between gap-3">
-            <div className="min-w-0 flex items-start gap-2.5">
-              <span
-                className="shrink-0 w-8 h-8 rounded-[10px] flex items-center justify-center"
-                style={{ background: '#EEF4EE', color: '#14532D' }}
-                aria-hidden="true"
-              >
-                <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2}>
-                  <path strokeLinecap="round" strokeLinejoin="round" d="M12 2c1 3-1 4-1 6a3 3 0 006 0c0-1 2 2 2 5a7 7 0 11-14 0c0-4 4-6 4-9 1 1 2 2 3 -2z" />
-                </svg>
-              </span>
-              <div className="min-w-0">
-                <p className="text-[10px] font-bold uppercase tracking-widest" style={{ color: '#5F8A6E' }}>
-                  Siguiente atención sugerida
-                </p>
-                {/* Principio 9 (IA copiloto): SIMI sugiere el orden de
-                    atención, la funcionaria decide si atenderlo o no —
-                    el botón "Atender" nunca actúa solo. */}
-                <p className="text-[9.5px] italic" style={{ color: '#94A3B8' }}>
-                  SIMI propone, usted decide
-                </p>
-                <p className={`mt-1 text-sm font-bold ${
-                  dias !== null && dias < 0
-                    ? 'text-rose-600'
-                    : dias !== null && dias <= 2
-                      ? 'text-orange-600'
-                      : ''
-                }`} style={dias === null || dias > 2 ? { color: '#12261A' } : {}}>
-                  {mensajeSiguienteAccion(siguiente)}
-                </p>
-              </div>
-            </div>
-            <div className="shrink-0 flex items-center gap-2">
-              <button
-                type="button"
-                onClick={onToggleSiguiente}
-                className="min-h-9 rounded-lg px-2.5 text-[11px] font-bold"
-                style={{ color: '#14532D', background: '#F8FAF7', border: '1px solid #D9E2D9' }}
-                aria-expanded="true"
-              >
-                Minimizar
-              </button>
-            {siguiente && (
-              <button
-                type="button"
-                onClick={() => onSeleccionar(siguiente)}
-                className="shrink-0 inline-flex items-center gap-1.5 rounded-lg px-4 py-2.5 text-sm font-bold focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-500/40 active:scale-95 transition-transform"
-                style={{ background: '#D4A017', color: '#3D2C00' }}
-              >
-                Atender
-                <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2.5}>
-                  <path strokeLinecap="round" strokeLinejoin="round" d="M5 12h14M13 6l6 6-6 6" />
-                </svg>
-              </button>
-            )}
-            </div>
-          </div>
-
-          {siguiente ? (
-            <div className="mt-2 grid grid-cols-1 sm:grid-cols-[minmax(150px,0.7fr)_minmax(0,1.6fr)_minmax(120px,0.6fr)] gap-3 text-xs">
-              <div className="min-w-0">
-                <p className="text-[9px] font-bold uppercase tracking-widest" style={{ color: '#94A3B8' }}>Radicado</p>
-                {/* Requisito legal — el número de radicado nunca se
-                    trunca: es el identificador oficial del trámite
-                    (AGN 060/2001). Puede envolver a dos líneas, no se
-                    recorta con ellipsis. */}
-                <p className="mt-1 font-mono font-bold break-words" style={{ color: '#14532D' }}>{siguiente.radicadoId}</p>
-              </div>
-              <div className="min-w-0">
-                <p className="text-[9px] font-bold uppercase tracking-widest" style={{ color: '#94A3B8' }}>Asunto</p>
-                <p
-                  className="mt-1 line-clamp-2"
-                  style={{ color: '#1F2933' }}
-                  title={siguiente.detalle.asunto}
-                >
-                  {siguiente.detalle.asunto}
-                </p>
-              </div>
-              <div className="min-w-0">
-                <p className="text-[9px] font-bold uppercase tracking-widest" style={{ color: '#94A3B8' }}>Responsable</p>
-                <p className="mt-1 truncate" style={{ color: '#1F2933' }}>
-                  {siguiente.clasificacion.funcionarioResponsableNombre ?? 'Sin asignar'}
-                </p>
-              </div>
-            </div>
-          ) : (
-            <p className="mt-2 text-xs" style={{ color: '#94A3B8' }}>
-              Cuando entren solicitudes activas, aquí aparecerá la prioridad operativa de la oficina.
-            </p>
-          )}
-        </div>
-        )}
-      </div>
-    </section>
+    <MetricsSummary
+      titulo="Métricas"
+      criticas={FILTROS_GRANDES.map((filtro) => {
+        const t = porFiltro.get(filtro);
+        if (!t) return null;
+        return {
+          label: t.label,
+          valor: t.valor,
+          color: t.rielColor,
+          activo: filtroActivo === filtro,
+          onClick: () => onFiltroChange(filtro),
+        };
+      }).filter(Boolean) as { label: string; valor: number; color: string; activo: boolean; onClick: () => void }[]}
+      secundarias={tarjetas
+        .filter((t) => !FILTROS_GRANDES.includes(t.filtro as FiltroGrande))
+        .map((t) => ({
+          label: t.label,
+          valor: t.valor,
+          color: t.rielColor,
+          activo: filtroActivo === t.filtro,
+          onClick: () => onFiltroChange(t.filtro),
+        }))}
+      acciones={controlesTop}
+    />
   );
 }
 
@@ -4593,10 +4324,6 @@ function DashboardInterior({ usuario, cerrarSesion }: { usuario: UsuarioAutentic
   const {
     modo: indicadoresModo,
     toggle: toggleIndicadoresModo,
-    bandejaMinimizada,
-    siguienteMinimizada,
-    toggleBandeja,
-    toggleSiguiente,
   } = useIndicadoresModo();
   const indicadoresCompactos = indicadoresModo === 'compacto';
   /** Roles de solo lectura: pueden ver pero no ejecutar acciones sobre radicados. */
@@ -5011,8 +4738,6 @@ function DashboardInterior({ usuario, cerrarSesion }: { usuario: UsuarioAutentic
               onToggleCompacto={toggleIndicadoresModo}
               soloDatosIncompletos={soloDatosIncompletos}
               onToggleDatosIncompletos={() => setSoloDatosIncompletos((v) => !v)}
-              radicados={todosLosRadicados}
-              onAbrirRadicado={(id) => abrirRadicadoPorId(id)}
             />
 
             {/* Panel Op Fase 2 — banda única "Estado operativo": KPIs
@@ -5049,16 +4774,52 @@ function DashboardInterior({ usuario, cerrarSesion }: { usuario: UsuarioAutentic
               onLimpiarTodo={limpiarTodosLosFiltros}
             />
 
-            <PanelOperacionDependencia
-              usuario={usuario}
-              radicados={todosLosRadicados}
-              onFiltroChange={(f) => dispatch({ type: 'SET_FILTRO_MIPG', filtro: f })}
-              onSeleccionar={(r) => dispatch({ type: 'SELECCIONAR_RADICADO', radicado: r })}
-              bandejaMinimizada={bandejaMinimizada}
-              siguienteMinimizada={siguienteMinimizada}
-              onToggleBandeja={toggleBandeja}
-              onToggleSiguiente={toggleSiguiente}
-            />
+            {/* Banner de prioridad — reemplaza la bandeja operativa +
+                siguiente atención sugerida. Versión compacta que muestra
+                solo lo crítico: el caso más urgente que necesita acción. */}
+            {(() => {
+              const resumen = calcularResumenBandeja(todosLosRadicados);
+              const siguiente = resumen.siguiente;
+              const dias = siguiente ? calcDiasRestantes(siguiente) : null;
+              const nivelBanner = dias !== null && dias < 0
+                ? 'critico'
+                : dias !== null && dias <= 2
+                  ? 'alerta'
+                  : 'normal';
+              const msgBanner = dias !== null && dias < 0
+                ? `Atender de inmediato: vencido hace ${Math.abs(dias)} día${Math.abs(dias) !== 1 ? 's' : ''}`
+                : dias !== null && dias === 0
+                  ? 'Atender hoy: vence durante la jornada actual'
+                  : dias !== null && dias <= 2
+                    ? `Atender pronto: vence en ${dias} día${dias !== 1 ? 's' : ''}`
+                    : siguiente
+                      ? 'Caso activo con término vigente'
+                      : 'No hay casos activos en esta bandeja';
+              return (
+                <div className="px-3 sm:px-4 py-2 shrink-0 bg-white" style={{ borderBottom: '1px solid #E5E7EB' }}>
+                  <PriorityBanner
+                    nivel={nivelBanner}
+                    mensaje={msgBanner}
+                    radicadoId={siguiente?.radicadoId}
+                    asunto={siguiente?.detalle.asunto}
+                    responsable={siguiente?.clasificacion.funcionarioResponsableNombre ?? undefined}
+                    accion={siguiente ? (
+                      <button
+                        type="button"
+                        onClick={() => dispatch({ type: 'SELECCIONAR_RADICADO', radicado: siguiente })}
+                        className="shrink-0 inline-flex items-center gap-1 rounded-lg px-3 py-1.5 text-xs font-bold transition-transform active:scale-95"
+                        style={{ background: '#D4A017', color: '#3D2C00' }}
+                      >
+                        Atender
+                        <svg className="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2.5}>
+                          <path strokeLinecap="round" strokeLinejoin="round" d="M5 12h14M13 6l6 6-6 6" />
+                        </svg>
+                      </button>
+                    ) : undefined}
+                  />
+                </div>
+              );
+            })()}
 
             {/* Tabla maestra */}
             <TablaRadicados

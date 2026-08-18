@@ -18,6 +18,7 @@ import {
   type TipoFrecuente,
   type MetricasGlobales,
 } from './useAnalytics';
+import { SectionHeader } from '@/app/components/design-system/SectionHeader';
 
 /* ══════════════════════════════════════════════════════════════
    PROPS
@@ -111,12 +112,7 @@ function AnilloSvg({ pct, color }: { pct: number; color: string }) {
 }
 
 function SeccionTitulo({ label, sub }: { label: string; sub?: string }) {
-  return (
-    <div className="mb-5">
-      <h3 className="text-base font-bold" style={{ color: '#1F2933' }}>{label}</h3>
-      {sub && <p className="text-[11px] mt-0.5" style={{ color: '#94A3B8' }}>{sub}</p>}
-    </div>
-  );
+  return <SectionHeader titulo={label} subtitulo={sub} variante="compact" />;
 }
 
 /* ── Sección KPIs ─────────────────────────────────────────── */
@@ -328,30 +324,24 @@ export function VistaAnalytics({ radicados, esAdmin, tenantIdUsuario }: Props) {
   return (
     <div className="flex-1 overflow-y-auto" style={{ background: '#F8FAF7' }}>
       {/* Header */}
-      <div className="sticky top-0 z-10 px-6 py-4 flex items-center justify-between shrink-0 bg-white"
-           style={{ borderBottom: '1px solid #D9E2D9', boxShadow: '0 1px 3px rgba(20,83,45,0.06)' }}>
-        <div>
-          <h2 className="text-sm font-bold" style={{ color: '#1F2933' }}>Centro de Inteligencia Operativa</h2>
-          <p className="text-[11px] mt-0.5" style={{ color: '#667085' }}>
-            {globales.totalPeriodo} radicados analizados · {totalBase} en ventana operativa
-          </p>
-        </div>
-
-        {/* Selector de período */}
-        <div className="flex items-center gap-1 rounded-xl p-1" style={{ background: '#EEF4EE', border: '1px solid #D9E2D9' }}>
-          {opciones.map((o) => (
-            <button key={String(o.valor)} onClick={() => setPeriodo(o.valor)}
-              className="px-3 py-1.5 rounded-lg text-[11px] font-bold transition-all duration-150"
-              style={periodo === o.valor
-                ? { background: '#14532D', color: '#ffffff' }
-                : { color: '#667085' }}
-              onMouseEnter={(e) => { if (periodo !== o.valor) (e.currentTarget as HTMLElement).style.color = '#1F2933'; }}
-              onMouseLeave={(e) => { if (periodo !== o.valor) (e.currentTarget as HTMLElement).style.color = '#667085'; }}>
-              {o.label}
-            </button>
-          ))}
-        </div>
-      </div>
+      <SectionHeader
+        titulo="Centro de Inteligencia Operativa"
+        subtitulo={`${globales.totalPeriodo} radicados analizados · ${totalBase} en ventana operativa`}
+        className="sticky top-0 z-10"
+        acciones={
+          <div className="flex items-center gap-1 rounded-xl p-1" style={{ background: '#EEF4EE', border: '1px solid #D9E2D9' }}>
+            {opciones.map((o) => (
+              <button key={String(o.valor)} onClick={() => setPeriodo(o.valor)}
+                className="px-3 py-1.5 rounded-lg text-[11px] font-bold transition-all duration-150"
+                style={periodo === o.valor
+                  ? { background: '#14532D', color: '#ffffff' }
+                  : { color: '#667085' }}>
+                {o.label}
+              </button>
+            ))}
+          </div>
+        }
+      />
 
       {/* Contenido */}
       <div className="p-6 space-y-6 max-w-6xl mx-auto">

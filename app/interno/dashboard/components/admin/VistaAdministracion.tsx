@@ -12,6 +12,9 @@ import { useCallback, useEffect, useState }  from 'react';
 import { DIRECTORIO_TENANTS, NOMBRES_TENANT } from '@/src/types/reglas-negocio';
 import type { TenantId }                      from '@/src/types/radicado';
 import type { RolInterno }                    from '@/lib/hooks/useAuth';
+import { SectionHeader } from '@/app/components/design-system/SectionHeader';
+import { StatusBadge } from '@/app/components/design-system/StatusBadge';
+import { EmptyState } from '@/app/components/design-system/EmptyState';
 
 /* ══════════════════════════════════════════════════════════════
    TIPOS
@@ -62,14 +65,6 @@ const TIPOS_USUARIO: { value: TipoUsuario; label: string }[] = [
 
 const DOMINIOS_INSTITUCIONALES = ['@simacota-santander.gov.co', '@simacota.gov.co'];
 
-const BADGE_ROL: Record<RolInterno, string> = {
-  ADMIN:            'bg-purple-50  text-purple-800 border-purple-200',
-  RECEPCIONISTA:    'bg-green-50   text-green-800  border-green-200',
-  FUNCIONARIO:      'bg-sky-50     text-sky-800    border-sky-200',
-  JEFE_DEPENDENCIA: 'bg-amber-50   text-amber-800  border-amber-200',
-  CONTROL_INTERNO:  'bg-rose-50    text-rose-800   border-rose-200',
-};
-
 const LABEL_ROL: Record<RolInterno, string> = {
   ADMIN:            'Admin',
   RECEPCIONISTA:    'Recepcionista',
@@ -78,10 +73,20 @@ const LABEL_ROL: Record<RolInterno, string> = {
   CONTROL_INTERNO:  'Control Int.',
 };
 
-const BADGE_TIPO: Record<TipoUsuario, string> = {
-  INSTITUCIONAL: 'bg-emerald-50 text-emerald-800 border-emerald-200',
-  UAT:           'bg-indigo-50  text-indigo-800  border-indigo-200',
-  PRUEBA:        'bg-slate-100  text-slate-700   border-slate-200',
+/** Mapeo de rol a tono de StatusBadge. */
+const rolTono: Record<RolInterno, 'danger' | 'info' | 'success' | 'accent' | 'warning'> = {
+  ADMIN:            'danger',
+  RECEPCIONISTA:    'info',
+  FUNCIONARIO:      'success',
+  JEFE_DEPENDENCIA: 'accent',
+  CONTROL_INTERNO:  'warning',
+};
+
+/** Mapeo de tipo de usuario a tono de StatusBadge. */
+const tipoTono: Record<TipoUsuario, 'success' | 'info' | 'neutral'> = {
+  INSTITUCIONAL: 'success',
+  UAT:           'info',
+  PRUEBA:        'neutral',
 };
 
 /* ══════════════════════════════════════════════════════════════
@@ -239,40 +244,27 @@ export function VistaAdministracion() {
   return (
     <div className="flex h-full min-h-0 flex-1 flex-col overflow-hidden" style={{ background: '#F8FAF7' }}>
       {/* Header */}
-      <div className="shrink-0 px-4 sm:px-6 py-4 sm:py-6 bg-white" style={{ borderBottom: '1px solid #D9E2D9' }}>
-        <div className="flex items-start justify-between gap-3">
-          <div>
-            <p className="text-[10px] font-bold uppercase tracking-widest mb-1" style={{ color: '#14532D' }}>
-              Administración
-            </p>
-            <h1 className="text-xl font-black" style={{ fontFamily: 'var(--font-manrope)', color: '#1F2933' }}>
-              Usuarios Internos
-            </h1>
-            <p className="text-xs font-semibold mt-1" style={{ color: '#14532D' }}>
-              Matriz UAT por Roles
-            </p>
-            <p className="text-xs mt-1" style={{ color: '#667085' }}>
-              {totalActivos} activo{totalActivos !== 1 ? 's' : ''}
-              {totalInactivos > 0 && <> · {totalInactivos} inactivo{totalInactivos !== 1 ? 's' : ''}</>}
-              {totalArchivados > 0 && <> · {totalArchivados} archivado{totalArchivados !== 1 ? 's' : ''}</>}
-            </p>
-          </div>
+      <SectionHeader
+        titulo="Usuarios Internos"
+        subtitulo={`${totalActivos} activo${totalActivos !== 1 ? 's' : ''}${totalInactivos > 0 ? ` · ${totalInactivos} inactivo${totalInactivos !== 1 ? 's' : ''}` : ''}${totalArchivados > 0 ? ` · ${totalArchivados} archivado${totalArchivados !== 1 ? 's' : ''}` : ''}`}
+        indicador={<span className="text-[10px] font-bold uppercase tracking-widest" style={{ color: '#14532D' }}>Administración</span>}
+        acciones={
           <button
             type="button"
             onClick={() => setShowModal(true)}
-            className="flex items-center gap-2 px-4 py-2.5 rounded-xl text-white text-sm font-bold transition-all active:scale-[0.97]"
+            className="flex items-center gap-2 px-4 py-2.5 rounded-xl text-white text-sm font-bold micro-btn-primary"
             style={{ background: '#14532D' }}
-            onMouseEnter={(e) => { (e.currentTarget as HTMLElement).style.background = '#166534'; }}
-            onMouseLeave={(e) => { (e.currentTarget as HTMLElement).style.background = '#14532D'; }}
           >
             <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
               <path strokeLinecap="round" strokeLinejoin="round" d="M12 4.5v15m7.5-7.5h-15" />
             </svg>
             Crear usuario
           </button>
-        </div>
+        }
+      />
 
-        <div className="grid grid-cols-2 lg:grid-cols-5 gap-2 mt-4">
+      <div className="shrink-0 px-4 sm:px-6 py-4 bg-white" style={{ borderBottom: '1px solid #D9E2D9' }}>
+        <div className="grid grid-cols-2 lg:grid-cols-5 gap-2">
           {[
             ['Activos', totalActivos, '#DCFCE7', '#166534'],
             ['Institucionales', totalInstitucionales, '#ECFDF5', '#047857'],
@@ -360,17 +352,12 @@ export function VistaAdministracion() {
             <span className="text-sm">Cargando usuarios...</span>
           </div>
         ) : filtrados.length === 0 ? (
-          <div className="text-center py-16">
-            <p className="text-3xl mb-3">👤</p>
-            <p className="font-bold" style={{ color: '#667085' }}>
-              {busqueda ? 'Sin resultados' : 'No hay usuarios registrados'}
-            </p>
-            <p className="text-xs mt-1" style={{ color: '#94A3B8' }}>
-              {busqueda
-                ? 'Intenta con otro término de búsqueda.'
-                : 'Crea el primer usuario con el botón "Crear usuario".'}
-            </p>
-          </div>
+          <EmptyState
+            titulo={busqueda ? 'Sin resultados' : 'No hay usuarios registrados'}
+            descripcion={busqueda
+              ? 'Intenta con otro término de búsqueda.'
+              : 'Crea el primer usuario con el botón "Crear usuario".'}
+          />
         ) : (
           <div className="overflow-x-auto rounded-xl bg-white" style={{ border: '1px solid #D9E2D9', boxShadow: '0 1px 3px rgba(20,83,45,0.06)' }}>
             <table className="w-full text-left">
@@ -411,17 +398,17 @@ export function VistaAdministracion() {
                       <p className="text-xs" style={{ color: '#667085' }}>{u.cargo || '—'}</p>
                     </td>
                     <td className="px-4 py-3">
-                      <span className={`inline-flex px-2 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wide border ${BADGE_ROL[u.rol] ?? 'bg-gray-100 text-gray-600 border-gray-200'}`}>
+                      <StatusBadge tono={rolTono[u.rol] ?? 'neutral'} tamano="sm">
                         {LABEL_ROL[u.rol] ?? u.rol}
-                      </span>
+                      </StatusBadge>
                     </td>
                     <td className="px-4 py-3">
                       <p className="text-xs" style={{ color: '#667085' }}>{NOMBRES_TENANT[u.tenantId] ?? u.tenantId}</p>
                     </td>
                     <td className="px-4 py-3">
-                      <span className={`inline-flex px-2 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wide border ${BADGE_TIPO[u.tipoUsuario] ?? BADGE_TIPO.INSTITUCIONAL}`}>
+                      <StatusBadge tono={tipoTono[u.tipoUsuario] ?? 'neutral'} tamano="sm">
                         {u.tipoUsuario}
-                      </span>
+                      </StatusBadge>
                     </td>
                     <td className="px-4 py-3">
                       <p className="text-xs" style={{ color: '#667085' }}>
@@ -429,11 +416,13 @@ export function VistaAdministracion() {
                       </p>
                     </td>
                     <td className="px-4 py-3">
-                      <span className={`inline-flex items-center gap-1.5 text-xs font-semibold ${u.activo && !u.archivado ? 'text-green-700' : ''}`}
-                            style={u.archivado ? { color: '#92400E' } : !u.activo ? { color: '#94A3B8' } : {}}>
-                        <span className={`w-1.5 h-1.5 rounded-full ${u.archivado ? 'bg-amber-500' : u.activo ? 'bg-green-500' : 'bg-gray-300'}`} />
+                      <StatusBadge
+                        tono={u.archivado ? 'warning' : u.activo ? 'success' : 'neutral'}
+                        conPunto
+                        tamano="sm"
+                      >
                         {u.archivado ? 'Archivado' : u.activo ? 'Activo' : 'Inactivo'}
-                      </span>
+                      </StatusBadge>
                     </td>
                     {/* Acciones */}
                     <td className="px-4 py-3">

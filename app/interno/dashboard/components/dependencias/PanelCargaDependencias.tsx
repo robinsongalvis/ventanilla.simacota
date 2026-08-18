@@ -5,6 +5,7 @@ import type { TenantId } from '@/src/types/radicado';
 import { useCargaDependencias, type AlertaTono, type CargaDependencia } from './useCargaDependencias';
 import { filtroMipgParaCelda, type CeldaDependencia } from './filtro-celda';
 import { useVentanilla, type FiltroMIPG } from '@/lib/store/ventanillaStore';
+import { SectionHeader } from '@/app/components/design-system/SectionHeader';
 
 /* ── Paleta institucional clara por tono ──────────────────────── */
 
@@ -210,19 +211,11 @@ export function PanelCargaDependencias({ radicados }: { radicados: VentanillaRad
     <div className="flex-1 flex flex-col overflow-hidden min-h-0 bg-[#F8FAF7]">
 
       {/* Header */}
-      <div className="flex items-center justify-between gap-4 px-5 py-4 bg-white shrink-0"
-           style={{ borderBottom: '1px solid #D9E2D9' }}>
-        <div>
-          <p className="text-[10px] font-bold uppercase tracking-widest" style={{ color: '#14532D' }}>
-            Panel Operacional
-          </p>
-          <h2 className="text-base font-black mt-0.5" style={{ color: '#1F2933' }}>Carga por Dependencia</h2>
-        </div>
-        <span className="flex items-center gap-1.5 text-[10px]" style={{ color: '#667085' }}>
-          <span className="w-1.5 h-1.5 rounded-full bg-green-500 animate-pulse" />
-          Tiempo real
-        </span>
-      </div>
+      <SectionHeader
+        titulo="Carga por Dependencia"
+        subtitulo="Panel Operacional"
+        indicador={<span className="w-1.5 h-1.5 rounded-full bg-green-500 animate-pulse" />}
+      />
 
       {/* KPI cards */}
       <div className="px-5 py-3 shrink-0 bg-white" style={{ borderBottom: '1px solid #D9E2D9' }}>
