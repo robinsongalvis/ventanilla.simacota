@@ -11,16 +11,29 @@
  *
  * QUÉ COMPRUEBA:
  *  1. Que las colecciones que sostienen el servicio EXISTEN y no están vacías.
- *  2. Que los consecutivos legales no tienen huecos ni duplicados, con el
- *     MISMO detector que usa la auditoría diaria — no una copia.
- *  3. Que los contadores concuerdan con los documentos que hay.
+ *  2. Que los consecutivos legales no tienen DUPLICADOS, con el MISMO
+ *     detector que usa la auditoría diaria — no una copia.
+ *  3. Que ninguna serie con contador en marcha se quedó sin NINGÚN
+ *     documento del año, que es la firma de una restauración que perdió datos.
+ *
+ * QUÉ **NO** COMPRUEBA, dicho explícitamente para que nadie lea de más en un
+ * veredicto verde: no detecta pérdidas PARCIALES. Los huecos no se tratan
+ * como fallo porque en producción también existen por causas legítimas (R3
+ * del registro de riesgos), y no hay aquí un oráculo del conteo real de
+ * producción contra el cual comparar. Un verde dice «las colecciones tienen
+ * datos y los consecutivos son coherentes», no «no falta ni un documento».
  *
  * SOLO LECTURA. Nunca escribe. Está pensado para correr contra la base
  * DESECHABLE del ensayo (`drill-*` en stage), jamás contra producción; el
  * llamador es quien elige la base con `--base`.
  *
  * Uso:
- *   node scripts/backups/verificar-restauracion.mjs --proyecto <id> --base <db>
+ *   node scripts/backups/verificar-restauracion.mjs --proyecto <id> --base <db> [--anio AAAA]
+ *
+ * `--anio` es el año del RESPALDO restaurado. Sin él se usa el año en curso,
+ * que es correcto solo mientras respaldo y corrida caigan en el mismo año:
+ * un ensayo disparado en enero sobre un respaldo de diciembre verificaría un
+ * año sin documentos y saldría verde sin haber comprobado nada.
  */
 import { getFirestore } from 'firebase-admin/firestore';
 import { applicationDefault, getApps, initializeApp } from 'firebase-admin/app';
@@ -42,9 +55,18 @@ function arg(nombre) {
 
 const proyecto = arg('--proyecto');
 const base = arg('--base');
+const anioArg = arg('--anio');
 
 if (!proyecto || !base) {
-  console.error('Uso: node scripts/backups/verificar-restauracion.mjs --proyecto <id> --base <db>');
+  console.error('Uso: node scripts/backups/verificar-restauracion.mjs --proyecto <id> --base <db> [--anio AAAA]');
+  process.exit(1);
+}
+
+// Un `--anio` mal formado se rechaza en vez de degradar en silencio al año en
+// curso: si el llamador se molestó en pasarlo, verificar otro año sería
+// exactamente el falso verde que este parámetro existe para evitar.
+if (anioArg !== undefined && !/^\d{4}$/.test(anioArg)) {
+  console.error(`--anio debe ser un año de cuatro cifras; se recibió "${anioArg}".`);
   process.exit(1);
 }
 if (proyecto === PROYECTO_PROD) {
@@ -84,7 +106,8 @@ for (const coleccion of COLECCIONES_CRITICAS) {
 // que no restaurar.
 lineas.push('');
 lineas.push('CONSECUTIVOS:');
-const anio = new Date().getUTCFullYear();
+const anio = anioArg ? Number(anioArg) : new Date().getUTCFullYear();
+lineas.push(`  (año verificado: ${anio}${anioArg ? ' — tomado del respaldo' : ' — año en curso, no se indicó --anio'})`);
 for (const [serie, coleccion] of Object.entries(COLECCION_POR_SERIE)) {
   const counterSnap = await db.doc(`counters/${serie}-${anio}`).get();
   const ultimo = Number(counterSnap.data()?.ultimo ?? 0);
