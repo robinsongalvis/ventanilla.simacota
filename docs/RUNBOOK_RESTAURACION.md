@@ -215,6 +215,7 @@ Verificado en prod el 2026-08-06 (vía `gcloud firestore databases describe`):
   ejecutó su primer export con éxito (run `31088181768`) a
   `gs://ventanilla-simacota-backups/diario/2026-08-06/` (≈ 361 KB). Aprovisionamiento:
   `setup-gcp-backups.sh` + secrets WIF + `iamcredentials.googleapis.com` habilitada
-  (esta última **falta añadirla al script**). Con ≥1 export verificado, la precondición
+  (el script la habilita solo desde el PR #152, junto con `iam`/`firestore`/`storage`).
+  Con ≥1 export verificado, la precondición
   de backup para el reset de producción queda cumplida (el reset sigue requiriendo
   orden explícita del propietario).
