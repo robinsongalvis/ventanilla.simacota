@@ -40,9 +40,11 @@ describe('parsearFechaHistoricaANoonISO', () => {
   it('"YYYY-MM-DD" válido → ISO anclado al MISMO día civil (no se corre un día por TZ)', () => {
     const r = parsearFechaHistoricaANoonISO('2026-01-06');
     expect(r).not.toBeNull();
-    // El día civil de Bogotá del resultado debe seguir siendo 6, no 5
-    // (regresión del defecto documentado: atLocalNoon() reinterpretaría
-    // este string como instante UTC y perdería un día).
+    // El día civil de Bogotá del resultado debe seguir siendo 6, no 5.
+    // (Históricamente esto protegía contra un defecto de atLocalNoon(), que
+    // reinterpretaba el string como instante UTC y perdía un día; desde el
+    // rescate del PR #156 la raíz está corregida y ambas rutas delegan en
+    // fechaCivilANoon — este test vigila que la delegación no regrese.)
     const partes = new Intl.DateTimeFormat('en-CA', { timeZone: 'America/Bogota', year: 'numeric', month: '2-digit', day: '2-digit' }).formatToParts(new Date(r!.iso));
     const dia = partes.find((p) => p.type === 'day')?.value;
     expect(dia).toBe('06');

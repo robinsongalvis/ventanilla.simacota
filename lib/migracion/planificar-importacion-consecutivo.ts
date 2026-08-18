@@ -125,6 +125,7 @@ import type { DatosPredio, Actuacion } from '@/lib/motor-expedientes/tipos';
 // ejecución con `lib/server/`): reutiliza la forma exacta del documento que
 // ya escriben las demás rutas de expedientes, sin duplicar la interfaz.
 import type { ExpedienteLicenciaDoc } from '@/lib/server/expedientes-licencias';
+import { fechaCivilANoon } from '@/lib/tiempos-radicado';
 
 /* ──────────────────────────────────────────────
    Snapshot de entrada (contrato con el JSON copiado a `scripts/migracion/datos/`)
@@ -356,44 +357,26 @@ export interface PlanImportacion {
    Utilidades puras de parseo (sin reimplementar `atLocalNoon`)
 ────────────────────────────────────────────── */
 
-const RE_FECHA_ISO = /^(\d{4})-(\d{2})-(\d{2})$/;
 
 /**
- * Parsea `fechaSolicitud` ("YYYY-MM-DD", ya un DÍA CIVIL sin ambigüedad de
- * huso horario — no un instante) a un ISO 8601 anclado al mediodía de ese
- * mismo día. Misma CONVENCIÓN de representación que `atLocalNoon`
- * (`lib/tiempos-radicado.ts`) — de ahí "atLocalNoon-compatible" — pero
- * deliberadamente SIN llamarla: `atLocalNoon` reinterpreta su entrada como
- * un INSTANTE (hace `new Date(value)` y vuelve a extraer el día civil vía
- * `Intl`/America-Bogota); para un string "solo fecha", `new Date(...)` lo
- * parsea como MEDIANOCHE UTC, y ese instante cae el día CIVIL ANTERIOR en
- * Bogotá (UTC−5) — verificado empíricamente:
- * `atLocalNoon('2026-01-06')` da día civil "05", no "06". Como
- * `fechaSolicitud` YA ES un día civil (no un instante que haya que
- * reinterpretar), la transformación correcta toma sus tres componentes
- * literales y los ancla al mediodía directamente — sin ningún paso por
- * huso horario intermedio.
+ * Parsea `fechaSolicitud` ("YYYY-MM-DD", ya un DÍA CIVIL — no un instante) a
+ * un ISO 8601 anclado al mediodía de ese día. Devuelve `null` (nunca lanza,
+ * nunca inventa) ante cualquier otro formato o una fecha calendario imposible
+ * — el caller manda el registro a cuarentena en vez de asumir un valor.
  *
- * Devuelve `null` (nunca lanza, nunca inventa) ante cualquier formato
- * distinto de "YYYY-MM-DD" o una fecha calendario imposible (p. ej.
- * "2026-02-30", que `Date` "normalizaría" en vez de rechazar) — el caller
- * manda el registro a cuarentena en vez de asumir un valor.
+ * HISTORIA. Esto fue una COPIA PRIVADA del parseo, mantenida a propósito
+ * porque `atLocalNoon` reinterpretaba un string de solo fecha como instante
+ * UTC y perdía un día (defecto que documentaba el test de este módulo).
+ * El rescate del PR #156 (18-ago-2026) arregló la raíz: `atLocalNoon` ya
+ * trata "YYYY-MM-DD" como día civil, y la lógica vive UNA sola vez en
+ * `fechaCivilANoon` (lib/tiempos-radicado.ts). Aquí solo queda el adaptador
+ * al contrato de este módulo ({iso, año} | null).
  */
 export function parsearFechaHistoricaANoonISO(texto: string | undefined | null): { iso: string; año: number } | null {
   if (!texto) return null;
-  const m = RE_FECHA_ISO.exec(texto.trim());
-  if (!m) return null;
-  const year = Number(m[1]);
-  const month = Number(m[2]);
-  const day = Number(m[3]);
-  const fecha = new Date(year, month - 1, day, 12, 0, 0, 0);
-  // Guarda contra fechas calendario imposibles: el constructor de `Date`
-  // "normaliza" en vez de fallar (p. ej. día 30 de febrero se convierte en
-  // 2 de marzo) — comparar contra los componentes originales lo detecta.
-  if (fecha.getFullYear() !== year || fecha.getMonth() !== month - 1 || fecha.getDate() !== day) {
-    return null;
-  }
-  return { iso: fecha.toISOString(), año: year };
+  const fecha = fechaCivilANoon(texto);
+  if (!fecha) return null;
+  return { iso: fecha.toISOString(), año: fecha.getFullYear() };
 }
 
 /* ──────────────────────────────────────────────
