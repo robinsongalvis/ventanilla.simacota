@@ -2748,25 +2748,34 @@ function PanelDerecho({
               </div>
             )}
 
+            {/* Tema CLARO. Este bloque nació el 28-may-2026, cuando todo el
+                flujo interno era oscuro, y la unificación visual del 1-jun se
+                lo saltó: quedó pintando `bg-slate-950/40` y `text-slate-300`
+                sobre el panel claro, lo que daba un gris #96989D con el
+                resumen a 1,94:1 y las etiquetas a 1,03:1 — ilegible. Y es
+                justo el bloque que la funcionaria necesita leer para decidir
+                (Principio 9: la IA propone, el funcionario decide).
+                Colores: tokens de ADR-0030 para los estados, e índigo (el
+                acento de IA en toda la app) en su versión clara. */}
             {radicado.analisisIa && (
-              <div className="border-t border-white/[0.07] pt-4">
+              <div className="pt-4" style={{ borderTop: '1px solid var(--color-border)' }}>
                 <div className="flex items-center justify-between mb-3">
                   <div className="flex items-center gap-1.5">
                     <span className="relative flex h-2 w-2">
-                      <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-indigo-400 opacity-75"></span>
-                      <span className="relative inline-flex rounded-full h-2 w-2 bg-indigo-500"></span>
+                      <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-indigo-500 opacity-75"></span>
+                      <span className="relative inline-flex rounded-full h-2 w-2 bg-indigo-600"></span>
                     </span>
-                    <span className="text-[10px] font-bold uppercase tracking-widest text-indigo-400">Análisis Asistido IA</span>
+                    <span className="text-[10px] font-bold uppercase tracking-widest text-indigo-700">Análisis Asistido IA</span>
                   </div>
-                  <span className="text-[10px] text-indigo-300 font-semibold bg-indigo-500/10 px-2 py-0.5 rounded-md border border-indigo-500/20">
+                  <span className="text-[10px] text-indigo-700 font-semibold bg-indigo-50 px-2 py-0.5 rounded-md border border-indigo-200">
                     Confianza: {(radicado.analisisIa.confianzaClasificacion * 100).toFixed(0)}%
                   </span>
                 </div>
 
-                <div className="space-y-3 bg-slate-950/40 p-4 rounded-xl border border-white/10">
+                <div className="space-y-3 bg-white p-4 rounded-xl" style={{ border: '1px solid var(--color-border)' }}>
                   <div>
-                    <span className="text-[9px] font-bold uppercase tracking-widest text-slate-500 block mb-1">Resumen Ejecutivo IA</span>
-                    <p className="text-xs text-slate-300 italic leading-relaxed">
+                    <span className="text-[9px] font-bold uppercase tracking-widest block mb-1" style={{ color: 'var(--text-secondary)' }}>Resumen Ejecutivo IA</span>
+                    <p className="text-xs italic leading-relaxed" style={{ color: 'var(--text-primary)' }}>
                       &quot;{radicado.analisisIa.resumenEjecutivo}&quot;
                     </p>
                   </div>
@@ -2776,7 +2785,7 @@ function PanelDerecho({
                       {radicado.analisisIa.etiquetasSemanticas.map((tag) => (
                         <span
                           key={tag}
-                          className="inline-flex items-center rounded-md bg-indigo-500/10 px-2 py-0.5 text-[9px] font-medium text-indigo-400 border border-indigo-500/20"
+                          className="inline-flex items-center rounded-md bg-indigo-50 px-2 py-0.5 text-[9px] font-medium text-indigo-700 border border-indigo-200"
                         >
                           #{tag}
                         </span>
@@ -2785,30 +2794,42 @@ function PanelDerecho({
                   )}
 
                   {/* Feedback de IA */}
-                  <div className="border-t border-white/[0.05] pt-3 flex items-center justify-between gap-3">
-                    <span className="text-[9px] font-bold uppercase tracking-widest text-slate-500">¿La IA acertó?</span>
-                    
+                  <div className="pt-3 flex items-center justify-between gap-3" style={{ borderTop: '1px solid var(--color-border)' }}>
+                    <span className="text-[9px] font-bold uppercase tracking-widest" style={{ color: 'var(--text-secondary)' }}>¿La IA acertó?</span>
+
                     {radicado.feedbackIa ? (
-                      <span className={`text-[10px] font-bold uppercase px-2 py-0.5 rounded-md ${
-                        radicado.feedbackIa.puntuacion === 'POSITIVO'
-                          ? 'bg-emerald-500/10 border border-emerald-500/30 text-emerald-400'
-                          : radicado.feedbackIa.puntuacion === 'CORREGIDO'
-                            ? 'bg-amber-500/10 border border-amber-500/30 text-amber-400'
-                            : 'bg-rose-500/10 border border-rose-500/30 text-rose-400'
-                      }`}>
+                      <span
+                        className={`text-[10px] font-bold uppercase px-2 py-0.5 rounded-md border ${
+                          radicado.feedbackIa.puntuacion === 'POSITIVO'
+                            ? 'bg-emerald-50 border-emerald-200'
+                            : radicado.feedbackIa.puntuacion === 'CORREGIDO'
+                              ? 'bg-amber-50 border-amber-200'
+                              : 'bg-rose-50 border-rose-200'
+                        }`}
+                        style={{
+                          color:
+                            radicado.feedbackIa.puntuacion === 'POSITIVO'
+                              ? 'var(--color-success-text)'
+                              : radicado.feedbackIa.puntuacion === 'CORREGIDO'
+                                ? 'var(--color-warning-text)'
+                                : 'var(--color-danger-text)',
+                        }}
+                      >
                         Calificado: {radicado.feedbackIa.puntuacion}
                       </span>
                     ) : (
                       <div className="flex items-center gap-2">
                         <button
                           onClick={() => enviarFeedbackIA('POSITIVO')}
-                          className="px-2.5 py-1 rounded-md bg-slate-800 hover:bg-slate-700 hover:text-emerald-400 border border-white/10 text-xs font-medium transition-colors cursor-pointer"
+                          className="px-2.5 py-1 rounded-md bg-white hover:bg-emerald-50 text-xs font-medium transition-colors cursor-pointer"
+                          style={{ border: '1px solid var(--color-border)', color: 'var(--text-primary)' }}
                         >
                           👍 Sí
                         </button>
                         <button
                           onClick={() => enviarFeedbackIA('NEGATIVO')}
-                          className="px-2.5 py-1 rounded-md bg-slate-800 hover:bg-slate-700 hover:text-rose-400 border border-white/10 text-xs font-medium transition-colors cursor-pointer"
+                          className="px-2.5 py-1 rounded-md bg-white hover:bg-rose-50 text-xs font-medium transition-colors cursor-pointer"
+                          style={{ border: '1px solid var(--color-border)', color: 'var(--text-primary)' }}
                         >
                           ❌ No
                         </button>
