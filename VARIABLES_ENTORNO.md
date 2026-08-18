@@ -138,6 +138,9 @@ Estas variables FALTAN en `.env.local` y deben agregarse:
 - `EMAIL_HOST`, `EMAIL_USER`, `EMAIL_PASS` ❌
 - `CRON_SECRET` ❌
 - `NEXT_PUBLIC_APP_URL` ❌
-- `SENTRY_DSN` ❌ (opcional)
+- `SENTRY_DSN` ❌ (opcional — **desde el 18-ago el código de arranque está listo**:
+  con `SENTRY_DSN` + `NEXT_PUBLIC_SENTRY_DSN` en Vercel, los errores de servidor,
+  navegador y frontera global llegan a Sentry con la PII depurada; sin ellas, no-op
+  total. Ver `instrumentation.ts` y ADR-0025 medida G7)
 
 El archivo `.env.local` está en `.gitignore` — nunca se sube al repositorio. ✅

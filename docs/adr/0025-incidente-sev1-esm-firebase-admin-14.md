@@ -104,7 +104,7 @@ Las medidas G/D eran **seguimiento con dueños y disparadores propios**, no cond
 | **G3/G4** smoke-test post-deploy + bypass automation | ⏳ **ABIERTO** |
 | **G5** política de majors (triaje N3, matriz de runtime demostrada) | ✅ **VIGENTE** (reforzada por el gate de auditoría gobernado, ADR-0028) |
 | **G6** backups Firestore | ✅ **RESUELTO** (workflow verificado 17-ago #194 · ensayo de restauración ejecutado 18-ago, corrida `32087393598`) |
-| **G7** Sentry forense | ⏳ **ABIERTO** (no configurado; forense aún depende de logs de Vercel) |
+| **G7** Sentry forense | 🟡 **CÓDIGO LISTO (18-ago)** — `instrumentation.ts` + `instrumentation-client.ts` + `app/global-error.tsx`, con PII depurada (`sanitizarEventoSentry`, H-N03), `sendDefaultPii: false`, sin Replay y solo errores; guardas en `__tests__/sentry-arranque.test.ts`. **Activación pendiente del propietario:** crear el proyecto en sentry.io y poner `SENTRY_DSN` + `NEXT_PUBLIC_SENTRY_DSN` en Vercel — sin DSN todo es no-op |
 | **D1** retiro del override `jose@^5` | 🗓️ **PROGRAMADO** (revisión trimestral, primera 2026-10-31; override `^5` vigente) |
 | **D2** scope anidado del override | ⏳ antes del próximo bump de `firebase-admin` |
 | **D3** gate ESM ampliado | ⏳ a evaluar |
