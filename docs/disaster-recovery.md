@@ -69,8 +69,10 @@ no había Cloud Scheduler, ni Action, ni script. Ya no es así.
 - Workflow `.github/workflows/backup-firestore.yml` — export diario de Firestore
   de producción a `gs://ventanilla-simacota-backups/diario/YYYY-MM-DD/`, a las
   02:00 hora Colombia (07:00 UTC), más disparo manual de prueba.
-- `scripts/backups/setup-gcp-backups.sh` — provisión idempotente de bucket,
-  retención (30 días vía lifecycle), service account de backups e IAM mínimo.
+- `scripts/backups/setup-gcp-backups.sh` — provisión idempotente: habilitación de
+  las APIs requeridas (`iamcredentials`/`iam`/`firestore`/`storage`), bucket,
+  retención (30 días vía lifecycle), service account de backups, IAM mínimo y
+  federación de identidad (WIF) opcional.
 - `scripts/backups/export-firestore.sh` — export manual equivalente para correr
   desde una máquina con `gcloud`.
 
@@ -92,7 +94,11 @@ manual verificado (GitHub Actions run `31088181768`, `success`) en
 `gs://ventanilla-simacota-backups/diario/2026-08-06/` (`overall_export_metadata` +
 `output-0/1`); tamaño del export ≈ **361 KB**. El aprovisionamiento requirió —además
 de `setup-gcp-backups.sh` + los secrets WIF— habilitar `iamcredentials.googleapis.com`
-(necesaria para la impersonación WIF; **falta añadirla al script**). Con ≥1 export
+(necesaria para la impersonación WIF). El primer intento (run `31087985656`) falló con
+`403 SERVICE_DISABLED` y la API se activó a mano; ese hueco **ya está cerrado en el
+script** (PR #152): `setup-gcp-backups.sh` habilita esa API —y `iam`/`firestore`/
+`storage`— ANTES de crear SA/IAM/WIF, de modo que una provisión limpia queda completa
+en una sola pasada. Con ≥1 export
 durable verificado, la precondición de backup para el reset de producción queda
 **cumplida** (el reset sigue requiriendo tu orden explícita).
 
