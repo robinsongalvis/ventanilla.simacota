@@ -10,6 +10,9 @@ import {
 } from '@/lib/mi-gestion/calcular-mi-gestion';
 import { misPendientes, type NivelPendiente } from '@/lib/mi-gestion/mis-pendientes';
 import { planDeSemana } from '@/lib/mi-gestion/plan-semana';
+import { SectionHeader } from '@/app/components/design-system/SectionHeader';
+import { StatusBadge } from '@/app/components/design-system/StatusBadge';
+import { EmptyState } from '@/app/components/design-system/EmptyState';
 
 /* ══════════════════════════════════════════════════════════════
    Sprint Mi gestión — dashboard personal del funcionario.
@@ -98,29 +101,20 @@ export function VistaMiGestion({ radicados, usuario, onAbrirRadicado, ahora }: V
   return (
     <div className="flex-1 overflow-y-auto min-h-0" style={{ background: '#F8FAF7' }}>
       {/* ── Header con chip de semáforo ── */}
-      <div
-        className="flex items-center justify-between gap-3 px-4 md:px-6 pt-4 pb-3 bg-white"
-        style={{ borderBottom: '1px solid #E3EAE3' }}
-      >
-        <div className="min-w-0">
-          <div className="flex items-center gap-2">
-            <span className="text-[10px] font-bold uppercase tracking-[0.12em]" style={{ color: '#5F8A6E' }}>
-              Mi gestión · desempeño personal
-            </span>
-            <span className="w-1.5 h-1.5 rounded-full shrink-0" style={{ background: '#3B9E5F' }} />
-            <span className="text-[10px]" style={{ color: '#7A8B7F' }}>tiempo real</span>
-          </div>
-          <p className="text-lg font-black leading-tight mt-0.5 truncate" style={{ color: '#12261A' }}>
-            {usuario.nombre} · {NOMBRES_TENANT[usuario.tenantId] ?? usuario.tenantId}
-          </p>
-        </div>
-        <span
-          className="text-[11px] font-semibold px-3 py-1 rounded-full shrink-0"
-          style={{ background: chip.bg, color: chip.texto, border: `1px solid ${chip.borde}` }}
-        >
-          {chip.label}
-        </span>
-      </div>
+      <SectionHeader
+        titulo={`${usuario.nombre} · ${NOMBRES_TENANT[usuario.tenantId] ?? usuario.tenantId}`}
+        subtitulo="Mi gestión · desempeño personal"
+        indicador={<span className="w-1.5 h-1.5 rounded-full shrink-0" style={{ background: '#3B9E5F' }} />}
+        acciones={
+          <StatusBadge
+            tono={g.semaforo === 'VERDE' ? 'success' : g.semaforo === 'AMBAR' ? 'warning' : 'danger'}
+            conPunto
+            tamano="md"
+          >
+            {chip.label}
+          </StatusBadge>
+        }
+      />
 
       {/* ── Barra de cumplimiento con zonas y marcador ── */}
       <div className="px-4 md:px-6 pt-4 pb-1 bg-white" style={{ borderBottom: '1px solid #E3EAE3' }}>
@@ -168,13 +162,9 @@ export function VistaMiGestion({ radicados, usuario, onAbrirRadicado, ahora }: V
       {/* ── Atiende primero + tendencia semanal ── */}
       <div className="grid gap-3 px-4 md:px-6 pb-4 grid-cols-1 md:grid-cols-2">
         <div className="rounded-xl bg-white px-3.5 py-3" style={{ border: '1px solid #E3EAE3' }}>
-          <p className="text-[10.5px] font-bold uppercase tracking-widest mb-2" style={{ color: '#854F0B' }}>
-            Atiende primero
-          </p>
+          <SectionHeader titulo="Atiende primero" variante="compact" />
           {g.atencionPrioritaria.length === 0 ? (
-            <p className="text-xs py-2" style={{ color: '#7A8B7F' }}>
-              Sin urgencias: nada vence en los próximos 2 días.
-            </p>
+            <EmptyState titulo="Sin urgencias" descripcion="Nada vence en los próximos 2 días." />
           ) : (
             g.atencionPrioritaria.map((a, i) => (
               <button
@@ -203,9 +193,7 @@ export function VistaMiGestion({ radicados, usuario, onAbrirRadicado, ahora }: V
         </div>
 
         <div className="rounded-xl bg-white px-3.5 py-3" style={{ border: '1px solid #E3EAE3' }}>
-          <p className="text-[10.5px] font-bold uppercase tracking-widest mb-2" style={{ color: '#5F8A6E' }}>
-            Respondidos por semana
-          </p>
+          <SectionHeader titulo="Respondidos por semana" variante="compact" />
           <div className="flex items-end gap-2" style={{ height: 64 }}>
             {g.tendencia.map((s) => (
               <div
@@ -239,30 +227,26 @@ export function VistaMiGestion({ radicados, usuario, onAbrirRadicado, ahora }: V
       {/* ── Tu semana: cómo se distribuyen los vencimientos ── */}
       <div className="px-4 md:px-6 pb-3">
         <div className="rounded-xl bg-white px-3.5 py-3" style={{ border: '1px solid #E3EAE3' }}>
-          <div className="flex items-center justify-between gap-2 flex-wrap mb-2">
-            <p className="text-[10.5px] font-bold uppercase tracking-widest" style={{ color: '#5F8A6E' }}>
-              Tu semana
-            </p>
-            <div className="flex items-center gap-2">
-              {semana.vencidos > 0 && (
-                <span
-                  className="text-[10.5px] font-semibold px-2 py-0.5 rounded-full"
-                  style={{ background: '#FCEBEB', color: '#791F1F' }}
-                >
-                  {semana.vencidos} ya vencido{semana.vencidos !== 1 ? 's' : ''}
-                </span>
-              )}
-              {semana.despues > 0 && (
-                <span className="text-[10.5px]" style={{ color: '#7A8B7F' }}>
-                  +{semana.despues} después de esta semana
-                </span>
-              )}
-            </div>
-          </div>
+          <SectionHeader
+            titulo="Tu semana"
+            variante="compact"
+            acciones={
+              <>
+                {semana.vencidos > 0 && (
+                  <StatusBadge tono="danger" tamano="sm">
+                    {semana.vencidos} ya vencido{semana.vencidos !== 1 ? 's' : ''}
+                  </StatusBadge>
+                )}
+                {semana.despues > 0 && (
+                  <span className="text-[10.5px]" style={{ color: '#7A8B7F' }}>
+                    +{semana.despues} después de esta semana
+                  </span>
+                )}
+              </>
+            }
+          />
           {semana.totalSemana === 0 && semana.vencidos === 0 ? (
-            <p className="text-xs py-1" style={{ color: '#7A8B7F' }}>
-              Nada te vence esta semana.
-            </p>
+            <EmptyState titulo="Semana despejada" descripcion="Nada te vence esta semana." />
           ) : (
             <div className="grid grid-cols-7 gap-1.5">
               {semana.dias.map((d) => (
@@ -297,18 +281,13 @@ export function VistaMiGestion({ radicados, usuario, onAbrirRadicado, ahora }: V
       {/* ── Mis pendientes: la cola completa de trabajo ── */}
       <div className="px-4 md:px-6 pb-5">
         <div className="rounded-xl bg-white px-3.5 py-3" style={{ border: '1px solid #E3EAE3' }}>
-          <div className="flex items-baseline justify-between gap-2 mb-2">
-            <p className="text-[10.5px] font-bold uppercase tracking-widest" style={{ color: '#5F8A6E' }}>
-              Mis pendientes
-            </p>
-            <span className="text-[11px] tabular-nums" style={{ color: '#7A8B7F' }}>
-              {pendientes.length} radicado{pendientes.length !== 1 ? 's' : ''}
-            </span>
-          </div>
+          <SectionHeader
+            titulo="Mis pendientes"
+            variante="compact"
+            contador={`${pendientes.length} radicado${pendientes.length !== 1 ? 's' : ''}`}
+          />
           {pendientes.length === 0 ? (
-            <p className="text-xs py-2" style={{ color: '#7A8B7F' }}>
-              No tienes radicados pendientes — bandeja limpia.
-            </p>
+            <EmptyState titulo="Bandeja limpia" descripcion="No tienes radicados pendientes." />
           ) : (
             pendientes.map((p, i) => {
               const chip = CHIP_PENDIENTE[p.nivel];
