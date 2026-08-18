@@ -403,6 +403,20 @@ curso, texto del aviso de silencio positivo (con jurídica).
 
 ## 8. Plan por fases sugerido
 
+> **Nota sobre la numeración de fases (18-ago-2026).** La numeración de este §8 fue la
+> propuesta original y NO es la que quedó operativa: el plan
+> (`docs/planes/PLAN_FASES_MOTOR_EXPEDIENTES.md`) desglosó la Fase 0 de aquí en sus
+> Fases 0–3 y desplazó el resto. **La numeración canónica es la del plan** — es la que usan
+> los PdC, el PR #162, el ADR-0029 y el código en producción. Las menciones de fase de este
+> documento (y de las adendas del ADR-0026 que lo citan) se leen con esta tabla:
+>
+> | Hito | PLAN_FASES (canónico) | Este §8 |
+> |---|---|---|
+> | Cimientos, definición de trámite, intake y paneles | Fases 0–3 | Fase 0 |
+> | Resolución de Licencia de Construcción | Fase 4 | Fase 1 |
+> | Migración de expedientes | Fase 5 | Fase 2 |
+> | Segundo trámite e históricos bajo demanda | «Después» (sin número) | Fases 3 y 4 |
+
 **Precondiciones bloqueantes (antes de cualquier código):**
 1. `[VALIDACIÓN EXTERNA]` **Concepto jurídico formal** de la oficina jurídica de la Alcaldía sobre
    §4 (revisión previa reglada, silencio positivo, doble numeración AGN, constancias) + **acto

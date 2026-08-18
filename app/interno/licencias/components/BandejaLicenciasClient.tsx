@@ -147,7 +147,9 @@ export function BandejaLicenciasClient({ onAbrirExpediente, onIrALibroConsecutiv
     void cargar();
   }, [cargandoAuth, usuario, cargar]);
 
-  // R9: los RECONSTRUIDOS (si algún día llegan por migración, Fase 5) nunca
+  // R9: los RECONSTRUIDOS (si algún día llegan por migración — Fase 5 en la
+  // numeración canónica del PLAN_FASES_MOTOR_EXPEDIENTES; el blueprint §8 y
+  // las adendas del ADR-0026 llaman «Fase 2» a esa misma etapa) nunca
   // cuentan para los KPIs — mismo principio que aplicaban los fixtures.
   const kpis = useMemo(() => {
     const contables = expedientes.filter((e) => !esReconstruido(e));

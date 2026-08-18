@@ -1,7 +1,21 @@
 # Plan de implementación por fases — Motor de Expedientes (primer caso: Licencia de Construcción)
 
+> **Nota sobre la numeración de fases (18-ago-2026).** Este plan y el §8 del blueprint
+> (`docs/blueprints/CN-motor-expedientes-administrativos.md`) numeran las MISMAS etapas con
+> números distintos, y las adendas del ADR-0026 citan fases mezclando ambas numeraciones.
+> **La numeración canónica es la de ESTE plan**, porque es la que usan los registros de
+> ejecución que ya están en main — los PdC, el PR #162 («arranque de Fase 2»), el ADR-0029 y
+> los comentarios del código — y renumerarla contradiría esa historia escrita. Equivalencia:
+>
+> | Hito | Este plan (canónico) | Blueprint §8 / adendas ADR-0026 |
+> |---|---|---|
+> | Cimientos, definición de trámite, intake y paneles | Fases 0–3 | Fase 0 |
+> | Resolución de Licencia de Construcción | Fase 4 | Fase 1 |
+> | Migración de expedientes | Fase 5 | Fase 2 |
+> | Segundo trámite e históricos bajo demanda | «Después» (sin número) | Fases 3 y 4 |
+
 > **Estado: PROPUESTA PARA APROBACIÓN. No se escribe código todavía.** Base: ADR-0026 + blueprint v2. Cada fase con criterio de terminado, revisión cruzada y PdC del propietario, como la pieza angular. La Licencia de Construcción es la **primera instancia** del motor, no un módulo aparte.
-> **Precondiciones globales (bloquean la Fase 1 en adelante):** concepto jurídico formal (hito de radicación + plazo de revisión previa + competencia), checklist oficial completo (falta pág. 2), validación con la Secretaría de Planeación. La Fase 0 puede avanzar sin ellas.
+> **Precondiciones globales (bloquean la Fase 1 en adelante):** concepto jurídico formal (hito de radicación + plazo de revisión previa + competencia), checklist oficial completo (cumplida el 11-ago-2026: formato oficial F-PGD-009 v02 íntegro, commit `960491d`), validación con la Secretaría de Planeación. La Fase 0 puede avanzar sin ellas.
 
 ## Principios (todas las fases)
 Una fase = un PR con CI verde + revisión cruzada · escritura server-side · evidencia por entrega · rollback definido · PdC del propietario · **nada toca producción de Simacota** (el módulo se prueba en stage cuando exista — coordinar con el frente de entornos). Regla de autorización de 6 pasos vigente para cualquier acción que toque un servicio.

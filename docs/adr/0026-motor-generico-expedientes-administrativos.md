@@ -41,7 +41,7 @@ El multi-tenant existente permite que el motor sirva a otras dependencias. La **
 
 ## Precondiciones para levantar la suspensión e implementar
 1. **Concepto jurídico formal** de la oficina jurídica de la Alcaldía sobre: el hito de radicación (D5), el plazo reglado de la revisión previa, el silencio positivo, y el acto administrativo del alcalde que designa la competencia de expedir en Planeación. **BLOQUEANTE.**
-2. **Checklist oficial completo** (hoy tenemos "página 1 de 2" de Licencia — `docs/blueprints/requisitos-licencia-construccion-obra-nueva.md`).
+2. **Checklist oficial completo** (hoy tenemos "página 1 de 2" de Licencia — `docs/blueprints/requisitos-licencia-construccion-obra-nueva.md`). **Nota (18-ago-2026): CUMPLIDA — ver Adenda 2026-08-18.**
 3. **Validación con la Secretaría de Planeación** (flujo real, búsqueda, campos del predio).
 4. Los pre-requisitos de seguridad de datos de D9 (guard monotónico en counters) implementados y verificados antes de la serie `expedientes`.
 
@@ -101,3 +101,23 @@ Criterios vinculantes de revisión cruzada para **todo** PR de la Fase 1:
 4. Toda **excepción arquitectónica** se documenta **mediante ADR antes de implementarse**.
 
 Si durante la Fase 1 una decisión rompe estos principios, se **detiene el desarrollo**, se revisa la arquitectura y se corrige el rumbo antes de continuar.
+
+---
+
+## Adenda 2026-08-18 — Corrección de la precondición #2 y aviso sobre la numeración de fases
+
+**Precondición #2 (checklist oficial completo): CUMPLIDA desde el 11-ago-2026.** La frase
+«hoy tenemos ‘página 1 de 2’ de Licencia» quedó obsoleta: el propietario aportó el formato
+oficial íntegro (**F-PGD-009 v02**, aprobado el 15-01-2024, archivado en `docs/blueprints/`)
+y la Definición de Licencia quedó declarada COMPLETA contra ese formato, requisito por
+requisito (commit `960491d`). Sigue abierta solo la confirmación de práctica con el
+ingeniero de Planeación — validación humana, no un hueco del checklist.
+
+**Aviso sobre la numeración de fases.** Las menciones «Fase N» de este ADR y de sus adendas
+siguen mayormente la numeración del §8 del blueprint, con alguna mezcla (p. ej. la deuda #7
+usa «Fase 1» en el sentido del plan). La numeración **canónica y operativa** es la de
+`docs/planes/PLAN_FASES_MOTOR_EXPEDIENTES.md` — la usada por los PdC, el PR #162, el
+ADR-0029 y el código —; la tabla de equivalencia está al inicio de ese plan y en el §8 del
+blueprint. En particular: «segundo trámite (Fase 3)» de A1 = etapa «Después» del plan, y la
+«Fase 2 — Migración» del blueprint = **Fase 5** del plan. Este ADR sigue siendo vinculante
+en sus decisiones (D1–D9, A1–A3); esta nota solo desambigua las etiquetas de fase.
