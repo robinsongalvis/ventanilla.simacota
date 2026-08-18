@@ -8,6 +8,12 @@
 # reales de ciudadanos dentro, esa esperanza era el único plan de
 # continuidad del municipio.
 #
+# PRIMERA EJECUCIÓN CON ÉXITO: 18-ago-2026, corrida 32087393598. El respaldo
+# del 17-ago se restauró en la base desechable `drill-2026-08-17-7` de stage
+# y el verificador dictaminó RESTAURACIÓN VÁLIDA. Conviene repetirlo cada vez
+# que cambie el modelo de datos o el procedimiento de respaldo: un ensayo que
+# se hizo una vez y nunca más vuelve a ser una esperanza.
+#
 # QUÉ TOCA Y QUÉ NO. Todo lo que ESCRIBE ocurre en STAGE, en una base de
 # datos desechable que se crea y se borra en la misma corrida. De
 # producción solo se LEE el bucket de respaldos. Producción no se modifica
