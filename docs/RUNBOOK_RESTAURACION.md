@@ -2,8 +2,16 @@
 
 **Objetivo:** restaurar un export de respaldo de Firestore y **verificar que es
 recuperable**, sin tocar producción. Es la contraparte de restauración del respaldo
-descrito en `docs/disaster-recovery.md` §3 (procedimiento **definido**; el drill
-end-to-end contra un export real queda **pendiente** hasta el primer export durable).
+descrito en `docs/disaster-recovery.md` §3.
+
+> **EJECUTADO el 18-ago-2026.** El drill end-to-end contra un export real de
+> producción dejó de ser teoría: corrida
+> [`32087393598`](https://github.com/robinsongalvis/ventanilla.simacota/actions/runs/32087393598),
+> respaldo del 17-ago-2026, restaurado en la base desechable
+> `drill-2026-08-17-7` de stage y verificado con
+> `scripts/backups/verificar-restauracion.mjs`. Veredicto: **RESTAURACIÓN
+> VÁLIDA**. Se automatiza en `.github/workflows/drill-restauracion.yml` y se
+> dispara a mano. Detalle en §6.
 
 > **Regla de oro:** una restauración de *ensayo* (drill) SIEMPRE va a **STAGE**
 > (`ventanilla-simacota-stage`), **NUNCA** a producción (`ventanilla-unica-f31b1`).
