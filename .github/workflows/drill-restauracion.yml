@@ -224,7 +224,9 @@ jobs:
 
       - uses: actions/setup-node@v7
         with:
-          node-version: 22
+          # Fuente única de la versión de Node (G2, ADR-0025): si se fija aquí
+          # a mano, .nvmrc deja de ser fuente única el día que divergen.
+          node-version-file: '.nvmrc'
           cache: 'npm'
 
       # El paso de verificación corre un script Node que importa
