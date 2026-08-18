@@ -5,6 +5,8 @@ import { NOMBRES_TENANT } from '@/src/types/reglas-negocio';
 import type { SalidaOficial } from '@/src/types/salida';
 import { formatFechaCortaColombia } from '@/lib/fecha-colombia';
 import { SelloDespacho } from './SelloDespacho';
+import { SectionHeader } from '@/app/components/design-system/SectionHeader';
+import { EmptyState } from '@/app/components/design-system/EmptyState';
 
 /* ══════════════════════════════════════════════════════════════
    Sprint Radicación de salida — libro de correspondencia despachada.
@@ -60,25 +62,24 @@ export function VistaSalidas({
 
   return (
     <div className="flex-1 overflow-y-auto px-4 sm:px-6 py-6" style={{ background: '#F8FAF7' }}>
-      <div className="flex items-start justify-between gap-4 mb-4 flex-wrap">
-        <div>
-          <p className="text-[10px] font-bold uppercase tracking-[0.12em] mb-1" style={{ color: '#8A6A12' }}>
-            Correspondencia despachada
-          </p>
-          <h2 className="text-xl font-black" style={{ color: '#12261A' }}>Libro de salidas</h2>
-        </div>
-        <button
-          type="button"
-          onClick={onNuevaSalida}
-          className="inline-flex items-center gap-1.5 text-[13px] font-bold px-4 py-2.5 rounded-[10px] transition-opacity hover:opacity-90"
-          style={{ background: '#D4A017', color: '#3D2C00', border: '1px solid #B8890F' }}
-        >
-          <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2.5}>
-            <path strokeLinecap="round" strokeLinejoin="round" d="M12 5v14M5 12h14" />
-          </svg>
-          Registrar salida
-        </button>
-      </div>
+      <SectionHeader
+        titulo="Libro de salidas"
+        subtitulo="Correspondencia despachada"
+        indicador={<span className="w-1.5 h-1.5 rounded-full shrink-0" style={{ background: '#8A6A12' }} />}
+        acciones={
+          <button
+            type="button"
+            onClick={onNuevaSalida}
+            className="inline-flex items-center gap-1.5 text-[13px] font-bold px-4 py-2.5 rounded-[10px] transition-opacity hover:opacity-90"
+            style={{ background: '#D4A017', color: '#3D2C00', border: '1px solid #B8890F' }}
+          >
+            <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2.5}>
+              <path strokeLinecap="round" strokeLinejoin="round" d="M12 5v14M5 12h14" />
+            </svg>
+            Registrar salida
+          </button>
+        }
+      />
 
       <div className="mb-4">
         <input
@@ -101,11 +102,12 @@ export function VistaSalidas({
       {cargando && salidas.length === 0 ? (
         <p className="text-xs" style={{ color: '#7A8B7F' }}>Cargando libro de salidas…</p>
       ) : visibles.length === 0 ? (
-        <p className="text-xs" style={{ color: '#7A8B7F' }}>
-          {salidas.length === 0
+        <EmptyState
+          titulo={salidas.length === 0 ? 'Sin salidas registradas' : 'Sin resultados'}
+          descripcion={salidas.length === 0
             ? 'Aún no hay salidas registradas. La primera correspondencia despachada aparecerá aquí con su número 2-SAL.'
             : 'Ninguna salida coincide con la búsqueda.'}
-        </p>
+        />
       ) : (
         <div className="rounded-xl bg-white overflow-hidden" style={{ border: '1px solid #E3EAE3' }}>
           {visibles.map((s, i) => (

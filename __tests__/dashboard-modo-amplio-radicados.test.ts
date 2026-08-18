@@ -19,19 +19,15 @@ describe('Dashboard — vista amplia de radicados', () => {
   });
 
   it('permite minimizar y mostrar cada tarjeta individualmente', () => {
-    expect(dashboard).toContain('bandejaMinimizada ? (');
-    expect(dashboard).toContain('siguienteMinimizada ? (');
-    expect(dashboard).toContain('onClick={onToggleBandeja}');
-    expect(dashboard).toContain('onClick={onToggleSiguiente}');
-    expect(dashboard).toContain('Minimizar');
-    expect(dashboard).toContain('Mostrar');
+    expect(dashboard).toContain('Minimizar paneles');
+    expect(dashboard).toContain('Mostrar paneles');
+    expect(dashboard).toContain('onToggleCompacto={toggleIndicadoresModo}');
+    expect(dashboard).toContain('indicadoresCompactos');
   });
 
   it('mantiene barras compactas y la tabla visible con más espacio', () => {
-    expect(dashboard).toContain('min-h-12 rounded-xl');
-    expect(dashboard).toContain('{resumen.totalActivos} activos');
-    expect(dashboard).toContain('{resumen.vencidos} vencidos');
-    expect(dashboard).toContain('<PanelOperacionDependencia');
+    expect(dashboard).toContain('<PriorityBanner');
+    expect(dashboard).toContain('<BarraKpisOperativos');
     expect(dashboard).toContain('<TarjetasMIPG');
     expect(dashboard).toContain('<TablaRadicados');
   });
@@ -67,8 +63,8 @@ describe('Dashboard — vista amplia de radicados', () => {
 
   it('evita desbordamiento horizontal en las barras móviles', () => {
     expect(dashboard).toContain('overflow-hidden');
-    expect(dashboard).toContain('min-w-0 truncate text-xs');
-    expect(dashboard).toContain('shrink-0 min-h-9');
-    expect(dashboard).toContain('grid grid-cols-1 lg:grid-cols');
+    expect(dashboard).toContain('overflow-x-auto');
+    expect(dashboard).toContain('min-w-0');
+    expect(dashboard).toContain('shrink-0');
   });
 });

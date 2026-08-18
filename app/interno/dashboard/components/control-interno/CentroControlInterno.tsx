@@ -14,6 +14,7 @@ import { PanelHallazgos } from './PanelHallazgos';
 import { PanelPlanesMejora } from './PanelPlanesMejora';
 import { PanelDependenciasControl } from './PanelDependenciasControl';
 import { PanelReportesControl } from './PanelReportesControl';
+import { SectionHeader } from '@/app/components/design-system/SectionHeader';
 
 type PestanaCi =
   | 'PANORAMA'
@@ -44,20 +45,12 @@ export function CentroControlInterno() {
   return (
     <div className="space-y-4">
       {/* Encabezado institucional */}
-      <header className="rounded-2xl bg-white p-5 sm:p-6" style={{ border: '1px solid #D9E2D9', boxShadow: '0 1px 3px rgba(20,83,45,0.06)' }}>
-        <p className="text-[10px] font-bold uppercase tracking-widest" style={{ color: '#14532D' }}>
-          Oficina de Control Interno
-        </p>
-        <h1 className="mt-1 text-xl sm:text-2xl font-black" style={{ color: '#1F2933', fontFamily: 'var(--font-manrope)' }}>
-          Centro de Control Interno
-        </h1>
-        <p className="mt-1 text-xs sm:text-sm" style={{ color: '#667085' }}>
-          Seguimiento a riesgos, hallazgos, planes de mejora y cumplimiento de las dependencias.
-        </p>
-        <p className="mt-2 text-[10px] font-medium" style={{ color: '#94A3B8' }}>
-          Este módulo le permite revisar, registrar hallazgos y solicitar planes de mejora. No reemplaza al funcionario que responde el radicado.
-        </p>
-      </header>
+      <SectionHeader
+        titulo="Centro de Control Interno"
+        subtitulo="Seguimiento a riesgos, hallazgos, planes de mejora y cumplimiento de las dependencias."
+        nota="Este módulo le permite revisar, registrar hallazgos y solicitar planes de mejora. No reemplaza al funcionario que responde el radicado."
+        indicador={<span className="text-[10px] font-bold uppercase tracking-widest" style={{ color: '#14532D' }}>Oficina de Control Interno</span>}
+      />
 
       {/* Pestañas */}
       <nav className="flex flex-wrap gap-2">

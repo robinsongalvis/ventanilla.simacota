@@ -2,8 +2,16 @@
 
 **Objetivo:** restaurar un export de respaldo de Firestore y **verificar que es
 recuperable**, sin tocar producción. Es la contraparte de restauración del respaldo
-descrito en `docs/disaster-recovery.md` §3 (procedimiento **definido**; el drill
-end-to-end contra un export real queda **pendiente** hasta el primer export durable).
+descrito en `docs/disaster-recovery.md` §3.
+
+> **EJECUTADO el 18-ago-2026.** El drill end-to-end contra un export real de
+> producción dejó de ser teoría: corrida
+> [`32087393598`](https://github.com/robinsongalvis/ventanilla.simacota/actions/runs/32087393598),
+> respaldo del 17-ago-2026, restaurado en la base desechable
+> `drill-2026-08-17-7` de stage y verificado con
+> `scripts/backups/verificar-restauracion.mjs`. Veredicto: **RESTAURACIÓN
+> VÁLIDA**. Se automatiza en `.github/workflows/drill-restauracion.yml` y se
+> dispara a mano. Detalle en §6.
 
 > **Regla de oro:** una restauración de *ensayo* (drill) SIEMPRE va a **STAGE**
 > (`ventanilla-simacota-stage`), **NUNCA** a producción (`ventanilla-unica-f31b1`).
@@ -26,8 +34,25 @@ gestionados*, que solo restauran dentro del mismo proyecto).
 
 ## 0. Requisitos previos
 
-- `gcloud` autenticado con permiso de import en **stage** (`roles/datastore.importExportAdmin`
-  sobre `ventanilla-simacota-stage`) y lectura del bucket de respaldos.
+- `gcloud` autenticado contra **stage** con permisos suficientes:
+  - **Si va a restaurar sobre una base que YA existe:** basta
+    `roles/datastore.importExportAdmin` sobre `ventanilla-simacota-stage`.
+  - **Si va a crear una base nueva** (§3 y el ensayo automatizado lo hacen):
+    hace falta `roles/datastore.owner` sobre `ventanilla-simacota-stage`.
+    `importExportAdmin` **no alcanza**: no incluye `datastore.databases.create`
+    ni `datastore.databases.delete`. Verificado el 17-ago-2026 contra la
+    documentación oficial de IAM de Firestore, tras una corrida fallida.
+    El rol va sobre **stage**, nunca sobre producción.
+- Lectura del bucket de respaldos, que vive en el proyecto de **producción**.
+  Son **dos identidades distintas** y ninguna hereda de la otra:
+  - quien ejecuta `gcloud` (lista y elige el respaldo) → `roles/storage.objectViewer`;
+  - el *service agent* de Firestore de stage (lee los archivos durante el
+    import) → `roles/storage.objectViewer` **y** `roles/storage.legacyBucketReader`,
+    porque `objectViewer` no incluye `storage.buckets.get`. Ambos de solo lectura.
+
+  > El workflow `drill-restauracion.yml` sondea esto solo y escribe en el
+  > resumen de la corrida los comandos exactos, ya rellenados con la
+  > identidad y el número de proyecto reales.
 - Credencial de servicio de **stage** para la verificación (el `.env.stage` del
   laboratorio, con `FIREBASE_SERVICE_ACCOUNT` apuntando a stage — ver
   `.env.stage.example` y `scripts/laboratorio/instalar-service-account.mjs`).

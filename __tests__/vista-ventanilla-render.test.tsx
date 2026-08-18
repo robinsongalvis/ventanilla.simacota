@@ -71,7 +71,7 @@ describe('Mostrador — VistaVentanilla', () => {
   /* 1 · header propio del mostrador */
   it('muestra el header "Atención al ciudadano" con su eyebrow', () => {
     render(<VistaVentanilla {...props()} />);
-    expect(screen.getByText(/Mostrador de atención/i)).toBeTruthy();
+    expect(screen.getByRole('heading', { name: /Atención al ciudadano/i })).toBeTruthy();
     expect(screen.getByText(/Ventanilla · Atención al ciudadano/i)).toBeTruthy();
   });
 

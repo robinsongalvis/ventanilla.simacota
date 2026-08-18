@@ -119,8 +119,12 @@ recuperación de 7 días *dentro de la misma base* (útil ante corrupción recie
 ### 3.2. Proceso de Restauración ante Corrupción de Datos
 
 El procedimiento **exacto, con criterios de éxito** vive en
-`docs/RUNBOOK_RESTAURACION.md` (está **definido**; el drill end-to-end contra un
-export real de producción queda **pendiente** hasta el primer export durable). Resumen:
+`docs/RUNBOOK_RESTAURACION.md`. El drill end-to-end contra un export real de
+producción se **ejecutó con éxito el 18-ago-2026** (corrida
+[`32087393598`](https://github.com/robinsongalvis/ventanilla.simacota/actions/runs/32087393598)):
+el respaldo del 17-ago se restauró en una base desechable de stage y se
+verificó su contenido. Desde esa fecha el respaldo del municipio es
+**probado**, no supuesto. Resumen:
 
 1. Toda restauración de *ensayo* va a **STAGE** (`ventanilla-simacota-stage`),
    nunca a producción.

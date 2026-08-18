@@ -177,6 +177,27 @@
   box-sizing: border-box;
 }
 
+/* ── Cursor pointer global ──
+   Asegura que todo elemento interactivo muestre la manita.
+   Cubre: botones, enlaces, inputs, selects, labels clickeables,
+   elementos con role="button", y cualquier cosa con onClick/aria-pressed.
+   Se excluye `disabled` y `readonly` (no son accionables). */
+button:not(:disabled),
+a[href],
+input:not(:disabled):not([readonly]):not([type="hidden"]),
+select:not(:disabled),
+textarea:not(:disabled):not([readonly]),
+label[role="button"],
+label[for],
+[role="button"]:not([aria-disabled="true"]),
+[role="link"],
+[role="tab"],
+[aria-pressed],
+[onclick],
+summary {
+  cursor: pointer;
+}
+
 html {
   scroll-behavior: smooth;
 }

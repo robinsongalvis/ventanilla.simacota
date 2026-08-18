@@ -12,6 +12,9 @@ import {
 } from '@/lib/mostrador/trabajo-de-hoy';
 import { nombreSolicitanteVisible } from '@/lib/seguridad/identidad-protegida';
 import { coincideIdentidadFiltroRapido } from '@/lib/busqueda/coincidencia-filtro-rapido';
+import { SectionHeader } from '@/app/components/design-system/SectionHeader';
+import { EmptyState } from '@/app/components/design-system/EmptyState';
+import { StatusBadge } from '@/app/components/design-system/StatusBadge';
 
 /* ══════════════════════════════════════════════════════════════
    Ventanilla · módulo de mostrador — "Atención al ciudadano".
@@ -119,57 +122,50 @@ export function VistaVentanilla({
   return (
     <div className="flex-1 overflow-y-auto min-h-0" style={{ background: '#F8FAF7' }}>
       {/* ── Header del mostrador ── */}
-      <div
-        className="flex items-center justify-between gap-3 px-4 md:px-6 pt-4 pb-3 bg-white"
-        style={{ borderBottom: '1px solid #E3EAE3' }}
-      >
-        <div className="min-w-0">
-          <div className="flex items-center gap-2">
-            <span className="text-[10px] font-bold uppercase tracking-[0.12em]" style={{ color: '#8A6A12' }}>
-              Mostrador de atención
-            </span>
-            <span className="w-1.5 h-1.5 rounded-full shrink-0" style={{ background: DORADO }} />
-          </div>
-          <p className="text-lg font-black leading-tight mt-0.5 truncate" style={{ color: '#12261A' }}>
-            Ventanilla · Atención al ciudadano
-          </p>
-        </div>
-        <div className="flex items-center gap-2 shrink-0">
-        {onAbrirReparto && (
-          <button
-            type="button"
-            onClick={onAbrirReparto}
-            className="inline-flex items-center gap-1.5 text-[13px] font-bold px-4 py-2.5 rounded-[10px] transition-colors hover:bg-[#EEF4EE]"
-            style={{ border: '1px solid #14532D', color: '#14532D', background: 'white' }}
-          >
-            Reparto del día
-          </button>
-        )}
-        {onRegistrarSalida && (
-          <button
-            type="button"
-            onClick={onRegistrarSalida}
-            className="inline-flex items-center gap-1.5 text-[13px] font-bold px-4 py-2.5 rounded-[10px] transition-colors hover:bg-[#EEF4EE]"
-            style={{ border: '1px solid #14532D', color: '#14532D', background: 'white' }}
-          >
-            Registrar salida
-          </button>
-        )}
-        {puedeRadicar && (
-          <button
-            type="button"
-            onClick={onNuevaRadicacion}
-            className="inline-flex items-center gap-1.5 text-[13px] font-bold px-4 py-2.5 rounded-[10px] shrink-0 transition-opacity hover:opacity-90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-600/40"
-            style={{ background: DORADO, color: '#3D2C00', border: '1px solid #B8890F' }}
-          >
-            <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2.5}>
-              <path strokeLinecap="round" strokeLinejoin="round" d="M12 5v14M5 12h14" />
-            </svg>
-            Nueva radicación
-          </button>
-        )}
-        </div>
-      </div>
+      <SectionHeader
+        titulo="Ventanilla · Atención al ciudadano"
+        variante="default"
+        indicador={
+          <span className="w-1.5 h-1.5 rounded-full shrink-0" style={{ background: DORADO }} />
+        }
+        acciones={
+          <>
+            {onAbrirReparto && (
+              <button
+                type="button"
+                onClick={onAbrirReparto}
+                className="inline-flex items-center gap-1.5 text-[13px] font-bold px-4 py-2.5 rounded-[10px] transition-colors hover:bg-[#EEF4EE]"
+                style={{ border: '1px solid #14532D', color: '#14532D', background: 'white' }}
+              >
+                Reparto del día
+              </button>
+            )}
+            {onRegistrarSalida && (
+              <button
+                type="button"
+                onClick={onRegistrarSalida}
+                className="inline-flex items-center gap-1.5 text-[13px] font-bold px-4 py-2.5 rounded-[10px] transition-colors hover:bg-[#EEF4EE]"
+                style={{ border: '1px solid #14532D', color: '#14532D', background: 'white' }}
+              >
+                Registrar salida
+              </button>
+            )}
+            {puedeRadicar && (
+              <button
+                type="button"
+                onClick={onNuevaRadicacion}
+                className="inline-flex items-center gap-1.5 text-[13px] font-bold px-4 py-2.5 rounded-[10px] shrink-0 transition-opacity hover:opacity-90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-600/40"
+                style={{ background: DORADO, color: '#3D2C00', border: '1px solid #B8890F' }}
+              >
+                <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2.5}>
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M12 5v14M5 12h14" />
+                </svg>
+                Nueva radicación
+              </button>
+            )}
+          </>
+        }
+      />
 
       {/* ── Búsqueda protagonista ── */}
       <div className="px-4 md:px-6 py-4 bg-white" style={{ borderBottom: '1px solid #E3EAE3' }}>
@@ -261,10 +257,10 @@ export function VistaVentanilla({
             </div>
           )}
           {resultados.length === 0 && (
-            <p className="text-xs" style={{ color: '#7A8B7F' }}>
-              Nada con &ldquo;{consulta.trim()}&rdquo; en la bandeja actual. Prueba la búsqueda avanzada
-              para el histórico completo.
-            </p>
+            <EmptyState
+              titulo="Sin coincidencias"
+              descripcion={`Nada con "${consulta.trim()}" en la bandeja actual. Prueba la búsqueda avanzada para el histórico completo.`}
+            />
           )}
         </div>
       )}
@@ -331,10 +327,10 @@ export function VistaVentanilla({
           </div>
 
           {hoy.filas.length === 0 ? (
-            <p className="mt-3 text-xs" style={{ color: '#7A8B7F' }}>
-              Hoy no se han radicado documentos. El primero del día aparecerá aquí
-              con sus pendientes de recepción.
-            </p>
+            <EmptyState
+              titulo="Sin radicados hoy"
+              descripcion="Hoy no se han radicado documentos. El primero del día aparecerá aquí con sus pendientes de recepción."
+            />
           ) : (
             <div className="mt-2.5 rounded-xl bg-white overflow-hidden" style={{ border: '1px solid #E3EAE3' }}>
               {filasVisibles.map((f, i) => (
@@ -346,9 +342,10 @@ export function VistaVentanilla({
                 />
               ))}
               {filasVisibles.length === 0 && (
-                <p className="px-4 py-3 text-xs italic" style={{ color: '#94A3B8' }}>
-                  Ninguna fila coincide con el filtro elegido.
-                </p>
+                <EmptyState
+                  titulo="Sin resultados para este filtro"
+                  descripcion="Ninguna fila coincide con el filtro elegido."
+                />
               )}
             </div>
           )}
@@ -423,29 +420,23 @@ function FilaTrabajoHoyItem({
       </span>
       <span className="flex items-center gap-1.5 flex-wrap justify-end shrink-0">
         {fila.identidadReservada && (
-          <span
-            className="text-[10.5px] font-semibold px-2 py-0.5 rounded-full"
-            style={{ background: '#EEF2F5', color: '#3A4551' }}
-          >
-            Identidad reservada
-          </span>
+          <StatusBadge tono="neutral" tamano="sm">Identidad reservada</StatusBadge>
         )}
-        {fila.pendientes.map((p) => (
-          <span
-            key={p}
-            className="text-[10.5px] font-semibold px-2 py-0.5 rounded-full"
-            style={{ background: CHIP_PENDIENTE[p].bg, color: CHIP_PENDIENTE[p].texto }}
-          >
-            {CHIP_PENDIENTE[p].label}
-          </span>
-        ))}
+        {fila.pendientes.map((p) => {
+          const tonoMap: Record<PendienteMostrador, 'warning' | 'danger'> = {
+            SELLAR_PDF: 'warning',
+            DATOS_INCOMPLETOS: 'warning',
+            CORREO_FALLIDO: 'danger',
+            CONSTANCIA_SIN_ENVIAR: 'warning',
+          };
+          return (
+            <StatusBadge key={p} tono={tonoMap[p]} tamano="sm">
+              {CHIP_PENDIENTE[p].label}
+            </StatusBadge>
+          );
+        })}
         {fila.pendientes.length === 0 && (
-          <span
-            className="text-[10.5px] font-semibold px-2 py-0.5 rounded-full"
-            style={{ background: '#EEF4EE', color: VERDE_INST }}
-          >
-            Al día
-          </span>
+          <StatusBadge tono="success" tamano="sm">Al día</StatusBadge>
         )}
       </span>
       <span className="inline-flex items-center gap-1 text-[11.5px] font-semibold shrink-0" style={{ color: VERDE_INST }}>

@@ -1,0 +1,397 @@
+# ══════════════════════════════════════════════════════════════════════
+# Ensayo de restauración (drill) — Firestore
+#
+# POR QUÉ EXISTE. `docs/RUNBOOK_RESTAURACION.md` describe cómo restaurar,
+# pero hasta el 17-ago-2026 NUNCA se había ejecutado: el propio runbook lo
+# declaraba pendiente. Un respaldo que nadie ha restaurado no es un
+# respaldo, es una esperanza — y con 196 expedientes históricos y radicados
+# reales de ciudadanos dentro, esa esperanza era el único plan de
+# continuidad del municipio.
+#
+# PRIMERA EJECUCIÓN CON ÉXITO: 18-ago-2026, corrida 32087393598. El respaldo
+# del 17-ago se restauró en la base desechable `drill-2026-08-17-7` de stage
+# y el verificador dictaminó RESTAURACIÓN VÁLIDA. Conviene repetirlo cada vez
+# que cambie el modelo de datos o el procedimiento de respaldo: un ensayo que
+# se hizo una vez y nunca más vuelve a ser una esperanza.
+#
+# QUÉ TOCA Y QUÉ NO. Todo lo que ESCRIBE ocurre en STAGE, en una base de
+# datos desechable que se crea y se borra en la misma corrida. De
+# producción solo se LEE el bucket de respaldos. Producción no se modifica
+# en ningún paso — no hay un solo comando de escritura contra ella.
+#
+# PRECONDICIÓN (una sola vez, la hace el propietario). El bucket de
+# respaldos vive en el proyecto de PRODUCCIÓN y aquí se lee desde stage, así
+# que hay que concederle lectura a DOS identidades distintas — es el error
+# que costó la corrida 32079164053, donde se concedió solo la segunda:
+#
+#   1. La cuenta de servicio de ACTIONS (la del secret GCP_STAGE_SA_KEY):
+#      es la que LISTA el bucket para elegir qué respaldo restaurar.
+#
+#   2. El *service agent* de Firestore de stage: es quien de verdad LEE los
+#      archivos durante el import. No es la misma identidad que la anterior
+#      y no hereda sus permisos.
+#
+#   3. Y además la cuenta de ACTIONS necesita poder CREAR y BORRAR la base
+#      desechable en STAGE. Ojo: roles/datastore.importExportAdmin NO
+#      alcanza — no incluye datastore.databases.create ni .delete. El único
+#      rol predefinido que los trae es roles/datastore.owner, y va sobre
+#      STAGE, jamás sobre producción.
+#
+# NO hace falta transcribir los comandos desde aquí: el paso «Comprobar
+# precondiciones» sondea lo que se puede sondear y escribe en el resumen de
+# la corrida los comandos exactos, ya rellenados con la identidad y el
+# número de proyecto reales. Se listan TODOS los faltantes de una vez,
+# porque descubrirlos de a uno costó tres corridas.
+#
+# Todo lo concedido sobre el bucket es de SOLO LECTURA: no da ningún
+# permiso sobre la base de producción.
+#
+# NUNCA se programa: se dispara a mano. Crea y borra bases de datos, y eso
+# no debe pasar solo.
+# ══════════════════════════════════════════════════════════════════════
+name: Ensayo de restauración (stage)
+
+on:
+  workflow_dispatch:
+    inputs:
+      confirmar:
+        description: 'Escriba exactamente "ensayo" para confirmar'
+        required: true
+        default: ''
+      fecha:
+        description: 'Respaldo a restaurar (AAAA-MM-DD). Vacío = el más reciente.'
+        required: false
+        default: ''
+
+permissions:
+  contents: read
+  id-token: write
+
+concurrency:
+  group: drill-restauracion
+  cancel-in-progress: false
+
+jobs:
+  drill:
+    name: Restaurar un respaldo en una base desechable de stage
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    env:
+      BACKUP_BUCKET: ventanilla-simacota-backups
+      PROYECTO_PROD: ventanilla-unica-f31b1
+      PROYECTO_STAGE: ventanilla-simacota-stage
+      WIF_PROVIDER_STAGE: ${{ secrets.GCP_STAGE_WORKLOAD_IDENTITY_PROVIDER }}
+      SA_KEY_STAGE: ${{ secrets.GCP_STAGE_SA_KEY }}
+
+    steps:
+      - name: Confirmación explícita
+        if: ${{ github.event.inputs.confirmar != 'ensayo' }}
+        run: |
+          echo "::error::Escriba exactamente 'ensayo' en el campo de confirmación. Nada se ejecutó."
+          exit 1
+
+      - uses: actions/checkout@v4
+
+      - name: Comprobar que hay credenciales de stage
+        run: |
+          if [ -z "${WIF_PROVIDER_STAGE}" ] && [ -z "${SA_KEY_STAGE}" ]; then
+            echo "::error::Falta el secret GCP_STAGE_WORKLOAD_IDENTITY_PROVIDER (o GCP_STAGE_SA_KEY)."
+            echo "::error::El ensayo escribe en STAGE, así que necesita una credencial de STAGE — nunca la de producción."
+            exit 1
+          fi
+
+      - name: Autenticar a STAGE (WIF)
+        if: ${{ env.WIF_PROVIDER_STAGE != '' }}
+        uses: google-github-actions/auth@v3
+        with:
+          workload_identity_provider: ${{ secrets.GCP_STAGE_WORKLOAD_IDENTITY_PROVIDER }}
+          service_account: ${{ secrets.GCP_STAGE_SA }}
+
+      - name: Autenticar a STAGE (clave JSON)
+        if: ${{ env.WIF_PROVIDER_STAGE == '' && env.SA_KEY_STAGE != '' }}
+        uses: google-github-actions/auth@v3
+        with:
+          credentials_json: ${{ secrets.GCP_STAGE_SA_KEY }}
+
+      - uses: google-github-actions/setup-gcloud@v3
+
+      # ── 0. Precondiciones: TODAS de una vez ──────────────────────────
+      #
+      # POR QUÉ ESTE PASO EXISTE. Las tres primeras corridas del ensayo se
+      # gastaron destapando una precondición por vez: primero el secret,
+      # después el permiso de lectura del bucket, y quedaban por delante el
+      # rol para crear bases y la instalación de dependencias. Cada
+      # descubrimiento costaba un ciclo entero de corrección + corrida.
+      #
+      # Este paso comprueba de golpe todo lo que el ensayo va a necesitar y
+      # reporta la lista COMPLETA de lo que falta, con el comando exacto
+      # para concederlo. Una corrida, todos los faltantes.
+      #
+      # Las comprobaciones son de SOLO LECTURA y no crean nada.
+      - name: Comprobar precondiciones
+        run: |
+          set -uo pipefail
+          FALTA=0
+          CUENTA="$(gcloud auth list --filter=status:ACTIVE --format='value(account)' 2>/dev/null || true)"
+          STAGE_NUM="$(gcloud projects describe "${PROYECTO_STAGE}" --format='value(projectNumber)' 2>/dev/null || true)"
+          echo "Identidad de Actions : ${CUENTA:-desconocida}"
+          echo "Proyecto de stage    : ${PROYECTO_STAGE} (${STAGE_NUM:-número no legible})"
+          echo ""
+
+          # (a) ¿Puede esta identidad LEER el bucket de respaldos? Prueba real.
+          if gcloud storage ls "gs://${BACKUP_BUCKET}/diario/" >/dev/null 2>&1; then
+            echo "✔ (a) lectura del bucket de respaldos"
+          else
+            echo "✘ (a) NO puede leer gs://${BACKUP_BUCKET}"
+            FALTA=1
+          fi
+
+          # (b) ¿Puede CREAR y BORRAR bases en stage? `test-iam-permissions`
+          # responde qué permisos tiene quien pregunta, sin ejercerlos.
+          # Si el propio sondeo no se pudiera ejecutar, se avisa y se sigue:
+          # un sondeo que falla no debe tumbar el ensayo por sí solo.
+          # Se llama la API REST directamente porque `gcloud projects
+          # test-iam-permissions` NO existe como subcomando — comprobado en la
+          # corrida 32083949713, que respondió "Invalid choice". La API sí
+          # existe y, por diseño, no exige ningún permiso para invocarla:
+          # devuelve el subconjunto de permisos que tiene quien pregunta.
+          TOKEN="$(gcloud auth print-access-token 2>/dev/null || true)"
+          SONDEO=""
+          if [ -n "${TOKEN}" ]; then
+            SONDEO="$(curl -sS -m 30 -X POST \
+              -H "Authorization: Bearer ${TOKEN}" \
+              -H "Content-Type: application/json" \
+              -d '{"permissions":["datastore.databases.create","datastore.databases.delete"]}' \
+              "https://cloudresourcemanager.googleapis.com/v1/projects/${PROYECTO_STAGE}:testIamPermissions" 2>&1 || true)"
+          fi
+          # Una respuesta con "error" (o vacía) significa que el SONDEO falló,
+          # no que falten los permisos. Confundir ambas cosas mandaría al
+          # propietario a conceder un rol que quizá ya tiene.
+          if [ -z "${SONDEO}" ] || printf '%s' "${SONDEO}" | grep -q '"error"'; then
+            echo "⚠ (b) no se pudo sondear permisos de Firestore; se continúa y el paso 'Crear base' dirá si falta alguno."
+            [ -n "${SONDEO}" ] && printf '%s\n' "${SONDEO}"
+          else
+            # Respuesta legítima: {"permissions":[...]}, o {} si no tiene ninguno.
+            for P in datastore.databases.create datastore.databases.delete; do
+              if printf '%s' "${SONDEO}" | grep -q "\"${P}\""; then
+                echo "✔ (b) ${P}"
+              else
+                echo "✘ (b) FALTA ${P}"
+                FALTA=1
+              fi
+            done
+          fi
+
+          # (c) El SERVICE AGENT de Firestore de stage es OTRA identidad y no
+          # se puede sondear desde aquí: solo se sabrá al importar. Se deja
+          # dicho para que se conceda junto con lo demás y no en otra vuelta.
+          echo "… (c) el service agent de Firestore de stage no es sondeable desde este runner; se comprueba al importar."
+          echo ""
+
+          if [ "${FALTA}" -ne 0 ]; then
+            echo "::error::Faltan precondiciones. Conceda TODO lo siguiente y vuelva a disparar el ensayo — están juntas a propósito, para no gastar otra corrida por cada una."
+            {
+              echo "### ⛔ Precondiciones que faltan"
+              echo ""
+              echo "Ejecútelas con una cuenta con permisos de administración en ambos proyectos:"
+              echo ""
+              echo '```bash'
+              echo "# 1. La identidad de Actions de stage lee los respaldos (bucket en producción)"
+              echo "gcloud storage buckets add-iam-policy-binding gs://${BACKUP_BUCKET} \\"
+              echo "  --member='serviceAccount:${CUENTA}' \\"
+              echo "  --role=roles/storage.objectViewer --project=${PROYECTO_PROD}"
+              echo ""
+              echo "# 2. El service agent de Firestore de stage lee los respaldos durante el import"
+              echo "#    (objectViewer no incluye storage.buckets.get; legacyBucketReader sí, y es de solo lectura)"
+              echo "for R in roles/storage.objectViewer roles/storage.legacyBucketReader; do"
+              echo "  gcloud storage buckets add-iam-policy-binding gs://${BACKUP_BUCKET} \\"
+              echo "    --member='serviceAccount:service-${STAGE_NUM:-NUM_STAGE}@gcp-sa-firestore.iam.gserviceaccount.com' \\"
+              echo "    --role=\"\$R\" --project=${PROYECTO_PROD}"
+              echo "done"
+              echo ""
+              echo "# 3. La identidad de Actions crea y borra la base desechable EN STAGE."
+              echo "#    roles/datastore.importExportAdmin NO alcanza: no incluye databases.create"
+              echo "#    ni databases.delete. El único rol predefinido que los trae es datastore.owner,"
+              echo "#    y se concede sobre STAGE, nunca sobre producción."
+              echo "gcloud projects add-iam-policy-binding ${PROYECTO_STAGE} \\"
+              echo "  --member='serviceAccount:${CUENTA}' \\"
+              echo "  --role=roles/datastore.owner"
+              echo '```'
+            } >> "$GITHUB_STEP_SUMMARY"
+            exit 1
+          fi
+          echo "Precondiciones sondeables: en orden."
+
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 22
+          cache: 'npm'
+
+      # El paso de verificación corre un script Node que importa
+      # firebase-admin. `node_modules` no está versionado, así que sin esto
+      # el ensayo moriría con ERR_MODULE_NOT_FOUND — y lo haría DESPUÉS de
+      # haber pagado el import entero, justo en el único paso que acredita
+      # que el respaldo sirve.
+      - name: Instalar dependencias del verificador
+        run: npm ci
+
+      # ── 1. Elegir el respaldo y comprobar que está ÍNTEGRO ────────────
+      - name: Elegir respaldo
+        id: elegir
+        run: |
+          set -euo pipefail
+          # NOTA (17-ago-2026): las tuberías con `grep` van con `|| true`
+          # DENTRO de la sustitución. Sin eso, un listado vacío hace que
+          # `grep` devuelva 1, `pipefail` lo propague y `set -e` mate el
+          # paso ANTES de los mensajes de error de abajo — que es
+          # exactamente lo que pasó en la corrida 32079164053: exit 1 pelado,
+          # sin una sola línea que dijera por qué.
+          CUENTA="$(gcloud auth list --filter=status:ACTIVE --format='value(account)' 2>/dev/null || true)"
+          echo "Identidad activa: ${CUENTA:-desconocida}"
+
+          FECHA="${{ github.event.inputs.fecha }}"
+          if [ -z "${FECHA}" ]; then
+            # El más reciente que tenga marcador de export COMPLETADO. Un
+            # export a medias no sirve para un ensayo: daría un falso
+            # negativo y haría desconfiar de un respaldo que sí está bien.
+            #
+            # El stderr se CAPTURA, no se descarta: distinguir "no tengo
+            # permiso" de "no hay respaldos" es la diferencia entre saber
+            # qué arreglar y adivinar.
+            if ! LISTADO="$(gcloud storage ls "gs://${BACKUP_BUCKET}/diario/" 2>&1)"; then
+              echo "${LISTADO}"
+              if printf '%s' "${LISTADO}" | grep -qiE 'denied|forbidden|403|does not have|not authorized'; then
+                echo "::error::La identidad de stage (${CUENTA:-desconocida}) no puede LEER gs://${BACKUP_BUCKET}, que vive en el proyecto de producción."
+                echo "::error::Concédale roles/storage.objectViewer sobre ese bucket. OJO: son DOS identidades (la de Actions y el service agent de Firestore) — ver la cabecera de este workflow."
+              else
+                echo "::error::No fue posible listar gs://${BACKUP_BUCKET}/diario/."
+              fi
+              exit 1
+            fi
+            FECHA="$(printf '%s\n' "${LISTADO}" \
+              | sed 's#.*/diario/##; s#/$##' | grep -E '^[0-9]{4}-[0-9]{2}-[0-9]{2}$' | sort | tail -1 || true)"
+          fi
+          if [ -z "${FECHA}" ]; then
+            echo "::error::No hay ningún respaldo con formato AAAA-MM-DD en gs://${BACKUP_BUCKET}/diario/."
+            exit 1
+          fi
+          URI="gs://${BACKUP_BUCKET}/diario/${FECHA}"
+          MARCADOR="${URI}/${FECHA}.overall_export_metadata"
+          if ! gcloud storage ls "${MARCADOR}" >/dev/null 2>&1; then
+            echo "::error::El respaldo de ${FECHA} NO tiene marcador de export completado (${MARCADOR}). Está incompleto: no sirve para el ensayo ni para una restauración real."
+            exit 1
+          fi
+          BYTES="$(gcloud storage du --summarize "${URI}/**" 2>/dev/null | awk 'NR==1{print $1}')"
+          echo "Respaldo elegido: ${URI} (${BYTES} bytes)"
+          {
+            echo "FECHA=${FECHA}"
+            echo "URI=${URI}"
+            echo "BYTES=${BYTES}"
+          } >> "$GITHUB_OUTPUT"
+
+      # ── 2. Base DESECHABLE en stage ──────────────────────────────────
+      - name: Crear base de ensayo
+        id: crear
+        run: |
+          set -euo pipefail
+          # El id lleva la fecha del respaldo y el número de corrida: si algo
+          # queda sin borrar, se sabe de qué ensayo salió.
+          DEST_DB="drill-${{ steps.elegir.outputs.FECHA }}-${{ github.run_number }}"
+          echo "DEST_DB=${DEST_DB}" >> "$GITHUB_OUTPUT"
+          gcloud firestore databases create \
+            --database="${DEST_DB}" \
+            --location=nam5 \
+            --type=firestore-native \
+            --project="${PROYECTO_STAGE}"
+          echo "Base de ensayo creada: ${DEST_DB} (stage)"
+
+      # ── 3. Importar ──────────────────────────────────────────────────
+      - name: Importar el respaldo
+        id: importar
+        run: |
+          set -euo pipefail
+          if ! OPERACION="$(gcloud firestore import "${{ steps.elegir.outputs.URI }}" \
+              --database="${{ steps.crear.outputs.DEST_DB }}" \
+              --project="${PROYECTO_STAGE}" \
+              --async --format='value(name)' 2>&1)"; then
+            echo "${OPERACION}"
+            if printf '%s' "${OPERACION}" | grep -qi 'permission\|denied\|403'; then
+              echo "::error::PERMISSION_DENIED al leer el bucket. Falta la precondición: el service agent de Firestore de STAGE necesita roles/storage.objectViewer sobre gs://${BACKUP_BUCKET} (ver la cabecera de este workflow)."
+            fi
+            exit 1
+          fi
+          echo "Operación: ${OPERACION}"
+          for _ in $(seq 1 180); do
+            ESTADO="$(gcloud firestore operations describe "${OPERACION}" \
+              --database="${{ steps.crear.outputs.DEST_DB }}" \
+              --project="${PROYECTO_STAGE}" --format='value(metadata.operationState)')"
+            echo "  estado: ${ESTADO}"
+            case "${ESTADO}" in
+              SUCCESSFUL) echo "Import COMPLETADO."; exit 0 ;;
+              FAILED|CANCELLED)
+                echo "::error::El import terminó en estado ${ESTADO}."
+                exit 1 ;;
+            esac
+            sleep 10
+          done
+          echo "::error::El import no terminó dentro de la ventana de espera."
+          exit 1
+
+      # ── 4. Verificar que lo restaurado SIRVE ─────────────────────────
+      #
+      # No basta con que el import diga SUCCESSFUL: eso solo dice que los
+      # bytes se movieron. El criterio es que los datos estén completos y
+      # sean coherentes — si no, el ensayo pasa y la restauración real
+      # fracasaría el día que importe.
+      - name: Verificar el contenido restaurado
+        id: verificar
+        run: |
+          set -euo pipefail
+          RESUMEN="$(gcloud firestore databases describe \
+            --database="${{ steps.crear.outputs.DEST_DB }}" \
+            --project="${PROYECTO_STAGE}" --format='value(name)')"
+          echo "Base restaurada: ${RESUMEN}"
+          # El año se toma del RESPALDO, no del reloj del runner. Si se
+          # dejara implícito, un ensayo disparado en enero sobre un respaldo
+          # de diciembre verificaría el año equivocado: encontraría cero
+          # documentos en las tres series y dictaminaría «válida» sin haber
+          # comprobado nada. Un falso verde sobre el único plan de
+          # continuidad del municipio es peor que un fallo ruidoso.
+          FECHA_RESPALDO="${{ steps.elegir.outputs.FECHA }}"
+          ANIO_RESPALDO="${FECHA_RESPALDO%%-*}"
+          echo "Verificando el año del respaldo: ${ANIO_RESPALDO}"
+          node scripts/backups/verificar-restauracion.mjs \
+            --proyecto "${PROYECTO_STAGE}" \
+            --base "${{ steps.crear.outputs.DEST_DB }}" \
+            --anio "${ANIO_RESPALDO}" \
+            | tee /tmp/verificacion.txt
+          {
+            echo 'VERIFICACION<<EOF'
+            cat /tmp/verificacion.txt
+            echo 'EOF'
+          } >> "$GITHUB_ENV"
+
+      # ── 5. Limpieza — SIEMPRE, incluso si algo falló ─────────────────
+      - name: Borrar la base de ensayo
+        if: ${{ always() && steps.crear.outputs.DEST_DB != '' }}
+        run: |
+          echo "Borrando ${{ steps.crear.outputs.DEST_DB }} de stage…"
+          gcloud firestore databases delete \
+            --database="${{ steps.crear.outputs.DEST_DB }}" \
+            --project="${PROYECTO_STAGE}" --quiet || \
+            echo "::warning::No se pudo borrar la base de ensayo ${{ steps.crear.outputs.DEST_DB }}. Bórrela a mano para no acumular costo."
+
+      - name: Resumen
+        if: ${{ always() }}
+        run: |
+          {
+            echo "### Ensayo de restauración"
+            echo "- Respaldo: \`${{ steps.elegir.outputs.URI }}\`"
+            echo "- Tamaño: \`${{ steps.elegir.outputs.BYTES }}\` bytes"
+            echo "- Base de ensayo: \`${{ steps.crear.outputs.DEST_DB }}\` (stage, ya borrada)"
+            echo "- Resultado: \`${{ job.status }}\`"
+            echo ""
+            echo '```'
+            echo "${VERIFICACION:-Sin verificación: el ensayo no llegó a ese paso.}"
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"

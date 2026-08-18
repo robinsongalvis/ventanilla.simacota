@@ -10,7 +10,7 @@ describe('Usuarios Internos — layout con scroll vertical', () => {
   });
 
   it('mantiene encabezado y mensajes fuera del área desplazable', () => {
-    expect(vistaAdministracion).toContain('shrink-0 px-4 sm:px-6 py-4 sm:py-6 bg-white');
+    expect(vistaAdministracion).toContain('<SectionHeader');
     expect(vistaAdministracion).toContain('mt-4 shrink-0 px-4 py-3');
   });
 
