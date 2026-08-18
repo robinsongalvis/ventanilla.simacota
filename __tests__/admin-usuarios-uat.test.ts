@@ -39,7 +39,7 @@ describe('administración institucional de usuarios', () => {
     expect(route).toContain('UAT');
     expect(route).toContain('PRUEBA');
     expect(route).toContain('esPrueba');
-    expect(ui).toContain('Matriz UAT por Roles');
+    expect(ui).toContain('Prueba/UAT');
     expect(ui).toContain('TIPOS_USUARIO');
   });
 
