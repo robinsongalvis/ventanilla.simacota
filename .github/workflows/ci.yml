@@ -9,6 +9,16 @@ on:
     # checks que un PR contra main. No cambia el comportamiento para main.
     branches: [ main, develop, release/fase5-hardening, pr1-base, pr2-h3 ]
 
+# ── Runtime pinning (G2, ADR-0025) ───────────────────────────────────────────
+# La versión de Node se fija en `.nvmrc` (fuente única; los jobs la leen con
+# `node-version-file`) y se documenta en `engines` de package.json.
+# El runtime de producción (Vercel) corre con `require(esm)` DESACTIVADO; esa
+# condición se emula en CI mediante el gate G1
+# (`__tests__/regresion-esm-require-firebase-admin.test.ts`), que fuerza
+# `--no-experimental-require-module` en procesos HIJO dentro de `npm test`.
+# NO se fija ese flag como NODE_OPTIONS global del job: rompe el propio runner de
+# vitest (ERR_REQUIRE_ESM, verificado localmente en Node 24). La protección la da
+# el flag vía G1, no la versión de Node (CI corre 22; Vercel, 24).
 jobs:
   validate:
     name: Build & Security Gates
@@ -34,7 +44,7 @@ jobs:
       - name: Setup Node.js
         uses: actions/setup-node@v7
         with:
-          node-version: 22
+          node-version-file: '.nvmrc'
           cache: 'npm'
 
       - name: Install Dependencies
@@ -111,7 +121,7 @@ jobs:
       - name: Setup Node.js
         uses: actions/setup-node@v7
         with:
-          node-version: 22
+          node-version-file: '.nvmrc'
           cache: 'npm'
 
       - name: Setup Java (emulador)
@@ -149,7 +159,7 @@ jobs:
       - name: Setup Node.js
         uses: actions/setup-node@v7
         with:
-          node-version: 22
+          node-version-file: '.nvmrc'
           cache: 'npm'
 
       - name: Generar informe de despliegue (semáforo + veredicto)
