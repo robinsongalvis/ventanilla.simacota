@@ -183,10 +183,50 @@ function partesFechaColombia(date: Date): { year: number; month: number; day: nu
  * antes) — varios consumidores (`sumarMesCalendario`) dependen de eso.
  */
 export function atLocalNoon(value: string | Date): Date {
+  // Un string de SOLO fecha ("YYYY-MM-DD") ya ES un día civil — no hay
+  // instante que reinterpretar. Sin esta vía, `new Date('2026-01-06')` lo
+  // parsea como MEDIANOCHE UTC, que en Bogotá (UTC−5) cae el día civil
+  // ANTERIOR: el plazo nacería un día antes de lo que dice el papel. El
+  // módulo de migración llegó a mantener una copia privada de este parseo
+  // (`parsearFechaHistoricaANoonISO`) precisamente para esquivar el defecto;
+  // desde el rescate del PR #156 esa copia delega aquí.
+  if (typeof value === 'string' && RE_FECHA_CIVIL.test(value.trim())) {
+    // Contrato de esta función: nunca lanza — una fecha calendario imposible
+    // ("2026-02-31") se propaga como Invalid Date, igual que un string
+    // ilegible. Antes se "normalizaba" en silencio al 2 de marzo.
+    return fechaCivilANoon(value) ?? new Date(NaN);
+  }
   const date = value instanceof Date ? value : new Date(value);
   if (Number.isNaN(date.getTime())) return date;
   const { year, month, day } = partesFechaColombia(date);
   return new Date(year, month - 1, day, 12, 0, 0, 0);
+}
+
+const RE_FECHA_CIVIL = /^\d{4}-\d{2}-\d{2}$/;
+
+/**
+ * Parsea un DÍA CIVIL "YYYY-MM-DD" (no un instante) a un `Date` anclado al
+ * mediodía local de ese mismo día, o `null` si el texto no tiene ese formato
+ * o la fecha calendario es imposible (`Date` "normalizaría" un 30 de febrero
+ * al 2 de marzo en vez de rechazarlo — comparar contra los componentes
+ * originales lo detecta).
+ *
+ * Es la ÚNICA implementación de este parseo: `atLocalNoon` la usa para su
+ * vía de solo-fecha y el importador de históricos delega en ella. Si alguna
+ * vez parece necesitarse otra copia, es señal de que falta exportar algo
+ * aquí, no de que haya que duplicar (Principio 3).
+ */
+export function fechaCivilANoon(texto: string): Date | null {
+  const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(texto.trim());
+  if (!m) return null;
+  const year = Number(m[1]);
+  const month = Number(m[2]);
+  const day = Number(m[3]);
+  const fecha = new Date(year, month - 1, day, 12, 0, 0, 0);
+  if (fecha.getFullYear() !== year || fecha.getMonth() !== month - 1 || fecha.getDate() !== day) {
+    return null;
+  }
+  return fecha;
 }
 
 /**
