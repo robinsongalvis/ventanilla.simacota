@@ -144,20 +144,36 @@ jobs:
           # responde qué permisos tiene quien pregunta, sin ejercerlos.
           # Si el propio sondeo no se pudiera ejecutar, se avisa y se sigue:
           # un sondeo que falla no debe tumbar el ensayo por sí solo.
-          PERMISOS="datastore.databases.create,datastore.databases.delete"
-          if SONDEO="$(gcloud projects test-iam-permissions "${PROYECTO_STAGE}" \
-                --permissions="${PERMISOS}" --format='value(permissions)' 2>&1)"; then
+          # Se llama la API REST directamente porque `gcloud projects
+          # test-iam-permissions` NO existe como subcomando — comprobado en la
+          # corrida 32083949713, que respondió "Invalid choice". La API sí
+          # existe y, por diseño, no exige ningún permiso para invocarla:
+          # devuelve el subconjunto de permisos que tiene quien pregunta.
+          TOKEN="$(gcloud auth print-access-token 2>/dev/null || true)"
+          SONDEO=""
+          if [ -n "${TOKEN}" ]; then
+            SONDEO="$(curl -sS -m 30 -X POST \
+              -H "Authorization: Bearer ${TOKEN}" \
+              -H "Content-Type: application/json" \
+              -d '{"permissions":["datastore.databases.create","datastore.databases.delete"]}' \
+              "https://cloudresourcemanager.googleapis.com/v1/projects/${PROYECTO_STAGE}:testIamPermissions" 2>&1 || true)"
+          fi
+          # Una respuesta con "error" (o vacía) significa que el SONDEO falló,
+          # no que falten los permisos. Confundir ambas cosas mandaría al
+          # propietario a conceder un rol que quizá ya tiene.
+          if [ -z "${SONDEO}" ] || printf '%s' "${SONDEO}" | grep -q '"error"'; then
+            echo "⚠ (b) no se pudo sondear permisos de Firestore; se continúa y el paso 'Crear base' dirá si falta alguno."
+            [ -n "${SONDEO}" ] && printf '%s\n' "${SONDEO}"
+          else
+            # Respuesta legítima: {"permissions":[...]}, o {} si no tiene ninguno.
             for P in datastore.databases.create datastore.databases.delete; do
-              if printf '%s' "${SONDEO}" | grep -q "${P}"; then
+              if printf '%s' "${SONDEO}" | grep -q "\"${P}\""; then
                 echo "✔ (b) ${P}"
               else
                 echo "✘ (b) FALTA ${P}"
                 FALTA=1
               fi
             done
-          else
-            echo "⚠ (b) no se pudo sondear permisos de Firestore; se continúa y el paso 'Crear base' dirá si falta algo."
-            echo "${SONDEO}"
           fi
 
           # (c) El SERVICE AGENT de Firestore de stage es OTRA identidad y no
