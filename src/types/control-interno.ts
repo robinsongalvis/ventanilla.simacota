@@ -50,7 +50,10 @@ export type TipoAlertaControlInterno =
   | 'NOTIFICACION_FALLIDA'
   | 'DEPENDENCIA_CONGESTIONADA'
   | 'TIPO_URGENTE_SIN_ATENDER'
-  | 'PRORROGA_SIN_JUSTIFICACION';
+  | 'PRORROGA_SIN_JUSTIFICACION'
+  // SIMI patrones — señales transversales que anticipan problemas:
+  | 'CIUDADANO_REINCIDENTE'
+  | 'DEVOLUCIONES_ACUMULADAS';
 
 export type EstadoAlerta = 'ABIERTA' | 'GESTIONADA' | 'DESCARTADA';
 
@@ -253,6 +256,8 @@ export const LABEL_TIPO_ALERTA: Record<TipoAlertaControlInterno, string> = {
   DEPENDENCIA_CONGESTIONADA:  'Dependencia congestionada',
   TIPO_URGENTE_SIN_ATENDER:   'Tipo urgente sin atender',
   PRORROGA_SIN_JUSTIFICACION: 'Prórroga sin justificación suficiente',
+  CIUDADANO_REINCIDENTE:      'Ciudadano con varios casos activos',
+  DEVOLUCIONES_ACUMULADAS:    'Devoluciones acumuladas en la dependencia',
 };
 
 export const LABEL_ESTADO_HALLAZGO: Record<EstadoHallazgo, string> = {
