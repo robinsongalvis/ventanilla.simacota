@@ -212,6 +212,56 @@ describe('consecutivo-legal — guard D9 cableado en confirmarConsecutivosLegale
   });
 });
 
+describe('consecutivo-legal — monotonicidad A TRAVÉS de la vía cableada (rescate PR #154)', () => {
+  /* POR QUÉ ESTE BLOQUE. Los tests de arriba disparan el guard D9 por
+     `ultimoActual` corrupto (3.5, −2) o por `origen: RECONSTRUIDO` — nunca
+     por un `consecutivo` no monótono llegando a `confirmarConsecutivosLegales`.
+     Con solo esos casos, una regresión tautológica del cableado (p. ej.
+     refactorizar a `ultimoPropuesto: p.ultimoActual + 1`, que se valida a sí
+     mismo) dejaría TODO en verde mientras el guard deja de vigilar lo único
+     que importa: que el número que se escribe avance de verdad sobre el que
+     se leyó. Estos tres casos mutan el `consecutivo` leído, que es la única
+     forma de detectarla. Rescatados del PR #154 (cerrado por superado en lo
+     demás) el 18-ago-2026. */
+
+  it('RETROCESO por la vía cableada: consecutivo < leído+1 → lanza y NO escribe', async () => {
+    const doble = fakeTx({ 'counters/radicados-2026': 41 });
+    const pend = await leerConsecutivosLegales(doble.tx, fakeDb(), FECHA, [
+      { serie: 'radicados', formatear: fmtRadicado },
+    ]);
+    pend[0].consecutivo = 40; // retrocede respecto del ultimo=41 leído
+    expect(() => confirmarConsecutivosLegales(doble.tx, FECHA, pend)).toThrow(
+      /no puede retroceder ni estancarse/,
+    );
+    expect(doble.escrituras).toHaveLength(0); // el guard corre ANTES del tx.set
+  });
+
+  it('ESTANCAMIENTO por la vía cableada: consecutivo == leído → lanza y NO escribe', async () => {
+    const doble = fakeTx({ 'counters/radicados-2026': 41 });
+    const pend = await leerConsecutivosLegales(doble.tx, fakeDb(), FECHA, [
+      { serie: 'radicados', formatear: fmtRadicado },
+    ]);
+    pend[0].consecutivo = 41; // repetiría el número ya asentado — AGN 060
+    expect(() => confirmarConsecutivosLegales(doble.tx, FECHA, pend)).toThrow(
+      /no puede retroceder ni estancarse/,
+    );
+    expect(doble.escrituras).toHaveLength(0);
+  });
+
+  it('LOTE mixto: una serie no monótona contamina el lote entero — ninguna se escribe', async () => {
+    const doble = fakeTx({ 'counters/radicados-2026': 10, 'counters/salidas-2026': 5 });
+    const pend = await leerConsecutivosLegales(doble.tx, fakeDb(), FECHA, [
+      { serie: 'radicados', formatear: fmtRadicado },
+      { serie: 'salidas', formatear: fmtSalida },
+    ]);
+    pend[1].consecutivo = 5; // la segunda se estanca; la primera es válida
+    expect(() => confirmarConsecutivosLegales(doble.tx, FECHA, pend)).toThrow(
+      /no puede retroceder ni estancarse/,
+    );
+    expect(doble.escrituras).toHaveLength(0); // ni la serie válida se escribió
+  });
+});
+
 describe('consecutivo-legal — verificarAvanceCounter (guard monotónico D9, ADR-0026)', () => {
   it('acepta un avance REAL estrictamente mayor que el actual', () => {
     expect(() =>
