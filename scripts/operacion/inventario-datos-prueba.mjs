@@ -53,9 +53,13 @@ if (!crudo) {
   console.error('Falta FIREBASE_SERVICE_ACCOUNT en el entorno.');
   process.exit(2);
 }
+// El .env puede traer el valor entre comillas (dotenv las quita al cargar;
+// un `grep | cut` crudo no). Se toleran aquí para que el comando documentado
+// funcione tal cual — falló en el primer uso real por esto.
+const sinComillas = crudo.trim().replace(/^['"]/, '').replace(/['"]$/, '');
 let credencial;
 try {
-  credencial = JSON.parse(crudo);
+  credencial = JSON.parse(sinComillas);
 } catch (e) {
   console.error('FIREBASE_SERVICE_ACCOUNT no es JSON válido:', e.message);
   process.exit(2);
