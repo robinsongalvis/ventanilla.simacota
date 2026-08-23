@@ -58,3 +58,6 @@ apppass.txt
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+
+# Detalle local de inventarios/importaciones con PII — jamás al repositorio
+*.local.json
