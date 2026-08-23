@@ -52,7 +52,20 @@ históricos, la salida y las 2 planillas.
 - Ensayo previo en stage con dobles `ENSAYO-*`: VÁLIDO (10/10).
 
 ## Resultado de la ejecución
-**PENDIENTE** — se completa con la salida del comando tras ejecutarlo el
-propietario. Residual conocido: los archivos de Storage de los radicados
-borrados (si los hubiera) quedan huérfanos e inaccesibles desde la
-aplicación; su barrido queda para el paquete PT-4.
+**EJECUTADA el 23-ago-2026 por el propietario** (Robinson David Galvis),
+desde su equipo, en dos pasos con evidencia pegada al chat de la sesión:
+
+1. **Dry-run:** `Verificación: 10/10 objetivos confirmados contra su huella`
+   y plan idéntico a la lista de este acta.
+2. **Ejecución** (`CONFIRMO_LIMPIEZA=SI`): los 8 BORRADO y los 2 ANULADO,
+   en el orden del plan, sin un solo fallo ni desviación.
+
+Estado esperado tras la limpieza: `ventanilla_radicados` 24→19 documentos
+(17 legítimos + 2 anulados con constancia), `expedientes` 199→196 (solo los
+históricos reales). La verificación de cierre es re-ejecutar el inventario
+en solo lectura: debe reportar C1=0, C3=0 y C2=2 — esos 2 son los números
+25 y 26 anulados, visibles a propósito: son la constancia.
+
+Residual conocido: los archivos de Storage de los radicados borrados (si
+los hubiera) quedan huérfanos e inaccesibles desde la aplicación; su
+barrido queda para el paquete PT-4.
