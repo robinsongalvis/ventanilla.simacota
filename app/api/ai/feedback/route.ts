@@ -1,8 +1,22 @@
 import { NextResponse } from 'next/server';
 import { getFirebaseAdminDb } from '@/lib/firebase-admin';
 import { checkRateLimit, getClientIp, rateLimitHeaders } from '@/lib/ai/rate-limit';
+import { requireActiveInternalUser } from '@/lib/server/internal-auth';
 
 export async function POST(request: Request) {
+  /* PT-3 (24-ago-2026): esta era la ÚNICA ruta /api/ai que escribía estado
+     de negocio SIN sesión — un anónimo de internet que derivara un
+     radicadoId (formato público) podía sembrar feedbackIa en un radicado
+     real y contaminar ai_feedback/ai_auditoria sin actor atribuible. La
+     sesión va ANTES del rate limit: a un no autenticado no se le regala
+     ni el conteo de la ventana. El actor sale de la sesión, no del body —
+     un evaluador no puede firmar como otro. */
+  let usuario;
+  try {
+    usuario = await requireActiveInternalUser();
+  } catch {
+    return NextResponse.json({ error: 'Sesión requerida.' }, { status: 401 });
+  }
   const limite = { maxRequests: 30, windowMs: 60_000 };
   const ip = getClientIp(request);
   const bloqueado = checkRateLimit(`ai:feedback:${ip}`, limite);
@@ -21,8 +35,6 @@ export async function POST(request: Request) {
     const payload = await request.json();
     const {
       radicadoId,
-      usuarioId,
-      actorNombre,
       puntuacion, // 'POSITIVO' | 'CORREGIDO' | 'NEGATIVO'
       motivoCorreccion,
       clasificacionOriginal,
@@ -34,12 +46,15 @@ export async function POST(request: Request) {
       confianzaIA,
     } = payload;
 
-    if (!radicadoId || !usuarioId || !puntuacion) {
+    if (!radicadoId || !puntuacion) {
       return NextResponse.json(
-        { error: 'radicadoId, usuarioId y puntuacion son requeridos.' },
+        { error: 'radicadoId y puntuacion son requeridos.' },
         { status: 400 }
       );
     }
+    // Identidad del evaluador: SIEMPRE de la sesión verificada.
+    const usuarioId = usuario.uid;
+    const actorNombre = usuario.nombre;
 
     const db = getFirebaseAdminDb();
     const ahora = new Date().toISOString();
@@ -49,7 +64,7 @@ export async function POST(request: Request) {
       feedbackId,
       radicadoId,
       usuarioId,
-      actorNombre: actorNombre || 'Funcionario',
+      actorNombre,
       puntuacion,
       motivoCorreccion: motivoCorreccion || null,
       fecha: ahora,
@@ -59,7 +74,7 @@ export async function POST(request: Request) {
     await db.doc(`ventanilla_radicados/${radicadoId}`).update({
       feedbackIa: {
         usuarioId,
-        actorNombre: actorNombre || 'Funcionario',
+        actorNombre,
         puntuacion,
         motivoCorreccion: motivoCorreccion || null,
         fecha: ahora,
