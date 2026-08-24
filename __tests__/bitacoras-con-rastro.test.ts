@@ -66,3 +66,12 @@ describe('guardas de forma — los cinco catch probatorios registran', () => {
     }
   });
 });
+
+describe('auth/session — el 401 conserva la causa real en el registro', () => {
+  it('el catch registra con logError y responde genérico (sin filtrar el porqué)', () => {
+    const fuente = readFileSync(join(process.cwd(), 'app/api/auth/session/route.ts'), 'utf8');
+    const codigo = fuente.split('\n').filter((l) => !l.trim().startsWith('//')).join('\n');
+    expect(codigo).toContain("logError({ radicadoId: '', modulo: 'auth/session', error: err });");
+    expect(codigo).toContain("{ error: 'Sesion invalida.' }");
+  });
+});

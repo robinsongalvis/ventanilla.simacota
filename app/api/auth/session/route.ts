@@ -6,6 +6,7 @@ import {
   sessionCookieOptions,
 } from '@/lib/auth-cookie';
 import { getFirebaseAdminAuth, getFirebaseAdminDb } from '@/lib/firebase-admin';
+import { logError } from '@/lib/logger';
 
 export const runtime = 'nodejs';
 
@@ -93,7 +94,17 @@ export async function POST(request: NextRequest) {
     });
 
     return response;
-  } catch {
+  } catch (err) {
+    // Este catch aplana a 401 CUALQUIER fallo del servidor: verifyIdToken,
+    // la lectura de users/{uid}, createSessionCookie o la red hacia
+    // Firebase. Eso está bien para el cliente (no se filtra el porqué a un
+    // atacante), pero mudo costó un diagnóstico entero: el 18-ago un
+    // FIREBASE_SERVICE_ACCOUNT ilegible en local produjo «contraseña
+    // incorrecta» en pantalla y CERO rastro en la terminal — se buscó el
+    // fallo en la credencial del usuario cuando era del servidor. logError
+    // registra la causa real (mensaje saneado de PII) sin cambiar la
+    // respuesta.
+    logError({ radicadoId: '', modulo: 'auth/session', error: err });
     return NextResponse.json({ error: 'Sesion invalida.' }, { status: 401 });
   }
 }
