@@ -35,9 +35,16 @@ permissions:
   contents: read
   issues: write
 
+# Grupo POR DESPLIEGUE y sin cancelación: con un grupo global y
+# cancel-in-progress, cualquier deployment_status de un preview (que llegan
+# constantemente y este job descarta por el if:) mataba el smoke de
+# PRODUCCIÓN en vuelo — y un run cancelado no dispara failure() ni
+# success(): ni abre incidencia ni cierra la abierta. El deploy se quedaba
+# sin comprobar y sin nada rojo en ningún sitio, que es exactamente el
+# hueco silencioso que este workflow existe para tapar.
 concurrency:
-  group: smoke-post-deploy
-  cancel-in-progress: true
+  group: smoke-post-deploy-${{ github.event.deployment.sha || github.run_id }}
+  cancel-in-progress: false
 
 jobs:
   smoke:
@@ -60,7 +67,12 @@ jobs:
           set -uo pipefail
           FALLOS=""
           for RUTA in /api/health / /interno/login /consulta; do
-            CODIGO=$(curl -sL -o /dev/null -w '%{http_code}' --max-time 30 "${BASE}${RUTA}" || echo 000)
+            # curl ya imprime 000 cuando no conecta; el `|| echo 000` de
+            # antes concatenaba un segundo y la incidencia decía «HTTP
+            # 000000» — el texto que alguien lee a las 3 a.m. para decidir
+            # un rollback.
+            CODIGO=$(curl -sL -o /dev/null -w '%{http_code}' --max-time 30 "${BASE}${RUTA}" || true)
+            CODIGO=${CODIGO:-000}
             echo "  ${RUTA} → HTTP ${CODIGO}"
             case "${CODIGO}" in
               200) ;;

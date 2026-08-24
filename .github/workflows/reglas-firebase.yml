@@ -66,10 +66,17 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Fallar cerrado sin credencial
+      - name: Guardas que corren SIEMPRE (proyecto y credencial)
         env:
           SA: ${{ secrets.FIREBASE_SA_RULES }}
         run: |
+          # La lista blanca va aquí, no en el paso de deploy: con
+          # accion=verificar (el valor por defecto) el input llegaba sin
+          # validar a un paso que exporta la credencial en su entorno.
+          case "${PROYECTO}" in
+            ventanilla-unica-f31b1|ventanilla-simacota-stage) ;;
+            *) echo "::error::Proyecto no permitido: ${PROYECTO}"; exit 1 ;;
+          esac
           if [ -z "${SA}" ]; then
             echo "::error::Falta el secret FIREBASE_SA_RULES (clave JSON de una SA con roles/firebaserules.admin en ${PROYECTO})."
             echo "::error::Sin él este workflow no puede ni verificar ni desplegar — no finge."
@@ -90,12 +97,6 @@ jobs:
             echo "::error::Las reglas solo se despliegan desde main."
             exit 1
           fi
-          # El proyecto también se valida contra una lista blanca: es el
-          # destino de un deploy de reglas, no un campo libre.
-          case "${PROYECTO}" in
-            ventanilla-unica-f31b1|ventanilla-simacota-stage) ;;
-            *) echo "::error::Proyecto no permitido: ${PROYECTO}"; exit 1 ;;
-          esac
 
       - uses: actions/setup-node@v7
         with:
@@ -165,3 +166,37 @@ jobs:
               await github.rest.issues.create({ ...context.repo, title: '🟠 Deriva entre el repo y las reglas vivas de Firebase', body: cuerpo, labels: ['deriva-reglas'] });
             }
             core.setFailed('Deriva detectada');
+
+      - name: Cerrar la incidencia de deriva si volvió a coincidir
+        if: ${{ env.ACCION == 'verificar' && steps.deriva.outputs.ESTADO == 'sin_deriva' }}
+        uses: actions/github-script@v8
+        with:
+          script: |
+            // Simétrico del smoke: sin esto la incidencia queda abierta
+            // para siempre y la SIGUIENTE deriva real entra como comentario
+            // en un hilo viejo que ya nadie mira — la alarma se degrada sola.
+            const abiertas = await github.rest.issues.listForRepo({ ...context.repo, state: 'open', labels: 'deriva-reglas' });
+            for (const iss of abiertas.data) {
+              await github.rest.issues.createComment({ ...context.repo, issue_number: iss.number, body: '✅ Las reglas vivas volvieron a coincidir con el repositorio — se cierra.' });
+              await github.rest.issues.update({ ...context.repo, issue_number: iss.number, state: 'closed' });
+            }
+
+      - name: Avisar si el vigía NO PUDO comprobar
+        if: ${{ always() && env.ACCION == 'verificar' && steps.deriva.outputs.ESTADO == 'fallo' }}
+        uses: actions/github-script@v8
+        env:
+          REPORTE: ${{ steps.deriva.outputs.REPORTE }}
+        with:
+          script: |
+            // Etiqueta PROPIA, separada de deriva-reglas: «no pude
+            // comprobar» y «hay deriva» son cosas distintas y mezclarlas
+            // fue justo el defecto que este PR corrige. Sin este paso, un
+            // secret revocado dejaba el vigía muerto durante semanas con
+            // solo un job rojo que nadie mira.
+            const cuerpo = ['El vigía semanal NO pudo comprobar las reglas (no es deriva — es infraestructura):', '', '```', process.env.REPORTE || 'ver el log', '```', '', 'Causas típicas: clave de la SA revocada o caducada, SA sin roles/firebaserules.admin, o fallo de red. Mientras esto siga así, NADIE está vigilando la deriva de reglas.'].join('\n');
+            const abiertas = await github.rest.issues.listForRepo({ ...context.repo, state: 'open', labels: 'vigia-reglas-caido' });
+            if (abiertas.data.length > 0) {
+              await github.rest.issues.createComment({ ...context.repo, issue_number: abiertas.data[0].number, body: cuerpo });
+            } else {
+              await github.rest.issues.create({ ...context.repo, title: '🔴 El vigía de reglas no puede comprobar (infraestructura)', body: cuerpo, labels: ['vigia-reglas-caido'] });
+            }
