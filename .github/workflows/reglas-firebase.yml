@@ -46,18 +46,29 @@ permissions:
   contents: read
   issues: write
 
+# Nunca dos corridas a la vez sobre las reglas vivas de un proyecto.
+concurrency:
+  group: reglas-firebase-${{ github.event.inputs.proyecto || 'ventanilla-unica-f31b1' }}
+  cancel-in-progress: false
+
 jobs:
   reglas:
     runs-on: ubuntu-latest
     timeout-minutes: 15
+    # La credencial NO vive a nivel de job a propósito: así no está en el
+    # entorno de `npm ci`, que ejecuta scripts de terceros. Solo los dos
+    # pasos que la necesitan la reciben. Los inputs viajan por `env` y
+    # nunca interpolados en `run:` — un valor con `;` o backticks se
+    # ejecutaría con la SA de producción a mano.
     env:
-      SA: ${{ secrets.FIREBASE_SA_RULES }}
       PROYECTO: ${{ github.event.inputs.proyecto || 'ventanilla-unica-f31b1' }}
       ACCION: ${{ github.event.inputs.accion || 'verificar' }}
     steps:
       - uses: actions/checkout@v4
 
       - name: Fallar cerrado sin credencial
+        env:
+          SA: ${{ secrets.FIREBASE_SA_RULES }}
         run: |
           if [ -z "${SA}" ]; then
             echo "::error::Falta el secret FIREBASE_SA_RULES (clave JSON de una SA con roles/firebaserules.admin en ${PROYECTO})."
@@ -67,15 +78,24 @@ jobs:
 
       - name: Guardas del deploy
         if: ${{ env.ACCION == 'desplegar' }}
+        env:
+          CONFIRMAR: ${{ github.event.inputs.confirmar }}
+          REF: ${{ github.ref }}
         run: |
-          if [ "${{ github.event.inputs.confirmar }}" != "desplegar reglas" ]; then
+          if [ "${CONFIRMAR}" != "desplegar reglas" ]; then
             echo "::error::Escriba exactamente 'desplegar reglas' en la confirmación. Nada se desplegó."
             exit 1
           fi
-          if [ "${{ github.ref }}" != "refs/heads/main" ]; then
-            echo "::error::Las reglas solo se despliegan desde main (rama actual: ${{ github.ref }})."
+          if [ "${REF}" != "refs/heads/main" ]; then
+            echo "::error::Las reglas solo se despliegan desde main."
             exit 1
           fi
+          # El proyecto también se valida contra una lista blanca: es el
+          # destino de un deploy de reglas, no un campo libre.
+          case "${PROYECTO}" in
+            ventanilla-unica-f31b1|ventanilla-simacota-stage) ;;
+            *) echo "::error::Proyecto no permitido: ${PROYECTO}"; exit 1 ;;
+          esac
 
       - uses: actions/setup-node@v7
         with:
@@ -85,6 +105,8 @@ jobs:
 
       - name: Verificar deriva (solo lectura)
         id: deriva
+        env:
+          SA: ${{ secrets.FIREBASE_SA_RULES }}
         run: |
           set -uo pipefail
           export FIREBASE_SERVICE_ACCOUNT="${SA}"
@@ -110,6 +132,8 @@ jobs:
 
       - name: Desplegar reglas (solo si se pidió)
         if: ${{ env.ACCION == 'desplegar' }}
+        env:
+          SA: ${{ secrets.FIREBASE_SA_RULES }}
         run: |
           set -euo pipefail
           printf '%s' "${SA}" > /tmp/sa.json

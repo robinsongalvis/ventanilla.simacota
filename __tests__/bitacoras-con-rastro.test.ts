@@ -67,11 +67,22 @@ describe('guardas de forma — los cinco catch probatorios registran', () => {
   });
 });
 
-describe('auth/session — el 401 conserva la causa real en el registro', () => {
-  it('el catch registra con logError y responde genérico (sin filtrar el porqué)', () => {
-    const fuente = readFileSync(join(process.cwd(), 'app/api/auth/session/route.ts'), 'utf8');
-    const codigo = fuente.split('\n').filter((l) => !l.trim().startsWith('//')).join('\n');
+describe('auth/session — distingue ruido de cliente de avería del servidor', () => {
+  const fuente = readFileSync(join(process.cwd(), 'app/api/auth/session/route.ts'), 'utf8');
+  const codigo = fuente.split('\n').filter((l) => !l.trim().startsWith('//')).join('\n');
+
+  it('un token del cliente (código auth/*) NO va a Sentry — solo consola', () => {
+    // Endpoint público: un token expirado es ruido esperable. Mandarlo a
+    // Sentry inundaría la bandeja el día que se estrene el DSN.
+    expect(codigo).toContain("codigo.startsWith('auth/')");
+    expect(codigo).toContain("console.warn('[auth/session] token rechazado:'");
+  });
+
+  it('cualquier otro fallo SÍ se registra con logError (credencial, Firestore, cookie)', () => {
     expect(codigo).toContain("logError({ radicadoId: '', modulo: 'auth/session', error: err });");
+  });
+
+  it('la respuesta al cliente sigue siendo genérica', () => {
     expect(codigo).toContain("{ error: 'Sesion invalida.' }");
   });
 });

@@ -104,7 +104,20 @@ export async function POST(request: NextRequest) {
     // fallo en la credencial del usuario cuando era del servidor. logError
     // registra la causa real (mensaje saneado de PII) sin cambiar la
     // respuesta.
-    logError({ radicadoId: '', modulo: 'auth/session', error: err });
+    // …pero NO todo fallo aquí es una avería. Este endpoint es público: un
+    // token expirado o malformado es ruido esperable (sesión vencida en una
+    // pestaña vieja), y mandarlo a Sentry inundaría la bandeja justo cuando
+    // se estrene el DSN — un vigilante que grita por todo deja de leerse.
+    // Los códigos de token de firebase-admin se registran en consola y NADA
+    // más; lo demás (credencial del servidor ilegible, Firestore caído,
+    // createSessionCookie roto) sí es avería y va con logError → Sentry.
+    const codigo = (err as { code?: string } | null)?.code ?? '';
+    const esTokenDelCliente = typeof codigo === 'string' && codigo.startsWith('auth/');
+    if (esTokenDelCliente) {
+      console.warn('[auth/session] token rechazado:', codigo);
+    } else {
+      logError({ radicadoId: '', modulo: 'auth/session', error: err });
+    }
     return NextResponse.json({ error: 'Sesion invalida.' }, { status: 401 });
   }
 }

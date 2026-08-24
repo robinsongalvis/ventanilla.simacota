@@ -27,17 +27,25 @@ name: Smoke post-deploy (producción)
 
 on:
   deployment_status:
+  # Disparo manual: permite ESTRENARLO contra producción antes de confiar
+  # en él (si no, su primera ejecución sería en un incidente real).
+  workflow_dispatch:
 
 permissions:
   contents: read
   issues: write
 
+concurrency:
+  group: smoke-post-deploy
+  cancel-in-progress: true
+
 jobs:
   smoke:
     # Solo deployments de Production que terminaron en success.
     if: >-
-      github.event.deployment_status.state == 'success' &&
-      github.event.deployment.environment == 'Production'
+      github.event_name == 'workflow_dispatch' ||
+      (github.event.deployment_status.state == 'success' &&
+       github.event.deployment.environment == 'Production')
     runs-on: ubuntu-latest
     timeout-minutes: 10
     env:
@@ -77,8 +85,9 @@ jobs:
           script: |
             const fallos = process.env.FALLOS || 'ver el log del workflow';
             const titulo = '🔴 Smoke post-deploy FALLÓ — producción desplegada pero no responde sana';
+            const sha = context.payload.deployment?.sha?.slice(0, 7) ?? 'manual';
             const cuerpo = [
-              `El deployment \`${context.payload.deployment.sha.slice(0,7)}\` quedó en Production pero el smoke-test falló:`,
+              `El deployment \`${sha}\` quedó en Production pero el smoke-test falló:`,
               '', '```', fallos, '```', '',
               `Corrida: ${context.serverUrl}/${context.repo.owner}/${context.repo.repo}/actions/runs/${context.runId}`,
               '', 'Rollback: redeploy del tag/deployment anterior en Vercel (1 clic) — ver PLAN_GO_LIVE Fase 5.',
@@ -101,6 +110,7 @@ jobs:
               ...context.repo, state: 'open', labels: 'smoke-produccion',
             });
             for (const iss of abiertas.data) {
-              await github.rest.issues.createComment({ ...context.repo, issue_number: iss.number, body: `✅ El smoke del deployment \`${context.payload.deployment.sha.slice(0,7)}\` respondió sano en las cuatro superficies — se cierra.` });
+              const sha = context.payload.deployment?.sha?.slice(0, 7) ?? 'manual';
+              await github.rest.issues.createComment({ ...context.repo, issue_number: iss.number, body: `✅ El smoke del deployment \`${sha}\` respondió sano en las cuatro superficies — se cierra.` });
               await github.rest.issues.update({ ...context.repo, issue_number: iss.number, state: 'closed' });
             }

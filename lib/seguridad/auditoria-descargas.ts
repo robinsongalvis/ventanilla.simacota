@@ -88,6 +88,6 @@ export async function registrarDescargaAuditoria(
     // señal alguna (hallazgo D5 del go-live): si Firestore rechazara estas
     // escrituras, se descubriría en una auditoría externa, no por el
     // control. logError nunca lanza: el no-bloqueo se conserva.
-    logError({ radicadoId: '', modulo: 'auditoria/descargas', error: err });
+    logError({ radicadoId: params.radicadoId ?? '', modulo: 'auditoria/descargas', error: err });
   }
 }
