@@ -3,6 +3,7 @@ import { autorizarAuditor } from '../_auth';
 import { getFirebaseAdminDb } from '@/lib/firebase-admin';
 import { DIRECTORIO_TENANTS } from '@/src/types/reglas-negocio';
 import type { TenantId } from '@/src/types/radicado';
+import { logError } from '@/lib/logger';
 
 export const runtime = 'nodejs';
 
@@ -50,7 +51,13 @@ export async function GET(request: Request): Promise<NextResponse> {
       .sort((a, b) => a.nombre.localeCompare(b.nombre, 'es'));
 
     return NextResponse.json({ ok: true, responsables });
-  } catch {
+  } catch (err) {
+    // PT-2/D5 (24-ago-2026): antes este catch devolvía 500 sin dejar UN solo
+    // rastro — si Control Interno fallaba en producción, no había ni una
+    // línea para diagnosticar (y el error atrapado tampoco llega a Sentry
+    // por onRequestError). logError registra estructurado Y reporta a
+    // Sentry cuando el DSN esté vivo; el cliente recibe mensaje genérico.
+    logError({ radicadoId: '', modulo: 'control-interno/responsables', error: err });
     return NextResponse.json(
       { error: 'No fue posible cargar los responsables de la dependencia.' },
       { status: 500 },

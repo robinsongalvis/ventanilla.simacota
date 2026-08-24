@@ -22,6 +22,7 @@ import {
 } from '@/lib/control-interno/panorama';
 import { evaluarRiesgoMasivo } from '@/lib/control-interno/riesgos';
 import { generarReporteExcelControlInterno } from '@/lib/control-interno/server/reporte-excel';
+import { logError } from '@/lib/logger';
 
 export const runtime = 'nodejs';
 
@@ -84,8 +85,14 @@ export async function GET(req: Request): Promise<NextResponse> {
       },
     });
   } catch (err) {
+    // PT-2/D5 (24-ago-2026): antes este catch devolvía 500 sin dejar UN solo
+    // rastro y filtraba err.message crudo al cliente — si Control Interno fallaba en producción, no había ni una
+    // línea para diagnosticar (y el error atrapado tampoco llega a Sentry
+    // por onRequestError). logError registra estructurado Y reporta a
+    // Sentry cuando el DSN esté vivo; el cliente recibe mensaje genérico.
+    logError({ radicadoId: '', modulo: 'control-interno/reportes', error: err });
     return NextResponse.json(
-      { error: err instanceof Error ? err.message : 'Error al generar el reporte.' },
+      { error: 'No fue posible generar el reporte.' },
       { status: 500 },
     );
   }

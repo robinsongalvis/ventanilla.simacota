@@ -11,6 +11,7 @@ import { listarRadicadosParaControl } from '@/lib/control-interno/server/datos';
 import { generarAlertas, resumirAlertasPorNivel } from '@/lib/control-interno/alertas';
 import type { TenantId } from '@/src/types/radicado';
 import type { NivelRiesgo } from '@/src/types/control-interno';
+import { logError } from '@/lib/logger';
 
 export const runtime = 'nodejs';
 
@@ -45,8 +46,14 @@ export async function GET(req: Request): Promise<NextResponse> {
       alertas: alertas.slice(0, 500),
     });
   } catch (err) {
+    // PT-2/D5 (24-ago-2026): antes este catch devolvía 500 sin dejar UN solo
+    // rastro y filtraba err.message crudo al cliente — si Control Interno fallaba en producción, no había ni una
+    // línea para diagnosticar (y el error atrapado tampoco llega a Sentry
+    // por onRequestError). logError registra estructurado Y reporta a
+    // Sentry cuando el DSN esté vivo; el cliente recibe mensaje genérico.
+    logError({ radicadoId: '', modulo: 'control-interno/alertas', error: err });
     return NextResponse.json(
-      { error: err instanceof Error ? err.message : 'Error al generar alertas.' },
+      { error: 'No fue posible generar las alertas.' },
       { status: 500 },
     );
   }
