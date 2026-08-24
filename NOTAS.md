@@ -128,3 +128,36 @@ git diff origin/main...origin/feat/nocturno-go-live
 **No abrí PR**: usted dijo rama aparte sin push a main, y abrir el PR es
 suyo. Los 12 commits son independientes — puede tomar unos y descartar
 otros con `git cherry-pick`.
+
+---
+
+## 13. Lo que la revisión adversarial encontró en MI propio trabajo
+
+Antes de abrir el PR sometí los commits del turno a revisión adversarial. No
+salió limpio, y eso es lo relevante de esta sección: el turno nocturno
+produjo tres defectos propios, dos de ellos en el código escrito
+precisamente para "endurecer".
+
+| Defecto mío | Cómo se cazó | Estado |
+|---|---|---|
+| El mensaje de "radicado no encontrado" afirmaba *fuera de la ventana de 180 días* — pero la misma rama se dispara con un radicado de OTRA dependencia, confirmando su existencia a quien no debe verlo | Test **preexistente** `alertas-ver-radicado.test.ts` («muestra error seguro») | Corregido: el mensaje nombra ambas causas sin confirmar ninguna |
+| `cancel-in-progress: true` en el smoke: un despliegue de preview cancelaba el smoke de producción en vuelo, y un run cancelado no abre ni cierra incidencia — cero alarma, en silencio | Revisión adversarial | Corregido: grupo por SHA, sin cancelación |
+| El mensaje de un commit se llevó a la historia permanente ~200 líneas de `--help` y un volcado de `env` con IDs de sesión y rutas locales | Revisión adversarial | Corregido por `rebase --reword` |
+
+Más otros cuatro menores en los workflows (lista blanca que solo cubría el
+camino de deploy, incidencia de deriva que no se cerraba nunca, `fallo` del
+vigía sin aviso fuera de Actions, y `HTTP 000000` en el texto de la
+incidencia). Todos corregidos antes del PR.
+
+**Lectura honesta:** el trabajo autónomo sin revisor produce defectos con la
+misma facilidad que el trabajo acompañado — y dos de los tres se colaron
+justo donde yo estaba más seguro de estar mejorando la seguridad. La red que
+funcionó fue la combinación de tests preexistentes y revisión adversarial,
+no mi propia confianza.
+
+### Nota sobre un fallo de la suite
+
+`__tests__/radicacion-interna-staging-falla.test.ts` falla localmente por
+timeout de 5000 ms. **No es de esta rama**: comprobado revirtiendo `app/` y
+`lib/` al estado de `main` y reproduciendo el mismo fallo. En este entorno
+falta `FIREBASE_STORAGE_BUCKET`. El árbitro es CI sobre el PR.
