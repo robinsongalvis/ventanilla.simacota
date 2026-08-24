@@ -135,11 +135,11 @@ const MATRIZ = [
     ejecutar: (db) => getDocs(collection(db, 'ventanilla_radicados')),
   },
   {
-    grupo: 'ventanilla_radicados', caso: 'ADMIN crea radicado con radicadoId coincidente', actor: 'admin-a', esperado: 'permitido',
+    grupo: 'ventanilla_radicados', caso: 'ADMIN ya NO crea radicados por cliente (CR-2 cerrado, cutover PT-1 23-ago)', actor: 'admin-a', esperado: 'denegado',
     ejecutar: (db) => setDoc(doc(db, 'ventanilla_radicados/rad-nuevo-1'), { radicadoId: 'rad-nuevo-1', clasificacion: { oficinaDestino: TENANT_A } }),
   },
   {
-    grupo: 'ventanilla_radicados', caso: 'RECEPCIONISTA crea radicado con radicadoId coincidente', actor: 'recepcionista-a', esperado: 'permitido',
+    grupo: 'ventanilla_radicados', caso: 'RECEPCIONISTA ya NO crea radicados por cliente (CR-2 cerrado — la radicación es del servidor)', actor: 'recepcionista-a', esperado: 'denegado',
     ejecutar: (db) => setDoc(doc(db, 'ventanilla_radicados/rad-nuevo-2'), { radicadoId: 'rad-nuevo-2', clasificacion: { oficinaDestino: TENANT_A } }),
   },
   {
@@ -256,7 +256,7 @@ const MATRIZ = [
     ejecutar: (db) => getDocs(query(collection(db, 'ventanilla_salidas'), where('dependenciaOrigen', '==', TENANT_A))),
   },
   {
-    grupo: 'ventanilla_salidas', caso: 'RECEPCIONISTA crea salida con salidaId coincidente', actor: 'recepcionista-a', esperado: 'permitido',
+    grupo: 'ventanilla_salidas', caso: 'RECEPCIONISTA ya NO crea salidas por cliente (el libro se registra por /api/salidas/registrar)', actor: 'recepcionista-a', esperado: 'denegado',
     ejecutar: (db) => setDoc(doc(db, 'ventanilla_salidas/sal-nueva-1'), { salidaId: 'sal-nueva-1', dependenciaOrigen: TENANT_A }),
   },
   {
