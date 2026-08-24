@@ -390,6 +390,11 @@ export interface VentanillaRadicado {
      que es el que alimenta el Excel institucional, se olvidó de filtrarlos.
      Declararlos es lo que convierte «acordarse» en «que el compilador te
      avise». */
+  /** ¿El acto interno de respuesta ocurrió dentro del plazo? Se guarda aparte
+   *  de `cumplioTermino` porque son cosas distintas: cumplir exige además
+   *  haber NOTIFICADO (Ley 1755). Distinguirlas separa «se respondió tarde»
+   *  de «se respondió a tiempo pero el aviso no salió». */
+  respuestaEnTermino?: boolean;
   /** Registro de prueba: nunca cuenta como operación real. */
   isTest?: boolean;
   /** Excluido de métricas e indicadores oficiales. */
