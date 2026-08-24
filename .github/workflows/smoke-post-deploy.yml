@@ -1,0 +1,102 @@
+# ══════════════════════════════════════════════════════════════════════
+# Smoke-test POST-DEPLOY — G3/G4 del SEV-1 (ADR-0025) · PT-6 del go-live
+#
+# POR QUÉ EXISTE. El SEV-1 de julio estuvo 14 HORAS en 500 sin que nadie lo
+# supiera: cada merge a main despliega a producción en minutos y NADA
+# comprobaba después que el sitio siguiera vivo. La auditoría del go-live lo
+# marcó 🟠: «exactamente la clase de hueco que ya costó 14 horas».
+#
+# QUÉ HACE. Cuando GitHub registra un deployment_status exitoso de
+# Production, espera un momento de propagación y golpea el sitio REAL:
+#   1. /api/health           → debe responder 200
+#   2. /                     → 200 (portal ciudadano)
+#   3. /interno/login        → 200 (la puerta del panel)
+#   4. /consulta             → 200 (consulta ciudadana)
+# Solo LECTURAS (GET) — jamás escribe ni radica nada.
+#
+# SI FALLA: abre (o comenta) una incidencia con la etiqueta `smoke-produccion`
+# — el mismo patrón de alarma del workflow de respaldos, que ya demostró
+# despertar a alguien. El verde de Vercel dice «desplegué»; este workflow
+# dice «y SIRVE».
+#
+# El dominio institucional (ventanilla.simacota.gov.co) está caído por DNS
+# ajeno al proyecto (24-ago): se golpea el dominio de Vercel, que es el que
+# las constancias ciudadanas citan. Cuando el DNS vuelva, añadirlo aquí.
+# ══════════════════════════════════════════════════════════════════════
+name: Smoke post-deploy (producción)
+
+on:
+  deployment_status:
+
+permissions:
+  contents: read
+  issues: write
+
+jobs:
+  smoke:
+    # Solo deployments de Production que terminaron en success.
+    if: >-
+      github.event.deployment_status.state == 'success' &&
+      github.event.deployment.environment == 'Production'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    env:
+      BASE: https://ventanilla-simacota.vercel.app
+    steps:
+      - name: Esperar propagación
+        run: sleep 45
+
+      - name: Golpear las cuatro superficies
+        id: golpe
+        run: |
+          set -uo pipefail
+          FALLOS=""
+          for RUTA in /api/health / /interno/login /consulta; do
+            CODIGO=$(curl -sL -o /dev/null -w '%{http_code}' --max-time 30 "${BASE}${RUTA}" || echo 000)
+            echo "  ${RUTA} → HTTP ${CODIGO}"
+            case "${CODIGO}" in
+              200) ;;
+              *) FALLOS="${FALLOS}${RUTA} → HTTP ${CODIGO}\n" ;;
+            esac
+          done
+          if [ -n "${FALLOS}" ]; then
+            printf 'FALLOS<<EOF\n%b\nEOF\n' "${FALLOS}" >> "$GITHUB_OUTPUT"
+            echo "::error::El deploy está en producción pero el sitio NO responde sano."
+            exit 1
+          fi
+          echo "Las cuatro superficies responden 200 — el deploy SIRVE."
+
+      - name: Abrir o comentar la incidencia
+        if: ${{ failure() }}
+        uses: actions/github-script@v8
+        with:
+          script: |
+            const fallos = `${{ steps.golpe.outputs.FALLOS }}` || 'ver el log del workflow';
+            const titulo = '🔴 Smoke post-deploy FALLÓ — producción desplegada pero no responde sana';
+            const cuerpo = [
+              `El deployment \`${context.payload.deployment.sha.slice(0,7)}\` quedó en Production pero el smoke-test falló:`,
+              '', '```', fallos, '```', '',
+              `Corrida: ${context.serverUrl}/${context.repo.owner}/${context.repo.repo}/actions/runs/${context.runId}`,
+              '', 'Rollback: redeploy del tag/deployment anterior en Vercel (1 clic) — ver PLAN_GO_LIVE Fase 5.',
+            ].join('\n');
+            const abiertas = await github.rest.issues.listForRepo({
+              ...context.repo, state: 'open', labels: 'smoke-produccion',
+            });
+            if (abiertas.data.length > 0) {
+              await github.rest.issues.createComment({ ...context.repo, issue_number: abiertas.data[0].number, body: cuerpo });
+            } else {
+              await github.rest.issues.create({ ...context.repo, title: titulo, body: cuerpo, labels: ['smoke-produccion'] });
+            }
+
+      - name: Cerrar la incidencia si todo sanó
+        if: ${{ success() }}
+        uses: actions/github-script@v8
+        with:
+          script: |
+            const abiertas = await github.rest.issues.listForRepo({
+              ...context.repo, state: 'open', labels: 'smoke-produccion',
+            });
+            for (const iss of abiertas.data) {
+              await github.rest.issues.createComment({ ...context.repo, issue_number: iss.number, body: `✅ El smoke del deployment \`${context.payload.deployment.sha.slice(0,7)}\` respondió sano en las cuatro superficies — se cierra.` });
+              await github.rest.issues.update({ ...context.repo, issue_number: iss.number, state: 'closed' });
+            }
