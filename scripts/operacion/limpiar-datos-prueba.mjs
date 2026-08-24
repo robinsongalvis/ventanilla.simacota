@@ -184,6 +184,17 @@ async function borrarConSubcolecciones(ref) {
   await ref.delete();
 }
 
+/* La aplicación muestra SIEMPRE el día civil de Bogotá (lib/fecha-colombia.ts:
+   TIMEZONE_COLOMBIA). Este script debe hablar el mismo idioma o su tabla no
+   sirve para comparar. Devuelve AAAA-MM-DD para que ordene alfabéticamente. */
+const FMT_BOGOTA = new Intl.DateTimeFormat('sv-SE', { timeZone: 'America/Bogota' });
+function fechaCivilBogota(iso) {
+  if (typeof iso !== 'string' || !iso) return '—';
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return '—';
+  return FMT_BOGOTA.format(d);
+}
+
 /* Lo que el humano compara contra su pantalla. El dry-run es la ÚNICA
    oportunidad de detectar que la lista señala a otra cosa de la que se cree:
    quien autoriza no puede confirmar ids a ciegas. */
@@ -192,7 +203,12 @@ function retrato(d) {
   // dos rutas que probé antes (fechaRadicacion, fechaCreacion) no existen y
   // habrían impreso «—» en las 17 filas, dejando al humano sin nada que
   // comparar contra el acta — que es justo para lo que sirve el dry-run.
-  const fecha = String(d?.control?.fechaRadicado ?? '—').slice(0, 10);
+  // DÍA CIVIL EN BOGOTÁ, no el día en UTC. `fechaRadicado` es un instante
+  // ISO; cortarlo a 10 caracteres da la fecha UTC, y un radicado creado a las
+  // 19:00 de Bogotá ya es del día siguiente en UTC. En la ronda del 24-ago eso
+  // desplazó 7 de 17 filas un día respecto de lo que la funcionaria veía en
+  // pantalla — justo la columna que existe para que ella pueda comparar.
+  const fecha = fechaCivilBogota(d?.control?.fechaRadicado);
   // PII: un radicado con identidad reservada NO se destapa en una terminal
   // para «facilitar la revisión». La fecha, el estado y el número bastan para
   // identificar la fila; el nombre es precisamente lo que la ley protege.

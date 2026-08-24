@@ -156,9 +156,26 @@ no bloquea esta ronda porque nadie de fuera conoce esos números.
 
 _(a completar por el propietario tras correr el comando)_
 
-- Dry-run:
-- Ejecución (`CONFIRMO_LIMPIEZA=SI`):
-- Verificación de cierre (re-inventario):
+**EJECUTADA el 24-ago-2026 por el propietario desde su terminal** (el patrón de
+siempre: yo construyo y ensayo, él ejecuta contra producción y pega la salida).
+
+- **Contador leído:** `radicados-2026`, último emitido = **27**. Coherente con la
+  lista: la serie no tiene números más allá del 27.
+- **Dry-run:** `Verificación: 17/17 objetivos confirmados contra su huella`. La
+  tabla se contrastó una por una contra el tablero: fechas, estados
+  (`RESUELTO` / `ASIGNADO` / `PRORROGA`) y solicitantes coinciden con los 17.
+- **Ejecución** (`CONFIRMO_LIMPIEZA=SI`): 17 líneas `ANULADO`, sin fallos.
+- **Verificación de cierre:** re-ejecutar el dry-run debe reportar los 17 como
+  «YA está anulado» y no permitir una segunda escritura.
+
+**Discrepancia aclarada durante la verificación.** Siete de las diecisiete fechas
+del dry-run salieron un día por delante de las del tablero. No era un dato
+distinto: la columna imprimía el día en **UTC** y la aplicación muestra el día
+civil de **Bogotá** (UTC−5), así que un radicado creado después de las 19:00
+locales ya figura al día siguiente en UTC. Se comprobó la equivalencia en los
+siete casos antes de autorizar. Es la tercera vez que esta trampa aparece en el
+proyecto pese a existir `lib/fecha-colombia.ts`; el script quedó corregido para
+imprimir el día civil de Bogotá.
 
 ## 9. Consecuencia pendiente de decidir
 
