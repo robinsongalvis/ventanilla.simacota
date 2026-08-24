@@ -23,7 +23,7 @@ lo que ya existe.
 
 | # | Paquete | Esfuerzo | Depende de |
 |---|---|---|---|
-| PT-1 | **Cutover al servidor**: flip de `USA_RADICACION_INTERNA_SERVER`, cerrar `counters`/`create` de cliente (CR-1, CR-2), trazabilidad y salidas server-only (patrón D8) | ~3 días + UAT stage | autorización del propietario |
+| PT-1 | ✅ **EJECUTADO 24-ago** (acta `ACTA_CUTOVER_PT1_2026-08-24.md`): flip + UAT con huella de servidor + CR-1/CR-2 cerrados y reglas desplegadas en stage y producción. Resta el PR-C (trazabilidad server-only, patrón D8) | PR-C: ~1-2 días | — |
 | PT-2 | **Canales de alerta vivos**: SMTP · DSN Sentry · uptime contra `/api/health` · contacto de contingencia · el cron de alertas debe fallar RUIDOSO cuando 0 envíos salgan | horas | 4 acciones del propietario + 2 h dev |
 | PT-3 | **Superficie de seguridad**: auth en `/api/ai/feedback` · endurecer `storage.rules` · verificar proveedores de Auth (sin auto-registro) · retirar 4 usuarios UAT | ~1 día | verificación en consola (propietario) |
 | PT-4 | **Respaldo de adjuntos**: versioning del bucket + export diario de Storage (el export de Firestore NO incluye los archivos) | ~½ día | 1 comando del propietario + workflow |
