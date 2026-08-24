@@ -41,9 +41,9 @@ Sin esta variable, SIMI Jurídico no genera análisis ni borradores.
 ```
 EMAIL_HOST=smtp.gmail.com
 EMAIL_PORT=587
-EMAIL_USER=notificaciones@simacota-santander.gov.co
+EMAIL_USER=contactenos@simacota-santander.gov.co
 EMAIL_PASS=xxxx-xxxx-xxxx-xxxx   # App Password de Gmail
-EMAIL_FROM="Alcaldía de Simacota <notificaciones@simacota-santander.gov.co>"
+EMAIL_FROM="Alcaldía de Simacota <contactenos@simacota-santander.gov.co>"
 ```
 Para Gmail: activar autenticación de 2 pasos → Contraseñas de aplicación → Mail
 Sin esta configuración, los emails de aprobaciones no se envían.

@@ -22,8 +22,40 @@
  *   node scripts/operacion/verificar-correo.mjs --enviar-a alguien@dominio.gov.co
  */
 import nodemailer from 'nodemailer';
+import { readFileSync } from 'node:fs';
+import { fileURLToPath } from 'node:url';
+import { dirname, resolve } from 'node:path';
 
 function arg(n) { const i = process.argv.indexOf(n); return i === -1 ? undefined : process.argv[i + 1]; }
+
+/* El remitente NO es una preferencia: es el buzón que la alcaldía publica como
+   oficial, y vive en DIRECTORIO_TENANTS (src/types/reglas-negocio.ts, «fuente
+   única de verdad»). Notificar desde otra dirección significa que la respuesta
+   del ciudadano cae en un buzón que nadie lee — y que el correo llega desde un
+   remitente que no aparece en ninguna parte oficial, que es exactamente el
+   perfil de un intento de suplantación.
+   Se lee con expresión regular a propósito: este script es un .mjs suelto sin
+   build, no puede importar TypeScript. Si el formato del archivo cambia, avisa
+   en vez de fallar: es una comprobación de coherencia, no una guarda de
+   seguridad. */
+function emailOficialDeVentanilla() {
+  try {
+    const raiz = resolve(dirname(fileURLToPath(import.meta.url)), '..', '..');
+    const src = readFileSync(resolve(raiz, 'src/types/reglas-negocio.ts'), 'utf8');
+    const bloque = src.split('VENTANILLA_UNICA:')[1];
+    if (!bloque) return null;
+    const m = bloque.slice(0, 400).match(/emailOficial:\s*'([^']+)'/);
+    return m ? m[1] : null;
+  } catch {
+    return null;
+  }
+}
+
+/** Extrae la dirección de un `Nombre <correo@dominio>` o la devuelve tal cual. */
+function soloDireccion(v) {
+  const m = String(v ?? '').match(/<([^>]+)>/);
+  return (m ? m[1] : String(v ?? '')).trim().toLowerCase();
+}
 const destinatario = arg('--enviar-a');
 
 const host = process.env.EMAIL_HOST;
@@ -54,6 +86,23 @@ console.log(`Servidor : ${host}:${port} (${port === 465 ? 'SSL' : 'STARTTLS'})`)
 console.log(`Usuario  : ${user}`);
 console.log(`Remitente: ${from}`);
 console.log(`Clave    : ${pass.length} caracteres${pass.length === 16 ? ' (largo de contraseña de aplicación ✔)' : ' ⚠ Google espera 16 — si es la clave normal del usuario, fallará'}`);
+
+const oficial = emailOficialDeVentanilla();
+if (oficial === null) {
+  console.log('⚠ No se pudo leer el correo oficial de DIRECTORIO_TENANTS — se omite la comprobación de coherencia.');
+} else {
+  const desajustes = [];
+  if (soloDireccion(user) !== oficial.toLowerCase()) desajustes.push(`EMAIL_USER (${user})`);
+  if (soloDireccion(from) !== oficial.toLowerCase()) desajustes.push(`EMAIL_FROM (${soloDireccion(from)})`);
+  if (desajustes.length) {
+    console.log(`⚠ NO coincide con el buzón oficial de Ventanilla Única (${oficial}):`);
+    for (const d of desajustes) console.log(`    · ${d}`);
+    console.log('  Notificar desde otra dirección deja las respuestas del ciudadano en un buzón que nadie lee.');
+    console.log('  Si el buzón oficial cambió, actualice DIRECTORIO_TENANTS en src/types/reglas-negocio.ts.');
+  } else {
+    console.log(`✔ Coincide con el buzón oficial de Ventanilla Única (${oficial}).`);
+  }
+}
 console.log('');
 
 const transporter = nodemailer.createTransport({

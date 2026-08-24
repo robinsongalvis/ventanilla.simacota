@@ -39,9 +39,9 @@ Antes del primer envío productivo, validar que `simacota-santander.gov.co` teng
 |---|---|---|
 | `EMAIL_HOST` | `smtp.gmail.com` | Sí |
 | `EMAIL_PORT` | `587` | No (default) |
-| `EMAIL_USER` | `notificaciones@simacota-santander.gov.co` | Sí |
+| `EMAIL_USER` | `contactenos@simacota-santander.gov.co` | Sí |
 | `EMAIL_PASS` | App Password de 16 caracteres — solo en Vercel | Sí |
-| `EMAIL_FROM` | `Alcaldía de Simacota <notificaciones@simacota-santander.gov.co>` | Sí |
+| `EMAIL_FROM` | `Alcaldía de Simacota <contactenos@simacota-santander.gov.co>` | Sí |
 
 > [!CAUTION]
 > `EMAIL_PASS` NUNCA debe aparecer en código, archivos `.env` versionados, documentos ni capturas. Solo debe estar en Vercel Environment Variables → Production.
@@ -51,7 +51,7 @@ Antes del primer envío productivo, validar que `simacota-santander.gov.co` teng
 ## 3. Procedimiento de configuración inicial
 
 ### Paso 1 — Configurar cuenta Gmail institucional
-1. Iniciar sesión en `notificaciones@simacota-santander.gov.co`
+1. Iniciar sesión en `contactenos@simacota-santander.gov.co`
 2. Ir a **Cuenta de Google → Seguridad**
 3. Activar **Verificación en dos pasos** (obligatorio)
 4. Ir a **Contraseñas de aplicaciones**
@@ -64,9 +64,9 @@ Antes del primer envío productivo, validar que `simacota-santander.gov.co` teng
    ```
    EMAIL_HOST=smtp.gmail.com
    EMAIL_PORT=587
-   EMAIL_USER=notificaciones@simacota-santander.gov.co
+   EMAIL_USER=contactenos@simacota-santander.gov.co
    EMAIL_PASS=[App Password de 16 caracteres SIN espacios intermedios en Vercel]
-   EMAIL_FROM=Alcaldía de Simacota <notificaciones@simacota-santander.gov.co>
+   EMAIL_FROM=Alcaldía de Simacota <contactenos@simacota-santander.gov.co>
    ```
 3. Guardar cada variable
 
@@ -133,7 +133,7 @@ Error: connect ETIMEDOUT smtp.gmail.com:587
 ### 4.4 El correo llega a spam
 **Causa:** El dominio `simacota-santander.gov.co` puede no tener SPF/DKIM configurado para Google Workspace.
 **Acción (corto plazo — mientras se resuelve el dominio):**
-- Pedir al ciudadano agregar `notificaciones@simacota-santander.gov.co` a sus contactos
+- Pedir al ciudadano agregar `contactenos@simacota-santander.gov.co` a sus contactos
 - Revisar la carpeta de spam
 
 **Acción (mediano plazo — definitiva):**
