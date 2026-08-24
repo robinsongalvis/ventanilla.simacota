@@ -92,25 +92,6 @@ export async function POST(request: Request, context: RouteContext): Promise<Nex
     const nuevaFecha = new Date(fechaActual);
     nuevaFecha.setDate(nuevaFecha.getDate() + diasProrroga);
 
-    await getFirebaseAdminDb().doc(`ventanilla_radicados/${radicadoId}`).update({
-      'termino.fechaVencimiento': nuevaFecha.toISOString(),
-      'termino.prorrogasAplicadas': (radicado.termino.prorrogasAplicadas ?? 0) + 1,
-      estadoActual: 'PRORROGA',
-      ultimaActualizacion: ahora,
-    });
-    await appendTrazabilidadAdmin(radicadoId, {
-      fecha: ahora,
-      accion: 'PRORROGA',
-      actorUid: usuario.uid,
-      actorNombre: usuario.nombre,
-      nota: motivo,
-      metadata: {
-        actorRol: usuario.rol,
-        diasProrroga,
-        fechaVencimientoAnterior: radicado.termino.fechaVencimiento,
-        fechaVencimientoNueva: nuevaFecha.toISOString(),
-      },
-    });
 
     // ── Notificación progresiva al ciudadano ──
     const dependencia = DIRECTORIO_TENANTS[radicado.clasificacion.oficinaDestino];
@@ -185,6 +166,39 @@ export async function POST(request: Request, context: RouteContext): Promise<Nex
         }
       }
     }
+
+    /* ESCRITURA DESPUÉS DEL AVISO, igual que en subsanación y resolución. No se
+       revierte la prórroga cuando el correo falla —la entidad sí necesita el
+       plazo, y devolver la fecha la dejaría vencida al instante— pero el
+       expediente registra si el ciudadano fue informado. `prorrogaNotificada`
+       en false es lo que obliga a notificar por otra vía y deja constancia de
+       que, hasta entonces, esta prórroga no le es oponible. */
+    await getFirebaseAdminDb().doc(`ventanilla_radicados/${radicadoId}`).update({
+      'termino.fechaVencimiento': nuevaFecha.toISOString(),
+      'termino.prorrogasAplicadas': (radicado.termino.prorrogasAplicadas ?? 0) + 1,
+      estadoActual: 'PRORROGA',
+      ultimaActualizacion: ahora,
+      prorrogaNotificada: emailEnviado,
+    });
+    await appendTrazabilidadAdmin(radicadoId, {
+      fecha: ahora,
+      accion: 'PRORROGA',
+      actorUid: usuario.uid,
+      actorNombre: usuario.nombre,
+      nota: motivo,
+      metadata: {
+        actorRol: usuario.rol,
+        diasProrroga,
+        fechaVencimientoAnterior: radicado.termino.fechaVencimiento,
+        fechaVencimientoNueva: nuevaFecha.toISOString(),
+        // Lo que OCURRIÓ con el aviso, no lo que se pretendía. El art. 14 de la
+        // Ley 1755 condiciona la prórroga a informarla ANTES del vencimiento:
+        // una que el ciudadano nunca conoció le mueve la fecha en silencio —
+        // llega el día en que le debían respuesta, no pasa nada, y él no sabe
+        // ni que se corrió ni hasta cuándo.
+        notificadaAlCiudadano: emailEnviado,
+      },
+    });
 
     registrarEventoNegocio({
       operacion: 'prorroga',
