@@ -105,14 +105,17 @@ Se corrigió en dos niveles:
    el id con `Date.now() % 1e8` **rellenado a ocho con ceros**, así que ni
    «tiene el campo» ni «empieza por ceros» prueban nada. El contador se lee,
    jamás se escribe (DF-9); si no se puede leer, ningún borrado se autoriza.
-2. **Guarda en el limpiador:** ningún objetivo de BORRADO puede tener
-   `consecutivo`. Si lo tiene, el script **aborta completo** y exige decidirlo
-   en un acta. Una lista mal armada ya no puede provocar un borrado en la serie.
+2. **Guarda en el limpiador:** ningún objetivo de BORRADO puede satisfacer ese
+   criterio. Si lo satisface, el script **aborta completo** y exige decidirlo
+   en un acta. Y si el contador no se puede leer, tampoco se autoriza ningún
+   borrado: la guarda falla cerrada, no abierta. Una lista mal armada ya no
+   puede provocar un borrado dentro de la serie.
 
-El regex se conserva como señal secundaria, ampliado a las etiquetas de canal
-**pero anclado a los ceros de relleno** (`000` + 5 dígitos): el botón E2E
-emitía `1-WEB-2026-{8 dígitos aleatorios}` sin tocar el contador, y esos sí
-eran borrables — se borraron en la ronda 1 y estuvo bien.
+El regex del id queda **solo como señal secundaria**, para que a un documento de
+la serie al que le faltara el campo tampoco se le trate como borrable. Por sí
+solo no decide nada: el ancla de los ceros de relleno que se le añadió es
+insuficiente, porque el E2E también rellena su id con `padStart(8, '0')` y
+podría producir un número con ceros a la izquierda.
 
 ## 7. Verificación
 
