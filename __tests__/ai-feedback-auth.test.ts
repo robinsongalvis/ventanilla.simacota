@@ -9,6 +9,7 @@
  * decisiones: sin sesión → 401 sin escribir nada; con sesión, la identidad
  * del evaluador es LA DE LA SESIÓN aunque el body traiga otra.
  */
+import { readFileSync } from 'node:fs';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 let sesion: { uid: string; nombre: string; rol: string; tenantId: string } | null = null;
@@ -73,7 +74,6 @@ describe('/api/ai/feedback — autenticación (PT-3)', () => {
 
 describe('storage.rules — el bucket entero es Admin-SDK-only (PT-3)', () => {
   it('ninguna cláusula allow distinta de false (las puertas muertas no reviven)', () => {
-    const { readFileSync } = require('node:fs') as typeof import('node:fs');
     const reglas = readFileSync('storage.rules', 'utf8')
       .split('\n')
       .filter((l: string) => !l.trim().startsWith('//'));
