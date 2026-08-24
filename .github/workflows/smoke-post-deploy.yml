@@ -69,9 +69,13 @@ jobs:
       - name: Abrir o comentar la incidencia
         if: ${{ failure() }}
         uses: actions/github-script@v8
+        env:
+          # Por `env`, nunca interpolado en el script: la salida lleva rutas
+          # y códigos, y un valor con backticks rompería el template literal.
+          FALLOS: ${{ steps.golpe.outputs.FALLOS }}
         with:
           script: |
-            const fallos = `${{ steps.golpe.outputs.FALLOS }}` || 'ver el log del workflow';
+            const fallos = process.env.FALLOS || 'ver el log del workflow';
             const titulo = '🔴 Smoke post-deploy FALLÓ — producción desplegada pero no responde sana';
             const cuerpo = [
               `El deployment \`${context.payload.deployment.sha.slice(0,7)}\` quedó en Production pero el smoke-test falló:`,

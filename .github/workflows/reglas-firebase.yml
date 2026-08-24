@@ -88,30 +88,51 @@ jobs:
         run: |
           set -uo pipefail
           export FIREBASE_SERVICE_ACCOUNT="${SA}"
-          if node scripts/operacion/verificar-reglas-vivas.mjs --proyecto "${PROYECTO}" | tee /tmp/deriva.txt; then
-            echo "SIN_DERIVA=1" >> "$GITHUB_OUTPUT"
-          else
-            echo "SIN_DERIVA=0" >> "$GITHUB_OUTPUT"
-          fi
+          # El verificador distingue por código de salida: 4 = DERIVA REAL;
+          # 2 credencial ilegible; 3 credencial de otro proyecto; 1 fallo de
+          # red/permiso. Colapsarlos todos en «hay deriva» haría que un
+          # secret caducado o un parpadeo de googleapis amaneciera como una
+          # incidencia FALSA de deriva, con instrucción de ir a desplegar
+          # reglas — la alarma mintiendo justo en su estreno. Se captura
+          # stderr también (2>&1): esos errores salen por ahí y el reporte
+          # quedaba vacío.
+          node scripts/operacion/verificar-reglas-vivas.mjs --proyecto "${PROYECTO}" > /tmp/deriva.txt 2>&1
+          RC=$?
+          cat /tmp/deriva.txt
           { echo 'REPORTE<<EOF'; cat /tmp/deriva.txt; echo 'EOF'; } >> "$GITHUB_OUTPUT"
+          case "${RC}" in
+            0) echo "ESTADO=sin_deriva" >> "$GITHUB_OUTPUT" ;;
+            4) echo "ESTADO=deriva"     >> "$GITHUB_OUTPUT" ;;
+            *) echo "ESTADO=fallo"      >> "$GITHUB_OUTPUT"
+               echo "::error::El verificador no pudo comprobar (código ${RC}): credencial ilegible/de otro proyecto, permiso o red. NO es deriva — no se abre incidencia de deriva."
+               exit 1 ;;
+          esac
 
       - name: Desplegar reglas (solo si se pidió)
         if: ${{ env.ACCION == 'desplegar' }}
         run: |
           set -euo pipefail
           printf '%s' "${SA}" > /tmp/sa.json
-          GOOGLE_APPLICATION_CREDENTIALS=/tmp/sa.json npx firebase-tools deploy \
+          # Versión FIJADA a propósito: sin pin, npx bajaría el latest del
+          # registro justo cuando la credencial de reglas está en disco —
+          # y este proyecto ya perdió 14 horas por una dependencia sin fijar
+          # (SEV-1, ADR-0025). Subir de major es una decisión con su PR.
+          GOOGLE_APPLICATION_CREDENTIALS=/tmp/sa.json npx --yes firebase-tools@15.19.0 deploy \
             --only firestore:rules,storage --project "${PROYECTO}" --non-interactive
           rm -f /tmp/sa.json
           export FIREBASE_SERVICE_ACCOUNT="${SA}"
           node scripts/operacion/verificar-reglas-vivas.mjs --proyecto "${PROYECTO}"
 
-      - name: Incidencia si el vigía encontró deriva
-        if: ${{ env.ACCION == 'verificar' && steps.deriva.outputs.SIN_DERIVA == '0' }}
+      - name: Incidencia si el vigía encontró deriva REAL
+        if: ${{ env.ACCION == 'verificar' && steps.deriva.outputs.ESTADO == 'deriva' }}
         uses: actions/github-script@v8
+        env:
+          # Por `env`, nunca interpolado dentro del script: un reporte con
+          # comillas o backticks rompería el template literal (o algo peor).
+          REPORTE: ${{ steps.deriva.outputs.REPORTE }}
         with:
           script: |
-            const reporte = `${{ steps.deriva.outputs.REPORTE }}`;
+            const reporte = process.env.REPORTE || 'ver el log del workflow';
             const cuerpo = ['El vigía semanal encontró DERIVA entre el repo y las reglas vivas:', '', '```', reporte, '```', '', 'Desplegar desde este mismo workflow (accion=desplegar) tras revisar el porqué — una deriva puede ser un deploy olvidado o un cambio manual en la consola que nadie versionó.'].join('\n');
             const abiertas = await github.rest.issues.listForRepo({ ...context.repo, state: 'open', labels: 'deriva-reglas' });
             if (abiertas.data.length > 0) {
