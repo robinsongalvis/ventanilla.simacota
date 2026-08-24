@@ -19,13 +19,18 @@ const tablero = readFileSync(join(process.cwd(), 'app/interno/dashboard/page.tsx
 const panel = readFileSync(join(process.cwd(), 'app/interno/licencias/components/PanelDetalleExpediente.tsx'), 'utf8');
 const hook = readFileSync(join(process.cwd(), 'lib/hooks/useVentanillaRadicados.ts'), 'utf8');
 
-describe('deep-link radicado — el fallo explica la causa real', () => {
-  it('el mensaje nombra la ventana operativa y la salida (búsqueda avanzada)', () => {
-    expect(tablero).toContain('no está en la ventana operativa del tablero');
+describe('deep-link radicado — el fallo da salida SIN filtrar existencia', () => {
+  it('ofrece la búsqueda avanzada como salida', () => {
     expect(tablero).toContain('Búsqueda avanzada');
   });
 
-  it('la ventana citada en el mensaje coincide con la del stream', () => {
+  it('enuncia las dos causas posibles sin confirmar cuál', () => {
+    // Decir solo «fuera de la ventana» le confirmaría a un funcionario que
+    // un radicado de otra dependencia EXISTE. La disyunción es deliberada.
+    expect(tablero).toContain('o fuera de su dependencia');
+  });
+
+  it('la ventana citada coincide con la del stream', () => {
     // Si alguien cambia VENTANA_DIAS_STREAM, el mensaje deja de ser cierto:
     // este test obliga a actualizarlo junto con el valor.
     const m = hook.match(/VENTANA_DIAS_STREAM\s*=\s*(\d+)/);

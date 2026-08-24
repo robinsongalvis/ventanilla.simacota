@@ -4365,17 +4365,20 @@ function DashboardInterior({ usuario, cerrarSesion }: { usuario: UsuarioAutentic
 
     const radicado = todosLosRadicados.find((r) => r.radicadoId === id);
     if (!radicado) {
-      // El tablero trabaja sobre una ventana viva de 180 días
-      // (VENTANA_DIAS_STREAM). Un radicado más antiguo NO está fuera del
-      // alcance del usuario: está fuera de la VENTANA — y la diferencia le
-      // importa a quien abre un expediente de licencia años después desde
-      // el enlace a su radicado de origen. El mensaje genérico mandaba a
-      // pensar en un problema de permisos que no existe.
+      // Esta rama cubre DOS casos que no se pueden distinguir sin filtrar
+      // información: el radicado está fuera de la ventana viva del tablero
+      // (VENTANA_DIAS_STREAM = 180 días) o está fuera del alcance del
+      // usuario (otra dependencia). Decir «está fuera de la ventana»
+      // insinuaría que existe a quien no puede verlo — por eso el mensaje
+      // enuncia AMBAS causas sin confirmar cuál, y ofrece la salida útil.
+      // (Antes decía solo «No fue posible abrir el radicado», seguro pero
+      // sin salida: quien abre un expediente de licencia años después desde
+      // el enlace a su radicado de origen quedaba sin saber qué hacer.)
       setErrorAbrirRadicado(
-        `El radicado ${id} no está en la ventana operativa del tablero (últimos 180 días). ` +
-        'Búsquelo en «Búsqueda avanzada», que consulta el archivo completo.',
+        'No fue posible abrir el radicado. Puede estar fuera de los últimos 180 días ' +
+        'o fuera de su dependencia — búsquelo en «Búsqueda avanzada».',
       );
-      console.warn('[dashboard] Radicado fuera de la ventana viva o del alcance del usuario.', { radicadoId: id });
+      console.warn('[dashboard] No fue posible abrir radicado dentro del alcance del usuario.', { radicadoId: id });
       return false;
     }
 

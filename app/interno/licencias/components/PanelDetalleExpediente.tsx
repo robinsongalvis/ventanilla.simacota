@@ -296,7 +296,7 @@ export function PanelDetalleExpediente({ expedienteId, onCerrar, textoColision =
                     <Link
                       href={`/interno/dashboard?radicadoId=${encodeURIComponent(expediente.radicadoId)}`}
                       className="underline decoration-dotted underline-offset-2 hover:opacity-80"
-                      title="Abrir el radicado en Ventanilla — allí están los documentos que el ciudadano adjuntó al radicar. Si superó los 180 días, el tablero indicará buscarlo en Búsqueda avanzada."
+                      title="Abrir el radicado en Ventanilla — allí están los documentos que el ciudadano adjuntó al radicar. Si no está disponible en el tablero, este le indicará dónde buscarlo."
                     >
                       <NumeroLegal value={expediente.radicadoId} variant="radicado" size="sm" />
                     </Link>
@@ -304,7 +304,7 @@ export function PanelDetalleExpediente({ expedienteId, onCerrar, textoColision =
                   {' · '}Creado el {formatFechaColombia(expediente.creadoEn)}
                   {expediente.radicadoId ? (
                     <span className="block text-[10px] mt-0.5" style={{ color: 'var(--text-secondary)' }}>
-                      Los documentos que el ciudadano adjuntó al radicar viven en el radicado. El enlace lo abre en Ventanilla si está dentro de los últimos 180 días; si es más antiguo, el tablero le indicará buscarlo en «Búsqueda avanzada».
+                      Los documentos que el ciudadano adjuntó al radicar viven en el radicado. El enlace lo abre en Ventanilla; si el radicado ya no está en el tablero (más de 180 días), este le indicará buscarlo en «Búsqueda avanzada».
                     </span>
                   ) : null}
                 </p>

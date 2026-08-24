@@ -58,6 +58,21 @@ describe('Panel de Alertas Predictivas — navegación Ver radicado', () => {
     expect(dashboard).toContain("console.warn('[dashboard] No fue posible abrir radicado dentro del alcance del usuario.', { radicadoId: id })");
   });
 
+  it('el mensaje de «no encontrado» no revela SI el radicado existe (24-ago-2026)', () => {
+    // La misma rama cubre «fuera de la ventana de 180 días» y «fuera de su
+    // dependencia». Al añadir la salida útil (búsqueda avanzada) se
+    // enuncian AMBAS causas sin confirmar cuál: afirmar la ventana le diría
+    // a un funcionario que un radicado ajeno EXISTE. El id tampoco se
+    // interpola en el mensaje visible.
+    const bloque = dashboard.slice(
+      dashboard.indexOf('const radicado = todosLosRadicados.find'),
+      dashboard.indexOf('setErrorAbrirRadicado(null)'),
+    );
+    expect(bloque).toContain('o fuera de su dependencia');
+    expect(bloque).toContain('Búsqueda avanzada');
+    expect(bloque).not.toMatch(/setErrorAbrirRadicado\(\s*`[^`]*\$\{id\}/);
+  });
+
   it('no altera filtros MIPG ni recalcula el Panel de Alertas', () => {
     const bloqueAlertas = dashboard.slice(
       dashboard.indexOf("vistaActual === 'ALERTAS'"),
