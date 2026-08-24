@@ -75,7 +75,17 @@ mecanismo que ya los saca de bandeja y de métricas), bloque `anulado` con
 referencia a esta acta, y entrada de trazabilidad `ANULACION_DATO_PRUEBA`.
 El registro **queda**; el número se pierde **con constancia**.
 
-## 5. Defecto corregido en la herramienta
+## 5. Rectificación del acta del 23-ago sobre estos 17
+
+El acta anterior, bajo «No se tocan», los declaró por escrito **«archivo real
+del municipio»**, por no llevar marca explícita de prueba. Esta acta
+**sustituye esa determinación** para esos 17 registros. La evidencia nueva es
+la confirmación expresa del propietario del 24-ago-2026: son datos de prueba
+propios y ninguno corresponde a una petición ciudadana real. Se deja
+constancia del cambio para que la cadena de custodia no muestre dos actas
+consecutivas afirmando lo contrario sin explicación.
+
+## 6. Defecto corregido en la herramienta
 
 El clasificador del inventario decidía la pertenencia a la serie **por el
 aspecto del id** (`RE_SERIE_LEGAL` solo reconocía `1-110-`, `2-SAL/2-110-` y
@@ -86,9 +96,15 @@ stage ya la había pillado cuando no cubría las salidas.
 
 Se corrigió en dos niveles:
 
-1. **Criterio primario, estructural:** pertenece a la serie el documento que
-   **guarda el campo `consecutivo`** — prueba dura de que consumió el contador.
-   El nombre del id deja de ser criterio.
+1. **Criterio primario, estructural** — y en dos condiciones, porque la
+   revisión adversarial tumbó dos versiones previas de esta regla:
+   `control.consecutivo` (bajo `control`, no en la raíz) debe **casar con la
+   cola numérica del id** *y* estar **dentro del rango ya emitido por el
+   contador**. Ninguna basta sola: el botón E2E fabricaba
+   `control.consecutivo` desde su `testRunId` sin tocar el contador y generaba
+   el id con `Date.now() % 1e8` **rellenado a ocho con ceros**, así que ni
+   «tiene el campo» ni «empieza por ceros» prueban nada. El contador se lee,
+   jamás se escribe (DF-9); si no se puede leer, ningún borrado se autoriza.
 2. **Guarda en el limpiador:** ningún objetivo de BORRADO puede tener
    `consecutivo`. Si lo tiene, el script **aborta completo** y exige decidirlo
    en un acta. Una lista mal armada ya no puede provocar un borrado en la serie.
@@ -98,7 +114,7 @@ El regex se conserva como señal secundaria, ampliado a las etiquetas de canal
 emitía `1-WEB-2026-{8 dígitos aleatorios}` sin tocar el contador, y esos sí
 eran borrables — se borraron en la ronda 1 y estuvo bien.
 
-## 6. Verificación
+## 7. Verificación
 
 - 13 casos de clasificación probados, incluidos los cuatro aleatorios del botón
   E2E que **deben** seguir dando «fuera de la serie»: los 13 correctos.
@@ -107,8 +123,33 @@ eran borrables — se borraron en la ronda 1 y estuvo bien.
   leer la base.
 - Integridad de la lista: 17 ids únicos, cada uno casa con su `consecutivo`,
   y la ronda no contiene ninguna orden de borrado.
+- Criterio de serie probado con 8 casos, **incluido un id del E2E con ceros de
+  relleno** que la versión anterior daba por miembro de la serie.
+- `tsc --noEmit` y `eslint` limpios tras incorporar al tipo los campos
+  `isTest`, `excludeFromMetrics` y `anulado`, que el código usaba desde hacía
+  meses sin declararlos.
 
-## 7. Ejecución
+### Lo que la revisión adversarial tumbó de mi primera versión
+
+| Defecto | Efecto real |
+|---|---|
+| La huella leía `consecutivo` en la **raíz**; vive en `control.consecutivo` | El script habría abortado en los 17 sin escribir nada — inútil, aunque sin daño |
+| La «guarda estructural» usaba esa misma ruta | Era **código muerto**: nunca protegía de nada |
+| El criterio «tiene el campo ⇒ consumió el contador» | **Falso**: el E2E fabrica el campo sin tocar el contador |
+| El ancla «empieza por ceros» del regex | El E2E rellena con `padStart(8,'0')`: puede colisionar |
+| `retrato()` leía `fechaRadicacion` / `fechaCreacion` | Campos inexistentes: la columna FECHA salía «—» en las 17 filas, dejando al humano sin nada que comparar |
+| El dry-run imprimía el nombre de solicitantes con **identidad reservada** | Fuga de PII en la terminal, justo lo que la ley protege |
+| `RONDAS[rondaPedida]` sin `Object.hasOwn` | `--ronda constructor` pasaba la guarda y reventaba con un stack trace |
+
+## 8. Ejecución
+
+**Advertencia sobre el alcance real de la anulación.** Marcar `isTest` +
+`excludeFromMetrics` + `anulado` los saca de la bandeja operativa, de la
+búsqueda avanzada, del reporte MIPG, de los dos crones de plazo legal y —desde
+este cambio— de Control Interno. **No los saca de la consulta pública del
+ciudadano**, que no filtra por estas marcas: quien tenga el número seguirá
+viendo el radicado como si estuviera en trámite. Queda anotado como pendiente;
+no bloquea esta ronda porque nadie de fuera conoce esos números.
 
 _(a completar por el propietario tras correr el comando)_
 
@@ -116,7 +157,7 @@ _(a completar por el propietario tras correr el comando)_
 - Ejecución (`CONFIRMO_LIMPIEZA=SI`):
 - Verificación de cierre (re-inventario):
 
-## 8. Consecuencia pendiente de decidir
+## 9. Consecuencia pendiente de decidir
 
 Anulados el 25, 26 y ahora del 9 al 24 y el 27, **la serie 2026 de este sistema
 queda sin ningún radicado real**. El contador, en cambio, sigue en 27: el

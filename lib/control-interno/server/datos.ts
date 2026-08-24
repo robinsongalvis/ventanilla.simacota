@@ -6,6 +6,7 @@
  */
 
 import { getFirebaseAdminDb } from '@/lib/firebase-admin';
+import { soloOperacionReal } from '@/lib/radicados/dato-de-prueba';
 import type { VentanillaRadicado } from '@/src/types/ventanilla';
 import type { TenantId } from '@/src/types/radicado';
 import type {
@@ -44,7 +45,11 @@ export async function listarRadicadosParaControl(
   }
 
   const snap = await query.get();
-  return snap.docs.map((d) => d.data() as VentanillaRadicado);
+  // Control Interno es el ÚNICO consumidor de métricas que no filtraba. Con
+  // los datos de prueba dentro, su panel reportaba PQRSD ciudadanas vencidas
+  // en nivel CRÍTICO que no existen, y las exportaba al Excel institucional
+  // — inflando a la baja el indicador oficial de cumplimiento de términos.
+  return soloOperacionReal(snap.docs.map((d) => d.data() as VentanillaRadicado));
 }
 
 /* ══════════════════════════════════════════════════════════════

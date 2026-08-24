@@ -110,12 +110,15 @@ async function inventariar(coleccion, describir) {
     // cambia la máscara»; la consulta pública las acepta en una sola
     // expresión). Clasificar por el prefijo daba «fuera de la serie» a
     // radicados que SÍ consumieron el contador — y por tanto «borrables» a
-    // registros cuyo borrado deja hueco en la foliación AGN. La prueba dura
-    // es el campo `consecutivo`: si el documento lo guarda, salió del
-    // contador. El regex se conserva solo como señal secundaria, para que un
-    // documento de la serie al que le falte el campo tampoco caiga en
-    // borrable.
-    const consumioContador = typeof d.consecutivo === 'number';
+    // registros cuyo borrado deja hueco en la foliación AGN.
+    // La prueba dura es que `control.consecutivo` (NO la raíz:
+    // src/types/ventanilla.ts:111 lo declara dentro de ControlRadicacion) CASE
+    // con la cola del id. La sola presencia del campo no vale: el botón E2E lo
+    // fabricaba a partir de su testRunId sin tocar el contador, y su id salía
+    // de Date.now() — nunca casan. El regex queda como señal secundaria.
+    const cons = d?.control?.consecutivo;
+    const cola = Number(String(doc.id).split('-').pop());
+    const consumioContador = typeof cons === 'number' && Number.isFinite(cola) && cola === cons;
     const enSerieLegal = consumioContador || RE_SERIE_LEGAL.test(doc.id);
     if (RE_FORMATO_VIEJO.test(doc.id)) filas.formatoViejo += 1;
     else if (enSerieLegal) filas.formatoNuevo += 1;
