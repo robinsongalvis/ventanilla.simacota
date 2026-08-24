@@ -62,13 +62,6 @@ service cloud.firestore {
      * radicados cuyo `oficinaDestino` coincide con su propio tenant. Jefe y
      * Control Interno quedan fuera (son solo lectura).
      */
-    function canWriteTrazabilidad(radicadoId, database) {
-      return isAdmin() || isRecepcionista()
-        || (isFuncionario()
-            && get(/databases/$(database)/documents/ventanilla_radicados/$(radicadoId))
-                  .data.clasificacion.oficinaDestino == userTenant());
-    }
-
     function assignedTenant(data) {
       return data.clasificacionIA != null
         && data.clasificacionIA.oficinaDestino == userTenant();
@@ -174,9 +167,15 @@ service cloud.firestore {
             && get(/databases/$(database)/documents/ventanilla_radicados/$(radicadoId))
                   .data.clasificacion.oficinaDestino == userTenant());
       // Escritura: roles operativos CON aislamiento por tenant (ADR-0008 / R8).
-      // El Funcionario solo escribe sobre radicados de su propio tenant; Jefe y
-      // Control Interno son solo lectura.
-      allow create: if canWriteTrazabilidad(radicadoId, database);
+      // PR-C del cutover (24-ago-2026): la trazabilidad es SERVER-ONLY,
+      // patrón D8. Los dos únicos escritores de cliente resultaron código
+      // muerto (el resolver DEPRECATED sin llamadores y la radicación
+      // legada, inalcanzable tras el flip) — se extirparon en vez de
+      // migrarse. Con create de cliente, cualquier FUNCIONARIO podía
+      // inyectar eventos con actor forjado: el registro probatorio de
+      // notificaciones perdía no-repudio. El actor lo captura el servidor
+      // (appendTrazabilidadAdmin / el handler de radicación).
+      allow create: if false;
       allow update, delete: if false;
     }
 

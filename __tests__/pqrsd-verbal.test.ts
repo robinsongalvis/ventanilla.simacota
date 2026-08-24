@@ -42,8 +42,10 @@ describe('PQRSD verbal — medio explícito', () => {
   it('el medio verbal queda en el radicado, no en el número (serie única 1-110)', () => {
     // Desde el Sprint Número con oficina radicadora, el canal ya no
     // viaja en el ID: lo verbal queda explícito en control.medioRecepcion.
-    const accion = readFileSync('lib/actions/radicarVentanilla.ts', 'utf8');
-    expect(accion).toContain('medioRecepcion: datos.medioRecepcion');
-    expect(accion).not.toContain('mapCanal');
+    // Re-apuntada en el PR-C: el invariante vive en el constructor puro
+    // compartido del camino del servidor (el legado se extirpó).
+    const constructor = readFileSync('lib/recepcion/construir-radicado.ts', 'utf8');
+    expect(constructor).toContain('medioRecepcion: entrada.control.medioRecepcion');
+    expect(constructor).not.toContain('mapCanal');
   });
 });

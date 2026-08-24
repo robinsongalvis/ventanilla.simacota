@@ -3249,9 +3249,9 @@ function DrawerNuevoRadicado({
     try {
       const ahora = new Date();
       // Pieza angular (P2.1) — Fase 3: bifurcación por
-      // USA_RADICACION_INTERNA_SERVER (docs/CRONOGRAMA_PIEZA_ANGULAR.md
-      // §FASE 3). Con el switch en false (hoy) es exactamente la misma
-      // llamada de siempre — ver lib/recepcion/radicar-segun-flag.ts.
+      // Camino ÚNICO por el servidor desde el cutover PT-1 (24-ago-2026):
+      // POST /api/radicacion/interna. El kill-switch se retiró en el PR-C
+      // — ver la cabecera de lib/recepcion/radicar-segun-flag.ts.
       const { radicadoId } = await radicarSegunFlag(
         payload,
         { uid: usuario.uid, nombre: usuario.nombre, tenantId: usuario.tenantId },

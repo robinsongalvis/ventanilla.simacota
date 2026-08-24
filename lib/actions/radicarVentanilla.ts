@@ -1,15 +1,5 @@
-import { addDoc, collection, doc, getDoc, runTransaction } from 'firebase/firestore';
-import { getDb } from '@/lib/firebase';
 import { sanitizeFirestoreData } from '@/lib/firestore/removeUndefined';
-import { formatearRadicadoInstitucional } from '@/lib/radicado-institucional';
-import { TIPOS_SOLICITUD, type TipoSolicitudId } from '@/lib/tiempos-radicado';
-import { subirArchivos } from '@/lib/storage';
-import { validarReglasRadicacion } from '@/lib/seguridad/reglas-radicacion';
-import {
-  construirClasificacionInicial,
-  construirNotaRadicacion,
-} from '@/lib/recepcion/clasificacion-inicial';
-import { construirVentanillaRadicado } from '@/lib/recepcion/construir-radicado';
+import type { TipoSolicitudId } from '@/lib/tiempos-radicado';
 import type {
   CanalRespuesta,
   DatosNoAportados,
@@ -18,8 +8,6 @@ import type {
   TipoDocumento,
   TipoEntrada,
   TipoPersona,
-  TrazabilidadRadicado,
-  VentanillaRadicado,
 } from '@/src/types/ventanilla';
 import type { TenantId } from '@/src/types/radicado';
 
@@ -84,9 +72,6 @@ export class RadicacionValidacionError extends Error {
   }
 }
 
-function algunNoAportado(d: DatosNoAportados): boolean {
-  return Boolean(d.documento || d.telefono || d.correo || d.direccion);
-}
 
 /**
  * Sprint 1.5 — construye la nota humana del evento
@@ -153,210 +138,18 @@ export { sanitizeFirestoreData };
  * `sanitizeFirestoreData` aplica una capa de defensa adicional en el objeto
  * completo antes de la escritura transaccional.
  */
-export async function radicarInstitucionalmente(
-  datos:      DatosRadicacionInstitucional,
-  actor:      ActorRadicacion,
-  onProgress: (mensaje: string, pct: number) => void = () => {},
-): Promise<ResultadoRadicacion> {
-  // Sprint 1.5 — reglas de negocio delegadas a lib/seguridad/reglas-radicacion.
-  const errorRegla = validarReglasRadicacion({
-    noAportaCorreo: datos.noAportaCorreo,
-    canalRespuesta: datos.canalRespuesta,
-  });
-  if (errorRegla) {
-    throw new RadicacionValidacionError(errorRegla);
-  }
+/* ══════════════════════════════════════════════════════════════
+   Aquí vivía `radicarInstitucionalmente` — la radicación LEGADA que
+   escribía contadores, radicado y trazabilidad desde el NAVEGADOR.
 
-  onProgress('Generando número de radicado…', 10);
+   Se extirpó en el PR-C del cutover (24-ago-2026): desde el flip #215 la
+   radicación corre por POST /api/radicacion/interna, y desde el cierre de
+   reglas #217 las escrituras de cliente están DENEGADAS — este código no
+   podía volver a funcionar: si alguien lo hubiera invocado, habría fallado
+   contra las reglas a mitad de camino, dejando estado parcial. Un camino
+   muerto que parece vivo es peor que ninguno.
 
-  // H3 (Bloque 2), fix mínimo client-side de la ruta interna: peek del contador
-  // (solo lectura) para conocer el número y la ruta de los adjuntos. NO se
-  // consume aquí → si la subida falla, no queda consecutivo fantasma.
-  const db = getDb();
-  const ahora = new Date();
-  const year = ahora.getFullYear();
-  const counterRef = doc(db, 'counters', `radicados-${year}`);
-  const peek = await getDoc(counterRef);
-  const consecutivo = Number(peek.data()?.ultimo ?? 0) + 1;
-  const radicadoId = formatearRadicadoInstitucional(consecutivo, ahora);
-
-  onProgress('Subiendo archivos adjuntos…', 30);
-  const { exitosos } = datos.archivos.length > 0
-    ? await subirArchivos(datos.archivos, radicadoId)
-    : { exitosos: [] };
-
-  onProgress('Guardando radicado en Firestore…', 75);
-
-  const tipo = TIPOS_SOLICITUD[datos.tipoSolicitudId];
-
-  // Construimos el documento con `null` explícito en campos opcionales vacíos.
-  // Nunca usamos `|| undefined` — Firestore rechaza undefined con una excepción:
-  // "Function setDoc() called with invalid data. Unsupported field value: undefined"
-  // Sprint Ventanilla Operativa 1 — objeto de marcas "no aporta".
-  const datosNoAportados: DatosNoAportados = {
-    documento: datos.noAportaDocumento === true,
-    telefono:  datos.noAportaTelefono  === true,
-    correo:    datos.noAportaCorreo    === true,
-    direccion: datos.noAportaDireccion === true,
-  };
-  const hayNoAportados = algunNoAportado(datosNoAportados);
-
-  /* Sprint Radicación dirigida — presentación del solicitante, con la
-     misma derivación de la superficie pública (app/api/radicacion/route.ts;
-     el constructor puro compartido deriva esAnonimo/identidadReservada
-     internamente a partir de tipoPresentacion). */
-  const tipoPresentacion = datos.tipoPresentacion ?? 'IDENTIFICADA';
-  const esAnonimo = tipoPresentacion === 'ANONIMA';
-
-  // C1/M1 (pieza angular) — constructor puro compartido con la superficie
-  // pública (app/api/radicacion/route.ts). Reutiliza construirClasificacionInicial
-  // (funcionarioResponsableUid) aquí, como siempre; el constructor resuelve
-  // internamente sugerirSerieDocumental. No toca la numeración (H3).
-  const radicado: VentanillaRadicado = construirVentanillaRadicado({
-    radicadoId,
-    consecutivo,
-    ahora,
-    prioridad: tipo.prioridadSugerida,
-    tipoPresentacion,
-    canalRespuesta: datos.canalRespuesta ?? null,
-
-    solicitante: {
-      tipoPersona:     datos.tipoPersona,
-      tipoDocumento:   datos.tipoDocumento,
-      numeroDocumento: datos.numeroDocumento.trim(),
-      // Anónimo sin nombre → mismo placeholder del flujo público.
-      nombreCompleto:  datos.nombreCompleto.trim()
-        || (esAnonimo ? 'Ciudadano anonimo' : ''),
-      // Campos opcionales: cadena vacía → null (NUNCA undefined)
-      email:    datos.email.trim()     || null,
-      telefono: datos.telefono.trim()  || null,
-      telefonoMovil: (datos.telefonoMovil ?? '').trim() || null,
-      telefonoFijo:  (datos.telefonoFijo  ?? '').trim() || null,
-      direccion: datos.direccion.trim() || null,
-      ubicacion: {
-        pais:         datos.pais,
-        departamento: datos.departamento,
-        municipio:    datos.municipio,
-        barrio:       (datos.barrio ?? '').trim() || null,
-      },
-      datosNoAportados: hayNoAportados ? datosNoAportados : undefined,
-    },
-
-    control: {
-      medioRecepcion: datos.medioRecepcion,
-      origen:         datos.medioRecepcion === 'WEB' ? 'WEB' : 'FISICO_ESCANER',
-      horaRadicado:   ahora.toLocaleTimeString('es-CO', { hour: '2-digit', minute: '2-digit' }),
-      origenIngreso:  datos.origenIngreso ?? 'PQRSD_WEB_OFICIAL',
-      tipoEntrada:    datos.tipoEntrada   ?? 'PQRSD',
-    },
-
-    termino: {
-      tipoSolicitudId:     datos.tipoSolicitudId,
-      tipoSolicitudNombre: tipo.nombre,
-      diasRespuesta:       tipo.diasRespuesta,
-      unidad:              tipo.unidad,
-      fechaVencimiento:    datos.fechaVencimiento,
-    },
-
-    /* Sprint Radicación dirigida: el radicado nace dirigido a la
-       dependencia elegida en recepción. Si va a otra dependencia, nace
-       sin funcionario responsable ("sin asignar" allá). */
-    clasificacionBase: construirClasificacionInicial(
-      datos.oficinaDestino ?? 'VENTANILLA_UNICA',
-      actor.uid,
-    ),
-    // Sprint Área al radicar — el área nace con el radicado cuando la
-    // recepción la conoce; si no, la fija la dependencia al asignar.
-    areaResponsable: datos.areaResponsable?.trim() || undefined,
-
-    detalle: {
-      asunto:       datos.asunto.trim(),
-      descripcion:  datos.descripcion.trim(),
-      numeroFolios: datos.numeroFolios,
-      // Si el campo viene vacío o con solo espacios → null.
-      // NUNCA undefined → genera: "Unsupported field value: undefined"
-      // en detalle.anexosDescripcion al llamar a setDoc().
-      anexosDescripcion: datos.anexosDescripcion.trim() || null,
-      numeroAnexos: datos.numeroAnexos ?? 0,
-      observacionesAnexos: (datos.observacionesAnexos ?? '').trim() || null,
-    },
-
-    archivos: exitosos.map((a, i) => ({
-      nombre:    a.nombre,
-      url:       a.url,
-      path:      a.path,
-      tipo:      a.tipo,
-      tamanioKB: a.tamanioKB,
-      orden:     i + 1,
-    })),
-  });
-
-  // Capa de defensa final: sanitizeFirestoreData garantiza que ningún campo
-  // llegue como `undefined` aunque se añadan atributos nuevos en el futuro.
-  const radicadoSeguro = sanitizeFirestoreData(
-    radicado as unknown as Record<string, unknown>,
-  );
-
-  // H3: contador y documento se confirman JUNTOS en una transacción del SDK
-  // cliente. Si el contador cambió entre el peek y la tx (concurrencia; operador
-  // único, raro), se aborta y el usuario reintenta — nunca un consecutivo
-  // fantasma ni un número repetido.
-  await runTransaction(db, async (tx) => {
-    const snap = await tx.get(counterRef);
-    if (Number(snap.data()?.ultimo ?? 0) + 1 !== consecutivo) {
-      throw new RadicacionValidacionError(
-        'La numeración cambió durante el registro; reintente el radicado.',
-      );
-    }
-    tx.set(
-      counterRef,
-      { ultimo: consecutivo, anio: year, actualizadoEn: ahora.toISOString() },
-      { merge: true },
-    );
-    tx.set(doc(db, 'ventanilla_radicados', radicadoId), radicadoSeguro);
-  });
-  await addDoc(
-    collection(getDb(), 'ventanilla_radicados', radicadoId, 'trazabilidad'),
-    {
-      eventoId: `ev_${radicadoId}_RADICACION`,
-      fecha: ahora.toISOString(),
-      accion: 'RADICACION',
-      actorUid: actor.uid,
-      actorNombre: actor.nombre,
-      /* Sprint Radicación dirigida — la trazabilidad registra el destino
-         desde el nacimiento del radicado, no desde el primer traslado. */
-      oficinaDestino: datos.oficinaDestino ?? 'VENTANILLA_UNICA',
-      nota: construirNotaRadicacion(
-        actor.nombre,
-        datos.medioRecepcion,
-        datos.oficinaDestino ?? 'VENTANILLA_UNICA',
-      ),
-    } satisfies TrazabilidadRadicado,
-  );
-
-  // Sprint 1.5 — evento operativo cuando el solicitante no aportó datos.
-  // No se muestra en la línea de tiempo pública (ver ACCIONES_PUBLICAS
-  // en lib/seguridad/consulta-publica-radicado.ts).
-  if (hayNoAportados) {
-    await addDoc(
-      collection(getDb(), 'ventanilla_radicados', radicadoId, 'trazabilidad'),
-      {
-        eventoId: `ev_${radicadoId}_DATOS_NO_APORTADOS`,
-        fecha: ahora.toISOString(),
-        accion: 'DATOS_NO_APORTADOS_MARCADOS',
-        actorUid: actor.uid,
-        actorNombre: actor.nombre,
-        nota: construirNotaDatosNoAportados(datosNoAportados),
-        metadata: {
-          documento: datosNoAportados.documento === true,
-          correo:    datosNoAportados.correo    === true,
-          telefono:  datosNoAportados.telefono  === true,
-          direccion: datosNoAportados.direccion === true,
-        },
-      } satisfies TrazabilidadRadicado,
-    );
-  }
-
-  onProgress('Radicado registrado exitosamente.', 100);
-  return { radicadoId, consecutivo };
-}
+   Este archivo queda como MÓDULO DE CONTRATO: los tipos, el error de
+   validación y las notas que comparten el caller y el endpoint del
+   servidor. La historia completa del código extirpado vive en git.
+══════════════════════════════════════════════════════════════ */
