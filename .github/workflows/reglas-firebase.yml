@@ -1,0 +1,122 @@
+# ══════════════════════════════════════════════════════════════════════
+# Reglas de Firebase — deploy manual gobernado + vigía de deriva · PT-5
+#
+# POR QUÉ EXISTE. Hasta el 24-ago las reglas se desplegaban con un comando
+# manual del propietario desde su equipo: funcionó, pero «las reglas están
+# desplegadas» era una afirmación sin verificación, y la deriva
+# repo↔producción era indetectable (hallazgo 🟠 de la auditoría). Este
+# workflow cierra ambas cosas:
+#
+#   · deploy: workflow_dispatch MANUAL con confirmación escrita — deploya
+#     los .rules del main ACTUAL al proyecto elegido. Nunca automático:
+#     cambiar reglas vivas es una decisión, no un efecto colateral.
+#   · vigía: cada lunes (y a demanda) corre el verificador de deriva de
+#     solo lectura contra producción; si lo vivo no es lo versionado, abre
+#     incidencia etiquetada `deriva-reglas`.
+#
+# CREDENCIAL: secret FIREBASE_SA_RULES (clave JSON de una SA de producción
+# con roles/firebaserules.admin — la misma admin-sdk sirve). Si falta, el
+# workflow FALLA CERRADO con instrucción, jamás finge (patrón de la casa).
+# ══════════════════════════════════════════════════════════════════════
+name: Reglas Firebase (deploy gobernado + vigía de deriva)
+
+on:
+  workflow_dispatch:
+    inputs:
+      accion:
+        description: 'verificar (solo lectura) o desplegar'
+        required: true
+        default: 'verificar'
+        type: choice
+        options: [verificar, desplegar]
+      proyecto:
+        description: 'ID del proyecto Firebase'
+        required: true
+        default: 'ventanilla-unica-f31b1'
+      confirmar:
+        description: 'Para desplegar, escriba exactamente "desplegar reglas"'
+        required: false
+        default: ''
+  schedule:
+    # Vigía semanal de deriva — lunes 13:10 UTC (8:10 Bogotá), tras la
+    # auditoría de consecutivos de las 13:00.
+    - cron: '10 13 * * 1'
+
+permissions:
+  contents: read
+  issues: write
+
+jobs:
+  reglas:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    env:
+      SA: ${{ secrets.FIREBASE_SA_RULES }}
+      PROYECTO: ${{ github.event.inputs.proyecto || 'ventanilla-unica-f31b1' }}
+      ACCION: ${{ github.event.inputs.accion || 'verificar' }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Fallar cerrado sin credencial
+        run: |
+          if [ -z "${SA}" ]; then
+            echo "::error::Falta el secret FIREBASE_SA_RULES (clave JSON de una SA con roles/firebaserules.admin en ${PROYECTO})."
+            echo "::error::Sin él este workflow no puede ni verificar ni desplegar — no finge."
+            exit 1
+          fi
+
+      - name: Guardas del deploy
+        if: ${{ env.ACCION == 'desplegar' }}
+        run: |
+          if [ "${{ github.event.inputs.confirmar }}" != "desplegar reglas" ]; then
+            echo "::error::Escriba exactamente 'desplegar reglas' en la confirmación. Nada se desplegó."
+            exit 1
+          fi
+          if [ "${{ github.ref }}" != "refs/heads/main" ]; then
+            echo "::error::Las reglas solo se despliegan desde main (rama actual: ${{ github.ref }})."
+            exit 1
+          fi
+
+      - uses: actions/setup-node@v7
+        with:
+          node-version-file: '.nvmrc'
+          cache: 'npm'
+      - run: npm ci
+
+      - name: Verificar deriva (solo lectura)
+        id: deriva
+        run: |
+          set -uo pipefail
+          export FIREBASE_SERVICE_ACCOUNT="${SA}"
+          if node scripts/operacion/verificar-reglas-vivas.mjs --proyecto "${PROYECTO}" | tee /tmp/deriva.txt; then
+            echo "SIN_DERIVA=1" >> "$GITHUB_OUTPUT"
+          else
+            echo "SIN_DERIVA=0" >> "$GITHUB_OUTPUT"
+          fi
+          { echo 'REPORTE<<EOF'; cat /tmp/deriva.txt; echo 'EOF'; } >> "$GITHUB_OUTPUT"
+
+      - name: Desplegar reglas (solo si se pidió)
+        if: ${{ env.ACCION == 'desplegar' }}
+        run: |
+          set -euo pipefail
+          printf '%s' "${SA}" > /tmp/sa.json
+          GOOGLE_APPLICATION_CREDENTIALS=/tmp/sa.json npx firebase-tools deploy \
+            --only firestore:rules,storage --project "${PROYECTO}" --non-interactive
+          rm -f /tmp/sa.json
+          export FIREBASE_SERVICE_ACCOUNT="${SA}"
+          node scripts/operacion/verificar-reglas-vivas.mjs --proyecto "${PROYECTO}"
+
+      - name: Incidencia si el vigía encontró deriva
+        if: ${{ env.ACCION == 'verificar' && steps.deriva.outputs.SIN_DERIVA == '0' }}
+        uses: actions/github-script@v8
+        with:
+          script: |
+            const reporte = `${{ steps.deriva.outputs.REPORTE }}`;
+            const cuerpo = ['El vigía semanal encontró DERIVA entre el repo y las reglas vivas:', '', '```', reporte, '```', '', 'Desplegar desde este mismo workflow (accion=desplegar) tras revisar el porqué — una deriva puede ser un deploy olvidado o un cambio manual en la consola que nadie versionó.'].join('\n');
+            const abiertas = await github.rest.issues.listForRepo({ ...context.repo, state: 'open', labels: 'deriva-reglas' });
+            if (abiertas.data.length > 0) {
+              await github.rest.issues.createComment({ ...context.repo, issue_number: abiertas.data[0].number, body: cuerpo });
+            } else {
+              await github.rest.issues.create({ ...context.repo, title: '🟠 Deriva entre el repo y las reglas vivas de Firebase', body: cuerpo, labels: ['deriva-reglas'] });
+            }
+            core.setFailed('Deriva detectada');
