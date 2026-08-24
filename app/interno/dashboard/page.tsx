@@ -4365,7 +4365,19 @@ function DashboardInterior({ usuario, cerrarSesion }: { usuario: UsuarioAutentic
 
     const radicado = todosLosRadicados.find((r) => r.radicadoId === id);
     if (!radicado) {
-      setErrorAbrirRadicado('No fue posible abrir el radicado.');
+      // Esta rama cubre DOS casos que no se pueden distinguir sin filtrar
+      // información: el radicado está fuera de la ventana viva del tablero
+      // (VENTANA_DIAS_STREAM = 180 días) o está fuera del alcance del
+      // usuario (otra dependencia). Decir «está fuera de la ventana»
+      // insinuaría que existe a quien no puede verlo — por eso el mensaje
+      // enuncia AMBAS causas sin confirmar cuál, y ofrece la salida útil.
+      // (Antes decía solo «No fue posible abrir el radicado», seguro pero
+      // sin salida: quien abre un expediente de licencia años después desde
+      // el enlace a su radicado de origen quedaba sin saber qué hacer.)
+      setErrorAbrirRadicado(
+        'No fue posible abrir el radicado. Puede estar fuera de los últimos 180 días ' +
+        'o fuera de su dependencia — búsquelo en «Búsqueda avanzada».',
+      );
       console.warn('[dashboard] No fue posible abrir radicado dentro del alcance del usuario.', { radicadoId: id });
       return false;
     }

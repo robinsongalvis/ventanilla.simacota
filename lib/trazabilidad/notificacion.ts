@@ -1,5 +1,6 @@
 import { getFirebaseAdminDb } from '@/lib/firebase-admin';
 import { removeUndefinedDeep } from '@/lib/firestore/removeUndefined';
+import { logError } from '@/lib/logger';
 
 /* ══════════════════════════════════════════════════════════════
    registrarTrazabilidadNotificacion — Helper único para todos
@@ -92,8 +93,11 @@ export async function registrarTrazabilidadNotificacion(
     } else {
       await subcol.add(evento);
     }
-  } catch {
-    // Trazabilidad nunca debe interrumpir el flujo principal.
+  } catch (err) {
+    // Trazabilidad nunca debe interrumpir el flujo principal — pero sí debe
+    // gritar si no puede escribirse (D5): es el registro probatorio de las
+    // notificaciones. logError nunca lanza; el no-bloqueo se conserva.
+    logError({ radicadoId: '', modulo: 'trazabilidad/notificacion', error: err });
   }
 }
 
@@ -174,8 +178,9 @@ export async function registrarNotificacionOmitida({
         motivo,
       },
     }));
-  } catch {
-    // No bloquear el flujo principal.
+  } catch (err) {
+    // No bloquear el flujo principal — con rastro (D5).
+    logError({ radicadoId: '', modulo: 'trazabilidad/notificacion-gestionada', error: err });
   }
 }
 

@@ -138,14 +138,25 @@ export async function GET(request: Request): Promise<NextResponse> {
       }
     }
 
+    // PT-2 (24-ago-2026): si hubo alertas que enviar y el 100% falló, el
+    // cron NO puede reportar verde — es el escenario real que la auditoría
+    // encontró (SMTP vacío: cada envío lanzaba, el catch contaba y la ruta
+    // devolvía ok:true; el panel de Vercel mostraba el cron «sano» mientras
+    // CERO avisos de vencimiento llegaban a nadie). Un vigilante que
+    // reporta éxito cuando no vigila es peor que ninguno: el 500 hace el
+    // fallo visible en el panel de crons y en el monitoreo.
+    const fracasoTotal = errores > 0 && enviados === 0;
+    if (fracasoTotal) {
+      console.error('[cron/alertas-vencimiento] FRACASO TOTAL: había alertas y ningún envío salió', JSON.stringify({ total: radicados.length, errores, omitidos }));
+    }
     return NextResponse.json({
-      ok:        true,
+      ok:        !fracasoTotal,
       timestamp: ahora,
       total:     radicados.length,
       alertados: enviados,
       errores,
       omitidos,
-    });
+    }, { status: fracasoTotal ? 500 : 200 });
 
   } catch (err) {
     const msg = err instanceof Error ? err.message : String(err);

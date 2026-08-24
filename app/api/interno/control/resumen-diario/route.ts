@@ -17,6 +17,7 @@ import {
 import { generarAlertas } from '@/lib/control-interno/alertas';
 import { calcularDesempenoPorDependencia } from '@/lib/control-interno/panorama';
 import { generarRecomendacionesDia } from '@/lib/control-interno/recomendaciones';
+import { logError } from '@/lib/logger';
 
 export const runtime = 'nodejs';
 
@@ -57,8 +58,14 @@ export async function GET(): Promise<NextResponse> {
       },
     });
   } catch (err) {
+    // PT-2/D5 (24-ago-2026): antes este catch devolvía 500 sin dejar UN solo
+    // rastro y filtraba err.message crudo al cliente — si Control Interno fallaba en producción, no había ni una
+    // línea para diagnosticar (y el error atrapado tampoco llega a Sentry
+    // por onRequestError). logError registra estructurado Y reporta a
+    // Sentry cuando el DSN esté vivo; el cliente recibe mensaje genérico.
+    logError({ radicadoId: '', modulo: 'control-interno/resumen-diario', error: err });
     return NextResponse.json(
-      { error: err instanceof Error ? err.message : 'No se pudo cargar el resumen del día.' },
+      { error: 'No se pudo cargar el resumen del día.' },
       { status: 500 },
     );
   }

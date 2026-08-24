@@ -20,6 +20,7 @@ import type {
   TipoHallazgo,
 } from '@/src/types/control-interno';
 import type { TenantId } from '@/src/types/radicado';
+import { logError } from '@/lib/logger';
 
 export const runtime = 'nodejs';
 
@@ -120,8 +121,14 @@ export async function POST(req: Request): Promise<NextResponse> {
     });
     return NextResponse.json({ ok: true, id, hallazgo: { ...hallazgo, id } });
   } catch (err) {
+    // PT-2/D5 (24-ago-2026): antes este catch devolvía 500 sin dejar UN solo
+    // rastro y filtraba err.message crudo al cliente — si Control Interno fallaba en producción, no había ni una
+    // línea para diagnosticar (y el error atrapado tampoco llega a Sentry
+    // por onRequestError). logError registra estructurado Y reporta a
+    // Sentry cuando el DSN esté vivo; el cliente recibe mensaje genérico.
+    logError({ radicadoId: '', modulo: 'control-interno/hallazgos', error: err });
     return NextResponse.json(
-      { error: err instanceof Error ? err.message : 'Error al crear hallazgo.' },
+      { error: 'No fue posible crear el hallazgo.' },
       { status: 500 },
     );
   }

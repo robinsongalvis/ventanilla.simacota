@@ -17,6 +17,7 @@
 
 import { createHmac } from 'node:crypto';
 import { getFirebaseAdminDb } from '@/lib/firebase-admin';
+import { logError } from '@/lib/logger';
 
 const TTL_DIAS = 180;
 const MAX_ARCHIVO_NOMBRE = 200;
@@ -81,7 +82,12 @@ export async function registrarDescargaAuditoria(
         : {}),
       expiresAt,
     });
-  } catch {
-    // La auditoría no debe bloquear la descarga ni convertir un 302 en 500.
+  } catch (err) {
+    // La auditoría no debe bloquear la descarga ni convertir un 302 en 500 —
+    // pero callar del todo agujerea la bitácora de descargas de PII sin
+    // señal alguna (hallazgo D5 del go-live): si Firestore rechazara estas
+    // escrituras, se descubriría en una auditoría externa, no por el
+    // control. logError nunca lanza: el no-bloqueo se conserva.
+    logError({ radicadoId: params.radicadoId ?? '', modulo: 'auditoria/descargas', error: err });
   }
 }

@@ -58,8 +58,10 @@ async function registrarAuditoriaNotificacion(params: {
       motivo:      params.motivo,
       fecha:       new Date().toISOString(),
     }));
-  } catch {
-    // La auditoría de seguridad nunca debe filtrar detalles ni bloquear el flujo.
+  } catch (err) {
+    // La auditoría de seguridad nunca debe filtrar detalles ni bloquear el
+    // flujo — pero un fallo al escribirla merece rastro (D5).
+    logError({ radicadoId: '', modulo: 'notificar-ciudadano/auditoria', error: err });
   }
 }
 
@@ -110,8 +112,9 @@ async function registrarTrazabilidadNotificacionCiudadano(params: {
       return;
     }
     await subcol.add(evento);
-  } catch {
-    // La trazabilidad no debe impedir la respuesta del endpoint.
+  } catch (err) {
+    // La trazabilidad no debe impedir la respuesta del endpoint — con rastro (D5).
+    logError({ radicadoId: '', modulo: 'notificar-ciudadano/trazabilidad', error: err });
   }
 }
 
