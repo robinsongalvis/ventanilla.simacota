@@ -26,7 +26,7 @@ vi.mock('@/lib/actions/radicarVentanilla', async (importOriginal) => {
   return { ...original, radicarInstitucionalmente: vi.fn().mockResolvedValue({ radicadoId: 'legado', consecutivo: 1 }) };
 });
 vi.mock('@/lib/recepcion/radicar-interna-cliente', () => ({
-  radicarInternaCliente: vi.fn().mockResolvedValue({ radicadoId: 'nuevo', consecutivo: 1 }),
+  radicarInternaCliente: vi.fn().mockResolvedValue({ radicadoId: 'servidor', consecutivo: 7 }),
 }));
 
 import { radicarInstitucionalmente, type DatosRadicacionInstitucional } from '@/lib/actions/radicarVentanilla';
@@ -55,18 +55,23 @@ const DATOS: DatosRadicacionInstitucional = {
 };
 
 describe('kill-switch de radicación interna a servidor', () => {
-  it('nace en OFF — la producción no cambia de comportamiento', () => {
-    expect(USA_RADICACION_INTERNA_SERVER).toBe(false);
+  it('está en ON — cutover PT-1 ejecutado (23-ago-2026, autorizado por el propietario)', () => {
+    // Si esto falla porque alguien lo puso en false: puede ser el rollback
+    // legítimo de 1 línea (documentado en el flag) — actualice este test
+    // JUNTO con el flag y deje constancia del porqué. Si falla porque
+    // alguien lo cambió sin saberlo, este test acaba de evitar que la
+    // radicación vuelva al cliente en silencio.
+    expect(USA_RADICACION_INTERNA_SERVER).toBe(true);
   });
 
-  it('con el switch en OFF, el caller invoca el camino legado — nunca el cliente del endpoint', async () => {
+  it('con el switch en ON, el caller invoca el cliente del endpoint — nunca el camino legado', async () => {
     const resultado = await radicarSegunFlag(
       DATOS,
       { uid: 'u1', nombre: 'Ana Recepción', tenantId: 'VENTANILLA_UNICA' },
     );
 
-    expect(radicarInstitucionalmente).toHaveBeenCalledTimes(1);
-    expect(radicarInternaCliente).not.toHaveBeenCalled();
-    expect(resultado).toEqual({ radicadoId: 'legado', consecutivo: 1 });
+    expect(radicarInternaCliente).toHaveBeenCalledTimes(1);
+    expect(radicarInstitucionalmente).not.toHaveBeenCalled();
+    expect(resultado).toEqual({ radicadoId: 'servidor', consecutivo: 7 });
   });
 });
