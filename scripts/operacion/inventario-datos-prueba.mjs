@@ -78,7 +78,15 @@ const db = getFirestore();
 // planillas (PL). Borrar un doc marcado de CUALQUIERA deja hueco en su
 // foliación — el ensayo en stage atrapó ese error cuando esta constante solo
 // cubría 1-110: las salidas de prueba salían «borrables» y no lo son.
-const RE_SERIE_LEGAL = /^(1-110-\d{4,6}-\d{8}|2-(?:SAL|110)-\d{4,6}-\d{8}|PL-\d{4}-\d{4})$/;
+// Incluye las etiquetas históricas por canal (1-WEB/OFICIO/EMAIL/PRESENCIAL),
+// que son la MISMA serie anual con otra máscara — pero solo cuando el último
+// segmento está rellenado con ceros (`000` + 5 dígitos = consecutivos 1‥99999,
+// que es como los escribe padStart(8,'0')). Esa distinción importa: el botón
+// E2E emitía `1-WEB-2026-{8 dígitos ALEATORIOS}` SIN tocar el contador
+// (64476419, 81440313…), y esos sí eran borrables — de hecho se borraron en la
+// ronda del 23-ago. Sin el ancla de los ceros, meter el canal en esta constante
+// habría convertido en «anulables» unos registros que no consumieron nada.
+const RE_SERIE_LEGAL = /^(1-110-\d{4,6}-\d{8}|1-(?:WEB|OFICIO|EMAIL|PRESENCIAL)-\d{4,6}-000\d{5}|2-(?:SAL|110)-\d{4,6}-\d{8}|PL-\d{4}-\d{4})$/;
 const RE_FORMATO_VIEJO = /^1-110-\d{4}-\d{8}$/;
 const RE_INDICIO = /\b(prueba|test|uat|ensayo|demo)\b/i;
 
@@ -94,7 +102,21 @@ async function inventariar(coleccion, describir) {
   const filas = { C1_BORRABLE: [], C2_ANULAR: [], C3_CUARENTENA: [], LEGITIMOS: 0, formatoViejo: 0, formatoNuevo: 0 };
   for (const doc of snap.docs) {
     const d = doc.data();
-    const enSerieLegal = RE_SERIE_LEGAL.test(doc.id);
+    // PERTENECER A LA SERIE SE PRUEBA POR EL DATO, NO POR EL NOMBRE. El id
+    // solo lleva una máscara, y la máscara cambió con el tiempo: `1-WEB-…`,
+    // `1-OFICIO-…`, `1-EMAIL-…` y `1-PRESENCIAL-…` son etiquetas HISTÓRICAS
+    // POR CANAL del MISMO consecutivo anual que hoy se escribe `1-110-…`
+    // (lib/radicado-institucional.ts: «el consecutivo anual continúa: solo
+    // cambia la máscara»; la consulta pública las acepta en una sola
+    // expresión). Clasificar por el prefijo daba «fuera de la serie» a
+    // radicados que SÍ consumieron el contador — y por tanto «borrables» a
+    // registros cuyo borrado deja hueco en la foliación AGN. La prueba dura
+    // es el campo `consecutivo`: si el documento lo guarda, salió del
+    // contador. El regex se conserva solo como señal secundaria, para que un
+    // documento de la serie al que le falte el campo tampoco caiga en
+    // borrable.
+    const consumioContador = typeof d.consecutivo === 'number';
+    const enSerieLegal = consumioContador || RE_SERIE_LEGAL.test(doc.id);
     if (RE_FORMATO_VIEJO.test(doc.id)) filas.formatoViejo += 1;
     else if (enSerieLegal) filas.formatoNuevo += 1;
     const marcado = marcaExplicita(d);
