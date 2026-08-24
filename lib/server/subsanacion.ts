@@ -112,7 +112,19 @@ export function planRequerirSubsanacion(
   actor: ActorSubsanacion,
   motivo: string,
   ahora: Date,
-  notificable: boolean,
+  /**
+   * ¿El ciudadano fue NOTIFICADO de verdad? No «¿tiene correo?».
+   *
+   * Antes este parámetro se llamaba `notificable` y lo calculaba la ruta a
+   * partir de si había una dirección de correo. Con eso, un envío fallido
+   * dejaba igualmente anclada la suspensión: el término que la Alcaldía le
+   * debe al ciudadano se congelaba y a él le empezaba a correr un mes para
+   * subsanar algo que nunca supo. Notificable NO es notificado.
+   *
+   * La función es PURA, así que la ruta puede planificar, enviar, y volver a
+   * planificar con el resultado real del envío.
+   */
+  notificado: boolean,
 ): PlanSubsanacion | ErrorSubsanacion {
   const regimen = getRegimenLegalSubsanacion(radicado.termino?.tipoSolicitudId);
   if (regimen.clase === 'ESPECIAL_NO_HABILITADO') {
@@ -158,7 +170,7 @@ export function planRequerirSubsanacion(
     prorroga: null,
   };
 
-  if (!notificable) {
+  if (!notificado) {
     return {
       update: { 'termino.suspension': base, ultimaActualizacion: nowIso },
       evento: {
@@ -169,7 +181,10 @@ export function planRequerirSubsanacion(
     };
   }
 
-  // Notificable → anclar la suspensión con el reloj SERVER-SIDE.
+  // Notificado DE VERDAD → recién ahora se ancla la suspensión con el reloj
+  // SERVER-SIDE. Mientras no se le avise, el plazo de la Alcaldía sigue
+  // corriendo: ante la duda, el reloj corre contra la entidad y nunca contra
+  // el ciudadano.
   const dias = diasRestantesHabiles(radicado.termino!.fechaVencimiento, ahora);
   const fechaLimite = plazoSubsanacion(ahora).toISOString();
   const suspension: SuspensionTermino = {

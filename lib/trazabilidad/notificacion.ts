@@ -216,10 +216,27 @@ export async function marcarNotificacionGestionada({
     },
   });
 
+  /* Cerrar el círculo del cumplimiento. Desde que notificar es parte de
+     responder, un radicado resuelto cuyo correo falló queda con
+     `cumplioTermino: false`. Si la funcionaria notificó por otra vía (correo
+     físico, personalmente, por teléfono con constancia), este es el momento en
+     que eso consta — y el indicador debe poder ponerse en verde.
+     Pero se calcula con la fecha REAL de la notificación, no con la del acto
+     interno: notificar tres semanas tarde no es cumplir en término. Si ya
+     estaba en verde no se toca. */
+  const snap = await docRef.get();
+  const d = snap.data() ?? {};
+  const vencimiento = d?.termino?.fechaVencimiento;
+  const recalculo =
+    d?.estadoActual === 'RESUELTO' && d?.cumplioTermino === false && typeof vencimiento === 'string'
+      ? { cumplioTermino: new Date(ahoraIso) <= new Date(vencimiento) }
+      : {};
+
   const batch = db.batch();
   batch.set(subcol.doc(), evento);
   batch.update(docRef, {
     alertaNotificacionFallida: false,
+    ...recalculo,
     ultimaActualizacion: ahoraIso,
   });
   await batch.commit();

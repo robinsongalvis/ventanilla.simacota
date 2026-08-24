@@ -67,25 +67,25 @@ export async function POST(request: Request, context: RouteContext): Promise<Nex
     }) && !!emailDestino;
 
     const ahora = new Date();
-    const plan = planRequerirSubsanacion(radicado, usuario, motivo, ahora, notificable);
-    if (esError(plan)) {
-      return NextResponse.json({ error: plan.mensaje }, { status: plan.status });
+
+    /* ORDEN INVERTIDO A PROPÓSITO: primero se AVISA, después se escribe.
+       Antes se escribía la suspensión y luego se intentaba el correo dentro de
+       un try/catch que se tragaba el fallo — con SMTP sin configurar eso pasaba
+       el 100% de las veces, y el expediente quedaba afirmando una notificación
+       que nunca salió del edificio.
+       El planificador es PURO, así que se planifica en seco para obtener la
+       fecha límite que va en el correo, se envía, y se vuelve a planificar con
+       el resultado REAL. Si el aviso no sale, el requerimiento queda emitido y
+       PENDIENTE de notificación manual: el término de la Alcaldía sigue
+       corriendo y al ciudadano no le corre ningún plazo. */
+    const planTentativo = planRequerirSubsanacion(radicado, usuario, motivo, ahora, true);
+    if (esError(planTentativo)) {
+      return NextResponse.json({ error: planTentativo.mensaje }, { status: planTentativo.status });
     }
-
-    await getFirebaseAdminDb().doc(`ventanilla_radicados/${radicadoId}`).update(plan.update);
-    await appendTrazabilidadAdmin(radicadoId, {
-      fecha: ahora.toISOString(),
-      accion: plan.evento.accion,
-      actorUid: usuario.uid,
-      actorNombre: usuario.nombre,
-      nota: plan.evento.nota,
-      metadata: { ...plan.evento.metadata, dependencia: radicado.clasificacion.oficinaDestino },
-    });
-
-    // Notificación al ciudadano (solo si era notificable → ya se ancló).
+    // Notificación al ciudadano ANTES de consolidar nada.
     let emailEnviado = false;
     if (notificable && emailDestino) {
-      const fechaLimite = String((plan.update['termino.suspension'] as { fechaLimiteSubsanacion?: string })?.fechaLimiteSubsanacion ?? '');
+      const fechaLimite = String((planTentativo.update['termino.suspension'] as { fechaLimiteSubsanacion?: string })?.fechaLimiteSubsanacion ?? '');
       try {
         await enviarEmail({
           to: emailDestino,
@@ -114,7 +114,27 @@ export async function POST(request: Request, context: RouteContext): Promise<Nex
       }
     }
 
-    return NextResponse.json({ ok: true, estadoActual: plan.nuevoEstado, notificado: notificable, emailEnviado });
+    /* Ahora, con el resultado REAL del envío, se planifica y se escribe. Si el
+       correo no salió, `planRequerirSubsanacion` toma la rama «pendiente de
+       notificación por vía manual»: la suspensión NO se ancla, el término de la
+       Alcaldía sigue corriendo y la trazabilidad dice `notificado: false`. */
+    const plan = planRequerirSubsanacion(radicado, usuario, motivo, ahora, emailEnviado);
+    if (esError(plan)) {
+      return NextResponse.json({ error: plan.mensaje }, { status: plan.status });
+    }
+
+    await getFirebaseAdminDb().doc(`ventanilla_radicados/${radicadoId}`).update(plan.update);
+    await appendTrazabilidadAdmin(radicadoId, {
+      fecha: ahora.toISOString(),
+      accion: plan.evento.accion,
+      actorUid: usuario.uid,
+      actorNombre: usuario.nombre,
+      nota: plan.evento.nota,
+      metadata: { ...plan.evento.metadata, dependencia: radicado.clasificacion.oficinaDestino },
+    });
+
+    // `notificado` informa lo que OCURRIÓ, no lo que se pretendía.
+    return NextResponse.json({ ok: true, estadoActual: plan.nuevoEstado ?? radicado.estadoActual, notificado: emailEnviado, emailEnviado });
   } catch (error) {
     const { radicadoId } = await context.params.catch(() => ({ radicadoId: 'desconocido' }));
     logError({ radicadoId, modulo: 'radicados/requerir-subsanacion', error });

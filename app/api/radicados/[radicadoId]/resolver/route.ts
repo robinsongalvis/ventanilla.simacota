@@ -147,12 +147,40 @@ export async function POST(request: Request, context: RouteContext): Promise<Nex
       ? await uploadRespuestaPdfAdmin(archivo, radicadoId)
       : null;
     const respuestaOficial = buildRespuestaOficial(archivoPdf, nota, ahora, usuario);
-    const cumplioTermino = new Date(ahora) <= new Date(radicado.termino.fechaVencimiento);
+    /* NOTIFICAR ES PARTE DE RESPONDER. La Ley 1755 no obliga solo a resolver:
+       obliga a notificar, y una respuesta que no sale de la entidad no es
+       oponible al ciudadano. Antes `cumplioTermino` se sellaba en verde aquí
+       —con el instante del acto interno— y SOBREVIVÍA al fallo del envío, que
+       ocurría más abajo: el ciudadano se quedaba sin su respuesta y su caso
+       engordaba igualmente el indicador de cumplimiento que se reporta a
+       Control Interno y a MIPG.
+       Por eso el envío se movió ARRIBA de la escritura y el cumplimiento se
+       calcula con las DOS condiciones. Se conserva `respuestaEnTermino` por
+       separado: sirve para distinguir «la funcionaria respondió tarde» de
+       «respondió a tiempo pero el aviso no salió», que son dos problemas
+       distintos con dos responsables distintos. */
+    const respuestaEnTermino = new Date(ahora) <= new Date(radicado.termino.fechaVencimiento);
+
+    const { emailEnviado, error: emailError } = await notificarCiudadano({
+      email: radicado.solicitante.email,
+      esAnonimo: radicado.esAnonimo,
+      tipoPresentacion: radicado.tipoPresentacion,
+      nombre: radicado.solicitante.nombreCompleto,
+      radicadoId,
+      asunto: radicado.detalle.asunto,
+      nota,
+      tenantId: radicado.clasificacion.oficinaDestino,
+      fechaRespuesta: ahora,
+      tieneArchivo: Boolean(archivoPdf),
+    });
+
+    const cumplioTermino = respuestaEnTermino && emailEnviado;
 
     await getFirebaseAdminDb().doc(`ventanilla_radicados/${radicadoId}`).update({
       estadoActual: 'RESUELTO',
       ultimaActualizacion: ahora,
       cumplioTermino,
+      respuestaEnTermino,
       ...(respuestaOficial ? { respuestaOficial } : {}),
     });
     await appendTrazabilidadAdmin(radicadoId, {
@@ -176,18 +204,6 @@ export async function POST(request: Request, context: RouteContext): Promise<Nex
       },
     });
 
-    const { emailEnviado, error: emailError } = await notificarCiudadano({
-      email: radicado.solicitante.email,
-      esAnonimo: radicado.esAnonimo,
-      tipoPresentacion: radicado.tipoPresentacion,
-      nombre: radicado.solicitante.nombreCompleto,
-      radicadoId,
-      asunto: radicado.detalle.asunto,
-      nota,
-      tenantId: radicado.clasificacion.oficinaDestino,
-      fechaRespuesta: ahora,
-      tieneArchivo: Boolean(archivoPdf),
-    });
 
     registrarEventoNegocio({
       operacion: 'respuesta',
