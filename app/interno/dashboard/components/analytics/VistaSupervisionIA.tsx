@@ -38,7 +38,6 @@ export function VistaSupervisionIA() {
   const [audits,    setAudits]    = useState<AuditDoc[]>([]);
   const [logs,      setLogs]      = useState<LogDoc[]>([]);
   const [cargando,  setCargando]  = useState(true);
-  const [flags,     setFlags]     = useState(AI_FEATURE_FLAGS);
 
   useEffect(() => {
     const db = getDb();
@@ -128,10 +127,6 @@ export function VistaSupervisionIA() {
     return alerts;
   }, [feedbacks, audits, kpis]);
 
-  function toggleFlag(key: keyof typeof AI_FEATURE_FLAGS) {
-    setFlags(prev => ({ ...prev, [key]: !prev[key] }));
-  }
-
   if (cargando) {
     return (
       <div className="flex h-full items-center justify-center">
@@ -218,15 +213,24 @@ export function VistaSupervisionIA() {
             <h3 className="text-sm font-bold uppercase tracking-wider" style={{ color: '#1F2933' }}>
               Feature Flags (Caliente)
             </h3>
-            <p className="text-[10px] mt-0.5" style={{ color: '#94A3B8' }}>
-              Activa o desactiva módulos de IA sin re-desplegar.
+            {/* PT-7 (24-ago-2026): estos interruptores eran DECORATIVOS —
+                solo movían un useState local; los flags reales son constantes
+                compiladas (lib/ai/feature-flags). Un ADMIN que «apagara» el
+                chat SIMI creía haberlo apagado y el widget seguía vivo para
+                los ciudadanos: peor que no tener control es fingirlo.
+                Ahora son indicadores de SOLO LECTURA con la verdad al pie;
+                cablearlos de verdad (Firestore + consulta en runtime) exige
+                diseño propio — anotado en el plan. */}
+            <p className="text-[10px] mt-0.5" style={{ color: '#667085' }}>
+              Estado compilado de los módulos de IA — solo lectura. Cambiarlos
+              requiere un despliegue; estos indicadores no son interruptores.
             </p>
           </div>
           <div className="space-y-3.5 pt-1">
-            <ToggleSwitch label="Chat SIMI Público"        desc="Habilita widget conversacional"        isActive={flags.ENABLE_SIMI_CHAT}      onToggle={() => toggleFlag('ENABLE_SIMI_CHAT')} />
-            <ToggleSwitch label="Clasificación en Caliente" desc="Debounce e inferencia en /radicacion"  isActive={flags.ENABLE_AUTO_CLASSIFY}  onToggle={() => toggleFlag('ENABLE_AUTO_CLASSIFY')} />
-            <ToggleSwitch label="Etiquetas Semánticas"      desc="Auto-generación de tags"               isActive={flags.ENABLE_AUTO_TAGS}      onToggle={() => toggleFlag('ENABLE_AUTO_TAGS')} />
-            <ToggleSwitch label="Resumen de Solicitud"      desc="Genera resúmenes ejecutivos"           isActive={flags.ENABLE_AI_SUMMARY}     onToggle={() => toggleFlag('ENABLE_AI_SUMMARY')} />
+            <EstadoModuloIA label="Chat SIMI Público"        desc="Widget conversacional del portal"     activo={AI_FEATURE_FLAGS.ENABLE_SIMI_CHAT} />
+            <EstadoModuloIA label="Clasificación en Caliente" desc="Debounce e inferencia en /radicacion" activo={AI_FEATURE_FLAGS.ENABLE_AUTO_CLASSIFY} />
+            <EstadoModuloIA label="Etiquetas Semánticas"      desc="Auto-generación de tags"              activo={AI_FEATURE_FLAGS.ENABLE_AUTO_TAGS} />
+            <EstadoModuloIA label="Resumen de Solicitud"      desc="Genera resúmenes ejecutivos"          activo={AI_FEATURE_FLAGS.ENABLE_AI_SUMMARY} />
           </div>
         </div>
 
@@ -313,28 +317,26 @@ function KpiCard({
   );
 }
 
-function ToggleSwitch({
-  label, desc, isActive, onToggle,
-}: { label: string; desc: string; isActive: boolean; onToggle: () => void }) {
+function EstadoModuloIA({
+  label, desc, activo,
+}: { label: string; desc: string; activo: boolean }) {
   return (
     <div
-      className="flex items-center justify-between gap-4 p-2.5 rounded-xl transition-colors"
-      style={{ border: '1px solid #D9E2D9', background: isActive ? '#EEF4EE' : '#F8FAF7' }}
+      className="flex items-center justify-between gap-4 p-2.5 rounded-xl"
+      style={{ border: '1px solid #D9E2D9', background: activo ? '#EEF4EE' : '#F8FAF7' }}
     >
       <div className="min-w-0">
         <p className="text-xs font-bold" style={{ color: '#1F2933' }}>{label}</p>
-        <p className="text-[9px] leading-normal truncate" style={{ color: '#94A3B8' }}>{desc}</p>
+        <p className="text-[9px] leading-normal truncate" style={{ color: '#667085' }}>{desc}</p>
       </div>
-      <button
-        onClick={onToggle}
-        className="w-11 h-6 rounded-full p-1 cursor-pointer transition-all duration-300 shrink-0"
-        style={{ background: isActive ? '#14532D' : '#D9E2D9' }}
+      <span
+        className="text-[9px] font-bold uppercase tracking-wider px-2 py-1 rounded-md shrink-0"
+        style={activo
+          ? { background: '#ECFDF5', color: 'var(--color-success-text)', border: '1px solid #A7F3D0' }
+          : { background: '#F8FAF7', color: 'var(--text-secondary)', border: '1px solid #D9E2D9' }}
       >
-        <div
-          className="w-4 h-4 rounded-full bg-white transition-all duration-300 shadow"
-          style={{ transform: isActive ? 'translateX(20px)' : 'translateX(0)' }}
-        />
-      </button>
+        {activo ? 'Activo' : 'Apagado'}
+      </span>
     </div>
   );
 }
