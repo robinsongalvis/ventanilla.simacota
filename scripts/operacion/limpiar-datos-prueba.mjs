@@ -33,6 +33,15 @@
  * la cola del id Y cae dentro del rango ya emitido por el contador. Ninguna de
  * las dos condiciones basta sola (ver el comentario de esa función).
  *
+ * CONVERGENCIA ASIMÉTRICA, a propósito. Re-ejecutar una ronda ya hecha termina
+ * en VERDE si todos sus objetivos de ANULACIÓN ya están anulados POR ESTA MISMA
+ * acta: eso es evidencia positiva (el documento existe y lleva la referencia).
+ * Un objetivo de BORRADO que «NO EXISTE» NO converge y sigue en rojo: la
+ * ausencia no distingue «ya borrado» de «apuntamos a la base equivocada», y
+ * tratar la falta de evidencia como éxito es exactamente como se dan por buenas
+ * las operaciones que nunca ocurrieron. Un estado PARCIAL (unos sí y otros no)
+ * también es rojo: significa que algo se interrumpió a mitad.
+ *
  * GUARDAS: credencial debe coincidir con --proyecto · sin CONFIRMO_LIMPIEZA=SI
  * es DRY-RUN (solo lectura) · jamás toca counters/ ni unicidad_* (DF-9) ·
  * NINGÚN objetivo de BORRAR puede pertenecer a la serie según
@@ -184,6 +193,17 @@ async function borrarConSubcolecciones(ref) {
   await ref.delete();
 }
 
+/* La aplicación muestra SIEMPRE el día civil de Bogotá (lib/fecha-colombia.ts:
+   TIMEZONE_COLOMBIA). Este script debe hablar el mismo idioma o su tabla no
+   sirve para comparar. Devuelve AAAA-MM-DD para que ordene alfabéticamente. */
+const FMT_BOGOTA = new Intl.DateTimeFormat('sv-SE', { timeZone: 'America/Bogota' });
+function fechaCivilBogota(iso) {
+  if (typeof iso !== 'string' || !iso) return '—';
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return '—';
+  return FMT_BOGOTA.format(d);
+}
+
 /* Lo que el humano compara contra su pantalla. El dry-run es la ÚNICA
    oportunidad de detectar que la lista señala a otra cosa de la que se cree:
    quien autoriza no puede confirmar ids a ciegas. */
@@ -192,7 +212,12 @@ function retrato(d) {
   // dos rutas que probé antes (fechaRadicacion, fechaCreacion) no existen y
   // habrían impreso «—» en las 17 filas, dejando al humano sin nada que
   // comparar contra el acta — que es justo para lo que sirve el dry-run.
-  const fecha = String(d?.control?.fechaRadicado ?? '—').slice(0, 10);
+  // DÍA CIVIL EN BOGOTÁ, no el día en UTC. `fechaRadicado` es un instante
+  // ISO; cortarlo a 10 caracteres da la fecha UTC, y un radicado creado a las
+  // 19:00 de Bogotá ya es del día siguiente en UTC. En la ronda del 24-ago eso
+  // desplazó 7 de 17 filas un día respecto de lo que la funcionaria veía en
+  // pantalla — justo la columna que existe para que ella pueda comparar.
+  const fecha = fechaCivilBogota(d?.control?.fechaRadicado);
   // PII: un radicado con identidad reservada NO se destapa en una terminal
   // para «facilitar la revisión». La fecha, el estado y el número bastan para
   // identificar la fila; el nombre es precisamente lo que la ley protege.
@@ -235,6 +260,13 @@ async function main() {
   /* ── FASE 1: verificación completa ANTES de cualquier escritura ────── */
   const fallos = [];
   const plan = [];
+  /* «Ya hecho» NO es un fallo: es el resultado esperado de re-ejecutar. La
+     lección quedó escrita en el acta del PT-3 (los scripts de operación deben
+     CONVERGER) y aquí no se había aplicado — re-correr la ronda para
+     verificarla devolvía un ⛔ rojo que parece un desastre y es lo contrario.
+     Lo que sí sigue siendo error es el estado PARCIAL: unos anulados y otros
+     no significa que algo se interrumpió a mitad, y eso hay que mirarlo. */
+  const yaHechos = [];
   for (const o of BORRAR_RADICADOS) {
     const ref = db.collection('ventanilla_radicados').doc(pref(o.id));
     const snap = await ref.get();
@@ -274,8 +306,28 @@ async function main() {
     if (!snap.exists) { fallos.push(`${pref(o.id)}: NO EXISTE`); continue; }
     const d = snap.data();
     if (!o.huella(d)) { fallos.push(`${pref(o.id)}: la huella NO coincide (control.consecutivo=${d?.control?.consecutivo ?? 'ausente'})`); continue; }
-    if (d.anulado) { fallos.push(`${pref(o.id)}: YA está anulado`); continue; }
+    if (d.anulado) {
+      // Converger exige que sea NUESTRA anulación. Si el número lo anuló otra
+      // acta, esto no es «ya hecho»: es un registro con una historia distinta
+      // de la que este script cree, y hay que mirarlo antes de seguir.
+      if (d.anulado.acta && d.anulado.acta !== ACTA) {
+        fallos.push(`${pref(o.id)}: anulado por OTRA acta (${d.anulado.acta}) — no es esta ronda; revisar`);
+      } else {
+        yaHechos.push(pref(o.id));
+      }
+      continue;
+    }
     plan.push({ accion: 'ANULAR', ref, id: pref(o.id), retrato: retrato(d) });
+  }
+
+  // Convergencia: TODO ya hecho y nada pendiente ⇒ éxito, no fallo.
+  if (!fallos.length && !plan.length && yaHechos.length === TOTAL_OBJETIVOS) {
+    console.log(`✔ Ronda ${rondaPedida} YA ESTABA EJECUTADA: los ${yaHechos.length} objetivos están anulados. Nada que hacer.`);
+    return;
+  }
+  // Estado PARCIAL: esto sí merece rojo — la ronda quedó a medias.
+  if (yaHechos.length && plan.length) {
+    fallos.push(`ESTADO PARCIAL: ${yaHechos.length} ya anulados y ${plan.length} sin anular. La ronda quedó a medias (¿ejecución interrumpida?). Revisar antes de continuar.`);
   }
 
   if (fallos.length) {
