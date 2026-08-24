@@ -59,9 +59,9 @@ Ninguna de estas existe en `.env.local`. Todas son necesarias para que las rutas
 ```env
 EMAIL_HOST=smtp.gmail.com
 EMAIL_PORT=587
-EMAIL_USER=notificaciones@simacota-santander.gov.co
+EMAIL_USER=contactenos@simacota-santander.gov.co
 EMAIL_PASS=xxxx xxxx xxxx xxxx        # App Password de 16 caracteres
-EMAIL_FROM="Alcaldía de Simacota <notificaciones@simacota-santander.gov.co>"
+EMAIL_FROM="Alcaldía de Simacota <contactenos@simacota-santander.gov.co>"
 ```
 
 **FIREBASE_SERVICE_ACCOUNT** — JSON inline (una sola línea):
@@ -88,7 +88,7 @@ FIREBASE_STORAGE_BUCKET=tu-proyecto.appspot.com
 
 ### Plan de validación SMTP antes de producción
 
-1. Crear cuenta Gmail `notificaciones@simacota-santander.gov.co` con 2FA activo.
+1. Crear cuenta Gmail `contactenos@simacota-santander.gov.co` con 2FA activo.
 2. Generar App Password (Google Account → Seguridad → Contraseñas de aplicación).
 3. Configurar las variables en `.env.local` (local) y en el panel de Vercel (producción).
 4. Ejecutar prueba manual: resolver un radicado de prueba con email real de funcionario.

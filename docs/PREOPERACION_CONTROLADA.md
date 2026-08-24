@@ -131,7 +131,7 @@ Las reglas de Firestore bloquean nuevas escrituras en esa colección legacy.
 ## Pendientes antes de publicación oficial
 
 1. **Configurar SMTP definitivo institucional:**
-   - Cuenta: `notificaciones@simacota-santander.gov.co`
+   - Cuenta: `contactenos@simacota-santander.gov.co`
    - Requiere: 2FA activado + App Password de Gmail
    - Actualizar `EMAIL_USER`, `EMAIL_PASS`, `EMAIL_FROM` en Vercel
 
