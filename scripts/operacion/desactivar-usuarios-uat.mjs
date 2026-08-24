@@ -47,14 +47,16 @@ const email = (o) => (ensayo ? o.email.replace('@', '.ensayo-pt3@') : o.email);
 
 async function main() {
   if (ensayo) {
-    console.log('— sembrando dobles de ensayo —');
-    for (const o of OBJETIVOS) {
+    console.log('— sembrando dobles de ensayo (uno PRE-desactivado, para ejercitar la omisión idempotente) —');
+    for (const [i, o] of OBJETIVOS.entries()) {
       const u = await auth.createUser({ email: email(o), password: 'Ensayo-' + Math.random().toString(36).slice(2, 10) });
-      await db.doc('users/' + u.uid).set({ email: email(o), rol: o.rolEsperado, activo: true, ensayoPt3: true });
+      const pre = i === 0;
+      if (pre) await auth.updateUser(u.uid, { disabled: true });
+      await db.doc('users/' + u.uid).set({ email: email(o), rol: o.rolEsperado, activo: !pre, archivado: pre, ensayoPt3: true });
     }
   }
 
-  const plan = []; const fallos = [];
+  const plan = []; const fallos = []; const yaHechas = [];
   for (const o of OBJETIVOS) {
     let u;
     try { u = await auth.getUserByEmail(email(o)); }
@@ -63,15 +65,22 @@ async function main() {
     const d = perfil.data();
     if (!perfil.exists) { fallos.push(`${email(o)}: sin perfil users/`); continue; }
     if (d.rol !== o.rolEsperado) { fallos.push(`${email(o)}: rol "${d.rol}" ≠ esperado "${o.rolEsperado}" — huella NO coincide`); continue; }
-    if (u.disabled && d.activo === false) { fallos.push(`${email(o)}: YA está desactivado`); continue; }
+    // Idempotencia: «ya desactivada» NO es un fallo — es la meta ya
+    // cumplida para esa cuenta. El primer uso real en producción encontró
+    // 3 de 4 ya archivadas (por el flujo de Administración, previo) y el
+    // todo-o-nada original bloqueaba el retiro de la única pendiente.
+    // Abortar sigue reservado para lo que huele mal (huella/rol/ausencia).
+    if (u.disabled && d.activo === false) { yaHechas.push(email(o)); continue; }
     plan.push({ o, u });
   }
+  for (const y of yaHechas) console.log(`  (ya desactivada, se omite: ${y})`);
   if (fallos.length) {
     console.error('⛔ VERIFICACIÓN FALLIDA — nada se tocó:');
     for (const f of fallos) console.error('   · ' + f);
     process.exitCode = 4; return;
   }
-  console.log(`Verificación: ${plan.length}/4 cuentas confirmadas contra su huella.`);
+  if (plan.length === 0) { console.log('✔ Nada pendiente: las 4 cuentas ya están desactivadas.'); return; }
+  console.log(`Verificación: ${plan.length}/${OBJETIVOS.length} cuentas pendientes confirmadas contra su huella (${yaHechas.length} ya hechas).`);
   if (!ejecutar && !ensayo) {
     console.log('\nDRY-RUN (sin CONFIRMO_DESACTIVACION=SI no se escribe). Plan:');
     for (const p of plan) console.log(`  DESACTIVAR  ${email(p.o)}  (rol ${p.o.rolEsperado})`);
@@ -86,6 +95,7 @@ async function main() {
     console.log(`  DESACTIVADA  ${email(p.o)}`);
   }
   if (ensayo) {
+    if (yaHechas.length !== 1) { console.error(`  ✘ el ensayo esperaba 1 omitida por idempotencia, hubo ${yaHechas.length}`); process.exitCode = 5; }
     console.log('— verificando y limpiando dobles —');
     let mal = 0;
     for (const o of OBJETIVOS) {
