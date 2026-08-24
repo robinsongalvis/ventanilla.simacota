@@ -16,5 +16,12 @@
    `firestore.rules`/`storage.rules` sigan abiertas a cliente (Fase 4 aún
    no ejecutada), poner este flag en `false` basta para volver a la ruta
    legada sin redeploy de reglas.
+
+   CUTOVER EJECUTADO (23-ago-2026, PT-1 del PLAN_GO_LIVE, autorizado por el
+   propietario): la radicación interna corre por el SERVIDOR. La ventana de
+   rollback de 1 línea sigue abierta hasta que el PR de Fase 4 cierre las
+   reglas de cliente (counters/create) — a partir de ahí, revertir exige
+   también redesplegar reglas, a propósito: la regla cerrada es el candado
+   CR-1/CR-2 y no se reabre por conveniencia.
 ══════════════════════════════════════════════════════════════ */
-export const USA_RADICACION_INTERNA_SERVER = false;
+export const USA_RADICACION_INTERNA_SERVER = true;

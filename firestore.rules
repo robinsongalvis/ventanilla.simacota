@@ -139,9 +139,11 @@ service cloud.firestore {
         || ((isFuncionario() || isJefeDependencia())
             && resource.data.clasificacion.oficinaDestino == userTenant());
 
-      // Solo admin y recepcionista pueden radicar institucionalmente.
-      allow create: if (isAdmin() || isRecepcionista())
-        && request.resource.data.radicadoId == radicadoId;
+      // CR-2 CERRADO (cutover PT-1, 23-ago-2026): la radicación corre por
+      // el SERVIDOR (/api/radicacion/interna, Admin SDK) desde el flip de
+      // USA_RADICACION_INTERNA_SERVER. Un create de cliente era un registro
+      // oficial forjable: ningún campo de negocio se validaba aquí.
+      allow create: if false;
 
       // Mutaciones críticas pasan por APIs server-side con Admin SDK.
       // Esto blinda cumplioTermino, estadoActual, clasificación, prórrogas y respuesta oficial.
@@ -188,9 +190,11 @@ service cloud.firestore {
         || ((isFuncionario() || isJefeDependencia())
             && resource.data.dependenciaOrigen == userTenant());
 
-      // Solo recepción/admin registran salidas (ventanilla única de salida).
-      allow create: if (isAdmin() || isRecepcionista())
-        && request.resource.data.salidaId == salidaId;
+      // Cutover PT-1 (23-ago-2026): toda salida se registra por
+      // /api/salidas/registrar (Admin SDK) — verificado que NINGÚN flujo de
+      // cliente escribía esta colección; la regla abierta era pura
+      // superficie de forja del libro (que se declara inmutable).
+      allow create: if false;
 
       allow update, delete: if false;
     }
@@ -206,8 +210,14 @@ service cloud.firestore {
 
     // ── Contadores de consecutivo anual ────────────────────────────────────
     match /counters/{document} {
-      // Lectura y escritura transaccional para generar el número de radicado.
-      allow read, write: if isAdmin() || isRecepcionista();
+      // CR-1 CERRADO (cutover PT-1, 23-ago-2026): el consecutivo legal solo
+      // avanza en el SERVIDOR (consecutivo-legal.ts, guard D9 de
+      // monotonicidad). Con write de cliente, cualquier sesión ADMIN o
+      // RECEPCIONISTA podía saltar, reiniciar o colisionar la foliación
+      // AGN 060 — el hallazgo CR-1 abierto desde julio. La lectura queda:
+      // es inofensiva y algún tablero podría consultarla.
+      allow read: if isAdmin() || isRecepcionista();
+      allow write: if false;
     }
 
     // ── Reserva de unicidad de números de expediente (Fase 2) ─────────────
