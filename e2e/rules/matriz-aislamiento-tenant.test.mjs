@@ -185,7 +185,7 @@ const MATRIZ = [
     ejecutar: (db) => getDoc(doc(db, 'ventanilla_radicados/rad-b-1/trazabilidad/evt-1')),
   },
   {
-    grupo: 'trazabilidad', caso: 'FUNCIONARIO de su propio tenant puede crear entrada de trazabilidad', actor: 'funcionario-a', esperado: 'permitido',
+    grupo: 'trazabilidad', caso: 'FUNCIONARIO ya NO crea trazabilidad por cliente (PR-C: server-only, actor sin forja)', actor: 'funcionario-a', esperado: 'denegado',
     ejecutar: (db) => setDoc(doc(db, 'ventanilla_radicados/rad-a-1/trazabilidad/evt-nuevo-1'), { evento: 'nota' }),
   },
   {
@@ -210,7 +210,7 @@ const MATRIZ = [
     // igual que en su `allow read`. admin-a (TENANT_A) escribe sobre rad-b-1
     // (oficinaDestino TENANT_B). Si un refactor restringe a Admin por tenant por
     // error, este caso lo detecta.
-    grupo: 'trazabilidad', caso: 'ADMIN crea trazabilidad cross-tenant (ventanilla única, alcance conservado)', actor: 'admin-a', esperado: 'permitido',
+    grupo: 'trazabilidad', caso: 'ADMIN tampoco crea trazabilidad por cliente (PR-C: el actor lo captura el servidor)', actor: 'admin-a', esperado: 'denegado',
     ejecutar: (db) => setDoc(doc(db, 'ventanilla_radicados/rad-b-1/trazabilidad/evt-admin-cross'), { evento: 'nota-admin' }),
   },
   {
