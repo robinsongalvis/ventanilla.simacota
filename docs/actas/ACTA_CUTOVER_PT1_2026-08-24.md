@@ -31,12 +31,21 @@
 - La ventana de rollback de 1 línea quedó CERRADA a propósito: revertir el
   cutover exige ahora también redesplegar reglas.
 
-## Qué queda del paquete (no cerrado por este acta)
+## Adenda 24-ago-2026 — PR-C ejecutado: el paquete queda CERRADO ENTERO
 
-- **PR-C**: migrar los 5 flujos de cliente que escriben `trazabilidad`
-  (patrón D8) y cerrar su regla — hasta entonces, la trazabilidad de
-  radicados sigue abierta a cliente (riesgo conocido, AMARILLO en la
-  auditoría).
+El censo del PR-C [#219] halló que los «5 flujos» eran 2 y ambos CÓDIGO
+MUERTO (el resolver DEPRECATED sin llamadores; la radicación legada
+inalcanzable tras el flip). Se enterraron en vez de migrarse —1.445 líneas
+fuera— y `trazabilidad create → false` quedó desplegado en stage y
+PRODUCCIÓN (`✔ Deploy complete!`, 24-ago, por el propietario). El
+kill-switch se retiró: revertir el cutover es desde ahora una decisión con
+ADR, no un interruptor.
+
+**Estado final del paquete: counters, radicados, salidas y trazabilidad —
+todo server-only en las reglas VIVAS de producción.**
+
+## Fuera de este paquete
+
 - Retiro de usuarios UAT y endurecimiento de Storage (PT-3).
 
 ## Incidencias durante la ejecución
