@@ -135,11 +135,11 @@ const MATRIZ = [
     ejecutar: (db) => getDocs(collection(db, 'ventanilla_radicados')),
   },
   {
-    grupo: 'ventanilla_radicados', caso: 'ADMIN crea radicado con radicadoId coincidente', actor: 'admin-a', esperado: 'permitido',
+    grupo: 'ventanilla_radicados', caso: 'ADMIN ya NO crea radicados por cliente (CR-2 cerrado, cutover PT-1 23-ago)', actor: 'admin-a', esperado: 'denegado',
     ejecutar: (db) => setDoc(doc(db, 'ventanilla_radicados/rad-nuevo-1'), { radicadoId: 'rad-nuevo-1', clasificacion: { oficinaDestino: TENANT_A } }),
   },
   {
-    grupo: 'ventanilla_radicados', caso: 'RECEPCIONISTA crea radicado con radicadoId coincidente', actor: 'recepcionista-a', esperado: 'permitido',
+    grupo: 'ventanilla_radicados', caso: 'RECEPCIONISTA ya NO crea radicados por cliente (CR-2 cerrado — la radicación es del servidor)', actor: 'recepcionista-a', esperado: 'denegado',
     ejecutar: (db) => setDoc(doc(db, 'ventanilla_radicados/rad-nuevo-2'), { radicadoId: 'rad-nuevo-2', clasificacion: { oficinaDestino: TENANT_A } }),
   },
   {
@@ -256,7 +256,7 @@ const MATRIZ = [
     ejecutar: (db) => getDocs(query(collection(db, 'ventanilla_salidas'), where('dependenciaOrigen', '==', TENANT_A))),
   },
   {
-    grupo: 'ventanilla_salidas', caso: 'RECEPCIONISTA crea salida con salidaId coincidente', actor: 'recepcionista-a', esperado: 'permitido',
+    grupo: 'ventanilla_salidas', caso: 'RECEPCIONISTA ya NO crea salidas por cliente (el libro se registra por /api/salidas/registrar)', actor: 'recepcionista-a', esperado: 'denegado',
     ejecutar: (db) => setDoc(doc(db, 'ventanilla_salidas/sal-nueva-1'), { salidaId: 'sal-nueva-1', dependenciaOrigen: TENANT_A }),
   },
   {
@@ -371,8 +371,17 @@ const MATRIZ = [
     ejecutar: (db) => setDoc(doc(db, 'counters/2026'), { valor: 2 }),
   },
   {
-    grupo: 'counters', caso: 'RECEPCIONISTA puede escribir counters', actor: 'recepcionista-a', esperado: 'permitido',
+    grupo: 'counters', caso: 'RECEPCIONISTA NO puede escribir counters (CR-1 cerrado, cutover PT-1)', actor: 'recepcionista-a', esperado: 'denegado',
     ejecutar: (db) => setDoc(doc(db, 'counters/2026'), { valor: 2 }),
+  }, {
+    grupo: 'counters', caso: 'ADMIN tampoco escribe counters — el consecutivo solo avanza en el servidor', actor: 'admin-a', esperado: 'denegado',
+    ejecutar: (db) => setDoc(doc(db, 'counters/2026'), { valor: 99 }),
+  }, {
+    grupo: 'cutover', caso: 'RECEPCIONISTA NO crea radicados por cliente (CR-2 cerrado — la radicación es del servidor)', actor: 'recepcionista-a', esperado: 'denegado',
+    ejecutar: (db) => setDoc(doc(db, 'ventanilla_radicados/1-110-202608-99999901'), { radicadoId: '1-110-202608-99999901' }),
+  }, {
+    grupo: 'cutover', caso: 'ADMIN NO crea salidas por cliente (el libro se registra por /api/salidas/registrar)', actor: 'admin-a', esperado: 'denegado',
+    ejecutar: (db) => setDoc(doc(db, 'ventanilla_salidas/2-SAL-2026-99999901'), { salidaId: '2-SAL-2026-99999901' }),
   },
 
   // ══ ventanilla_planillas ══════════════════════════════════════════════════
