@@ -60,6 +60,10 @@ concurrency:
 permissions:
   contents: read
   id-token: write
+  # Sin esto el paso que abre la incidencia falla con «Resource not accessible
+  # by integration»: el vigía construido para gritar se queda mudo, y el fallo
+  # solo se ve entrando a la pestaña de Actions — que es donde nadie mira.
+  issues: write
 
 jobs:
   respaldar:
@@ -109,11 +113,19 @@ jobs:
       - name: Comprobar que el bucket de destino existe y tiene versionado
         run: |
           set -uo pipefail
-          if ! gcloud storage buckets describe "gs://${DESTINO_BUCKET}" >/dev/null 2>&1; then
-            echo "::error::El bucket de respaldo gs://${DESTINO_BUCKET} no existe."
-            echo "Créelo con los comandos de scripts/backups/README.md §Adjuntos."
+          # NO se silencia stderr: la primera versión hacía `2>&1 >/dev/null` y
+          # convertía un «permiso denegado» en «no existe». El bucket estaba
+          # creado y el mensaje mandó a buscar lo que no era — el instrumento
+          # mintiendo sobre lo que pasó.
+          SALIDA="$(gcloud storage buckets describe "gs://${DESTINO_BUCKET}" 2>&1)" || {
+            echo "::error::No se pudo LEER gs://${DESTINO_BUCKET}. Puede que no exista, o que la cuenta de servicio no tenga permiso sobre el bucket."
+            echo "Mensaje real de gcloud:"
+            echo "${SALIDA}"
+            echo ""
+            echo "Si dice 403 o 'does not have storage.buckets.get', el bucket existe y falta el rol:"
+            echo "  gcloud storage buckets add-iam-policy-binding gs://${DESTINO_BUCKET} --member=serviceAccount:<SA> --role=roles/storage.legacyBucketReader"
             exit 1
-          fi
+          }
           # El versionado es la red bajo la red: si un objeto del ORIGEN se
           # corrompe y el rsync copia la versión corrupta, la anterior sigue
           # recuperable en el destino. Sin él, el respaldo hereda la corrupción.
