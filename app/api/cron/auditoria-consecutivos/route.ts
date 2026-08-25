@@ -184,11 +184,35 @@ export async function GET(request: Request): Promise<NextResponse> {
     let totalHuecos = 0;
     let totalDuplicados = 0;
     let totalDocumentosLeidos = 0;
+    /* Contadores que se contradicen a sí mismos. Se reportan aparte de huecos y
+       duplicados porque son de otra naturaleza: un hueco es un síntoma, esto es
+       la CAUSA — y la causa hay que arreglarla antes de que produzca síntomas. */
+    const contadoresIncoherentes: string[] = [];
 
     for (const [serie, coleccion] of Object.entries(COLECCION_POR_SERIE)) {
       // Solo lectura: contador anual de la serie (NUNCA se escribe aquí).
       const counterSnap = await db.doc(`counters/${serie}-${anio}`).get();
       const ultimo = Number(counterSnap.data()?.ultimo ?? 0);
+
+      /* ── Vigilancia: ¿el contador cuadra con su propia historia de apertura?
+         Tercera capa, y la que ve lo que las otras dos no pueden.
+
+         La reserva de unicidad IMPIDE el duplicado. La coherencia en la
+         emisión DETIENE una emisión sobre un contador movido hacia atrás.
+         Ninguna de las dos ve un contador movido hacia ADELANTE: eso no rompe
+         nada al emitir —solo salta números— y solo se nota mirando.
+
+         Aquí se mira, y SOLO se mira: este cron es de lectura absoluta. */
+      const aperturaReg = counterSnap.data()?.apertura as
+        { abiertoEn?: number; autorizadoPor?: string; fecha?: string } | undefined;
+      const abiertoEn = aperturaReg?.abiertoEn;
+      if (typeof abiertoEn === 'number' && Number.isInteger(abiertoEn) && ultimo < abiertoEn - 1) {
+        contadoresIncoherentes.push(
+          `${serie}: declara apertura en ${abiertoEn} (autorizó ${aperturaReg?.autorizadoPor ?? 'sin declarar'}` +
+          `${aperturaReg?.fecha ? `, ${aperturaReg.fecha}` : ''}) pero su valor es ${ultimo}. ` +
+          `Alguien lo movió hacia atrás fuera del mecanismo de apertura.`,
+        );
+      }
 
       // Solo lectura: consecutivos realmente persistidos del año en curso.
       // Mismo criterio que el detector: cuenta TODO documento del año,
