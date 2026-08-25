@@ -153,6 +153,35 @@ desactualizado**: omite `HISTORICO_SIN_RESOLVER`.
 - Los ficheros de migración usan anotaciones y *casts*, no `Record` exhaustivos: **no rompen**.
 - El cambio es **aditivo**: los expedientes ya escritos conservan su estado y no requieren migración.
 
+### 4.5 El estado previo también tiene plazo
+
+Un expediente sin término anclado **no es un caso a ignorar: es un caso a
+vigilar con otra regla**. Si algo entra en estado previo y se queda ahí, eso
+también es un plazo — el de la Administración para verificar completitud, que no
+puede ser indefinido. El vigía debe **reportarlos, no saltárselos**, y disparar
+alerta al superar una edad máxima.
+
+De ahí se sigue que el vigía distinga **tres situaciones y no dos**: término
+corriendo, término suspendido por observaciones, y expediente sin anclar. Cada
+una con su regla. Colapsarlas en «tiene fecha / no tiene fecha» vuelve invisible
+el tercer caso, que es el mismo error de fondo que este ADR corrige.
+
+**Sobre la edad máxima, y cómo debe preguntarse.** Ese número no mide solo
+cuánto puede tardar la Administración. Mide el tiempo durante el cual un
+ciudadano **ya entregó su solicitud y todavía no tiene término corriendo a su
+favor**. Los dos intereses apuntan en direcciones opuestas: mientras más largo,
+más cómoda la verificación y más tiempo la persona en el limbo. Planteado como
+*«¿cuántos días necesitan ustedes?»*, la respuesta natural será un número
+grande.
+
+Criterio adoptado: el valor es **configurable, no constante en código**, y
+arranca en **el número más corto que Planeación diga que puede sostener**, no en
+el más cómodo. Ampliarlo después con evidencia es una conversación fácil;
+reducirlo cuando ya se acostumbraron, no.
+
+Implementado en `app/api/cron/vencimientos-licencias` con defecto conservador de
+3 días hábiles, pendiente del valor definitivo (§7).
+
 ## 6. Consecuencias
 
 **A favor:** el estado deja de afirmar lo que no verificó; el término arranca cuando debe; el
@@ -172,5 +201,7 @@ el día que se abra la emisión real esa afirmación viaja con un número de la 
   decide la Secretaría de Planeación, no ingeniería.
 - El **formato del número de recepción**.
 - Si la verificación de completitud genera **acta** o basta la bitácora.
+- La **edad máxima en estado previo** (§4.5). El defecto de 3 días hábiles es
+  provisional, elegido por conservador y no por estudiado.
 - **Con qué número abre la operación real** la serie de radicados — decisión pendiente con gestión
   documental, independiente de este ADR pero del mismo momento.
