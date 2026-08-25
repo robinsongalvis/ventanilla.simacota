@@ -84,8 +84,24 @@ radicación del ciudadano o en la verificación del funcionario?
 
 La verificación **declara** un hecho, no lo crea. Si el ciudadano presentó todo el día 10 y la
 funcionaria verifica el 14, el expediente **estuvo en debida forma desde el 10**: los cuatro días
-de demora administrativa no se le pueden descontar. Si presentó incompleto el 10 y subsanó el 20,
-el ancla es el 20.
+de demora administrativa no se le pueden descontar.
+
+**EL CASO COTIDIANO — entrega parcial en mostrador.** Tras el recorte de alcance (§4.7), este deja
+de ser un caso de borde y pasa a ser *el* escenario normal: el ciudadano llega al mostrador con 9
+de los 19 documentos, la funcionaria abre el expediente y guarda esos nueve, y él vuelve días
+después con el resto.
+
+En ese escenario el ancla es **el día en que entrega el último documento obligatorio**, no el día
+en que abrió el expediente. La diferencia no es teórica: si el sistema fecha la radicación el día
+de la entrega parcial, esos días corren **contra la Alcaldía** — se descuentan de los 45 hábiles
+sin que nadie haya podido revisar un expediente que aún estaba incompleto.
+
+⚠️ **Consecuencia sobre lo ya desplegado.** Hoy el expediente ancla en
+`radicado.control.fechaRadicado` (PR #235), que en el mostrador sería el día de la primera visita.
+Esa corrección era la correcta para el mundo *sin* estado previo —donde el expediente solo nacía
+completo— y deja de serlo con entrega parcial. **Es la razón por la que el emisor de números no
+puede cablearse antes de esta decisión:** el número oficial y el arranque del plazo ocurren en la
+misma frontera, y hoy esa frontera está en el sitio equivocado para el caso que va a ser mayoría.
 
 En la práctica: el ancla es la fecha del **último requisito obligatorio aportado**, que el sistema
 ya conoce por los propios aportes. Nunca la fecha del clic de verificación.
@@ -253,6 +269,32 @@ De los tres casos se sigue una prueba práctica, barata de aplicar: **ante todo
 filtro, preguntar qué caso queda fuera por no tener ese campo.** Si la
 respuesta es «el que estoy buscando», el filtro está mal.
 
+### 4.7 Recorte de alcance decidido con Planeación
+
+**Se elimina el portal ciudadano.** No habrá radicación por cuenta del ciudadano, ni perfiles, ni
+registro de usuarios externos, ni autenticación pública. Todo el trámite se opera desde adentro:
+una funcionaria de Planeación atiende en el mostrador, captura los datos y carga los documentos
+por el ciudadano.
+
+Ese recorte **no debilita este ADR: lo hace más necesario.** El portal habría producido
+expedientes completos o nada; el mostrador produce expedientes **parciales por defecto** (§4.3), y
+son justo los que hoy no se pueden representar sin mentir sobre su completitud.
+
+**Se agrega, sin cuenta y sin contraseña:**
+
+- **Aviso por correo en cuatro hitos** — apertura del expediente, radicación (con número y fecha
+  de arranque del plazo), acta de observaciones, y resolución.
+- **Consulta pública extendida a licencias** — el ciudadano entra con su radicado y ve estado,
+  fecha de radicación, días transcurridos y qué sigue. Sin datos de terceros ni documentos
+  internos.
+- **Correo y celular se capturan en el mostrador**, al abrir el expediente.
+
+⚖️ **Distinción que gobierna todos los textos.** El aviso por correo o mensaje es **servicio al
+ciudadano**, no notificación jurídica. El acto administrativo se notifica como manda la ley
+(Ley 1437, arts. 66-69). Ningún texto puede dar a entender lo contrario: un correo redactado como
+si notificara crea la apariencia de un acto que no ocurrió, y de ahí salen nulidades. Los textos
+quedan pendientes de validación por Planeación (§7).
+
 ## 6. Consecuencias
 
 **A favor:** el estado deja de afirmar lo que no verificó; el término arranca cuando debe; el
@@ -273,6 +315,11 @@ el día que se abra la emisión real esa afirmación viaja con un número de la 
 - El **formato del número de recepción**.
 - Si la verificación de completitud genera **acta** o basta la bitácora.
 - La **edad máxima en estado previo** (§4.5). El defecto de 3 días hábiles es
-  provisional, elegido por conservador y no por estudiado.
+  provisional, elegido por conservador y no por estudiado. **Con entrega parcial en mostrador este
+  número cambia de naturaleza:** ya no mide cuánto tarda la Administración en verificar, sino
+  cuánto puede tardar el CIUDADANO en volver con lo que falta. Tres días hábiles es
+  probablemente muy corto para eso, y el valor debe revisarse a la luz del §4.3.
+- Los **textos de los avisos** al ciudadano (§4.7), con la distinción entre servicio y
+  notificación jurídica marcada de forma explícita.
 - **Con qué número abre la operación real** la serie de radicados — decisión pendiente con gestión
   documental, independiente de este ADR pero del mismo momento.
