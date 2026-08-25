@@ -102,6 +102,17 @@ export interface SolicitudSerie {
    * Convierte un duplicado silencioso en un fallo ruidoso — fail-closed.
    */
   exigeAperturaExplicita?: boolean;
+  /**
+   * Datos adicionales que el caller quiere ver EN la reserva de unicidad.
+   *
+   * La reserva es un documento con nombre —el número emitido— y ese nombre ya
+   * hace el trabajo. Pero algunas series necesitan además un puntero inverso:
+   * `expedientes` guarda `expedienteId` y `tenantId` para poder ir del número
+   * al expediente sin barrer la colección. Se aportan aquí, en la MISMA
+   * reserva, en vez de crear una segunda: dos `create` sobre el mismo
+   * documento dentro de una transacción la hacen fallar entera.
+   */
+  datosUnicidad?: Record<string, unknown>;
 }
 
 /**
@@ -140,6 +151,8 @@ export interface ConsecutivoPendiente {
    * necesita depender teniendo el `db` en la mano.
    */
   refUnicidad: DocumentReference;
+  /** Campos extra que el caller aporta a la reserva (ver `SolicitudSerie.datosUnicidad`). */
+  datosUnicidad?: Record<string, unknown>;
   /** Valor de `counters/{serie}-{año}.ultimo` leído (0 si el documento no existía). Alimenta el guard D9 en `confirmarConsecutivosLegales`. */
   ultimoActual: number;
   /** Origen declarado por el caller (`SolicitudSerie.origen`, default `'REAL'`). Alimenta el guard D9 en `confirmarConsecutivosLegales`. */
@@ -253,6 +266,7 @@ export async function leerConsecutivosLegales(
       consecutivo,
       documentoId: s.formatear(consecutivo, fecha),
       refUnicidad: db.doc(`unicidad_${s.serie}/${s.formatear(consecutivo, fecha)}`),
+      datosUnicidad: s.datosUnicidad,
       ultimoActual,
       origen: s.origen ?? 'REAL',
     };
@@ -332,6 +346,7 @@ export function confirmarConsecutivosLegales(
       consecutivo: p.consecutivo,
       // Instante REAL de la reserva (auditoría), no la fecha ancla del documento.
       creadoEn: new Date().toISOString(),
+      ...p.datosUnicidad,
     });
     tx.set(p.ref, { ultimo: p.consecutivo, ...marca }, { merge: true });
   }
