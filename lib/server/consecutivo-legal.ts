@@ -132,6 +132,14 @@ export interface ConsecutivoPendiente {
   consecutivo: number;
   /** Id de negocio ya formateado a partir del consecutivo leído. */
   documentoId: string;
+  /**
+   * Dónde se reserva la unicidad de `documentoId`. Se construye en la fase de
+   * LECTURA con el mismo `db` que recibió esta función, y no navegando desde
+   * `ref` hacia atrás: el retropuntero `ref.firestore` es una superficie del
+   * SDK que no todo doble de prueba implementa, y de la que este archivo no
+   * necesita depender teniendo el `db` en la mano.
+   */
+  refUnicidad: DocumentReference;
   /** Valor de `counters/{serie}-{año}.ultimo` leído (0 si el documento no existía). Alimenta el guard D9 en `confirmarConsecutivosLegales`. */
   ultimoActual: number;
   /** Origen declarado por el caller (`SolicitudSerie.origen`, default `'REAL'`). Alimenta el guard D9 en `confirmarConsecutivosLegales`. */
@@ -227,6 +235,7 @@ export async function leerConsecutivosLegales(
       ref: refs[i],
       consecutivo,
       documentoId: s.formatear(consecutivo, fecha),
+      refUnicidad: db.doc(`unicidad_${s.serie}/${s.formatear(consecutivo, fecha)}`),
       ultimoActual,
       origen: s.origen ?? 'REAL',
     };
@@ -301,8 +310,7 @@ export function confirmarConsecutivosLegales(
        (radicación pública e interna, registro exprés, salidas y planillas), y
        cubre las CUATRO series por construcción: nadie puede añadir una serie
        nueva y olvidarse de reservarla. */
-    const unicidadRef = p.ref.firestore.doc(`unicidad_${p.serie}/${p.documentoId}`);
-    tx.create(unicidadRef, {
+    tx.create(p.refUnicidad, {
       serie: p.serie,
       consecutivo: p.consecutivo,
       // Instante REAL de la reserva (auditoría), no la fecha ancla del documento.
