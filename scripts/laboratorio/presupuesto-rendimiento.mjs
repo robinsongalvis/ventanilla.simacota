@@ -213,6 +213,20 @@ const REGISTRO = [
     ref: 'ADR-0010 §Deuda · PLAN_OLA2 §Deuda #3',
   },
   {
+    archivo: 'app/api/cron/vencimientos-licencias/route.ts',
+    estado: 'ACOTADA',
+    clase: 'BATCH',
+    descripcion: 'Vigía del término de 45 días hábiles de licencias (Decreto 1077). Lee '
+      + 'la colección `expedientes` con techo duro de 1000 documentos y clasifica cada uno '
+      + 'en corriendo / suspendido / sin anclar / resuelto. La cota es NUMÉRICA y no por '
+      + 'consulta a propósito: el vigía debe ver TODOS los expedientes vivos, incluidos los '
+      + 'que NO tienen fecha de vencimiento — filtrar por rango de fecha excluiría justo el '
+      + 'caso que este cron existe para detectar (expediente sin término anclado). El volumen '
+      + 'esperado es de decenas por año (~45 licencias/año según el consecutivo real de '
+      + 'Planeación), muy por debajo del techo.',
+    ref: 'ADR-0011 2B · ADR-0033 §4.5 · auditoría del módulo de Licencias (punto D7)',
+  },
+  {
     archivo: 'app/api/cron/alertas-vencimiento/route.ts',
     estado: 'ACOTADA',
     clase: 'BATCH',
