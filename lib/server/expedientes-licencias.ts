@@ -560,6 +560,11 @@ export interface RadicadoParaHandoff {
   clasificacion: { oficinaDestino: string };
   solicitante: { nombreCompleto: string; numeroDocumento: string };
   vinculoExpediente?: { expedienteId: string; numeroExpediente: string; fecha: string } | null;
+  /** Bloque de control del radicado. Solo se usa `fechaRadicado`, que es el
+   *  instante en que el CIUDADANO radicó —escrito por el servidor en la
+   *  transacción de radicación— y que ancla el término de 45 días hábiles.
+   *  Opcional porque un radicado histórico importado puede no traerlo. */
+  control?: { fechaRadicado?: string };
 }
 
 export interface CrearExpedienteDesdeRadicadoInput {
@@ -578,6 +583,11 @@ export interface PlanCrearExpedienteDesdeRadicado {
   primeraActuacion: ActuacionLicenciaDoc;
   /** Lo que se escribe en `VentanillaRadicado.vinculoExpediente` — MISMA transacción que crea el expediente. */
   vinculoRadicado: VinculoExpedienteRadicado;
+  /** Instante que ancla el término de 45 días hábiles: la radicación del
+   *  CIUDADANO (`control.fechaRadicado` del radicado), no la apertura del
+   *  expediente. El caller lo necesita para indexar el contador de la serie
+   *  con la MISMA fecha que el número (riesgo Nochevieja). */
+  fechaAnclaTermino: string;
 }
 
 /**
@@ -716,6 +726,21 @@ export function planCrearExpedienteDesdeRadicado(
   const nowIso = ahora.toISOString();
   const numero = formatearNumeroExpedienteDemo(ahora);
 
+  /* ANCLA DEL TÉRMINO — la radicación del CIUDADANO, no la apertura del
+     expediente. Antes esta actuación llevaba `nowIso`, el instante en que la
+     funcionaria abre el módulo de Licencias. Con eso, los días que pasan entre
+     que el ciudadano radica en ventanilla y que Planeación abre su expediente
+     NO se contaban: si radicaba el lunes y el expediente se abría el viernes,
+     el sistema afirmaba que quedaban 45 días hábiles cuando legalmente
+     quedaban 41 — el retraso interno se le descontaba al ciudadano y se le
+     regalaba a la Administración.
+     `control.fechaRadicado` lo escribe el servidor en la transacción de
+     radicación (src/types/ventanilla.ts, ControlRadicacion), así que es hora de
+     servidor y no del navegador de nadie. El respaldo a `nowIso` solo cubre un
+     radicado histórico sin ese campo; en ese caso el ancla es peor pero nunca
+     favorable a la Administración por accidente. */
+  const fechaAnclaTermino = radicado.control?.fechaRadicado ?? nowIso;
+
   const primeraActuacion: ActuacionLicenciaDoc = {
     id: crypto.randomUUID(),
     expedienteId: id,
@@ -725,9 +750,9 @@ export function planCrearExpedienteDesdeRadicado(
     actorUid: actor.uid,
     actorNombre: actor.nombre,
     actorRol: actor.rol,
-    fecha: nowIso,
+    fecha: fechaAnclaTermino,
     origen: 'REAL',
-    detalle: `Expediente creado a partir del radicado de ventanilla ${radicado.radicadoId} (handoff D2). Demostración (esPrueba: true) — candado de emisión real cerrado (R10, ADR-0026 precondición #4).`,
+    detalle: `Expediente creado a partir del radicado de ventanilla ${radicado.radicadoId} (handoff D2). Término anclado a la radicación del ciudadano (${fechaAnclaTermino}), no a la apertura del expediente. Demostración (esPrueba: true) — candado de emisión real cerrado (R10, ADR-0026 precondición #4).`,
   };
 
   const expediente: ExpedienteLicenciaDoc = {
@@ -757,6 +782,10 @@ export function planCrearExpedienteDesdeRadicado(
     expediente,
     primeraActuacion,
     vinculoRadicado: { expedienteId: id, numeroExpediente: numero, fecha: nowIso },
+    /** Instante que ancla el término, expuesto para que el caller no tenga que
+     *  volver a derivarlo del plan (lo necesita el emisor real: el número y el
+     *  contador deben indexarse por la MISMA fecha — riesgo Nochevieja). */
+    fechaAnclaTermino,
   };
 }
 
