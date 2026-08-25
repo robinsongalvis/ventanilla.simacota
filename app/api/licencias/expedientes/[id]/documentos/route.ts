@@ -12,6 +12,7 @@
    magic-bytes, 10MB, `sanitizeFilename`, hash SHA-256 sobre los bytes.
 ══════════════════════════════════════════════════════════════ */
 
+import { calcularCompletitudExpediente } from '@/lib/server/completitud-expediente';
 import { randomUUID } from 'node:crypto';
 import { NextResponse } from 'next/server';
 import { getFirebaseAdminDb, getFirebaseAdminStorage } from '@/lib/firebase-admin';
@@ -146,8 +147,17 @@ export async function POST(request: Request, context: RouteContext): Promise<Nex
     });
 
     if (resultado.aportesActualizados) {
+      // La completitud se recalcula EN EL SERVIDOR con cada cambio de aportes y
+      // se guarda junto al expediente. Antes solo existía como etiqueta en una
+      // pantalla: dependía de quién estuviera mirando. No bloquea nada todavía
+      // —eso lo decide el ADR-0033— pero deja de ser una opinión del navegador.
       await expedienteRef.update({
         aportes: resultado.aportesActualizados,
+        completitud: calcularCompletitudExpediente(
+          resultado.aportesActualizados,
+          expediente.contexto ?? {},
+          ahora,
+        ),
         actualizadoEn: ahora.toISOString(),
       });
     } else {
