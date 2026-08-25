@@ -188,24 +188,41 @@ export interface AperturaEnCounter {
  * toda emisión anterior a la apertura — fallar cerrado donde no hay riesgo es
  * tan malo como no fallar donde lo hay.
  */
+export function describirIncoherenciaApertura(
+  serie: SerieConsecutivo,
+  ultimoActual: number,
+  apertura: AperturaEnCounter | undefined,
+): string | null {
+  const abiertoEn = apertura?.abiertoEn;
+  if (typeof abiertoEn !== 'number' || !Number.isInteger(abiertoEn)) return null;
+
+  // Tras abrir en `abiertoEn`, el contador nunca puede estar por debajo de
+  // `abiertoEn - 1`: ese es el valor con el que quedó, y solo sube.
+  const pisoLegitimo = abiertoEn - 1;
+  if (ultimoActual >= pisoLegitimo) return null;
+
+  return (
+    `Contador incoherente en la serie '${serie}': declara que se abrió en ${abiertoEn} ` +
+    `(autorizado por ${apertura?.autorizadoPor ?? 'sin declarar'}${apertura?.fecha ? `, ${apertura.fecha}` : ''}) ` +
+    `pero su valor actual es ${ultimoActual}, por debajo del piso ${pisoLegitimo}. ` +
+    `Alguien lo movió hacia atrás fuera del mecanismo de apertura.`
+  );
+}
+
+/**
+ * Versión que DETIENE. La usa la emisión: si el contador se contradice, no se
+ * emite — seguir desde ahí repetiría números ya entregados.
+ */
 export function verificarCoherenciaConApertura(
   serie: SerieConsecutivo,
   ultimoActual: number,
   apertura: AperturaEnCounter | undefined,
 ): void {
-  const abiertoEn = apertura?.abiertoEn;
-  if (typeof abiertoEn !== 'number' || !Number.isInteger(abiertoEn)) return;
-
-  // Tras abrir en `abiertoEn`, el contador nunca puede estar por debajo de
-  // `abiertoEn - 1`: ese es el valor con el que quedó, y solo sube.
-  const pisoLegitimo = abiertoEn - 1;
-  if (ultimoActual < pisoLegitimo) {
+  const incoherencia = describirIncoherenciaApertura(serie, ultimoActual, apertura);
+  if (incoherencia) {
     throw new Error(
-      `Contador incoherente en la serie '${serie}': declara que se abrió en ${abiertoEn} ` +
-        `(autorizado por ${apertura?.autorizadoPor ?? 'sin declarar'}${apertura?.fecha ? `, ${apertura.fecha}` : ''}) ` +
-        `pero su valor actual es ${ultimoActual}, por debajo del piso ${pisoLegitimo}. ` +
-        `Alguien lo movió hacia atrás fuera del mecanismo de apertura. NO se emite: ` +
-        `seguir desde aquí repetiría números ya entregados. Revise el contador antes de reanudar.`,
+      `${incoherencia} NO se emite: seguir desde aquí repetiría números ya entregados. ` +
+        `Revise el contador antes de reanudar.`,
     );
   }
 }

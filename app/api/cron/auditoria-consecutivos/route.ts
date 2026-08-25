@@ -1,3 +1,7 @@
+import {
+  describirIncoherenciaApertura,
+  type SerieConsecutivo,
+} from '@/lib/server/consecutivo-legal';
 import { NextResponse }          from 'next/server';
 import { FieldPath } from 'firebase-admin/firestore';
 import { getFirebaseAdminDb }    from '@/lib/firebase-admin';
@@ -203,16 +207,12 @@ export async function GET(request: Request): Promise<NextResponse> {
          nada al emitir —solo salta números— y solo se nota mirando.
 
          Aquí se mira, y SOLO se mira: este cron es de lectura absoluta. */
-      const aperturaReg = counterSnap.data()?.apertura as
-        { abiertoEn?: number; autorizadoPor?: string; fecha?: string } | undefined;
-      const abiertoEn = aperturaReg?.abiertoEn;
-      if (typeof abiertoEn === 'number' && Number.isInteger(abiertoEn) && ultimo < abiertoEn - 1) {
-        contadoresIncoherentes.push(
-          `${serie}: declara apertura en ${abiertoEn} (autorizó ${aperturaReg?.autorizadoPor ?? 'sin declarar'}` +
-          `${aperturaReg?.fecha ? `, ${aperturaReg.fecha}` : ''}) pero su valor es ${ultimo}. ` +
-          `Alguien lo movió hacia atrás fuera del mecanismo de apertura.`,
-        );
-      }
+      const incoherencia = describirIncoherenciaApertura(
+        serie as SerieConsecutivo,
+        ultimo,
+        counterSnap.data()?.apertura,
+      );
+      if (incoherencia) contadoresIncoherentes.push(incoherencia);
 
       // Solo lectura: consecutivos realmente persistidos del año en curso.
       // Mismo criterio que el detector: cuenta TODO documento del año,
@@ -261,7 +261,19 @@ export async function GET(request: Request): Promise<NextResponse> {
       });
     }
 
-    const totalHallazgos = totalHuecos + totalDuplicados + (expedientesCorrupto ? 1 : 0);
+    /* Un contador incoherente CUENTA como hallazgo. Si no contara, una serie
+       saboteada sin huecos ni duplicados daría cero y el cron guardaría
+       silencio — que es justo lo que significa "todo bien" en este cron. */
+    for (const mensaje of contadoresIncoherentes) {
+      logError({
+        radicadoId: 'n/a',
+        modulo: 'cron/auditoria-consecutivos/coherencia-apertura',
+        error: new Error(mensaje),
+      });
+    }
+
+    const totalHallazgos =
+      totalHuecos + totalDuplicados + contadoresIncoherentes.length + (expedientesCorrupto ? 1 : 0);
 
     registrarEventoNegocio({
       operacion:  'auditoria_consecutivos',
@@ -277,6 +289,7 @@ export async function GET(request: Request): Promise<NextResponse> {
       // Silencio = todo bien: sin correo.
       return NextResponse.json({
         ok: true, anio, timestamp: timestampIso, hallazgos: 0, series,
+        contadoresIncoherentes,
       });
     }
 
@@ -306,6 +319,7 @@ export async function GET(request: Request): Promise<NextResponse> {
         const asunto = buildAuditoriaConsecutivosSubject(totalHallazgos, anio);
         const html = buildAuditoriaConsecutivosHtml({
           anio, timestamp: timestampIso, series: seriesArr, totalHuecos, totalDuplicados,
+          contadoresIncoherentes,
         });
 
         await enviarEmail({ to: destino, subject: asunto, html });
@@ -317,6 +331,7 @@ export async function GET(request: Request): Promise<NextResponse> {
 
     return NextResponse.json({
       ok: true, anio, timestamp: timestampIso, hallazgos: totalHallazgos, correoEnviado, series,
+      contadoresIncoherentes,
     });
 
   } catch (err) {
