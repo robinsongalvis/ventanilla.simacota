@@ -73,3 +73,59 @@ Restauración: ver `docs/RUNBOOK_RESTAURACION.md`.
 30 días (regla `lifecycle-retention.json`). Ajustable si el municipio define
 otra ventana legal. Los objetos con más de 30 días se borran automáticamente;
 no requiere intervención manual.
+
+---
+
+## Adjuntos (Storage) — PT-4
+
+El export de Firestore **no incluye Storage**. Los adjuntos del ciudadano, las
+respuestas firmadas, las copias selladas y los oficios de salida se respaldan
+aparte, con `.github/workflows/backup-storage.yml`.
+
+### Lo que el propietario provisiona una vez
+
+**1. Versionado y borrado suave en el bucket de ORIGEN.** Cubre el escenario
+más probable —borrado accidental o sobrescritura— sin depender de que el
+respaldo haya corrido:
+
+```bash
+gcloud storage buckets update gs://ventanilla-unica-f31b1.firebasestorage.app \
+  --versioning --soft-delete-duration=30d
+```
+
+**2. El bucket de respaldo, con versionado y SIN caducidad.** Distinto del de
+Firestore a propósito: aquel borra a los 30 días, correcto para un export de
+base de datos e inaceptable para documentos con retención legal de una década.
+
+```bash
+gcloud storage buckets create gs://ventanilla-simacota-adjuntos-respaldo \
+  --location=us-central1 --uniform-bucket-level-access
+gcloud storage buckets update gs://ventanilla-simacota-adjuntos-respaldo --versioning
+```
+
+**3. Permisos de la service account de respaldos** — leer el origen, escribir
+el destino:
+
+```bash
+SA="$(gcloud iam service-accounts list --format='value(email)' --filter='displayName~backup')"
+gcloud storage buckets add-iam-policy-binding gs://ventanilla-unica-f31b1.firebasestorage.app \
+  --member="serviceAccount:${SA}" --role=roles/storage.objectViewer
+gcloud storage buckets add-iam-policy-binding gs://ventanilla-simacota-adjuntos-respaldo \
+  --member="serviceAccount:${SA}" --role=roles/storage.objectAdmin
+```
+
+### Comprobar que el respaldo sirve para restaurar
+
+Contar objetos no basta: mil archivos copiados no dicen nada si el que falta es
+el oficio firmado de un expediente. La verificación es de **conciliación** —
+Firestore guarda la ruta de cada archivo, así que sirve de oráculo:
+
+```bash
+FIREBASE_SERVICE_ACCOUNT="$(grep '^FIREBASE_SERVICE_ACCOUNT=' .env.local | cut -d= -f2-)" \
+  node scripts/backups/verificar-respaldo-adjuntos.mjs \
+    --proyecto ventanilla-unica-f31b1 --respaldo ventanilla-simacota-adjuntos-respaldo
+```
+
+Responde una sola pregunta: **¿todo archivo que un expediente referencia existe
+en el respaldo?** Si falta alguno, los enumera. Si no puede leer el respaldo,
+falla — no reporta verde.
