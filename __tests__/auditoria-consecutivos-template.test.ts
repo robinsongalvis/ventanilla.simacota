@@ -154,7 +154,23 @@ describe('vercel.json — cron de auditoría de consecutivos', () => {
     expect(desistimiento?.schedule).toBe('0 6 * * *');
   });
 
-  it('hay exactamente 3 crons configurados', () => {
-    expect(cfg.crons).toHaveLength(3);
+  /* Antes esto era `toHaveLength(3)`: un número suelto que solo decía CUÁNTOS
+     y no CUÁLES. Al añadir el vigía de licencias falló sin explicar nada —
+     había que ir a git a averiguar si el cron nuevo era legítimo o un descuido.
+     Enumerar el conjunto exacto conserva la protección (nadie añade ni quita un
+     trabajo programado sin que esta prueba lo cante) y además dice, en el propio
+     mensaje de fallo, qué apareció o qué desapareció. */
+  it('los trabajos programados son EXACTAMENTE estos cuatro', () => {
+    expect(cfg.crons.map((c) => c.path).sort()).toEqual([
+      '/api/cron/alertas-vencimiento',
+      '/api/cron/auditoria-consecutivos',
+      '/api/cron/desistimiento-tacito',
+      '/api/cron/vencimientos-licencias',
+    ]);
+  });
+
+  it('el vigía de licencias corre en días hábiles, antes de la jornada', () => {
+    const vigia = cfg.crons.find((c) => c.path === '/api/cron/vencimientos-licencias');
+    expect(vigia?.schedule).toBe('30 12 * * 1-5'); // 7:30 de Bogotá, lunes a viernes
   });
 });
