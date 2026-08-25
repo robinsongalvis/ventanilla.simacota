@@ -282,9 +282,12 @@ son justo los que hoy no se pueden representar sin mentir sobre su completitud.
 
 **Se agrega, sin cuenta y sin contraseña:**
 
-- ⏸️ **Aviso por correo en cuatro hitos** — apertura del expediente, radicación (con número y
-  fecha de arranque del plazo), acta de observaciones, y resolución. **APLAZADO** por decisión del
-  propietario: por ahora no se maneja correo, y WhatsApp/SMS quedan para más adelante.
+- ✅ **Aviso por correo en cuatro hitos** — apertura del expediente, radicación (con número y
+  fecha de arranque del plazo), acta de observaciones, y resolución. **VA.** Exige configurar
+  SMTP, que hoy no lo está.
+- ⏸️ **WhatsApp y SMS — APLAZADOS**, por el costo recurrente. Se revisan más adelante con
+  presupuesto delante. La diferencia con el correo no es técnica sino económica: el correo
+  institucional ya está pagado y autenticado; la mensajería cobra por mensaje, para siempre.
 - **Consulta pública extendida a licencias** — el ciudadano entra con su radicado y ve estado,
   fecha de radicación, días transcurridos y qué sigue. Sin datos de terceros ni documentos
   internos.
@@ -292,12 +295,28 @@ son justo los que hoy no se pueden representar sin mentir sobre su completitud.
   los canales estén aplazados: capturarlos no cuesta nada hoy y no tenerlos obliga mañana a
   perseguir uno por uno a los ciudadanos ya atendidos.
 
-⚠️ **Consecuencia de aplazar los canales, para que no sorprenda.** Sin correo ni mensajería, el
-ciudadano solo se entera de dos maneras: **la constancia impresa que se lleva del mostrador**, y
-**volver a consultar por su cuenta**. Eso convierte el papel del mostrador en el canal principal —
-no en un respaldo— y hace que la consulta pública deje de ser una comodidad y pase a ser el único
-medio de seguimiento a distancia. Conviene que Planeación lo sepa al decidir el orden, porque el
-plazo de los 45 días corre igual aunque nadie pueda avisar de nada.
+⚠️ **Consecuencia de aplazar la mensajería.** Buena parte de la población de Simacota no maneja
+correo. Para esas personas, aplazar WhatsApp y SMS significa que los dos canales que les quedan son
+**la constancia impresa que se llevan del mostrador** y **volver a preguntar**. El plazo de los 45
+días corre igual aunque no se les pueda avisar de nada — por eso la constancia impresa (§4.8) no es
+un respaldo del correo sino una pieza con función propia, y por eso la consulta pública se mantiene.
+
+### 4.8 La constancia impresa — pieza con nombre propio
+
+Aunque el correo entre, la constancia sigue siendo **lo único que el ciudadano se lleva en la
+mano**, y para quien no usa correo es el único registro de lo que pasó. No es un comprobante de
+cortesía: es el documento con el que vuelve.
+
+Debe decirle, sin que tenga que preguntar:
+
+- **qué entregó** y **qué le falta** — el escenario de entrega parcial es el normal (§4.3);
+- **su número** y **desde cuándo corre el plazo** — que con entrega parcial NO es el día en que
+  abrió el expediente;
+- **cuándo vence**, y **cómo consultar** su estado sin cuenta ni contraseña.
+
+La lista de faltantes es lo que la convierte en útil: alguien que llega con 9 de 19 documentos se
+va sabiendo exactamente cuáles son los 10 que le faltan, en vez de con la instrucción de «traer lo
+que falta».
 
 ⚖️ **Distinción que gobierna todos los textos.** El aviso por correo o mensaje es **servicio al
 ciudadano**, no notificación jurídica. El acto administrativo se notifica como manda la ley
