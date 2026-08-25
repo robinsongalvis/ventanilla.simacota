@@ -223,6 +223,14 @@ service cloud.firestore {
     // Doc id = número de expediente formateado. Escrita SOLO por el servidor
     // (Admin SDK, tx.create en lib/server/emitir-numero-expediente.ts);
     // ningún cliente lee ni escribe.
+    /* Reserva de unicidad de las series de radicación (radicados, salidas,
+       planillas). Mismo régimen que unicidad_expedientes: Admin SDK y nadie
+       más. Un cliente que pudiera crear aquí podría "quemar" un número que
+       nunca se usa, o peor, impedir que la emisión legítima lo reserve. */
+    match /unicidad_radicados/{id} { allow read, write: if false; }
+    match /unicidad_salidas/{id}   { allow read, write: if false; }
+    match /unicidad_planillas/{id} { allow read, write: if false; }
+
     match /unicidad_expedientes/{id} {
       allow read, write: if false;
     }

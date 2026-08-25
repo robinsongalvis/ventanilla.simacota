@@ -230,6 +230,33 @@ export function confirmarConsecutivosLegales(
 
   const marca = { anio: fecha.getFullYear(), actualizadoEn: fecha.toISOString() };
   for (const p of pendientes) {
+    /* RESERVA DE UNICIDAD — hace IMPOSIBLE el duplicado, no solo detectable.
+
+       El guard D9 de arriba impide que el contador RETROCEDA al emitir, pero no
+       cubre el caso peor: que alguien lo mueva hacia atrás POR FUERA (a mano,
+       con un script, restaurando un respaldo). Entonces la siguiente emisión lee
+       27, propone 28, y D9 lo aprueba —28 es mayor que 27— sin ver que el
+       radicado 28 YA EXISTE. El resultado no es un hueco: son duplicados
+       silenciosos, uno por emisión, hasta que alguien los note.
+       Dos ciudadanos con el mismo número de radicado son dos expedientes que se
+       pisan, y eso no se corrige con un acta.
+
+       `tx.create` falla si el documento ya existe, sin necesitar una lectura
+       previa: la semántica de `create` en una transacción hace esa comprobación
+       al confirmar. Si falla, TODA la transacción del caller aborta — no queda
+       ni el contador avanzado ni el documento de negocio.
+
+       Va aquí, en el punto ÚNICO por el que pasan las cinco rutas de emisión
+       (radicación pública e interna, registro exprés, salidas y planillas), y
+       cubre las CUATRO series por construcción: nadie puede añadir una serie
+       nueva y olvidarse de reservarla. */
+    const unicidadRef = p.ref.firestore.doc(`unicidad_${p.serie}/${p.documentoId}`);
+    tx.create(unicidadRef, {
+      serie: p.serie,
+      consecutivo: p.consecutivo,
+      // Instante REAL de la reserva (auditoría), no la fecha ancla del documento.
+      creadoEn: new Date().toISOString(),
+    });
     tx.set(p.ref, { ultimo: p.consecutivo, ...marca }, { merge: true });
   }
 }
