@@ -182,6 +182,33 @@ reducirlo cuando ya se acostumbraron, no.
 Implementado en `app/api/cron/vencimientos-licencias` con defecto conservador de
 3 días hábiles, pendiente del valor definitivo (§7).
 
+### 4.6 La regla de fondo, enunciada una vez
+
+Las decisiones de §4.5, el diseño del vigía y buena parte de lo corregido en este
+módulo son **la misma regla aplicada en formas distintas**. Conviene dejarla
+escrita una vez, en lugar de redescubrirla cada vez:
+
+> **El instrumento que vigila el silencio no puede filtrar por el campo que falta
+> justo en los casos que más importan.**
+
+Las tres formas en que apareció:
+
+1. **No colapsar categorías.** El vigía distingue término corriendo, suspendido y
+   sin anclar. Reducirlo a «tiene fecha / no tiene fecha» habría vuelto invisible
+   el tercer caso — que es el que este ADR crea.
+2. **No confundir «no hay» con «no miré».** El informe cuenta las cuatro
+   situaciones siempre, incluso en cero, y falla en rojo si no pudo completar la
+   revisión. Un cero indistinguible de una ausencia de revisión es peor que no
+   informar.
+3. **No excluir lo que no encaja en el filtro.** La cota de lectura del vigía es
+   numérica y no por rango de fecha de vencimiento — acotar por esa fecha
+   excluiría precisamente al expediente que no la tiene, que es el que hay que
+   detectar.
+
+El defecto que este ADR corrige es de la misma familia: un expediente que nace
+afirmando completitud porque el sistema no tenía cómo representar «todavía no
+verificado». **Lo que no se puede nombrar, no se puede vigilar.**
+
 ## 6. Consecuencias
 
 **A favor:** el estado deja de afirmar lo que no verificó; el término arranca cuando debe; el
