@@ -282,12 +282,22 @@ son justo los que hoy no se pueden representar sin mentir sobre su completitud.
 
 **Se agrega, sin cuenta y sin contraseña:**
 
-- **Aviso por correo en cuatro hitos** — apertura del expediente, radicación (con número y fecha
-  de arranque del plazo), acta de observaciones, y resolución.
+- ⏸️ **Aviso por correo en cuatro hitos** — apertura del expediente, radicación (con número y
+  fecha de arranque del plazo), acta de observaciones, y resolución. **APLAZADO** por decisión del
+  propietario: por ahora no se maneja correo, y WhatsApp/SMS quedan para más adelante.
 - **Consulta pública extendida a licencias** — el ciudadano entra con su radicado y ve estado,
   fecha de radicación, días transcurridos y qué sigue. Sin datos de terceros ni documentos
   internos.
-- **Correo y celular se capturan en el mostrador**, al abrir el expediente.
+- **Correo y celular se capturan en el mostrador**, al abrir el expediente. Se mantiene aunque
+  los canales estén aplazados: capturarlos no cuesta nada hoy y no tenerlos obliga mañana a
+  perseguir uno por uno a los ciudadanos ya atendidos.
+
+⚠️ **Consecuencia de aplazar los canales, para que no sorprenda.** Sin correo ni mensajería, el
+ciudadano solo se entera de dos maneras: **la constancia impresa que se lleva del mostrador**, y
+**volver a consultar por su cuenta**. Eso convierte el papel del mostrador en el canal principal —
+no en un respaldo— y hace que la consulta pública deje de ser una comodidad y pase a ser el único
+medio de seguimiento a distancia. Conviene que Planeación lo sepa al decidir el orden, porque el
+plazo de los 45 días corre igual aunque nadie pueda avisar de nada.
 
 ⚖️ **Distinción que gobierna todos los textos.** El aviso por correo o mensaje es **servicio al
 ciudadano**, no notificación jurídica. El acto administrativo se notifica como manda la ley
