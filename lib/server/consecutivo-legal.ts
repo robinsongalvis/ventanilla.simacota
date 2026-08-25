@@ -153,6 +153,55 @@ const emitidosPorTx = new WeakMap<Transaction, WeakSet<ConsecutivoPendiente[]>>(
  * formateado. No escribe nada. Debe invocarse antes de cualquier `tx.set` del
  * caller (regla lecturas-antes-de-escrituras del Admin SDK).
  */
+/** Lo que el acto de apertura deja escrito en el contador (ver lib/server/apertura-series.ts). */
+export interface AperturaEnCounter {
+  veniaDe?: number;
+  abiertoEn?: number;
+  fecha?: string;
+  autorizadoPor?: string;
+}
+
+/**
+ * ¿El contador cuadra con su propia historia?
+ *
+ * QUÉ CIERRA, Y POR QUÉ NO BASTABA LA RESERVA. La reserva de unicidad hace
+ * IMPOSIBLE el duplicado — pero no explica por qué apareció, y falla en el
+ * último paso con un `ALREADY_EXISTS` que no dice nada a quien lo lee. Esta
+ * comprobación detecta la CAUSA y detiene la emisión antes de intentarla.
+ *
+ * EL CASO QUE DETECTA. Un contador movido hacia atrás por fuera del sistema —a
+ * mano, con un script, restaurando un respaldo de ayer—. El guard D9 no lo ve:
+ * lee 27, propone 28, y 28 > 27 es un avance perfectamente válido. Pero si el
+ * contador declara que se abrió en 1600, estar en 27 es imposible sin que
+ * alguien lo haya movido, y cada emisión desde ahí reintenta números ya usados.
+ *
+ * Solo actúa si el contador TIENE registro de apertura. Una serie que nunca se
+ * abrió no tiene historia contra la cual contradecirse, y exigirla bloquearía
+ * toda emisión anterior a la apertura — fallar cerrado donde no hay riesgo es
+ * tan malo como no fallar donde lo hay.
+ */
+export function verificarCoherenciaConApertura(
+  serie: SerieConsecutivo,
+  ultimoActual: number,
+  apertura: AperturaEnCounter | undefined,
+): void {
+  const abiertoEn = apertura?.abiertoEn;
+  if (typeof abiertoEn !== 'number' || !Number.isInteger(abiertoEn)) return;
+
+  // Tras abrir en `abiertoEn`, el contador nunca puede estar por debajo de
+  // `abiertoEn - 1`: ese es el valor con el que quedó, y solo sube.
+  const pisoLegitimo = abiertoEn - 1;
+  if (ultimoActual < pisoLegitimo) {
+    throw new Error(
+      `Contador incoherente en la serie '${serie}': declara que se abrió en ${abiertoEn} ` +
+        `(autorizado por ${apertura?.autorizadoPor ?? 'sin declarar'}${apertura?.fecha ? `, ${apertura.fecha}` : ''}) ` +
+        `pero su valor actual es ${ultimoActual}, por debajo del piso ${pisoLegitimo}. ` +
+        `Alguien lo movió hacia atrás fuera del mecanismo de apertura. NO se emite: ` +
+        `seguir desde aquí repetiría números ya entregados. Revise el contador antes de reanudar.`,
+    );
+  }
+}
+
 export async function leerConsecutivosLegales(
   tx: Transaction,
   db: Firestore,
@@ -170,6 +219,8 @@ export async function leerConsecutivosLegales(
       throw new SerieNoAbiertaError(s.serie, anio);
     }
     const ultimoActual = Number(snaps[i].data()?.ultimo ?? 0);
+    // Coherencia con la propia historia del contador — ANTES de calcular nada.
+    verificarCoherenciaConApertura(s.serie, ultimoActual, snaps[i].data()?.apertura);
     const consecutivo = ultimoActual + 1;
     return {
       serie: s.serie,
