@@ -102,6 +102,17 @@ export interface SolicitudSerie {
    * Convierte un duplicado silencioso en un fallo ruidoso — fail-closed.
    */
   exigeAperturaExplicita?: boolean;
+  /**
+   * Datos adicionales que el caller quiere ver EN la reserva de unicidad.
+   *
+   * La reserva es un documento con nombre —el número emitido— y ese nombre ya
+   * hace el trabajo. Pero algunas series necesitan además un puntero inverso:
+   * `expedientes` guarda `expedienteId` y `tenantId` para poder ir del número
+   * al expediente sin barrer la colección. Se aportan aquí, en la MISMA
+   * reserva, en vez de crear una segunda: dos `create` sobre el mismo
+   * documento dentro de una transacción la hacen fallar entera.
+   */
+  datosUnicidad?: Record<string, unknown>;
 }
 
 /**
@@ -132,6 +143,16 @@ export interface ConsecutivoPendiente {
   consecutivo: number;
   /** Id de negocio ya formateado a partir del consecutivo leído. */
   documentoId: string;
+  /**
+   * Dónde se reserva la unicidad de `documentoId`. Se construye en la fase de
+   * LECTURA con el mismo `db` que recibió esta función, y no navegando desde
+   * `ref` hacia atrás: el retropuntero `ref.firestore` es una superficie del
+   * SDK que no todo doble de prueba implementa, y de la que este archivo no
+   * necesita depender teniendo el `db` en la mano.
+   */
+  refUnicidad: DocumentReference;
+  /** Campos extra que el caller aporta a la reserva (ver `SolicitudSerie.datosUnicidad`). */
+  datosUnicidad?: Record<string, unknown>;
   /** Valor de `counters/{serie}-{año}.ultimo` leído (0 si el documento no existía). Alimenta el guard D9 en `confirmarConsecutivosLegales`. */
   ultimoActual: number;
   /** Origen declarado por el caller (`SolicitudSerie.origen`, default `'REAL'`). Alimenta el guard D9 en `confirmarConsecutivosLegales`. */
@@ -153,6 +174,72 @@ const emitidosPorTx = new WeakMap<Transaction, WeakSet<ConsecutivoPendiente[]>>(
  * formateado. No escribe nada. Debe invocarse antes de cualquier `tx.set` del
  * caller (regla lecturas-antes-de-escrituras del Admin SDK).
  */
+/** Lo que el acto de apertura deja escrito en el contador (ver lib/server/apertura-series.ts). */
+export interface AperturaEnCounter {
+  veniaDe?: number;
+  abiertoEn?: number;
+  fecha?: string;
+  autorizadoPor?: string;
+}
+
+/**
+ * ¿El contador cuadra con su propia historia?
+ *
+ * QUÉ CIERRA, Y POR QUÉ NO BASTABA LA RESERVA. La reserva de unicidad hace
+ * IMPOSIBLE el duplicado — pero no explica por qué apareció, y falla en el
+ * último paso con un `ALREADY_EXISTS` que no dice nada a quien lo lee. Esta
+ * comprobación detecta la CAUSA y detiene la emisión antes de intentarla.
+ *
+ * EL CASO QUE DETECTA. Un contador movido hacia atrás por fuera del sistema —a
+ * mano, con un script, restaurando un respaldo de ayer—. El guard D9 no lo ve:
+ * lee 27, propone 28, y 28 > 27 es un avance perfectamente válido. Pero si el
+ * contador declara que se abrió en 1600, estar en 27 es imposible sin que
+ * alguien lo haya movido, y cada emisión desde ahí reintenta números ya usados.
+ *
+ * Solo actúa si el contador TIENE registro de apertura. Una serie que nunca se
+ * abrió no tiene historia contra la cual contradecirse, y exigirla bloquearía
+ * toda emisión anterior a la apertura — fallar cerrado donde no hay riesgo es
+ * tan malo como no fallar donde lo hay.
+ */
+export function describirIncoherenciaApertura(
+  serie: SerieConsecutivo,
+  ultimoActual: number,
+  apertura: AperturaEnCounter | undefined,
+): string | null {
+  const abiertoEn = apertura?.abiertoEn;
+  if (typeof abiertoEn !== 'number' || !Number.isInteger(abiertoEn)) return null;
+
+  // Tras abrir en `abiertoEn`, el contador nunca puede estar por debajo de
+  // `abiertoEn - 1`: ese es el valor con el que quedó, y solo sube.
+  const pisoLegitimo = abiertoEn - 1;
+  if (ultimoActual >= pisoLegitimo) return null;
+
+  return (
+    `Contador incoherente en la serie '${serie}': declara que se abrió en ${abiertoEn} ` +
+    `(autorizado por ${apertura?.autorizadoPor ?? 'sin declarar'}${apertura?.fecha ? `, ${apertura.fecha}` : ''}) ` +
+    `pero su valor actual es ${ultimoActual}, por debajo del piso ${pisoLegitimo}. ` +
+    `Alguien lo movió hacia atrás fuera del mecanismo de apertura.`
+  );
+}
+
+/**
+ * Versión que DETIENE. La usa la emisión: si el contador se contradice, no se
+ * emite — seguir desde ahí repetiría números ya entregados.
+ */
+export function verificarCoherenciaConApertura(
+  serie: SerieConsecutivo,
+  ultimoActual: number,
+  apertura: AperturaEnCounter | undefined,
+): void {
+  const incoherencia = describirIncoherenciaApertura(serie, ultimoActual, apertura);
+  if (incoherencia) {
+    throw new Error(
+      `${incoherencia} NO se emite: seguir desde aquí repetiría números ya entregados. ` +
+        `Revise el contador antes de reanudar.`,
+    );
+  }
+}
+
 export async function leerConsecutivosLegales(
   tx: Transaction,
   db: Firestore,
@@ -170,12 +257,16 @@ export async function leerConsecutivosLegales(
       throw new SerieNoAbiertaError(s.serie, anio);
     }
     const ultimoActual = Number(snaps[i].data()?.ultimo ?? 0);
+    // Coherencia con la propia historia del contador — ANTES de calcular nada.
+    verificarCoherenciaConApertura(s.serie, ultimoActual, snaps[i].data()?.apertura);
     const consecutivo = ultimoActual + 1;
     return {
       serie: s.serie,
       ref: refs[i],
       consecutivo,
       documentoId: s.formatear(consecutivo, fecha),
+      refUnicidad: db.doc(`unicidad_${s.serie}/${s.formatear(consecutivo, fecha)}`),
+      datosUnicidad: s.datosUnicidad,
       ultimoActual,
       origen: s.origen ?? 'REAL',
     };
@@ -230,6 +321,33 @@ export function confirmarConsecutivosLegales(
 
   const marca = { anio: fecha.getFullYear(), actualizadoEn: fecha.toISOString() };
   for (const p of pendientes) {
+    /* RESERVA DE UNICIDAD — hace IMPOSIBLE el duplicado, no solo detectable.
+
+       El guard D9 de arriba impide que el contador RETROCEDA al emitir, pero no
+       cubre el caso peor: que alguien lo mueva hacia atrás POR FUERA (a mano,
+       con un script, restaurando un respaldo). Entonces la siguiente emisión lee
+       27, propone 28, y D9 lo aprueba —28 es mayor que 27— sin ver que el
+       radicado 28 YA EXISTE. El resultado no es un hueco: son duplicados
+       silenciosos, uno por emisión, hasta que alguien los note.
+       Dos ciudadanos con el mismo número de radicado son dos expedientes que se
+       pisan, y eso no se corrige con un acta.
+
+       `tx.create` falla si el documento ya existe, sin necesitar una lectura
+       previa: la semántica de `create` en una transacción hace esa comprobación
+       al confirmar. Si falla, TODA la transacción del caller aborta — no queda
+       ni el contador avanzado ni el documento de negocio.
+
+       Va aquí, en el punto ÚNICO por el que pasan las cinco rutas de emisión
+       (radicación pública e interna, registro exprés, salidas y planillas), y
+       cubre las CUATRO series por construcción: nadie puede añadir una serie
+       nueva y olvidarse de reservarla. */
+    tx.create(p.refUnicidad, {
+      serie: p.serie,
+      consecutivo: p.consecutivo,
+      // Instante REAL de la reserva (auditoría), no la fecha ancla del documento.
+      creadoEn: new Date().toISOString(),
+      ...p.datosUnicidad,
+    });
     tx.set(p.ref, { ultimo: p.consecutivo, ...marca }, { merge: true });
   }
 }

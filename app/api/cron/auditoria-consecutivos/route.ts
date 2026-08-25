@@ -1,3 +1,7 @@
+import {
+  describirIncoherenciaApertura,
+  type SerieConsecutivo,
+} from '@/lib/server/consecutivo-legal';
 import { NextResponse }          from 'next/server';
 import { FieldPath } from 'firebase-admin/firestore';
 import { getFirebaseAdminDb }    from '@/lib/firebase-admin';
@@ -184,11 +188,31 @@ export async function GET(request: Request): Promise<NextResponse> {
     let totalHuecos = 0;
     let totalDuplicados = 0;
     let totalDocumentosLeidos = 0;
+    /* Contadores que se contradicen a sí mismos. Se reportan aparte de huecos y
+       duplicados porque son de otra naturaleza: un hueco es un síntoma, esto es
+       la CAUSA — y la causa hay que arreglarla antes de que produzca síntomas. */
+    const contadoresIncoherentes: string[] = [];
 
     for (const [serie, coleccion] of Object.entries(COLECCION_POR_SERIE)) {
       // Solo lectura: contador anual de la serie (NUNCA se escribe aquí).
       const counterSnap = await db.doc(`counters/${serie}-${anio}`).get();
       const ultimo = Number(counterSnap.data()?.ultimo ?? 0);
+
+      /* ── Vigilancia: ¿el contador cuadra con su propia historia de apertura?
+         Tercera capa, y la que ve lo que las otras dos no pueden.
+
+         La reserva de unicidad IMPIDE el duplicado. La coherencia en la
+         emisión DETIENE una emisión sobre un contador movido hacia atrás.
+         Ninguna de las dos ve un contador movido hacia ADELANTE: eso no rompe
+         nada al emitir —solo salta números— y solo se nota mirando.
+
+         Aquí se mira, y SOLO se mira: este cron es de lectura absoluta. */
+      const incoherencia = describirIncoherenciaApertura(
+        serie as SerieConsecutivo,
+        ultimo,
+        counterSnap.data()?.apertura,
+      );
+      if (incoherencia) contadoresIncoherentes.push(incoherencia);
 
       // Solo lectura: consecutivos realmente persistidos del año en curso.
       // Mismo criterio que el detector: cuenta TODO documento del año,
@@ -237,7 +261,19 @@ export async function GET(request: Request): Promise<NextResponse> {
       });
     }
 
-    const totalHallazgos = totalHuecos + totalDuplicados + (expedientesCorrupto ? 1 : 0);
+    /* Un contador incoherente CUENTA como hallazgo. Si no contara, una serie
+       saboteada sin huecos ni duplicados daría cero y el cron guardaría
+       silencio — que es justo lo que significa "todo bien" en este cron. */
+    for (const mensaje of contadoresIncoherentes) {
+      logError({
+        radicadoId: 'n/a',
+        modulo: 'cron/auditoria-consecutivos/coherencia-apertura',
+        error: new Error(mensaje),
+      });
+    }
+
+    const totalHallazgos =
+      totalHuecos + totalDuplicados + contadoresIncoherentes.length + (expedientesCorrupto ? 1 : 0);
 
     registrarEventoNegocio({
       operacion:  'auditoria_consecutivos',
@@ -253,6 +289,7 @@ export async function GET(request: Request): Promise<NextResponse> {
       // Silencio = todo bien: sin correo.
       return NextResponse.json({
         ok: true, anio, timestamp: timestampIso, hallazgos: 0, series,
+        contadoresIncoherentes,
       });
     }
 
@@ -282,6 +319,7 @@ export async function GET(request: Request): Promise<NextResponse> {
         const asunto = buildAuditoriaConsecutivosSubject(totalHallazgos, anio);
         const html = buildAuditoriaConsecutivosHtml({
           anio, timestamp: timestampIso, series: seriesArr, totalHuecos, totalDuplicados,
+          contadoresIncoherentes,
         });
 
         await enviarEmail({ to: destino, subject: asunto, html });
@@ -293,6 +331,7 @@ export async function GET(request: Request): Promise<NextResponse> {
 
     return NextResponse.json({
       ok: true, anio, timestamp: timestampIso, hallazgos: totalHallazgos, correoEnviado, series,
+      contadoresIncoherentes,
     });
 
   } catch (err) {
