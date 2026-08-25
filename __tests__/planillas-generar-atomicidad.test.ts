@@ -50,6 +50,7 @@ const fakeDb = {
   }),
   runTransaction: async (cb: (tx: unknown) => Promise<unknown>) => {
     const buffer: { path: string; data: { ultimo?: number } }[] = [];
+    const reservados = new Set<string>();
     const tx = {
       get: async (ref: { path: string }) => ({
         data: () => {
@@ -57,6 +58,16 @@ const fakeDb = {
           return v === undefined ? undefined : { ultimo: v };
         },
       }),
+      /* Reserva de unicidad del número emitido. Con semántica real: falla si
+         el documento ya existe. Sin ella, este doble no representaba la
+         transacción que corre de verdad y los casos de fallo pasaban por
+         "tx.create no es una función" en vez de por el fallo inyectado. */
+      create: (ref: { path: string }, data: { ultimo?: number }) => {
+        if (falla(ref.path)) throw new Error('fallo al reservar el número (en tx)');
+        if (reservados.has(ref.path)) throw new Error(`ALREADY_EXISTS: ${ref.path}`);
+        reservados.add(ref.path);
+        buffer.push({ path: ref.path, data });
+      },
       set: (ref: { path: string }, data: { ultimo?: number }) => {
         if (falla(ref.path)) throw new Error('fallo al persistir planilla (en tx)');
         buffer.push({ path: ref.path, data });
