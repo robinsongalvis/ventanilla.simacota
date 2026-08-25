@@ -53,9 +53,42 @@ const ESCALONES = [
   { hasta: 15, nivel: 'AVISO'    as const },
 ];
 
-/** Días hábiles que la Administración puede tardar en verificar completitud
- *  antes de que el expediente sin anclar se convierta en un hallazgo. */
-const EDAD_MAXIMA_SIN_ANCLAR_HABILES = 5;
+/* ── Edad máxima en estado previo ────────────────────────────────────────
+   NO es una constante de código a propósito, y el porqué importa más que el
+   mecanismo.
+
+   Este número no mide solo «cuánto puede tardar la Administración en
+   verificar completitud». Mide el tiempo durante el cual un ciudadano YA
+   entregó su solicitud y TODAVÍA no tiene término corriendo a su favor. Los
+   dos intereses apuntan en direcciones opuestas: mientras más largo, más
+   cómoda la verificación y más tiempo la persona en el limbo.
+
+   Por eso el valor por defecto es el extremo CORTO, no el cómodo: ampliarlo
+   después con evidencia es una conversación fácil; reducirlo cuando ya se
+   acostumbraron, no. Y por eso se lee de configuración: cambiarlo no debe
+   exigir un despliegue, pero sí debe ser un acto deliberado y visible.
+
+   Valor definitivo pendiente de la Secretaría de Planeación (ADR-0033 §7). */
+const EDAD_MAXIMA_SIN_ANCLAR_POR_DEFECTO = 3;
+/** Cota de cordura: un valor de configuración es un dato, y los datos vienen
+ *  mal. Fuera de este rango se ignora y se usa el defecto. */
+const EDAD_MAXIMA_LIMITE = 45;
+
+async function leerEdadMaximaSinAnclar(
+  db: FirebaseFirestore.Firestore,
+): Promise<{ dias: number; origen: 'CONFIGURACION' | 'DEFECTO' }> {
+  try {
+    const snap = await db.doc('configuracion/licencias').get();
+    const crudo = snap.exists ? snap.data()?.edadMaximaSinAnclarHabiles : undefined;
+    if (Number.isInteger(crudo) && crudo >= 1 && crudo <= EDAD_MAXIMA_LIMITE) {
+      return { dias: crudo as number, origen: 'CONFIGURACION' };
+    }
+  } catch {
+    // Un fallo al leer configuración NO puede tumbar la vigilancia del plazo:
+    // se sigue con el defecto, que es el valor conservador.
+  }
+  return { dias: EDAD_MAXIMA_SIN_ANCLAR_POR_DEFECTO, origen: 'DEFECTO' };
+}
 
 /** Techo de lectura (clase BATCH, ADR-0011 2B) — defensa en profundidad. */
 const TECHO_LECTURA = 1000;
@@ -165,6 +198,7 @@ export async function GET(request: Request): Promise<NextResponse> {
       snap.docs.map((d) => d.data() as ExpedienteLicenciaDoc & { isTest?: boolean }),
     );
 
+    const edadMaxima = await leerEdadMaximaSinAnclar(db);
     const filas = vivos.map((e) => clasificarFrenteAlTermino(e as never, ahora));
 
     const corriendo   = filas.filter((f) => f.situacion === 'CORRIENDO');
@@ -174,7 +208,7 @@ export async function GET(request: Request): Promise<NextResponse> {
 
     const alertables = corriendo.filter((f) => f.nivel !== undefined);
     const enEsperaExcesiva = sinAnclar.filter(
-      (f) => (f.diasHabilesEnEspera ?? 0) > EDAD_MAXIMA_SIN_ANCLAR_HABILES,
+      (f) => (f.diasHabilesEnEspera ?? 0) > edadMaxima.dias,
     );
 
     /* El informe cuenta las TRES situaciones siempre, incluso en cero. Un
@@ -185,6 +219,10 @@ export async function GET(request: Request): Promise<NextResponse> {
       ok: true,
       revisadoEn: ahora.toISOString(),
       revisados: filas.length,
+      // Se declara con qué umbral se juzgó y de dónde salió: un informe que no
+      // dice su propio criterio no se puede auditar ni discutir.
+      edadMaximaSinAnclarHabiles: edadMaxima.dias,
+      edadMaximaOrigen: edadMaxima.origen,
       situaciones: {
         corriendo: corriendo.length,
         suspendidos: suspendidos.length,
