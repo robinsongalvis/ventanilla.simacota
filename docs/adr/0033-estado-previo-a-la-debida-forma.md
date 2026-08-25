@@ -184,30 +184,74 @@ Implementado en `app/api/cron/vencimientos-licencias` con defecto conservador de
 
 ### 4.6 La regla de fondo, enunciada una vez
 
-Las decisiones de §4.5, el diseño del vigía y buena parte de lo corregido en este
-módulo son **la misma regla aplicada en formas distintas**. Conviene dejarla
-escrita una vez, en lugar de redescubrirla cada vez:
+Buena parte de lo corregido en este módulo es **la misma regla aplicada en
+formas distintas**. Conviene dejarla escrita una vez, en lugar de
+redescubrirla cada vez:
 
-> **El instrumento que vigila el silencio no puede filtrar por el campo que falta
-> justo en los casos que más importan.**
+> **El instrumento que vigila el silencio no puede filtrar por el campo que
+> falta justo en los casos que más importan.**
 
-Las tres formas en que apareció:
+No es una máxima abstracta: se ha materializado tres veces en este módulo, y
+las tres veces el defecto **compilaba, pasaba las pruebas y no se quejaba**.
+Por eso se registran como casos, con nombre y con lo que cada uno habría
+ocultado.
 
-1. **No colapsar categorías.** El vigía distingue término corriendo, suspendido y
-   sin anclar. Reducirlo a «tiene fecha / no tiene fecha» habría vuelto invisible
-   el tercer caso — que es el que este ADR crea.
-2. **No confundir «no hay» con «no miré».** El informe cuenta las cuatro
-   situaciones siempre, incluso en cero, y falla en rojo si no pudo completar la
-   revisión. Un cero indistinguible de una ausencia de revisión es peor que no
-   informar.
-3. **No excluir lo que no encaja en el filtro.** La cota de lectura del vigía es
-   numérica y no por rango de fecha de vencimiento — acotar por esa fecha
-   excluiría precisamente al expediente que no la tiene, que es el que hay que
-   detectar.
+#### Caso 1 — El clasificador de estados del vigía
 
-El defecto que este ADR corrige es de la misma familia: un expediente que nace
+Al escribir el vigía deduje «suspendido» de `terminoResolucionSigueCorriendo`,
+que responde *«¿ya se resolvió?»* y no *«¿está suspendido?»*.
+`CON_ACTA_DE_OBSERVACIONES` no figura entre los estados resueltos, así que
+habría caído en **corriendo**.
+
+*Lo que habría ocultado:* un expediente con el reloj legalmente detenido,
+contado y alertado como si el plazo siguiera corriendo. Y el caso simétrico —
+el expediente **sin anclar**— habría desaparecido por completo si el vigía se
+hubiera escrito con dos categorías («tiene fecha / no tiene fecha») en vez de
+cuatro.
+
+*Cómo se cazó:* al redactar la prueba, antes de ejecutarla. El colapso de
+categorías cometido dentro del código escrito para evitarlo.
+
+#### Caso 2 — La cota de lectura del vigía
+
+La forma natural de acotar la consulta era por rango de fecha de vencimiento,
+que es como lo hace el cron equivalente de PQRSD.
+
+*Lo que habría ocultado:* **exactamente el caso que este ADR crea.** Un
+expediente en estado previo no tiene fecha de vencimiento — es su definición.
+Filtrar por ese campo lo excluye del barrido, y el instrumento construido para
+detectar el silencio se vuelve ciego precisamente ante él.
+
+*Cómo se resolvió:* cota **numérica** (techo de documentos), no por consulta.
+Queda registrado en el presupuesto de rendimiento R11 con esa justificación,
+porque de otro modo parece un descuido.
+
+#### Caso 3 — La expresión que reconoce rutas de adjuntos
+
+El verificador de conciliación del respaldo descubre las rutas de Storage
+recorriendo el JSON de cada documento. La primera expresión usaba `[^\s]+`.
+
+*Lo que habría ocultado:* todo archivo **con espacios en el nombre** — y el
+sanitizador de nombres del sistema los conserva. En la prueba, el que se
+perdía era `respuestas/…/oficio firmado.pdf`: precisamente el oficio de
+respuesta firmado, que es el documento irreemplazable del expediente. La
+verificación habría reportado «conciliado» sin haber mirado el archivo que más
+importa.
+
+*Cómo se cazó:* probando el detector contra las ocho formas reales de ruta
+antes de subirlo. Ocurrió **dentro de la herramienta escrita para aplicar esta
+misma regla**, y unas horas después de enunciarla aquí.
+
+---
+
+El defecto que este ADR corrige es de la misma familia: un expediente nace
 afirmando completitud porque el sistema no tenía cómo representar «todavía no
-verificado». **Lo que no se puede nombrar, no se puede vigilar.**
+verificado». **Lo que no se puede nombrar, no se puede vigilar** — y lo que se
+filtra por el campo ausente, tampoco.
+
+De los tres casos se sigue una prueba práctica, barata de aplicar: **ante todo
+filtro, preguntar qué caso queda fuera por no tener ese campo.** Si la
+respuesta es «el que estoy buscando», el filtro está mal.
 
 ## 6. Consecuencias
 
