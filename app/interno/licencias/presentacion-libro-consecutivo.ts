@@ -52,6 +52,9 @@ export const UMBRAL_POR_VENCER_DIAS_HABILES_LIBRO = 5;
  * operativa validada con Planeación para agrupar los 9 estados jurídicos.
  */
 const ESTADOS_EN_TRAMITE_LIBRO: readonly EstadoJuridicoLicencia[] = [
+  // Ver la nota de BandejaLicenciasClient: sin esta entrada el estado previo
+  // se vuelve invisible en el filtro «en trámite» del libro.
+  'PRESENTADA',
   'RADICADA_EN_DEBIDA_FORMA',
   'EN_REVISION',
   'CON_ACTA_DE_OBSERVACIONES',
