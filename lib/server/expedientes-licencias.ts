@@ -1,4 +1,5 @@
 import type { TenantId } from '@/src/types/radicado';
+import { calcularCompletitudExpediente, type CompletitudExpediente } from '@/lib/server/completitud-expediente';
 import type { Expediente, Actuacion, ContextoEvaluacionRequisito, DefinicionTramite } from '@/lib/motor-expedientes/tipos';
 import { CATALOGO_FIGURAS_NORMATIVAS } from '@/lib/motor-expedientes/catalogo-subtipos-normativo';
 import { puedeTransicionar, type EstadoJuridicoLicencia, type RevisionHistoricaLicencia } from '@/lib/motor-expedientes/estados-licencia';
@@ -72,6 +73,11 @@ export function esErrorExpediente(x: unknown): x is ErrorExpediente {
 export interface ExpedienteLicenciaDoc extends Expediente {
   /** DF-5: estado JURÍDICO del ciclo, convive con `estado` (operativo del panel) sin sustituirlo. */
   estadoJuridico: EstadoJuridicoLicencia;
+  /** Completitud calculada EN EL SERVIDOR y recalculada con cada cambio de aportes.
+   *  Opcional porque los expedientes escritos antes de este cambio no la traen —
+   *  su ausencia significa «nunca se evaluó en servidor», que NO es lo mismo que
+   *  «está completo»: quien la lea debe distinguir los dos casos. */
+  completitud?: CompletitudExpediente;
   /** `true` en TODO expediente creado en esta fase (candado de emisión) — nunca `undefined` en un documento real de esta colección. */
   esPrueba?: boolean;
   /**
@@ -751,6 +757,12 @@ export function planCrearExpedienteDesdeRadicado(
     // `planCrearExpedienteDemo`: nace ya poblado porque el expediente nace
     // CON su actuación de radicación en la MISMA transacción.
     fechaAlertaConservadora: calcularFechaAlertaConservadoraMirror([primeraActuacion]),
+    // Nace con la completitud REAL: aportes vacíos ⇒ incompleto, con todos los
+    // requisitos aplicables listados como faltantes. Que el expediente afirme
+    // `RADICADA_EN_DEBIDA_FORMA` con este bloque diciendo lo contrario es
+    // exactamente la contradicción que el ADR-0033 viene a resolver — y ahora
+    // queda ESCRITA en el documento en vez de solo en una auditoría.
+    completitud: calcularCompletitudExpediente([], input.contexto ?? {}, ahora),
   };
 
   return {
