@@ -84,8 +84,24 @@ radicación del ciudadano o en la verificación del funcionario?
 
 La verificación **declara** un hecho, no lo crea. Si el ciudadano presentó todo el día 10 y la
 funcionaria verifica el 14, el expediente **estuvo en debida forma desde el 10**: los cuatro días
-de demora administrativa no se le pueden descontar. Si presentó incompleto el 10 y subsanó el 20,
-el ancla es el 20.
+de demora administrativa no se le pueden descontar.
+
+**EL CASO COTIDIANO — entrega parcial en mostrador.** Tras el recorte de alcance (§4.7), este deja
+de ser un caso de borde y pasa a ser *el* escenario normal: el ciudadano llega al mostrador con 9
+de los 19 documentos, la funcionaria abre el expediente y guarda esos nueve, y él vuelve días
+después con el resto.
+
+En ese escenario el ancla es **el día en que entrega el último documento obligatorio**, no el día
+en que abrió el expediente. La diferencia no es teórica: si el sistema fecha la radicación el día
+de la entrega parcial, esos días corren **contra la Alcaldía** — se descuentan de los 45 hábiles
+sin que nadie haya podido revisar un expediente que aún estaba incompleto.
+
+⚠️ **Consecuencia sobre lo ya desplegado.** Hoy el expediente ancla en
+`radicado.control.fechaRadicado` (PR #235), que en el mostrador sería el día de la primera visita.
+Esa corrección era la correcta para el mundo *sin* estado previo —donde el expediente solo nacía
+completo— y deja de serlo con entrega parcial. **Es la razón por la que el emisor de números no
+puede cablearse antes de esta decisión:** el número oficial y el arranque del plazo ocurren en la
+misma frontera, y hoy esa frontera está en el sitio equivocado para el caso que va a ser mayoría.
 
 En la práctica: el ancla es la fecha del **último requisito obligatorio aportado**, que el sistema
 ya conoce por los propios aportes. Nunca la fecha del clic de verificación.
@@ -184,30 +200,129 @@ Implementado en `app/api/cron/vencimientos-licencias` con defecto conservador de
 
 ### 4.6 La regla de fondo, enunciada una vez
 
-Las decisiones de §4.5, el diseño del vigía y buena parte de lo corregido en este
-módulo son **la misma regla aplicada en formas distintas**. Conviene dejarla
-escrita una vez, en lugar de redescubrirla cada vez:
+Buena parte de lo corregido en este módulo es **la misma regla aplicada en
+formas distintas**. Conviene dejarla escrita una vez, en lugar de
+redescubrirla cada vez:
 
-> **El instrumento que vigila el silencio no puede filtrar por el campo que falta
-> justo en los casos que más importan.**
+> **El instrumento que vigila el silencio no puede filtrar por el campo que
+> falta justo en los casos que más importan.**
 
-Las tres formas en que apareció:
+No es una máxima abstracta: se ha materializado tres veces en este módulo, y
+las tres veces el defecto **compilaba, pasaba las pruebas y no se quejaba**.
+Por eso se registran como casos, con nombre y con lo que cada uno habría
+ocultado.
 
-1. **No colapsar categorías.** El vigía distingue término corriendo, suspendido y
-   sin anclar. Reducirlo a «tiene fecha / no tiene fecha» habría vuelto invisible
-   el tercer caso — que es el que este ADR crea.
-2. **No confundir «no hay» con «no miré».** El informe cuenta las cuatro
-   situaciones siempre, incluso en cero, y falla en rojo si no pudo completar la
-   revisión. Un cero indistinguible de una ausencia de revisión es peor que no
-   informar.
-3. **No excluir lo que no encaja en el filtro.** La cota de lectura del vigía es
-   numérica y no por rango de fecha de vencimiento — acotar por esa fecha
-   excluiría precisamente al expediente que no la tiene, que es el que hay que
-   detectar.
+#### Caso 1 — El clasificador de estados del vigía
 
-El defecto que este ADR corrige es de la misma familia: un expediente que nace
+Al escribir el vigía deduje «suspendido» de `terminoResolucionSigueCorriendo`,
+que responde *«¿ya se resolvió?»* y no *«¿está suspendido?»*.
+`CON_ACTA_DE_OBSERVACIONES` no figura entre los estados resueltos, así que
+habría caído en **corriendo**.
+
+*Lo que habría ocultado:* un expediente con el reloj legalmente detenido,
+contado y alertado como si el plazo siguiera corriendo. Y el caso simétrico —
+el expediente **sin anclar**— habría desaparecido por completo si el vigía se
+hubiera escrito con dos categorías («tiene fecha / no tiene fecha») en vez de
+cuatro.
+
+*Cómo se cazó:* al redactar la prueba, antes de ejecutarla. El colapso de
+categorías cometido dentro del código escrito para evitarlo.
+
+#### Caso 2 — La cota de lectura del vigía
+
+La forma natural de acotar la consulta era por rango de fecha de vencimiento,
+que es como lo hace el cron equivalente de PQRSD.
+
+*Lo que habría ocultado:* **exactamente el caso que este ADR crea.** Un
+expediente en estado previo no tiene fecha de vencimiento — es su definición.
+Filtrar por ese campo lo excluye del barrido, y el instrumento construido para
+detectar el silencio se vuelve ciego precisamente ante él.
+
+*Cómo se resolvió:* cota **numérica** (techo de documentos), no por consulta.
+Queda registrado en el presupuesto de rendimiento R11 con esa justificación,
+porque de otro modo parece un descuido.
+
+#### Caso 3 — La expresión que reconoce rutas de adjuntos
+
+El verificador de conciliación del respaldo descubre las rutas de Storage
+recorriendo el JSON de cada documento. La primera expresión usaba `[^\s]+`.
+
+*Lo que habría ocultado:* todo archivo **con espacios en el nombre** — y el
+sanitizador de nombres del sistema los conserva. En la prueba, el que se
+perdía era `respuestas/…/oficio firmado.pdf`: precisamente el oficio de
+respuesta firmado, que es el documento irreemplazable del expediente. La
+verificación habría reportado «conciliado» sin haber mirado el archivo que más
+importa.
+
+*Cómo se cazó:* probando el detector contra las ocho formas reales de ruta
+antes de subirlo. Ocurrió **dentro de la herramienta escrita para aplicar esta
+misma regla**, y unas horas después de enunciarla aquí.
+
+---
+
+El defecto que este ADR corrige es de la misma familia: un expediente nace
 afirmando completitud porque el sistema no tenía cómo representar «todavía no
-verificado». **Lo que no se puede nombrar, no se puede vigilar.**
+verificado». **Lo que no se puede nombrar, no se puede vigilar** — y lo que se
+filtra por el campo ausente, tampoco.
+
+De los tres casos se sigue una prueba práctica, barata de aplicar: **ante todo
+filtro, preguntar qué caso queda fuera por no tener ese campo.** Si la
+respuesta es «el que estoy buscando», el filtro está mal.
+
+### 4.7 Recorte de alcance decidido con Planeación
+
+**Se elimina el portal ciudadano.** No habrá radicación por cuenta del ciudadano, ni perfiles, ni
+registro de usuarios externos, ni autenticación pública. Todo el trámite se opera desde adentro:
+una funcionaria de Planeación atiende en el mostrador, captura los datos y carga los documentos
+por el ciudadano.
+
+Ese recorte **no debilita este ADR: lo hace más necesario.** El portal habría producido
+expedientes completos o nada; el mostrador produce expedientes **parciales por defecto** (§4.3), y
+son justo los que hoy no se pueden representar sin mentir sobre su completitud.
+
+**Se agrega, sin cuenta y sin contraseña:**
+
+- ✅ **Aviso por correo en cuatro hitos** — apertura del expediente, radicación (con número y
+  fecha de arranque del plazo), acta de observaciones, y resolución. **VA.** Exige configurar
+  SMTP, que hoy no lo está.
+- ⏸️ **WhatsApp y SMS — APLAZADOS**, por el costo recurrente. Se revisan más adelante con
+  presupuesto delante. La diferencia con el correo no es técnica sino económica: el correo
+  institucional ya está pagado y autenticado; la mensajería cobra por mensaje, para siempre.
+- **Consulta pública extendida a licencias** — el ciudadano entra con su radicado y ve estado,
+  fecha de radicación, días transcurridos y qué sigue. Sin datos de terceros ni documentos
+  internos.
+- **Correo y celular se capturan en el mostrador**, al abrir el expediente. Se mantiene aunque
+  los canales estén aplazados: capturarlos no cuesta nada hoy y no tenerlos obliga mañana a
+  perseguir uno por uno a los ciudadanos ya atendidos.
+
+⚠️ **Consecuencia de aplazar la mensajería.** Buena parte de la población de Simacota no maneja
+correo. Para esas personas, aplazar WhatsApp y SMS significa que los dos canales que les quedan son
+**la constancia impresa que se llevan del mostrador** y **volver a preguntar**. El plazo de los 45
+días corre igual aunque no se les pueda avisar de nada — por eso la constancia impresa (§4.8) no es
+un respaldo del correo sino una pieza con función propia, y por eso la consulta pública se mantiene.
+
+### 4.8 La constancia impresa — pieza con nombre propio
+
+Aunque el correo entre, la constancia sigue siendo **lo único que el ciudadano se lleva en la
+mano**, y para quien no usa correo es el único registro de lo que pasó. No es un comprobante de
+cortesía: es el documento con el que vuelve.
+
+Debe decirle, sin que tenga que preguntar:
+
+- **qué entregó** y **qué le falta** — el escenario de entrega parcial es el normal (§4.3);
+- **su número** y **desde cuándo corre el plazo** — que con entrega parcial NO es el día en que
+  abrió el expediente;
+- **cuándo vence**, y **cómo consultar** su estado sin cuenta ni contraseña.
+
+La lista de faltantes es lo que la convierte en útil: alguien que llega con 9 de 19 documentos se
+va sabiendo exactamente cuáles son los 10 que le faltan, en vez de con la instrucción de «traer lo
+que falta».
+
+⚖️ **Distinción que gobierna todos los textos.** El aviso por correo o mensaje es **servicio al
+ciudadano**, no notificación jurídica. El acto administrativo se notifica como manda la ley
+(Ley 1437, arts. 66-69). Ningún texto puede dar a entender lo contrario: un correo redactado como
+si notificara crea la apariencia de un acto que no ocurrió, y de ahí salen nulidades. Los textos
+quedan pendientes de validación por Planeación (§7).
 
 ## 6. Consecuencias
 
@@ -229,6 +344,11 @@ el día que se abra la emisión real esa afirmación viaja con un número de la 
 - El **formato del número de recepción**.
 - Si la verificación de completitud genera **acta** o basta la bitácora.
 - La **edad máxima en estado previo** (§4.5). El defecto de 3 días hábiles es
-  provisional, elegido por conservador y no por estudiado.
+  provisional, elegido por conservador y no por estudiado. **Con entrega parcial en mostrador este
+  número cambia de naturaleza:** ya no mide cuánto tarda la Administración en verificar, sino
+  cuánto puede tardar el CIUDADANO en volver con lo que falta. Tres días hábiles es
+  probablemente muy corto para eso, y el valor debe revisarse a la luz del §4.3.
+- Los **textos de los avisos** al ciudadano (§4.7), con la distinción entre servicio y
+  notificación jurídica marcada de forma explícita.
 - **Con qué número abre la operación real** la serie de radicados — decisión pendiente con gestión
   documental, independiente de este ADR pero del mismo momento.
