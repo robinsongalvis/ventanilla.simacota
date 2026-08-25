@@ -1,10 +1,29 @@
 # ADR-0033 — Estado previo a la radicación en debida forma (Licencias)
 
-- **Estado:** PROPUESTO — pendiente de decisión del propietario
+- **Estado:** **ACEPTADO** (25-ago-2026, decisión del propietario tras revisión completa)
 - **Fecha:** 24 de agosto de 2026
 - **Contexto previo:** [auditoría del módulo](../licencias/auditoria-radicacion.md) · ADR-0026 (motor de expedientes) · ADR-0031 (apertura explícita de la serie)
 
 ---
+
+## 0. La decisión
+
+**Se aprueba la separación de estados** (opción 2 de §3). Textualmente:
+
+> El expediente puede existir y recibir documentos **sin afirmar completitud y sin término
+> corriendo**. La radicación, el número oficial y el arranque del plazo ocurren **en la transición
+> al estado de debida forma**, no en la creación.
+
+Consecuencias inmediatas:
+
+- El emisor de consecutivos se cablea en la transición `PRESENTADA → RADICADA_EN_DEBIDA_FORMA`.
+  **No** en la creación.
+- **Ningún expediente vuelve a nacer en debida forma.**
+- La constancia impresa y el aviso de radicación ya pueden decir la fecha correcta, porque ya
+  existe una fecha correcta que decir.
+
+El nombre `PRESENTADA` es **provisional**: es lenguaje institucional, no técnico, y si la
+Secretaría de Planeación lo llama distinto se cambia (§7).
 
 ## 1. El problema
 

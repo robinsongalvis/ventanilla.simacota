@@ -322,7 +322,14 @@ export function planCrearExpedienteDemo(
     id: crypto.randomUUID(),
     expedienteId: id,
     tenantId,
-    tipo: 'radicacion-debida-forma',
+    /* ADR-0033 §0 — la apertura NO es la radicación. Este slug no está en
+       SLUG_A_TIPO_EVENTO (lib/motor-expedientes/termino.ts), y el motor ignora
+       las actuaciones sin relevancia para el término: por eso un expediente
+       recién abierto NO tiene término corriendo. La actuación
+       'radicacion-debida-forma' se escribirá en la TRANSICIÓN, cuando el
+       checklist se verifique en servidor — y con ella el número oficial y el
+       arranque del plazo. */
+    tipo: 'apertura-expediente',
     etapa: 'radicacion',
     actorUid: actor.uid,
     actorNombre: actor.nombre,
@@ -340,7 +347,7 @@ export function planCrearExpedienteDemo(
     // id es el que se espera que tenga cuando exista.
     tramiteId: DEFINICION_LICENCIA_CONSTRUCCION_PARCIAL.id,
     estado: 'EN_REVISION',
-    estadoJuridico: 'RADICADA_EN_DEBIDA_FORMA',
+    estadoJuridico: 'PRESENTADA',
     solicitanteNombre: nombre,
     solicitanteDocumento: documento,
     contexto: input.contexto ?? {},
@@ -726,7 +733,9 @@ export function planCrearExpedienteDesdeRadicado(
     id: crypto.randomUUID(),
     expedienteId: id,
     tenantId,
-    tipo: 'radicacion-debida-forma',
+    /* ADR-0033 §0 — ver la nota del camino demo: la apertura NO es la
+       radicación, y este slug no genera evento de término. */
+    tipo: 'apertura-expediente',
     etapa: 'radicacion',
     actorUid: actor.uid,
     actorNombre: actor.nombre,
@@ -741,7 +750,7 @@ export function planCrearExpedienteDesdeRadicado(
     tenantId,
     tramiteId: DEFINICION_LICENCIA_CONSTRUCCION_PARCIAL.id,
     estado: 'EN_REVISION',
-    estadoJuridico: 'RADICADA_EN_DEBIDA_FORMA',
+    estadoJuridico: 'PRESENTADA',
     solicitanteNombre: radicado.solicitante.nombreCompleto,
     solicitanteDocumento: radicado.solicitante.numeroDocumento,
     contexto: input.contexto ?? {},
