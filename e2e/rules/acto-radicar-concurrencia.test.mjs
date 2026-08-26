@@ -150,6 +150,19 @@ function peticion(id, body = { confirmo: true }) {
   };
 }
 
+/** Llama al GET real del detalle — la misma respuesta que consume la pantalla. */
+async function verDetalle(id) {
+  const { GET } = await entorno.cargarModulo('@/app/api/licencias/expedientes/[id]/route.ts');
+  entorno.setSession({
+    uid: 'uid-planeacion', email: 'planeacion@simacota.gov.co', nombre: 'Funcionaria de Planeación',
+    rol: 'FUNCIONARIO', tenantId: TENANT, activo: true,
+  });
+  const res = await GET(new Request(`http://ensayo.local/api/licencias/expedientes/${id}`), {
+    params: Promise.resolve({ id }),
+  });
+  return res.json();
+}
+
 async function radicar(id, body) {
   const { req, ctx } = peticion(id, body);
   const res = await entorno.POST(req, ctx);
@@ -316,4 +329,70 @@ test('dos expedientes distintos a la vez: números distintos y contiguos, sin hu
     `esperaba dos números contiguos sin hueco, obtuvo ${consecutivos}`,
   );
   assert.equal(await leerContador(), antes + 2);
+});
+
+// ══════════════════════════════════════════════════════════════════════════
+// LA VISTA PREVIA Y EL ACTO NO PUEDEN DECIR COSAS DISTINTAS.
+//
+// La funcionaria decide mirando la vista previa y confirma el día que esa
+// pantalla le muestra. Si la previa y el acto usaran criterios distintos, ella
+// firmaría una fecha y el sistema anclaría otra — y el desacuerdo aparecería
+// como un rechazo inexplicable, o peor, como un término anclado en un día que
+// nadie vio.
+//
+// Por eso la previa llama a la MISMA función pura que ejecuta el POST. Estas
+// pruebas comprueban que eso siga siendo cierto de extremo a extremo.
+// ══════════════════════════════════════════════════════════════════════════
+test('la vista previa anuncia el mismo día que el acto ancla', async () => {
+  const id = await sembrarExpedienteCompleto('previa-coincide');
+
+  const previa = await verDetalle(id);
+  assert.equal(previa.computos.debidaForma.procede, true, JSON.stringify(previa.computos.debidaForma));
+  const anunciado = previa.computos.debidaForma.anclaPropuesta;
+
+  // Se confirma EXACTAMENTE el día que la pantalla mostró.
+  const { status, body } = await radicar(id, { confirmo: true, anclaEsperada: anunciado });
+  assert.equal(status, 200, `esperaba 200, obtuvo ${status}: ${JSON.stringify(body)}`);
+  assert.equal(body.diaCivilDelAncla, anunciado, 'el acto ancló el día que la previa anunció');
+  assert.equal(body.baseDelAncla, previa.computos.debidaForma.baseDelAncla, 'y por la misma razón');
+});
+
+test('la vista previa dice POR QUÉ no procede, con lo que falta', async () => {
+  const id = await sembrarExpedienteCompleto('previa-incompleto');
+  const exp = (await db.doc(`expedientes/${id}`).get()).data();
+  await db.doc(`expedientes/${id}`).update({ aportes: exp.aportes.slice(0, 2) });
+
+  const previa = await verDetalle(id);
+  const df = previa.computos.debidaForma;
+  assert.equal(df.procede, false);
+  assert.equal(df.yaRadicada, false);
+  assert.match(String(df.motivo), /todavía no está completa/i, `motivo: ${df.motivo}`);
+  // Y el mensaje enumera, para que ella pueda decírselo al ciudadano.
+  assert.match(String(df.motivo), /faltan \d+ de \d+/);
+});
+
+test('tras radicar, la vista previa deja de ofrecer el acto y muestra desde cuándo corre el plazo', async () => {
+  const id = await sembrarExpedienteCompleto('previa-ya-radicada');
+  const { status, body } = await radicar(id);
+  assert.equal(status, 200, JSON.stringify(body));
+
+  const previa = await verDetalle(id);
+  const df = previa.computos.debidaForma;
+  assert.equal(df.procede, false, 'no puede ofrecerse dos veces');
+  assert.equal(df.yaRadicada, true);
+  assert.equal(df.numeroExpediente, body.numeroExpediente);
+  assert.ok(df.desdeCuandoCorreElPlazo, 'debe decir desde cuándo corre el plazo');
+});
+
+test('la vista previa avisa ANTES si el término va a nacer vencido', async () => {
+  // Completa desde hace más de 45 días hábiles: el término nace vencido. El
+  // acto procede —es un hecho verdadero— pero nadie debe enterarse al pulsar.
+  const id = await sembrarExpedienteCompleto('previa-nace-vencido', {
+    completoDesde: '2025-01-10T12:00:00.000Z',
+  });
+
+  const df = (await verDetalle(id)).computos.debidaForma;
+  assert.equal(df.procede, true, 'un término vencido no impide radicar: es un hecho');
+  assert.equal(df.naceVencido, true, 'pero la pantalla tiene que decirlo antes');
+  assert.ok(df.venceraEl, 'y decir qué día venció');
 });

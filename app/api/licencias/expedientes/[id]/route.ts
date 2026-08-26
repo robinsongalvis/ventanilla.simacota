@@ -34,11 +34,16 @@ import { SUBCOLECCION_DOCUMENTOS } from '@/lib/server/expedientes-documentos-tip
 import { DEFINICION_LICENCIA_CONSTRUCCION_PARCIAL } from '@/lib/motor-expedientes/definiciones/licencia-construccion-parcial';
 import {
   evaluarPlazoSubsanacion,
+  evaluarRadicacionEnDebidaForma,
+  esErrorExpediente,
+  esRadicacionYaOcurrida,
   generarBorradorActoDesistimiento,
   PLAZO_DECISION_LICENCIA_DIAS_HABILES,
   type ExpedienteLicenciaDoc,
   type ActuacionLicenciaDoc,
+  type DocumentoParaAncla,
 } from '@/lib/server/expedientes-licencias';
+import { atLocalNoon, sumarDiasHabiles, diasRestantesHabiles } from '@/lib/tiempos-radicado';
 import { calcularVencimientoDual, derivarEventosTermino } from '@/lib/motor-expedientes/termino';
 import { calcularVencimientoVigencia, esErrorVigencia } from '@/lib/motor-expedientes/vigencias';
 import { logError } from '@/lib/logger';
@@ -126,6 +131,74 @@ export async function GET(request: Request, context: RouteContext): Promise<Next
       }
     }
 
+    /* ── VISTA PREVIA DEL ACTO DE RADICAR ────────────────────────────────
+       Lo que la funcionaria tiene que ver ANTES de pulsar el acto que emite
+       identidad legal y arranca un plazo de 45 días hábiles:
+
+         · si procede, y si no, POR QUÉ — con la lista de lo que falta;
+         · QUÉ DÍA quedará anclado el término, y por qué documento;
+         · si esa fecha es un hecho registrado o una deducción;
+         · y el caso duro: si el término nacerá ya vencido.
+
+       Descubrir cualquiera de esas cosas DESPUÉS de pulsar sería el peor
+       mostrador posible: el número ya estaría emitido y el plazo corriendo.
+
+       Se calcula con la MISMA función pura que ejecuta el POST — no con una
+       réplica «de presentación». Si divergieran, la pantalla prometería una
+       cosa y el acto haría otra, que es exactamente la clase de defecto que
+       este módulo lleva una semana persiguiendo.
+
+       CERO lecturas nuevas: `actuaciones` y `documentos` ya se trajeron
+       arriba para otros fines. */
+    /* Un solo reloj para toda la vista previa: la fecha del ancla, la
+       proyección del vencimiento y el juicio de «nace vencido» tienen que
+       mirar el mismo instante, o pueden contradecirse entre sí. */
+    const ahora = new Date();
+    const evaluacion = evaluarRadicacionEnDebidaForma({
+      expediente: expediente as unknown as ExpedienteLicenciaDoc,
+      actuacionesPrevias: actuaciones as ActuacionLicenciaDoc[],
+      documentos: (documentos as DocumentoParaAncla[]).filter((d) => d?.creadoEn),
+      tenantEsperado: expediente.tenantId as TenantId,
+      ahora,
+    });
+
+    const debidaForma = esErrorExpediente(evaluacion)
+      ? { procede: false, motivo: evaluacion.mensaje, yaRadicada: false }
+      : esRadicacionYaOcurrida(evaluacion)
+        ? {
+            procede: false,
+            yaRadicada: true,
+            motivo: 'Este expediente ya está radicado en legal y debida forma.',
+            numeroExpediente: evaluacion.numeroExpediente,
+            desdeCuandoCorreElPlazo: evaluacion.anclaIso,
+          }
+        : {
+            procede: true,
+            yaRadicada: false,
+            /* El día que la funcionaria confirma. Viaja de vuelta en el POST
+               como `anclaEsperada`: si la evidencia cambia entre que mira y
+               pulsa, el acto se rechaza en vez de afirmar una fecha que ella
+               no vio. */
+            anclaPropuesta: evaluacion.anclaDiaCivil,
+            anclaIso: evaluacion.anclaIso,
+            baseDelAncla: evaluacion.baseDelAncla,
+            requisitoQueFijaElAncla: evaluacion.evidencia.requisitoId,
+            documentoQueFijaElAncla: evaluacion.evidencia.documentoId,
+            requisitosAplicables: evaluacion.completitud.aplicables,
+            /* El caso duro, dicho antes y no después: si el último documento
+               entró hace más de 45 días hábiles, el término nace vencido. El
+               acto procede igual —es un hecho verdadero— pero nadie debería
+               enterarse al pulsar. */
+            venceraEl: sumarDiasHabiles(
+              atLocalNoon(evaluacion.anclaIso),
+              PLAZO_DECISION_LICENCIA_DIAS_HABILES,
+            ).toISOString(),
+            naceVencido:
+              diasRestantesHabiles(
+                sumarDiasHabiles(atLocalNoon(evaluacion.anclaIso), PLAZO_DECISION_LICENCIA_DIAS_HABILES).toISOString(),
+              ) < 0,
+          };
+
     return NextResponse.json({
       ok: true,
       expediente,
@@ -136,7 +209,7 @@ export async function GET(request: Request, context: RouteContext): Promise<Next
       // exista resolución real por `expediente.tramiteId` (persistencia de
       // Fase 1), este campo se resuelve dinámicamente en vez de fijo.
       definicionId: DEFINICION_LICENCIA_CONSTRUCCION_PARCIAL.id,
-      computos: { terminoDual, vigencia, plazoSubsanacion },
+      computos: { terminoDual, vigencia, plazoSubsanacion, debidaForma },
       borradorActoDesistimiento,
     });
   } catch (error) {
