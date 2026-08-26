@@ -156,7 +156,26 @@ async function radicar(id, body) {
   return { status: res.status, body: await res.json() };
 }
 
+/**
+ * Cada caso arranca con la serie en el mismo punto — y SIN reservas vivas.
+ *
+ * Rebobinar el contador dejando las reservas puestas es ilegítimo en
+ * producción (detiene la emisión de la serie, que es justo la salvaguarda que
+ * este repositorio añadió) y aquí producía un falso fallo: el caso 1 reservaba
+ * el 0400, el `beforeEach` devolvía el contador a 399, y todos los casos
+ * siguientes chocaban contra esa reserva para siempre.
+ *
+ * Es el MISMO residuo que se corrigió el 25-ago en
+ * `fase3-radicacion-interna-concurrencia.test.mjs`, cometido otra vez en un
+ * archivo nuevo. La lección no viajó con la lección: viajó con el archivo.
+ */
 beforeEach(async () => {
+  const reservas = await db.collection('unicidad_expedientes').get();
+  await Promise.all(reservas.docs.map((d) => d.ref.delete()));
+  for (const id of creados) {
+    const actuaciones = await db.collection(`expedientes/${id}/actuaciones`).get();
+    await Promise.all(actuaciones.docs.map((d) => d.ref.delete()));
+  }
   await abrirSerie();
 });
 
