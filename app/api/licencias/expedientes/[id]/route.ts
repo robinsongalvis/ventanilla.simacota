@@ -44,6 +44,16 @@ import {
   type DocumentoParaAncla,
 } from '@/lib/server/expedientes-licencias';
 import { atLocalNoon, sumarDiasHabiles, diasRestantesHabiles } from '@/lib/tiempos-radicado';
+
+/** Ejecuta un cálculo de PRESENTACIÓN sin dejar que su fallo tumbe la lectura. */
+function intentar<T>(calculo: () => T): T | null {
+  try {
+    return calculo();
+  } catch (error) {
+    logError({ radicadoId: 'n/a', modulo: 'licencias/expedientes/[id]/vista-previa', error });
+    return null;
+  }
+}
 import { calcularVencimientoDual, derivarEventosTermino } from '@/lib/motor-expedientes/termino';
 import { calcularVencimientoVigencia, esErrorVigencia } from '@/lib/motor-expedientes/vigencias';
 import { logError } from '@/lib/logger';
@@ -154,15 +164,21 @@ export async function GET(request: Request, context: RouteContext): Promise<Next
        proyección del vencimiento y el juicio de «nace vencido» tienen que
        mirar el mismo instante, o pueden contradecirse entre sí. */
     const ahora = new Date();
-    const evaluacion = evaluarRadicacionEnDebidaForma({
+    /* La previa es información, no la razón de esta ruta: si su cálculo falla,
+       el detalle del expediente debe seguir cargando. Se dice que no se pudo
+       evaluar —nunca se afirma que «no procede», que sería una conclusión que
+       nadie sacó— y el POST volverá a evaluarlo con su propia transacción. */
+    const evaluacion = intentar(() => evaluarRadicacionEnDebidaForma({
       expediente: expediente as unknown as ExpedienteLicenciaDoc,
       actuacionesPrevias: actuaciones as ActuacionLicenciaDoc[],
       documentos: (documentos as DocumentoParaAncla[]).filter((d) => d?.creadoEn),
       tenantEsperado: expediente.tenantId as TenantId,
       ahora,
-    });
+    }));
 
-    const debidaForma = esErrorExpediente(evaluacion)
+    const debidaForma = evaluacion === null
+      ? { procede: false, yaRadicada: false, motivo: 'No se pudo evaluar si la radicación procede. Abra el expediente de nuevo; si persiste, avise a soporte.' }
+      : esErrorExpediente(evaluacion)
       ? { procede: false, motivo: evaluacion.mensaje, yaRadicada: false }
       : esRadicacionYaOcurrida(evaluacion)
         ? {

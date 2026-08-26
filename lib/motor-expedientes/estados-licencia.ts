@@ -233,7 +233,18 @@ export function puedeTransicionar(
   hacia: EstadoJuridicoLicencia,
   opciones: OpcionesTransicionLicencia = {},
 ): boolean {
-  const permitida = TRANSICIONES[desde].find((t) => t.hacia === hacia);
+  /* FAIL-CLOSED ANTE UN ESTADO DESCONOCIDO. `desde` viene tipado, pero en la
+     práctica sale de Firestore, donde cabe cualquier cosa: un expediente
+     escrito antes de que `estadoJuridico` existiera lo trae `undefined`, y un
+     documento migrado puede traer un valor legado. `TRANSICIONES[desde]` era
+     entonces `undefined` y `.find` LANZABA — tumbando al llamador entero.
+
+     Un guard que explota no es fail-closed: es un fallo. Lo correcto ante un
+     estado que no se reconoce es negar la transición, que es justo lo que un
+     guard debe hacer cuando no puede afirmar nada. */
+  const salidas = TRANSICIONES[desde];
+  if (!salidas) return false;
+  const permitida = salidas.find((t) => t.hacia === hacia);
   if (!permitida) return false;
   if (permitida.requiereNoHuboActaPrevia && opciones.yaHuboActa === true) return false;
   return true;
@@ -249,7 +260,7 @@ export function transicionesDesde(
   estado: EstadoJuridicoLicencia,
   opciones: OpcionesTransicionLicencia = {},
 ): { hacia: EstadoJuridicoLicencia; fundamento: string }[] {
-  return TRANSICIONES[estado]
+  return (TRANSICIONES[estado] ?? [])
     .filter((t) => !(t.requiereNoHuboActaPrevia && opciones.yaHuboActa === true))
     .map((t) => ({ hacia: t.hacia, fundamento: t.fundamento }));
 }

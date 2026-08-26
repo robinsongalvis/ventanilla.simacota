@@ -283,3 +283,25 @@ describe('el acto de radicar — lo que se escribe', () => {
     expect(planDe().parcheExpediente).not.toHaveProperty('estado');
   });
 });
+
+describe('el guard de transiciones ante un estado que no conoce', () => {
+  /* `estadoJuridico` viene tipado, pero en la práctica sale de Firestore,
+     donde cabe cualquier cosa: un expediente escrito ANTES de que ese campo
+     existiera lo trae `undefined`, y uno migrado puede traer un valor legado.
+     `TRANSICIONES[desde]` era entonces `undefined` y `.find` LANZABA,
+     tumbando al llamador entero — en el detalle, un 500 que impedía abrir el
+     expediente.
+
+     Un guard que explota no es fail-closed: es un fallo. */
+  it('un expediente sin estado jurídico se rechaza, no revienta', () => {
+    const sinEstado = expedienteCompleto();
+    delete (sinEstado as { estadoJuridico?: unknown }).estadoJuridico;
+    const r = evaluar(sinEstado);
+    expect(esErrorExpediente(r) && r.status).toBe(409);
+  });
+
+  it('un estado legado que ya no existe tampoco revienta', () => {
+    const r = evaluar(expedienteCompleto({ estadoJuridico: 'CERRADA_LEGADO' as never }));
+    expect(esErrorExpediente(r) && r.status).toBe(409);
+  });
+});
