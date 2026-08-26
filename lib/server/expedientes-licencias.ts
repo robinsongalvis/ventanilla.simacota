@@ -168,8 +168,30 @@ export interface ExpedienteLicenciaDoc extends Expediente {
  * `tipos.ts` NO se modifica (mismo motivo que `ExpedienteLicenciaDoc`: no
  * acoplar el núcleo a un caso concreto).
  */
+/**
+ * Evidencia de la afirmación que hace el acto de radicar. Vive EN la actuación
+ * —que es append-only— y no en el documento raíz, que se sobrescribe: dentro de
+ * un año, reconstruir quién afirmó que la solicitud estaba completa y con qué
+ * documento se hace leyendo esto.
+ */
+export interface EvidenciaRadicacion {
+  requisitosAplicables: number;
+  requisitosFaltantes: number;
+  requisitoQueFijaElAncla: string;
+  documentoQueFijaElAncla: string;
+  /** De dónde salió la fecha: un hecho registrado o una deducción. Un auditor no debería tener que adivinarlo. */
+  baseDelAncla: 'MOMENTO_REGISTRADO_DE_COMPLETITUD' | 'PRIMERA_VERSION_DEL_ULTIMO_DOCUMENTO';
+  /** Ata la afirmación al binario exacto (INV-3). `null` si la versión no lo trae. */
+  hashSha256: string | null;
+  definicionId: string;
+  numeroExpediente: string;
+  serieId: string;
+}
+
 export interface ActuacionLicenciaDoc extends Actuacion {
   tenantId: string;
+  /** Presente SOLO en la actuación `tipo: 'radicacion-debida-forma'`. */
+  evidenciaRadicacion?: EvidenciaRadicacion;
   /**
    * Presente SOLO en actuaciones `tipo: 'comunicacion-enviada'` — el tipo
    * ESTRUCTURADO de la comunicación (p. ej. "Aviso de acta de observaciones
@@ -1476,7 +1498,7 @@ export function planRadicarEnDebidaForma(entrada: {
      documento raíz, que se sobrescribe. Dentro de un año, reconstruir quién
      afirmó que la solicitud estaba completa y con qué documento se hace
      leyendo esto, y el hash ata la afirmación al binario exacto (INV-3). */
-  const conEvidencia = {
+  const conEvidencia: ActuacionLicenciaDoc = {
     ...actuacion,
     evidenciaRadicacion: {
       requisitosAplicables: evaluacion.completitud.aplicables,
@@ -1489,7 +1511,7 @@ export function planRadicarEnDebidaForma(entrada: {
       numeroExpediente: numeroEmitido,
       serieId: 'expedientes',
     },
-  } as ActuacionLicenciaDoc;
+  };
 
   /* El espejo se recalcula sobre la serie COMPLETA tras esta escritura.
      Omitirlo dejaría `fechaAlertaConservadora: null` en el raíz con el

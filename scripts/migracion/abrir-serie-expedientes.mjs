@@ -296,14 +296,33 @@ async function main() {
   }
 
   const ahora = new Date().toISOString();
+  /* EL REGISTRO VA ANIDADO BAJO `apertura`, Y CON ESAS GRAFÍAS EXACTAS.
+     No es una preferencia de estilo: `verificarCoherenciaConApertura`
+     (lib/server/consecutivo-legal.ts) y el cron de auditoría de los lunes
+     leen `counters/{serie}-{año}.apertura.abiertoEn`, un NÚMERO. Este script
+     escribía `abiertaEn` (una fecha) aplanado en la raíz, así que ambos
+     verificadores recibían `undefined` y salían por su primera línea: el
+     guard quedaba INERTE justo en `expedientes`, la única serie que exige
+     apertura explícita y la única con un libro de papel detrás.
+
+     Es la regla del ADR-0033 §4.6 otra vez — el instrumento que vigila no
+     puede filtrar por el campo que falta en el caso que más importa — y
+     además había DOS abridores incompatibles del mismo documento
+     (`scripts/operacion/abrir-series.mjs` sí lo escribía bien).
+     `__tests__/apertura-forma-unica.test.ts` impide que vuelvan a divergir. */
   const marca = {
     ultimo: propuesta.ultimo,
     anio,
     actualizadoEn: ahora,
-    abiertaEn: ahora,
-    abiertaPor: 'scripts/migracion/abrir-serie-expedientes.mjs',
-    libroConfirmadoEl: confirmadoEl,
-    motivo: `Apertura explícita de la serie ${anio} (ADR-0031). Último consecutivo del libro de Planeación: ${propuesta.ultimo}, confirmado el ${confirmadoEl}.`,
+    apertura: {
+      veniaDe: 0,
+      abiertoEn: propuesta.ultimo + 1,
+      fecha: ahora,
+      autorizadoPor: 'scripts/migracion/abrir-serie-expedientes.mjs',
+      referencia: `Libro de Planeación confirmado el ${confirmadoEl}`,
+      motivoDelSalto: `Apertura explícita de la serie ${anio} (ADR-0031). Último consecutivo del libro de Planeación: ${propuesta.ultimo}, confirmado el ${confirmadoEl}.`,
+      libroConfirmadoEl: confirmadoEl,
+    },
   };
 
   const ref = db.doc(`counters/expedientes-${anio}`);

@@ -25,6 +25,12 @@ import { formatFechaLargaColombia } from '@/lib/fecha-colombia';
      ningún término corriendo. Lo dice EXPRESAMENTE, no por omisión: el
      ciudadano tiene derecho a saber que el reloj todavía no arrancó, y a
      saber qué lo hace arrancar.
+   - NO PROMETE UN AVISO QUE EL SISTEMA NO PUEDE ENVIAR. La primera versión
+     decía «la Alcaldía se lo comunicará por este mismo medio»: no existe hoy
+     ninguna plantilla ni ninguna ruta que envíe ese aviso cuando se declara la
+     radicación en debida forma. Prometerlo repetía, en pequeño, el defecto que
+     este archivo vino a corregir. El texto apunta a donde el ciudadano SÍ puede
+     preguntar. Cuando el aviso exista, se cambia aquí.
    - NO enlaza la consulta pública. `/consulta` resuelve radicados de
      ventanilla, no expedientes de licencias: prometer un enlace que no
      encuentra su trámite sería el mismo defecto que este archivo corrige,
@@ -151,8 +157,9 @@ export function buildAcuseReciboExpedienteHtml(p: TemplateAcuseReciboExpedienteP
       <tr><td style="padding:14px 16px;">
         <p style="margin:0;font-size:13px;line-height:1.6;color:#1F2933;">
           <strong>Según nuestro registro, usted entregó todos los documentos que su trámite exige.</strong>
-          La Secretaría de Planeación los verificará y le informará por este mismo medio la fecha a
-          partir de la cual empieza a correr el plazo legal.
+          La Secretaría de Planeación los verificará y, cuando declare la radicación en legal y
+          debida forma, quedará fijada la fecha desde la cual corre el plazo legal. Puede consultarla
+          en la Secretaría indicando el número de expediente.
         </p>
       </td></tr>
     </table>
@@ -189,8 +196,9 @@ export function buildAcuseReciboExpedienteHtml(p: TemplateAcuseReciboExpedienteP
           <strong>radicada en legal y debida forma</strong>, lo que ocurre cuando la documentación
           está completa y así lo verifica la Secretaría de Planeación
           ${completa ? '' : '— es decir, cuando usted entregue los documentos pendientes '}(artículo
-          2.2.6.1.2.1.1, parágrafo 1, del Decreto 1077 de 2015). Cuando eso ocurra, la Alcaldía se
-          lo comunicará por este mismo medio e indicará desde qué fecha corre el plazo.
+          2.2.6.1.2.1.1, parágrafo 1, del Decreto 1077 de 2015). Puede verificar en cualquier momento
+          en la Secretaría de Planeación si su solicitud ya quedó radicada y desde qué fecha corre el
+          plazo.
         </p>
       </td></tr>
     </table>
