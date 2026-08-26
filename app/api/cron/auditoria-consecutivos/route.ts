@@ -1,7 +1,9 @@
 import {
   describirIncoherenciaApertura,
+  SERIES_CONSECUTIVO,
   type SerieConsecutivo,
 } from '@/lib/server/consecutivo-legal';
+import { elementosNoDeclarados, type AlcanceVigilancia } from '@/lib/server/alcance-vigilancia';
 import { NextResponse }          from 'next/server';
 import { FieldPath } from 'firebase-admin/firestore';
 import { getFirebaseAdminDb }    from '@/lib/firebase-admin';
@@ -23,6 +25,28 @@ import {
 } from '@/scripts/laboratorio/detectar-consecutivos-fantasma.mjs';
 
 export const runtime = 'nodejs';
+
+/**
+ * ALCANCE DECLARADO DE ESTE VIGILANTE (regla operativa del ADR-0033 §4.6).
+ *
+ * Este cron recorría `COLECCION_POR_SERIE` —tres series— y nadie había escrito
+ * en ninguna parte que la cuarta quedaba fuera. `expedientes` es justamente la
+ * única con un libro de papel detrás y la única que exige apertura explícita:
+ * el vigilante no sabía qué no estaba mirando, y su silencio se leyó como
+ * conformidad.
+ *
+ * Ahora la exclusión es una decisión escrita, y
+ * `__tests__/alcance-vigilancia-consecutivos.test.ts` comprueba que entre
+ * cubiertos y excluidos no quede ninguna serie huérfana. Añadir una serie al
+ * dominio sin decidir qué hace este cron con ella rompe esa prueba.
+ */
+export const ALCANCE_BARRIDA_CONTINUIDAD: AlcanceVigilancia<SerieConsecutivo> = {
+  cubiertos: ['radicados', 'salidas', 'planillas'],
+  excluidos: {
+    expedientes:
+      'No tiene colección de documentos asignada mientras Fase 1 no la defina, así que no hay serie de ids que barrer por continuidad. NO queda sin vigilancia: se audita en su propia rama (estado del contador y coherencia con su apertura) más abajo en este mismo cron.',
+  },
+};
 // Techo del plan (Vercel Hobby/Pro: 300s en funciones cron) — mismo estándar
 // que los demás crons de plazo legal (Roadmap P1.4).
 export const maxDuration = 300;

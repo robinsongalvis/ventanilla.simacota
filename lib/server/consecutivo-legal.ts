@@ -37,6 +37,19 @@ import type { OrigenActuacion } from '@/lib/motor-expedientes/tipos';
 export type SerieConsecutivo = 'radicados' | 'salidas' | 'planillas' | 'expedientes';
 
 /**
+ * EL DOMINIO, EN CÓDIGO Y NO EN UN COMENTARIO.
+ *
+ * Existe para que un instrumento de vigilancia pueda declarar su alcance
+ * CONTRA algo, y para que una prueba pueda comprobar que no deja ninguna serie
+ * huérfana (ver `lib/server/alcance-vigilancia.ts`, regla operativa del
+ * ADR-0033 §4.6). El `satisfies` obliga a que esta lista y la unión de arriba
+ * digan lo mismo: añadir una serie al tipo sin añadirla aquí no compila.
+ */
+export const SERIES_CONSECUTIVO = [
+  'radicados', 'salidas', 'planillas', 'expedientes',
+] as const satisfies readonly SerieConsecutivo[];
+
+/**
  * Origen del consecutivo que se pretende escribir en un `counters/{serie}-{año}`.
  *
  * Alias del tipo canónico `OrigenActuacion` (`lib/motor-expedientes/tipos.ts`)
