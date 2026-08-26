@@ -9,10 +9,28 @@ import { getFirebaseAdminDb }    from '@/lib/firebase-admin';
 import { diasRestantesHabiles }  from '@/lib/tiempos-radicado';
 import type { VentanillaRadicado } from '@/src/types/ventanilla';
 import type { AlertaVencimiento, AlertaTipoDeadline } from '@/src/types/simi-control-interno';
+import { ESTADOS_ACTIVOS as ESTADOS_ACTIVOS_DOMINIO } from '@/lib/radicado-estados';
 
-const ESTADOS_ACTIVOS = new Set([
-  'PENDIENTE', 'EN_REVISION', 'EN_PROCESO', 'ASIGNADO', 'DEVUELTO', 'PRORROGA',
-]);
+/**
+ * ALCANCE DECLARADO de este vigilante (ADR-0033 §4.6-bis).
+ *
+ * Se DERIVA de `ESTADOS_ACTIVOS` en vez de reescribirla: hasta el 26-ago-2026
+ * había una copia local que omitía `EN_SUBSANACION` sin decir si era decisión
+ * u olvido. Ahora es una decisión escrita — y añadir un estado activo nuevo al
+ * dominio lo incorpora aquí solo, sin que nadie tenga que acordarse.
+ *
+ * `EN_SUBSANACION` queda FUERA a propósito: en ese estado el término legal está
+ * SUSPENDIDO (BM-B33), así que alertar de su vencimiento sería avisar de un
+ * plazo que no está corriendo — y el aviso equivocado gasta la credibilidad del
+ * que sí importa.
+ */
+const EXCLUIDOS_POR_TERMINO_SUSPENDIDO = {
+  EN_SUBSANACION: 'El término legal está SUSPENDIDO (BM-B33): no hay vencimiento que alertar mientras el reloj esté detenido.',
+};
+
+const ESTADOS_ACTIVOS = new Set(
+  [...ESTADOS_ACTIVOS_DOMINIO].filter((e) => !(e in EXCLUIDOS_POR_TERMINO_SUSPENDIDO)),
+);
 
 interface AlertaResult {
   alertasCreadas:    number;

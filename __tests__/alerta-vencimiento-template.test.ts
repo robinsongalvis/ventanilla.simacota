@@ -133,10 +133,20 @@ describe('cableado del cron — no toca lógica funcional', () => {
     expect(s).toContain('excludeFromMetrics');
   });
 
-  it('conserva el umbral de 2 días hábiles y los estados activos', () => {
+  it('conserva el umbral de 2 días hábiles', () => {
     expect(s).toContain('UMBRAL_DIAS = 2');
-    expect(s).toContain('PENDIENTE');
-    expect(s).toContain('PRORROGA');
+  });
+
+  /* Esta guarda custodiaba que el cron nombrara 'PENDIENTE' y 'PRORROGA' — es
+     decir, que su lista literal de estados activos no cambiara sin que nadie lo
+     notara. Desde el 26-ago-2026 esa lista NO existe: se deriva de
+     `ESTADOS_ACTIVOS` del dominio, y las exclusiones se declaran por escrito.
+     La intención se conserva; lo que cambia es qué la sostiene. La verificación
+     completa vive en `alcance-vigilantes-estados-activos.test.ts`. */
+  it('deriva los estados activos del dominio en vez de reescribirlos', () => {
+    expect(s).toMatch(/ESTADOS_ACTIVOS as ESTADOS_ACTIVOS_DOMINIO/);
+    expect(s).toContain('EXCLUIDOS_POR_TERMINO_SUSPENDIDO');
+    expect(s).not.toMatch(/new Set\(\[\s*'PENDIENTE'/);
   });
 
   it('usa la plantilla extraída en vez de HTML inline', () => {
