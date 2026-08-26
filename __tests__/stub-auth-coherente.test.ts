@@ -1,6 +1,5 @@
 import { describe, it, expect } from 'vitest';
 import { canOperateTenant } from '@/lib/server/internal-auth';
-// @ts-expect-error — stub .mjs sin tipos, cargado a propósito para contrastarlo
 import { canOperateTenant as replica } from '@/e2e/rules/support/fase3-stub-internal-auth.mjs';
 import type { TenantId } from '@/src/types/radicado';
 
