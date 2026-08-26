@@ -406,6 +406,7 @@ describe('coincideFiltroLibro / filtrarFilasLibro / conteos', () => {
       id: 'f1',
       numeroExpediente: '68745-0-26-0001',
       fechaRadicacion: '2026-03-10T15:00:00.000Z',
+      fechaApertura: '2026-03-01T15:00:00.000Z',
       solicitanteNombre: 'Carlos Alberto Rojas',
       solicitanteDocumento: '91234567',
       subtipos: ['Licencia de construcción'],
@@ -477,6 +478,7 @@ describe('generarCsvLibroConsecutivo', () => {
       id: 'exp-1',
       numeroExpediente: '68745-0-26-0001',
       fechaRadicacion: '2026-03-10T15:00:00.000Z',
+      fechaApertura: '2026-03-01T15:00:00.000Z',
       solicitanteNombre: 'Carlos Alberto Rojas',
       solicitanteDocumento: '91234567',
       subtipos: ['Licencia de construcción'],
@@ -508,14 +510,23 @@ describe('generarCsvLibroConsecutivo', () => {
     const csv = generarCsvLibroConsecutivo([]);
     const [encabezado] = csv.replace(/^﻿/, '').split('\r\n');
     expect(encabezado).toBe(
-      'N. EXPEDIENTE;FECHA RADICACION;SOLICITANTE;DOCUMENTO;SUBTIPOS;ESTADO JURIDICO;N. LICENCIA;FECHA FIRMEZA;PRUEBA;COLISION',
+      'N. EXPEDIENTE;FECHA APERTURA;FECHA RADICACION;SOLICITANTE;DOCUMENTO;SUBTIPOS;ESTADO JURIDICO;N. LICENCIA;FECHA FIRMEZA;PRUEBA;COLISION',
     );
   });
 
   it('una fila con acto final ausente muestra "—" en N. LICENCIA y FECHA FIRMEZA, y "NO" en PRUEBA', () => {
     const csv = generarCsvLibroConsecutivo([filaSintetica()]);
     const [, filaTexto] = csv.replace(/^﻿/, '').split('\r\n');
-    expect(filaTexto).toBe('68745-0-26-0001;10/03/2026;Carlos Alberto Rojas;91234567;Licencia de construcción;En revisión;—;—;NO;NO');
+    expect(filaTexto).toBe('68745-0-26-0001;01/03/2026;10/03/2026;Carlos Alberto Rojas;91234567;Licencia de construcción;En revisión;—;—;NO;NO');
+  });
+
+  /* El caso que motiva la columna nueva: un expediente PRESENTADA no tiene
+     fecha de radicación en debida forma. La celda queda VACÍA — antes salía
+     la fecha de apertura, afirmando que el término arrancó ese día. */
+  it('un expediente sin radicar deja la FECHA RADICACION vacía, no la rellena con la apertura', () => {
+    const csv = generarCsvLibroConsecutivo([filaSintetica({ fechaRadicacion: null })]);
+    const filaTexto = csv.replace(/^\uFEFF/, '').split('\r\n')[1];
+    expect(filaTexto).toBe('68745-0-26-0001;01/03/2026;;Carlos Alberto Rojas;91234567;Licencia de construcción;En revisión;—;—;NO;NO');
   });
 
   it('una fila con acto final y esPrueba=true muestra los valores reales y "SI"', () => {
@@ -552,7 +563,7 @@ describe('coincideBusquedaLibro', () => {
     return {
       numeroExpediente: '68745-0-26-0007',
       radicadoId: '1-110-202603-00042',
-      fechaRadicacion: '2026-03-10T15:00:00.000Z',
+      fechaApertura: '2026-03-10T15:00:00.000Z',
       solicitanteNombre: 'María Fernanda Gálvez',
       solicitanteDocumento: '91234567',
       matriculaInmobiliaria: '321-51890',
@@ -627,7 +638,7 @@ describe('coincideBusquedaLibro', () => {
   });
 
   it('fecha de radicación inválida: no lanza, simplemente no aporta coincidencia por fecha', () => {
-    const campos = camposBase({ fechaRadicacion: 'no-es-fecha' });
+    const campos = camposBase({ fechaApertura: 'no-es-fecha' });
     expect(() => coincideBusquedaLibro(campos, 'maria')).not.toThrow();
     expect(coincideBusquedaLibro(campos, 'maria')).toBe(true);
   });

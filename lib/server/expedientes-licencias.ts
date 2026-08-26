@@ -117,6 +117,21 @@ export interface ExpedienteLicenciaDoc extends Expediente {
    */
   fechaAlertaConservadora?: string | null;
   /**
+   * Día en que la solicitud quedó RADICADA EN LEGAL Y DEBIDA FORMA (ISO 8601),
+   * escrito por el acto de radicar. Es la fecha con efecto de plazo.
+   *
+   * Denormalizada en el raíz por el mismo motivo que `fechaAlertaConservadora`:
+   * el Libro Consecutivo y la Bandeja listan sin traer la subcolección de
+   * actuaciones, y sin este campo tendrían que seguir usando `creadoEn` —el día
+   * en que se abrió la carpeta— para una columna rotulada «fecha de radicación».
+   *
+   * AUSENTE mientras el expediente no se haya radicado (PRESENTADA), y en los
+   * históricos reconstruidos. Quien la lea debe mostrar un vacío honesto, nunca
+   * sustituirla por `creadoEn`: son dos hechos distintos y el ADR-0033 existe
+   * precisamente para no confundirlos.
+   */
+  fechaRadicacionDebidaForma?: string;
+  /**
    * DF-10 (decisión del propietario, 11-ago-2026): texto EXACTO del campo
    * "estado" del libro histórico de Planeación al momento de migrar —
    * verbatim, ANTES de cualquier normalización o interpretación
@@ -1252,7 +1267,16 @@ export function evaluarRadicacionEnDebidaForma(entrada: {
      `completitud` es opcional y su ausencia significa «nunca se evaluó» —
      que no es «está completo». Una compuerta escrita `completitud?.completo
      !== false` dejaría pasar justo a los expedientes que nunca se evaluaron. */
-  const completitud = calcularCompletitudExpediente(exp.aportes ?? [], exp.contexto ?? {}, ahora);
+  /* `exp.completitud` entra como PREVIA. SIN ese cuarto argumento, `completoDesde`
+     —el instante REGISTRADO en que la solicitud quedó completa— se regenera como
+     `ahora` en cada evaluación, y el ancla del término vuelve a ser una deducción
+     disfrazada de hecho. Compilaba, pasaba las pruebas y no se quejaba. */
+  const completitud = calcularCompletitudExpediente(
+    exp.aportes ?? [],
+    exp.contexto ?? {},
+    ahora,
+    exp.completitud,
+  );
   if (!completitud.completo) {
     const lista = completitud.faltantes.map((f) => f.nombre).join('; ');
     return {
@@ -1383,7 +1407,8 @@ export interface PlanRadicarEnDebidaForma {
      * mostrando `creadoEn` —el día que se abrió la carpeta— en la columna
      * «fecha de radicación», contradiciendo a la actuación que dice otra.
      * Dos fechas distintas para el mismo hecho es el defecto que el
-     * ADR-0033 vino a corregir.
+     * ADR-0033 vino a corregir. Escribirlo aquí es la mitad del trabajo; la
+     * otra mitad es que el Libro lo LEA (`presentacion-libro-consecutivo.ts`).
      */
     fechaRadicacionDebidaForma: string;
     fechaAlertaConservadora: string | null;

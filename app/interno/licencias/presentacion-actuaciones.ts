@@ -48,6 +48,10 @@ export const TIPO_TIMELINE: Record<string, EventoTimelineItem['tipo']> = {
  */
 export function tituloComunicacionEnviada(detalle: string | undefined): string {
   if (detalle?.startsWith(PREFIJO_AVISO_ACTA_COMUNICACION)) return 'Aviso de acta enviado';
+  if (detalle?.startsWith('Acuse')) return 'Acuse de recibo enviado al ciudadano';
+  /* Se conserva para las actuaciones YA ESCRITAS antes del 26-ago-2026, cuando
+     este momento enviaba una constancia. No se borra: el timeline debe seguir
+     describiendo con fidelidad lo que de verdad salió aquel día. */
   if (detalle?.startsWith('Constancia')) return 'Constancia enviada al ciudadano';
   return 'Comunicación enviada al ciudadano';
 }

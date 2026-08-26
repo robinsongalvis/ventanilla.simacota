@@ -181,7 +181,7 @@ export function CrearDesdeRadicadoModal({ onCerrar, onCreado }: CrearDesdeRadica
             <p className="text-xs max-w-sm" style={{ color: '#667085' }}>
               Número de demostración (esPrueba) — no es un consecutivo legal. Vinculado al radicado{' '}
               <NumeroLegal value={radicadoSeleccionado ?? ''} variant="radicado" size="sm" />.
-              {creado.constanciaEnviada && ' Se envió la constancia de radicación al solicitante.'}
+              {creado.constanciaEnviada && ' Se envió al solicitante el acuse de recibo de su solicitud.'}
             </p>
             {!creado.constanciaEnviada && (
               <p

@@ -66,8 +66,22 @@ export interface FilaLibroConsecutivo {
   id: string;
   /** Texto ya formateado (mono en pantalla) — `numeroExpediente.numero` o, a falta de él, el id del documento. */
   numeroExpediente: string;
-  /** ISO 8601 — `creadoEn` del expediente (fecha de radicación en debida forma, no de recepción material — RN-6). */
-  fechaRadicacion: string;
+  /**
+   * ISO 8601 — día en que el expediente quedó RADICADO EN LEGAL Y DEBIDA
+   * FORMA. `null` mientras eso no haya ocurrido (PRESENTADA) y en los
+   * históricos reconstruidos.
+   *
+   * Hasta el 26-ago-2026 este campo se llenaba con `creadoEn` y su JSDoc
+   * afirmaba que ese valor ERA la fecha de debida forma. Desde el ADR-0033
+   * es falso: `creadoEn` es el día en que se abrió la carpeta, y el
+   * expediente nace en PRESENTADA. La columna rotulada «Fecha radicación»
+   * —en pantalla y en el CSV que reemplaza el Excel de Planeación— estaba
+   * afirmando que el término de 45 días hábiles arrancó un día en que no
+   * había arrancado. Un vacío honesto vale más que una fecha cómoda.
+   */
+  fechaRadicacion: string | null;
+  /** ISO 8601 — día en que se abrió el expediente. Es un hecho distinto, y se muestra aparte. */
+  fechaApertura: string;
   solicitanteNombre: string;
   solicitanteDocumento: string;
   /** Nombres legibles de los subtipos declarados, en el orden del expediente — p. ej. `['Licencia de construcción']`. INTOCADO (fuente del CSV, `generarCsvLibroConsecutivo`) — para códigos crudos usar `subtipoCodigos`. */
@@ -300,7 +314,8 @@ export function construirFilasLibroConsecutivo(
       return {
         id: exp.id,
         numeroExpediente: numeroExpedienteTexto(exp),
-        fechaRadicacion: exp.creadoEn,
+        fechaRadicacion: exp.fechaRadicacionDebidaForma ?? null,
+        fechaApertura: exp.creadoEn,
         solicitanteNombre: exp.solicitanteNombre,
         solicitanteDocumento: exp.solicitanteDocumento,
         subtipos: subtipoCodigos.map(nombreSubtipo),
@@ -568,6 +583,7 @@ export function nombreArchivoCsvLibroConsecutivo(año: number): string {
 
 const ENCABEZADOS_CSV = [
   'N. EXPEDIENTE',
+  'FECHA APERTURA',
   'FECHA RADICACION',
   'SOLICITANTE',
   'DOCUMENTO',
@@ -612,7 +628,8 @@ export function generarCsvLibroConsecutivo(filas: readonly FilaLibroConsecutivo[
   const filasTexto = filas.map((f) => {
     const celdas = [
       f.numeroExpediente,
-      formatFechaColombia(f.fechaRadicacion),
+      formatFechaColombia(f.fechaApertura),
+      f.fechaRadicacion ? formatFechaColombia(f.fechaRadicacion) : '',
       f.solicitanteNombre,
       f.solicitanteDocumento,
       f.subtipos.join(', '),
@@ -645,7 +662,12 @@ export function generarCsvLibroConsecutivo(filas: readonly FilaLibroConsecutivo[
 /**
  * Campos sobre los que corre el buscador rápido — los 6 que pidió el
  * propietario (número de expediente/radicado, nombre del solicitante,
- * documento, matrícula, código de subtipo y estado) más `fechaRadicacion`.
+ * documento, matrícula, código de subtipo y estado) más la fecha de APERTURA.
+ *
+ * Se busca por la apertura y no por la radicación en debida forma a propósito:
+ * la segunda puede no existir todavía (expediente en PRESENTADA), y un
+ * buscador que deja de encontrar un expediente porque aún no se radicó es
+ * exactamente lo contrario de lo que necesita quien atiende al ciudadano.
  * SUPUESTO EXPLÍCITO (Principio 13, no estaba en la lista literal del
  * pedido): sin la fecha formateada, el propio ejemplo del encargo —
  * "buscar 'galvis 2025' encuentra al solicitante Galvis del año 2025" —
@@ -655,7 +677,7 @@ export function generarCsvLibroConsecutivo(filas: readonly FilaLibroConsecutivo[
 export interface CamposBusquedaLibro {
   numeroExpediente: string;
   radicadoId?: string | null;
-  fechaRadicacion: string;
+  fechaApertura: string;
   solicitanteNombre: string;
   solicitanteDocumento: string;
   matriculaInmobiliaria?: string | null;
@@ -706,7 +728,7 @@ export function coincideBusquedaLibro(campos: CamposBusquedaLibro, termino: stri
     [
       campos.numeroExpediente,
       campos.radicadoId ?? '',
-      formatFechaColombia(campos.fechaRadicacion),
+      formatFechaColombia(campos.fechaApertura),
       campos.solicitanteNombre,
       campos.solicitanteDocumento,
       campos.matriculaInmobiliaria ?? '',
@@ -733,7 +755,7 @@ export function camposBusquedaDesdeExpediente(exp: ExpedienteLicenciaDoc): Campo
   return {
     numeroExpediente: numeroExpedienteTexto(exp),
     radicadoId: exp.radicadoId ?? null,
-    fechaRadicacion: exp.creadoEn,
+    fechaApertura: exp.creadoEn,
     solicitanteNombre: exp.solicitanteNombre,
     solicitanteDocumento: exp.solicitanteDocumento,
     matriculaInmobiliaria: exp.predio?.matriculaInmobiliaria ?? null,
