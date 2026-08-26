@@ -323,3 +323,75 @@ describe('cron/auditoria-consecutivos — errores fatales', () => {
     expect(mockLogError).toHaveBeenCalled();
   });
 });
+
+describe('cron/auditoria-consecutivos — vigilancia de coherencia con la apertura', () => {
+  beforeEach(() => {
+    process.env.CRON_SECRET = 'secreto-real';
+  });
+
+  /* El caso que motiva la vigilancia: el contador declara haberse abierto en
+     1600 y está en 27. No hay huecos ni duplicados que ver —los documentos de
+     la serie ni siquiera existen todavía— así que las dos capas anteriores
+     callan y solo esta lo nota. */
+  it('detecta un contador movido hacia atrás por fuera y lo reporta como hallazgo', async () => {
+    mockCounterGet.mockImplementation(async (path: string) =>
+      path.startsWith('counters/radicados-')
+        ? {
+            data: () => ({
+              ultimo: 27,
+              apertura: {
+                abiertoEn: 1600,
+                autorizadoPor: 'Secretaría General',
+                fecha: '2026-09-01T13:00:00.000Z',
+              },
+            }),
+          }
+        : { data: () => ({ ultimo: 0 }) },
+    );
+
+    const res = await GET(reqConSecreto());
+    const data = await res.json();
+
+    expect(res.status).toBe(200);
+    expect(data.contadoresIncoherentes).toHaveLength(1);
+    expect(data.contadoresIncoherentes[0]).toMatch(/radicados/);
+    expect(data.contadoresIncoherentes[0]).toMatch(/1600/);
+    expect(data.contadoresIncoherentes[0]).toMatch(/27/);
+    // Cuenta como hallazgo: si no contara, el cron guardaría silencio.
+    expect(data.hallazgos).toBeGreaterThanOrEqual(1);
+    expect(mockEnviarEmail).toHaveBeenCalledTimes(1);
+    // Y queda en el registro de errores aunque el correo falle.
+    expect(mockLogError).toHaveBeenCalledWith(
+      expect.objectContaining({ modulo: 'cron/auditoria-consecutivos/coherencia-apertura' }),
+    );
+  });
+
+  it('el correo nombra la incoherencia en su cuerpo', async () => {
+    mockCounterGet.mockImplementation(async (path: string) =>
+      path.startsWith('counters/salidas-')
+        ? { data: () => ({ ultimo: 3, apertura: { abiertoEn: 900, autorizadoPor: 'Planeación' } }) }
+        : { data: () => ({ ultimo: 0 }) },
+    );
+
+    await GET(reqConSecreto());
+
+    const html = mockEnviarEmail.mock.calls[0][0].html;
+    expect(html).toMatch(/contador\(es\) incoherente\(s\)/i);
+    expect(html).toMatch(/900/);
+  });
+
+  /* Sin registro de apertura no hay historia contra la cual contradecirse:
+     una serie que nunca se abrió no debe generar ruido semanal. */
+  it('un contador SIN registro de apertura no produce hallazgo', async () => {
+    mockCounterGet.mockResolvedValue({ data: () => ({ ultimo: 5 }) });
+    mockCollectionGet.mockResolvedValue({
+      docs: Array.from({ length: 5 }, (_, i) => ({
+        id: `1-110-${new Date().getFullYear()}-${String(i + 1).padStart(8, '0')}`,
+      })),
+    });
+
+    const res = await GET(reqConSecreto());
+    const data = await res.json();
+    expect(data.contadoresIncoherentes).toEqual([]);
+  });
+});

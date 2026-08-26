@@ -153,10 +153,14 @@ export async function POST(request: Request, context: RouteContext): Promise<Nex
       // —eso lo decide el ADR-0033— pero deja de ser una opinión del navegador.
       await expedienteRef.update({
         aportes: resultado.aportesActualizados,
+        // `expediente.completitud` entra como PREVIA: de ahí se conserva
+        // `completoDesde`, el instante en que la solicitud quedó completa —
+        // el hecho que ancla el término. Recalcular no debe reescribirlo.
         completitud: calcularCompletitudExpediente(
           resultado.aportesActualizados,
           expediente.contexto ?? {},
           ahora,
+          expediente.completitud,
         ),
         actualizadoEn: ahora.toISOString(),
       });

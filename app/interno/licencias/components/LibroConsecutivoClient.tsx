@@ -411,6 +411,7 @@ export function LibroConsecutivoClient() {
             <thead>
               <tr style={{ borderBottom: '1px solid var(--color-border)' }}>
                 <Th ancho={190}>N.° expediente</Th>
+                <Th ancho={105}>Apertura</Th>
                 <Th ancho={110}>Fecha radicación</Th>
                 <Th>Solicitante</Th>
                 <Th ancho={150}>Tipo</Th>
@@ -497,8 +498,17 @@ export function LibroConsecutivoClient() {
                           {textoColision !== null && <EtiquetaColisionNumero explicacion={textoColision} />}
                         </div>
                       </td>
+                      <td className="px-3 py-2.5 align-top whitespace-nowrap" style={{ color: 'var(--text-secondary)' }}>
+                        {formatFechaColombia(fila.fechaApertura)}
+                      </td>
+                      {/* Radicación en legal y debida forma. Vacío mientras no
+                          haya ocurrido: hasta el 26-ago-2026 esta celda mostraba
+                          la fecha de apertura, afirmando que el término de 45
+                          días hábiles arrancó un día en que no había arrancado. */}
                       <td className="px-3 py-2.5 align-top whitespace-nowrap" style={{ color: 'var(--text-primary)' }}>
-                        {formatFechaColombia(fila.fechaRadicacion)}
+                        {fila.fechaRadicacion
+                          ? formatFechaColombia(fila.fechaRadicacion)
+                          : <span style={{ color: 'var(--text-secondary)' }} title="Aún no radicada en legal y debida forma">—</span>}
                       </td>
                       <td className="px-3 py-2.5 align-top" style={{ maxWidth: 220 }}>
                         {fila.faltaCedula ? (

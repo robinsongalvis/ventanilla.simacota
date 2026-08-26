@@ -9,7 +9,7 @@ import { describe, expect, it } from 'vitest';
 const DESDE_RADICADO_ROUTE = readFileSync('app/api/licencias/expedientes/desde-radicado/route.ts', 'utf8');
 const CANDIDATOS_ROUTE = readFileSync('app/api/licencias/radicados-candidatos/route.ts', 'utf8');
 const ACTUACIONES_ROUTE = readFileSync('app/api/licencias/expedientes/[id]/actuaciones/route.ts', 'utf8');
-const CONSTANCIA_TEMPLATE = readFileSync('lib/email/templates/constancia-expediente-licencia.ts', 'utf8');
+const ACUSE_TEMPLATE = readFileSync('lib/email/templates/acuse-recibo-expediente-licencia.ts', 'utf8');
 const AVISO_TEMPLATE = readFileSync('lib/email/templates/aviso-acta-observaciones.ts', 'utf8');
 
 function importaDe(fuente: string, especificador: string): boolean {
@@ -35,7 +35,7 @@ describe('POST .../expedientes/desde-radicado — candado R10 intacto', () => {
   });
   it('un fallo de envío de constancia está dentro de un try/catch propio (no revierte la operación)', () => {
     const idxTry = DESDE_RADICADO_ROUTE.lastIndexOf('try {');
-    const idxEnviar = DESDE_RADICADO_ROUTE.indexOf('buildConstanciaExpedienteSubject(numero)');
+    const idxEnviar = DESDE_RADICADO_ROUTE.indexOf('buildAcuseReciboExpedienteSubject(numero)');
     expect(idxTry).toBeGreaterThan(-1);
     expect(idxEnviar).toBeGreaterThan(idxTry);
   });
@@ -71,13 +71,13 @@ describe('POST .../actuaciones — aviso de acta condicionado a fechaComunicacio
 });
 
 describe('Plantillas — sin función de reenvío ni parámetro de fecha de vencimiento', () => {
-  it('constancia-expediente-licencia.ts NO exporta ninguna función de reenvío/resend (el texto documental SÍ puede mencionar la palabra, describiendo la restricción)', () => {
-    expect(CONSTANCIA_TEMPLATE).not.toMatch(/export\s+(async\s+)?function\s+\w*(reenv|resend)\w*/i);
+  it('acuse-recibo-expediente-licencia.ts NO exporta ninguna función de reenvío/resend (el texto documental SÍ puede mencionar la palabra, describiendo la restricción)', () => {
+    expect(ACUSE_TEMPLATE).not.toMatch(/export\s+(async\s+)?function\s+\w*(reenv|resend)\w*/i);
   });
-  it('TemplateConstanciaExpedienteParams NO declara ningún campo de vencimiento', () => {
-    const bloqueInterface = CONSTANCIA_TEMPLATE.slice(
-      CONSTANCIA_TEMPLATE.indexOf('interface TemplateConstanciaExpedienteParams'),
-      CONSTANCIA_TEMPLATE.indexOf('}', CONSTANCIA_TEMPLATE.indexOf('interface TemplateConstanciaExpedienteParams')),
+  it('TemplateAcuseReciboExpedienteParams NO declara ningún campo de vencimiento', () => {
+    const bloqueInterface = ACUSE_TEMPLATE.slice(
+      ACUSE_TEMPLATE.indexOf('interface TemplateAcuseReciboExpedienteParams'),
+      ACUSE_TEMPLATE.indexOf('}', ACUSE_TEMPLATE.indexOf('interface TemplateAcuseReciboExpedienteParams')),
     );
     expect(bloqueInterface.toLowerCase()).not.toContain('vencimiento');
   });

@@ -1,3 +1,9 @@
+import {
+  describirIncoherenciaApertura,
+  SERIES_CONSECUTIVO,
+  type SerieConsecutivo,
+} from '@/lib/server/consecutivo-legal';
+import { elementosNoDeclarados, type AlcanceVigilancia } from '@/lib/server/alcance-vigilancia';
 import { NextResponse }          from 'next/server';
 import { FieldPath } from 'firebase-admin/firestore';
 import { getFirebaseAdminDb }    from '@/lib/firebase-admin';
@@ -19,6 +25,28 @@ import {
 } from '@/scripts/laboratorio/detectar-consecutivos-fantasma.mjs';
 
 export const runtime = 'nodejs';
+
+/**
+ * ALCANCE DECLARADO DE ESTE VIGILANTE (regla operativa del ADR-0033 §4.6).
+ *
+ * Este cron recorría `COLECCION_POR_SERIE` —tres series— y nadie había escrito
+ * en ninguna parte que la cuarta quedaba fuera. `expedientes` es justamente la
+ * única con un libro de papel detrás y la única que exige apertura explícita:
+ * el vigilante no sabía qué no estaba mirando, y su silencio se leyó como
+ * conformidad.
+ *
+ * Ahora la exclusión es una decisión escrita, y
+ * `__tests__/alcance-vigilancia-consecutivos.test.ts` comprueba que entre
+ * cubiertos y excluidos no quede ninguna serie huérfana. Añadir una serie al
+ * dominio sin decidir qué hace este cron con ella rompe esa prueba.
+ */
+export const ALCANCE_BARRIDA_CONTINUIDAD: AlcanceVigilancia<SerieConsecutivo> = {
+  cubiertos: ['radicados', 'salidas', 'planillas'],
+  excluidos: {
+    expedientes:
+      'No tiene colección de documentos asignada mientras Fase 1 no la defina, así que no hay serie de ids que barrer por continuidad. NO queda sin vigilancia: se audita en su propia rama (estado del contador y coherencia con su apertura) más abajo en este mismo cron.',
+  },
+};
 // Techo del plan (Vercel Hobby/Pro: 300s en funciones cron) — mismo estándar
 // que los demás crons de plazo legal (Roadmap P1.4).
 export const maxDuration = 300;
@@ -184,11 +212,32 @@ export async function GET(request: Request): Promise<NextResponse> {
     let totalHuecos = 0;
     let totalDuplicados = 0;
     let totalDocumentosLeidos = 0;
+    /* Contadores que se contradicen a sí mismos. Se reportan aparte de huecos y
+       duplicados porque son de otra naturaleza: un hueco es un síntoma, esto es
+       la CAUSA — y la causa hay que arreglarla antes de que produzca síntomas. */
+    const contadoresIncoherentes: string[] = [];
 
     for (const [serie, coleccion] of Object.entries(COLECCION_POR_SERIE)) {
       // Solo lectura: contador anual de la serie (NUNCA se escribe aquí).
       const counterSnap = await db.doc(`counters/${serie}-${anio}`).get();
       const ultimo = Number(counterSnap.data()?.ultimo ?? 0);
+
+      /* ── Vigilancia: ¿el contador cuadra con su propia historia de apertura?
+         Tercera capa. Detecta el RETROCESO —el contador por debajo de su
+         punto de apertura—, que es el caso que produce duplicados.
+
+         (Un contador movido hacia ADELANTE no lo ve esta comprobación, y no
+         hace falta: saltar números deja HUECOS, y los huecos ya los detecta
+         la barrida de continuidad de más arriba. Una versión anterior de este
+         comentario afirmaba lo contrario; era falso.)
+
+         Aquí se mira, y SOLO se mira: este cron es de lectura absoluta. */
+      const incoherencia = describirIncoherenciaApertura(
+        serie as SerieConsecutivo,
+        ultimo,
+        counterSnap.data()?.apertura,
+      );
+      if (incoherencia) contadoresIncoherentes.push(incoherencia);
 
       // Solo lectura: consecutivos realmente persistidos del año en curso.
       // Mismo criterio que el detector: cuenta TODO documento del año,
@@ -227,6 +276,23 @@ export async function GET(request: Request): Promise<NextResponse> {
     // ReporteSerieExpedientes / auditarCounterExpedientes arriba).
     const counterExpedientesSnap = await db.doc(`counters/expedientes-${anio}`).get();
     const reporteExpedientes = auditarCounterExpedientes(counterExpedientesSnap.data());
+
+    /* `expedientes` NO está en COLECCION_POR_SERIE —se audita en esta rama
+       aparte, porque Fase 1 aún no le asigna colección—, así que la vigilancia
+       de coherencia del bucle de arriba nunca la alcanzaba. Y es justo la
+       serie que MÁS la necesita: la única con `exigeAperturaExplicita`, la
+       única con un libro de papel detrás, y la única donde un contador
+       retrocedido duplicaría actos administrativos ya firmados.
+
+       Segunda vez que la misma regla muerde en esta misma funcionalidad: el
+       instrumento que vigila no puede filtrar por el campo —o por la lista—
+       que deja fuera el caso que más importa. */
+    const incoherenciaExpedientes = describirIncoherenciaApertura(
+      'expedientes',
+      Number(counterExpedientesSnap.data()?.ultimo ?? 0),
+      counterExpedientesSnap.data()?.apertura,
+    );
+    if (incoherenciaExpedientes) contadoresIncoherentes.push(incoherenciaExpedientes);
     series.expedientes = reporteExpedientes;
     const expedientesCorrupto = reporteExpedientes.estado === 'CORRUPTO';
     if (expedientesCorrupto) {
@@ -237,7 +303,19 @@ export async function GET(request: Request): Promise<NextResponse> {
       });
     }
 
-    const totalHallazgos = totalHuecos + totalDuplicados + (expedientesCorrupto ? 1 : 0);
+    /* Un contador incoherente CUENTA como hallazgo. Si no contara, una serie
+       saboteada sin huecos ni duplicados daría cero y el cron guardaría
+       silencio — que es justo lo que significa "todo bien" en este cron. */
+    for (const mensaje of contadoresIncoherentes) {
+      logError({
+        radicadoId: 'n/a',
+        modulo: 'cron/auditoria-consecutivos/coherencia-apertura',
+        error: new Error(mensaje),
+      });
+    }
+
+    const totalHallazgos =
+      totalHuecos + totalDuplicados + contadoresIncoherentes.length + (expedientesCorrupto ? 1 : 0);
 
     registrarEventoNegocio({
       operacion:  'auditoria_consecutivos',
@@ -253,6 +331,7 @@ export async function GET(request: Request): Promise<NextResponse> {
       // Silencio = todo bien: sin correo.
       return NextResponse.json({
         ok: true, anio, timestamp: timestampIso, hallazgos: 0, series,
+        contadoresIncoherentes,
       });
     }
 
@@ -282,6 +361,7 @@ export async function GET(request: Request): Promise<NextResponse> {
         const asunto = buildAuditoriaConsecutivosSubject(totalHallazgos, anio);
         const html = buildAuditoriaConsecutivosHtml({
           anio, timestamp: timestampIso, series: seriesArr, totalHuecos, totalDuplicados,
+          contadoresIncoherentes,
         });
 
         await enviarEmail({ to: destino, subject: asunto, html });
@@ -293,6 +373,7 @@ export async function GET(request: Request): Promise<NextResponse> {
 
     return NextResponse.json({
       ok: true, anio, timestamp: timestampIso, hallazgos: totalHallazgos, correoEnviado, series,
+      contadoresIncoherentes,
     });
 
   } catch (err) {

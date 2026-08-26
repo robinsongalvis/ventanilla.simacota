@@ -54,7 +54,11 @@ const ID_TABLA_BANDEJA_LICENCIAS = 'tabla-bandeja-licencias';
  * "por vencer" de PQRSD, que sí está validado). Se declara aquí, fácil de
  * ajustar cuando exista esa validación.
  */
-const ESTADOS_EN_TRAMITE: readonly EstadoJuridicoLicencia[] = ['RADICADA_EN_DEBIDA_FORMA', 'EN_REVISION', 'EN_VIABILIDAD'];
+// PRESENTADA va aquí o los expedientes en estado previo NO CAEN EN NINGÚN
+// BALDE y desaparecen del panorama sin que nada falle (ADR-0033 §4.6, Caso 1:
+// los arrays no avisan al compilador). Un expediente esperando documentos es
+// trámite en curso: la Alcaldía lo tiene en su poder.
+const ESTADOS_EN_TRAMITE: readonly EstadoJuridicoLicencia[] = ['PRESENTADA', 'RADICADA_EN_DEBIDA_FORMA', 'EN_REVISION', 'EN_VIABILIDAD'];
 const ESTADOS_RESUELTOS: readonly EstadoJuridicoLicencia[] = ['CONCEDIDA', 'NEGADA', 'DESISTIDA', 'NOTIFICADA', 'EN_FIRME'];
 
 function esReconstruido(exp: ExpedienteLicenciaDoc): boolean {
@@ -215,7 +219,7 @@ export function BandejaLicenciasClient({ onAbrirExpediente, onIrALibroConsecutiv
             className="inline-flex items-center gap-2 rounded-[10px] px-4 py-2.5 text-sm font-bold transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-1 hover:brightness-95 active:scale-[0.98]"
             style={{ background: '#D4A017', color: '#14532D', boxShadow: '0 2px 8px rgba(212,160,23,0.25)' }}
           >
-            Radicar solicitud →
+            Recibir solicitud →
           </button>
         </div>
       </div>
@@ -253,7 +257,7 @@ export function BandejaLicenciasClient({ onAbrirExpediente, onIrALibroConsecutiv
           overline="En trámite"
           valor={kpis.enTramite.length}
           tono="normal"
-          detalle={<span>Radicados, en revisión o en viabilidad — sin acta pendiente</span>}
+          detalle={<span>Solicitudes abiertas: presentadas, radicadas, en revisión o en viabilidad — sin acta pendiente</span>}
         />
         <TarjetaKPI
           overline="Resueltos"
@@ -311,7 +315,7 @@ export function BandejaLicenciasClient({ onAbrirExpediente, onIrALibroConsecutiv
                       className="mt-3 inline-flex items-center gap-2 rounded-[10px] px-4 py-2 text-sm font-bold focus-visible:outline-none focus-visible:ring-2"
                       style={{ background: '#D4A017', color: '#14532D' }}
                     >
-                      Radicar solicitud →
+                      Recibir solicitud →
                     </button>
                   </td>
                 </tr>

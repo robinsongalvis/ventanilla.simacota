@@ -1,10 +1,29 @@
 # ADR-0033 — Estado previo a la radicación en debida forma (Licencias)
 
-- **Estado:** PROPUESTO — pendiente de decisión del propietario
+- **Estado:** **ACEPTADO** (25-ago-2026, decisión del propietario tras revisión completa)
 - **Fecha:** 24 de agosto de 2026
 - **Contexto previo:** [auditoría del módulo](../licencias/auditoria-radicacion.md) · ADR-0026 (motor de expedientes) · ADR-0031 (apertura explícita de la serie)
 
 ---
+
+## 0. La decisión
+
+**Se aprueba la separación de estados** (opción 2 de §3). Textualmente:
+
+> El expediente puede existir y recibir documentos **sin afirmar completitud y sin término
+> corriendo**. La radicación, el número oficial y el arranque del plazo ocurren **en la transición
+> al estado de debida forma**, no en la creación.
+
+Consecuencias inmediatas:
+
+- El emisor de consecutivos se cablea en la transición `PRESENTADA → RADICADA_EN_DEBIDA_FORMA`.
+  **No** en la creación.
+- **Ningún expediente vuelve a nacer en debida forma.**
+- La constancia impresa y el aviso de radicación ya pueden decir la fecha correcta, porque ya
+  existe una fecha correcta que decir.
+
+El nombre `PRESENTADA` es **provisional**: es lenguaje institucional, no técnico, y si la
+Secretaría de Planeación lo llama distinto se cambia (§7).
 
 ## 1. El problema
 
@@ -207,8 +226,14 @@ redescubrirla cada vez:
 > **El instrumento que vigila el silencio no puede filtrar por el campo que
 > falta justo en los casos que más importan.**
 
-No es una máxima abstracta: se ha materializado tres veces en este módulo, y
-las tres veces el defecto **compilaba, pasaba las pruebas y no se quejaba**.
+No es una máxima abstracta: se ha materializado **cinco veces documentadas**, y
+las cinco el defecto **compilaba, pasaba las pruebas y no se quejaba**.
+
+*(Nota de recuento, 26-ago-2026: el propietario la llamó «sexta aparición». Al
+registrarla aquí se detectó que dos de los casos previos eran el MISMO defecto
+—la expresión `[^\s]+` del detector de rutas— contado dos veces. Se deja la
+cuenta en cinco: inflarla para que cuadre con la memoria de nadie sería, en
+pequeño, el mismo vicio que este ADR persigue.)*
 Por eso se registran como casos, con nombre y con lo que cada uno habría
 ocultado.
 
@@ -258,6 +283,36 @@ importa.
 antes de subirlo. Ocurrió **dentro de la herramienta escrita para aplicar esta
 misma regla**, y unas horas después de enunciarla aquí.
 
+#### Caso 4 — El escritor y el vigilante, en desacuerdo sobre dónde vive el dato
+
+`scripts/migracion/abrir-serie-expedientes.mjs` escribía el registro de
+apertura **aplanado en la raíz** del contador y con la grafía `abiertaEn` (una
+fecha). Los dos verificadores —`verificarCoherenciaConApertura` en la emisión y
+el cron de los lunes— leen `counters/{serie}-{año}.apertura.abiertoEn` (un
+número). Recibían `undefined` y salían por su primera línea.
+
+*Lo que habría ocultado:* el guard de coherencia quedaba **inerte** en
+`expedientes`: la única serie que exige apertura explícita, la única con un
+libro de papel detrás, y la única donde un contador retrocedido duplicaría
+actos administrativos ya firmados.
+
+*Cómo se cazó:* barrido adversarial en busca de escrituras a Firestore con
+objetos literales sin tipar. El script es `.mjs`: ahí no hay compilador que
+vigile nada.
+
+#### Caso 5 — El vigilante que recorría una lista incompleta
+
+La vigilancia de coherencia añadida al cron corría **dentro del bucle** sobre
+`COLECCION_POR_SERIE`, un mapa de tres entradas. `expedientes` no está en él —
+se audita en una rama aparte— así que la tercera capa nunca alcanzaba la cuarta
+serie. **La misma serie del Caso 5, en la misma semana.**
+
+*Lo que habría ocultado:* exactamente lo mismo que el Caso 4, por otra vía.
+Antes fue el campo; ahora, la lista.
+
+*Cómo se cazó:* segundo barrido adversarial, después de dar por cerrado el
+Caso 5.
+
 ---
 
 El defecto que este ADR corrige es de la misma familia: un expediente nace
@@ -265,9 +320,91 @@ afirmando completitud porque el sistema no tenía cómo representar «todavía n
 verificado». **Lo que no se puede nombrar, no se puede vigilar** — y lo que se
 filtra por el campo ausente, tampoco.
 
-De los tres casos se sigue una prueba práctica, barata de aplicar: **ante todo
+De los cinco casos se sigue una prueba práctica, barata de aplicar: **ante todo
 filtro, preguntar qué caso queda fuera por no tener ese campo.** Si la
 respuesta es «el que estoy buscando», el filtro está mal.
+
+### 4.6-bis Regla operativa: todo vigilante declara su alcance
+
+Decidido el 26-ago-2026, tras la quinta aparición y la **segunda sobre la misma
+serie en la misma semana**. Enunciarla cinco veces no bastó, así que deja de
+ser una nota y pasa a ser vinculante:
+
+> **Cuando se construya cualquier instrumento que vigile —cron, guard,
+> verificador, prueba— el mismo cambio debe enumerar, por escrito y en el
+> propio código, contra qué corre y qué queda fuera.**
+>
+> Una lista que se recorre sin declarar quién no está en ella es un vigilante
+> que no sabe qué no está mirando.
+
+**Excluir sigue siendo legítimo** —y a veces obligatorio—. Lo que deja de ser
+posible es excluir **sin darse cuenta**. Esa es la diferencia entre una
+decisión y un descuido, y es toda la diferencia.
+
+#### Cómo se verifica solo
+
+La regla se incumplió cinco veces porque dependía de que alguien la recordara.
+`lib/server/alcance-vigilancia.ts` la convierte en algo que una prueba
+comprueba:
+
+1. **El dominio vive en código, no en un comentario.** `SERIES_CONSECUTIVO`
+   (`lib/server/consecutivo-legal.ts`) se declara `satisfies readonly
+   SerieConsecutivo[]`: añadir una serie al tipo sin añadirla a la lista no
+   compila.
+2. **El instrumento declara su alcance** en un `AlcanceVigilancia<T>`:
+   `cubiertos` y `excluidos`, cada exclusión con su razón. `excluidos` se tipa
+   `Partial<Record<T, string>>`, así que **una clave mal escrita no compila** —
+   una exclusión con errata no puede hacerse pasar por declarada.
+3. **Una prueba comprueba que no queda nadie huérfano**:
+   `elementosNoDeclarados(dominio, alcance)` debe dar vacío. Añadir una serie
+   al dominio sin decidir qué hace el vigilante con ella **rompe la prueba**.
+4. **Y la simétrica**: `elementosFantasma` detecta lo declarado que ya no
+   existe — el paso previo a quedarse ciego cuando el dominio se renombra.
+5. **La prueba se prueba a sí misma.** `__tests__/alcance-vigilancia-consecutivos.test.ts`
+   reproduce el alcance exacto que el cron tenía antes del 26-ago-2026 y
+   verifica que el mecanismo lo señala: un guard que no se ha visto fallar no
+   es un guard, es una esperanza.
+
+#### El hueco que este mecanismo NO cierra
+
+Hay que decirlo con el caso concreto, porque un hueco enunciado en abstracto se
+olvida igual que la regla que vino a sostener:
+
+> **El día que alguien escriba un cron nuevo y no declare su alcance, este
+> mecanismo calla.** No hay nada que compare ese cron contra ningún dominio,
+> porque el mecanismo solo comprueba a los instrumentos que se declaran. Un
+> vigilante que no declara nada es indistinguible de un vigilante que no
+> existe — y su silencio, otra vez, se lee como conformidad.
+
+Es exactamente el mismo defecto una vuelta más arriba: antes era una lista
+incompleta dentro de un vigilante; ahora es la lista incompleta **de los
+vigilantes**.
+
+**Qué lo cerraría** — escrito aquí para que la siguiente vuelta no empiece de
+cero:
+
+Un **registro central de instrumentos de vigilancia**. Un módulo único donde
+cada cron, guard, verificador o conciliador se inscribe con su dominio y su
+`AlcanceVigilancia`, y una prueba que cruce ese registro contra el inventario
+real de instrumentos del repositorio. El inventario real puede obtenerse de dos
+sitios que ya existen y no dependen de que nadie recuerde nada:
+
+1. **`vercel.json`** — la lista de crons desplegados. Todo cron que corra en
+   producción está ahí; un cron en el registro que no esté en `vercel.json` no
+   corre, y uno en `vercel.json` que no esté en el registro no declara alcance.
+2. **El árbol de `app/api/cron/**`** — los handlers, para el mismo cruce por el
+   otro lado.
+
+La prueba sería la misma forma que ya se aplica a las series:
+`elementosNoDeclarados(inventarioReal, registroDeInstrumentos)`. Lo que hoy
+protege a las cuatro series, protegiendo a los vigilantes.
+
+**No se construye ahora** (decisión del propietario, 26-ago-2026): primero hay
+que ver cuántos instrumentos hay y qué están dejando fuera. Esa enumeración es
+el paso previo, y va antes que el registro.
+
+**Precedente aplicable a todo el repositorio**, no solo a las series: el mismo
+patrón sirve para dependencias, tipos de trámite, estados y roles.
 
 ### 4.7 Recorte de alcance decidido con Planeación
 
