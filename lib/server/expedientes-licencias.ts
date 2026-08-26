@@ -158,7 +158,7 @@ export interface ActuacionLicenciaDoc extends Actuacion {
   /**
    * Presente SOLO en actuaciones `tipo: 'comunicacion-enviada'` — el tipo
    * ESTRUCTURADO de la comunicación (p. ej. "Aviso de acta de observaciones
-   * y correcciones", "Constancia de radicación en legal y debida forma").
+   * y correcciones", "Acuse de recibo de solicitud").
    * Corrección de un hallazgo de revisión cruzada con consecuencia jurídica
    * (10-ago-2026): `'comunicacion-enviada'` es un tipo COMPARTIDO por la
    * constancia (`desde-radicado/route.ts`) y el aviso del acta
@@ -827,21 +827,22 @@ export function debeEnviarComunicacionExpediente(
   radicado: RadicadoParaComunicacion | null | undefined,
   numeroExpediente?: string,
 ): GateComunicacionExpediente {
-  // NUNCA se envía una constancia oficial con un número de DEMOSTRACIÓN.
+  // NUNCA se comunica al ciudadano un número de DEMOSTRACIÓN.
   //
-  // La plantilla afirma al ciudadano que ese número "identifica su trámite de
-  // manera única y permanente" (`lib/email/templates/constancia-expediente-
-  // licencia.ts`) y no distingue el origen del número. Con el candado R10
-  // cerrado, todo expediente nace con `DEMO-{AA}-{8hex}`: enviar esa
-  // constancia sería afirmarle por escrito a un ciudadano, con membrete de la
-  // Alcaldía, algo falso — y no existe ruta de reenvío ni de corrección.
+  // El corte sigue vigente aunque el correo haya dejado de ser una constancia:
+  // desde el 26-ago-2026 se envía un ACUSE DE RECIBO
+  // (`lib/email/templates/acuse-recibo-expediente-licencia.ts`), que no
+  // certifica ningún hecho jurídico — pero sí le da al ciudadano un número
+  // con el que volver al mostrador. Con el candado R10 cerrado ese número es
+  // `DEMO-{AA}-{8hex}`, que no existe en ninguna serie: la persona vendría a
+  // preguntar por un expediente que nadie puede encontrar.
   //
   // Se corta AQUÍ y no en la plantilla a propósito: la decisión de comunicar
   // es del dominio, no de la maqueta del correo.
   if (numeroExpediente?.startsWith('DEMO-')) {
     return {
       debeEnviar: false,
-      motivo: 'El expediente tiene un número de DEMOSTRACIÓN (candado R10): no se comunica al ciudadano una constancia oficial con un número que no es el consecutivo legal.',
+      motivo: 'El expediente tiene un número de DEMOSTRACIÓN (candado R10): no se le entrega al ciudadano un número que no pertenece a la serie legal y con el que nadie podría encontrar su expediente.',
     };
   }
   if (!DEFINICIONES_HABILITADAS_COMUNICACION_EXPEDIENTE.has(tramiteId)) {

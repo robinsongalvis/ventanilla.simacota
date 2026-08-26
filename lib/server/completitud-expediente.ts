@@ -101,3 +101,48 @@ export function calcularCompletitudExpediente(
     evaluadoEn: ahora.toISOString(),
   };
 }
+
+/** Lo que el ciudadano necesita ver en un acuse de recibo: qué entregó y qué le falta. */
+export interface ResumenDocumentosAcuse {
+  entregados: string[];
+  faltantes: { nombre: string; motivo: string }[];
+  aplicables: number;
+  completo: boolean;
+}
+
+/**
+ * Qué documentos entregó el ciudadano y cuáles le faltan, con nombres
+ * legibles — no ids de requisito.
+ *
+ * PARA QUÉ EXISTE. El acuse de recibo tiene que decirle al ciudadano qué
+ * queda pendiente; si no, no le sirve de nada haber venido. `CompletitudExpediente`
+ * ya guarda los faltantes, pero no los ENTREGADOS: contar «12 de 19» sin poder
+ * enumerar los 12 obliga a la persona a volver al mostrador a preguntar
+ * exactamente lo que el acuse existe para evitar.
+ *
+ * Los requisitos condicionales que NO aplican a este caso no se listan en
+ * ninguna de las dos columnas: pedirle a alguien un documento que su trámite
+ * no exige es tan dañino como no pedirle el que sí.
+ */
+export function resumenDocumentosAcuse(
+  aportes: AporteRequisito[],
+  contexto: ContextoEvaluacionRequisito,
+): ResumenDocumentosAcuse {
+  const tramite = DEFINICION_LICENCIA_CONSTRUCCION_PARCIAL;
+  const r = evaluarCompletitud(tramite, aportes, contexto);
+
+  const noAplican = new Set(r.noAplicables);
+  const faltanIds = new Set(r.faltantes.map((f) => f.requisitoId));
+  const indeterminados = new Set(r.indeterminados.map((i) => i.requisitoId));
+
+  const entregados = tramite.requisitos
+    .filter((req) => !noAplican.has(req.id) && !faltanIds.has(req.id) && !indeterminados.has(req.id))
+    .map((req) => req.nombre);
+
+  return {
+    entregados,
+    faltantes: r.faltantes.map((f) => ({ nombre: f.nombre, motivo: String(f.motivo) })),
+    aplicables: tramite.requisitos.length - r.noAplicables.length,
+    completo: r.completo,
+  };
+}
