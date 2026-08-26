@@ -1235,6 +1235,7 @@ function diaCivilBogota(iso: string): string {
  * explica con acta, pero explicarlo es trabajo que nadie tiene por qué hacer.
  */
 export function evaluarRadicacionEnDebidaForma(entrada: {
+  /** Tal como está en Firestore ANTES de este acto — de aquí sale el hecho registrado. */
   expediente: ExpedienteLicenciaDoc;
   actuacionesPrevias: ActuacionLicenciaDoc[];
   /** Documentos leídos por los ids que traen los `aportes` APORTADOS. */
@@ -1316,6 +1317,21 @@ export function evaluarRadicacionEnDebidaForma(entrada: {
     exp.completitud,
   );
   if (!completitud.completo) {
+    /* DOS CAUSAS DISTINTAS, DOS MENSAJES DISTINTOS. Con una sola redacción, un
+       expediente bloqueado por contexto incompleto le decía a la funcionaria
+       «faltan 0 de 19 requisitos» — un mensaje que no se puede accionar: no
+       falta ningún documento, falta saber QUÉ documentos aplican a este caso
+       (si hay apoderado, si el predio linda con espacio público, la categoría
+       de complejidad). Un rechazo que no dice qué hacer es un rechazo a medias. */
+    if (completitud.faltantes.length === 0) {
+      return {
+        status: 409,
+        mensaje:
+          'Faltan datos del caso para saber qué documentos exige este trámite (por ejemplo si actúa un apoderado, ' +
+          'si el predio linda con espacio público, o la categoría de complejidad). Complete esos datos en el ' +
+          'expediente y vuelva a intentarlo: hasta entonces no se puede afirmar que la solicitud esté completa.',
+      };
+    }
     const lista = completitud.faltantes.map((f) => f.nombre).join('; ');
     return {
       status: 409,
@@ -1361,7 +1377,20 @@ export function evaluarRadicacionEnDebidaForma(entrada: {
      y solo para expedientes anteriores a ese campo — con su base escrita en
      la evidencia para que nadie confunda una fecha registrada con una
      inferida. */
-  const registrado = completitud.completoDesde;
+  /* EL HECHO REGISTRADO ES EL **PERSISTIDO**, NO EL RECALCULADO.
+
+     `completitud` viene de recalcular ahora mismo, y ese recálculo SELLA
+     `completoDesde` con «ahora» si el expediente está completo y no traía
+     valor previo. Tomarlo de ahí hacía que el ancla fuera SIEMPRE el momento
+     registrado —la deducción quedaba en código muerto— y, en un expediente
+     anterior al campo, el término arrancaría HOY: exactamente lo que este
+     código dice que nunca hará, regalándole a la Administración los días que
+     el expediente llevaba completo sin que nadie lo declarara.
+
+     Se lee del documento tal como estaba ANTES de esta evaluación. Si no lo
+     trae, no hay hecho registrado y se pasa a la deducción declarada, con su
+     guard de término vencido. */
+  const registrado = exp.completitud?.completoDesde;
   const baseDelAncla = registrado
     ? ('MOMENTO_REGISTRADO_DE_COMPLETITUD' as const)
     : ('PRIMERA_VERSION_DEL_ULTIMO_DOCUMENTO' as const);
