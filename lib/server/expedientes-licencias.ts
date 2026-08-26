@@ -1,11 +1,11 @@
 import type { TenantId } from '@/src/types/radicado';
 import { calcularCompletitudExpediente, type CompletitudExpediente } from '@/lib/server/completitud-expediente';
-import type { Expediente, Actuacion, ContextoEvaluacionRequisito, DefinicionTramite } from '@/lib/motor-expedientes/tipos';
+import type { Expediente, Actuacion, ContextoEvaluacionRequisito, DefinicionTramite, NumeroExpedienteAsignado } from '@/lib/motor-expedientes/tipos';
 import { CATALOGO_FIGURAS_NORMATIVAS } from '@/lib/motor-expedientes/catalogo-subtipos-normativo';
 import { puedeTransicionar, type EstadoJuridicoLicencia, type RevisionHistoricaLicencia } from '@/lib/motor-expedientes/estados-licencia';
 import { esEstadoCerrado } from '@/lib/radicado-estados';
 import { DEFINICION_LICENCIA_CONSTRUCCION_PARCIAL } from '@/lib/motor-expedientes/definiciones/licencia-construccion-parcial';
-import { sumarDiasHabiles, diasRestantesHabiles } from '@/lib/tiempos-radicado';
+import { sumarDiasHabiles, diasRestantesHabiles, atLocalNoon } from '@/lib/tiempos-radicado';
 import { debeNotificarCiudadano, type CriterioNotificacion } from '@/lib/email/debe-notificar-ciudadano';
 import { PREFIJO_AVISO_ACTA_COMUNICACION } from '@/lib/motor-expedientes/comunicaciones-licencia';
 import { calcularVencimientoDual, derivarEventosTermino } from '@/lib/motor-expedientes/termino';
@@ -1088,5 +1088,378 @@ export function generarBorradorActoDesistimiento(
   return {
     titulo: `Proyecto de acto de desistimiento tácito — expediente ${numero}`,
     cuerpo,
+  };
+}
+
+/* ══════════════════════════════════════════════════════════════
+   EL ACTO DE RADICAR — PRESENTADA → RADICADA_EN_DEBIDA_FORMA
+
+   Es el momento en que la Alcaldía AFIRMA que la solicitud llegó completa:
+   nace el número oficial y arranca el término de 45 días hábiles
+   (D.1077/2015 art. 2.2.6.1.2.1.1 par. 1). ADR-0033: el número y el término
+   nacen en ESTA transición, no al crear el expediente.
+
+   TODO lo de aquí es PURO. La transacción, la emisión del número y las
+   escrituras las orquesta la ruta; este módulo decide QUÉ debe ocurrir y se
+   deja probar sin Firestore.
+══════════════════════════════════════════════════════════════ */
+
+/** Lo que el acto necesita saber de un documento aportado. Subconjunto deliberado de `DocumentoExpedienteDoc`. */
+export interface DocumentoParaAncla {
+  id: string;
+  requisitoId?: string;
+  /**
+   * ISO 8601, INMUTABLE: creación del documento lógico (= su v0001). NO es
+   * `versionVigente.subidoEn`. La diferencia tiene consecuencia jurídica:
+   * si el ciudadano corrige un documento con una versión nueva, el término
+   * NO se recorre hacia adelante — la solicitud estuvo completa desde la
+   * primera cobertura de ese requisito.
+   */
+  creadoEn: string;
+  versionVigente?: { hashSha256?: string };
+}
+
+export interface EvidenciaDelAncla {
+  /** Requisito cuyo documento fija el ancla (el ÚLTIMO en llegar). */
+  requisitoId: string;
+  documentoId: string;
+  /** Hash de la versión vigente — ata la afirmación al binario exacto (INV-3). */
+  hashSha256?: string;
+}
+
+export interface EvaluacionRadicacionDebidaForma {
+  /** Día en que la solicitud quedó completa, ISO 8601 al mediodía local. */
+  anclaIso: string;
+  /** Cómo se determinó el ancla. Hoy hay un solo valor, y decirlo es parte de la evidencia. */
+  baseDelAncla: 'PRIMERA_VERSION_DEL_ULTIMO_DOCUMENTO';
+  /** El mismo día, en formato civil `YYYY-MM-DD` — lo que se enseña y lo que se confirma. */
+  anclaDiaCivil: string;
+  evidencia: EvidenciaDelAncla;
+  completitud: CompletitudExpediente;
+}
+
+/** El acto ya ocurrió. No se repite: se devuelve lo que quedó escrito. */
+export interface RadicacionYaOcurrida {
+  yaEstaba: true;
+  numeroExpediente: string | null;
+  anclaIso: string;
+}
+
+export function esRadicacionYaOcurrida(x: unknown): x is RadicacionYaOcurrida {
+  return typeof x === 'object' && x !== null && (x as RadicacionYaOcurrida).yaEstaba === true;
+}
+
+/** Día civil de Bogotá de un instante ISO — `YYYY-MM-DD`, sin depender del reloj del proceso. */
+function diaCivilBogota(iso: string): string {
+  return new Intl.DateTimeFormat('en-CA', {
+    timeZone: 'America/Bogota',
+    year: 'numeric', month: '2-digit', day: '2-digit',
+  }).format(new Date(iso));
+}
+
+/**
+ * ¿Procede declarar la radicación en legal y debida forma?
+ *
+ * PURA, y se ejecuta DENTRO de la transacción sobre lo que la transacción
+ * acaba de leer — no sobre lo que la pantalla vio hace un minuto. Esa es la
+ * revalidación: entre que la funcionaria miró y pulsó, alguien pudo subir un
+ * documento, retirar otro o radicar el expediente por otra pestaña.
+ *
+ * ORDEN DELIBERADO de los guards, de más específico a más genérico: un
+ * expediente histórico debe recibir una negativa que diga «es histórico», no
+ * un «faltan documentos» que nadie puede satisfacer.
+ *
+ * SE EJECUTA ANTES DE LEER EL CONTADOR. Un rechazo no llega siquiera a mirar
+ * la serie, así que un intento fallido no puede dejar un hueco: un hueco se
+ * explica con acta, pero explicarlo es trabajo que nadie tiene por qué hacer.
+ */
+export function evaluarRadicacionEnDebidaForma(entrada: {
+  expediente: ExpedienteLicenciaDoc;
+  actuacionesPrevias: ActuacionLicenciaDoc[];
+  /** Documentos leídos por los ids que traen los `aportes` APORTADOS. */
+  documentos: DocumentoParaAncla[];
+  /** Día civil que la pantalla le mostró a la funcionaria. Si ya no coincide, se rechaza. */
+  anclaEsperada?: string;
+  tenantEsperado: TenantId;
+  ahora: Date;
+}): ErrorExpediente | RadicacionYaOcurrida | EvaluacionRadicacionDebidaForma {
+  const { expediente: exp, actuacionesPrevias, documentos, anclaEsperada, tenantEsperado, ahora } = entrada;
+
+  /* (a) Tenant. `canOperateTenant` deja pasar a ADMIN y RECEPCIONISTA contra
+     CUALQUIER dependencia; sin esta comprobación un rol transversal podría
+     declarar en debida forma un expediente que no es de su escritorio. */
+  if (exp.tenantId !== tenantEsperado) {
+    return { status: 404, mensaje: 'Expediente no encontrado.' };
+  }
+
+  /* (b) Un expediente RECONSTRUIDO no se radica: su radicación ocurrió en
+     papel, años atrás. Declararla hoy inventaría un hito que ya pasó y
+     arrancaría un término legal sobre un trámite que puede estar resuelto. */
+  if (exp.origen === 'RECONSTRUIDO' || exp.revisionHistorica) {
+    return {
+      status: 409,
+      mensaje: 'Este expediente proviene del libro histórico de Planeación: su radicación consta en papel y no se declara de nuevo aquí. Para completar su revisión use el flujo de revisión histórica.',
+    };
+  }
+
+  /* (c) Un expediente de DEMOSTRACIÓN no consume la serie legal. El candado
+     R10 ya lo impide aguas arriba; esto lo vuelve imposible también por dato,
+     no solo por configuración. */
+  if (exp.esPrueba === true) {
+    return {
+      status: 422,
+      mensaje: 'Este es un expediente de demostración (esPrueba). No puede recibir un número de la serie legal de expedientes.',
+    };
+  }
+
+  /* (d) REPLAY — el acto ya ocurrió. La idempotencia es del DOMINIO: el
+     propio `estadoJuridico`, leído bajo el bloqueo de la transacción, es el
+     candado. No se inventa una clave de idempotencia porque el estado ya
+     dice, con precisión jurídica, si el hecho ocurrió.
+
+     Devuelve 200 con lo escrito, no un error: quien reintenta tras una
+     desconexión no cometió ninguna falta, y un 409 le haría pensar que hay
+     dos radicaciones cuando hay una. */
+  if (exp.estadoJuridico === 'RADICADA_EN_DEBIDA_FORMA') {
+    const yaEscrita = actuacionesPrevias.find(
+      (a) => a.tipo === 'radicacion-debida-forma' && a.origen === 'REAL',
+    );
+    return {
+      yaEstaba: true,
+      numeroExpediente: exp.numeroExpediente?.numero ?? null,
+      anclaIso: yaEscrita?.fecha ?? exp.actualizadoEn ?? ahora.toISOString(),
+    };
+  }
+
+  /* (e) Cualquier otro estado: la máquina de estados decide, no una lista
+     escrita a mano aquí. */
+  if (!puedeTransicionar(exp.estadoJuridico, 'RADICADA_EN_DEBIDA_FORMA')) {
+    return {
+      status: 409,
+      mensaje: `Un expediente en estado "${exp.estadoJuridico}" no puede declararse radicado en legal y debida forma. Solo procede desde "PRESENTADA".`,
+    };
+  }
+
+  /* (f) Completitud RECALCULADA, nunca leída del campo persistido.
+     `completitud` es opcional y su ausencia significa «nunca se evaluó» —
+     que no es «está completo». Una compuerta escrita `completitud?.completo
+     !== false` dejaría pasar justo a los expedientes que nunca se evaluaron. */
+  const completitud = calcularCompletitudExpediente(exp.aportes ?? [], exp.contexto ?? {}, ahora);
+  if (!completitud.completo) {
+    const lista = completitud.faltantes.map((f) => f.nombre).join('; ');
+    return {
+      status: 409,
+      mensaje: `La solicitud todavía no está completa: faltan ${completitud.faltantes.length} de ${completitud.aplicables} requisitos aplicables (${lista}). El término no puede arrancar hasta que estén todos.`,
+    };
+  }
+
+  /* (g) EL ANCLA. El término corre desde el día en que llegó el ÚLTIMO
+     requisito, no desde hoy ni desde que se abrió el expediente. Se deriva
+     de la evidencia —la fecha inmutable del documento— y nunca del reloj:
+     si no se puede determinar, se rechaza. Caer hacia `ahora` regalaría a la
+     Administración los días que el expediente llevaba completo sin que nadie
+     lo declarara, que es exactamente lo contrario de lo que protege el
+     término. */
+  const porId = new Map(documentos.map((d) => [d.id, d]));
+  const cubiertos: { requisitoId: string; doc: DocumentoParaAncla }[] = [];
+  for (const aporte of exp.aportes ?? []) {
+    if (aporte.estado !== 'APORTADO') continue;
+    for (const docId of aporte.documentoIds ?? []) {
+      const doc = porId.get(docId);
+      if (doc) cubiertos.push({ requisitoId: aporte.requisitoId, doc });
+    }
+  }
+  if (cubiertos.length === 0) {
+    return {
+      status: 409,
+      mensaje: 'No se puede determinar desde cuándo corre el término: el expediente figura completo pero no hay documentos con fecha que lo respalden. Revise los documentos antes de radicar.',
+    };
+  }
+
+  const ultimo = cubiertos.reduce((a, b) =>
+    new Date(b.doc.creadoEn).getTime() > new Date(a.doc.creadoEn).getTime() ? b : a,
+  );
+  const anclaIso = atLocalNoon(ultimo.doc.creadoEn).toISOString();
+  const anclaDiaCivil = diaCivilBogota(ultimo.doc.creadoEn);
+
+  /* (h) Control optimista LEGIBLE POR UN AUDITOR: la funcionaria confirma el
+     día que la pantalla le enseñó. Si entre lo que vio y el commit entró otro
+     documento, el ancla se movió y el acto se rechaza — en vez de afirmar una
+     fecha que ella nunca vio. Es lo contrario de un campo de fecha libre, que
+     sería la puerta trasera al «clic de verificación» que ADR-0033 prohíbe. */
+  if (anclaEsperada && anclaEsperada !== anclaDiaCivil) {
+    return {
+      status: 409,
+      mensaje: `La evidencia cambió mientras revisaba: usted vio que el término arrancaría el ${anclaEsperada} y ahora arrancaría el ${anclaDiaCivil}. Vuelva a revisar el expediente antes de radicar.`,
+    };
+  }
+
+  /* ⚠️ EL ANCLA SE DERIVA DE `creadoEn`, QUE RESPONDE A OTRA PREGUNTA.
+     `creadoEn` es la fecha en que se adjuntó el PRIMER archivo de ese
+     requisito, no la fecha en que el requisito quedó de verdad satisfecho:
+     el servidor no revisa contenido, así que un PDF equivocado subido el
+     día 1 marca el requisito como aportado, y la corrección posterior entra
+     como versión nueva sin mover `creadoEn`.
+
+     El sesgo favorece al ciudadano, y hasta aquí sería la doctrina
+     conservadora de siempre. Pero llevado al extremo deja de ser un sesgo:
+     si el ancla derivada es tan antigua que el término YA venció, radicar
+     hoy equivaldría a declarar de oficio un silencio administrativo
+     positivo — la licencia concedida por no responder a tiempo.
+
+     Mientras el sistema no registre CUÁNDO la solicitud quedó completa (un
+     `completoDesde` escrito en el instante en que la completitud pasa a
+     verdadera, hoy inexistente), este acto NO adivina: se detiene y pide una
+     decisión humana. Un «no puedo» ruidoso, en lugar de un plazo vencido en
+     silencio. */
+  const vencimiento = sumarDiasHabiles(atLocalNoon(anclaIso), PLAZO_DECISION_LICENCIA_DIAS_HABILES);
+  if (diasRestantesHabiles(vencimiento.toISOString()) < 0) {
+    return {
+      status: 409,
+      mensaje:
+        `No se radica automáticamente: la fecha del último documento (${anclaDiaCivil}) haría que el término ` +
+        `de ${PLAZO_DECISION_LICENCIA_DIAS_HABILES} días hábiles naciera YA VENCIDO. Esa fecha es la de la primera ` +
+        `versión del documento, que puede no ser el día en que la solicitud quedó realmente completa. ` +
+        `Revise el expediente con Planeación antes de declarar la radicación: radicar así equivaldría a ` +
+        `reconocer un silencio administrativo positivo.`,
+    };
+  }
+
+  return {
+    anclaIso,
+    anclaDiaCivil,
+    /** De dónde salió el ancla — para que un auditor no tenga que suponerlo. */
+    baseDelAncla: 'PRIMERA_VERSION_DEL_ULTIMO_DOCUMENTO' as const,
+    evidencia: {
+      requisitoId: ultimo.requisitoId,
+      documentoId: ultimo.doc.id,
+      hashSha256: ultimo.doc.versionVigente?.hashSha256,
+    },
+    completitud,
+  };
+}
+
+export interface PlanRadicarEnDebidaForma {
+  /** Se escribe con `tx.create` sobre un id DETERMINISTA — el tercer candado contra el acto duplicado. */
+  actuacion: ActuacionLicenciaDoc;
+  actuacionId: string;
+  /** Campos a fusionar en el documento raíz del expediente. */
+  parcheExpediente: {
+    estadoJuridico: EstadoJuridicoLicencia;
+    /* Tipado contra el modelo A PROPÓSITO: escribí `anio` en la primera
+       versión y el compilador no dijo nada, porque el objeto era literal.
+       El campo real es `año`, y un expediente con `anio` habría quedado sin
+       número visible para todo lo que lo lee. */
+    numeroExpediente: NumeroExpedienteAsignado;
+    /**
+     * La fecha JURÍDICA de la radicación, denormalizada en el raíz por el
+     * mismo motivo que `fechaAlertaConservadora`: quien lista no paga la
+     * lectura de la subcolección. Sin esto, el Libro Consecutivo seguiría
+     * mostrando `creadoEn` —el día que se abrió la carpeta— en la columna
+     * «fecha de radicación», contradiciendo a la actuación que dice otra.
+     * Dos fechas distintas para el mismo hecho es el defecto que el
+     * ADR-0033 vino a corregir.
+     */
+    fechaRadicacionDebidaForma: string;
+    fechaAlertaConservadora: string | null;
+    completitud: CompletitudExpediente;
+    actualizadoEn: string;
+  };
+}
+
+/** Id determinista de la actuación que declara la radicación. Un solo acto, un solo documento. */
+export function idActuacionRadicacion(expedienteId: string): string {
+  return `${expedienteId}-radicacion`;
+}
+
+/**
+ * Construye lo que se escribe, una vez emitido el número. PURA.
+ *
+ * Se separa de `evaluarRadicacionEnDebidaForma` a propósito: entre las dos
+ * ocurre la emisión del consecutivo, que es la ÚLTIMA lectura y la PRIMERA
+ * escritura de la transacción. Partir el cómputo en dos deja ese orden
+ * visible en la ruta en vez de escondido en un solo bloque.
+ */
+export function planRadicarEnDebidaForma(entrada: {
+  expedienteId: string;
+  tenantId: string;
+  evaluacion: EvaluacionRadicacionDebidaForma;
+  numeroEmitido: string;
+  anioSerie: number;
+  actuacionesPrevias: ActuacionLicenciaDoc[];
+  actor: { uid: string; nombre: string; rol: string };
+  ahora: Date;
+  definicionId?: string;
+  observacion?: string;
+}): PlanRadicarEnDebidaForma {
+  const { expedienteId, tenantId, evaluacion, numeroEmitido, anioSerie,
+          actuacionesPrevias, actor, ahora, definicionId, observacion } = entrada;
+
+  const actuacionId = idActuacionRadicacion(expedienteId);
+  const actuacion: ActuacionLicenciaDoc = {
+    id: actuacionId,
+    expedienteId,
+    tenantId,
+    /* EXACTAMENTE este slug. `SLUG_A_TIPO_EVENTO` es un lookup literal: una
+       variante ('radicacion_debida_forma', 'radicacionDebidaForma') no da
+       error — se descarta EN SILENCIO y el término nunca arranca. */
+    tipo: 'radicacion-debida-forma',
+    etapa: 'radicacion',
+    actorUid: actor.uid,
+    actorNombre: actor.nombre,
+    actorRol: actor.rol,
+    /* La fecha JURÍDICA: el día en que la solicitud quedó completa. NO el
+       instante en que se pulsó el botón — ese va en `selloServidor`, que
+       pone la ruta. Dos relojes con papeles distintos. */
+    fecha: evaluacion.anclaIso,
+    /* REAL, sin excepción: R9 excluye del término toda actuación
+       RECONSTRUIDA antes incluso de mirar el slug. */
+    origen: 'REAL',
+    detalle:
+      `Radicación en legal y debida forma. Expediente ${numeroEmitido}. ` +
+      `Término de ${PLAZO_DECISION_LICENCIA_DIAS_HABILES} días hábiles desde ${evaluacion.anclaDiaCivil} ` +
+      `(último requisito aportado: ${evaluacion.evidencia.requisitoId}).` +
+      (observacion ? ` Observación: ${observacion}` : ''),
+  };
+
+  /* La evidencia viaja EN la actuación —que es append-only— y no en el
+     documento raíz, que se sobrescribe. Dentro de un año, reconstruir quién
+     afirmó que la solicitud estaba completa y con qué documento se hace
+     leyendo esto, y el hash ata la afirmación al binario exacto (INV-3). */
+  const conEvidencia = {
+    ...actuacion,
+    evidenciaRadicacion: {
+      requisitosAplicables: evaluacion.completitud.aplicables,
+      requisitosFaltantes: evaluacion.completitud.faltantes.length,
+      requisitoQueFijaElAncla: evaluacion.evidencia.requisitoId,
+      documentoQueFijaElAncla: evaluacion.evidencia.documentoId,
+      hashSha256: evaluacion.evidencia.hashSha256 ?? null,
+      definicionId: definicionId ?? DEFINICION_LICENCIA_CONSTRUCCION_PARCIAL.id,
+      numeroExpediente: numeroEmitido,
+      serieId: 'expedientes',
+    },
+  } as ActuacionLicenciaDoc;
+
+  /* El espejo se recalcula sobre la serie COMPLETA tras esta escritura.
+     Omitirlo dejaría `fechaAlertaConservadora: null` en el raíz con el
+     término ya corriendo — y el vigía de vencimientos clasifica por ese
+     campo ANTES que por nada: el expediente seguiría reportándose SIN_ANCLAR
+     mientras el reloj legal corre. */
+  const fechaAlertaConservadora = calcularFechaAlertaConservadoraMirror([
+    ...actuacionesPrevias,
+    conEvidencia,
+  ]);
+
+  return {
+    actuacion: conEvidencia,
+    actuacionId,
+    parcheExpediente: {
+      estadoJuridico: 'RADICADA_EN_DEBIDA_FORMA',
+      numeroExpediente: { numero: numeroEmitido, serieId: 'expedientes', año: anioSerie },
+      fechaRadicacionDebidaForma: evaluacion.anclaIso,
+      fechaAlertaConservadora,
+      completitud: evaluacion.completitud,
+      actualizadoEn: ahora.toISOString(),
+    },
   };
 }
