@@ -6,7 +6,13 @@ import type { ExpedienteLicenciaDoc } from '@/lib/server/expedientes-licencias';
 import { SelectorSubtiposNormativos } from './SelectorSubtiposNormativos';
 
 /* ══════════════════════════════════════════════════════════════
-   Formulario "Radicar solicitud" — bloque "Integración UI y demo".
+   Formulario "Recibir solicitud" — bloque "Integración UI y demo".
+
+   El verbo dice lo que la acción HACE. Hasta el 26-ago-2026 este modal decía
+   «Radicar solicitud»: crea un expediente en PRESENTADA y escribe una actuación
+   `apertura-expediente`, que por el ADR-0033 es un acto ANTERIOR y distinto de
+   la radicación en legal y debida forma. La funcionaria no puede leer en el
+   botón que está haciendo algo que no está haciendo.
 
    Envía a `POST /api/licencias/expedientes`. El servidor SIEMPRE crea un
    expediente de PRUEBA (`esPrueba: true`, candado R10) — este formulario
@@ -86,7 +92,7 @@ export function RadicarSolicitudModal({ onCerrar, onCreado }: RadicarSolicitudMo
       className="fixed inset-0 z-50 flex items-center justify-center px-3 py-3"
       role="dialog"
       aria-modal="true"
-      aria-label="Radicar solicitud de licencia"
+      aria-label="Recibir solicitud de licencia"
     >
       <button type="button" aria-label="Cerrar" onClick={onCerrar} className="absolute inset-0 bg-black/55" />
 
@@ -99,7 +105,7 @@ export function RadicarSolicitudModal({ onCerrar, onCreado }: RadicarSolicitudMo
             Secretaría de Planeación · Licencias Urbanísticas
           </p>
           <h2 className="text-lg font-black leading-tight" style={{ color: '#12261A' }}>
-            Radicar solicitud
+            Recibir solicitud
           </h2>
           <p className="text-xs mt-1" style={{ color: '#5F6F64' }}>
             Crea un expediente de demostración (esPrueba) — la emisión con consecutivo legal está bloqueada hasta autorizar la siembra (R10).
@@ -181,7 +187,7 @@ export function RadicarSolicitudModal({ onCerrar, onCreado }: RadicarSolicitudMo
               <button type="submit" disabled={guardando}
                 className="px-5 py-2 rounded-xl text-sm font-bold text-white disabled:opacity-60"
                 style={{ background: '#14532D' }}>
-                {guardando ? 'Radicando…' : 'Radicar solicitud'}
+                {guardando ? 'Recibiendo…' : 'Recibir solicitud'}
               </button>
             </footer>
           </form>

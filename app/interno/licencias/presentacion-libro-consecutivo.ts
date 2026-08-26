@@ -162,7 +162,7 @@ export interface FilaLibroConsecutivo {
    * (otro año, o fuera del lote). Por eso jamás enciende la marca: eso solo
    * lo hace `colision`, que sí es dato persistido.
    */
-  otrosConMismoNumero: { id: string; solicitanteNombre: string; fechaRadicacion: string }[];
+  otrosConMismoNumero: { id: string; solicitanteNombre: string; fechaApertura: string }[];
 }
 
 /** `true` si el valor es un string vacío/solo espacios (o no es string) — mismo criterio de "faltante" para cédula y demás campos de texto de la fila. */
@@ -248,7 +248,7 @@ export function subtiposConEstadoLibro(codigos: readonly string[]): SubtipoLibro
  * `null` si `creadoEn` no es una fecha válida (dato corrupto: se excluye
  * del conteo por año en vez de agruparlo bajo un año inventado).
  */
-export function añoRadicacionColombia(creadoEn: string): number | null {
+export function añoAperturaColombia(creadoEn: string): number | null {
   const fecha = safeDate(creadoEn);
   if (!fecha) return null;
   const texto = new Intl.DateTimeFormat('en-CA', { timeZone: TIMEZONE_COLOMBIA, year: 'numeric' }).format(fecha);
@@ -268,7 +268,7 @@ export function añosDisponiblesLibro(
 ): number[] {
   const años = new Set<number>([añoActual]);
   for (const exp of expedientes) {
-    const año = añoRadicacionColombia(exp.creadoEn);
+    const año = añoAperturaColombia(exp.creadoEn);
     if (año !== null) años.add(año);
   }
   return [...años].sort((a, b) => b - a);
@@ -289,15 +289,15 @@ export function construirFilasLibroConsecutivo(
   expedientes: readonly ExpedienteLicenciaDoc[],
   año: number,
 ): FilaLibroConsecutivo[] {
-  const delAño = expedientes.filter((exp) => añoRadicacionColombia(exp.creadoEn) === año);
+  const delAño = expedientes.filter((exp) => añoAperturaColombia(exp.creadoEn) === año);
   // Índice número legal → expedientes que lo llevan, para resolver `otros
   // ConMismoNumero`. Se construye SOLO con lo que la vista tiene cargado; ver
   // el alcance declarado en el JSDoc del campo. Nunca decide `colision`.
-  const porNumero = new Map<string, { id: string; solicitanteNombre: string; fechaRadicacion: string }[]>();
+  const porNumero = new Map<string, { id: string; solicitanteNombre: string; fechaApertura: string }[]>();
   for (const exp of delAño) {
     const numero = numeroExpedienteTexto(exp);
     const lista = porNumero.get(numero) ?? [];
-    lista.push({ id: exp.id, solicitanteNombre: exp.solicitanteNombre, fechaRadicacion: exp.creadoEn });
+    lista.push({ id: exp.id, solicitanteNombre: exp.solicitanteNombre, fechaApertura: exp.creadoEn });
     porNumero.set(numero, lista);
   }
   return delAño
@@ -440,7 +440,7 @@ export function textoColisionLibro(fila: Pick<FilaLibroConsecutivo, 'colision' |
   // hasta el 13-ago-2026 se descartaba.
   if (fila.otrosConMismoNumero.length > 0) {
     const otros = fila.otrosConMismoNumero
-      .map((o) => `${o.solicitanteNombre || 'sin nombre registrado'} (${formatFechaColombia(o.fechaRadicacion)})`)
+      .map((o) => `${o.solicitanteNombre || 'sin nombre registrado'} (abierto el ${formatFechaColombia(o.fechaApertura)})`)
       .join('; ');
     const preludio = fila.colision
       ? `Comparte el número ${fila.numeroExpediente} con`

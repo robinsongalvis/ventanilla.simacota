@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import {
-  añoRadicacionColombia,
+  añoAperturaColombia,
   añosDisponiblesLibro,
   calcularConteosKpiLibro,
   calcularConteosPorFiltroLibro,
@@ -57,18 +57,18 @@ function expedienteBase(overrides: Partial<ExpedienteLicenciaDoc> = {}): Expedie
   };
 }
 
-describe('añoRadicacionColombia', () => {
+describe('añoAperturaColombia', () => {
   it('deriva el año en horario Colombia a partir de un ISO válido', () => {
-    expect(añoRadicacionColombia('2026-03-10T15:00:00.000Z')).toBe(2026);
+    expect(añoAperturaColombia('2026-03-10T15:00:00.000Z')).toBe(2026);
   });
 
   it('un ISO cercano a medianoche UTC que en Bogotá aún es el día/año anterior se ancla al año Colombia, no al UTC', () => {
     // 1-ene-2026 02:00 UTC = 31-dic-2025 21:00 hora Colombia (UTC-5).
-    expect(añoRadicacionColombia('2026-01-01T02:00:00.000Z')).toBe(2025);
+    expect(añoAperturaColombia('2026-01-01T02:00:00.000Z')).toBe(2025);
   });
 
   it('devuelve null para una fecha inválida', () => {
-    expect(añoRadicacionColombia('no-es-fecha')).toBeNull();
+    expect(añoAperturaColombia('no-es-fecha')).toBeNull();
   });
 });
 
@@ -797,7 +797,7 @@ describe('colisión de radicado — el Libro delata la anomalía que el importad
     const conGemelo = textoColisionLibro({
       colision: true,
       numeroExpediente: '68745-0-25-0037',
-      otrosConMismoNumero: [{ id: 'y', solicitanteNombre: 'Pedro Rojas Peña', fechaRadicacion: '2025-09-30T15:00:00.000Z' }],
+      otrosConMismoNumero: [{ id: 'y', solicitanteNombre: 'Pedro Rojas Peña', fechaApertura: '2025-09-30T15:00:00.000Z' }],
     })!;
     expect(conGemelo).toContain('Pedro Rojas Peña');
     expect(conGemelo).toContain('30/09/2025');

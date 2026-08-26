@@ -199,12 +199,13 @@ export async function GET(request: Request): Promise<NextResponse> {
       const ultimo = Number(counterSnap.data()?.ultimo ?? 0);
 
       /* ── Vigilancia: ¿el contador cuadra con su propia historia de apertura?
-         Tercera capa, y la que ve lo que las otras dos no pueden.
+         Tercera capa. Detecta el RETROCESO —el contador por debajo de su
+         punto de apertura—, que es el caso que produce duplicados.
 
-         La reserva de unicidad IMPIDE el duplicado. La coherencia en la
-         emisión DETIENE una emisión sobre un contador movido hacia atrás.
-         Ninguna de las dos ve un contador movido hacia ADELANTE: eso no rompe
-         nada al emitir —solo salta números— y solo se nota mirando.
+         (Un contador movido hacia ADELANTE no lo ve esta comprobación, y no
+         hace falta: saltar números deja HUECOS, y los huecos ya los detecta
+         la barrida de continuidad de más arriba. Una versión anterior de este
+         comentario afirmaba lo contrario; era falso.)
 
          Aquí se mira, y SOLO se mira: este cron es de lectura absoluta. */
       const incoherencia = describirIncoherenciaApertura(
@@ -251,6 +252,23 @@ export async function GET(request: Request): Promise<NextResponse> {
     // ReporteSerieExpedientes / auditarCounterExpedientes arriba).
     const counterExpedientesSnap = await db.doc(`counters/expedientes-${anio}`).get();
     const reporteExpedientes = auditarCounterExpedientes(counterExpedientesSnap.data());
+
+    /* `expedientes` NO está en COLECCION_POR_SERIE —se audita en esta rama
+       aparte, porque Fase 1 aún no le asigna colección—, así que la vigilancia
+       de coherencia del bucle de arriba nunca la alcanzaba. Y es justo la
+       serie que MÁS la necesita: la única con `exigeAperturaExplicita`, la
+       única con un libro de papel detrás, y la única donde un contador
+       retrocedido duplicaría actos administrativos ya firmados.
+
+       Segunda vez que la misma regla muerde en esta misma funcionalidad: el
+       instrumento que vigila no puede filtrar por el campo —o por la lista—
+       que deja fuera el caso que más importa. */
+    const incoherenciaExpedientes = describirIncoherenciaApertura(
+      'expedientes',
+      Number(counterExpedientesSnap.data()?.ultimo ?? 0),
+      counterExpedientesSnap.data()?.apertura,
+    );
+    if (incoherenciaExpedientes) contadoresIncoherentes.push(incoherenciaExpedientes);
     series.expedientes = reporteExpedientes;
     const expedientesCorrupto = reporteExpedientes.estado === 'CORRUPTO';
     if (expedientesCorrupto) {
