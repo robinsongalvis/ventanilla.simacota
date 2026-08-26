@@ -1130,8 +1130,15 @@ export interface EvidenciaDelAncla {
 export interface EvaluacionRadicacionDebidaForma {
   /** Día en que la solicitud quedó completa, ISO 8601 al mediodía local. */
   anclaIso: string;
-  /** Cómo se determinó el ancla. Hoy hay un solo valor, y decirlo es parte de la evidencia. */
-  baseDelAncla: 'PRIMERA_VERSION_DEL_ULTIMO_DOCUMENTO';
+  /**
+   * Cómo se determinó el ancla, y decirlo es parte de la evidencia:
+   *  - `MOMENTO_REGISTRADO_DE_COMPLETITUD`: el sistema anotó cuándo la
+   *    solicitud quedó completa. Es el caso normal y el único auditable.
+   *  - `PRIMERA_VERSION_DEL_ULTIMO_DOCUMENTO`: respaldo para expedientes
+   *    anteriores a ese registro — fecha DEDUCIDA, con las salvedades del
+   *    guard de término vencido.
+   */
+  baseDelAncla: 'MOMENTO_REGISTRADO_DE_COMPLETITUD' | 'PRIMERA_VERSION_DEL_ULTIMO_DOCUMENTO';
   /** El mismo día, en formato civil `YYYY-MM-DD` — lo que se enseña y lo que se confirma. */
   anclaDiaCivil: string;
   evidencia: EvidenciaDelAncla;
@@ -1279,8 +1286,25 @@ export function evaluarRadicacionEnDebidaForma(entrada: {
   const ultimo = cubiertos.reduce((a, b) =>
     new Date(b.doc.creadoEn).getTime() > new Date(a.doc.creadoEn).getTime() ? b : a,
   );
-  const anclaIso = atLocalNoon(ultimo.doc.creadoEn).toISOString();
-  const anclaDiaCivil = diaCivilBogota(ultimo.doc.creadoEn);
+
+  /* EL ANCLA ES UN HECHO REGISTRADO, NO UNA DEDUCCIÓN.
+
+     `completoDesde` se graba en el instante en que la completitud pasa a
+     verdadera (ver `CompletitudExpediente`). Esa es la fecha que ancla el
+     término, y es auditable: consta cuándo se registró, no se reconstruye
+     después a partir de otra cosa.
+
+     La deducción desde la fecha del documento queda como RESPALDO declarado,
+     y solo para expedientes anteriores a ese campo — con su base escrita en
+     la evidencia para que nadie confunda una fecha registrada con una
+     inferida. */
+  const registrado = completitud.completoDesde;
+  const baseDelAncla = registrado
+    ? ('MOMENTO_REGISTRADO_DE_COMPLETITUD' as const)
+    : ('PRIMERA_VERSION_DEL_ULTIMO_DOCUMENTO' as const);
+  const fuente = registrado ?? ultimo.doc.creadoEn;
+  const anclaIso = atLocalNoon(fuente).toISOString();
+  const anclaDiaCivil = diaCivilBogota(fuente);
 
   /* (h) Control optimista LEGIBLE POR UN AUDITOR: la funcionaria confirma el
      día que la pantalla le enseñó. Si entre lo que vio y el commit entró otro
@@ -1313,7 +1337,8 @@ export function evaluarRadicacionEnDebidaForma(entrada: {
      decisión humana. Un «no puedo» ruidoso, en lugar de un plazo vencido en
      silencio. */
   const vencimiento = sumarDiasHabiles(atLocalNoon(anclaIso), PLAZO_DECISION_LICENCIA_DIAS_HABILES);
-  if (diasRestantesHabiles(vencimiento.toISOString()) < 0) {
+  if (baseDelAncla === 'PRIMERA_VERSION_DEL_ULTIMO_DOCUMENTO'
+      && diasRestantesHabiles(vencimiento.toISOString()) < 0) {
     return {
       status: 409,
       mensaje:
@@ -1328,8 +1353,7 @@ export function evaluarRadicacionEnDebidaForma(entrada: {
   return {
     anclaIso,
     anclaDiaCivil,
-    /** De dónde salió el ancla — para que un auditor no tenga que suponerlo. */
-    baseDelAncla: 'PRIMERA_VERSION_DEL_ULTIMO_DOCUMENTO' as const,
+    baseDelAncla,
     evidencia: {
       requisitoId: ultimo.requisitoId,
       documentoId: ultimo.doc.id,
@@ -1433,6 +1457,7 @@ export function planRadicarEnDebidaForma(entrada: {
       requisitosFaltantes: evaluacion.completitud.faltantes.length,
       requisitoQueFijaElAncla: evaluacion.evidencia.requisitoId,
       documentoQueFijaElAncla: evaluacion.evidencia.documentoId,
+      baseDelAncla: evaluacion.baseDelAncla,
       hashSha256: evaluacion.evidencia.hashSha256 ?? null,
       definicionId: definicionId ?? DEFINICION_LICENCIA_CONSTRUCCION_PARCIAL.id,
       numeroExpediente: numeroEmitido,

@@ -35,6 +35,31 @@ export interface CompletitudExpediente {
   aplicables: number;
   /** Instante del cálculo, en el reloj del SERVIDOR. */
   evaluadoEn: string;
+  /**
+   * INSTANTE EN QUE LA SOLICITUD QUEDÓ COMPLETA — el hecho que ancla el
+   * término de 45 días hábiles (D.1077/2015 art. 2.2.6.1.2.1.1 par. 1).
+   *
+   * POR QUÉ NO BASTABA DEDUCIRLO. Antes de este campo, el acto de radicar
+   * derivaba el ancla de la fecha del último documento aportado. Pero esa
+   * fecha (`DocumentoExpedienteDoc.creadoEn`) es la del PRIMER archivo de ese
+   * requisito, y el servidor no revisa contenido: un PDF equivocado subido el
+   * día 1 marca el requisito como aportado, y la corrección posterior entra
+   * como versión nueva sin moverla. El término habría arrancado el día 1 —
+   * pudiendo nacer ya vencido, que es reconocer de oficio un silencio
+   * administrativo positivo.
+   *
+   * Se GRABA la primera vez que `completo` pasa a `true` y se CONSERVA
+   * mientras siga siéndolo: recalcular no debe reescribir un hecho ya
+   * ocurrido. Si la completitud se pierde (se retira un documento, cambia el
+   * contexto y aplica un requisito nuevo), se BORRA: cuando vuelva a
+   * completarse, el término arranca desde la fecha nueva — el tiempo que el
+   * expediente pasó incompleto no corre contra la Administración.
+   *
+   * Ausente (`undefined`) también en los expedientes evaluados antes de que
+   * este campo existiera; quien lo lea debe distinguir «nunca estuvo
+   * completo» de «no lo sabemos», y nunca inventar una fecha.
+   */
+  completoDesde?: string;
 }
 
 /**
@@ -49,6 +74,8 @@ export function calcularCompletitudExpediente(
   aportes: AporteRequisito[],
   contexto: ContextoEvaluacionRequisito,
   ahora: Date,
+  /** Lo que había guardado antes del cambio — de ahí se conserva `completoDesde`. */
+  previa?: CompletitudExpediente,
 ): CompletitudExpediente {
   // La definición es hoy una constante compilada y única (la de obra nueva).
   // Cuando el checklist se parametrice por modalidad, este es el punto donde
@@ -57,8 +84,13 @@ export function calcularCompletitudExpediente(
   const tramite = DEFINICION_LICENCIA_CONSTRUCCION_PARCIAL;
   const r = evaluarCompletitud(tramite, aportes, contexto);
 
+  /* `completoDesde` se conserva si ya estaba y la solicitud SIGUE completa;
+     nace ahora si acaba de completarse; desaparece si dejó de estarlo. */
+  const completoDesde = r.completo ? (previa?.completoDesde ?? ahora.toISOString()) : undefined;
+
   return {
     completo: r.completo,
+    ...(completoDesde ? { completoDesde } : {}),
     faltantes: r.faltantes.map((f) => ({
       requisitoId: f.requisitoId,
       nombre: f.nombre,
