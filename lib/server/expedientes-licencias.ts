@@ -415,7 +415,7 @@ export function planCrearExpedienteDemo(
    Registro de actuaciones (acta / respuesta)
 ────────────────────────────────────────────── */
 
-export type TipoActuacionPermitida = 'acta-observaciones' | 'respuesta-subsanacion';
+export type TipoActuacionPermitida = 'inicio-revision' | 'acta-observaciones' | 'respuesta-subsanacion';
 
 export const DETALLE_ACTUACION_MIN = 15;
 
@@ -440,12 +440,28 @@ export interface PlanRegistrarActuacion {
  * solo por estar aquí declarada.
  */
 const ESTADO_DESTINO_POR_TIPO_ACTUACION: Readonly<Record<TipoActuacionPermitida, EstadoJuridicoLicencia>> = {
+  /* LA SALIDA DEL CALLEJÓN. Desde `RADICADA_EN_DEBIDA_FORMA` el mapa de
+     transiciones solo permite `EN_REVISION` y `DESISTIDA`, y hasta el
+     26-ago-2026 NINGUNA ruta escribía `EN_REVISION`. Consecuencia: el acta de
+     observaciones —lo ÚNICO que DETIENE el término— era inalcanzable, porque
+     solo procede desde `EN_REVISION`.
+
+     Es decir: radicar habría emitido un número legal y arrancado un plazo de
+     45 días hábiles que el sistema no podía suspender. Peor que no emitirlo.
+
+     `inicio-revision` NO mueve el reloj: su slug no está en
+     `SLUG_A_TIPO_EVENTO` (`lib/motor-expedientes/termino.ts`) a propósito.
+     Empezar a revisar es un hecho operativo, no uno de los cuatro eventos que
+     el Decreto 1077 reconoce como relevantes para el cómputo. */
+  'inicio-revision': 'EN_REVISION',
   'acta-observaciones': 'CON_ACTA_DE_OBSERVACIONES',
   'respuesta-subsanacion': 'EN_VIABILIDAD',
 };
 
 function esTipoActuacionPermitida(tipo: string): tipo is TipoActuacionPermitida {
-  return tipo === 'acta-observaciones' || tipo === 'respuesta-subsanacion';
+  return tipo === 'inicio-revision'
+    || tipo === 'acta-observaciones'
+    || tipo === 'respuesta-subsanacion';
 }
 
 /**

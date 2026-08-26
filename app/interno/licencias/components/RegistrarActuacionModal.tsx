@@ -18,6 +18,12 @@ import type { EstadoJuridicoLicencia } from '@/lib/motor-expedientes/estados-lic
 ══════════════════════════════════════════════════════════════ */
 
 const COPIA: Record<TipoActuacionPermitida, { titulo: string; etiquetaCampo: string; placeholder: string; nota: string }> = {
+  'inicio-revision': {
+    titulo: 'Iniciar revisión del expediente',
+    etiquetaCampo: 'Quién asume la revisión y con qué alcance',
+    placeholder: 'Asume la revisión el arquitecto de Planeación; se verificarán planos, cesiones y aportes urbanísticos…',
+    nota: 'No detiene el plazo: el término de 45 días hábiles sigue corriendo. Registrar el inicio de la revisión es lo que habilita levantar el acta de observaciones, que sí lo suspende.',
+  },
   'acta-observaciones': {
     titulo: 'Registrar acta de observaciones',
     etiquetaCampo: 'Observaciones formuladas',
