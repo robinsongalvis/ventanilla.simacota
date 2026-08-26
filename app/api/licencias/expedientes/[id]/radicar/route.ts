@@ -87,6 +87,35 @@ type ResultadoTx =
       radicadoId: string | null;
     };
 
+/**
+ * ¿El error dice que alguien se nos adelantó tomando ese documento?
+ *
+ * Se reconoce por el CÓDIGO de gRPC (6 = ALREADY_EXISTS) y, como respaldo, por
+ * el texto. El código es lo fiable; el texto cambia entre el emulador y
+ * producción y no debe ser el criterio principal.
+ */
+function esColisionDeReserva(error: unknown): boolean {
+  const e = error as { code?: number | string; message?: string } | null;
+  if (!e) return false;
+  if (e.code === 6 || e.code === 'already-exists') return true;
+  return typeof e.message === 'string' && e.message.includes('ALREADY_EXISTS');
+}
+
+const INTENTOS_ANTE_COLISION = 3;
+
+async function conReintentoPorColision<T>(operacion: () => Promise<T>): Promise<T> {
+  let ultimo: unknown;
+  for (let intento = 1; intento <= INTENTOS_ANTE_COLISION; intento++) {
+    try {
+      return await operacion();
+    } catch (err) {
+      if (!esColisionDeReserva(err)) throw err;
+      ultimo = err;
+    }
+  }
+  throw ultimo;
+}
+
 export async function POST(req: Request, ctx: { params: Promise<{ id: string }> }) {
   const { id } = await ctx.params;
   const inicio = Date.now();
@@ -128,7 +157,27 @@ export async function POST(req: Request, ctx: { params: Promise<{ id: string }> 
     const expedienteRef = db.doc(`expedientes/${id}`);
     const actor = { uid: usuario.uid, nombre: usuario.nombre, rol: usuario.rol };
 
-    const resultado: ResultadoTx = await db.runTransaction(async (tx) => {
+    /* REINTENTO ANTE COLISIÓN DE RESERVA — descubierto por la prueba de
+       concurrencia contra el emulador, no razonando sobre el código.
+
+       Dos peticiones simultáneas leen el contador en 399, ambas proponen 400 y
+       ambas intentan `tx.create` sobre `unicidad_expedientes/…-0400`. Una gana.
+       La otra recibe ALREADY_EXISTS — y Firestore NO REINTENTA ante eso: no es
+       un aborto por contención (ABORTED), es un error permanente. La
+       transacción muere y la petición perdedora devolvía 500.
+
+       La seguridad nunca estuvo en riesgo: el número no se entregó dos veces,
+       que es lo que la reserva existe para garantizar. Pero la OPERACIÓN se
+       perdía: la funcionaria veía «no fue posible» sin saber que reintentar
+       habría funcionado. Dos funcionarias radicando expedientes distintos a la
+       misma hora es el caso normal en un mostrador, no una rareza.
+
+       Reintentar es seguro porque el callback vuelve a leerlo TODO: si el
+       expediente ya quedó radicado, el segundo intento sale por el camino de
+       replay; si la colisión fue por otro expediente, toma el número siguiente.
+       Acotado a 3: si tres intentos seguidos colisionan, algo más pasa y es
+       preferible fallar ruidosamente que girar. */
+    const resultado: ResultadoTx = await conReintentoPorColision(() => db.runTransaction(async (tx) => {
       // ── LECTURA 1 · el expediente. Bloqueo pesimista: dos funcionarias que
       //    pulsen a la vez se serializan aquí.
       const expSnap = await tx.get(expedienteRef);
@@ -244,7 +293,7 @@ export async function POST(req: Request, ctx: { params: Promise<{ id: string }> 
         requisitosAplicables: evaluacion.completitud.aplicables,
         radicadoId: exp.radicadoId ?? null,
       };
-    });
+    }));
 
     if ('error' in resultado) {
       return NextResponse.json({ error: resultado.error.mensaje }, { status: resultado.error.status });
@@ -308,6 +357,19 @@ export async function POST(req: Request, ctx: { params: Promise<{ id: string }> 
       return NextResponse.json({ error: error.message }, { status: error.status });
     }
     logError({ radicadoId: id, modulo: 'licencias/radicar', error });
+    /* Si tras los reintentos sigue colisionando, no es un fallo del sistema
+       sino contención sostenida: se dice con esas palabras y con un 409, para
+       que la funcionaria sepa que reintentar es lo que corresponde. Un 500 la
+       dejaría creyendo que algo se rompió. */
+    if (esColisionDeReserva(error)) {
+      return NextResponse.json(
+        {
+          error: 'Otro trámite está tomando un número de la serie en este mismo momento. ' +
+            'Vuelva a intentarlo en unos segundos: no se emitió ningún número ni se modificó el expediente.',
+        },
+        { status: 409 },
+      );
+    }
     return NextResponse.json(
       { error: 'No fue posible declarar la radicación en legal y debida forma.' },
       { status: 500 },

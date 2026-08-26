@@ -190,6 +190,12 @@ test('el camino feliz: el número sale de la serie abierta y el término queda a
 });
 
 // ══════════════════════════════════════════════════════════════════════════
+/* EL CASO QUE CAZÓ EL DEFECTO. Antes del 26-ago-2026 las dos peticiones
+   devolvían 500: ambas leían el contador en 399, ambas proponían 400, y la
+   perdedora recibía ALREADY_EXISTS al reservar. Firestore NO reintenta ante
+   eso —no es un aborto por contención— así que la operación se perdía. El
+   número nunca se entregó dos veces: lo que se perdía era el trabajo de la
+   funcionaria, con un mensaje que no le decía que reintentar bastaba. */
 test('dos peticiones SIMULTÁNEAS sobre el mismo expediente: una radica, la otra no duplica', async () => {
   const id = await sembrarExpedienteCompleto('simultaneas');
   const antes = await leerContador();
