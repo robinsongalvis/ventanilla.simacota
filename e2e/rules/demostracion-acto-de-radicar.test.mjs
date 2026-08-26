@@ -197,10 +197,11 @@ test('DEMOSTRACIÓN — un expediente llevado de presentada a radicado', async (
   L(`    Fecha jurídica ....... ${fecha(act.fecha)}   — NO el instante del botón`);
   L(`    Hora del acto ........ la puso la base de datos (serverTimestamp)`);
   L(`    Requisitos faltantes . ${act.evidenciaRadicacion.requisitosFaltantes}`);
-  L(`    Documento que fija    `);
-  L(`      la fecha ........... ${act.evidenciaRadicacion.documentoQueFijaElAncla}`);
+  L(`    De dónde sale la fecha ${act.evidenciaRadicacion.baseDelAncla === 'MOMENTO_REGISTRADO_DE_COMPLETITUD'
+        ? 'del momento REGISTRADO en que la solicitud quedó completa'
+        : `del documento ${act.evidenciaRadicacion.documentoQueFijaElAncla} (deducida)`}`);
+  L(`    Último documento ..... ${act.evidenciaRadicacion.ultimoDocumentoAportado}`);
   L(`      su huella .......... ${act.evidenciaRadicacion.hashSha256}`);
-  L(`    Base de la fecha ..... ${act.evidenciaRadicacion.baseDelAncla}`);
   L(`    Número reservado en .. unicidad_expedientes/${body.numeroExpediente}  (existe: ${reserva.exists})`);
   L('');
   L('  Y la pantalla ya no ofrece el acto:');

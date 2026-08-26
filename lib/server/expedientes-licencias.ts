@@ -177,8 +177,20 @@ export interface ExpedienteLicenciaDoc extends Expediente {
 export interface EvidenciaRadicacion {
   requisitosAplicables: number;
   requisitosFaltantes: number;
-  requisitoQueFijaElAncla: string;
-  documentoQueFijaElAncla: string;
+  /**
+   * Qué documento fijó la fecha del término — SOLO cuando la fecha se dedujo
+   * de él. `null` cuando el ancla salió del momento REGISTRADO de completitud,
+   * porque entonces ningún documento la fijó.
+   *
+   * Nombrar un documento en los dos casos era una imprecisión con
+   * consecuencia: un auditor leería «documento que fija la fecha» y creería
+   * que esa fecha sale de ese archivo, cuando sale del registro. La destapó la
+   * propia demostración al imprimirlo en lenguaje llano.
+   */
+  requisitoQueFijaElAncla: string | null;
+  documentoQueFijaElAncla: string | null;
+  /** El último documento aportado, siempre — informativo, no la causa de la fecha. */
+  ultimoDocumentoAportado: string;
   /** De dónde salió la fecha: un hecho registrado o una deducción. Un auditor no debería tener que adivinarlo. */
   baseDelAncla: 'MOMENTO_REGISTRADO_DE_COMPLETITUD' | 'PRIMERA_VERSION_DEL_ULTIMO_DOCUMENTO';
   /** Ata la afirmación al binario exacto (INV-3). `null` si la versión no lo trae. */
@@ -1548,8 +1560,16 @@ export function planRadicarEnDebidaForma(entrada: {
     evidenciaRadicacion: {
       requisitosAplicables: evaluacion.completitud.aplicables,
       requisitosFaltantes: evaluacion.completitud.faltantes.length,
-      requisitoQueFijaElAncla: evaluacion.evidencia.requisitoId,
-      documentoQueFijaElAncla: evaluacion.evidencia.documentoId,
+      /* Solo se nombra el documento cuando de verdad fijó la fecha. */
+      requisitoQueFijaElAncla:
+        evaluacion.baseDelAncla === 'PRIMERA_VERSION_DEL_ULTIMO_DOCUMENTO'
+          ? evaluacion.evidencia.requisitoId
+          : null,
+      documentoQueFijaElAncla:
+        evaluacion.baseDelAncla === 'PRIMERA_VERSION_DEL_ULTIMO_DOCUMENTO'
+          ? evaluacion.evidencia.documentoId
+          : null,
+      ultimoDocumentoAportado: evaluacion.evidencia.documentoId,
       baseDelAncla: evaluacion.baseDelAncla,
       hashSha256: evaluacion.evidencia.hashSha256 ?? null,
       definicionId: definicionId ?? DEFINICION_LICENCIA_CONSTRUCCION_PARCIAL.id,

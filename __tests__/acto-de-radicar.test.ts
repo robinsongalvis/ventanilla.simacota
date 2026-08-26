@@ -275,6 +275,12 @@ describe('el acto de radicar — lo que se escribe', () => {
     const ev = planDe().actuacion.evidenciaRadicacion!;
     expect(ev.requisitosFaltantes).toBe(0);
     expect(ev.baseDelAncla).toBe('MOMENTO_REGISTRADO_DE_COMPLETITUD');
+    /* Con el ancla venida del REGISTRO, ningún documento fijó la fecha — y la
+       evidencia no puede insinuar lo contrario. El último documento sigue
+       constando, como dato informativo. */
+    expect(ev.documentoQueFijaElAncla).toBeNull();
+    expect(ev.requisitoQueFijaElAncla).toBeNull();
+    expect(ev.ultimoDocumentoAportado).toMatch(/^doc-/);
     expect(ev.hashSha256).toMatch(/^hash-/);
     expect(ev.numeroExpediente).toBe('68745-0-26-0008');
   });
@@ -303,5 +309,23 @@ describe('el guard de transiciones ante un estado que no conoce', () => {
   it('un estado legado que ya no existe tampoco revienta', () => {
     const r = evaluar(expedienteCompleto({ estadoJuridico: 'CERRADA_LEGADO' as never }));
     expect(esErrorExpediente(r) && r.status).toBe(409);
+  });
+});
+
+describe('la evidencia no le atribuye la fecha a quien no la fijó', () => {
+  it('cuando la fecha se DEDUCE, sí nombra el documento que la fijó', () => {
+    const exp = expedienteCompleto();
+    delete exp.completitud!.completoDesde;
+    const ev = evaluar(exp);
+    if (esErrorExpediente(ev) || esRadicacionYaOcurrida(ev)) throw new Error('debía proceder');
+    const plan = planRadicarEnDebidaForma({
+      expedienteId: 'exp-1', tenantId: TENANT, evaluacion: ev,
+      numeroEmitido: '68745-0-26-0009', anioSerie: 2026, actuacionesPrevias: [],
+      actor: { uid: 'u1', nombre: 'Funcionaria', rol: 'FUNCIONARIO' }, ahora: AHORA,
+    });
+    const e = plan.actuacion.evidenciaRadicacion!;
+    expect(e.baseDelAncla).toBe('PRIMERA_VERSION_DEL_ULTIMO_DOCUMENTO');
+    expect(e.documentoQueFijaElAncla).toMatch(/^doc-/);
+    expect(e.requisitoQueFijaElAncla).toBeTruthy();
   });
 });
