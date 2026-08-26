@@ -365,10 +365,43 @@ comprueba:
    verifica que el mecanismo lo señala: un guard que no se ha visto fallar no
    es un guard, es una esperanza.
 
-**Lo que este mecanismo NO hace, y hay que decirlo:** no descubre por sí solo
-que existe un vigilante nuevo sin alcance declarado. Comprueba a los que lo
-declaran. Cerrar ese hueco exigiría un registro central de instrumentos, y esa
-decisión no se toma aquí — queda anotada como la siguiente vuelta.
+#### El hueco que este mecanismo NO cierra
+
+Hay que decirlo con el caso concreto, porque un hueco enunciado en abstracto se
+olvida igual que la regla que vino a sostener:
+
+> **El día que alguien escriba un cron nuevo y no declare su alcance, este
+> mecanismo calla.** No hay nada que compare ese cron contra ningún dominio,
+> porque el mecanismo solo comprueba a los instrumentos que se declaran. Un
+> vigilante que no declara nada es indistinguible de un vigilante que no
+> existe — y su silencio, otra vez, se lee como conformidad.
+
+Es exactamente el mismo defecto una vuelta más arriba: antes era una lista
+incompleta dentro de un vigilante; ahora es la lista incompleta **de los
+vigilantes**.
+
+**Qué lo cerraría** — escrito aquí para que la siguiente vuelta no empiece de
+cero:
+
+Un **registro central de instrumentos de vigilancia**. Un módulo único donde
+cada cron, guard, verificador o conciliador se inscribe con su dominio y su
+`AlcanceVigilancia`, y una prueba que cruce ese registro contra el inventario
+real de instrumentos del repositorio. El inventario real puede obtenerse de dos
+sitios que ya existen y no dependen de que nadie recuerde nada:
+
+1. **`vercel.json`** — la lista de crons desplegados. Todo cron que corra en
+   producción está ahí; un cron en el registro que no esté en `vercel.json` no
+   corre, y uno en `vercel.json` que no esté en el registro no declara alcance.
+2. **El árbol de `app/api/cron/**`** — los handlers, para el mismo cruce por el
+   otro lado.
+
+La prueba sería la misma forma que ya se aplica a las series:
+`elementosNoDeclarados(inventarioReal, registroDeInstrumentos)`. Lo que hoy
+protege a las cuatro series, protegiendo a los vigilantes.
+
+**No se construye ahora** (decisión del propietario, 26-ago-2026): primero hay
+que ver cuántos instrumentos hay y qué están dejando fuera. Esa enumeración es
+el paso previo, y va antes que el registro.
 
 **Precedente aplicable a todo el repositorio**, no solo a las series: el mismo
 patrón sirve para dependencias, tipos de trámite, estados y roles.
