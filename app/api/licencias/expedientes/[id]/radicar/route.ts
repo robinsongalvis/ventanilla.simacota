@@ -4,9 +4,20 @@
    EL ACTO DE RADICAR — PRESENTADA → RADICADA_EN_DEBIDA_FORMA.
 
    Es el momento en que la Alcaldía AFIRMA que la solicitud llegó completa:
-   nace el número oficial de la serie legal y arranca el término de 45 días
-   hábiles (D.1077/2015 art. 2.2.6.1.2.1.1 par. 1). ADR-0033: el número y el
-   término nacen en ESTA transición, no al abrir el expediente.
+   queda asentado el número oficial y arranca el término de 45 días hábiles
+   (D.1077/2015 art. 2.2.6.1.2.1.1 par. 1). ADR-0033: el número y el término se
+   fijan en ESTA transición, no al abrir el expediente.
+
+   EL NÚMERO NO SE EMITE: SE RECIBE (decisión del propietario, 26-ago-2026).
+   En la Administración Municipal todo entra por ventanilla, y el número de
+   ventanilla es el oficial, el único, el que vale. El operario mira el libro,
+   escribe el número, el sistema lo VALIDA y lo GRABA. Un solo número, no dos.
+
+   Consecuencia directa: esta ruta ya NO toca `counters/expedientes-*` ni
+   `unicidad_expedientes`, así que el candado R10 —que existe para proteger esa
+   serie— dejó de aplicarle. No se relajó nada: lo que se quitó fue la emisión
+   que ese candado custodiaba. `__tests__/radicar-no-emite-serie-propia.test.ts`
+   asevera que la ruta no puede alcanzarla.
 
    TODO O NADA. Una sola `runTransaction`: revalidar, derivar el ancla,
    emitir el consecutivo, escribir la actuación y parchear el expediente. Si
@@ -20,7 +31,8 @@
 
    IDEMPOTENCIA POR EL DOMINIO. No hay clave de idempotencia inventada: el
    propio `estadoJuridico`, leído bajo el bloqueo pesimista de `tx.get`, es el
-   candado; la reserva `unicidad_expedientes/{numero}` es el segundo; y el id
+   candado; la reserva `unicidad_radicados/{numero}` es el segundo —y además
+   impide que dos licencias se lleven el mismo número del libro—; y el id
    determinista de la actuación (`{expedienteId}-radicacion`, escrito con
    `tx.create`) es el tercero. Un reintento devuelve 200 con lo ya escrito.
 
@@ -35,11 +47,8 @@ import { getFirebaseAdminDb } from '@/lib/firebase-admin';
 import { canOperateTenant, InternalAuthError, requireActiveInternalUser } from '@/lib/server/internal-auth';
 import { appendTrazabilidadAdmin } from '@/lib/server/radicados-security';
 import { atLocalNoon } from '@/lib/tiempos-radicado';
-import { codigosNumeroExpediente } from '@/src/types/reglas-negocio';
-import { emitirNumeroExpedienteReal } from '@/lib/server/emitir-numero-expediente';
-import { SerieNoAbiertaError } from '@/lib/server/consecutivo-legal';
+import { validarNumeroRadicadoManual } from '@/lib/server/numero-radicado-manual';
 import {
-  evaluarCandadoEmisionReal,
   evaluarRadicacionEnDebidaForma,
   planRadicarEnDebidaForma,
   esErrorExpediente,
@@ -69,6 +78,11 @@ interface BodyRadicar {
    * exacta al «clic de verificación» que el ADR-0033 §4.3 prohíbe.
    */
   anclaEsperada?: string;
+  /**
+   * El número que el operario transcribe del LIBRO DE VENTANILLA, tal cual lo
+   * ve. El sistema lo valida y lo normaliza; no lo inventa ni lo corrige.
+   */
+  numeroRadicado?: string;
   observacion?: string;
 }
 
@@ -85,6 +99,9 @@ type ResultadoTx =
       fechaAlertaConservadora: string | null;
       requisitosAplicables: number;
       radicadoId: string | null;
+      /** `true` si al normalizar cambió el texto que escribió el operario. */
+      seNormalizo: boolean;
+      transcrito: string;
     };
 
 /**
@@ -126,14 +143,6 @@ export async function POST(req: Request, ctx: { params: Promise<{ id: string }> 
       return NextResponse.json({ error: 'Tu rol no permite operar expedientes de licencias.' }, { status: 403 });
     }
 
-    /* CANDADO R10, ANTES de abrir la transacción. Con él cerrado no existe
-       ninguna rama de código que alcance `counters/` ni `unicidad_expedientes`.
-       Fallar aquí es lo que hace que eso sea comprobable, no una promesa. */
-    const candado = evaluarCandadoEmisionReal();
-    if (esErrorExpediente(candado)) {
-      return NextResponse.json({ error: candado.mensaje }, { status: candado.status });
-    }
-
     const body = (await req.json().catch(() => null)) as BodyRadicar | null;
     if (body?.confirmo !== true) {
       return NextResponse.json(
@@ -144,10 +153,13 @@ export async function POST(req: Request, ctx: { params: Promise<{ id: string }> 
     const anclaEsperada = typeof body.anclaEsperada === 'string' ? body.anclaEsperada.trim() : undefined;
     const observacion = typeof body.observacion === 'string' ? body.observacion.trim() || undefined : undefined;
 
-    /* Códigos del número legal, FAIL-CLOSED y fuera de la transacción: un
-       número con código DANE inventado es un defecto de identidad legal que no
-       se repara. Si falta configuración, la excepción ya dice cuál. */
-    const codigos = codigosNumeroExpediente(TENANT_LICENCIAS);
+    /* EL NÚMERO DEL LIBRO. Se valida FUERA de la transacción: es una
+       comprobación de forma sobre lo tecleado, no depende de nada que la
+       transacción lea, y un rechazo aquí no debe llegar siquiera a abrirla. */
+    const numero = validarNumeroRadicadoManual(body.numeroRadicado);
+    if (!numero.ok) {
+      return NextResponse.json({ error: numero.motivo }, { status: 400 });
+    }
 
     /* La fecha de emisión se fija UNA VEZ y FUERA del callback, al mediodía
        local: el contador se indexa por año civil de Bogotá, y un reintento
@@ -236,29 +248,33 @@ export async function POST(req: Request, ctx: { params: Promise<{ id: string }> 
         return { yaEstaba: true, numeroExpediente: evaluacion.numeroExpediente, anclaIso: evaluacion.anclaIso };
       }
 
-      // ── ÚLTIMA LECTURA + PRIMERA ESCRITURA, juntas y al final.
-      let emitido;
-      try {
-        emitido = await emitirNumeroExpedienteReal({
-          tx, db, fecha: fechaEmision, tenantId: TENANT_LICENCIAS, codigos, expedienteId: id,
-        });
-      } catch (err) {
-        // Sin esto, «la serie no está abierta» saldría como un 500 genérico en
-        // vez del mensaje que dice exactamente qué hay que sembrar.
-        if (err instanceof SerieNoAbiertaError) return { error: { status: 409, mensaje: err.message } };
-        throw err;
-      }
-
       const plan = planRadicarEnDebidaForma({
         expedienteId: id,
         tenantId: exp.tenantId,
         evaluacion,
-        numeroEmitido: emitido.numeroExpediente,
-        anioSerie: fechaEmision.getFullYear(),
+        numeroOficial: numero.canonico,
+        /* El año sale del NÚMERO, no del reloj: el libro puede estar en enero y
+           el trámite radicarse el 2 de febrero. La serie a la que se imputa la
+           fija el número, no el día en que alguien lo teclea. */
+        anioSerie: numero.anio,
         actuacionesPrevias,
         actor,
         ahora: fechaEmision,
         observacion,
+      });
+
+      /* PRIMERA ESCRITURA: la reserva del número. Hace imposible que dos
+         licencias se lleven el mismo del libro, y que una licencia se lleve uno
+         que ventanilla ya emitió por su cuenta. `tx.create` falla si existe,
+         sin lectura previa, y su fallo aborta TODA la transacción — no queda ni
+         el estado movido ni la actuación escrita. */
+      tx.create(db.doc(`unicidad_radicados/${numero.canonico}`), {
+        serie: 'radicados',
+        consecutivo: numero.consecutivo,
+        creadoEn: new Date().toISOString(),
+        origenDelNumero: 'TRANSCRITO_DEL_LIBRO',
+        expedienteId: id,
+        transcritoPor: actor.uid,
       });
 
       /* `tx.create` sobre id determinista: falla si ya existe, sin lectura
@@ -275,7 +291,7 @@ export async function POST(req: Request, ctx: { params: Promise<{ id: string }> 
         tx.update(radicadoRef, {
           vinculoExpediente: {
             expedienteId: id,
-            numeroExpediente: emitido.numeroExpediente,
+            numeroExpediente: numero.canonico,
             fecha: evaluacion.anclaIso,
           },
           ultimaActualizacion: fechaEmision.toISOString(),
@@ -284,8 +300,10 @@ export async function POST(req: Request, ctx: { params: Promise<{ id: string }> 
 
       return {
         radicoAhora: true,
-        numeroExpediente: emitido.numeroExpediente,
-        consecutivo: emitido.consecutivo,
+        numeroExpediente: numero.canonico,
+        consecutivo: numero.consecutivo,
+        seNormalizo: numero.seNormalizo,
+        transcrito: numero.transcrito,
         anclaIso: evaluacion.anclaIso,
         anclaDiaCivil: evaluacion.anclaDiaCivil,
         baseDelAncla: evaluacion.baseDelAncla,
@@ -345,6 +363,11 @@ export async function POST(req: Request, ctx: { params: Promise<{ id: string }> 
       radicoAhora: true,
       numeroExpediente: resultado.numeroExpediente,
       consecutivo: resultado.consecutivo,
+      /* Si al normalizar cambió el texto, la pantalla debe enseñárselo: el
+         operario escribió una cosa y quedó grabada otra —la misma, con el
+         relleno del sistema— y tiene derecho a verlo antes de imprimir. */
+      loQueEscribio: resultado.transcrito,
+      seNormalizo: resultado.seNormalizo,
       desdeCuandoCorreElPlazo: resultado.anclaIso,
       diaCivilDelAncla: resultado.anclaDiaCivil,
       baseDelAncla: resultado.baseDelAncla,

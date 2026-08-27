@@ -207,7 +207,7 @@ describe('el acto de radicar — idempotencia por el dominio', () => {
   it('un expediente ya radicado devuelve lo escrito, no un error', () => {
     const yaRadicado = expedienteCompleto({
       estadoJuridico: 'RADICADA_EN_DEBIDA_FORMA',
-      numeroExpediente: { numero: '68745-0-26-0007', serieId: 'expedientes', año: 2026 },
+      numeroExpediente: { numero: '1-110-202608-00001300', serieId: 'radicados', año: 2026 },
     });
     const previa: ActuacionLicenciaDoc = {
       id: idActuacionRadicacion('exp-1'), expedienteId: 'exp-1', tenantId: TENANT,
@@ -218,7 +218,7 @@ describe('el acto de radicar — idempotencia por el dominio', () => {
     const r = evaluar(yaRadicado, { actuacionesPrevias: [previa] });
     expect(esRadicacionYaOcurrida(r)).toBe(true);
     if (!esRadicacionYaOcurrida(r)) return;
-    expect(r.numeroExpediente).toBe('68745-0-26-0007');
+    expect(r.numeroExpediente).toBe('1-110-202608-00001300');
     expect(r.anclaIso).toBe('2026-08-20T17:00:00.000Z');
   });
 
@@ -234,7 +234,7 @@ describe('el acto de radicar — lo que se escribe', () => {
     if (esErrorExpediente(ev) || esRadicacionYaOcurrida(ev)) throw new Error('debía proceder');
     return planRadicarEnDebidaForma({
       expedienteId: 'exp-1', tenantId: TENANT, evaluacion: ev,
-      numeroEmitido: '68745-0-26-0008', anioSerie: 2026,
+      numeroOficial: '1-110-202608-00001342', anioSerie: 2026,
       actuacionesPrevias: [], actor: { uid: 'u1', nombre: 'Funcionaria', rol: 'FUNCIONARIO' },
       ahora: AHORA,
     });
@@ -269,14 +269,24 @@ describe('el acto de radicar — lo que se escribe', () => {
     const n = planDe().parcheExpediente.numeroExpediente as unknown as Record<string, unknown>;
     expect(n.año).toBe(2026);
     expect(n).not.toHaveProperty('anio');
+    /* La serie es la de VENTANILLA: es de donde sale el número. Afirmar
+       `expedientes` haría creer que consumió un consecutivo de una serie que
+       este acto ya no toca. */
+    expect(n.serieId).toBe('radicados');
   });
 
   it('la evidencia queda EN la actuación, que es append-only, con su hash y su base', () => {
     const ev = planDe().actuacion.evidenciaRadicacion!;
     expect(ev.requisitosFaltantes).toBe(0);
     expect(ev.baseDelAncla).toBe('MOMENTO_REGISTRADO_DE_COMPLETITUD');
+    /* Con el ancla venida del REGISTRO, ningún documento fijó la fecha — y la
+       evidencia no puede insinuar lo contrario. El último documento sigue
+       constando, como dato informativo. */
+    expect(ev.documentoQueFijaElAncla).toBeNull();
+    expect(ev.requisitoQueFijaElAncla).toBeNull();
+    expect(ev.ultimoDocumentoAportado).toMatch(/^doc-/);
     expect(ev.hashSha256).toMatch(/^hash-/);
-    expect(ev.numeroExpediente).toBe('68745-0-26-0008');
+    expect(ev.numeroExpediente).toBe('1-110-202608-00001342');
   });
 
   it('el estado OPERATIVO no se toca: son dos ejes distintos', () => {
@@ -303,5 +313,23 @@ describe('el guard de transiciones ante un estado que no conoce', () => {
   it('un estado legado que ya no existe tampoco revienta', () => {
     const r = evaluar(expedienteCompleto({ estadoJuridico: 'CERRADA_LEGADO' as never }));
     expect(esErrorExpediente(r) && r.status).toBe(409);
+  });
+});
+
+describe('la evidencia no le atribuye la fecha a quien no la fijó', () => {
+  it('cuando la fecha se DEDUCE, sí nombra el documento que la fijó', () => {
+    const exp = expedienteCompleto();
+    delete exp.completitud!.completoDesde;
+    const ev = evaluar(exp);
+    if (esErrorExpediente(ev) || esRadicacionYaOcurrida(ev)) throw new Error('debía proceder');
+    const plan = planRadicarEnDebidaForma({
+      expedienteId: 'exp-1', tenantId: TENANT, evaluacion: ev,
+      numeroOficial: '1-110-202608-00001343', anioSerie: 2026, actuacionesPrevias: [],
+      actor: { uid: 'u1', nombre: 'Funcionaria', rol: 'FUNCIONARIO' }, ahora: AHORA,
+    });
+    const e = plan.actuacion.evidenciaRadicacion!;
+    expect(e.baseDelAncla).toBe('PRIMERA_VERSION_DEL_ULTIMO_DOCUMENTO');
+    expect(e.documentoQueFijaElAncla).toMatch(/^doc-/);
+    expect(e.requisitoQueFijaElAncla).toBeTruthy();
   });
 });
