@@ -1,0 +1,202 @@
+# ══════════════════════════════════════════════════════════════════════
+# Reglas de Firebase — deploy manual gobernado + vigía de deriva · PT-5
+#
+# POR QUÉ EXISTE. Hasta el 24-ago las reglas se desplegaban con un comando
+# manual del propietario desde su equipo: funcionó, pero «las reglas están
+# desplegadas» era una afirmación sin verificación, y la deriva
+# repo↔producción era indetectable (hallazgo 🟠 de la auditoría). Este
+# workflow cierra ambas cosas:
+#
+#   · deploy: workflow_dispatch MANUAL con confirmación escrita — deploya
+#     los .rules del main ACTUAL al proyecto elegido. Nunca automático:
+#     cambiar reglas vivas es una decisión, no un efecto colateral.
+#   · vigía: cada lunes (y a demanda) corre el verificador de deriva de
+#     solo lectura contra producción; si lo vivo no es lo versionado, abre
+#     incidencia etiquetada `deriva-reglas`.
+#
+# CREDENCIAL: secret FIREBASE_SA_RULES (clave JSON de una SA de producción
+# con roles/firebaserules.admin — la misma admin-sdk sirve). Si falta, el
+# workflow FALLA CERRADO con instrucción, jamás finge (patrón de la casa).
+# ══════════════════════════════════════════════════════════════════════
+name: Reglas Firebase (deploy gobernado + vigía de deriva)
+
+on:
+  workflow_dispatch:
+    inputs:
+      accion:
+        description: 'verificar (solo lectura) o desplegar'
+        required: true
+        default: 'verificar'
+        type: choice
+        options: [verificar, desplegar]
+      proyecto:
+        description: 'ID del proyecto Firebase'
+        required: true
+        default: 'ventanilla-unica-f31b1'
+      confirmar:
+        description: 'Para desplegar, escriba exactamente "desplegar reglas"'
+        required: false
+        default: ''
+  schedule:
+    # Vigía semanal de deriva — lunes 13:10 UTC (8:10 Bogotá), tras la
+    # auditoría de consecutivos de las 13:00.
+    - cron: '10 13 * * 1'
+
+permissions:
+  contents: read
+  issues: write
+
+# Nunca dos corridas a la vez sobre las reglas vivas de un proyecto.
+concurrency:
+  group: reglas-firebase-${{ github.event.inputs.proyecto || 'ventanilla-unica-f31b1' }}
+  cancel-in-progress: false
+
+jobs:
+  reglas:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    # La credencial NO vive a nivel de job a propósito: así no está en el
+    # entorno de `npm ci`, que ejecuta scripts de terceros. Solo los dos
+    # pasos que la necesitan la reciben. Los inputs viajan por `env` y
+    # nunca interpolados en `run:` — un valor con `;` o backticks se
+    # ejecutaría con la SA de producción a mano.
+    env:
+      PROYECTO: ${{ github.event.inputs.proyecto || 'ventanilla-unica-f31b1' }}
+      ACCION: ${{ github.event.inputs.accion || 'verificar' }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Guardas que corren SIEMPRE (proyecto y credencial)
+        env:
+          SA: ${{ secrets.FIREBASE_SA_RULES }}
+        run: |
+          # La lista blanca va aquí, no en el paso de deploy: con
+          # accion=verificar (el valor por defecto) el input llegaba sin
+          # validar a un paso que exporta la credencial en su entorno.
+          case "${PROYECTO}" in
+            ventanilla-unica-f31b1|ventanilla-simacota-stage) ;;
+            *) echo "::error::Proyecto no permitido: ${PROYECTO}"; exit 1 ;;
+          esac
+          if [ -z "${SA}" ]; then
+            echo "::error::Falta el secret FIREBASE_SA_RULES (clave JSON de una SA con roles/firebaserules.admin en ${PROYECTO})."
+            echo "::error::Sin él este workflow no puede ni verificar ni desplegar — no finge."
+            exit 1
+          fi
+
+      - name: Guardas del deploy
+        if: ${{ env.ACCION == 'desplegar' }}
+        env:
+          CONFIRMAR: ${{ github.event.inputs.confirmar }}
+          REF: ${{ github.ref }}
+        run: |
+          if [ "${CONFIRMAR}" != "desplegar reglas" ]; then
+            echo "::error::Escriba exactamente 'desplegar reglas' en la confirmación. Nada se desplegó."
+            exit 1
+          fi
+          if [ "${REF}" != "refs/heads/main" ]; then
+            echo "::error::Las reglas solo se despliegan desde main."
+            exit 1
+          fi
+
+      - uses: actions/setup-node@v7
+        with:
+          node-version-file: '.nvmrc'
+          cache: 'npm'
+      - run: npm ci
+
+      - name: Verificar deriva (solo lectura)
+        id: deriva
+        env:
+          SA: ${{ secrets.FIREBASE_SA_RULES }}
+        run: |
+          set -uo pipefail
+          export FIREBASE_SERVICE_ACCOUNT="${SA}"
+          # El verificador distingue por código de salida: 4 = DERIVA REAL;
+          # 2 credencial ilegible; 3 credencial de otro proyecto; 1 fallo de
+          # red/permiso. Colapsarlos todos en «hay deriva» haría que un
+          # secret caducado o un parpadeo de googleapis amaneciera como una
+          # incidencia FALSA de deriva, con instrucción de ir a desplegar
+          # reglas — la alarma mintiendo justo en su estreno. Se captura
+          # stderr también (2>&1): esos errores salen por ahí y el reporte
+          # quedaba vacío.
+          node scripts/operacion/verificar-reglas-vivas.mjs --proyecto "${PROYECTO}" > /tmp/deriva.txt 2>&1
+          RC=$?
+          cat /tmp/deriva.txt
+          { echo 'REPORTE<<EOF'; cat /tmp/deriva.txt; echo 'EOF'; } >> "$GITHUB_OUTPUT"
+          case "${RC}" in
+            0) echo "ESTADO=sin_deriva" >> "$GITHUB_OUTPUT" ;;
+            4) echo "ESTADO=deriva"     >> "$GITHUB_OUTPUT" ;;
+            *) echo "ESTADO=fallo"      >> "$GITHUB_OUTPUT"
+               echo "::error::El verificador no pudo comprobar (código ${RC}): credencial ilegible/de otro proyecto, permiso o red. NO es deriva — no se abre incidencia de deriva."
+               exit 1 ;;
+          esac
+
+      - name: Desplegar reglas (solo si se pidió)
+        if: ${{ env.ACCION == 'desplegar' }}
+        env:
+          SA: ${{ secrets.FIREBASE_SA_RULES }}
+        run: |
+          set -euo pipefail
+          printf '%s' "${SA}" > /tmp/sa.json
+          # Versión FIJADA a propósito: sin pin, npx bajaría el latest del
+          # registro justo cuando la credencial de reglas está en disco —
+          # y este proyecto ya perdió 14 horas por una dependencia sin fijar
+          # (SEV-1, ADR-0025). Subir de major es una decisión con su PR.
+          GOOGLE_APPLICATION_CREDENTIALS=/tmp/sa.json npx --yes firebase-tools@15.19.0 deploy \
+            --only firestore:rules,storage --project "${PROYECTO}" --non-interactive
+          rm -f /tmp/sa.json
+          export FIREBASE_SERVICE_ACCOUNT="${SA}"
+          node scripts/operacion/verificar-reglas-vivas.mjs --proyecto "${PROYECTO}"
+
+      - name: Incidencia si el vigía encontró deriva REAL
+        if: ${{ env.ACCION == 'verificar' && steps.deriva.outputs.ESTADO == 'deriva' }}
+        uses: actions/github-script@v8
+        env:
+          # Por `env`, nunca interpolado dentro del script: un reporte con
+          # comillas o backticks rompería el template literal (o algo peor).
+          REPORTE: ${{ steps.deriva.outputs.REPORTE }}
+        with:
+          script: |
+            const reporte = process.env.REPORTE || 'ver el log del workflow';
+            const cuerpo = ['El vigía semanal encontró DERIVA entre el repo y las reglas vivas:', '', '```', reporte, '```', '', 'Desplegar desde este mismo workflow (accion=desplegar) tras revisar el porqué — una deriva puede ser un deploy olvidado o un cambio manual en la consola que nadie versionó.'].join('\n');
+            const abiertas = await github.rest.issues.listForRepo({ ...context.repo, state: 'open', labels: 'deriva-reglas' });
+            if (abiertas.data.length > 0) {
+              await github.rest.issues.createComment({ ...context.repo, issue_number: abiertas.data[0].number, body: cuerpo });
+            } else {
+              await github.rest.issues.create({ ...context.repo, title: '🟠 Deriva entre el repo y las reglas vivas de Firebase', body: cuerpo, labels: ['deriva-reglas'] });
+            }
+            core.setFailed('Deriva detectada');
+
+      - name: Cerrar la incidencia de deriva si volvió a coincidir
+        if: ${{ env.ACCION == 'verificar' && steps.deriva.outputs.ESTADO == 'sin_deriva' }}
+        uses: actions/github-script@v8
+        with:
+          script: |
+            // Simétrico del smoke: sin esto la incidencia queda abierta
+            // para siempre y la SIGUIENTE deriva real entra como comentario
+            // en un hilo viejo que ya nadie mira — la alarma se degrada sola.
+            const abiertas = await github.rest.issues.listForRepo({ ...context.repo, state: 'open', labels: 'deriva-reglas' });
+            for (const iss of abiertas.data) {
+              await github.rest.issues.createComment({ ...context.repo, issue_number: iss.number, body: '✅ Las reglas vivas volvieron a coincidir con el repositorio — se cierra.' });
+              await github.rest.issues.update({ ...context.repo, issue_number: iss.number, state: 'closed' });
+            }
+
+      - name: Avisar si el vigía NO PUDO comprobar
+        if: ${{ always() && env.ACCION == 'verificar' && steps.deriva.outputs.ESTADO == 'fallo' }}
+        uses: actions/github-script@v8
+        env:
+          REPORTE: ${{ steps.deriva.outputs.REPORTE }}
+        with:
+          script: |
+            // Etiqueta PROPIA, separada de deriva-reglas: «no pude
+            // comprobar» y «hay deriva» son cosas distintas y mezclarlas
+            // fue justo el defecto que este PR corrige. Sin este paso, un
+            // secret revocado dejaba el vigía muerto durante semanas con
+            // solo un job rojo que nadie mira.
+            const cuerpo = ['El vigía semanal NO pudo comprobar las reglas (no es deriva — es infraestructura):', '', '```', process.env.REPORTE || 'ver el log', '```', '', 'Causas típicas: clave de la SA revocada o caducada, SA sin roles/firebaserules.admin, o fallo de red. Mientras esto siga así, NADIE está vigilando la deriva de reglas.'].join('\n');
+            const abiertas = await github.rest.issues.listForRepo({ ...context.repo, state: 'open', labels: 'vigia-reglas-caido' });
+            if (abiertas.data.length > 0) {
+              await github.rest.issues.createComment({ ...context.repo, issue_number: abiertas.data[0].number, body: cuerpo });
+            } else {
+              await github.rest.issues.create({ ...context.repo, title: '🔴 El vigía de reglas no puede comprobar (infraestructura)', body: cuerpo, labels: ['vigia-reglas-caido'] });
+            }

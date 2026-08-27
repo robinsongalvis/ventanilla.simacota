@@ -62,13 +62,6 @@ service cloud.firestore {
      * radicados cuyo `oficinaDestino` coincide con su propio tenant. Jefe y
      * Control Interno quedan fuera (son solo lectura).
      */
-    function canWriteTrazabilidad(radicadoId, database) {
-      return isAdmin() || isRecepcionista()
-        || (isFuncionario()
-            && get(/databases/$(database)/documents/ventanilla_radicados/$(radicadoId))
-                  .data.clasificacion.oficinaDestino == userTenant());
-    }
-
     function assignedTenant(data) {
       return data.clasificacionIA != null
         && data.clasificacionIA.oficinaDestino == userTenant();
@@ -139,9 +132,11 @@ service cloud.firestore {
         || ((isFuncionario() || isJefeDependencia())
             && resource.data.clasificacion.oficinaDestino == userTenant());
 
-      // Solo admin y recepcionista pueden radicar institucionalmente.
-      allow create: if (isAdmin() || isRecepcionista())
-        && request.resource.data.radicadoId == radicadoId;
+      // CR-2 CERRADO (cutover PT-1, 23-ago-2026): la radicación corre por
+      // el SERVIDOR (/api/radicacion/interna, Admin SDK) desde el flip de
+      // USA_RADICACION_INTERNA_SERVER. Un create de cliente era un registro
+      // oficial forjable: ningún campo de negocio se validaba aquí.
+      allow create: if false;
 
       // Mutaciones críticas pasan por APIs server-side con Admin SDK.
       // Esto blinda cumplioTermino, estadoActual, clasificación, prórrogas y respuesta oficial.
@@ -172,9 +167,15 @@ service cloud.firestore {
             && get(/databases/$(database)/documents/ventanilla_radicados/$(radicadoId))
                   .data.clasificacion.oficinaDestino == userTenant());
       // Escritura: roles operativos CON aislamiento por tenant (ADR-0008 / R8).
-      // El Funcionario solo escribe sobre radicados de su propio tenant; Jefe y
-      // Control Interno son solo lectura.
-      allow create: if canWriteTrazabilidad(radicadoId, database);
+      // PR-C del cutover (24-ago-2026): la trazabilidad es SERVER-ONLY,
+      // patrón D8. Los dos únicos escritores de cliente resultaron código
+      // muerto (el resolver DEPRECATED sin llamadores y la radicación
+      // legada, inalcanzable tras el flip) — se extirparon en vez de
+      // migrarse. Con create de cliente, cualquier FUNCIONARIO podía
+      // inyectar eventos con actor forjado: el registro probatorio de
+      // notificaciones perdía no-repudio. El actor lo captura el servidor
+      // (appendTrazabilidadAdmin / el handler de radicación).
+      allow create: if false;
       allow update, delete: if false;
     }
 
@@ -188,9 +189,11 @@ service cloud.firestore {
         || ((isFuncionario() || isJefeDependencia())
             && resource.data.dependenciaOrigen == userTenant());
 
-      // Solo recepción/admin registran salidas (ventanilla única de salida).
-      allow create: if (isAdmin() || isRecepcionista())
-        && request.resource.data.salidaId == salidaId;
+      // Cutover PT-1 (23-ago-2026): toda salida se registra por
+      // /api/salidas/registrar (Admin SDK) — verificado que NINGÚN flujo de
+      // cliente escribía esta colección; la regla abierta era pura
+      // superficie de forja del libro (que se declara inmutable).
+      allow create: if false;
 
       allow update, delete: if false;
     }
@@ -206,14 +209,28 @@ service cloud.firestore {
 
     // ── Contadores de consecutivo anual ────────────────────────────────────
     match /counters/{document} {
-      // Lectura y escritura transaccional para generar el número de radicado.
-      allow read, write: if isAdmin() || isRecepcionista();
+      // CR-1 CERRADO (cutover PT-1, 23-ago-2026): el consecutivo legal solo
+      // avanza en el SERVIDOR (consecutivo-legal.ts, guard D9 de
+      // monotonicidad). Con write de cliente, cualquier sesión ADMIN o
+      // RECEPCIONISTA podía saltar, reiniciar o colisionar la foliación
+      // AGN 060 — el hallazgo CR-1 abierto desde julio. La lectura queda:
+      // es inofensiva y algún tablero podría consultarla.
+      allow read: if isAdmin() || isRecepcionista();
+      allow write: if false;
     }
 
     // ── Reserva de unicidad de números de expediente (Fase 2) ─────────────
     // Doc id = número de expediente formateado. Escrita SOLO por el servidor
     // (Admin SDK, tx.create en lib/server/emitir-numero-expediente.ts);
     // ningún cliente lee ni escribe.
+    /* Reserva de unicidad de las series de radicación (radicados, salidas,
+       planillas). Mismo régimen que unicidad_expedientes: Admin SDK y nadie
+       más. Un cliente que pudiera crear aquí podría "quemar" un número que
+       nunca se usa, o peor, impedir que la emisión legítima lo reserve. */
+    match /unicidad_radicados/{id} { allow read, write: if false; }
+    match /unicidad_salidas/{id}   { allow read, write: if false; }
+    match /unicidad_planillas/{id} { allow read, write: if false; }
+
     match /unicidad_expedientes/{id} {
       allow read, write: if false;
     }

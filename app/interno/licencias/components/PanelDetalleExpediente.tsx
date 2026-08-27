@@ -285,10 +285,28 @@ export function PanelDetalleExpediente({ expedienteId, onCerrar, textoColision =
                     ))}
                   </dl>
                 )}
-                <p className="text-[11px] mt-2" style={{ color: 'var(--text-muted)' }}>
+                <p className="text-[11px] mt-2" style={{ color: 'var(--text-secondary)' }}>
                   Radicado de origen:{' '}
-                  {expediente.radicadoId ? <NumeroLegal value={expediente.radicadoId} variant="radicado" size="sm" /> : 'sin vincular'}
+                  {expediente.radicadoId ? (
+                    /* PT-7/AMARILLO de la auditoría (24-ago-2026): el número era
+                       texto muerto — para ver los anexos que el ciudadano
+                       adjuntó al radicar, la funcionaria debía irse a
+                       Ventanilla y BUSCARLO a mano. El enlace profundo ya
+                       existía (?radicadoId=); solo faltaba usarlo. */
+                    <Link
+                      href={`/interno/dashboard?radicadoId=${encodeURIComponent(expediente.radicadoId)}`}
+                      className="underline decoration-dotted underline-offset-2 hover:opacity-80"
+                      title="Abrir el radicado en Ventanilla — allí están los documentos que el ciudadano adjuntó al radicar. Si no está disponible en el tablero, este le indicará dónde buscarlo."
+                    >
+                      <NumeroLegal value={expediente.radicadoId} variant="radicado" size="sm" />
+                    </Link>
+                  ) : 'sin vincular'}
                   {' · '}Creado el {formatFechaColombia(expediente.creadoEn)}
+                  {expediente.radicadoId ? (
+                    <span className="block text-[10px] mt-0.5" style={{ color: 'var(--text-secondary)' }}>
+                      Los documentos que el ciudadano adjuntó al radicar viven en el radicado. El enlace lo abre en Ventanilla; si el radicado ya no está en el tablero (más de 180 días), este le indicará buscarlo en «Búsqueda avanzada».
+                    </span>
+                  ) : null}
                 </p>
               </Seccion>
 

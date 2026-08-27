@@ -49,7 +49,25 @@ export type OperacionLectura = 'busqueda_radicados';
  * 060/2001 de continuidad y unicidad de las series de radicación
  * (`app/api/cron/auditoria-consecutivos/route.ts`).
  */
-export type OperacionSistema = 'auditoria_consecutivos';
+export type OperacionSistema =
+  | 'auditoria_consecutivos'
+  /**
+   * Vigía predictivo de plazos de SIMI. Añadido el 27-ago-2026, al agendarlo:
+   * hasta entonces terminaba en silencio, y los logs de Vercel guardan el
+   * estado y la duración pero NO el cuerpo de la respuesta. Una corrida que
+   * analizó 500 radicados y una que no encontró ninguno se veían idénticas.
+   */
+  | 'alertas_vencimiento_simi'
+  /**
+   * Los otros tres trabajos programados. Añadidos el 27-ago-2026 por la misma
+   * razón que el de SIMI: los logs de Vercel guardan el estado y la duración,
+   * no el cuerpo de la respuesta. Sin esto, «corrió bien» y «corrió bien y no
+   * encontró nada» eran el mismo registro — y el segundo puede significar que
+   * el vigía dejó de ver lo que debía.
+   */
+  | 'vigia_vencimientos_licencias'
+  | 'alertas_vencimiento_pqrsd'
+  | 'desistimiento_tacito';
 
 /** Vocabulario completo de operaciones observables (escritura + lectura + sistema). */
 export type Operacion = OperacionCritica | OperacionLectura | OperacionSistema;
@@ -76,6 +94,20 @@ export interface EventoNegocio {
    * patrón O(N) hoy y que 2A debe reducir a ~pageSize.
    */
   docsLeidos?: number;
+  /**
+   * Solo en los vigías de plazos: cuántas alertas se CREARON y cuántas se
+   * omitieron por existir ya. Sin estos dos números, «corrió bien» y «corrió
+   * bien y no hizo nada» son el mismo registro — y el segundo puede significar
+   * que el vigía dejó de ver lo que debía.
+   */
+  alertasCreadas?:  number;
+  alertasOmitidas?: number;
+  /**
+   * Cuántos casos requirieron una acción: avisos efectivamente enviados,
+   * actos propuestos. Es el número que distingue una barrida que miró y no
+   * halló nada de una que halló y actuó.
+   */
+  accionados?: number;
 }
 
 /**
@@ -101,6 +133,11 @@ export function registrarEventoNegocio(params: {
   error?:     unknown;
   /** Solo para operaciones de LECTURA (ADR-0011): nº de documentos leídos. */
   docsLeidos?: number;
+  /** Solo para los vigías de plazos: cuántas alertas se crearon y cuántas se omitieron. */
+  alertasCreadas?:  number;
+  alertasOmitidas?: number;
+  /** Cuántos casos requirieron una acción del cron (avisos enviados, actos propuestos). */
+  accionados?: number;
 }): EventoNegocio {
   const timestamp = new Date().toISOString();
   const radicadoId = params.radicadoId;
@@ -122,6 +159,9 @@ export function registrarEventoNegocio(params: {
         }
       : {}),
     ...(typeof params.docsLeidos === 'number' ? { docsLeidos: params.docsLeidos } : {}),
+    ...(typeof params.alertasCreadas === 'number' ? { alertasCreadas: params.alertasCreadas } : {}),
+    ...(typeof params.alertasOmitidas === 'number' ? { alertasOmitidas: params.alertasOmitidas } : {}),
+    ...(typeof params.accionados === 'number' ? { accionados: params.accionados } : {}),
   };
 
   // 1. Log estructurado (siempre)

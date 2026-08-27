@@ -76,3 +76,21 @@ export async function requireActiveInternalUser() {
   }
   return sesionActual;
 }
+
+/**
+ * REPLICA EXACTA de `canOperateTenant` (lib/server/internal-auth.ts:82-86).
+ *
+ * Se replica en vez de reexportar el real porque este stub SUSTITUYE al módulo
+ * entero: quien importa `@/lib/server/internal-auth` recibe este archivo, y
+ * reexportar desde el original crearía una importación circular a través del
+ * mismo alias que el plugin intercepta.
+ *
+ * Es una función PURA de tres líneas sobre la sesión, sin I/O — pero es una
+ * réplica, y las réplicas se desincronizan calladas. `__tests__/stub-auth-
+ * coherente.test.ts` compara ambas contra las mismas entradas.
+ */
+export function canOperateTenant(user, tenantId) {
+  return user.rol === 'ADMIN'
+    || user.rol === 'RECEPCIONISTA'
+    || (user.rol === 'FUNCIONARIO' && user.tenantId === tenantId);
+}

@@ -1,4 +1,5 @@
-import { readFileSync } from 'fs';
+import { readFileSync, readdirSync } from 'fs';
+import { join } from 'path';
 import { describe, expect, it } from 'vitest';
 import {
   buildAuditoriaConsecutivosHtml,
@@ -154,7 +155,58 @@ describe('vercel.json — cron de auditoría de consecutivos', () => {
     expect(desistimiento?.schedule).toBe('0 6 * * *');
   });
 
-  it('hay exactamente 3 crons configurados', () => {
-    expect(cfg.crons).toHaveLength(3);
+  /* Antes esto era `toHaveLength(3)`: un número suelto que solo decía CUÁNTOS
+     y no CUÁLES. Al añadir el vigía de licencias falló sin explicar nada —
+     había que ir a git a averiguar si el cron nuevo era legítimo o un descuido.
+     Enumerar el conjunto exacto conserva la protección (nadie añade ni quita un
+     trabajo programado sin que esta prueba lo cante) y además dice, en el propio
+     mensaje de fallo, qué apareció o qué desapareció. */
+  /* EXACTAMENTE estos, no «al menos estos». Esa rigidez es la que cazó al
+     quinto cron: existía un `route.ts` desplegable que nadie había agendado, y
+     una aserción de mínimo no lo habría notado nunca — el panel de Control
+     Interno mostraba un cero que significaba «nadie las generó», no «no hay». */
+  it('los trabajos programados son EXACTAMENTE estos cinco', () => {
+    expect(cfg.crons.map((c) => c.path).sort()).toEqual([
+      '/api/cron/alertas-vencimiento',
+      '/api/cron/auditoria-consecutivos',
+      '/api/cron/desistimiento-tacito',
+      '/api/cron/simi/alertas-vencimiento',
+      '/api/cron/vencimientos-licencias',
+    ]);
+  });
+
+  /* LA OTRA DIRECCIÓN, que es la que faltaba. La prueba de arriba compara lo
+     agendado contra una lista escrita a mano: es ciega a un handler que existe
+     y nadie programó. Aquí se recorre el árbol de `app/api/cron` y se exige que
+     cada `route.ts` tenga su entrada — el registro central que el ADR-0033
+     §4.6-bis anotó como pendiente, en su forma mínima y para este dominio. */
+  it('cada handler de cron que existe está agendado, y al revés', () => {
+    const handlers = [...listarHandlersDeCron('app/api/cron')].sort();
+    expect(cfg.crons.map((c) => c.path).sort()).toEqual(handlers);
+  });
+
+  it('el vigía de licencias corre en días hábiles, antes de la jornada', () => {
+    const vigia = cfg.crons.find((c) => c.path === '/api/cron/vencimientos-licencias');
+    expect(vigia?.schedule).toBe('30 12 * * 1-5'); // 7:30 de Bogotá, lunes a viernes
   });
 });
+
+/**
+ * Recorre `app/api/cron/**` y devuelve la ruta HTTP de cada `route.ts`.
+ *
+ * Es el inventario REAL de trabajos programables, derivado del árbol de
+ * archivos en vez de escrito a mano — el mismo criterio que el verificador de
+ * restauración aplica con `firestore.rules`. Un handler nuevo aparece aquí solo,
+ * sin que nadie tenga que acordarse.
+ */
+function listarHandlersDeCron(raiz: string, prefijo = '/api/cron'): string[] {
+  const rutas: string[] = [];
+  for (const entrada of readdirSync(raiz, { withFileTypes: true })) {
+    if (entrada.isDirectory()) {
+      rutas.push(...listarHandlersDeCron(join(raiz, entrada.name), `${prefijo}/${entrada.name}`));
+    } else if (entrada.name === 'route.ts') {
+      rutas.push(prefijo);
+    }
+  }
+  return rutas;
+}

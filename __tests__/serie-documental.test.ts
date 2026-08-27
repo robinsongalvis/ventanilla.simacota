@@ -71,10 +71,12 @@ describe('labelSerieDocumental', () => {
 describe('integración — el radicado nace con la serie', () => {
   it('la acción de radicar persiste la foto de la serie en la clasificación', () => {
     // Pieza angular (P2.1) Fase 1 — la construcción del radicado (incluida
-    // la foto de serieDocumental) se extrajo al constructor puro compartido
-    // `lib/recepcion/construir-radicado.ts`; la acción interna delega ahí.
-    const accion = readFileSync('lib/actions/radicarVentanilla.ts', 'utf8');
-    expect(accion).toContain('construirVentanillaRadicado');
+    // la foto de serieDocumental) vive en el constructor puro compartido
+    // `lib/recepcion/construir-radicado.ts`. Re-apuntada en el PR-C: la
+    // acción legada se extirpó y quien delega hoy es el handler del
+    // servidor, el único camino de radicación interna.
+    const handler = readFileSync('app/api/radicacion/interna/route.ts', 'utf8');
+    expect(handler).toContain('construirVentanillaRadicado');
     const constructor = readFileSync('lib/recepcion/construir-radicado.ts', 'utf8');
     expect(constructor).toContain('sugerirSerieDocumental');
     expect(constructor).toContain('serieDocumental: serie');

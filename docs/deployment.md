@@ -93,9 +93,9 @@ El sistema de notificaciones por correo electrónico requiere las siguientes var
 # Notificaciones institucionales — Gmail con App Password
 EMAIL_HOST=smtp.gmail.com
 EMAIL_PORT=587
-EMAIL_USER=notificaciones@simacota-santander.gov.co
+EMAIL_USER=contactenos@simacota-santander.gov.co
 EMAIL_PASS=[App Password de 16 caracteres — SOLO en Vercel, nunca en código]
-EMAIL_FROM=Alcaldía de Simacota <notificaciones@simacota-santander.gov.co>
+EMAIL_FROM=Alcaldía de Simacota <contactenos@simacota-santander.gov.co>
 ```
 
 ### Correos institucionales enviados

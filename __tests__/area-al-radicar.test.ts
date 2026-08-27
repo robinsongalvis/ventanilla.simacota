@@ -59,8 +59,12 @@ describe('acción de radicar — el área viaja a la clasificación', () => {
     // (trim de datos.areaResponsable), pero la escritura CONDICIONAL en
     // clasificacion.areaResponsable (solo si hay valor) se movió al
     // constructor puro compartido `lib/recepcion/construir-radicado.ts`.
-    const accion = readFileSync('lib/actions/radicarVentanilla.ts', 'utf8');
-    expect(accion).toContain('datos.areaResponsable?.trim()');
+    // Re-apuntada en el PR-C: en el handler del servidor, areaResponsable
+    // entra por el lector genérico campo(), y ES campo() quien hace trim —
+    // dos hechos, dos aserciones (si cualquiera cambia, esto delata).
+    const ruta = readFileSync('app/api/radicacion/interna/route.ts', 'utf8');
+    expect(ruta).toContain('campo(formData, CAMPOS_RADICACION_INTERNA.areaResponsable)');
+    expect(ruta).toMatch(/function campo\([\s\S]{0,200}?\.trim\(\)/);
     const constructor = readFileSync('lib/recepcion/construir-radicado.ts', 'utf8');
     expect(constructor).toContain('entrada.areaResponsable ? { areaResponsable: entrada.areaResponsable } : {}');
   });

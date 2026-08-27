@@ -2,49 +2,23 @@ rules_version = '2';
 
 service firebase.storage {
   match /b/{bucket}/o {
-    function signedIn() {
-      return request.auth != null;
-    }
-
-    function isAllowedRadicadoFile() {
-      return request.resource != null
-        && request.resource.size > 0
-        && request.resource.size <= 10 * 1024 * 1024
-        && (
-          request.resource.contentType.matches('image/.*')
-          || request.resource.contentType == 'application/pdf'
-          // Anexos Office (OOXML) — DOCX/XLSX/PPTX. Tipos exactos, sin
-          // comodín application/*: los formatos OLE antiguos (.doc/.xls/.ppt)
-          // quedan deliberadamente excluidos (ver lib/seguridad/magic-bytes.ts).
-          || request.resource.contentType == 'application/vnd.openxmlformats-officedocument.wordprocessingml.document'
-          || request.resource.contentType == 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
-          || request.resource.contentType == 'application/vnd.openxmlformats-officedocument.presentationml.presentation'
-        );
-    }
+    // PT-3 (24-ago-2026): el bucket ENTERO es Admin-SDK-only. Las dos
+    // puertas de subida directa autenticada que había (/radicados/ y
+    // /respuestas/) eran PUERTAS MUERTAS: la pública sube por
+    // /api/radicacion, la interna por /api/radicacion/interna desde el
+    // cutover PT-1, la resolución por /api/radicados/{id}/resolver, y
+    // `subirArchivos` de lib/storage quedó sin un solo llamador (verificado
+    // sin truncar). Su único uso posible era el abuso: cualquier token de
+    // Auth — sin perfil interno siquiera — podía subir 10 MB a discreción o
+    // plantar «respuestas oficiales». La validación de tipo/tamaño vive en
+    // el servidor (magic-bytes + límites del handler), donde no se esquiva.
 
     match /radicados/{radicadoId}/{archivo} {
-      // La radicación pública sube anexos vía Admin SDK en /api/radicacion.
-      // Solo usuarios internos autenticados conservan subida directa temporal para radicación interna.
-      allow create: if signedIn() && isAllowedRadicadoFile();
-
-      allow read: if false;
-
-      allow update, delete: if false;
+      allow read, write: if false;
     }
 
     match /respuestas/{radicadoId}/{archivo} {
-      // La resolución moderna sube vía Admin SDK en /api/radicados/{id}/resolver.
-      // Se mantiene autenticado para compatibilidad interna, nunca público.
-      allow create: if signedIn()
-        && request.resource != null
-        && request.resource.size > 0
-        && request.resource.size <= 10 * 1024 * 1024
-        && request.resource.contentType == 'application/pdf';
-
-      // Lectura solo via Admin SDK en /api/interno/archivo — nunca directa.
-      allow read: if false;
-
-      allow update, delete: if false;
+      allow read, write: if false;
     }
 
     // Sprint Ventanilla Operativa 3 — copias selladas.

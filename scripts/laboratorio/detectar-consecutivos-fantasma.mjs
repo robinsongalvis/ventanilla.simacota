@@ -14,11 +14,34 @@
  * de subsanación (AGN 060/2001 art. 5, que exige unicidad Y continuidad).
  */
 
-/** Colección de cada serie. */
+/**
+ * Colección de cada serie, y ALCANCE DECLARADO del detector (ADR-0033 §4.6-bis).
+ *
+ * `expedientes` NO está aquí, y la ausencia es una decisión: la serie no tiene
+ * colección de documentos con el número en el id, así que no hay ids que barrer
+ * por continuidad. Su unicidad la garantiza `unicidad_expedientes` y su
+ * coherencia la vigila el cron de auditoría.
+ *
+ * POR QUÉ SE ESCRIBE. Hasta el 26-ago-2026 esta ausencia no constaba en ningún
+ * sitio, y este guion es el que se corre a mano contra producción para levantar
+ * las constancias del AGN: imprimía «CERO HUECOS Y CERO DUPLICADOS — cierre
+ * limpio» sin haber mirado la única serie con un libro de papel detrás.
+ * `__tests__/alcance-detector-fantasma.test.mjs` comprueba que entre cubiertos
+ * y excluidos no quede ninguna serie huérfana.
+ */
 export const COLECCION_POR_SERIE = {
   radicados: 'ventanilla_radicados',
   salidas:   'ventanilla_salidas',
   planillas: 'ventanilla_planillas',
+};
+
+/** @type {{cubiertos: string[], excluidos: Record<string,string>}} */
+export const ALCANCE_DETECTOR = {
+  cubiertos: ['radicados', 'salidas', 'planillas'],
+  excluidos: {
+    expedientes:
+      'La serie no tiene colección de documentos cuyo id lleve el consecutivo, así que no hay serie de ids que barrer por continuidad. Su unicidad la garantiza la reserva `unicidad_expedientes` y su coherencia con la apertura la vigila el cron de auditoría de los lunes.',
+  },
 };
 
 /**

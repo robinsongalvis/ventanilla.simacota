@@ -24,21 +24,29 @@ describe('cierre seguridad go-live', () => {
     expect(rules).toContain('cumplioTermino');
   });
 
-  it('impide subida pública anónima directa a Storage', () => {
+  it('impide TODA subida directa a Storage — el bucket es Admin-SDK-only (PT-3)', () => {
+    // Antes esta guarda exigía `signedIn()` en la subida directa. El PT-3
+    // (24-ago-2026) la volvió más fuerte: las puertas autenticadas eran
+    // puertas muertas tras el cutover y se cerraron — ninguna cláusula
+    // allow del bucket admite nada que no sea `if false`.
     const rules = read('storage.rules');
-
     expect(rules).toContain('match /radicados/{radicadoId}/{archivo}');
-    expect(rules).toContain('allow create: if signedIn() && isAllowedRadicadoFile();');
-    expect(rules).not.toContain('allow create: if isAllowedRadicadoFile();');
+    const codigo = rules.split('\n').filter((l: string) => !l.trim().startsWith('//'));
+    const allows = codigo.filter((l: string) => l.includes('allow '));
+    expect(allows.length).toBeGreaterThan(0);
+    for (const a of allows) expect(a).toContain('if false');
   });
 
-  it('admite anexos Office (OOXML) por content type exacto, sin comodín application/*', () => {
-    const rules = read('storage.rules');
-
-    expect(rules).toContain('application/vnd.openxmlformats-officedocument.wordprocessingml.document');
-    expect(rules).toContain('application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
-    expect(rules).toContain('application/vnd.openxmlformats-officedocument.presentationml.presentation');
-    expect(rules).not.toContain("contentType.matches('application/*')");
+  it('admite anexos Office (OOXML) por tipo exacto — validado en el SERVIDOR, no en reglas (PT-3)', () => {
+    // La validación de tipos vivía en storage.rules porque el cliente subía
+    // directo. Con el bucket Admin-SDK-only, el único validador es el del
+    // servidor (magic-bytes), que verifica CONTENIDO real, no el content
+    // type declarable por el cliente — estrictamente más fuerte.
+    const magic = read('lib/seguridad/magic-bytes.ts');
+    expect(magic).toContain('application/vnd.openxmlformats-officedocument.wordprocessingml.document');
+    expect(magic).toContain('application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+    expect(magic).toContain('application/vnd.openxmlformats-officedocument.presentationml.presentation');
+    expect(magic).not.toContain("application/*");
   });
 
   it('revoca tokens al desactivar usuarios internos', () => {

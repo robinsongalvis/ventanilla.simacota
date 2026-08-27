@@ -1,0 +1,219 @@
+name: Backup Storage (adjuntos · PT-4)
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Respaldo diario de FIREBASE STORAGE — los adjuntos.
+#
+# POR QUÉ EXISTE. El respaldo de Firestore lleva meses corriendo y su
+# restauración se ensayó con éxito el 18-ago. Pero `gcloud firestore export`
+# NO incluye Storage, y ahí viven los archivos: lo que el ciudadano anexa a su
+# petición, las respuestas firmadas en PDF, las copias selladas y los oficios
+# de salida. Hoy no tienen ninguna copia.
+#
+# Qué se pierde exactamente sin esto: Firestore se restauraría completo, pero
+# cada documento quedaría convertido en una ficha que apunta a la nada — el
+# sistema guarda la RUTA del archivo, nunca sus bytes. Y la firma del oficio de
+# respuesta solo existe DENTRO del PDF: el texto se puede rehacer, la firma no.
+# Contra una retención documental de 10 a 20 años, eso es pérdida irreversible.
+#
+# TRES DECISIONES QUE PARECEN DETALLES Y NO LO SON:
+#
+#  1. Se copia el BUCKET ENTERO (`**`), no una lista de prefijos. El sistema
+#     escribe en nueve: seis finales (radicados/, respuestas/, sellados/,
+#     salidas/, planillas/, expedientes/) y TRES de staging (`_pendientes`)
+#     que nadie limpia y que contienen binarios reales. Una lista de prefijos
+#     escrita a mano olvidará alguno; peor, un respaldo derivado de las rutas
+#     guardadas en Firestore perdería justo esos tres, porque el archivo se
+#     sube antes de que exista el documento que lo referencia.
+#
+#  2. `rsync` SIN propagar borrados. Un respaldo que replica las eliminaciones
+#     del origen no protege del escenario más probable — el borrado
+#     accidental. El destino solo crece; la limpieza es una decisión aparte y
+#     deliberada.
+#
+#  3. El destino es un bucket DISTINTO y SIN la caducidad de 30 días del
+#     bucket de respaldos de Firestore. Treinta días son correctos para un
+#     export de base de datos; son inaceptables para documentos con retención
+#     legal de una década.
+#
+# REQUISITOS (los provisiona el propietario una vez — ver el paso «Comandos»
+# al final de este archivo y scripts/backups/README.md).
+# ─────────────────────────────────────────────────────────────────────────────
+
+on:
+  schedule:
+    # 08:00 UTC = 03:00 de Bogotá. Media hora después del export de Firestore
+    # (07:00 UTC) a propósito: si ambos fallan la misma noche, los mensajes de
+    # error no se pisan y se ve cuál cayó primero.
+    - cron: '0 8 * * *'
+  workflow_dispatch:
+    inputs:
+      confirmar:
+        description: 'Escribe "backup" para ejecutar manualmente'
+        required: true
+        default: ''
+
+# Sin cancelación: un respaldo a medias es peor que uno que se solapa.
+concurrency:
+  group: backup-storage
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+  id-token: write
+  # Sin esto el paso que abre la incidencia falla con «Resource not accessible
+  # by integration»: el vigía construido para gritar se queda mudo, y el fallo
+  # solo se ve entrando a la pestaña de Actions — que es donde nadie mira.
+  issues: write
+
+jobs:
+  respaldar:
+    name: Copiar adjuntos al bucket de respaldo
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    env:
+      GCP_PROJECT: ${{ vars.GCP_BACKUP_PROJECT || 'ventanilla-unica-f31b1' }}
+      ORIGEN_BUCKET: ${{ vars.FIREBASE_STORAGE_BUCKET || 'ventanilla-unica-f31b1.firebasestorage.app' }}
+      DESTINO_BUCKET: ${{ vars.GCP_STORAGE_BACKUP_BUCKET || 'ventanilla-simacota-adjuntos-respaldo' }}
+      WIF_PROVIDER: ${{ secrets.GCP_WORKLOAD_IDENTITY_PROVIDER }}
+      SA_KEY_JSON: ${{ secrets.GCP_BACKUP_SA_KEY }}
+
+    steps:
+      - name: Validar disparo manual
+        if: ${{ github.event_name == 'workflow_dispatch' && github.event.inputs.confirmar != 'backup' }}
+        run: |
+          echo "::error::Disparo manual sin confirmar. Escribe 'backup' en el input."
+          exit 1
+
+      - name: Verificar que la infraestructura está provisionada
+        run: |
+          if [ -z "$WIF_PROVIDER" ] && [ -z "$SA_KEY_JSON" ]; then
+            echo "::error::Respaldo de adjuntos NO ejecutado — sin credencial de GCP."
+            echo "Define GCP_WORKLOAD_IDENTITY_PROVIDER+GCP_BACKUP_SA (recomendado) o GCP_BACKUP_SA_KEY."
+            exit 1
+          fi
+
+      - name: Autenticar a GCP (WIF)
+        if: ${{ env.WIF_PROVIDER != '' }}
+        uses: google-github-actions/auth@v3
+        with:
+          workload_identity_provider: ${{ secrets.GCP_WORKLOAD_IDENTITY_PROVIDER }}
+          service_account: ${{ secrets.GCP_BACKUP_SA }}
+
+      - name: Autenticar a GCP (clave JSON)
+        if: ${{ env.WIF_PROVIDER == '' && env.SA_KEY_JSON != '' }}
+        uses: google-github-actions/auth@v3
+        with:
+          credentials_json: ${{ secrets.GCP_BACKUP_SA_KEY }}
+
+      - name: Configurar gcloud
+        uses: google-github-actions/setup-gcloud@v3
+        with:
+          project_id: ${{ env.GCP_PROJECT }}
+
+      - name: Comprobar que el bucket de destino existe y tiene versionado
+        run: |
+          set -uo pipefail
+          # NO se silencia stderr: la primera versión hacía `2>&1 >/dev/null` y
+          # convertía un «permiso denegado» en «no existe». El bucket estaba
+          # creado y el mensaje mandó a buscar lo que no era — el instrumento
+          # mintiendo sobre lo que pasó.
+          SALIDA="$(gcloud storage buckets describe "gs://${DESTINO_BUCKET}" 2>&1)" || {
+            echo "::error::No se pudo LEER gs://${DESTINO_BUCKET}. Puede que no exista, o que la cuenta de servicio no tenga permiso sobre el bucket."
+            echo "Mensaje real de gcloud:"
+            echo "${SALIDA}"
+            echo ""
+            echo "Si dice 403 o 'does not have storage.buckets.get', el bucket existe y falta el rol:"
+            echo "  gcloud storage buckets add-iam-policy-binding gs://${DESTINO_BUCKET} --member=serviceAccount:<SA> --role=roles/storage.legacyBucketReader"
+            exit 1
+          }
+          # El versionado es la red bajo la red: si un objeto del ORIGEN se
+          # corrompe y el rsync copia la versión corrupta, la anterior sigue
+          # recuperable en el destino. Sin él, el respaldo hereda la corrupción.
+          VERS="$(gcloud storage buckets describe "gs://${DESTINO_BUCKET}" --format='value(versioning.enabled)' 2>/dev/null)"
+          if [ "${VERS}" != "True" ] && [ "${VERS}" != "true" ]; then
+            echo "::error::gs://${DESTINO_BUCKET} NO tiene versionado de objetos."
+            echo "Actívelo: gcloud storage buckets update gs://${DESTINO_BUCKET} --versioning"
+            exit 1
+          fi
+          echo "Destino verificado: gs://${DESTINO_BUCKET} (versionado activo)."
+
+      - name: Medir el origen antes de copiar
+        id: origen
+        run: |
+          set -uo pipefail
+          N="$(gcloud storage ls --recursive "gs://${ORIGEN_BUCKET}/**" 2>/dev/null | grep -c '^gs://' || true)"
+          echo "objetos=${N:-0}" >> "$GITHUB_OUTPUT"
+          echo "Origen: ${N:-0} objeto(s) en gs://${ORIGEN_BUCKET}"
+
+      - name: Copiar (rsync ADITIVO — nunca borra en el destino)
+        run: |
+          set -uo pipefail
+          # SIN --delete-unmatched-destination-objects: a propósito. Ese flag
+          # convertiría el respaldo en un espejo, y un espejo replica el
+          # borrado accidental que este respaldo existe para deshacer.
+          gcloud storage rsync --recursive \
+            "gs://${ORIGEN_BUCKET}" "gs://${DESTINO_BUCKET}/espejo"
+          echo "Copia terminada."
+
+      - name: Verificar el resultado — y fallar si no cuadra
+        run: |
+          set -uo pipefail
+          ORIGEN_N="${{ steps.origen.outputs.objetos }}"
+          DESTINO_N="$(gcloud storage ls --recursive "gs://${DESTINO_BUCKET}/espejo/**" 2>/dev/null | grep -c '^gs://' || true)"
+          DESTINO_N="${DESTINO_N:-0}"
+          echo "Origen: ${ORIGEN_N} · Destino: ${DESTINO_N}"
+
+          # El destino puede tener MÁS que el origen (es aditivo: conserva lo
+          # que el origen ya borró). Lo que nunca puede tener es MENOS.
+          if [ "${DESTINO_N}" -lt "${ORIGEN_N}" ]; then
+            echo "::error::El respaldo tiene ${DESTINO_N} objetos y el origen ${ORIGEN_N}. Faltan archivos: la copia NO está completa."
+            exit 1
+          fi
+          # Origen vacío con destino vacío no es éxito: es «no había nada» o
+          # «no pude leer». Se distingue y se avisa en vez de pintar verde.
+          if [ "${ORIGEN_N}" -eq 0 ]; then
+            echo "::warning::El bucket de origen reportó CERO objetos. Puede ser correcto (sistema aún sin adjuntos) o un fallo de lectura. Revísalo antes de confiar en este respaldo."
+          fi
+
+          {
+            echo "### Respaldo de adjuntos"
+            echo ""
+            echo "- Origen: \`gs://${ORIGEN_BUCKET}\` — ${ORIGEN_N} objeto(s)"
+            echo "- Destino: \`gs://${DESTINO_BUCKET}/espejo\` — ${DESTINO_N} objeto(s)"
+            echo "- Fecha: $(date -u +%FT%TZ)"
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Abrir incidencia si el respaldo falló
+        if: ${{ failure() }}
+        uses: actions/github-script@v8
+        with:
+          script: |
+            // Misma disciplina que el smoke: la incidencia se abre sola y se
+            // cierra sola. Un respaldo que falla en silencio es exactamente
+            // igual de útil que no tenerlo, y se descubre el día del desastre.
+            const cuerpo = [
+              'El respaldo diario de **adjuntos** (Firebase Storage) falló.',
+              '',
+              `Corrida: ${context.serverUrl}/${context.repo.owner}/${context.repo.repo}/actions/runs/${context.runId}`,
+              '',
+              'Mientras esto siga así, los documentos que el ciudadano anexa y los oficios',
+              'firmados NO tienen copia. Firestore sí se respalda, pero su export no incluye',
+              'los archivos: restaurar devolvería expedientes apuntando a documentos que no existen.',
+            ].join('\n');
+            const abiertas = await github.rest.issues.listForRepo({ ...context.repo, state: 'open', labels: 'respaldo-adjuntos' });
+            if (abiertas.data.length > 0) {
+              await github.rest.issues.createComment({ ...context.repo, issue_number: abiertas.data[0].number, body: cuerpo });
+            } else {
+              await github.rest.issues.create({ ...context.repo, title: '🔴 El respaldo de adjuntos falló', body: cuerpo, labels: ['respaldo-adjuntos'] });
+            }
+
+      - name: Cerrar la incidencia si el respaldo volvió a funcionar
+        if: ${{ success() }}
+        uses: actions/github-script@v8
+        with:
+          script: |
+            const abiertas = await github.rest.issues.listForRepo({ ...context.repo, state: 'open', labels: 'respaldo-adjuntos' });
+            for (const iss of abiertas.data) {
+              await github.rest.issues.createComment({ ...context.repo, issue_number: iss.number, body: '✅ El respaldo de adjuntos volvió a completarse — se cierra.' });
+              await github.rest.issues.update({ ...context.repo, issue_number: iss.number, state: 'closed' });
+            }

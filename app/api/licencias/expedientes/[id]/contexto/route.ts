@@ -26,6 +26,7 @@ import {
   type ExpedienteLicenciaDoc,
 } from '@/lib/server/expedientes-licencias';
 import { logError } from '@/lib/logger';
+import { calcularCompletitudExpediente } from '@/lib/server/completitud-expediente';
 
 export const runtime = 'nodejs';
 
@@ -70,9 +71,27 @@ export async function PATCH(request: Request, context: RouteContext): Promise<Ne
     }
 
     const ahora = new Date();
-    await expedienteRef.update({ contexto: plan.contexto, actualizadoEn: ahora.toISOString() });
+    /* El contexto DECIDE qué requisitos aplican: cambiarlo puede completar la
+       solicitud (un condicional que deja de aplicar) o descompletarla (uno que
+       pasa a aplicar). Hasta ahora esta ruta no recalculaba la completitud, así
+       que el hecho guardado quedaba contradiciendo al contexto que acababa de
+       escribirse — y con él `completoDesde`, que es lo que ancla el término.
+       Se recalcula en la MISMA escritura, con la completitud previa para
+       conservar el instante si la solicitud ya estaba completa. */
+    const completitud = calcularCompletitudExpediente(
+      expediente.aportes ?? [],
+      plan.contexto,
+      ahora,
+      expediente.completitud,
+    );
 
-    return NextResponse.json({ ok: true, contexto: plan.contexto });
+    await expedienteRef.update({
+      contexto: plan.contexto,
+      completitud,
+      actualizadoEn: ahora.toISOString(),
+    });
+
+    return NextResponse.json({ ok: true, contexto: plan.contexto, completitud });
   } catch (error) {
     logError({ radicadoId: id, modulo: 'licencias/expedientes/[id]/contexto/PATCH', error });
     return jsonError(error);

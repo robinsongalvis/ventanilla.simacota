@@ -97,15 +97,21 @@ describe('planCrearExpedienteDesdeRadicado — proyección MÍNIMA D2 (sin copia
     expect(plan.expediente.tramiteId).toBe(DEFINICION_LICENCIA_CONSTRUCCION_PARCIAL.id);
   });
 
-  it('fechaAlertaConservadora (espejo R11): nace poblado y coincide con calcularVencimientoDual sobre la primera actuación', () => {
+  it('fechaAlertaConservadora (espejo R11): nace VACÍO — y sigue coincidiendo con lo que calcula el motor', () => {
     const plan = ok(planCrearExpedienteDesdeRadicado(radicadoBase(), { subtipos: ['CONSTRUCCION'] }, 'SEC_PLANEACION', ACTOR, AHORA));
     const esperado = calcularVencimientoDual(
       derivarEventosTermino([plan.primeraActuacion]),
       45, // PLAZO_DECISION_LICENCIA_DIAS_HABILES — solo como literal de comparación, no reimplementa el cómputo.
     ).fechaAlertaConservadora?.toISOString() ?? null;
 
-    expect(plan.expediente.fechaAlertaConservadora).not.toBeNull();
+    /* ADR-0033 §0 — el contrato CAMBIÓ a propósito: el expediente ya no nace en
+       debida forma. Esta prueba afirmaba el comportamiento anterior y ahora
+       afirma el nuevo. NO se invirtió la aserción sin más: el invariante que
+       protegía —que el espejo coincide con lo que calcula el motor— se conserva
+       intacto; lo que cambió es que ahora ambos valen null, porque no hay
+       término que proyectar hasta la transición a debida forma. */
     expect(plan.expediente.fechaAlertaConservadora).toBe(esperado);
+    expect(esperado).toBeNull();
   });
 });
 

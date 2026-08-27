@@ -23,11 +23,11 @@ lo que ya existe.
 
 | # | Paquete | Esfuerzo | Depende de |
 |---|---|---|---|
-| PT-1 | **Cutover al servidor**: flip de `USA_RADICACION_INTERNA_SERVER`, cerrar `counters`/`create` de cliente (CR-1, CR-2), trazabilidad y salidas server-only (patrón D8) | ~3 días + UAT stage | autorización del propietario |
+| PT-1 | ✅ **CERRADO ENTERO 24-ago** (acta + adenda): flip, UAT con huella de servidor, CR-1/CR-2 muertos, trazabilidad server-only (#219, código muerto enterrado: −1.445 líneas), reglas vivas en stage y producción | — | — |
 | PT-2 | **Canales de alerta vivos**: SMTP · DSN Sentry · uptime contra `/api/health` · contacto de contingencia · el cron de alertas debe fallar RUIDOSO cuando 0 envíos salgan | horas | 4 acciones del propietario + 2 h dev |
-| PT-3 | **Superficie de seguridad**: auth en `/api/ai/feedback` · endurecer `storage.rules` · verificar proveedores de Auth (sin auto-registro) · retirar 4 usuarios UAT | ~1 día | verificación en consola (propietario) |
+| PT-3 | ✅ **CERRADO 24-ago** (acta `ACTA_PT3_SUPERFICIE_2026-08-24.md`): feedback con sesión, bucket Admin-SDK-only VERIFICADO VIVO (sin deriva), 4 cuentas UAT desactivadas. Pendiente menor: captura de proveedores de Auth (consola, propietario) | — | — |
 | PT-4 | **Respaldo de adjuntos**: versioning del bucket + export diario de Storage (el export de Firestore NO incluye los archivos) | ~½ día | 1 comando del propietario + workflow |
-| PT-5 | **Pipeline de reglas**: deploy versionado de `firestore.rules`/`storage.rules` + detección de deriva repo↔producción | ~½ día | — |
+| PT-5 | 🟡 **A MEDIAS**: el detector de deriva ya existe y corre (`verificar-reglas-vivas.mjs`, estrenado 24-ago con SIN DERIVA en prod); falta el job de deploy automático de reglas | ~¼ día | — |
 | PT-6 | **Control de release**: smoke-test post-deploy (G3/G4 del SEV-1) · `npm ci` en CI · registrar el E2E de stage (cierra el AMBER de la compuerta) | ~1 día | — |
 | PT-7 | **Definición de producto**: doble reloj radicado↔expediente (¿el handoff suspende la PQRSD?) · toggles de IA decorativos · siembra R10 de la serie legal | corto + decisiones | funcionaria/Jurídica · dato de Planeación |
 

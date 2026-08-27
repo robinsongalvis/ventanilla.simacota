@@ -11,6 +11,14 @@
     {
       "path": "/api/cron/auditoria-consecutivos",
       "schedule": "0 13 * * 1"
+    },
+    {
+      "path": "/api/cron/vencimientos-licencias",
+      "schedule": "30 12 * * 1-5"
+    },
+    {
+      "path": "/api/cron/simi/alertas-vencimiento",
+      "schedule": "0 12 * * 1-5"
     }
   ]
 }

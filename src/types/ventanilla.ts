@@ -285,6 +285,15 @@ export interface ClasificacionRadicado {
   fechaAsignacionResponsable?:    string;
 }
 
+/** Constancia de anulación de un número de la serie consecutiva. */
+export interface AnulacionRadicado {
+  /** ISO-8601 del momento de la anulación. */
+  fecha: string;
+  motivo: string;
+  /** Ruta del acta que la autoriza — sin acta no hay anulación. */
+  acta: string;
+}
+
 export interface VentanillaRadicado {
   radicadoId: string;
   estadoActual: EstadoRadicado | 'ASIGNADO' | 'POR_VENCER' | 'VENCIDO' | 'PRORROGA';
@@ -373,6 +382,32 @@ export interface VentanillaRadicado {
     /** ISO 8601 — momento de la vinculación (reloj del servidor). */
     fecha: string;
   } | null;
+
+  /* ── Marcas de NO-operación-real ──────────────────────────────────────
+     Estos tres campos existían en los datos y en el código desde hace
+     tiempo (seis módulos filtran por ellos) pero NO en el tipo, así que
+     TypeScript no podía ayudar a nadie a recordarlos — y Control Interno,
+     que es el que alimenta el Excel institucional, se olvidó de filtrarlos.
+     Declararlos es lo que convierte «acordarse» en «que el compilador te
+     avise». */
+  /** ¿El acto interno de respuesta ocurrió dentro del plazo? Se guarda aparte
+   *  de `cumplioTermino` porque son cosas distintas: cumplir exige además
+   *  haber NOTIFICADO (Ley 1755). Distinguirlas separa «se respondió tarde»
+   *  de «se respondió a tiempo pero el aviso no salió». */
+  respuestaEnTermino?: boolean;
+  /** ¿Se informó al ciudadano de la prórroga? Mientras sea false, la prórroga
+   *  no le es oponible (Ley 1755 art. 14: debe informarse ANTES del
+   *  vencimiento) y hay que notificarla por otra vía. */
+  prorrogaNotificada?: boolean;
+  /** Registro de prueba: nunca cuenta como operación real. */
+  isTest?: boolean;
+  /** Excluido de métricas e indicadores oficiales. */
+  excludeFromMetrics?: boolean;
+  /** Número anulado con acta: el registro queda, el número se pierde con
+   *  constancia (AGN 060/2001 — un borrado dejaría un hueco indistinguible
+   *  de una pérdida documental). Lo escribe scripts/operacion/limpiar-datos-prueba.mjs. */
+  anulado?: AnulacionRadicado | null;
+
 }
 
 
