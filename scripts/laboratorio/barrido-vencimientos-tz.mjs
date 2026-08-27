@@ -264,7 +264,22 @@ async function main() {
   // Radicados NO cerrados — ajustar el criterio de "cerrado" al vigente del
   // dominio (estadoActual) si difiere; aquí se excluyen explícitamente para
   // respetar Ley 594/2000 art. 19 (nunca tocar lo archivado).
-  const ESTADOS_CERRADOS = new Set(['RESUELTO', 'DESISTIDO', 'ARCHIVADO', 'CERRADO']);
+  /* ESTADOS DE CIERRE — RÉPLICA de `ESTADOS_CERRADOS` (lib/radicado-estados.ts).
+     Este guion ESCRIBE sobre datos legales, así que la lista importa.
+
+     Hasta el 26-ago-2026 traía `ARCHIVADO` y `CERRADO`, que NO existen en
+     `EstadoRadicado`, y le faltaba `RECHAZADO`, que sí es cierre: dos guardas
+     que nunca protegieron a nadie, y un cierre real desprotegido. El guion
+     podía sobrescribir la fecha de vencimiento de un radicado RECHAZADO —
+     justo lo que su propia cabecera invoca el art. 19 de la Ley 594/2000 para
+     prohibir.
+
+     Se replica porque esto es `.mjs` y el criterio vive en TypeScript. Las
+     réplicas se desincronizan calladas, así que
+     `__tests__/estados-cierre-barrido-tz.test.ts` la compara contra la
+     canónica. `DEVUELTO` NO está a propósito: el dominio lo clasifica como
+     ACTIVO, no como cierre. */
+  const ESTADOS_CERRADOS = new Set(['RESUELTO', 'RECHAZADO', 'DESISTIDO']);
 
   const snap = await db.collection('ventanilla_radicados').get();
   const candidatos = [];
