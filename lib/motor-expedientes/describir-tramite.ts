@@ -24,28 +24,22 @@
  * parcelación, subdivisión (rural y urbana), reloteo, construcción, espacio
  * público, reconocimiento y aprobación de planos de propiedad horizontal.
  *
- * QUÉ NO DICE, DELIBERADAMENTE: **la modalidad**. Las 9 modalidades de
- * construcción del art. 2.2.6.1.1.7 —obra nueva, ampliación, adecuación,
- * modificación, restauración, reforzamiento estructural, demolición,
- * cerramiento y reconstrucción— son un EJE DISTINTO de las figuras (así lo
- * declara el propio catálogo), y hoy **el sistema no las captura en ninguna
- * parte**: no son un subtipo, no son una clave de contexto, no hay campo que
- * las guarde. Nadie se las pregunta al funcionario.
+ * QUÉ AÑADE, SI Y SOLO SI ESTÁ CAPTURADA: **la modalidad**. Las 9 modalidades
+ * de construcción del art. 2.2.6.1.1.7 son un EJE DISTINTO de las figuras (así
+ * lo declara el catálogo) y viven en `expediente.modalidadesConstruccion`.
  *
- * Por eso estos papeles ya no afirman ninguna. Decir «construcción» cuando el
- * expediente dice CONSTRUCCION es cierto para las nueve modalidades, incluida
- * la demolición —que es una modalidad de la licencia de construcción, no una
- * licencia aparte—. Añadirle «obra nueva» sería inventar el único dato que
- * nadie recogió. La doctrina es la del ADR-0033: no afirmar un hecho que no
- * ocurrió, y tampoco callarlo; aquí se calla lo que no se sabe, y lo que se
- * sabe se dice completo.
+ * Hubo un tiempo —hasta que ese campo existió— en que estos papeles NO podían
+ * nombrarla, porque nadie la capturaba y nombrarla habría sido inventarla. Esa
+ * es la regla que sobrevive al cambio: **lo que no está capturado no se
+ * nombra**. Un expediente anterior al campo sigue diciendo «licencia de
+ * construcción» a secas, y eso es cierto para las nueve modalidades —incluida
+ * la demolición, que es una modalidad de esa licencia, no una licencia aparte—.
  *
- * CUANDO EL SISTEMA CAPTURE LA MODALIDAD, este es el sitio donde entra: se le
- * añade un segundo argumento y se compone «licencia de construcción ·
- * demolición». Mientras tanto, la ausencia es visible aquí y no repartida por
- * las plantillas.
+ * Lo que NUNCA se hace es rellenar la ausencia con «obra nueva»: es la doctrina
+ * del ADR-0033, no afirmar un hecho que no ocurrió.
  */
 import { CATALOGO_FIGURAS_NORMATIVAS } from './catalogo-subtipos-normativo';
+import { describirModalidades, FIGURA_CON_MODALIDAD } from './modalidad-construccion';
 
 /**
  * Texto usado cuando el expediente no tiene figuras utilizables. No nombra
@@ -65,6 +59,10 @@ const NOMBRE_POR_CODIGO = new Map(
  * @param subtipos Códigos de figura persistidos en el expediente. Una solicitud
  *   puede combinar varias (p. ej. urbanización + construcción), y entonces el
  *   papel las nombra todas: omitir una sería describir de menos lo que se pidió.
+ * @param modalidadesConstruccion Modalidades capturadas, si las hay. Se anexan
+ *   a la figura de construcción —«licencia de construcción · demolición»— y solo
+ *   cuando esa figura está presente: una modalidad sin su figura sería un dato
+ *   descolgado, y el papel no lo arrastra.
  * @returns Texto en minúsculas, listo para insertarse en una frase corrida.
  *
  * Un código que no esté en el catálogo NO se descarta en silencio —sería
@@ -72,15 +70,28 @@ const NOMBRE_POR_CODIGO = new Map(
  * transcribe tal cual, para que el papel muestre el código real y quien lo lea
  * note que hay algo que el sistema no sabe traducir.
  */
-export function describirTramiteDesdeSubtipos(subtipos: readonly string[] | undefined): string {
+export function describirTramiteDesdeSubtipos(
+  subtipos: readonly string[] | undefined,
+  modalidadesConstruccion?: readonly string[] | undefined,
+): string {
   if (!Array.isArray(subtipos) || subtipos.length === 0) {
     return DESCRIPCION_TRAMITE_SIN_FIGURA;
   }
 
+  /* La modalidad califica a SU figura, no a la frase entera: en una solicitud
+     combinada (urbanización + construcción) es la construcción la que lleva
+     apellido. */
+  const modalidades = subtipos.includes(FIGURA_CON_MODALIDAD)
+    ? describirModalidades(modalidadesConstruccion)
+    : null;
+
   const nombres = subtipos
     .map((codigo) => (typeof codigo === 'string' ? codigo.trim() : ''))
     .filter((codigo) => codigo.length > 0)
-    .map((codigo) => NOMBRE_POR_CODIGO.get(codigo) ?? codigo);
+    .map((codigo) => {
+      const nombre = NOMBRE_POR_CODIGO.get(codigo) ?? codigo;
+      return codigo === FIGURA_CON_MODALIDAD && modalidades ? `${nombre} · ${modalidades}` : nombre;
+    });
 
   if (nombres.length === 0) return DESCRIPCION_TRAMITE_SIN_FIGURA;
   if (nombres.length === 1) return nombres[0];

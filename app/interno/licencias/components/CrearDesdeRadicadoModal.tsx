@@ -7,6 +7,8 @@ import type { RadicadoCandidato } from '@/app/api/licencias/radicados-candidatos
 import { formatFechaColombia } from '@/lib/fecha-colombia';
 import { NumeroLegal } from './NumeroLegal';
 import { SelectorSubtiposNormativos } from './SelectorSubtiposNormativos';
+import { SelectorModalidadesConstruccion } from './SelectorModalidadesConstruccion';
+import { exigeModalidadConstruccion } from '@/lib/motor-expedientes/modalidad-construccion';
 
 /* ══════════════════════════════════════════════════════════════
    Modal "Crear desde radicado" — Bloque A·A4 (handoff radicado⇄expediente).
@@ -47,6 +49,9 @@ export function CrearDesdeRadicadoModal({ onCerrar, onCreado }: CrearDesdeRadica
   const [errorSeleccion, setErrorSeleccion] = useState<string | null>(null);
   const [subtipos, setSubtipos] = useState<string[]>([]);
   const [errorSubtipos, setErrorSubtipos] = useState<string | null>(null);
+  const [modalidades, setModalidades] = useState<string[]>([]);
+  const [errorModalidades, setErrorModalidades] = useState<string | null>(null);
+
 
   const [guardando, setGuardando] = useState(false);
   const [errorServidor, setErrorServidor] = useState<string | null>(null);
@@ -90,6 +95,11 @@ export function CrearDesdeRadicadoModal({ onCerrar, onCreado }: CrearDesdeRadica
     setSubtipos((prev) => (prev.includes(codigo) ? prev.filter((c) => c !== codigo) : [...prev, codigo]));
   }
 
+  function alternarModalidad(codigo: string) {
+    setModalidades((prev) => (prev.includes(codigo) ? prev.filter((c) => c !== codigo) : [...prev, codigo]));
+  }
+
+
   const candidatosFiltrados = useMemo(() => {
     const q = busqueda.trim().toLowerCase();
     if (!q) return candidatos;
@@ -115,6 +125,15 @@ export function CrearDesdeRadicadoModal({ onCerrar, onCreado }: CrearDesdeRadica
       hayErrorLocal = true;
     } else {
       setErrorSubtipos(null);
+
+    /* Si la figura la exige, la modalidad es OBLIGATORIA en la pantalla —aunque
+       el servidor no la exija, porque tiene que poder leer los expedientes
+       viejos que nacieron sin ella. Quien crea uno nuevo, la captura. */
+    if (exigeModalidadConstruccion(subtipos) && modalidades.length === 0) {
+      setErrorModalidades('Indica al menos una modalidad de construcción (art. 2.2.6.1.1.7).');
+      return;
+    }
+    setErrorModalidades(null);
     }
     if (hayErrorLocal) return;
 
@@ -125,7 +144,11 @@ export function CrearDesdeRadicadoModal({ onCerrar, onCreado }: CrearDesdeRadica
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         credentials: 'include',
-        body: JSON.stringify({ radicadoId: radicadoSeleccionado, subtipos }),
+        body: JSON.stringify({
+          radicadoId: radicadoSeleccionado,
+          subtipos,
+          ...(exigeModalidadConstruccion(subtipos) ? { modalidadesConstruccion: modalidades } : {}),
+        }),
       });
       const body = await res.json().catch(() => ({}));
       if (!res.ok) {
@@ -300,6 +323,13 @@ export function CrearDesdeRadicadoModal({ onCerrar, onCreado }: CrearDesdeRadica
             </fieldset>
 
             <SelectorSubtiposNormativos seleccionados={subtipos} onAlternar={alternarSubtipo} error={errorSubtipos} />
+
+            <SelectorModalidadesConstruccion
+              subtipos={subtipos}
+              seleccionadas={modalidades}
+              onAlternar={alternarModalidad}
+              error={errorModalidades}
+            />
 
             {errorServidor && (
               <p

@@ -224,9 +224,18 @@ export interface DefinicionTramite {
    */
   clavesContexto?: ClaveContextoDeclarada[];
   /**
-   * Subtipos declarados por esta Definición (Fase 2, arranque PASO 7) —
-   * p. ej. Licencia de Construcción tiene subtipos "Obra Nueva",
-   * "Ampliación", "Modificación"... OPCIONAL y ADITIVO, mismo patrón que
+   * Subtipos declarados por esta Definición (Fase 2, arranque PASO 7).
+   *
+   * ⚠️ EL EJEMPLO ORIGINAL DE ESTE JSDOC ERA ENGAÑOSO. Decía que «Licencia de
+   * Construcción tiene subtipos Obra Nueva, Ampliación, Modificación», pero
+   * eso son MODALIDADES (art. 2.2.6.1.1.7) y viajan en
+   * `Expediente.modalidadesConstruccion`, no aquí. En el módulo de licencias
+   * `Expediente.subtipos` guarda códigos de FIGURA
+   * (`CATALOGO_FIGURAS_NORMATIVAS`: CONSTRUCCION, URBANIZACION…). Son dos ejes
+   * distintos que comparten palabra — ver
+   * `lib/motor-expedientes/modalidad-construccion.ts`.
+   *
+   * OPCIONAL y ADITIVO, mismo patrón que
    * `clavesContexto`: una Definición sin este campo simplemente no tiene
    * subtipos declarados, y `Expediente.subtipos` que referencien códigos
    * no declarados aquí se rechazan (fail-closed) en

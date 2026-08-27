@@ -53,6 +53,9 @@ describe('Recibir solicitud — envío y errores del servidor', () => {
 
     llenarDatosBasicos();
     fireEvent.click(screen.getByRole('checkbox', { name: /Licencia de construcción/i }));
+    // La figura CONSTRUCCION exige modalidad (art. 2.2.6.1.1.7, ADR-0035):
+    // sin marcarla el formulario ya no envía.
+    fireEvent.click(screen.getByRole('checkbox', { name: /Obra nueva/i }));
     fireEvent.click(screen.getByRole('button', { name: /^Recibir solicitud$/i }));
 
     await waitFor(() => expect(screen.getByText('DEMO-26-abc12345')).toBeTruthy());
@@ -73,6 +76,9 @@ describe('Recibir solicitud — envío y errores del servidor', () => {
 
     llenarDatosBasicos();
     fireEvent.click(screen.getByRole('checkbox', { name: /Licencia de construcción/i }));
+    // La figura CONSTRUCCION exige modalidad (art. 2.2.6.1.1.7, ADR-0035):
+    // sin marcarla el formulario ya no envía.
+    fireEvent.click(screen.getByRole('checkbox', { name: /Obra nueva/i }));
     fireEvent.click(screen.getByRole('button', { name: /^Recibir solicitud$/i }));
 
     await waitFor(() =>
@@ -101,5 +107,32 @@ describe('el verbo del formulario dice lo que la acción hace', () => {
     render(<RadicarSolicitudModal onCerrar={() => {}} onCreado={() => {}} />);
     expect(screen.queryByRole('button', { name: /radicar/i })).toBeNull();
     expect(screen.getByRole('button', { name: /^Recibir solicitud$/i })).toBeTruthy();
+  });
+});
+
+describe('Recibir solicitud — la modalidad de construcción (ADR-0035)', () => {
+  it('la pregunta NO aparece si la figura no la tiene', () => {
+    render(<RadicarSolicitudModal onCerrar={vi.fn()} />);
+    fireEvent.click(screen.getByRole('checkbox', { name: /Acto de reconocimiento/i }));
+    /* El acto de reconocimiento no tiene eje de modalidad. Preguntarla sería
+       pedir un dato que la norma no define para esa figura. */
+    expect(screen.queryByRole('checkbox', { name: /Obra nueva/i })).toBeNull();
+  });
+
+  it('aparece al elegir construcción, y sin ella no se envía nada al servidor', async () => {
+    const fetchMock = vi.fn();
+    vi.stubGlobal('fetch', fetchMock);
+    render(<RadicarSolicitudModal onCerrar={vi.fn()} />);
+    llenarDatosBasicos();
+    fireEvent.click(screen.getByRole('checkbox', { name: /Licencia de construcción/i }));
+
+    expect(screen.getByRole('checkbox', { name: /Obra nueva/i })).toBeTruthy();
+
+    fireEvent.click(screen.getByRole('button', { name: /Recibir solicitud/i }));
+    await waitFor(() => {
+      const alertas = screen.getAllByRole('alert').map((n) => n.textContent ?? '').join(' | ');
+      expect(alertas).toMatch(/modalidad/i);
+    });
+    expect(fetchMock, 'sin modalidad no se llama al servidor').not.toHaveBeenCalled();
   });
 });

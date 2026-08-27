@@ -80,7 +80,7 @@ export async function GET(_req: Request, ctx: { params: Promise<{ id: string }> 
          el servidor: antes este papel afirmaba «licencia de construcción ·
          obra nueva» a todo el mundo. La modalidad no se nombra porque el
          sistema no la captura — ver la cabecera de `describir-tramite.ts`. */
-      descripcionTramite: describirTramiteDesdeSubtipos(exp.subtipos),
+      descripcionTramite: describirTramiteDesdeSubtipos(exp.subtipos, exp.modalidadesConstruccion),
       /* La fecha JURÍDICA es la de la actuación, no la del documento raíz:
          la actuación no se reescribe nunca. */
       desdeCuandoCorreElPlazo: act.fecha,

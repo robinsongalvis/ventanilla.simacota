@@ -86,6 +86,9 @@ describe('Crear desde radicado — envío y errores del servidor', () => {
     await waitFor(() => expect(screen.getByText('1-110-202608-00000123')).toBeTruthy());
     fireEvent.click(screen.getByRole('radio', { name: /1-110-202608-00000123/ }));
     fireEvent.click(screen.getByRole('checkbox', { name: /Licencia de construcción/i }));
+    // La figura CONSTRUCCION exige modalidad (art. 2.2.6.1.1.7, ADR-0035):
+    // sin marcarla el formulario ya no envía.
+    fireEvent.click(screen.getByRole('checkbox', { name: /Obra nueva/i }));
   }
 
   it('exige seleccionar un radicado y un subtipo antes de enviar', async () => {
