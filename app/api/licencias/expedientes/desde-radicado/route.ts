@@ -166,7 +166,7 @@ export async function POST(request: Request): Promise<NextResponse> {
             // La figura sale del EXPEDIENTE (mismo motivo que en la
             // constancia impresa): este correo afirmaba «obra nueva» a todo
             // el mundo. La modalidad no se nombra: nadie la captura.
-            descripcionTramite: describirTramiteDesdeSubtipos(plan.expediente.subtipos),
+            descripcionTramite: describirTramiteDesdeSubtipos(plan.expediente.subtipos, plan.expediente.modalidadesConstruccion),
             // Día en que la Alcaldía RECIBIÓ la solicitud. No es una fecha con
             // efecto de plazo, y el correo lo dice expresamente.
             fechaRecepcion: plan.expediente.creadoEn,

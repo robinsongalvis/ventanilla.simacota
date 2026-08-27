@@ -229,43 +229,43 @@ describe('los papeles del ciudadano: la figura sale del expediente', () => {
   });
 
   /**
-   * LA ESPOLETA DE LOS PAPELES.
+   * LA ESPOLETA DE LOS PAPELES, EN SU SEGUNDA VIDA.
    *
-   * Mientras el sistema no capture la modalidad, ningún papel puede nombrar
-   * una. Si alguien vuelve a escribir «obra nueva» —o cualquiera de las otras
-   * ocho— en la descripción del trámite sin haberla capturado antes, este caso
-   * se pone rojo y dice por qué.
+   * Mientras nadie capturaba la modalidad, este caso exigía que ningún papel
+   * la nombrara. El campo `modalidadesConstruccion` ya existe, así que el caso
+   * se detectó a sí mismo y cambió de objeto —sin que nadie tuviera que
+   * acordarse—: ahora vigila la regla que sobrevive a la captura.
+   *
+   * LA REGLA: lo que no está capturado NO se nombra. Un expediente anterior al
+   * campo no recibe «obra nueva» de regalo.
    */
-  it('mientras nadie capture la modalidad, los papeles no nombran ninguna', () => {
-    const capturada = elSistemaCapturaLaModalidad();
-    if (capturada) {
-      /* Se empezó a capturar: los papeles PUEDEN nombrarla, y este caso deja de
-         tener objeto. Se afirma el hecho en vez de callarlo. */
-      expect(soloCodigo(EXPEDIENTES)).toMatch(/modalidad/i);
-      return;
-    }
-
-    const descripciones = [
-      describirTramiteDesdeSubtipos(['CONSTRUCCION']),
-      describirTramiteDesdeSubtipos(['RECONOCIMIENTO']),
-      describirTramiteDesdeSubtipos(['URBANIZACION', 'CONSTRUCCION']),
-    ].join(' | ').toLowerCase();
-
-    const nombradas = MODALIDADES_CONSTRUCCION
+  it('un expediente sin modalidad capturada no recibe ninguna inventada', () => {
+    const sinCapturar = describirTramiteDesdeSubtipos(['CONSTRUCCION']).toLowerCase();
+    const inventadas = MODALIDADES_CONSTRUCCION
       .map((m) => m.nombre.toLowerCase())
-      .filter((nombre) => descripciones.includes(nombre));
+      .filter((nombre) => sinCapturar.includes(nombre));
 
     expect(
-      nombradas,
+      inventadas,
       [
-        `El papel del ciudadano nombra una modalidad (${nombradas.join(', ')}) que el sistema`,
-        'NO captura en ninguna parte: no es un subtipo, no es una clave de contexto, no hay',
-        'campo que la guarde. Nadie se la pregunta al funcionario.',
-        '',
-        'Es un documento con efectos: afirmar en él una modalidad inventada es lo que esta',
-        'prueba existe para impedir. Antes de nombrarla hay que capturarla — y entonces este',
-        'caso lo detecta solo y deja de exigirlo.',
+        `El papel nombra la modalidad «${inventadas.join(', ')}» en un expediente que NO la tiene`,
+        'capturada. La ausencia del campo significa «nunca se preguntó», no «obra nueva»:',
+        'rellenarla es la invención que este archivo existe para impedir.',
       ].join('\n'),
     ).toEqual([]);
+  });
+
+  it('cuando SÍ está capturada, el papel la dice', () => {
+    const papel = describirTramiteDesdeSubtipos(['CONSTRUCCION'], ['demolicion']).toLowerCase();
+    expect(papel).toContain('construcci');
+    expect(papel, 'la modalidad capturada tiene que aparecer en el papel').toContain('demolici');
+  });
+
+  it('una modalidad sin su figura no se arrastra al papel', () => {
+    /* Dato descolgado: modalidad de construcción en un expediente que no
+       incluye la figura CONSTRUCCION. El servidor lo rechaza al crear; si un
+       documento histórico lo trajera, el papel no lo repite. */
+    const papel = describirTramiteDesdeSubtipos(['SUBDIVISION_RURAL'], ['demolicion']).toLowerCase();
+    expect(papel).not.toContain('demolici');
   });
 });
