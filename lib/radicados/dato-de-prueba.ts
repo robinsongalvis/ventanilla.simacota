@@ -11,12 +11,30 @@
  *
  * Un criterio de exclusión duplicado siempre termina así: se corrige en cinco
  * copias y se olvida la sexta. Aquí vive una sola vez.
+ *
+ * DOS VOCABULARIOS, UN CRITERIO (26-ago-2026). Los expedientes de licencias no
+ * usan `isTest`: marcan la demostración con `esPrueba`, escrito por el candado
+ * R10 (`lib/server/expedientes-licencias.ts`). Este criterio no lo miraba, así
+ * que `soloOperacionReal` sobre la colección `expedientes` no filtraba NADA —
+ * y con el candado cerrado el 100% de los expedientes es de demostración. El
+ * vigía del término los alertaba a todos como si fueran licencias reales camino
+ * del silencio administrativo positivo.
+ *
+ * Se reconocen los dos vocabularios en vez de renombrar uno: `esPrueba` está
+ * ligado a la doctrina R10 y renombrarlo esparciría el cambio a la
+ * documentación del candado y exigiría migrar los expedientes ya escritos.
+ * Reconocerlo aquí es aditivo y no deja a nadie fuera.
  */
 
 /** Marcas que el sistema pone sobre lo que no debe contar como operación real. */
 export interface MarcasDePrueba {
   isTest?: boolean;
   excludeFromMetrics?: boolean;
+  /**
+   * Vocabulario de los expedientes de licencias — `true` en todo expediente
+   * creado bajo el candado R10. Equivale a `isTest` para este criterio.
+   */
+  esPrueba?: boolean;
   /** Bloque escrito por las actas de anulación (scripts/operacion/limpiar-datos-prueba.mjs). */
   anulado?: { fecha: string; motivo: string; acta: string } | null;
 }
@@ -31,7 +49,10 @@ export interface MarcasDePrueba {
  */
 export function esDatoDePrueba(r: MarcasDePrueba | null | undefined): boolean {
   if (!r) return false;
-  return r.isTest === true || r.excludeFromMetrics === true || r.anulado != null;
+  return r.isTest === true
+    || r.esPrueba === true
+    || r.excludeFromMetrics === true
+    || r.anulado != null;
 }
 
 /** Deja solo la operación real. Usar en TODA lectura que alimente bandeja, métricas, alertas o reportes. */
