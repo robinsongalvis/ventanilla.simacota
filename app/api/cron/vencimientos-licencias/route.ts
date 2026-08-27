@@ -6,6 +6,7 @@ import { soloOperacionReal }  from '@/lib/radicados/dato-de-prueba';
 import { diasRestantesHabiles, sumarDiasHabiles } from '@/lib/tiempos-radicado';
 import { terminoResolucionSigueCorriendo } from '@/lib/motor-expedientes/estados-licencia';
 import type { ExpedienteLicenciaDoc } from '@/lib/server/expedientes-licencias';
+import { registrarEventoNegocio } from '@/lib/observabilidad/eventos-negocio';
 
 export const runtime = 'nodejs';
 export const maxDuration = 300;
@@ -188,6 +189,7 @@ export async function GET(request: Request): Promise<NextResponse> {
   }
 
   const ahora = new Date();
+  const inicioCron = Date.now();
   try {
     const db = getFirebaseAdminDb();
     const snap = await db.collection('expedientes').limit(TECHO_LECTURA).get();
@@ -215,6 +217,22 @@ export async function GET(request: Request): Promise<NextResponse> {
        vigía que solo reporta lo que encontró no permite distinguir «no hay
        nada que alertar» de «no miré»: esa ambigüedad es la que deja pasar los
        silencios administrativos. */
+    /* DEJAR RASTRO DE LO QUE HIZO, no solo de que respondió 200. Los logs de
+       Vercel guardan el estado y la duración, no el cuerpo de la respuesta: sin
+       esto, una barrida que revisó cientos y una que no encontró nada se ven
+       idénticas. El silencio de un vigilante tiene que poder distinguirse de
+       «no hizo nada». */
+    registrarEventoNegocio({
+      operacion:  'vigia_vencimientos_licencias',
+      resultado:  'ok',
+      latenciaMs: Date.now() - inicioCron,
+      radicadoId: null,
+      actorRol:   'CRON',
+      tenant:     'SEC_PLANEACION',
+      docsLeidos: filas.length,
+      accionados: sinAnclar.length + suspendidos.length,
+    });
+
     return NextResponse.json({
       ok: true,
       revisadoEn: ahora.toISOString(),

@@ -57,7 +57,17 @@ export type OperacionSistema =
    * estado y la duración pero NO el cuerpo de la respuesta. Una corrida que
    * analizó 500 radicados y una que no encontró ninguno se veían idénticas.
    */
-  | 'alertas_vencimiento_simi';
+  | 'alertas_vencimiento_simi'
+  /**
+   * Los otros tres trabajos programados. Añadidos el 27-ago-2026 por la misma
+   * razón que el de SIMI: los logs de Vercel guardan el estado y la duración,
+   * no el cuerpo de la respuesta. Sin esto, «corrió bien» y «corrió bien y no
+   * encontró nada» eran el mismo registro — y el segundo puede significar que
+   * el vigía dejó de ver lo que debía.
+   */
+  | 'vigia_vencimientos_licencias'
+  | 'alertas_vencimiento_pqrsd'
+  | 'desistimiento_tacito';
 
 /** Vocabulario completo de operaciones observables (escritura + lectura + sistema). */
 export type Operacion = OperacionCritica | OperacionLectura | OperacionSistema;
@@ -92,6 +102,12 @@ export interface EventoNegocio {
    */
   alertasCreadas?:  number;
   alertasOmitidas?: number;
+  /**
+   * Cuántos casos requirieron una acción: avisos efectivamente enviados,
+   * actos propuestos. Es el número que distingue una barrida que miró y no
+   * halló nada de una que halló y actuó.
+   */
+  accionados?: number;
 }
 
 /**
@@ -120,6 +136,8 @@ export function registrarEventoNegocio(params: {
   /** Solo para los vigías de plazos: cuántas alertas se crearon y cuántas se omitieron. */
   alertasCreadas?:  number;
   alertasOmitidas?: number;
+  /** Cuántos casos requirieron una acción del cron (avisos enviados, actos propuestos). */
+  accionados?: number;
 }): EventoNegocio {
   const timestamp = new Date().toISOString();
   const radicadoId = params.radicadoId;
@@ -143,6 +161,7 @@ export function registrarEventoNegocio(params: {
     ...(typeof params.docsLeidos === 'number' ? { docsLeidos: params.docsLeidos } : {}),
     ...(typeof params.alertasCreadas === 'number' ? { alertasCreadas: params.alertasCreadas } : {}),
     ...(typeof params.alertasOmitidas === 'number' ? { alertasOmitidas: params.alertasOmitidas } : {}),
+    ...(typeof params.accionados === 'number' ? { accionados: params.accionados } : {}),
   };
 
   // 1. Log estructurado (siempre)
