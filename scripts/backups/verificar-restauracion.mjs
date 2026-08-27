@@ -38,15 +38,63 @@
 import { getFirestore } from 'firebase-admin/firestore';
 import { applicationDefault, getApps, initializeApp } from 'firebase-admin/app';
 import { huecosDe, duplicadosDe, consecutivoDeId, perteneceAlAnio, COLECCION_POR_SERIE } from '../laboratorio/detectar-consecutivos-fantasma.mjs';
+import { inventarioDesdeReglas } from './inventario-desde-reglas.mjs';
 
 const PROYECTO_PROD = 'ventanilla-unica-f31b1';
 
 /**
- * Colecciones cuya AUSENCIA invalida la restauración. No es la lista
- * completa de la base: son las que, si faltan, el servicio no puede
- * atender a un ciudadano.
+ * EL INVENTARIO SE DERIVA DE `firestore.rules` (26-ago-2026), NO SE ESCRIBE.
+ *
+ * Antes eran tres colecciones de una lista a mano. Las reglas declaran veinte.
+ * Entre las que faltaban estaba `users` — sin ella nadie puede autenticarse y
+ * la plataforma restaurada es inservible, mientras el ensayo firmaba
+ * «✔ RESTAURACIÓN VÁLIDA». Un respaldo que compra confianza falsa es peor que
+ * no tener ensayo.
+ *
+ * `firestore.rules` es el único inventario que el sistema se ve OBLIGADO a
+ * mantener al día: una colección sin regla no se puede leer.
  */
-const COLECCIONES_CRITICAS = ['ventanilla_radicados', 'expedientes', 'counters'];
+const INVENTARIO = inventarioDesdeReglas();
+
+/**
+ * ALCANCE DECLARADO (ADR-0033 §4.6-bis).
+ *
+ * Del inventario completo, estas son las que además tienen que traer DATOS:
+ * si están vacías, la restauración no sirve aunque exista. El resto debe
+ * existir en el inventario y puede estar legítimamente vacío — y decirlo aquí
+ * es lo que impide que un vacío legítimo y una pérdida se confundan.
+ */
+const DEBEN_TENER_DATOS = {
+  users: 'Sin usuarios nadie puede autenticarse: `requireActiveInternalUser()` rechaza a todo el mundo y la plataforma restaurada no se puede ni abrir.',
+  ventanilla_radicados: 'Es el libro de correspondencia. Vacío significa que se perdió la operación entera.',
+  counters: 'Sin contadores no se puede emitir ningún consecutivo, y reconstruirlos a mano es lo que este ensayo existe para no tener que hacer.',
+};
+
+/**
+ * Las que pueden estar vacías SIN que eso indique pérdida, con su razón. Se
+ * enumeran para que el informe distinga «vacía y es normal» de «vacía y es un
+ * problema» — y para que una colección nueva no caiga en ninguno de los dos
+ * cajones sin que nadie lo decida.
+ */
+const PUEDEN_ESTAR_VACIAS = {
+  radicados: 'Colección legada, anterior a `ventanilla_radicados`. Puede no tener nada.',
+  unicidad_radicados: 'Las reservas se escriben desde que existen (ago-2026): un respaldo anterior no las trae.',
+  unicidad_salidas: 'Igual que `unicidad_radicados`.',
+  unicidad_planillas: 'Igual que `unicidad_radicados`.',
+  unicidad_expedientes: 'Solo la escribe la emisión real, bloqueada por el candado R10.',
+  expedientes: 'El módulo de licencias puede no tener expedientes todavía en el momento del respaldo.',
+  ventanilla_salidas: 'Un municipio puede pasar días sin emitir una salida.',
+  ventanilla_planillas: 'Se genera una por día hábil con reparto: un respaldo de fin de semana no la trae.',
+  ai_logs: 'Trazas de IA: informativas, no operativas.',
+  ai_feedback: 'Retroalimentación de IA: puede no haberla.',
+  ai_auditoria: 'Auditoría de IA: puede no haberla.',
+  admin_auditoria: 'Eventos de administración: puede no haberlos en el periodo.',
+  simi_auditoria: 'Auditoría de SIMI: puede no haberla.',
+  control_interno_hallazgos: 'Control Interno puede no tener hallazgos abiertos.',
+  control_interno_planes_mejora: 'Depende de que haya hallazgos.',
+  control_interno_alertas: 'Se generan por cron: un respaldo puede caer antes de la primera.',
+  control_interno_eventos: 'Igual que las alertas.',
+};
 
 function arg(nombre) {
   const i = process.argv.indexOf(nombre);
@@ -85,16 +133,55 @@ const lineas = [];
 lineas.push(`Proyecto: ${proyecto} · Base: ${base}`);
 lineas.push('');
 
-// ── 1. Colecciones críticas ──────────────────────────────────────────
-lineas.push('COLECCIONES:');
+// ── 1. Colecciones, TODAS las que declaran las reglas ────────────────
+lineas.push(`COLECCIONES (${INVENTARIO.raiz.length}, derivadas de firestore.rules):`);
 const conteos = {};
-for (const coleccion of COLECCIONES_CRITICAS) {
+
+/* Ninguna colección del inventario puede quedar sin clasificar. Si aparece una
+   nueva y nadie decidió si debe traer datos o puede estar vacía, el ensayo lo
+   dice en vez de suponerlo — que es exactamente cómo `users` se quedó fuera
+   durante meses. */
+const sinClasificar = INVENTARIO.raiz.filter(
+  (c) => !(c in DEBEN_TENER_DATOS) && !(c in PUEDEN_ESTAR_VACIAS),
+);
+if (sinClasificar.length > 0) {
+  problemas.push(
+    `Colección(es) sin clasificar en el alcance del verificador: ${sinClasificar.join(', ')}. ` +
+    'Decida en `scripts/backups/verificar-restauracion.mjs` si deben traer datos o pueden estar vacías. ' +
+    'Excluir es legítimo; excluir sin darse cuenta no.',
+  );
+}
+
+for (const coleccion of INVENTARIO.raiz) {
   const snap = await db.collection(coleccion).count().get();
   const n = snap.data().count;
   conteos[coleccion] = n;
-  lineas.push(`  ${coleccion.padEnd(24)} ${n} documento(s)`);
-  if (n === 0) {
-    problemas.push(`La colección "${coleccion}" quedó VACÍA tras la restauración.`);
+  const exigeDatos = coleccion in DEBEN_TENER_DATOS;
+  const marca = n === 0 ? (exigeDatos ? '  ✗ VACÍA' : '  (vacía, previsto)') : '';
+  lineas.push(`  ${coleccion.padEnd(30)} ${String(n).padStart(7)} documento(s)${marca}`);
+  if (n === 0 && exigeDatos) {
+    problemas.push(`"${coleccion}" quedó VACÍA. ${DEBEN_TENER_DATOS[coleccion]}`);
+  }
+}
+
+/* ── SUBCOLECCIONES. `.count()` sobre la raíz NO las ve: `actuaciones`,
+   `documentos` y `versiones` podían haberse perdido enteras con los conteos de
+   arriba en verde. Se cuentan con `collectionGroup`, que es la única forma de
+   verlas sin recorrer documento por documento. */
+lineas.push('');
+lineas.push(`SUBCOLECCIONES (${INVENTARIO.subcolecciones.length}):`);
+for (const sub of INVENTARIO.subcolecciones) {
+  const snap = await db.collectionGroup(sub.nombre).count().get();
+  const n = snap.data().count;
+  conteos[sub.ruta] = n;
+  lineas.push(`  ${sub.ruta.padEnd(44)} ${String(n).padStart(7)} documento(s)`);
+  /* Una subcolección vacía cuyo PADRE tiene documentos es sospechosa: significa
+     que se restauraron los expedientes pero no sus actuaciones. */
+  if (n === 0 && (conteos[sub.padre] ?? 0) > 0) {
+    problemas.push(
+      `"${sub.ruta}" está VACÍA mientras "${sub.padre}" tiene ${conteos[sub.padre]} documento(s). ` +
+      'Una restauración que trae los padres y pierde sus subcolecciones se ve completa y no lo está.',
+    );
   }
 }
 
