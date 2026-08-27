@@ -56,6 +56,8 @@ function jsonError(error: unknown) {
 interface BodyDesdeRadicado {
   radicadoId?: string;
   subtipos?: string[];
+  /** Modalidades del art. 2.2.6.1.1.7 — solo con la figura CONSTRUCCION. */
+  modalidadesConstruccion?: string[];
   contexto?: Record<string, string | number | boolean>;
 }
 
@@ -90,7 +92,12 @@ export async function POST(request: Request): Promise<NextResponse> {
 
       const plan = planCrearExpedienteDesdeRadicado(
         radicado,
-        { subtipos: body?.subtipos ?? [], contexto: body?.contexto },
+        {
+          subtipos: body?.subtipos ?? [],
+          // Sin capturar = ausente. No se rellena con un valor por defecto.
+          modalidadesConstruccion: body?.modalidadesConstruccion,
+          contexto: body?.contexto,
+        },
         TENANT_LICENCIAS,
         actor,
         ahora,
