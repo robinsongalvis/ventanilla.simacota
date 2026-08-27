@@ -25,7 +25,7 @@ import {
 import { appendTrazabilidadAdmin } from '@/lib/server/radicados-security';
 import type { TenantId } from '@/src/types/radicado';
 import type { VentanillaRadicado } from '@/src/types/ventanilla';
-import { DEFINICION_LICENCIA_CONSTRUCCION_PARCIAL } from '@/lib/motor-expedientes/definiciones/licencia-construccion-parcial';
+import { describirTramiteDesdeSubtipos } from '@/lib/motor-expedientes/describir-tramite';
 import {
   planCrearExpedienteDesdeRadicado,
   esErrorExpediente,
@@ -156,7 +156,10 @@ export async function POST(request: Request): Promise<NextResponse> {
             solicitanteNombre: plan.expediente.solicitanteNombre,
             solicitanteDocumento: plan.expediente.solicitanteDocumento,
             tipoDocumento: radicado.solicitante.tipoDocumento,
-            descripcionTramite: DEFINICION_LICENCIA_CONSTRUCCION_PARCIAL.nombre.toLowerCase(),
+            // La figura sale del EXPEDIENTE (mismo motivo que en la
+            // constancia impresa): este correo afirmaba «obra nueva» a todo
+            // el mundo. La modalidad no se nombra: nadie la captura.
+            descripcionTramite: describirTramiteDesdeSubtipos(plan.expediente.subtipos),
             // Día en que la Alcaldía RECIBIÓ la solicitud. No es una fecha con
             // efecto de plazo, y el correo lo dice expresamente.
             fechaRecepcion: plan.expediente.creadoEn,
