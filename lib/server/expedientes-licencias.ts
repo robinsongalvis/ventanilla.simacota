@@ -177,8 +177,20 @@ export interface ExpedienteLicenciaDoc extends Expediente {
 export interface EvidenciaRadicacion {
   requisitosAplicables: number;
   requisitosFaltantes: number;
-  requisitoQueFijaElAncla: string;
-  documentoQueFijaElAncla: string;
+  /**
+   * Qué documento fijó la fecha del término — SOLO cuando la fecha se dedujo
+   * de él. `null` cuando el ancla salió del momento REGISTRADO de completitud,
+   * porque entonces ningún documento la fijó.
+   *
+   * Nombrar un documento en los dos casos era una imprecisión con
+   * consecuencia: un auditor leería «documento que fija la fecha» y creería
+   * que esa fecha sale de ese archivo, cuando sale del registro. La destapó la
+   * propia demostración al imprimirlo en lenguaje llano.
+   */
+  requisitoQueFijaElAncla: string | null;
+  documentoQueFijaElAncla: string | null;
+  /** El último documento aportado, siempre — informativo, no la causa de la fecha. */
+  ultimoDocumentoAportado: string;
   /** De dónde salió la fecha: un hecho registrado o una deducción. Un auditor no debería tener que adivinarlo. */
   baseDelAncla: 'MOMENTO_REGISTRADO_DE_COMPLETITUD' | 'PRIMERA_VERSION_DEL_ULTIMO_DOCUMENTO';
   /** Ata la afirmación al binario exacto (INV-3). `null` si la versión no lo trae. */
@@ -1501,7 +1513,17 @@ export function planRadicarEnDebidaForma(entrada: {
   expedienteId: string;
   tenantId: string;
   evaluacion: EvaluacionRadicacionDebidaForma;
-  numeroEmitido: string;
+  /**
+   * El número del libro de ventanilla, ya validado y normalizado.
+   *
+   * DEJÓ DE EMITIRSE (decisión del propietario, 26-ago-2026). Antes esta
+   * función recibía un consecutivo emitido de la serie `expedientes`. Ahora
+   * recibe el número que el operario transcribe del libro: en la Administración
+   * Municipal todo entra por ventanilla, y ese número es el oficial, el único.
+   * Una licencia no recibe un número propio — recibe el que ya tiene.
+   */
+  numeroOficial: string;
+  /** Año de la serie a la que se imputa, tomado del propio número transcrito. */
   anioSerie: number;
   actuacionesPrevias: ActuacionLicenciaDoc[];
   actor: { uid: string; nombre: string; rol: string };
@@ -1509,7 +1531,7 @@ export function planRadicarEnDebidaForma(entrada: {
   definicionId?: string;
   observacion?: string;
 }): PlanRadicarEnDebidaForma {
-  const { expedienteId, tenantId, evaluacion, numeroEmitido, anioSerie,
+  const { expedienteId, tenantId, evaluacion, numeroOficial, anioSerie,
           actuacionesPrevias, actor, ahora, definicionId, observacion } = entrada;
 
   const actuacionId = idActuacionRadicacion(expedienteId);
@@ -1533,7 +1555,7 @@ export function planRadicarEnDebidaForma(entrada: {
        RECONSTRUIDA antes incluso de mirar el slug. */
     origen: 'REAL',
     detalle:
-      `Radicación en legal y debida forma. Expediente ${numeroEmitido}. ` +
+      `Radicación en legal y debida forma. Radicado ${numeroOficial}. ` +
       `Término de ${PLAZO_DECISION_LICENCIA_DIAS_HABILES} días hábiles desde ${evaluacion.anclaDiaCivil} ` +
       `(último requisito aportado: ${evaluacion.evidencia.requisitoId}).` +
       (observacion ? ` Observación: ${observacion}` : ''),
@@ -1548,13 +1570,21 @@ export function planRadicarEnDebidaForma(entrada: {
     evidenciaRadicacion: {
       requisitosAplicables: evaluacion.completitud.aplicables,
       requisitosFaltantes: evaluacion.completitud.faltantes.length,
-      requisitoQueFijaElAncla: evaluacion.evidencia.requisitoId,
-      documentoQueFijaElAncla: evaluacion.evidencia.documentoId,
+      /* Solo se nombra el documento cuando de verdad fijó la fecha. */
+      requisitoQueFijaElAncla:
+        evaluacion.baseDelAncla === 'PRIMERA_VERSION_DEL_ULTIMO_DOCUMENTO'
+          ? evaluacion.evidencia.requisitoId
+          : null,
+      documentoQueFijaElAncla:
+        evaluacion.baseDelAncla === 'PRIMERA_VERSION_DEL_ULTIMO_DOCUMENTO'
+          ? evaluacion.evidencia.documentoId
+          : null,
+      ultimoDocumentoAportado: evaluacion.evidencia.documentoId,
       baseDelAncla: evaluacion.baseDelAncla,
       hashSha256: evaluacion.evidencia.hashSha256 ?? null,
       definicionId: definicionId ?? DEFINICION_LICENCIA_CONSTRUCCION_PARCIAL.id,
-      numeroExpediente: numeroEmitido,
-      serieId: 'expedientes',
+      numeroExpediente: numeroOficial,
+      serieId: 'radicados',
     },
   };
 
@@ -1573,7 +1603,11 @@ export function planRadicarEnDebidaForma(entrada: {
     actuacionId,
     parcheExpediente: {
       estadoJuridico: 'RADICADA_EN_DEBIDA_FORMA',
-      numeroExpediente: { numero: numeroEmitido, serieId: 'expedientes', año: anioSerie },
+      /* La serie es `radicados`, la de ventanilla: es de donde sale el número.
+         Decirlo aquí importa — el Libro y la auditoría clasifican por `serieId`,
+         y afirmar `expedientes` haría creer que consumió un consecutivo de una
+         serie que este acto ya no toca. */
+      numeroExpediente: { numero: numeroOficial, serieId: 'radicados', año: anioSerie },
       fechaRadicacionDebidaForma: evaluacion.anclaIso,
       fechaAlertaConservadora,
       completitud: evaluacion.completitud,
