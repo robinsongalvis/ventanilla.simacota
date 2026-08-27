@@ -6,6 +6,7 @@ import { soloOperacionReal }  from '@/lib/radicados/dato-de-prueba';
 import { diasRestantesHabiles, sumarDiasHabiles } from '@/lib/tiempos-radicado';
 import { terminoResolucionSigueCorriendo } from '@/lib/motor-expedientes/estados-licencia';
 import type { ExpedienteLicenciaDoc } from '@/lib/server/expedientes-licencias';
+import type { TenantId } from '@/src/types/radicado';
 import { registrarEventoNegocio } from '@/lib/observabilidad/eventos-negocio';
 
 export const runtime = 'nodejs';
@@ -96,7 +97,16 @@ import {
   componerResumen,
   type EstadoVigilado,
   type NivelVigilancia,
+  type Transiciones,
 } from '@/lib/server/vigilancia-termino';
+import { enviarEmail } from '@/lib/email/mailer';
+import { DIRECTORIO_TENANTS } from '@/src/types/reglas-negocio';
+import {
+  buildNovedadesVigilanciaHtml,
+  buildNovedadesVigilanciaSubject,
+  buildResumenSemanalHtml,
+  buildResumenSemanalSubject,
+} from '@/lib/email/templates/vigilancia-termino-licencias';
 
 /** Techo de lectura (clase BATCH, ADR-0011 2B) — defensa en profundidad. */
 const TECHO_LECTURA = 1000;
@@ -189,6 +199,103 @@ function diasHabilesTranscurridos(desdeIso: string, ahora: Date): number {
   return dias;
 }
 
+/** Tenant dueño de los expedientes de licencias — el mismo del resto del módulo. */
+const TENANT_LICENCIAS: TenantId = 'SEC_PLANEACION';
+
+/**
+ * ¿Toca el resumen semanal?
+ *
+ * LUNES, día fijo, decidido en hora de Bogotá y no en UTC: el cron corre a las
+ * 12:30 UTC, que es 07:30 en Colombia — mismo día civil, pero razonarlo en UTC
+ * es la clase de suposición que rompe el día que cambie el horario del cron.
+ */
+export function esLunes(ahora: Date): boolean {
+  const enBogota = new Intl.DateTimeFormat('en-US', {
+    timeZone: 'America/Bogota',
+    weekday: 'short',
+  }).format(ahora);
+  return enBogota === 'Mon';
+}
+
+interface ResultadoAviso {
+  /** Cuántos correos HABÍA que mandar. Cero significa «no había nada que avisar». */
+  intentados: number;
+  enviados: number;
+  errores: number;
+  /** Por qué no se intentó, cuando `intentados` es 0 pese a haber novedades. */
+  omitido?: string;
+}
+
+/**
+ * Manda los dos correos que correspondan: las NOVEDADES (solo si algo entró o
+ * se agravó) y el RESUMEN SEMANAL (los lunes, SIEMPRE, incluso con el conjunto
+ * vacío — para que Planeación aprenda a esperarlo y su ausencia informe).
+ */
+async function avisar(p: {
+  buzon: string | undefined;
+  enlaceBandeja: string;
+  transiciones: Transiciones;
+  resumen: ReturnType<typeof componerResumen>;
+  esDiaDeResumen: boolean;
+}): Promise<ResultadoAviso> {
+  const novedades = p.transiciones.entraron.length + p.transiciones.agravaron.length;
+  const aMandar = (novedades > 0 ? 1 : 0) + (p.esDiaDeResumen ? 1 : 0);
+  if (aMandar === 0) return { intentados: 0, enviados: 0, errores: 0 };
+
+  if (!p.buzon) {
+    /* Sin buzón NO se cuenta como intento fallido —no hay a quién escribirle—
+       pero tampoco se calla: se declara el motivo para que el silencio se pueda
+       distinguir de un envío que se perdió. */
+    return {
+      intentados: 0,
+      enviados: 0,
+      errores: 0,
+      omitido: `El directorio no tiene correo oficial para ${TENANT_LICENCIAS}: no hay a quién avisar.`,
+    };
+  }
+
+  let enviados = 0;
+  let errores = 0;
+
+  if (novedades > 0) {
+    try {
+      await enviarEmail({
+        to: p.buzon,
+        subject: buildNovedadesVigilanciaSubject(
+          p.transiciones.entraron.length,
+          p.transiciones.agravaron.length,
+        ),
+        html: buildNovedadesVigilanciaHtml({
+          entraron: p.transiciones.entraron,
+          agravaron: p.transiciones.agravaron,
+          fechaCorridaIso: p.resumen.corridaIso,
+          enlaceBandeja: p.enlaceBandeja,
+        }),
+      });
+      enviados += 1;
+    } catch (error) {
+      errores += 1;
+      logError({ radicadoId: '', modulo: 'cron/vencimientos-licencias/aviso-novedades', error });
+    }
+  }
+
+  if (p.esDiaDeResumen) {
+    try {
+      await enviarEmail({
+        to: p.buzon,
+        subject: buildResumenSemanalSubject(p.resumen),
+        html: buildResumenSemanalHtml({ resumen: p.resumen, enlaceBandeja: p.enlaceBandeja }),
+      });
+      enviados += 1;
+    } catch (error) {
+      errores += 1;
+      logError({ radicadoId: '', modulo: 'cron/vencimientos-licencias/resumen-semanal', error });
+    }
+  }
+
+  return { intentados: aMandar, enviados, errores };
+}
+
 export async function GET(request: Request): Promise<NextResponse> {
   const auth = autorizarCron({
     authorization: request.headers.get('authorization'),
@@ -249,17 +356,21 @@ export async function GET(request: Request): Promise<NextResponse> {
       })),
     ];
 
+    /* Se izan fuera del `try`: si RECORDAR falla, el aviso no puede inventarse
+       transiciones que no pudo calcular — sale vacío, no falso. */
+    let transicionesDeLaCorrida: Transiciones = calcularTransiciones([], [], lecturaCompleta);
     let resumen = componerResumen(
       ahora.toISOString(),
       filas.length,
       vigilados,
-      calcularTransiciones([], vigilados, lecturaCompleta),
+      transicionesDeLaCorrida,
       lecturaCompleta,
     );
     try {
       const previosSnap = await db.collection(COLECCION_MEMORIA).get();
       const previos: EstadoVigilado[] = previosSnap.docs.map((d) => d.data() as EstadoVigilado);
       const transiciones = calcularTransiciones(previos, vigilados, lecturaCompleta);
+      transicionesDeLaCorrida = transiciones;
       resumen = componerResumen(ahora.toISOString(), filas.length, vigilados, transiciones, lecturaCompleta);
 
       const lote = db.batch();
@@ -282,6 +393,46 @@ export async function GET(request: Request): Promise<NextResponse> {
          corrida sigue siendo válido y se devuelve igual. Pero se registra, y el
          resumen sale con las transiciones vacías, no con transiciones falsas. */
       logError({ radicadoId: '', modulo: 'cron/vencimientos-licencias/memoria', error });
+    }
+
+    /* ── AVISAR ────────────────────────────────────────────────────────
+       El buzón sale del DIRECTORIO de dependencias, no de una variable de
+       entorno propia: es el mismo dato que ya usa el cron de PQRSD, y una
+       segunda fuente para la misma verdad acabaría divergiendo. */
+    const buzonPlaneacion = DIRECTORIO_TENANTS[TENANT_LICENCIAS]?.emailOficial;
+    const enlaceBandeja = `${process.env.NEXT_PUBLIC_APP_URL ?? 'https://ventanilla-simacota.vercel.app'}/interno/licencias`;
+    const correo = await avisar({
+      buzon: buzonPlaneacion,
+      enlaceBandeja,
+      transiciones: transicionesDeLaCorrida,
+      resumen,
+      esDiaDeResumen: esLunes(ahora),
+    });
+
+    /* ── LECCIÓN PT-2 (24-ago-2026) ────────────────────────────────────
+       Si HABÍA algo que avisar y NINGÚN envío salió, el cron NO puede
+       reportar verde. Es el escenario real que la auditoría encontró en el
+       cron de PQRSD: SMTP vacío, cada envío lanzaba, el catch contaba, la
+       ruta devolvía ok:true y el panel de Vercel pintaba el cron «sano»
+       mientras CERO avisos llegaban a nadie. Un vigilante que reporta éxito
+       cuando no vigila es peor que ninguno. */
+    if (correo.intentados > 0 && correo.enviados === 0) {
+      console.error(
+        '[cron/vencimientos-licencias] FRACASO TOTAL DE AVISO: había novedades y ningún correo salió',
+        JSON.stringify({ intentados: correo.intentados, errores: correo.errores, buzon: buzonPlaneacion ?? null }),
+      );
+      return NextResponse.json(
+        {
+          ok: false,
+          error:
+            'La revisión del término se completó, pero NINGÚN aviso pudo enviarse. ' +
+            'Los expedientes en alerta no han sido comunicados a Planeación.',
+          revisadoEn: ahora.toISOString(),
+          memoria: resumen,
+          correo,
+        },
+        { status: 500 },
+      );
     }
 
     /* El informe cuenta las TRES situaciones siempre, incluso en cero. Un
@@ -327,6 +478,7 @@ export async function GET(request: Request): Promise<NextResponse> {
       /* Lo que se PERSISTIÓ, en la misma respuesta: quien lea el JSON del cron
          ve exactamente lo que quedó escrito, sin tener que ir a buscarlo. */
       memoria: resumen,
+      correo,
       detalle: [...alertables, ...enEsperaExcesiva, ...suspendidos],
     });
   } catch (error) {
