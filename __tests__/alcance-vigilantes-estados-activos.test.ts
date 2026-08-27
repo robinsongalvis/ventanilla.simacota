@@ -54,3 +54,27 @@ describe('los vigilantes de plazos derivan sus estados del dominio', () => {
     }
   });
 });
+
+describe('los vigilantes usan el criterio CANÓNICO de dato de prueba', () => {
+  /* El paquete 1 unificó `esDatoDePrueba` para que reconociera `esPrueba`, pero
+     estos dos crons no lo LLAMABAN: tenían su propio filtro inline
+     (`!isTest && !excludeFromMetrics`), que no mira `anulado`.
+     Consecuencia viva: los 27 radicados de prueba anulados con acta conservan
+     su estado y su fecha de vencimiento, así que habrían generado alertas de
+     mora como si fueran PQRSD ciudadanas — y esas alertas alimentan el tablero
+     de Control Interno.
+     Arreglar el criterio y no cablearlo es arreglarlo a medias. */
+  it.each(VIGILANTES)('%s llama al criterio compartido, no a una copia', (_nombre, ruta) => {
+    const fuente = readFileSync(ruta, 'utf8');
+    expect(fuente).toMatch(/from '@\/lib\/radicados\/dato-de-prueba'/);
+    expect(fuente).toMatch(/soloOperacionReal|esDatoDePrueba/);
+  });
+
+  it.each(VIGILANTES)('%s ya no filtra con su propia condición inline', (_nombre, ruta) => {
+    const codigo = readFileSync(ruta, 'utf8')
+      .replace(/\/\*[\s\S]*?\*\//g, '')
+      .replace(/^\s*\/\/.*$/gm, '');
+    expect(codigo).not.toMatch(/!r\.isTest\s*&&\s*!r\.excludeFromMetrics/);
+    expect(codigo).not.toMatch(/d\.isTest \|\| d\.excludeFromMetrics/);
+  });
+});

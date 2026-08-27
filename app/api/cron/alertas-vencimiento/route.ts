@@ -12,6 +12,7 @@ import {
 import type { VentanillaRadicado } from '@/src/types/ventanilla';
 import type { TenantId }         from '@/src/types/radicado';
 import { ESTADOS_ACTIVOS as ESTADOS_ACTIVOS_DOMINIO } from '@/lib/radicado-estados';
+import { soloOperacionReal, type MarcasDePrueba } from '@/lib/radicados/dato-de-prueba';
 
 export const runtime = 'nodejs';
 // Techo del plan (Vercel Hobby/Pro: 300s en funciones cron) — evita que un
@@ -97,9 +98,13 @@ export async function GET(request: Request): Promise<NextResponse> {
       .orderBy('termino.fechaVencimiento')
       .limit(TECHO_LECTURA_CRON)
       .get();
-    const radicados = snap.docs
-      .map((d) => d.data() as VentanillaRadicado & { isTest?: boolean; excludeFromMetrics?: boolean })
-      .filter((r) => ESTADOS_ACTIVOS.has(r.estadoActual) && !r.isTest && !r.excludeFromMetrics);
+    const candidatos = snap.docs
+      /* CRITERIO CANÓNICO, no una copia: el filtro inline anterior no miraba
+         `anulado`, así que un radicado de prueba anulado con acta —que conserva
+         su estado y su vencimiento— seguía generando alertas de mora. */
+      .map((d) => d.data() as VentanillaRadicado & MarcasDePrueba);
+    const radicados = soloOperacionReal(candidatos)
+      .filter((r) => ESTADOS_ACTIVOS.has(r.estadoActual));
 
     for (const r of radicados) {
       const diasRestantes = diasRestantesHabiles(r.termino.fechaVencimiento);

@@ -10,6 +10,7 @@ import { diasRestantesHabiles }  from '@/lib/tiempos-radicado';
 import type { VentanillaRadicado } from '@/src/types/ventanilla';
 import type { AlertaVencimiento, AlertaTipoDeadline } from '@/src/types/simi-control-interno';
 import { ESTADOS_ACTIVOS as ESTADOS_ACTIVOS_DOMINIO } from '@/lib/radicado-estados';
+import { soloOperacionReal, esDatoDePrueba, type MarcasDePrueba } from '@/lib/radicados/dato-de-prueba';
 
 /**
  * ALCANCE DECLARADO de este vigilante (ADR-0033 §4.6-bis).
@@ -91,9 +92,14 @@ export async function generateDeadlineAlerts(): Promise<AlertaResult> {
     .limit(500)
     .get();
 
-  const radicados = snap.docs
-    .map((d) => d.data() as VentanillaRadicado & { isTest?: boolean; excludeFromMetrics?: boolean })
-    .filter((r) => !r.isTest && !r.excludeFromMetrics);
+  /* CRITERIO CANÓNICO, no una copia. El filtro inline anterior
+     (`!isTest && !excludeFromMetrics`) NO miraba `anulado`, así que los 27
+     radicados de prueba anulados con acta —que conservan su estado y su fecha
+     de vencimiento— habrían generado alertas como si fueran PQRSD ciudadanas
+     vivas, y esas alertas alimentan el tablero de Control Interno. */
+  const radicados = soloOperacionReal(
+    snap.docs.map((d) => d.data() as VentanillaRadicado & MarcasDePrueba),
+  );
 
   let alertasCreadas   = 0;
   let alertasOmitidas  = 0;
@@ -110,7 +116,7 @@ export async function generateDeadlineAlerts(): Promise<AlertaResult> {
 
   for (const doc of approvalSnap.docs) {
     const d = doc.data();
-    if (d.isTest || d.excludeFromMetrics) continue;
+    if (esDatoDePrueba(d as MarcasDePrueba)) continue;
     if (d.estado === 'pendiente_revision_jefe')     pendientesJefeSet.add(d.radicadoId as string);
     if (d.estado === 'pendiente_revision_juridica') pendientesJuridicaSet.add(d.radicadoId as string);
   }

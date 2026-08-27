@@ -127,10 +127,19 @@ describe('buildAlertaVencimientoSubject', () => {
 describe('cableado del cron — no toca lógica funcional', () => {
   const s = readFileSync('app/api/cron/alertas-vencimiento/route.ts', 'utf8');
 
-  it('sigue autorizando con autorizarCron y filtrando isTest/excludeFromMetrics', () => {
+  it('sigue autorizando con autorizarCron', () => {
     expect(s).toContain('autorizarCron');
-    expect(s).toContain('isTest');
-    expect(s).toContain('excludeFromMetrics');
+  });
+
+  /* La guarda anterior exigía que el archivo nombrara `isTest` y
+     `excludeFromMetrics` — es decir, custodiaba el filtro INLINE. Ese filtro
+     era el defecto: no miraba `anulado`, así que un radicado de prueba anulado
+     con acta seguía generando alertas de mora. La intención (que el cron no
+     alerte sobre datos de prueba) se conserva; lo que cambia es que ahora la
+     sostiene el criterio compartido, y no una copia que se quedó corta. */
+  it('filtra los datos de prueba con el criterio CANÓNICO, no con una copia', () => {
+    expect(s).toMatch(/from '@\/lib\/radicados\/dato-de-prueba'/);
+    expect(s).toContain('soloOperacionReal');
   });
 
   it('conserva el umbral de 2 días hábiles', () => {
