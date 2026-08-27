@@ -83,6 +83,12 @@ function mockFetchModulo(expedientes: ExpedienteLicenciaDoc[]) {
         }),
       });
     }
+    /* El roll-up del vigía (`PanelVigilanciaTermino`) consulta su propio
+       endpoint. Se responde «nunca ha corrido» porque estas pruebas son del
+       BUSCADOR: lo que importa es que el panel no rompa la bandeja. */
+    if (url === '/api/licencias/vigilancia-termino') {
+      return Promise.resolve({ ok: true, status: 200, json: async () => ({ ultimaCorrida: null, nuncaHaCorrido: true }) });
+    }
     throw new Error(`fetch inesperado en el test: ${url}`);
   });
 }

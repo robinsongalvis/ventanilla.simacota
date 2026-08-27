@@ -40,6 +40,7 @@ import { ChipEstadoJuridico } from './ChipEstadoJuridico';
 import { ChipPrueba } from './ChipPrueba';
 import { NumeroLegal } from './NumeroLegal';
 import { TarjetaKPI } from './TarjetaKPI';
+import { PanelVigilanciaTermino } from './PanelVigilanciaTermino';
 import { RadicarSolicitudModal } from './RadicarSolicitudModal';
 import { CrearDesdeRadicadoModal } from './CrearDesdeRadicadoModal';
 import { BuscadorRapidoLibro } from './BuscadorRapidoLibro';
@@ -229,6 +230,9 @@ export function BandejaLicenciasClient({ onAbrirExpediente, onIrALibroConsecutiv
           {error}
         </p>
       )}
+
+      {/* ── Vigía del término: el agregado del cron, no un cálculo de pantalla ── */}
+      <PanelVigilanciaTermino />
 
       {/* ── KPIs ── */}
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">

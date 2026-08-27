@@ -91,8 +91,19 @@ async function leerEdadMaximaSinAnclar(
   return { dias: EDAD_MAXIMA_SIN_ANCLAR_POR_DEFECTO, origen: 'DEFECTO' };
 }
 
+import {
+  calcularTransiciones,
+  componerResumen,
+  type EstadoVigilado,
+  type NivelVigilancia,
+} from '@/lib/server/vigilancia-termino';
+
 /** Techo de lectura (clase BATCH, ADR-0011 2B) — defensa en profundidad. */
 const TECHO_LECTURA = 1000;
+
+/** Memoria del vigía — cerradas a cliente en `firestore.rules`, igual que `expedientes`. */
+const COLECCION_MEMORIA = 'vigilancia_termino_licencias';
+const COLECCION_CORRIDAS = 'vigilancia_termino_corridas';
 
 type Situacion = 'CORRIENDO' | 'SUSPENDIDO' | 'SIN_ANCLAR' | 'RESUELTO';
 
@@ -213,6 +224,66 @@ export async function GET(request: Request): Promise<NextResponse> {
       (f) => (f.diasHabilesEnEspera ?? 0) > edadMaxima.dias,
     );
 
+    /* ── LA MEMORIA DEL VIGÍA ──────────────────────────────────────────
+       Hasta aquí el vigía clasificaba y se olvidaba: el veredicto vivía en la
+       respuesta HTTP y se evaporaba. Nadie lo recibía y nadie podía saber, al
+       día siguiente, QUÉ HABÍA CAMBIADO.
+
+       Se persiste el estado por expediente (para calcular transiciones) y un
+       resumen por corrida (para el tablero y el resumen semanal). El envío del
+       correo NO se hace aquí todavía: el buzón de Planeación está declarado en
+       el directorio pero nadie ha confirmado que exista, y enviar a un buzón
+       inexistente se pierde en silencio — que es peor que no enviar. */
+    const lecturaCompleta = snap.size < TECHO_LECTURA;
+
+    const vigilados: EstadoVigilado[] = [
+      ...alertables.map((f) => ({
+        expedienteId: f.expedienteId,
+        numeroExpediente: f.numeroExpediente,
+        nivel: f.nivel as NivelVigilancia,
+      })),
+      ...enEsperaExcesiva.map((f) => ({
+        expedienteId: f.expedienteId,
+        numeroExpediente: f.numeroExpediente,
+        nivel: 'ESPERA_EXCESIVA' as NivelVigilancia,
+      })),
+    ];
+
+    let resumen = componerResumen(
+      ahora.toISOString(),
+      filas.length,
+      vigilados,
+      calcularTransiciones([], vigilados, lecturaCompleta),
+      lecturaCompleta,
+    );
+    try {
+      const previosSnap = await db.collection(COLECCION_MEMORIA).get();
+      const previos: EstadoVigilado[] = previosSnap.docs.map((d) => d.data() as EstadoVigilado);
+      const transiciones = calcularTransiciones(previos, vigilados, lecturaCompleta);
+      resumen = componerResumen(ahora.toISOString(), filas.length, vigilados, transiciones, lecturaCompleta);
+
+      const lote = db.batch();
+      for (const v of vigilados) {
+        lote.set(db.collection(COLECCION_MEMORIA).doc(v.expedienteId), {
+          ...v,
+          ultimaCorridaIso: ahora.toISOString(),
+        });
+      }
+      /* Solo se borran los que SALIERON de verdad. Con lectura truncada
+         `salieron` viene vacío a propósito (ver `vigilancia-termino.ts`): un
+         expediente que no se leyó no puede declararse resuelto. */
+      for (const t of transiciones.salieron) {
+        lote.delete(db.collection(COLECCION_MEMORIA).doc(t.expedienteId));
+      }
+      lote.set(db.collection(COLECCION_CORRIDAS).doc(ahora.toISOString().slice(0, 10)), resumen);
+      await lote.commit();
+    } catch (error) {
+      /* Un fallo al RECORDAR no puede tumbar la vigilancia: el informe de esta
+         corrida sigue siendo válido y se devuelve igual. Pero se registra, y el
+         resumen sale con las transiciones vacías, no con transiciones falsas. */
+      logError({ radicadoId: '', modulo: 'cron/vencimientos-licencias/memoria', error });
+    }
+
     /* El informe cuenta las TRES situaciones siempre, incluso en cero. Un
        vigía que solo reporta lo que encontró no permite distinguir «no hay
        nada que alertar» de «no miré»: esa ambigüedad es la que deja pasar los
@@ -253,6 +324,9 @@ export async function GET(request: Request): Promise<NextResponse> {
         avisos:   alertables.filter((f) => f.nivel === 'AVISO').length,
         esperaExcesivaSinAnclar: enEsperaExcesiva.length,
       },
+      /* Lo que se PERSISTIÓ, en la misma respuesta: quien lea el JSON del cron
+         ve exactamente lo que quedó escrito, sin tener que ir a buscarlo. */
+      memoria: resumen,
       detalle: [...alertables, ...enEsperaExcesiva, ...suspendidos],
     });
   } catch (error) {
