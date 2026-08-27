@@ -107,6 +107,11 @@ export async function iniciarEntorno() {
     optimizeDeps: { noDiscovery: true },
   });
 
+  // Estas tres cargas concurrentes pueden materializar DOS instancias de cada
+  // stub (la del grafo de route.ts y la directa) — causa del 401 intermitente
+  // del 8-ago/24-ago-2026. Es inocuo desde que los stubs guardan su estado en
+  // `globalThis` con clave `Symbol.for()` (ver comentario en cada stub); se
+  // deja el `Promise.all` a propósito para seguir ejercitando ese camino.
   const [routeMod, authMod, storageMod] = await Promise.all([
     servidorVite.ssrLoadModule(RUTA_ROUTE),
     servidorVite.ssrLoadModule(RUTA_AUTH_STUB),

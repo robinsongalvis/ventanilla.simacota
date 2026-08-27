@@ -87,6 +87,18 @@ export async function iniciarEntorno() {
     optimizeDeps: { noDiscovery: true },
   });
 
+  // ── MISMO CAMINO QUE EL FLAKE DE FASE 3 (8-ago y 24-ago-2026) ────────────
+  // Estas tres cargas concurrentes pueden materializar DOS instancias de cada
+  // stub: la que cuelga del grafo de `route.ts` (que importa
+  // `@/lib/server/internal-auth`, redirigido por el plugin) y la directa de
+  // este `Promise.all`. Este arnés REUTILIZA los stubs de fase 3, así que
+  // hereda su inmunidad: el estado vive en `globalThis` bajo clave de
+  // `Symbol.for()` — ver el comentario largo en `fase3-stub-internal-auth.mjs`.
+  //
+  // Y NO, correr en serie no lo evita: `--test-concurrency=1` serializa entre
+  // ARCHIVOS de prueba, no dentro de este `Promise.all`, que es donde nace la
+  // concurrencia. Si algún día un stub vuelve a guardar estado en una variable
+  // de módulo, el 401 intermitente reaparece aquí igual que allá.
   const [routeMod, authMod, storageMod] = await Promise.all([
     servidorVite.ssrLoadModule(RUTA_ROUTE),
     servidorVite.ssrLoadModule(RUTA_AUTH_STUB),
