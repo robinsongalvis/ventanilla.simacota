@@ -127,16 +127,35 @@ describe('buildAlertaVencimientoSubject', () => {
 describe('cableado del cron — no toca lógica funcional', () => {
   const s = readFileSync('app/api/cron/alertas-vencimiento/route.ts', 'utf8');
 
-  it('sigue autorizando con autorizarCron y filtrando isTest/excludeFromMetrics', () => {
+  it('sigue autorizando con autorizarCron', () => {
     expect(s).toContain('autorizarCron');
-    expect(s).toContain('isTest');
-    expect(s).toContain('excludeFromMetrics');
   });
 
-  it('conserva el umbral de 2 días hábiles y los estados activos', () => {
+  /* La guarda anterior exigía que el archivo nombrara `isTest` y
+     `excludeFromMetrics` — es decir, custodiaba el filtro INLINE. Ese filtro
+     era el defecto: no miraba `anulado`, así que un radicado de prueba anulado
+     con acta seguía generando alertas de mora. La intención (que el cron no
+     alerte sobre datos de prueba) se conserva; lo que cambia es que ahora la
+     sostiene el criterio compartido, y no una copia que se quedó corta. */
+  it('filtra los datos de prueba con el criterio CANÓNICO, no con una copia', () => {
+    expect(s).toMatch(/from '@\/lib\/radicados\/dato-de-prueba'/);
+    expect(s).toContain('soloOperacionReal');
+  });
+
+  it('conserva el umbral de 2 días hábiles', () => {
     expect(s).toContain('UMBRAL_DIAS = 2');
-    expect(s).toContain('PENDIENTE');
-    expect(s).toContain('PRORROGA');
+  });
+
+  /* Esta guarda custodiaba que el cron nombrara 'PENDIENTE' y 'PRORROGA' — es
+     decir, que su lista literal de estados activos no cambiara sin que nadie lo
+     notara. Desde el 26-ago-2026 esa lista NO existe: se deriva de
+     `ESTADOS_ACTIVOS` del dominio, y las exclusiones se declaran por escrito.
+     La intención se conserva; lo que cambia es qué la sostiene. La verificación
+     completa vive en `alcance-vigilantes-estados-activos.test.ts`. */
+  it('deriva los estados activos del dominio en vez de reescribirlos', () => {
+    expect(s).toMatch(/ESTADOS_ACTIVOS as ESTADOS_ACTIVOS_DOMINIO/);
+    expect(s).toContain('EXCLUIDOS_POR_TERMINO_SUSPENDIDO');
+    expect(s).not.toMatch(/new Set\(\[\s*'PENDIENTE'/);
   });
 
   it('usa la plantilla extraída en vez de HTML inline', () => {
