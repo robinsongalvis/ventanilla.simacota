@@ -13,6 +13,7 @@ import type { VentanillaRadicado } from '@/src/types/ventanilla';
 import type { TenantId }         from '@/src/types/radicado';
 import { ESTADOS_ACTIVOS as ESTADOS_ACTIVOS_DOMINIO } from '@/lib/radicado-estados';
 import { soloOperacionReal, type MarcasDePrueba } from '@/lib/radicados/dato-de-prueba';
+import { registrarEventoNegocio } from '@/lib/observabilidad/eventos-negocio';
 
 export const runtime = 'nodejs';
 // Techo del plan (Vercel Hobby/Pro: 300s en funciones cron) — evita que un
@@ -61,6 +62,7 @@ const UMBRAL_DIAS = 2; // Alerta cuando quedan ≤ 2 días hábiles
 const TECHO_LECTURA_CRON = 1000;
 
 export async function GET(request: Request): Promise<NextResponse> {
+  const inicioCron = Date.now();
   // Verificar autorización
   const auth = autorizarCron({
     authorization: request.headers.get('authorization'),
@@ -172,6 +174,25 @@ export async function GET(request: Request): Promise<NextResponse> {
     if (fracasoTotal) {
       console.error('[cron/alertas-vencimiento] FRACASO TOTAL: había alertas y ningún envío salió', JSON.stringify({ total: radicados.length, errores, omitidos }));
     }
+    /* DEJAR RASTRO DE LO QUE HIZO, no solo de que respondió 200. Los logs de
+       Vercel guardan el estado y la duración, no el cuerpo de la respuesta: sin
+       esto, una barrida que revisó cientos y una que no encontró nada se ven
+       idénticas. El silencio de un vigilante tiene que poder distinguirse de
+       «no hizo nada». */
+    registrarEventoNegocio({
+      operacion:  'alertas_vencimiento_pqrsd',
+      resultado:  fracasoTotal ? 'error' : 'ok',
+      latenciaMs: Date.now() - inicioCron,
+      radicadoId: null,
+      actorRol:   'CRON',
+      tenant:     'VENTANILLA_UNICA',
+      docsLeidos: radicados.length,
+      /* Los avisos que DE VERDAD salieron, no los que tocaba enviar. La
+         diferencia entre los dos es justo lo que el #233 vino a corregir. */
+      accionados: enviados,
+      ...(fracasoTotal ? { error: new Error('Había alertas y ningún envío salió') } : {}),
+    });
+
     return NextResponse.json({
       ok:        !fracasoTotal,
       timestamp: ahora,
