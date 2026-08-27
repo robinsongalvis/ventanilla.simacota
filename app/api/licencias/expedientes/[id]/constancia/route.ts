@@ -25,7 +25,7 @@ import {
   type ActuacionLicenciaDoc,
   type ExpedienteLicenciaDoc,
 } from '@/lib/server/expedientes-licencias';
-import { DEFINICION_LICENCIA_CONSTRUCCION_PARCIAL } from '@/lib/motor-expedientes/definiciones/licencia-construccion-parcial';
+import { describirTramiteDesdeSubtipos } from '@/lib/motor-expedientes/describir-tramite';
 import { buildConstanciaRadicacionLicenciaHtml } from '@/lib/constancias/constancia-radicacion-licencia';
 import { logError } from '@/lib/logger';
 import type { TenantId } from '@/src/types/radicado';
@@ -76,7 +76,11 @@ export async function GET(_req: Request, ctx: { params: Promise<{ id: string }> 
       solicitanteNombre: exp.solicitanteNombre,
       solicitanteDocumento: exp.solicitanteDocumento,
       tipoDocumento: 'CC',
-      descripcionTramite: DEFINICION_LICENCIA_CONSTRUCCION_PARCIAL.nombre.toLowerCase(),
+      /* La figura sale del EXPEDIENTE, no de la única definición cableada en
+         el servidor: antes este papel afirmaba «licencia de construcción ·
+         obra nueva» a todo el mundo. La modalidad no se nombra porque el
+         sistema no la captura — ver la cabecera de `describir-tramite.ts`. */
+      descripcionTramite: describirTramiteDesdeSubtipos(exp.subtipos),
       /* La fecha JURÍDICA es la de la actuación, no la del documento raíz:
          la actuación no se reescribe nunca. */
       desdeCuandoCorreElPlazo: act.fecha,

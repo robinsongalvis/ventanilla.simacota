@@ -3,6 +3,10 @@ import { readFileSync } from 'node:fs';
 import { calcularCompletitudExpediente } from '@/lib/server/completitud-expediente';
 import { MODALIDADES_CONSTRUCCION } from '@/lib/motor-expedientes/catalogo-subtipos-normativo';
 import { DEFINICION_LICENCIA_CONSTRUCCION_PARCIAL } from '@/lib/motor-expedientes/definiciones/licencia-construccion-parcial';
+import {
+  describirTramiteDesdeSubtipos,
+  DESCRIPCION_TRAMITE_SIN_FIGURA,
+} from '@/lib/motor-expedientes/describir-tramite';
 
 /**
  * ═══════════════════════════════════════════════════════════════════════
@@ -32,7 +36,25 @@ import { DEFINICION_LICENCIA_CONSTRUCCION_PARCIAL } from '@/lib/motor-expediente
  * modalidad, el guard de `esPrueba` es obligatorio. Quitarlo pone esto en rojo
  * con instrucciones — que es exactamente el supervisor que hoy no hay.
  *
- * Hallazgo original de la auditoría de #234, que caducó en casi todo lo demás.
+ * ── LA SEGUNDA SUPERFICIE ─────────────────────────────────────────────────
+ *
+ * La misma ceguera llegaba a los PAPELES QUE RECIBE EL CIUDADANO: la constancia
+ * impresa y el acuse de recibo tomaban su descripción de la única definición
+ * cableada, y le decían «licencia de construcción · obra nueva» a todo el
+ * mundo. Un acto de reconocimiento recibía un papel de la Secretaría de
+ * Planeación afirmando algo que nunca solicitó.
+ *
+ * Eso ya está corregido —la figura sale del expediente— y el tercer bloque de
+ * esta prueba lo sostiene, incluida la parte que NO se puede corregir todavía:
+ * el sistema no captura la modalidad en ninguna parte, así que los papeles no
+ * la nombran. Si alguien vuelve a imprimir una modalidad sin capturarla antes,
+ * esto se pone rojo.
+ *
+ * Hallazgo original de la auditoría de #234. Aviso para quien lea esto luego:
+ * dije en su día que esa auditoría «caducó en casi todo lo demás» y era falso
+ * —salió de una muestra, no de una lectura completa—. El repaso exhaustivo
+ * encontró viva buena parte de su diagnóstico; el inventario verificado quedó
+ * en el comentario de cierre de #234.
  */
 
 const RUTA_COMPLETITUD = 'lib/server/completitud-expediente.ts';
@@ -149,5 +171,101 @@ describe('la espoleta: mientras el checklist sea ciego, el guard es obligatorio'
      que pasó en la primera versión de este archivo. */
   it('el detector distingue el estado actual, y no se deja engañar por la prosa', () => {
     expect(esCiegaALaModalidad(), 'hoy la completitud SÍ es ciega a la modalidad').toBe(true);
+  });
+});
+
+/* ─────────────────────────────────────────────────────────────────────────
+   LA SEGUNDA SUPERFICIE: LOS PAPELES QUE RECIBE EL CIUDADANO.
+
+   La constancia impresa y el acuse de recibo son documentos con efectos, y
+   afirmaban un trámite que el expediente no decía. Aquí la mina protege
+   también esos dos papeles.
+   ───────────────────────────────────────────────────────────────────────── */
+
+const RUTA_CONSTANCIA = 'app/api/licencias/expedientes/[id]/constancia/route.ts';
+const RUTA_ACUSE = 'app/api/licencias/expedientes/desde-radicado/route.ts';
+const CONSTANCIA = readFileSync(RUTA_CONSTANCIA, 'utf8');
+const ACUSE = readFileSync(RUTA_ACUSE, 'utf8');
+
+/** ¿Algún sitio GUARDA la modalidad del trámite? Se busca en el código —no en
+ *  la prosa— del módulo que escribe los expedientes: si un día se captura,
+ *  será ahí donde se escriba el campo. */
+function elSistemaCapturaLaModalidad(): boolean {
+  return /modalidad\w*\s*:/.test(soloCodigo(EXPEDIENTES));
+}
+
+describe('los papeles del ciudadano: la figura sale del expediente', () => {
+  it('ninguno de los dos papeles toma su descripción de la definición cableada', () => {
+    for (const [ruta, fuente] of [[RUTA_CONSTANCIA, CONSTANCIA], [RUTA_ACUSE, ACUSE]] as const) {
+      expect(
+        soloCodigo(fuente),
+        `${ruta}: el papel volvió a describir el trámite con la constante de obra nueva. ` +
+          'La figura tiene que salir de `expediente.subtipos` — ver `lib/motor-expedientes/describir-tramite.ts`.',
+      ).not.toMatch(/descripcionTramite:\s*DEFINICION_LICENCIA_CONSTRUCCION_PARCIAL/);
+      expect(
+        soloCodigo(fuente),
+        `${ruta}: el papel ya no deriva la figura del expediente.`,
+      ).toMatch(/descripcionTramite:\s*describirTramiteDesdeSubtipos\(/);
+    }
+  });
+
+  it('cada figura del catálogo se nombra como ella misma, no como obra nueva', () => {
+    expect(describirTramiteDesdeSubtipos(['RECONOCIMIENTO'])).toMatch(/reconocimiento/);
+    expect(describirTramiteDesdeSubtipos(['URBANIZACION'])).toMatch(/urbanizaci/);
+    expect(describirTramiteDesdeSubtipos(['CONSTRUCCION'])).toMatch(/construcci/);
+    /* Varias figuras en una misma solicitud: se nombran TODAS. Omitir una
+       sería describir de menos lo que el ciudadano pidió. */
+    const dos = describirTramiteDesdeSubtipos(['URBANIZACION', 'CONSTRUCCION']);
+    expect(dos).toMatch(/urbanizaci/);
+    expect(dos).toMatch(/construcci/);
+  });
+
+  it('un código que el catálogo no conoce se transcribe, no se descarta en silencio', () => {
+    /* Descartarlo sería el defecto original cambiado de sitio: el papel
+       quedaría describiendo de menos sin que nadie lo notara. */
+    expect(describirTramiteDesdeSubtipos(['LCR VISR'])).toContain('LCR VISR');
+    expect(describirTramiteDesdeSubtipos([])).toBe(DESCRIPCION_TRAMITE_SIN_FIGURA);
+    expect(describirTramiteDesdeSubtipos(undefined)).toBe(DESCRIPCION_TRAMITE_SIN_FIGURA);
+  });
+
+  /**
+   * LA ESPOLETA DE LOS PAPELES.
+   *
+   * Mientras el sistema no capture la modalidad, ningún papel puede nombrar
+   * una. Si alguien vuelve a escribir «obra nueva» —o cualquiera de las otras
+   * ocho— en la descripción del trámite sin haberla capturado antes, este caso
+   * se pone rojo y dice por qué.
+   */
+  it('mientras nadie capture la modalidad, los papeles no nombran ninguna', () => {
+    const capturada = elSistemaCapturaLaModalidad();
+    if (capturada) {
+      /* Se empezó a capturar: los papeles PUEDEN nombrarla, y este caso deja de
+         tener objeto. Se afirma el hecho en vez de callarlo. */
+      expect(soloCodigo(EXPEDIENTES)).toMatch(/modalidad/i);
+      return;
+    }
+
+    const descripciones = [
+      describirTramiteDesdeSubtipos(['CONSTRUCCION']),
+      describirTramiteDesdeSubtipos(['RECONOCIMIENTO']),
+      describirTramiteDesdeSubtipos(['URBANIZACION', 'CONSTRUCCION']),
+    ].join(' | ').toLowerCase();
+
+    const nombradas = MODALIDADES_CONSTRUCCION
+      .map((m) => m.nombre.toLowerCase())
+      .filter((nombre) => descripciones.includes(nombre));
+
+    expect(
+      nombradas,
+      [
+        `El papel del ciudadano nombra una modalidad (${nombradas.join(', ')}) que el sistema`,
+        'NO captura en ninguna parte: no es un subtipo, no es una clave de contexto, no hay',
+        'campo que la guarde. Nadie se la pregunta al funcionario.',
+        '',
+        'Es un documento con efectos: afirmar en él una modalidad inventada es lo que esta',
+        'prueba existe para impedir. Antes de nombrarla hay que capturarla — y entonces este',
+        'caso lo detecta solo y deja de exigirlo.',
+      ].join('\n'),
+    ).toEqual([]);
   });
 });
