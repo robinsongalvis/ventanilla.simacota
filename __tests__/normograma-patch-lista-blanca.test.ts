@@ -11,9 +11,13 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
  * las únicas sin ella.
  */
 
+/* Los dobles van TIPADOS a propósito. Sin la anotación, `vi.fn(async () => …)`
+   se infiere sin parámetros, y llamarlo con tres compila en vitest —que no
+   comprueba tipos— pero revienta el `tsc` de CI. Esa es exactamente la
+   diferencia que hizo que esta PR pasara en local y fallara en la compuerta. */
 const { mockUpdate, mockDelete, mockGet } = vi.hoisted(() => ({
-  mockUpdate: vi.fn(async () => undefined),
-  mockDelete: vi.fn(async () => undefined),
+  mockUpdate: vi.fn(async (_coleccion: string, _id: string, _datos: Record<string, unknown>) => undefined),
+  mockDelete: vi.fn(async (_coleccion: string, _id: string) => undefined),
   mockGet: vi.fn(async () => ({
     exists: true,
     data: () => ({ rol: 'ADMIN', activo: true, nombre: 'Admin de prueba', tenantId: 'VENTANILLA_UNICA' }),
