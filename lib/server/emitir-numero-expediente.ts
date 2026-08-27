@@ -1,4 +1,4 @@
-import type { DocumentReference, Firestore, Transaction } from 'firebase-admin/firestore';
+import type { Firestore, Transaction } from 'firebase-admin/firestore';
 import type { TenantId } from '@/src/types/radicado';
 import {
   confirmarConsecutivosLegales,
@@ -105,25 +105,19 @@ export async function emitirNumeroExpedienteReal(
       // existe, emitir arrancaría en 0001 y duplicaría un histórico. Se
       // exige abrir la serie a propósito (ver `exigeAperturaExplicita`).
       exigeAperturaExplicita: true,
+      /* Puntero inverso del expediente. Va DENTRO de la reserva que hace
+         `confirmarConsecutivosLegales`, no en una reserva propia: desde que la
+         reserva de unicidad cubre las cuatro series en el punto único, crear
+         aquí una segunda sobre el MISMO documento hacía fallar la transacción
+         entera. `creadoEn` (instante real de la reserva) lo pone el punto
+         único; aquí solo se aportan los campos que esta serie necesita. */
+      datosUnicidad: { expedienteId, tenantId },
     },
   ]);
   const pendiente = pendientes[0];
 
-  const unicidadRef: DocumentReference = db.doc(`unicidad_expedientes/${pendiente.documentoId}`);
-  // tx.create: falla si el documento YA existe, sin necesitar un tx.get
-  // previo — la propia semántica de `create` en una transacción de
-  // Firestore hace esa comprobación al confirmar. Si falla, TODA la
-  // transacción del caller aborta (atomicidad ya garantizada por
-  // `runTransaction`).
-  tx.create(unicidadRef, {
-    expedienteId,
-    tenantId,
-    // Instante REAL de la reserva (auditoría), no la fecha ancla de la
-    // actuación — esa viaja en el número mismo (AA) y en el counter.
-    creadoEn: new Date().toISOString(),
-  });
-
-  // Guard D9 + avance del contador (ver JSDoc de confirmarConsecutivosLegales).
+  // Guard D9 + reserva de unicidad + avance del contador
+  // (ver JSDoc de confirmarConsecutivosLegales).
   confirmarConsecutivosLegales(tx, fecha, pendientes);
 
   return { numeroExpediente: pendiente.documentoId, consecutivo: pendiente.consecutivo, pendiente };

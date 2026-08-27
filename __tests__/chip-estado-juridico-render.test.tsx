@@ -16,6 +16,7 @@ afterEach(() => cleanup());
 ══════════════════════════════════════════════════════════════ */
 
 const ETIQUETA: Record<EstadoJuridicoLicencia, string> = {
+  PRESENTADA: 'Presentada · sin verificar',
   RADICADA_EN_DEBIDA_FORMA: 'Radicada en debida forma',
   EN_REVISION: 'En revisión',
   CON_ACTA_DE_OBSERVACIONES: 'Con acta de observaciones',
@@ -36,7 +37,7 @@ describe('Módulo Licencias — ChipEstadoJuridico', () => {
   it('cubre todos los estados jurídicos declarados en el tipo', () => {
     // 9 hitos del ciclo (DF-5) + HISTORICO_SIN_RESOLVER (DF-10, que no es
     // un hito sino la ausencia declarada de uno).
-    expect(estados.length).toBe(10);
+    expect(estados.length).toBe(11); // +PRESENTADA (ADR-0033)
   });
 
   estados.forEach((estado) => {

@@ -50,7 +50,38 @@ const hoy = new Date();
 const dias = (n) => { const d = new Date(hoy); d.setDate(d.getDate() + n); return d.toISOString(); };
 
 /** Casos representativos — uno por comportamiento que la verificación debe poder observar. */
+/* ── Coherencia con la máquina de estados (ADR-0033) ──────────────────────
+   Un stage que produce estados que producción YA NO PUEDE producir es un stage
+   que miente. Desde que existe PRESENTADA, ningún expediente nace en debida
+   forma sin documentos — así que sembrar `RADICADA_EN_DEBIDA_FORMA` con
+   `aportes: []`, como se hacía aquí, fabricaba justo la contradicción que el
+   ADR eliminó.
+
+   Estos son los requisitos OBLIGATORIOS de la definición vigente. Van copiados
+   porque este script es `.mjs` y no puede importar TypeScript; la copia NO se
+   deja a la buena fe: `__tests__/siembra-stage-coherente.test.ts` falla si se
+   desvía de la definición real. */
+const REQUISITOS_OBLIGATORIOS = ['solicitud-escrita-titular', 'formulario-unico-nacional', 'certificado-tradicion-libertad', 'escritura-publica-predio', 'identidad-o-representacion-legal', 'declaracion-impuesto-predial', 'paz-y-salvo-municipal', 'certificacion-redam', 'proyecto-arquitectonico', 'disponibilidad-servicios-publicos', 'memorial-responsabilidad-profesionales', 'valla-citacion-vecinos', 'cancelacion-expensas'];
+
+/** Aportes de un expediente COMPLETO — el estado en que se radica en debida forma. */
+const APORTES_COMPLETOS = REQUISITOS_OBLIGATORIOS.map((requisitoId, i) => ({
+  requisitoId, estado: 'APORTADO', documentoIds: [`doc-siembra-${i + 1}`],
+}));
+
 const CASOS = [
+  {
+    /* ADR-0033 — el estado previo NECESITA su caso sembrado, o la interfaz nunca
+       lo ejercita: el chip ámbar, el KPI de la bandeja y el filtro del libro
+       quedarían sin probar hasta que un expediente real cayera ahí. Sin
+       documentos, sin actuación de radicación y SIN fecha de alerta: no tiene
+       término que proyectar. */
+    id: `${PREFIJO}presentada`, caso: 'Presentada en mostrador — entrega parcial, sin verificar',
+    solicitanteNombre: 'Jorge Enrique Suárez Peña', solicitanteDocumento: '91.234.567',
+    estadoJuridico: 'PRESENTADA', estado: 'EN_REVISION', origen: 'REAL',
+    numero: null, subtipos: ['CONSTRUCCION'],
+    creadoEn: dias(-2), fechaAlertaConservadora: null,
+    predio: { barrioVereda: 'CENTRO', matriculaInmobiliaria: '321-40012' },
+  },
   {
     id: `${PREFIJO}holgado`, caso: 'En trámite con plazo holgado (franja verde)',
     solicitanteNombre: 'María Fernanda López Ortiz', solicitanteDocumento: '1.098.765.432',
@@ -145,7 +176,9 @@ function docDe(c) {
     solicitanteNombre: c.solicitanteNombre,
     solicitanteDocumento: c.solicitanteDocumento,
     contexto: {},
-    aportes: [],
+    /* Coherencia: un expediente en estado previo NO tiene documentos; uno que
+       ya avanzó, SÍ los tiene todos — llegó ahí por estar completo. */
+    aportes: c.estadoJuridico === 'PRESENTADA' ? [] : APORTES_COMPLETOS,
     radicadoId: null,
     creadoEn: c.creadoEn,
     actualizadoEn: c.creadoEn,
@@ -168,6 +201,8 @@ function docDe(c) {
 
 const limpiar = process.argv.includes('--limpiar');
 
+
+
 const existentes = await db.collection('expedientes').where('loteVerificacion', '==', LOTE).get();
 if (!existentes.empty) {
   const batch = db.batch();
@@ -185,8 +220,10 @@ const batch = db.batch();
 for (const c of CASOS) {
   const doc = docDe(c);
   batch.set(db.doc(`expedientes/${doc.id}`), doc);
-  // Actuación de radicación, para que el detalle tenga línea de tiempo.
-  batch.set(db.doc(`expedientes/${doc.id}/actuaciones/${doc.id}-radicacion`), {
+  /* La actuación de radicación SOLO para los que ya radicaron. Un expediente en
+     PRESENTADA que la tuviera arrancaría el término — exactamente lo que el
+     estado previo existe para impedir. */
+  if (c.estadoJuridico !== 'PRESENTADA') batch.set(db.doc(`expedientes/${doc.id}/actuaciones/${doc.id}-radicacion`), {
     id: `${doc.id}-radicacion`,
     expedienteId: doc.id,
     tenantId: TENANT,

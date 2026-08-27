@@ -33,6 +33,14 @@ export interface TemplateAuditoriaConsecutivosParams {
   series:          SerieHallazgoAuditoria[];
   totalHuecos:     number;
   totalDuplicados: number;
+  /**
+   * Contadores que se contradicen a sí mismos: declaran haberse abierto en un
+   * número y están por debajo. Van APARTE de huecos y duplicados y ARRIBA de
+   * ellos porque son de otra naturaleza — un hueco es un síntoma, un contador
+   * movido hacia atrás es la causa, y mientras no se arregle sigue produciendo
+   * síntomas nuevos cada semana.
+   */
+  contadoresIncoherentes?: string[];
 }
 
 function escapeHtml(str: string): string {
@@ -75,7 +83,8 @@ function filaSerie(s: SerieHallazgoAuditoria): string {
 }
 
 export function buildAuditoriaConsecutivosHtml(p: TemplateAuditoriaConsecutivosParams): string {
-  const totalHallazgos = p.totalHuecos + p.totalDuplicados;
+  const incoherentes = p.contadoresIncoherentes ?? [];
+  const totalHallazgos = p.totalHuecos + p.totalDuplicados + incoherentes.length;
   const fechaFmt = new Date(p.timestamp).toLocaleString('es-CO', {
     dateStyle: 'long', timeStyle: 'short', timeZone: 'America/Bogota',
   });
@@ -112,11 +121,29 @@ export function buildAuditoriaConsecutivosHtml(p: TemplateAuditoriaConsecutivosP
     <p style="margin:0 0 20px;color:#37474f;font-size:15px;line-height:1.6;">
       La barrida semanal automática de continuidad y unicidad de las series de
       radicación (AGN 060 de 2001, artículo 5) encontró
-      <strong>${p.totalHuecos} hueco(s)</strong> y <strong>${p.totalDuplicados} duplicado(s)</strong>.
+      <strong>${p.totalHuecos} hueco(s)</strong>, <strong>${p.totalDuplicados} duplicado(s)</strong>${
+        incoherentes.length ? ` y <strong>${incoherentes.length} contador(es) incoherente(s)</strong>` : ''
+      }.
       Este correo es informativo: el sistema <strong>no corrige la serie por sí solo</strong>;
       un funcionario debe revisar el detalle y, si aplica, preparar la constancia de subsanación
       correspondiente.
     </p>
+
+    ${incoherentes.length ? `
+    <!-- Contadores incoherentes: primero, y en rojo. Es la causa. -->
+    <table width="100%" style="background:#FDECEA;border-left:4px solid #B3261E;border-radius:4px;margin-bottom:22px;border-collapse:collapse;">
+      <tr><td style="padding:16px 22px;">
+        <p style="margin:0 0 6px;color:#B3261E;font-size:10px;font-weight:800;letter-spacing:1.5px;text-transform:uppercase;">
+          Atención inmediata · ${incoherentes.length} contador(es) incoherente(s)
+        </p>
+        <p style="margin:0 0 10px;color:#37474f;font-size:13px;line-height:1.6;">
+          Un contador movido hacia atrás por fuera del sistema vuelve a proponer números ya
+          entregados. La plataforma <strong>no emitirá</strong> mientras siga así — la radicación
+          de esa serie está detenida hasta que alguien revise el contador.
+        </p>
+        ${incoherentes.map((m) => `<p style="margin:0 0 6px;color:#B3261E;font-size:13px;">${escapeHtml(m)}</p>`).join('')}
+      </td></tr>
+    </table>` : ''}
 
     <!-- Tarjeta de detalle por serie -->
     <table width="100%" style="background:#F6F9F6;border-left:4px solid #14532D;border-radius:4px;margin-bottom:22px;border-collapse:collapse;">

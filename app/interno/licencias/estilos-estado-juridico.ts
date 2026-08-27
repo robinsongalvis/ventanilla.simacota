@@ -32,6 +32,18 @@ import type { EstiloChipEstado } from './estilos-chip-estado';
  */
 export const ESTILOS_ESTADO_JURIDICO: Record<EstadoJuridicoLicencia, EstiloChipEstado> = {
   /**
+   * ADR-0033 — ámbar, el color de «requiere acción», no de «va avanzando».
+   * Un expediente aquí espera algo del ciudadano (los documentos que faltan) y
+   * no tiene término corriendo: pintarlo verde sugeriría que el trámite
+   * progresa solo, que es justo lo que no ocurre.
+   */
+  PRESENTADA: {
+    dot: '#D97706',
+    texto: '#92400E',
+    fondo: '#FEF3C7',
+    label: 'Presentada · sin verificar',
+  },
+  /**
    * DF-10 — gris deliberado: es el ÚNICO estado sin color de significado.
    * Los demás comunican algo (verde = avanza, ámbar = requiere acción, azul
    * = hito cumplido); este comunica *no sabemos*, y darle cualquier color

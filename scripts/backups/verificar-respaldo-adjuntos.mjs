@@ -82,7 +82,21 @@ function rutasEn(valor, encontradas = new Set()) {
 
 async function rutasReferenciadas() {
   const rutas = new Set();
-  const colecciones = ['ventanilla_radicados', 'ventanilla_salidas', 'planillas_reparto', 'expedientes'];
+  /* ALCANCE DECLARADO de esta conciliación (ADR-0033 §4.6-bis).
+     `planillas_reparto` NO EXISTE: la colección real es `ventanilla_planillas`
+     (firestore.rules, app/api/planillas/generar/route.ts). Firestore devolvía
+     un snapshot vacío sin lanzar, así que el guion imprimía «0 documento(s)
+     recorridos» y seguía — dejando el escaneo FIRMADO de la planilla fuera de
+     toda conciliación, que es justo uno de los documentos que no se pueden
+     reconstruir. Un nombre mal escrito y un universo vacío se ven igual. */
+  const colecciones = ['ventanilla_radicados', 'ventanilla_salidas', 'ventanilla_planillas', 'expedientes'];
+  /* Lo que esta conciliación NO cubre, dicho para que nadie lo suponga:
+     · Las subcolecciones a más de UN nivel — `expedientes/{id}/documentos/{doc}/versiones`
+       queda fuera, de modo que las versiones NO vigentes no se comprueban.
+     · Las colecciones de SIMI y las de laboratorio: no guardan adjuntos del
+       ciudadano.
+     Ambas exclusiones son decisiones, no descuidos; si alguna deja de serlo,
+     este comentario es el sitio donde se cambia. */
   for (const col of colecciones) {
     let docs = [];
     try {

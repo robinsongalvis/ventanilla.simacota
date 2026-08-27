@@ -7,7 +7,7 @@ import { useState } from 'react';
  * tiene fixtures, no hay endpoint que radicar/registrar acta/emitir acto
  * final. Dos variantes distintas de "no implementado" (spec Pantalla 01/02):
  *
- *  - `disabled=false` ("Radicar solicitud", "Registrar acta de
+ *  - `disabled=false` ("Recibir solicitud", "Registrar acta de
  *    observaciones"): el botón es real y da foco/feedback, pero la acción
  *    aún no está conectada — clic muestra una nota honesta en vez de
  *    fallar en silencio o simular una mutación que no ocurrió.

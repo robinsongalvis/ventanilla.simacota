@@ -12,7 +12,7 @@ afterEach(() => {
 });
 
 /* ══════════════════════════════════════════════════════════════
-   Bloque "Integración UI y demo" — formulario "Radicar solicitud"
+   Bloque "Integración UI y demo" — formulario "Recibir solicitud"
    (`RadicarSolicitudModal`), consume `POST /api/licencias/expedientes`.
 ══════════════════════════════════════════════════════════════ */
 
@@ -21,14 +21,14 @@ function llenarDatosBasicos() {
   fireEvent.change(screen.getByLabelText('Documento del solicitante'), { target: { value: '13456789' } });
 }
 
-describe('Radicar solicitud — validación de subtipos', () => {
+describe('Recibir solicitud — validación de subtipos', () => {
   it('exige al menos un subtipo antes de enviar (no llama al servidor)', () => {
     const fetchMock = vi.fn();
     vi.stubGlobal('fetch', fetchMock);
     render(<RadicarSolicitudModal onCerrar={vi.fn()} />);
 
     llenarDatosBasicos();
-    fireEvent.click(screen.getByRole('button', { name: /^Radicar solicitud$/i }));
+    fireEvent.click(screen.getByRole('button', { name: /^Recibir solicitud$/i }));
 
     expect(screen.getByRole('alert').textContent).toMatch(/al menos un subtipo/i);
     expect(fetchMock).not.toHaveBeenCalled();
@@ -41,7 +41,7 @@ describe('Radicar solicitud — validación de subtipos', () => {
   });
 });
 
-describe('Radicar solicitud — envío y errores del servidor', () => {
+describe('Recibir solicitud — envío y errores del servidor', () => {
   it('envía los subtipos seleccionados al servidor', async () => {
     const fetchMock = vi.fn().mockResolvedValue({
       ok: true,
@@ -53,7 +53,7 @@ describe('Radicar solicitud — envío y errores del servidor', () => {
 
     llenarDatosBasicos();
     fireEvent.click(screen.getByRole('checkbox', { name: /Licencia de construcción/i }));
-    fireEvent.click(screen.getByRole('button', { name: /^Radicar solicitud$/i }));
+    fireEvent.click(screen.getByRole('button', { name: /^Recibir solicitud$/i }));
 
     await waitFor(() => expect(screen.getByText('DEMO-26-abc12345')).toBeTruthy());
 
@@ -73,7 +73,7 @@ describe('Radicar solicitud — envío y errores del servidor', () => {
 
     llenarDatosBasicos();
     fireEvent.click(screen.getByRole('checkbox', { name: /Licencia de construcción/i }));
-    fireEvent.click(screen.getByRole('button', { name: /^Radicar solicitud$/i }));
+    fireEvent.click(screen.getByRole('button', { name: /^Recibir solicitud$/i }));
 
     await waitFor(() =>
       expect(screen.getByRole('alert').textContent).toMatch(/no está en el catálogo normativo/i));
@@ -87,5 +87,19 @@ describe('Radicar solicitud — envío y errores del servidor', () => {
     fireEvent.click(screen.getByRole('button', { name: /^Cancelar$/i }));
     expect(onCerrar).toHaveBeenCalled();
     expect(fetchMock).not.toHaveBeenCalled();
+  });
+});
+
+describe('el verbo del formulario dice lo que la acción hace', () => {
+  /* Esta pantalla crea un expediente en PRESENTADA y escribe una actuación
+     `apertura-expediente`. Bajo el ADR-0033 eso es un acto ANTERIOR y distinto
+     de la radicación en legal y debida forma, que emite el número oficial y
+     arranca los 45 días hábiles. Que el botón dijera «Radicar solicitud» le
+     afirmaba a la funcionaria que estaba haciendo algo que no estaba haciendo
+     — justo en el instante de decidir pulsar, que es donde más pesa. */
+  it('no ofrece «radicar» en ninguno de sus textos', () => {
+    render(<RadicarSolicitudModal onCerrar={() => {}} onCreado={() => {}} />);
+    expect(screen.queryByRole('button', { name: /radicar/i })).toBeNull();
+    expect(screen.getByRole('button', { name: /^Recibir solicitud$/i })).toBeTruthy();
   });
 });

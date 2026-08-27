@@ -3,7 +3,7 @@ import { buildAsignacionInternaHtml } from '@/lib/email/templates/asignacion-int
 import { buildAuditoriaConsecutivosHtml } from '@/lib/email/templates/auditoria-consecutivos';
 import { buildAvisoActaHtml } from '@/lib/email/templates/aviso-acta-observaciones';
 import { buildConfirmacionRadicacionHtml } from '@/lib/email/templates/confirmacion-radicacion';
-import { buildConstanciaExpedienteHtml } from '@/lib/email/templates/constancia-expediente-licencia';
+import { buildAcuseReciboExpedienteHtml } from '@/lib/email/templates/acuse-recibo-expediente-licencia';
 import { buildConstanciaRadicacionHtml } from '@/lib/email/templates/constancia-radicacion';
 import { buildDesistimientoHtml } from '@/lib/email/templates/desistimiento';
 import { buildNotificacionEstadoHtml } from '@/lib/email/templates/notificacion-estado';
@@ -81,11 +81,17 @@ export const CORREOS: { nombre: string; html: () => string }[] = [
     }),
   },
   {
-    nombre: 'constancia-expediente-licencia',
-    html: () => buildConstanciaExpedienteHtml({
-      numeroExpedienteFUN: '68745-0-26-0042', solicitanteNombre: 'María Fernanda López',
-      solicitanteDocumento: '1098765432', tipoDocumento: 'CC',
-      descripcionTramite: 'Licencia de construcción — obra nueva', fechaRadicacionLegal: ISO,
+    nombre: 'acuse-recibo-expediente-licencia',
+    html: () => buildAcuseReciboExpedienteHtml({
+      numeroExpediente: 'DEMO-26-abc12345',
+      solicitanteNombre: 'Juan Pérez',
+      solicitanteDocumento: '1098765432',
+      tipoDocumento: 'CC',
+      descripcionTramite: 'licencia de construcción — obra nueva',
+      fechaRecepcion: '2026-08-26T12:00:00.000Z',
+      documentosEntregados: ['Certificado de Tradición y Libertad'],
+      documentosFaltantes: [{ nombre: 'Paz y salvo municipal', motivo: 'SIN_APORTE' }],
+      requisitosAplicables: 19,
       radicadoVentanillaId: '1-110-202608-00000042',
     }),
   },

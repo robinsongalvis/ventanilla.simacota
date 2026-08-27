@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import {
-  añoRadicacionColombia,
+  añoAperturaColombia,
   añosDisponiblesLibro,
   calcularConteosKpiLibro,
   calcularConteosPorFiltroLibro,
@@ -57,18 +57,18 @@ function expedienteBase(overrides: Partial<ExpedienteLicenciaDoc> = {}): Expedie
   };
 }
 
-describe('añoRadicacionColombia', () => {
+describe('añoAperturaColombia', () => {
   it('deriva el año en horario Colombia a partir de un ISO válido', () => {
-    expect(añoRadicacionColombia('2026-03-10T15:00:00.000Z')).toBe(2026);
+    expect(añoAperturaColombia('2026-03-10T15:00:00.000Z')).toBe(2026);
   });
 
   it('un ISO cercano a medianoche UTC que en Bogotá aún es el día/año anterior se ancla al año Colombia, no al UTC', () => {
     // 1-ene-2026 02:00 UTC = 31-dic-2025 21:00 hora Colombia (UTC-5).
-    expect(añoRadicacionColombia('2026-01-01T02:00:00.000Z')).toBe(2025);
+    expect(añoAperturaColombia('2026-01-01T02:00:00.000Z')).toBe(2025);
   });
 
   it('devuelve null para una fecha inválida', () => {
-    expect(añoRadicacionColombia('no-es-fecha')).toBeNull();
+    expect(añoAperturaColombia('no-es-fecha')).toBeNull();
   });
 });
 
@@ -406,6 +406,7 @@ describe('coincideFiltroLibro / filtrarFilasLibro / conteos', () => {
       id: 'f1',
       numeroExpediente: '68745-0-26-0001',
       fechaRadicacion: '2026-03-10T15:00:00.000Z',
+      fechaApertura: '2026-03-01T15:00:00.000Z',
       solicitanteNombre: 'Carlos Alberto Rojas',
       solicitanteDocumento: '91234567',
       subtipos: ['Licencia de construcción'],
@@ -477,6 +478,7 @@ describe('generarCsvLibroConsecutivo', () => {
       id: 'exp-1',
       numeroExpediente: '68745-0-26-0001',
       fechaRadicacion: '2026-03-10T15:00:00.000Z',
+      fechaApertura: '2026-03-01T15:00:00.000Z',
       solicitanteNombre: 'Carlos Alberto Rojas',
       solicitanteDocumento: '91234567',
       subtipos: ['Licencia de construcción'],
@@ -508,14 +510,23 @@ describe('generarCsvLibroConsecutivo', () => {
     const csv = generarCsvLibroConsecutivo([]);
     const [encabezado] = csv.replace(/^﻿/, '').split('\r\n');
     expect(encabezado).toBe(
-      'N. EXPEDIENTE;FECHA RADICACION;SOLICITANTE;DOCUMENTO;SUBTIPOS;ESTADO JURIDICO;N. LICENCIA;FECHA FIRMEZA;PRUEBA;COLISION',
+      'N. EXPEDIENTE;FECHA APERTURA;FECHA RADICACION;SOLICITANTE;DOCUMENTO;SUBTIPOS;ESTADO JURIDICO;N. LICENCIA;FECHA FIRMEZA;PRUEBA;COLISION',
     );
   });
 
   it('una fila con acto final ausente muestra "—" en N. LICENCIA y FECHA FIRMEZA, y "NO" en PRUEBA', () => {
     const csv = generarCsvLibroConsecutivo([filaSintetica()]);
     const [, filaTexto] = csv.replace(/^﻿/, '').split('\r\n');
-    expect(filaTexto).toBe('68745-0-26-0001;10/03/2026;Carlos Alberto Rojas;91234567;Licencia de construcción;En revisión;—;—;NO;NO');
+    expect(filaTexto).toBe('68745-0-26-0001;01/03/2026;10/03/2026;Carlos Alberto Rojas;91234567;Licencia de construcción;En revisión;—;—;NO;NO');
+  });
+
+  /* El caso que motiva la columna nueva: un expediente PRESENTADA no tiene
+     fecha de radicación en debida forma. La celda queda VACÍA — antes salía
+     la fecha de apertura, afirmando que el término arrancó ese día. */
+  it('un expediente sin radicar deja la FECHA RADICACION vacía, no la rellena con la apertura', () => {
+    const csv = generarCsvLibroConsecutivo([filaSintetica({ fechaRadicacion: null })]);
+    const filaTexto = csv.replace(/^\uFEFF/, '').split('\r\n')[1];
+    expect(filaTexto).toBe('68745-0-26-0001;01/03/2026;;Carlos Alberto Rojas;91234567;Licencia de construcción;En revisión;—;—;NO;NO');
   });
 
   it('una fila con acto final y esPrueba=true muestra los valores reales y "SI"', () => {
@@ -552,7 +563,7 @@ describe('coincideBusquedaLibro', () => {
     return {
       numeroExpediente: '68745-0-26-0007',
       radicadoId: '1-110-202603-00042',
-      fechaRadicacion: '2026-03-10T15:00:00.000Z',
+      fechaApertura: '2026-03-10T15:00:00.000Z',
       solicitanteNombre: 'María Fernanda Gálvez',
       solicitanteDocumento: '91234567',
       matriculaInmobiliaria: '321-51890',
@@ -627,7 +638,7 @@ describe('coincideBusquedaLibro', () => {
   });
 
   it('fecha de radicación inválida: no lanza, simplemente no aporta coincidencia por fecha', () => {
-    const campos = camposBase({ fechaRadicacion: 'no-es-fecha' });
+    const campos = camposBase({ fechaApertura: 'no-es-fecha' });
     expect(() => coincideBusquedaLibro(campos, 'maria')).not.toThrow();
     expect(coincideBusquedaLibro(campos, 'maria')).toBe(true);
   });
@@ -786,7 +797,7 @@ describe('colisión de radicado — el Libro delata la anomalía que el importad
     const conGemelo = textoColisionLibro({
       colision: true,
       numeroExpediente: '68745-0-25-0037',
-      otrosConMismoNumero: [{ id: 'y', solicitanteNombre: 'Pedro Rojas Peña', fechaRadicacion: '2025-09-30T15:00:00.000Z' }],
+      otrosConMismoNumero: [{ id: 'y', solicitanteNombre: 'Pedro Rojas Peña', fechaApertura: '2025-09-30T15:00:00.000Z' }],
     })!;
     expect(conGemelo).toContain('Pedro Rojas Peña');
     expect(conGemelo).toContain('30/09/2025');

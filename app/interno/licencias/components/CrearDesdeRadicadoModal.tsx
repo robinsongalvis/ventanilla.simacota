@@ -181,7 +181,7 @@ export function CrearDesdeRadicadoModal({ onCerrar, onCreado }: CrearDesdeRadica
             <p className="text-xs max-w-sm" style={{ color: '#667085' }}>
               Número de demostración (esPrueba) — no es un consecutivo legal. Vinculado al radicado{' '}
               <NumeroLegal value={radicadoSeleccionado ?? ''} variant="radicado" size="sm" />.
-              {creado.constanciaEnviada && ' Se envió la constancia de radicación al solicitante.'}
+              {creado.constanciaEnviada && ' Se envió al solicitante el acuse de recibo de su solicitud.'}
             </p>
             {!creado.constanciaEnviada && (
               <p
@@ -189,7 +189,7 @@ export function CrearDesdeRadicadoModal({ onCerrar, onCreado }: CrearDesdeRadica
                 className="rounded-lg px-3 py-2 text-xs max-w-sm text-left font-semibold"
                 style={{ background: '#FFFBEB', border: '1px solid #FDE68A', color: '#92400E' }}
               >
-                ⚠ Constancia NO enviada al ciudadano — el radicado no tiene un correo de contacto habilitado (correo no aportado, no válido, o presentación anónima/reservada).
+                ⚠ Acuse de recibo NO enviado al ciudadano. Mientras el candado de emisión real (R10) siga cerrado, el expediente lleva un número de DEMOSTRACIÓN y la plataforma no le entrega al ciudadano un número que no pertenece a la serie legal. Si el candado ya está abierto, la causa sería que el radicado no tiene un correo de contacto habilitado.
               </p>
             )}
             <div className="flex gap-2">
