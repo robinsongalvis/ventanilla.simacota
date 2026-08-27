@@ -346,6 +346,18 @@ service cloud.firestore {
       allow create, update, delete: if false;
     }
 
+    /* Memoria del vigía del término de licencias (ADR-0033 §4.6-bis).
+       CERRADA A CLIENTE, igual que `expedientes`: es un derivado de esa
+       colección, y abrirla sería un canal lateral alrededor de su cierre. El
+       tablero la lee por ruta de servidor, no por SDK. */
+    match /vigilancia_termino_licencias/{expedienteId} {
+      allow read, write: if false;
+    }
+
+    match /vigilancia_termino_corridas/{corridaId} {
+      allow read, write: if false;
+    }
+
     match /{document=**} {
       allow read, write: if false;
     }

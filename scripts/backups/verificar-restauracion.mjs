@@ -83,6 +83,13 @@ const PUEDEN_ESTAR_VACIAS = {
   unicidad_planillas: 'Igual que `unicidad_radicados`.',
   unicidad_expedientes: 'Solo la escribe la emisión real, bloqueada por el candado R10.',
   expedientes: 'El módulo de licencias puede no tener expedientes todavía en el momento del respaldo.',
+  vigilancia_termino_licencias: 'Memoria DERIVADA del vigía del término: se reconstruye sola en la ' +
+    'siguiente corrida del cron a partir de `expedientes`, que es la fuente de verdad. Perderla ' +
+    'pierde el historial de transiciones, no un hecho. Y hoy está vacía POR CONSTRUCCIÓN: el vigía ' +
+    'excluye los datos de prueba, y con el candado R10 cerrado todo expediente nace `esPrueba`.',
+  vigilancia_termino_corridas: 'Bitácora de observabilidad del mismo vigía, una entrada por ' +
+    'corrida. Misma razón: derivada y reconstruible; su ausencia en un respaldo no indica pérdida ' +
+    'de datos de negocio.',
   ventanilla_salidas: 'Un municipio puede pasar días sin emitir una salida.',
   ventanilla_planillas: 'Se genera una por día hábil con reparto: un respaldo de fin de semana no la trae.',
   ai_logs: 'Trazas de IA: informativas, no operativas.',
