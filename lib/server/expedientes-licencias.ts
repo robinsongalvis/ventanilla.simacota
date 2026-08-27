@@ -2,6 +2,10 @@ import type { TenantId } from '@/src/types/radicado';
 import { calcularCompletitudExpediente, type CompletitudExpediente } from '@/lib/server/completitud-expediente';
 import type { Expediente, Actuacion, ContextoEvaluacionRequisito, DefinicionTramite, NumeroExpedienteAsignado } from '@/lib/motor-expedientes/tipos';
 import { CATALOGO_FIGURAS_NORMATIVAS } from '@/lib/motor-expedientes/catalogo-subtipos-normativo';
+import {
+  exigeModalidadConstruccion,
+  validarModalidadesConstruccion,
+} from '@/lib/motor-expedientes/modalidad-construccion';
 import { puedeTransicionar, type EstadoJuridicoLicencia, type RevisionHistoricaLicencia } from '@/lib/motor-expedientes/estados-licencia';
 import { esEstadoCerrado } from '@/lib/radicado-estados';
 import { DEFINICION_LICENCIA_CONSTRUCCION_PARCIAL } from '@/lib/motor-expedientes/definiciones/licencia-construccion-parcial';
@@ -80,6 +84,17 @@ export interface ExpedienteLicenciaDoc extends Expediente {
   completitud?: CompletitudExpediente;
   /** `true` en TODO expediente creado en esta fase (candado de emisión) — nunca `undefined` en un documento real de esta colección. */
   esPrueba?: boolean;
+  /**
+   * Modalidades del art. 2.2.6.1.1.7 cuando el expediente incluye la figura
+   * CONSTRUCCION. Lista porque el parágrafo 1 permite combinarlas.
+   *
+   * OPCIONAL, y su ausencia NO es «obra nueva»: significa SIN CAPTURAR. Los
+   * expedientes creados antes de este campo no lo traen, y no se rellenan con
+   * un valor por defecto — inventar el dato es exactamente el defecto que este
+   * campo vino a cerrar. Quien lo lea distingue los dos casos (ver
+   * `lib/motor-expedientes/modalidad-construccion.ts`).
+   */
+  modalidadesConstruccion?: string[];
   /**
    * ESPEJO denormalizado de `calcularVencimientoDual(...).fechaAlertaConservadora`
    * (`lib/motor-expedientes/termino.ts`, ISO 8601) — la fecha MÁS TEMPRANA
@@ -303,6 +318,8 @@ export interface CrearExpedienteInput {
   solicitanteNombre: string;
   solicitanteDocumento: string;
   subtipos: string[];
+  /** Modalidades del art. 2.2.6.1.1.7 — solo si `subtipos` incluye CONSTRUCCION. */
+  modalidadesConstruccion?: string[];
   contexto?: ContextoEvaluacionRequisito;
 }
 
@@ -364,6 +381,15 @@ export function planCrearExpedienteDemo(
     }
   }
 
+  /* La MODALIDAD (art. 2.2.6.1.1.7) es un eje DISTINTO de la figura: se valida
+     contra el catálogo y contra las figuras del propio expediente, para que no
+     entre una modalidad de construcción en una subdivisión. No se EXIGE aquí
+     —un expediente puede no traerla— pero si viene, viene correcta. */
+  const errorModalidad = validarModalidadesConstruccion(input.subtipos, input.modalidadesConstruccion);
+  if (errorModalidad) {
+    return { status: 400, mensaje: errorModalidad };
+  }
+
   const id = crypto.randomUUID();
   const nowIso = ahora.toISOString();
 
@@ -405,6 +431,12 @@ export function planCrearExpedienteDemo(
     creadoEn: nowIso,
     actualizadoEn: nowIso,
     subtipos: [...input.subtipos],
+    /* Solo se escribe si la figura la admite Y el llamador la capturó. La
+       ausencia se guarda como ausencia: nada de `?? []` ni de 'obra-nueva'
+       por defecto — ver la cabecera de `modalidad-construccion.ts`. */
+    ...(exigeModalidadConstruccion(input.subtipos) && input.modalidadesConstruccion?.length
+      ? { modalidadesConstruccion: [...input.modalidadesConstruccion] }
+      : {}),
     origen: 'REAL',
     numeroExpediente: {
       numero: formatearNumeroExpedienteDemo(ahora),
@@ -642,6 +674,8 @@ export interface RadicadoParaHandoff {
 
 export interface CrearExpedienteDesdeRadicadoInput {
   subtipos: string[];
+  /** Modalidades del art. 2.2.6.1.1.7 — solo si `subtipos` incluye CONSTRUCCION. */
+  modalidadesConstruccion?: string[];
   contexto?: ContextoEvaluacionRequisito;
 }
 
@@ -790,6 +824,15 @@ export function planCrearExpedienteDesdeRadicado(
     }
   }
 
+  /* La MODALIDAD (art. 2.2.6.1.1.7) es un eje DISTINTO de la figura: se valida
+     contra el catálogo y contra las figuras del propio expediente, para que no
+     entre una modalidad de construcción en una subdivisión. No se EXIGE aquí
+     —un expediente puede no traerla— pero si viene, viene correcta. */
+  const errorModalidad = validarModalidadesConstruccion(input.subtipos, input.modalidadesConstruccion);
+  if (errorModalidad) {
+    return { status: 400, mensaje: errorModalidad };
+  }
+
   const id = crypto.randomUUID();
   const nowIso = ahora.toISOString();
   const numero = formatearNumeroExpedienteDemo(ahora);
@@ -824,6 +867,12 @@ export function planCrearExpedienteDesdeRadicado(
     creadoEn: nowIso,
     actualizadoEn: nowIso,
     subtipos: [...input.subtipos],
+    /* Solo se escribe si la figura la admite Y el llamador la capturó. La
+       ausencia se guarda como ausencia: nada de `?? []` ni de 'obra-nueva'
+       por defecto — ver la cabecera de `modalidad-construccion.ts`. */
+    ...(exigeModalidadConstruccion(input.subtipos) && input.modalidadesConstruccion?.length
+      ? { modalidadesConstruccion: [...input.modalidadesConstruccion] }
+      : {}),
     origen: 'REAL',
     numeroExpediente: { numero, serieId: 'demo', año: ahora.getFullYear() },
     esPrueba: true,

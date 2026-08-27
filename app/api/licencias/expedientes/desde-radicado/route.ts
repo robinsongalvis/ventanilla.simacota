@@ -25,7 +25,7 @@ import {
 import { appendTrazabilidadAdmin } from '@/lib/server/radicados-security';
 import type { TenantId } from '@/src/types/radicado';
 import type { VentanillaRadicado } from '@/src/types/ventanilla';
-import { DEFINICION_LICENCIA_CONSTRUCCION_PARCIAL } from '@/lib/motor-expedientes/definiciones/licencia-construccion-parcial';
+import { describirTramiteDesdeSubtipos } from '@/lib/motor-expedientes/describir-tramite';
 import {
   planCrearExpedienteDesdeRadicado,
   esErrorExpediente,
@@ -56,6 +56,8 @@ function jsonError(error: unknown) {
 interface BodyDesdeRadicado {
   radicadoId?: string;
   subtipos?: string[];
+  /** Modalidades del art. 2.2.6.1.1.7 — solo con la figura CONSTRUCCION. */
+  modalidadesConstruccion?: string[];
   contexto?: Record<string, string | number | boolean>;
 }
 
@@ -90,7 +92,12 @@ export async function POST(request: Request): Promise<NextResponse> {
 
       const plan = planCrearExpedienteDesdeRadicado(
         radicado,
-        { subtipos: body?.subtipos ?? [], contexto: body?.contexto },
+        {
+          subtipos: body?.subtipos ?? [],
+          // Sin capturar = ausente. No se rellena con un valor por defecto.
+          modalidadesConstruccion: body?.modalidadesConstruccion,
+          contexto: body?.contexto,
+        },
         TENANT_LICENCIAS,
         actor,
         ahora,
@@ -156,7 +163,10 @@ export async function POST(request: Request): Promise<NextResponse> {
             solicitanteNombre: plan.expediente.solicitanteNombre,
             solicitanteDocumento: plan.expediente.solicitanteDocumento,
             tipoDocumento: radicado.solicitante.tipoDocumento,
-            descripcionTramite: DEFINICION_LICENCIA_CONSTRUCCION_PARCIAL.nombre.toLowerCase(),
+            // La figura sale del EXPEDIENTE (mismo motivo que en la
+            // constancia impresa): este correo afirmaba «obra nueva» a todo
+            // el mundo. La modalidad no se nombra: nadie la captura.
+            descripcionTramite: describirTramiteDesdeSubtipos(plan.expediente.subtipos, plan.expediente.modalidadesConstruccion),
             // Día en que la Alcaldía RECIBIÓ la solicitud. No es una fecha con
             // efecto de plazo, y el correo lo dice expresamente.
             fechaRecepcion: plan.expediente.creadoEn,

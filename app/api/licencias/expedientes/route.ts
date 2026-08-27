@@ -61,6 +61,8 @@ interface BodyCrearExpediente {
   solicitanteNombre?: string;
   solicitanteDocumento?: string;
   subtipos?: string[];
+  /** Modalidades del art. 2.2.6.1.1.7 — solo con la figura CONSTRUCCION. */
+  modalidadesConstruccion?: string[];
   contexto?: CrearExpedienteInput['contexto'];
 }
 
@@ -81,6 +83,9 @@ export async function POST(request: Request): Promise<NextResponse> {
         solicitanteNombre: body?.solicitanteNombre ?? '',
         solicitanteDocumento: body?.solicitanteDocumento ?? '',
         subtipos: body?.subtipos ?? [],
+        // Se pasa TAL CUAL: el planificador valida contra el catálogo y contra
+        // las figuras del propio expediente. `undefined` = sin capturar.
+        modalidadesConstruccion: body?.modalidadesConstruccion,
         contexto: body?.contexto,
       },
       TENANT_LICENCIAS,

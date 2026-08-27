@@ -4,6 +4,8 @@ import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import type { ExpedienteLicenciaDoc } from '@/lib/server/expedientes-licencias';
 import { SelectorSubtiposNormativos } from './SelectorSubtiposNormativos';
+import { SelectorModalidadesConstruccion } from './SelectorModalidadesConstruccion';
+import { exigeModalidadConstruccion } from '@/lib/motor-expedientes/modalidad-construccion';
 
 /* ══════════════════════════════════════════════════════════════
    Formulario "Recibir solicitud" — bloque "Integración UI y demo".
@@ -37,6 +39,9 @@ export function RadicarSolicitudModal({ onCerrar, onCreado }: RadicarSolicitudMo
   const [solicitanteDocumento, setSolicitanteDocumento] = useState('');
   const [subtipos, setSubtipos] = useState<string[]>([]);
   const [errorSubtipos, setErrorSubtipos] = useState<string | null>(null);
+  const [modalidades, setModalidades] = useState<string[]>([]);
+  const [errorModalidades, setErrorModalidades] = useState<string | null>(null);
+
 
   const [guardando, setGuardando] = useState(false);
   const [errorServidor, setErrorServidor] = useState<string | null>(null);
@@ -54,6 +59,11 @@ export function RadicarSolicitudModal({ onCerrar, onCreado }: RadicarSolicitudMo
     setSubtipos((prev) => (prev.includes(codigo) ? prev.filter((c) => c !== codigo) : [...prev, codigo]));
   }
 
+  function alternarModalidad(codigo: string) {
+    setModalidades((prev) => (prev.includes(codigo) ? prev.filter((c) => c !== codigo) : [...prev, codigo]));
+  }
+
+
   async function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
     if (subtipos.length === 0) {
@@ -61,6 +71,15 @@ export function RadicarSolicitudModal({ onCerrar, onCreado }: RadicarSolicitudMo
       return;
     }
     setErrorSubtipos(null);
+
+    /* Si la figura la exige, la modalidad es OBLIGATORIA en la pantalla —aunque
+       el servidor no la exija, porque tiene que poder leer los expedientes
+       viejos que nacieron sin ella. Quien crea uno nuevo, la captura. */
+    if (exigeModalidadConstruccion(subtipos) && modalidades.length === 0) {
+      setErrorModalidades('Indica al menos una modalidad de construcción (art. 2.2.6.1.1.7).');
+      return;
+    }
+    setErrorModalidades(null);
     setErrorServidor(null);
     setGuardando(true);
     try {
@@ -68,7 +87,14 @@ export function RadicarSolicitudModal({ onCerrar, onCreado }: RadicarSolicitudMo
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         credentials: 'include',
-        body: JSON.stringify({ solicitanteNombre, solicitanteDocumento, subtipos }),
+        body: JSON.stringify({
+          solicitanteNombre,
+          solicitanteDocumento,
+          subtipos,
+          // Solo viaja si la figura la admite: el servidor rechaza una
+          // modalidad descolgada de su figura.
+          ...(exigeModalidadConstruccion(subtipos) ? { modalidadesConstruccion: modalidades } : {}),
+        }),
       });
       const body = await res.json().catch(() => ({}));
       if (!res.ok) {
@@ -170,6 +196,13 @@ export function RadicarSolicitudModal({ onCerrar, onCreado }: RadicarSolicitudMo
             </div>
 
             <SelectorSubtiposNormativos seleccionados={subtipos} onAlternar={alternarSubtipo} error={errorSubtipos} />
+
+            <SelectorModalidadesConstruccion
+              subtipos={subtipos}
+              seleccionadas={modalidades}
+              onAlternar={alternarModalidad}
+              error={errorModalidades}
+            />
 
             {errorServidor && (
               <p role="alert" className="rounded-lg px-3 py-2 text-xs"
