@@ -40,6 +40,8 @@ import {
 } from '@/lib/server/expedientes-licencias';
 import { buildAvisoActaHtml, buildAvisoActaSubject } from '@/lib/email/templates/aviso-acta-observaciones';
 import { enviarEmail } from '@/lib/email/mailer';
+import { componerCorreoHito } from '@/lib/email/hitos-licencia';
+import { buildHitoLicenciaHtml } from '@/lib/email/templates/hito-licencia';
 import type { RegistrarActuacionInput } from '@/lib/server/expedientes-licencias';
 import { logError } from '@/lib/logger';
 
@@ -123,6 +125,47 @@ export async function POST(request: Request, context: RouteContext): Promise<Nex
     });
     await batch.commit();
 
+    /* ── EL CORREO DE HITO ─────────────────────────────────────────────
+       Los correos de hitos entraron en #265 y NO TENÍAN DISPARADOR: se
+       construyeron avisos para estados que ninguna ruta escribía. Este es el
+       disparador. `componerCorreoHito` devuelve `null` para los estados que no
+       se comunican, así que esta ruta no tiene que conocer la tabla — solo
+       respetar el null.
+
+       Post-commit y best-effort, igual que el aviso de acta: un fallo de envío
+       NUNCA revierte la actuación ya confirmada. */
+    let hitoEnviado = false;
+    const hito = componerCorreoHito(
+      plan.nuevoEstadoJuridico,
+      expediente.numeroExpediente?.numero ?? id,
+    );
+    if (hito && expediente.radicadoId) {
+      const radSnap = await db.doc(`ventanilla_radicados/${expediente.radicadoId}`).get();
+      const rad = radSnap.exists ? (radSnap.data() as VentanillaRadicado) : null;
+      const gateHito = debeEnviarComunicacionExpediente(
+        expediente.tramiteId,
+        rad,
+        expediente.numeroExpediente?.numero,
+      );
+      if (gateHito.debeEnviar && rad?.solicitante.email) {
+        try {
+          await enviarEmail({
+            to: rad.solicitante.email,
+            subject: hito.subject,
+            html: buildHitoLicenciaHtml({
+              hito,
+              numeroExpediente: expediente.numeroExpediente?.numero ?? id,
+              solicitanteNombre: expediente.solicitanteNombre,
+              urlConsulta: `${process.env.NEXT_PUBLIC_APP_URL ?? 'https://ventanilla-simacota.vercel.app'}/consulta`,
+            }),
+          });
+          hitoEnviado = true;
+        } catch (error) {
+          logError({ radicadoId: id, modulo: 'licencias/actuaciones/hito', error });
+        }
+      }
+    }
+
     // Aviso de acta (A5, dictamen gobierno-digital 8-ago) — SOLO para
     // 'acta-observaciones', post-commit, best-effort: un fallo de envío
     // NUNCA revierte el registro de la actuación ya confirmado.
@@ -167,7 +210,7 @@ export async function POST(request: Request, context: RouteContext): Promise<Nex
       }
     }
 
-    return NextResponse.json({ ok: true, actuacion: plan.actuacion, estadoJuridico: plan.nuevoEstadoJuridico, avisoEnviado });
+    return NextResponse.json({ ok: true, actuacion: plan.actuacion, estadoJuridico: plan.nuevoEstadoJuridico, avisoEnviado, hitoEnviado });
   } catch (error) {
     logError({ radicadoId: 'n/a', modulo: 'licencias/expedientes/[id]/actuaciones/POST', error });
     return jsonError(error);

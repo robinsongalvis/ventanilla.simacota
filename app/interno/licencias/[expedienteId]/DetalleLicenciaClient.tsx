@@ -20,6 +20,8 @@
 
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { RadicarDebidaFormaModal, type VistaPreviaDebidaForma } from '../components/RadicarDebidaFormaModal';
+import { accionesDeCierreDisponibles, puedeExpedirEjecutoria } from '../acciones-de-cierre';
+import type { TipoActuacionPermitida } from '@/lib/server/expedientes-licencias';
 import type { ReactNode } from 'react';
 import Link from 'next/link';
 import { useAuth } from '@/lib/hooks/useAuth';
@@ -90,7 +92,7 @@ export function DetalleLicenciaClient({ expedienteId, onVolver }: DetalleLicenci
   const [definicionId, setDefinicionId] = useState<string | null>(null);
   const [radicadoVinculado, setRadicadoVinculado] = useState<{ id: string; fecha: string } | null>(null);
   const [vinculando, setVinculando] = useState(false);
-  const [modalActuacion, setModalActuacion] = useState<'acta-observaciones' | 'respuesta-subsanacion' | null>(null);
+  const [modalActuacion, setModalActuacion] = useState<TipoActuacionPermitida | null>(null);
   const [modalRadicar, setModalRadicar] = useState(false);
   /** Bloque "Términos y vigencias protectores" (10-ago-2026) — `computos`/`borradorActoDesistimiento` YA CALCULADOS por el servidor (`GET .../[id]`), ver `../tipos-computos.ts`. */
   const [computos, setComputos] = useState<ComputosExpedienteUI | null>(null);
@@ -162,6 +164,15 @@ export function DetalleLicenciaClient({ expedienteId, onVolver }: DetalleLicenci
   }, [cargandoAuth, usuario, cargar]);
 
   const yaHuboActa = actuaciones.some((a) => a.tipo === 'acta-observaciones');
+
+  /* Las actuaciones de CIERRE se derivan del mapa de transiciones —la misma
+     función que el servidor consulta— para que la pantalla no pueda ofrecer un
+     botón que el servidor rechaza, ni esconder uno que sí procede. */
+  const accionesDeCierre = useMemo(
+    () => (expediente ? accionesDeCierreDisponibles(expediente.estadoJuridico, { yaHuboActa }) : []),
+    [expediente, yaHuboActa],
+  );
+
   const esHistorico = expediente?.origen === 'RECONSTRUIDO';
 
   /** ISO de la primera `radicacion-debida-forma` — solo referencia del ancla para `PanelTerminoDual`, nunca insumo de cómputo (eso ya lo hizo el servidor). */
@@ -386,6 +397,40 @@ export function DetalleLicenciaClient({ expedienteId, onVolver }: DetalleLicenci
                   )}
                 </div>
               )}
+              {/* LA CADENA DE CIERRE. Sin estos botones el expediente llegaba a
+                  EN_VIABILIDAD y se quedaba ahí para siempre. */}
+              {accionesDeCierre.map((accion) => (
+                <div key={accion.tipo} className="flex flex-col gap-1.5">
+                  <button
+                    type="button"
+                    onClick={() => setModalActuacion(accion.tipo)}
+                    className="inline-flex items-center gap-2 rounded-[10px] px-4 py-2.5 text-sm font-bold transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-1 hover:brightness-95 active:scale-[0.98]"
+                    style={
+                      accion.esDecisionDeFondo
+                        ? { background: '#14532D', color: '#fff', boxShadow: '0 2px 8px rgba(20,83,45,0.25)' }
+                        : { background: 'transparent', color: '#14532D', border: '1px solid #14532D' }
+                    }
+                  >
+                    {accion.etiqueta}
+                  </button>
+                </div>
+              ))}
+
+              {/* La constancia de ejecutoria SOLO cuando el acto está en firme:
+                  sin los hechos no se compone un papel «provisional», que sería
+                  certificar algo que no consta. */}
+              {expediente && puedeExpedirEjecutoria(expediente.estadoJuridico) && (
+                <a
+                  href={`/api/licencias/expedientes/${encodeURIComponent(expedienteId)}/ejecutoria`}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="inline-flex items-center gap-2 rounded-[10px] px-4 py-2.5 text-sm font-bold"
+                  style={{ background: '#D4A017', color: '#14532D' }}
+                >
+                  Constancia de ejecutoria
+                </a>
+              )}
+
               <div className="flex flex-col gap-1.5">
                 <button
                   type="button"

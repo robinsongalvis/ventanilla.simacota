@@ -33,10 +33,18 @@ describe('qué se comunica y qué no', () => {
     expect(HITO_NOTIFICABLE.RADICADA_EN_DEBIDA_FORMA.notifica).toBe(true);
   });
 
-  it('las observaciones y las decisiones SÍ', () => {
-    for (const e of ['CON_ACTA_DE_OBSERVACIONES', 'CONCEDIDA', 'NEGADA', 'DESISTIDA'] as const) {
+  it('las decisiones SÍ', () => {
+    for (const e of ['CONCEDIDA', 'NEGADA', 'DESISTIDA'] as const) {
       expect(HITO_NOTIFICABLE[e].notifica, `${e} debería avisarse`).toBe(true);
     }
+  });
+
+  it('el ACTA no manda hito: ya tiene su propio aviso, y es mejor', () => {
+    /* Al cablear el disparador, este estado mandaba DOS correos por el mismo
+       hecho. El aviso del acta imprime la fecha límite para responder; el hito
+       genérico no la conoce. Dos correos por un hecho es lo que entrena a la
+       gente a ignorar los nuestros. */
+    expect(HITO_NOTIFICABLE.CON_ACTA_DE_OBSERVACIONES.notifica).toBe(false);
   });
 
   it('las etapas internas NO: serían ruido', () => {
@@ -62,9 +70,9 @@ describe('el texto sale del MISMO sitio que la consulta pública', () => {
   it('no se redacta dos veces el mismo hecho', () => {
     /* Dos redacciones divergen, y entonces el ciudadano lee una cosa en el
        correo y otra en la pantalla sobre el mismo expediente. */
-    const hito = componerCorreoHito('CON_ACTA_DE_OBSERVACIONES', '1-110-202608-00000123');
-    expect(hito?.titulo).toBe(ESTADO_CIUDADANO_LICENCIA.CON_ACTA_DE_OBSERVACIONES.titulo);
-    expect(hito?.explicacion).toBe(ESTADO_CIUDADANO_LICENCIA.CON_ACTA_DE_OBSERVACIONES.explicacion);
+    const hito = componerCorreoHito('CONCEDIDA', '1-110-202608-00000123');
+    expect(hito?.titulo).toBe(ESTADO_CIUDADANO_LICENCIA.CONCEDIDA.titulo);
+    expect(hito?.explicacion).toBe(ESTADO_CIUDADANO_LICENCIA.CONCEDIDA.explicacion);
   });
 
   it('devuelve null para un estado que no se comunica', () => {
