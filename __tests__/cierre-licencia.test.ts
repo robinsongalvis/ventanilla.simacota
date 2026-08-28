@@ -1,0 +1,159 @@
+import { describe, it, expect } from 'vitest';
+import {
+  DIAS_HABILES_RECURSOS,
+  DIAS_HABILES_SUBSANACION_TACITO,
+  procedeDesistimientoTacito,
+  validarEvidenciaFirmeza,
+  validarEvidenciaNotificacion,
+  validarEvidenciaResolucion,
+  vencimientoRecursos,
+} from '@/lib/motor-expedientes/cierre-licencia';
+
+const AHORA = new Date('2026-08-28T12:00:00Z');
+
+describe('la resolución', () => {
+  it('exige número y fecha', () => {
+    expect(validarEvidenciaResolucion({}, AHORA)?.campo).toBe('numeroResolucion');
+    expect(validarEvidenciaResolucion({ numeroResolucion: 'R-123' }, AHORA)?.campo).toBe('fechaResolucion');
+  });
+
+  it('rechaza una fecha futura', () => {
+    /* Registrar un acto que todavía no se expidió. */
+    const e = validarEvidenciaResolucion(
+      { numeroResolucion: 'R-123', fechaResolucion: '2026-09-15T12:00:00Z' },
+      AHORA,
+    );
+    expect(e?.mensaje).toMatch(/no puede ser futura/i);
+  });
+
+  it('acepta una resolución de hoy', () => {
+    expect(validarEvidenciaResolucion(
+      { numeroResolucion: 'R-123', fechaResolucion: '2026-08-28T09:00:00Z' },
+      AHORA,
+    )).toBeNull();
+  });
+});
+
+describe('la notificación', () => {
+  it('NO puede ser futura: de ella corren los recursos del ciudadano', () => {
+    /* Adelantarla adelanta el vencimiento del plazo de recurso, y se lo recorta
+       sin que se entere. */
+    const e = validarEvidenciaNotificacion(
+      { fechaNotificacion: '2026-09-10T12:00:00Z', modo: 'PERSONAL' },
+      '2026-08-20T12:00:00Z',
+      AHORA,
+    );
+    expect(e?.mensaje).toMatch(/plazos de recurso/i);
+  });
+
+  it('no puede ser anterior a la resolución que notifica', () => {
+    const e = validarEvidenciaNotificacion(
+      { fechaNotificacion: '2026-08-10T12:00:00Z', modo: 'PERSONAL' },
+      '2026-08-20T12:00:00Z',
+      AHORA,
+    );
+    expect(e?.mensaje).toMatch(/anterior a la resolución/i);
+  });
+
+  it('exige decir CÓMO se surtió', () => {
+    const e = validarEvidenciaNotificacion({ fechaNotificacion: '2026-08-25T12:00:00Z' }, undefined, AHORA);
+    expect(e?.campo).toBe('modo');
+  });
+});
+
+describe('la firmeza — el control que protege el recurso', () => {
+  const NOTIFICADA_EL = '2026-08-20T12:00:00Z';
+
+  it('el plazo de recursos son 10 días hábiles desde la notificación', () => {
+    expect(DIAS_HABILES_RECURSOS).toBe(10);
+    const vence = vencimientoRecursos(NOTIFICADA_EL);
+    expect(new Date(vence).getTime()).toBeGreaterThan(new Date(NOTIFICADA_EL).getTime());
+  });
+
+  it('NO se puede declarar por vencimiento antes de que venza', () => {
+    /* ESTE ES EL CASO QUE IMPORTA: declararla antes le quitaría al ciudadano un
+       recurso que todavía tenía. */
+    const e = validarEvidenciaFirmeza(
+      { motivo: 'PLAZO_VENCIDO_SIN_RECURSOS', fechaFirmeza: '2026-08-25T12:00:00Z' },
+      NOTIFICADA_EL,
+      new Date('2026-08-25T12:00:00Z'),
+    );
+    expect(e?.mensaje).toMatch(/no se puede declarar la firmeza por vencimiento/i);
+    expect(e?.mensaje, 'el mensaje dice cuándo vence de verdad').toMatch(/\d{4}-\d{2}-\d{2}/);
+  });
+
+  it('sí se puede el día en que vence, y después', () => {
+    const vence = vencimientoRecursos(NOTIFICADA_EL);
+    expect(validarEvidenciaFirmeza(
+      { motivo: 'PLAZO_VENCIDO_SIN_RECURSOS', fechaFirmeza: vence },
+      NOTIFICADA_EL,
+      new Date(vence),
+    )).toBeNull();
+  });
+
+  it('sin fecha de notificación NO se puede afirmar que el plazo venció', () => {
+    const e = validarEvidenciaFirmeza(
+      { motivo: 'PLAZO_VENCIDO_SIN_RECURSOS', fechaFirmeza: '2026-08-28T12:00:00Z' },
+      undefined,
+      AHORA,
+    );
+    expect(e?.mensaje).toMatch(/no consta la fecha de notificación/i);
+  });
+
+  it('los otros dos motivos NO dependen del calendario', () => {
+    /* Renuncia expresa y recursos resueltos son hechos, no plazos: exigirles la
+       aritmética del vencimiento bloquearía firmezas legítimas. */
+    for (const motivo of ['RECURSOS_RESUELTOS', 'RENUNCIA_EXPRESA'] as const) {
+      expect(validarEvidenciaFirmeza(
+        { motivo, fechaFirmeza: '2026-08-22T12:00:00Z' },
+        NOTIFICADA_EL,
+        AHORA,
+      ), `${motivo} no debería exigir el vencimiento`).toBeNull();
+    }
+  });
+});
+
+describe('el desistimiento tácito', () => {
+  const COMUNICADA_EL = '2026-06-01T12:00:00Z';
+
+  it('procede a los 30 días hábiles de la COMUNICACIÓN del acta', () => {
+    expect(DIAS_HABILES_SUBSANACION_TACITO).toBe(30);
+    expect(procedeDesistimientoTacito({
+      fechaComunicacionActa: COMUNICADA_EL,
+      huboRespuestaSubsanacion: false,
+      ahora: AHORA,
+    })).toBeNull();
+  });
+
+  it('NO procede antes, y el mensaje dice cuántos van', () => {
+    const e = procedeDesistimientoTacito({
+      fechaComunicacionActa: '2026-08-20T12:00:00Z',
+      huboRespuestaSubsanacion: false,
+      ahora: AHORA,
+    });
+    expect(e?.mensaje).toMatch(/días hábiles desde la comunicación/i);
+    expect(e?.mensaje).toMatch(/30/);
+  });
+
+  it('NO procede si el ciudadano ya respondió, aunque hayan pasado los 30 días', () => {
+    /* Entre que el vigía mira y el funcionario pulsa puede haber entrado la
+       respuesta. Archivar sobre la foto de ayer cerraría una solicitud viva. */
+    const e = procedeDesistimientoTacito({
+      fechaComunicacionActa: COMUNICADA_EL,
+      huboRespuestaSubsanacion: true,
+      ahora: AHORA,
+    });
+    expect(e?.mensaje).toMatch(/ya respondió/i);
+    expect(e?.mensaje, 'y dice qué hacer en su lugar').toMatch(/acto de fondo/i);
+  });
+
+  it('sin fecha de comunicación NO se cuenta el plazo', () => {
+    /* El plazo corre desde la COMUNICACIÓN, no desde la expedición del acta. */
+    const e = procedeDesistimientoTacito({
+      fechaComunicacionActa: undefined,
+      huboRespuestaSubsanacion: false,
+      ahora: AHORA,
+    });
+    expect(e?.mensaje).toMatch(/no consta la fecha en que el acta se comunicó/i);
+  });
+});

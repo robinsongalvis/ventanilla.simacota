@@ -3,7 +3,7 @@ import { getFirebaseAdminDb } from '@/lib/firebase-admin';
 import { autorizarCron }      from '@/lib/seguridad/autorizar-cron';
 import { logError }           from '@/lib/logger';
 import { soloOperacionReal }  from '@/lib/radicados/dato-de-prueba';
-import { diasRestantesHabiles, sumarDiasHabiles } from '@/lib/tiempos-radicado';
+import { diasHabilesTranscurridos, diasRestantesHabiles, sumarDiasHabiles } from '@/lib/tiempos-radicado';
 import { terminoResolucionSigueCorriendo } from '@/lib/motor-expedientes/estados-licencia';
 import type { ExpedienteLicenciaDoc } from '@/lib/server/expedientes-licencias';
 import type { TenantId } from '@/src/types/radicado';
@@ -184,20 +184,6 @@ export function clasificarFrenteAlTermino(
   };
 }
 
-/** Días hábiles transcurridos entre dos instantes. Se apoya en la misma pieza
- *  de conteo del resto del sistema (festivos colombianos incluidos) en vez de
- *  dividir por 86.400.000, que ignoraría fines de semana y puentes. */
-function diasHabilesTranscurridos(desdeIso: string, ahora: Date): number {
-  const desde = new Date(desdeIso);
-  if (Number.isNaN(desde.getTime())) return 0;
-  let dias = 0;
-  // Cota dura: un expediente de más de 400 días hábiles en espera ya es un
-  // hallazgo por sí solo; no hace falta contar exacto para reportarlo.
-  while (dias < 400 && sumarDiasHabiles(desde, dias + 1).getTime() <= ahora.getTime()) {
-    dias += 1;
-  }
-  return dias;
-}
 
 /** Tenant dueño de los expedientes de licencias — el mismo del resto del módulo. */
 const TENANT_LICENCIAS: TenantId = 'SEC_PLANEACION';

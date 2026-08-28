@@ -3,6 +3,15 @@ import { calcularCompletitudExpediente, type CompletitudExpediente } from '@/lib
 import type { Expediente, Actuacion, ContextoEvaluacionRequisito, DefinicionTramite, NumeroExpedienteAsignado } from '@/lib/motor-expedientes/tipos';
 import { CATALOGO_FIGURAS_NORMATIVAS } from '@/lib/motor-expedientes/catalogo-subtipos-normativo';
 import {
+  procedeDesistimientoTacito,
+  validarEvidenciaFirmeza,
+  validarEvidenciaNotificacion,
+  validarEvidenciaResolucion,
+  type EvidenciaFirmeza,
+  type EvidenciaNotificacion,
+  type EvidenciaResolucion,
+} from '@/lib/motor-expedientes/cierre-licencia';
+import {
   exigeModalidadConstruccion,
   validarModalidadesConstruccion,
 } from '@/lib/motor-expedientes/modalidad-construccion';
@@ -219,6 +228,14 @@ export interface ActuacionLicenciaDoc extends Actuacion {
   tenantId: string;
   /** Presente SOLO en la actuación `tipo: 'radicacion-debida-forma'`. */
   evidenciaRadicacion?: EvidenciaRadicacion;
+  /**
+   * Evidencia ESTRUCTURADA de los actos de cierre. Va aquí y no en el `detalle`
+   * libre porque la constancia de ejecutoria tiene que poder volver a
+   * imprimirla, y un dato dentro de una frase no se puede verificar.
+   */
+  evidenciaCierre?: EvidenciaCierre;
+  /** ISO — día en que el acta se COMUNICÓ al ciudadano; de ahí corre el plazo de subsanación. */
+  fechaComunicacion?: string;
   /**
    * Presente SOLO en actuaciones `tipo: 'comunicacion-enviada'` — el tipo
    * ESTRUCTURADO de la comunicación (p. ej. "Aviso de acta de observaciones
@@ -459,13 +476,59 @@ export function planCrearExpedienteDemo(
    Registro de actuaciones (acta / respuesta)
 ────────────────────────────────────────────── */
 
-export type TipoActuacionPermitida = 'inicio-revision' | 'acta-observaciones' | 'respuesta-subsanacion';
+export type TipoActuacionPermitida =
+  | 'inicio-revision'
+  | 'acta-observaciones'
+  | 'respuesta-subsanacion'
+  /* ── LA CADENA DE CIERRE ────────────────────────────────────────────────
+     El mapa de transiciones admitía estos cinco estados desde siempre, con su
+     fundamento normativo escrito, y NINGUNA ruta los escribía: el expediente
+     llegaba a EN_VIABILIDAD y se quedaba ahí para siempre, con el término
+     corriendo contra la Alcaldía y el vigía contándolo como vivo. */
+  | 'resolucion-concede'
+  | 'resolucion-niega'
+  /** El ciudadano retira su solicitud (art. 2.2.6.1.2.3.4, expreso). */
+  | 'desistimiento-expreso'
+  /** No atendió el acta en 30 días hábiles (art. 2.2.6.1.2.3.4, tácito). */
+  | 'desistimiento-tacito'
+  | 'notificacion'
+  | 'firmeza';
+
+/** Los tres bloques de evidencia de cierre; cada actuación llena el suyo. */
+export interface EvidenciaCierre {
+  resolucion?: EvidenciaResolucion;
+  notificacion?: EvidenciaNotificacion;
+  firmeza?: EvidenciaFirmeza;
+}
+
+/**
+ * Etapa de cada actuación. `Record` COMPLETO: una actuación nueva sin etapa no
+ * compila. Antes era un ternario —«si es acta, revisión; si no, subsanación»—
+ * que con seis tipos más habría etiquetado una resolución como «subsanación».
+ */
+const ETAPA_POR_TIPO_ACTUACION: Readonly<Record<TipoActuacionPermitida, string>> = {
+  'inicio-revision': 'revision',
+  'acta-observaciones': 'revision',
+  'respuesta-subsanacion': 'subsanacion',
+  'resolucion-concede': 'decision',
+  'resolucion-niega': 'decision',
+  'desistimiento-expreso': 'decision',
+  'desistimiento-tacito': 'decision',
+  notificacion: 'notificacion',
+  firmeza: 'firmeza',
+};
 
 export const DETALLE_ACTUACION_MIN = 15;
 
 export interface RegistrarActuacionInput {
   tipo: string;
   detalle: string;
+  /* Evidencia ESTRUCTURADA de los actos de cierre. No va en el detalle libre
+     porque la constancia de ejecutoria tiene que poder volver a imprimirla y
+     un dato dentro de una frase no se puede verificar. */
+  resolucion?: Partial<EvidenciaResolucion>;
+  notificacion?: Partial<EvidenciaNotificacion>;
+  firmeza?: Partial<EvidenciaFirmeza>;
 }
 
 export interface PlanRegistrarActuacion {
@@ -500,6 +563,12 @@ const ESTADO_DESTINO_POR_TIPO_ACTUACION: Readonly<Record<TipoActuacionPermitida,
   'inicio-revision': 'EN_REVISION',
   'acta-observaciones': 'CON_ACTA_DE_OBSERVACIONES',
   'respuesta-subsanacion': 'EN_VIABILIDAD',
+  'resolucion-concede': 'CONCEDIDA',
+  'resolucion-niega': 'NEGADA',
+  'desistimiento-expreso': 'DESISTIDA',
+  'desistimiento-tacito': 'DESISTIDA',
+  'notificacion': 'NOTIFICADA',
+  'firmeza': 'EN_FIRME',
 };
 
 function esTipoActuacionPermitida(tipo: string): tipo is TipoActuacionPermitida {
@@ -552,7 +621,13 @@ export function planRegistrarActuacion(
   ahora: Date,
 ): PlanRegistrarActuacion | ErrorExpediente {
   if (!esTipoActuacionPermitida(input.tipo)) {
-    return { status: 400, mensaje: 'Tipo de actuación no permitido; solo se admiten "acta-observaciones" y "respuesta-subsanacion".' };
+    /* El mensaje ENUMERA los tipos desde la fuente, no desde una lista escrita
+       a mano que se quedó corta dos veces (decía «solo se admiten dos» cuando
+       ya eran tres). */
+    return {
+      status: 400,
+      mensaje: `Tipo de actuación no permitido. Se admiten: ${Object.keys(ESTADO_DESTINO_POR_TIPO_ACTUACION).join(', ')}.`,
+    };
   }
 
   const detalleLimpio = input.detalle?.trim() ?? '';
@@ -569,6 +644,61 @@ export function planRegistrarActuacion(
     return { status: 409, mensaje: 'No hay un acta de observaciones registrada para este expediente; no procede una respuesta de subsanación.' };
   }
 
+  /* ── LA EVIDENCIA DE LOS ACTOS DE CIERRE ────────────────────────────────
+     Cada fecha de esta cadena produce efectos jurídicos, así que el sistema la
+     VERIFICA en vez de creerla. Esa es la diferencia entre registrar un hecho y
+     afirmarlo. */
+  let evidenciaCierre: EvidenciaCierre | undefined;
+
+  if (input.tipo === 'resolucion-concede' || input.tipo === 'resolucion-niega') {
+    const err = validarEvidenciaResolucion(input.resolucion, ahora);
+    if (err) return { status: 400, mensaje: err.mensaje };
+    evidenciaCierre = { resolucion: input.resolucion as EvidenciaResolucion };
+  }
+
+  if (input.tipo === 'notificacion') {
+    /* La resolución que se notifica sale de la actuación previa, no del body:
+       el funcionario no puede decir que notificó un acto distinto del que
+       consta. */
+    const actoPrevio = [...actuacionesExistentes]
+      .reverse()
+      .find((a) => a.tipo === 'resolucion-concede' || a.tipo === 'resolucion-niega' || a.tipo === 'desistimiento-expreso' || a.tipo === 'desistimiento-tacito');
+    const err = validarEvidenciaNotificacion(
+      input.notificacion,
+      actoPrevio?.evidenciaCierre?.resolucion?.fechaResolucion,
+      ahora,
+    );
+    if (err) return { status: 400, mensaje: err.mensaje };
+    evidenciaCierre = { notificacion: input.notificacion as EvidenciaNotificacion };
+  }
+
+  if (input.tipo === 'firmeza') {
+    const notificacionPrevia = [...actuacionesExistentes]
+      .reverse()
+      .find((a) => a.tipo === 'notificacion');
+    const err = validarEvidenciaFirmeza(
+      input.firmeza,
+      notificacionPrevia?.evidenciaCierre?.notificacion?.fechaNotificacion,
+      ahora,
+    );
+    if (err) return { status: 400, mensaje: err.mensaje };
+    evidenciaCierre = { firmeza: input.firmeza as EvidenciaFirmeza };
+  }
+
+  if (input.tipo === 'desistimiento-tacito') {
+    /* SE VUELVE A COMPROBAR aquí aunque el vigía ya lo hubiera detectado:
+       entre que el cron mira y el funcionario pulsa puede haber entrado la
+       respuesta del ciudadano, y archivar sobre la foto de ayer cerraría una
+       solicitud que hoy está viva. */
+    const acta = actuacionesExistentes.find((a) => a.tipo === 'acta-observaciones');
+    const err = procedeDesistimientoTacito({
+      fechaComunicacionActa: acta?.fechaComunicacion,
+      huboRespuestaSubsanacion: actuacionesExistentes.some((a) => a.tipo === 'respuesta-subsanacion'),
+      ahora,
+    });
+    if (err) return { status: 409, mensaje: err.mensaje };
+  }
+
   const estadoDestino = ESTADO_DESTINO_POR_TIPO_ACTUACION[input.tipo];
   if (!puedeTransicionar(estadoJuridicoActual, estadoDestino, { yaHuboActa })) {
     return {
@@ -582,13 +712,14 @@ export function planRegistrarActuacion(
     expedienteId,
     tenantId,
     tipo: input.tipo,
-    etapa: input.tipo === 'acta-observaciones' ? 'revision' : 'subsanacion',
+    etapa: ETAPA_POR_TIPO_ACTUACION[input.tipo],
     actorUid: actor.uid,
     actorNombre: actor.nombre,
     actorRol: actor.rol,
     fecha: ahora.toISOString(),
     origen: 'REAL',
     detalle: detalleLimpio,
+    ...(evidenciaCierre ? { evidenciaCierre } : {}),
   };
 
   const fechaAlertaConservadora = calcularFechaAlertaConservadoraMirror([...actuacionesExistentes, actuacion]);
