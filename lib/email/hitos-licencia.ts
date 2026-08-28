@@ -44,8 +44,14 @@ export const HITO_NOTIFICABLE: Readonly<Record<EstadoJuridicoLicencia, DecisionH
      ciudadano tiene derecho a saber desde cuándo se le cuenta a la Alcaldía. */
   RADICADA_EN_DEBIDA_FORMA: { notifica: true, asuntoCorto: 'Su solicitud quedó radicada' },
 
-  /* Le toca hacer algo, y hay un plazo corriendo para hacerlo. */
-  CON_ACTA_DE_OBSERVACIONES: { notifica: true, asuntoCorto: 'Observaciones a su solicitud' },
+  CON_ACTA_DE_OBSERVACIONES: {
+    notifica: false,
+    razon:
+      'El acta YA tiene su propio aviso (`aviso-acta-observaciones`), y es mejor que este: imprime ' +
+      'la fecha límite para responder, que el hito genérico no conoce. Al cablear el disparador de ' +
+      'hitos este estado mandaba DOS correos por el mismo hecho — exactamente lo que entrena a la ' +
+      'gente a ignorar los nuestros. Lo cazó una prueba que ya existía.',
+  },
 
   /* Hay decisión. El correo avisa; la notificación formal es otra cosa. */
   CONCEDIDA: { notifica: true, asuntoCorto: 'Decisión sobre su licencia' },
