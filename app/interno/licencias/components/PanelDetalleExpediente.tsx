@@ -44,6 +44,7 @@ import {
   describirModalidades,
 } from '@/lib/motor-expedientes/modalidad-construccion';
 import { ChipEstadoJuridico } from './ChipEstadoJuridico';
+import { BotonDescargarSellado } from './BotonDescargarSellado';
 import { ChipPrueba } from './ChipPrueba';
 import { NumeroLegal } from './NumeroLegal';
 import { EtiquetaColisionNumero } from './EtiquetaColisionNumero';
@@ -363,10 +364,21 @@ export function PanelDetalleExpediente({ expedienteId, onCerrar, textoColision =
                 ) : (
                   <ul className="flex flex-col gap-2">
                     {documentos.map((doc) => (
-                      <li key={doc.id} className="flex flex-wrap items-center gap-x-2 gap-y-0.5 text-xs">
-                        <span className="truncate max-w-full font-medium" style={{ color: 'var(--text-primary)' }}>{doc.nombre}</span>
-                        <span className="shrink-0 font-mono" style={{ color: 'var(--text-secondary)' }}>v{doc.versionVigente.numeroVersion}</span>
-                        <span className="shrink-0" style={{ color: 'var(--text-muted)' }}>{formatFechaHoraColombia(doc.versionVigente.subidoEn)}</span>
+                      <li key={doc.id} className="flex flex-col gap-1 text-xs">
+                        <div className="flex flex-wrap items-center gap-x-2 gap-y-0.5">
+                          <span className="truncate max-w-full font-medium" style={{ color: 'var(--text-primary)' }}>{doc.nombre}</span>
+                          <span className="shrink-0 font-mono" style={{ color: 'var(--text-secondary)' }}>v{doc.versionVigente.numeroVersion}</span>
+                          <span className="shrink-0" style={{ color: 'var(--text-muted)' }}>{formatFechaHoraColombia(doc.versionVigente.subidoEn)}</span>
+                        </div>
+                        {/* El sello del mostrador, en digital: número y fecha en
+                            cada página de la COPIA. El original no se toca. */}
+                        {expediente && (
+                          <BotonDescargarSellado
+                            expedienteId={expediente.id}
+                            documentoId={doc.id}
+                            mimeType={doc.versionVigente.mimeType}
+                          />
+                        )}
                       </li>
                     ))}
                   </ul>

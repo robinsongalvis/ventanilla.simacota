@@ -71,3 +71,34 @@ export function selloCabeEnPagina(
   if (rect.y + rect.alto  > pagina.alto)  return false;
   return true;
 }
+
+/**
+ * SUELO DE LEGIBILIDAD.
+ *
+ * `calcularRectanguloSello` ENCOGE el sello para que quepa, así que
+ * `selloCabeEnPagina` solo dice que no en páginas de menos de 24 pt (0,85 cm) —
+ * un caso que no ocurre. El problema real es el contrario: en una página
+ * pequeña el sello cabe **encogido hasta ser ilegible**, y eso se reportaba
+ * como estampado con éxito. Un sello que nadie puede leer no es un sello, y
+ * decir que se puso es afirmar algo que el papel no sostiene.
+ *
+ * Las cotas salen del contenido, no de un número redondo:
+ *  · ALTO 52 pt — las cuatro líneas del sello se dibujan hasta 32 pt por debajo
+ *    del borde superior interno, más el padding de 6 arriba y la línea de pie a
+ *    6 del borde inferior: por debajo de 52 las líneas se pisan.
+ *  · ANCHO 120 pt — el número de radicado va en Courier 8,5 (avance 0,6 em =
+ *    5,1 pt por carácter). Un `1-110-202608-00000123` son 21 caracteres ≈ 107 pt,
+ *    más 12 de padding. Por debajo de eso, el dato que importa sale cortado.
+ */
+export const SELLO_MIN_ANCHO_PT = 120;
+export const SELLO_MIN_ALTO_PT = 52;
+
+/**
+ * ¿El sello dibujado en este rectángulo se puede LEER?
+ *
+ * Distinta de `selloCabeEnPagina`, que solo comprueba que no se salga de la
+ * página. Aquí se comprueba que valga para lo que existe.
+ */
+export function selloEsLegible(rect: RectanguloSello): boolean {
+  return rect.ancho >= SELLO_MIN_ANCHO_PT && rect.alto >= SELLO_MIN_ALTO_PT;
+}
