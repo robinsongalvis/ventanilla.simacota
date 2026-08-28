@@ -447,6 +447,27 @@ la prueba vigila, dejar constancia de que se puso roja y con qué mensaje, y
 restaurar. La constancia va en el commit o en la PR, no en un comentario del
 código — es evidencia de una comprobación hecha una vez, no una invariante.
 
+#### La simulación cuenta solo si lo rojo es lo que se quería probar
+
+Añadido el 28-ago-2026, el mismo día que la regla, porque **encontré el modo de
+cumplirla de mentira mientras la cumplía**.
+
+Simulando una regresión sobre el sellado de PDF rompí la sintaxis del archivo al
+inyectar el cambio. Vitest no pudo cargar la suite y reportó `no tests`. Yo tenía
+delante una salida que no era verde —y la regla dice «verlo fallar»—, así que a
+un lector rápido le habría parecido cumplida.
+
+> **No basta con que la ejecución no salga verde. Hay que comprobar que el fallo
+> es EL CASO que se quería probar, y que el mensaje es el suyo.**
+
+`no tests`, un error de compilación, una suite que no arranca o un archivo que no
+existe **no son la prueba fallando**: son la prueba sin ejecutarse. Confundirlos
+convierte esta regla en un trámite —«ejecuté la simulación»— exactamente igual
+que la 4.6-bis se incumplió cinco veces siendo enunciada.
+
+Al dejar constancia, por eso, se nombra el caso que falló y su mensaje, no solo
+que «se puso en rojo».
+
 #### El hueco que esta regla NO cierra
 
 > **Simular una regresión demuestra que el detector caza ESA, no todas.** Un
