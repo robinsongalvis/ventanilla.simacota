@@ -1,5 +1,7 @@
 import { NextResponse } from 'next/server';
 import { getFirebaseAdminDb } from '@/lib/firebase-admin';
+import type { EstadoJuridicoLicencia } from '@/lib/motor-expedientes/estados-licencia';
+import { aLicenciaPublica } from '@/lib/seguridad/consulta-publica-licencia';
 import {
   aLineaTiempoPublica,
   aRadicadoPublico,
@@ -195,8 +197,46 @@ export async function POST(request: Request): Promise<NextResponse> {
         userAgentHash,
       }),
     ]);
+    /* ── LA LICENCIA, SI LA HAY ────────────────────────────────────────
+       El ADR-0034 §7 dejó abierta la consulta ciudadana de licencias por dos
+       reparos: faltaba vocabulario ciudadano y un segundo factor propio. El
+       segundo desapareció solo — desde #252 el número del expediente ES el del
+       libro de ventanilla, así que el ciudadano consulta con el número que ya
+       tiene, por esta misma ruta, con el mismo segundo factor y el mismo límite
+       de tasa. No se abre superficie nueva: se añade un bloque.
+
+       Se lee DESPUÉS de verificar. Un fallo aquí no puede tumbar la consulta
+       del radicado, que es lo que el ciudadano vino a ver: si el expediente no
+       se puede leer, el bloque sale ausente, no roto. */
+    let licencia = null;
+    const expedienteId = radicado.vinculoExpediente?.expedienteId;
+    if (expedienteId) {
+      try {
+        const expSnap = await db.doc(`expedientes/${expedienteId}`).get();
+        if (expSnap.exists) {
+          const exp = expSnap.data() as {
+            numeroExpediente?: { numero?: string } | null;
+            estadoJuridico?: EstadoJuridicoLicencia;
+            fechaRadicacionDebidaForma?: string | null;
+          };
+          /* Solo los TRES campos que el bloque necesita. Pasar el expediente
+             entero dejaría la puerta abierta a que un campo nuevo se cuele en
+             una respuesta PÚBLICA por olvido. */
+          if (exp.estadoJuridico) {
+            licencia = aLicenciaPublica({
+              numeroExpediente: exp.numeroExpediente?.numero ?? null,
+              estadoJuridico: exp.estadoJuridico,
+              fechaRadicacionDebidaForma: exp.fechaRadicacionDebidaForma ?? null,
+            });
+          }
+        }
+      } catch {
+        licencia = null;
+      }
+    }
+
     rateLimitConsultaEmergencia.limpiarFallos(radicadoHash);
-    return jsonNoCache({ ok: true, radicado: respuesta });
+    return jsonNoCache({ ok: true, radicado: respuesta, licencia });
   } catch {
     return jsonNoCache(
       { ok: false, error: 'No fue posible realizar la consulta. Intente nuevamente más tarde.' },
