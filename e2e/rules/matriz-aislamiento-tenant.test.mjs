@@ -55,6 +55,62 @@ function dbDe(actor) {
  * @type {CasoMatriz[]}
  */
 const MATRIZ = [
+  /* ══ expedientes ════════════════════════════════════════════════════════
+     ADR-0034 exige estos casos EN EL MISMO PR que la proyección de ventanilla.
+     Hasta hoy la matriz tenía CERO sobre esta colección: estaba verde por
+     ausencia, que es la misma familia de todo lo corregido esta semana.
+
+     Y el aislamiento aquí NO es por tenant, es CLAUSURA TOTAL: `expedientes`
+     es `allow read, write: if false` para todo cliente. Por eso ventanilla ve
+     una proyección de SERVIDOR y no la colección — si el SDK pudiera leerla,
+     la proyección sería decorativa y el recorte del ADR-0034 (sin actuaciones,
+     sin documentos, sin actas) se podría saltar abriendo la consola. */
+  {
+    grupo: 'expedientes', caso: 'RECEPCIONISTA no lee el expediente, ni el de su propio tenant',
+    actor: 'recepcionista-a', esperado: 'denegado',
+    ejecutar: (db) => getDoc(doc(db, 'expedientes/exp-a-1')),
+  },
+  {
+    grupo: 'expedientes', caso: 'FUNCIONARIO del tenant dueño tampoco lo lee por SDK',
+    actor: 'funcionario-a', esperado: 'denegado',
+    ejecutar: (db) => getDoc(doc(db, 'expedientes/exp-a-1')),
+  },
+  {
+    grupo: 'expedientes', caso: 'JEFE del tenant dueño tampoco',
+    actor: 'jefe-a', esperado: 'denegado',
+    ejecutar: (db) => getDoc(doc(db, 'expedientes/exp-a-1')),
+  },
+  {
+    grupo: 'expedientes', caso: 'ni siquiera ADMIN — no hay rol que abra esta puerta',
+    actor: 'admin-a', esperado: 'denegado',
+    ejecutar: (db) => getDoc(doc(db, 'expedientes/exp-a-1')),
+  },
+  {
+    grupo: 'expedientes', caso: 'listar la colección tampoco',
+    actor: 'recepcionista-a', esperado: 'denegado',
+    ejecutar: (db) => getDocs(collection(db, 'expedientes')),
+  },
+  {
+    grupo: 'expedientes', caso: 'las ACTUACIONES son lo primero que el ADR-0034 deja fuera',
+    actor: 'recepcionista-a', esperado: 'denegado',
+    ejecutar: (db) => getDocs(collection(db, 'expedientes/exp-a-1/actuaciones')),
+  },
+  {
+    grupo: 'expedientes', caso: 'ventanilla NO escribe: no cambia estados ni radica',
+    actor: 'recepcionista-a', esperado: 'denegado',
+    ejecutar: (db) => updateDoc(doc(db, 'expedientes/exp-a-1'), { estadoJuridico: 'RADICADA_EN_DEBIDA_FORMA' }),
+  },
+  {
+    grupo: 'expedientes', caso: 'ni crea expedientes desde el cliente',
+    actor: 'recepcionista-a', esperado: 'denegado',
+    ejecutar: (db) => setDoc(doc(db, 'expedientes/exp-inventado'), { tenantId: TENANT_A }),
+  },
+  {
+    grupo: 'expedientes', caso: 'ni borra',
+    actor: 'admin-a', esperado: 'denegado',
+    ejecutar: (db) => deleteDoc(doc(db, 'expedientes/exp-a-1')),
+  },
+
   // ══ users/{uid} ═══════════════════════════════════════════════════════════
   {
     grupo: 'users', caso: 'get propio perfil', actor: 'funcionario-a', esperado: 'permitido',

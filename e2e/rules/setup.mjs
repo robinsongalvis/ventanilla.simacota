@@ -108,6 +108,19 @@ export async function sembrarDatos(testEnv) {
     await setDoc(doc(db, 'ventanilla_salidas/sal-a-1'), { salidaId: 'sal-a-1', dependenciaOrigen: TENANT_A });
     await setDoc(doc(db, 'ventanilla_salidas/sal-b-1'), { salidaId: 'sal-b-1', dependenciaOrigen: TENANT_B });
 
+    /* ── expedientes ────────────────────────────────────────────────────
+       Sembrado para poder DEMOSTRAR que está cerrado a todo cliente. Sin un
+       documento real, un `getDoc` que falla no distingue «la regla lo prohíbe»
+       de «no hay nada ahí» — y la prueba estaría verde por ausencia, que es la
+       familia de defecto que este repositorio lleva semanas corrigiendo. */
+    await setDoc(doc(db, 'expedientes/exp-a-1'), {
+      id: 'exp-a-1',
+      tenantId: TENANT_A,
+      estadoJuridico: 'PRESENTADA',
+      esPrueba: true,
+    });
+    await setDoc(doc(db, 'expedientes/exp-a-1/actuaciones/act-1'), { tipo: 'apertura-expediente' });
+
     // ── control_interno_* ──────────────────────────────────────────────────
     await setDoc(doc(db, 'control_interno_hallazgos/h-a-1'), { tenantId: TENANT_A });
     await setDoc(doc(db, 'control_interno_hallazgos/h-b-1'), { tenantId: TENANT_B });

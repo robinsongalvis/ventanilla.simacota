@@ -406,6 +406,53 @@ el paso previo, y va antes que el registro.
 **Precedente aplicable a todo el repositorio**, no solo a las series: el mismo
 patrón sirve para dependencias, tipos de trámite, estados y roles.
 
+### 4.6-ter Regla operativa: un detector no se da por bueno hasta verlo fallar
+
+Decidido el 27-ago-2026, tras la **tercera vez en la misma semana** en que una
+prueba escrita para impedir un defecto pasó en verde sin comprobar lo que decía
+comprobar. Es hermana de la 4.6-bis y por eso vive a su lado: aquella exige
+declarar qué se mira; esta exige demostrar que mirar sirve de algo.
+
+> **Un detector nuevo no se da por bueno hasta verlo fallar contra la regresión
+> que existe para impedir.**
+
+No basta con que la prueba esté verde: un verde puede significar «el defecto no
+está» o «el detector no lo vería aunque estuviera», y **desde fuera se ven
+idénticos**. Antes de confiar en el verde hay que romper el código a propósito
+—de la forma exacta que la prueba dice vigilar— y ver la prueba roja.
+
+#### Las tres veces, porque el caso concreto es lo que se recuerda
+
+1. **La palabra en un comentario.** El detector de
+   `__tests__/checklist-ciego-a-la-modalidad.test.ts` leyó «modalidad» en un
+   JSDoc, concluyó que el checklist ya estaba parametrizado y **se saltó en
+   silencio los dos casos que importaban**. Falso verde dentro de la prueba
+   escrita para impedir falsos verdes. Cura: mirar el código sin comentarios.
+2. **La aserción imposible de fallar.** Un `return` temprano hacía que la prueba
+   pasara tanto si el defecto se había corregido como si el detector se había
+   equivocado, sin forma de distinguirlas. Cura: afirmar el estado y actuar
+   sobre él, más un caso que verifica el propio detector.
+3. **El match de prefijo.** `__tests__/acto-radicar-alcanzable.test.ts`
+   comprobaba `/<RadicarDebidaFormaModal/`, así que renombrar el componente a
+   `...DESCONECTADO` la dejaba **verde con el modal desconectado**. Cura: exigir
+   delimitador.
+
+Las tres se descubrieron por el mismo procedimiento —simular la regresión— y
+**ninguna** se habría descubierto leyendo la prueba.
+
+#### Cómo se cumple
+
+En el mismo cambio que introduce el detector: romper el código de la forma que
+la prueba vigila, dejar constancia de que se puso roja y con qué mensaje, y
+restaurar. La constancia va en el commit o en la PR, no en un comentario del
+código — es evidencia de una comprobación hecha una vez, no una invariante.
+
+#### El hueco que esta regla NO cierra
+
+> **Simular una regresión demuestra que el detector caza ESA, no todas.** Un
+> detector puede cazar la regresión obvia y ser ciego a la variante que de
+> verdad ocurrirá. La regla sube el suelo; no garantiza el techo.
+
 ### 4.7 Recorte de alcance decidido con Planeación
 
 **Se elimina el portal ciudadano.** No habrá radicación por cuenta del ciudadano, ni perfiles, ni
