@@ -19,6 +19,7 @@
 ══════════════════════════════════════════════════════════════ */
 
 import { useCallback, useEffect, useMemo, useState } from 'react';
+import { RadicarDebidaFormaModal, type VistaPreviaDebidaForma } from '../components/RadicarDebidaFormaModal';
 import type { ReactNode } from 'react';
 import Link from 'next/link';
 import { useAuth } from '@/lib/hooks/useAuth';
@@ -90,8 +91,13 @@ export function DetalleLicenciaClient({ expedienteId, onVolver }: DetalleLicenci
   const [radicadoVinculado, setRadicadoVinculado] = useState<{ id: string; fecha: string } | null>(null);
   const [vinculando, setVinculando] = useState(false);
   const [modalActuacion, setModalActuacion] = useState<'acta-observaciones' | 'respuesta-subsanacion' | null>(null);
+  const [modalRadicar, setModalRadicar] = useState(false);
   /** Bloque "Términos y vigencias protectores" (10-ago-2026) — `computos`/`borradorActoDesistimiento` YA CALCULADOS por el servidor (`GET .../[id]`), ver `../tipos-computos.ts`. */
   const [computos, setComputos] = useState<ComputosExpedienteUI | null>(null);
+  /* La vista previa del acto de radicar. La ruta la devolvía desde #248 y nadie
+     la consumía: el acto estaba construido y era inalcanzable desde el
+     mostrador. */
+  const [debidaForma, setDebidaForma] = useState<VistaPreviaDebidaForma | null>(null);
   const [borradorActoDesistimiento, setBorradorActoDesistimiento] = useState<BorradorActoDesistimiento | null>(null);
 
   /**
@@ -131,6 +137,11 @@ export function DetalleLicenciaClient({ expedienteId, onVolver }: DetalleLicenci
           : null,
       );
       setComputos(body.computos && typeof body.computos === 'object' ? (body.computos as ComputosExpedienteUI) : null);
+      setDebidaForma(
+        body.debidaForma && typeof body.debidaForma === 'object'
+          ? (body.debidaForma as VistaPreviaDebidaForma)
+          : null,
+      );
       setBorradorActoDesistimiento(
         body.borradorActoDesistimiento && typeof body.borradorActoDesistimiento === 'object'
           ? (body.borradorActoDesistimiento as BorradorActoDesistimiento)
@@ -351,6 +362,30 @@ export function DetalleLicenciaClient({ expedienteId, onVolver }: DetalleLicenci
 
           {!esHistorico && (
             <div className="flex flex-col sm:flex-row gap-2 flex-wrap items-start">
+              {/* EL ACTO DE RADICAR. Va primero porque es el que abre el
+                  expediente al término legal; todo lo demás ocurre después de
+                  él. El motivo por el que no procede sale del SERVIDOR y se
+                  muestra entero: hoy el más frecuente es que el expediente es
+                  de demostración, el candado que protege la serie legal. */}
+              {debidaForma && (
+                <div className="flex flex-col gap-1.5">
+                  <button
+                    type="button"
+                    disabled={!debidaForma.procede}
+                    onClick={() => setModalRadicar(true)}
+                    aria-describedby={!debidaForma.procede ? 'radicar-nota' : undefined}
+                    className="inline-flex items-center gap-2 rounded-[10px] px-4 py-2.5 text-sm font-bold transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-1 disabled:opacity-50 disabled:cursor-not-allowed hover:brightness-95 active:scale-[0.98]"
+                    style={{ background: '#14532D', color: '#fff', boxShadow: '0 2px 8px rgba(20,83,45,0.25)' }}
+                  >
+                    Radicar en legal y debida forma
+                  </button>
+                  {!debidaForma.procede && debidaForma.motivo && (
+                    <p id="radicar-nota" className="text-xs max-w-xs" style={{ color: '#9A6206' }}>
+                      {debidaForma.motivo}
+                    </p>
+                  )}
+                </div>
+              )}
               <div className="flex flex-col gap-1.5">
                 <button
                   type="button"
@@ -430,6 +465,17 @@ export function DetalleLicenciaClient({ expedienteId, onVolver }: DetalleLicenci
           </p>
         </div>
       ) : null}
+
+      {modalRadicar && debidaForma && (
+        <RadicarDebidaFormaModal
+          expedienteId={expedienteId}
+          previa={debidaForma}
+          onCerrar={() => setModalRadicar(false)}
+          /* Recarga en silencio: tras el acto el expediente cambia de estado,
+             gana una actuación y estrena número. */
+          onRadicado={() => cargar({ silencioso: true })}
+        />
+      )}
 
       {modalActuacion && (
         <RegistrarActuacionModal
