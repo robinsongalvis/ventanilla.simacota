@@ -564,3 +564,29 @@ export function subsanacionVencida(
 ): boolean {
   return atLocalNoon(ahora).getTime() > atLocalNoon(fechaLimiteEfectiva).getTime();
 }
+
+/**
+ * Días hábiles TRANSCURRIDOS entre un instante y otro.
+ *
+ * Vivía como función privada dentro del cron del vigía de licencias. Se sube
+ * aquí —junto a `sumarDiasHabiles`, de la que se apoya— porque el cierre de
+ * expedientes necesita el mismo cálculo, y una cuarta copia del mismo conteo
+ * era la alternativa. (Quedan otras dos con este nombre en
+ * `lib/ai/predictive/riesgo-vencimiento.ts` y en `useAnalytics.ts`, pero tienen
+ * OTRA firma: reciben un radicado. Unificarlas es un cambio aparte.)
+ *
+ * Se apoya en la misma pieza de conteo del resto del sistema —festivos
+ * colombianos incluidos— en vez de dividir por 86.400.000, que ignoraría fines
+ * de semana y puentes.
+ */
+export function diasHabilesTranscurridos(desdeIso: string, ahora: Date): number {
+  const desde = new Date(desdeIso);
+  if (Number.isNaN(desde.getTime())) return 0;
+  let dias = 0;
+  /* Cota dura: más de 400 días hábiles en espera ya es un hallazgo por sí
+     solo; no hace falta contar exacto para reportarlo. */
+  while (dias < 400 && sumarDiasHabiles(desde, dias + 1).getTime() <= ahora.getTime()) {
+    dias += 1;
+  }
+  return dias;
+}

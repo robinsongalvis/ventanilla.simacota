@@ -36,6 +36,46 @@ const COPIA: Record<TipoActuacionPermitida, { titulo: string; etiquetaCampo: str
     placeholder: 'El solicitante aporta planos corregidos y escritura de cesión…',
     nota: 'Solo procede si ya existe un acta de observaciones registrada.',
   },
+
+  /* ── LA CADENA DE CIERRE ──────────────────────────────────────────────
+     Cada eslabón pide, además del detalle, la EVIDENCIA estructurada que la
+     constancia de ejecutoria tiene que poder volver a imprimir. */
+  'resolucion-concede': {
+    titulo: 'Registrar resolución que CONCEDE la licencia',
+    etiquetaCampo: 'Motivación de la decisión',
+    placeholder: 'Se concede la licencia por cumplir las normas urbanísticas aplicables…',
+    nota: 'Registra el acto administrativo ya expedido. La licencia no produce efectos hasta que se notifique.',
+  },
+  'resolucion-niega': {
+    titulo: 'Registrar resolución que NIEGA la licencia',
+    etiquetaCampo: 'Motivación de la negativa',
+    placeholder: 'Se niega por incumplir el índice de ocupación previsto en el POT…',
+    nota: 'La negativa también se notifica: de la notificación corren los plazos para que el ciudadano recurra.',
+  },
+  'desistimiento-expreso': {
+    titulo: 'Registrar desistimiento del solicitante',
+    etiquetaCampo: 'Cómo y cuándo lo manifestó',
+    placeholder: 'El solicitante radica escrito de desistimiento el 14 de agosto…',
+    nota: 'Procede en cualquier momento antes de la decisión (D.1077/2015 art. 2.2.6.1.2.3.4).',
+  },
+  'desistimiento-tacito': {
+    titulo: 'Archivar por desistimiento tácito',
+    etiquetaCampo: 'Constancia de que no se atendió el acta',
+    placeholder: 'Transcurridos los 30 días hábiles desde la comunicación del acta sin respuesta…',
+    nota: 'El servidor comprueba de nuevo que los 30 días hábiles transcurrieron y que no entró respuesta: no basta con que el vigía lo hubiera detectado.',
+  },
+  notificacion: {
+    titulo: 'Registrar notificación al ciudadano',
+    etiquetaCampo: 'Cómo se surtió la notificación',
+    placeholder: 'Notificación personal en la Secretaría de Planeación, con entrega de copia íntegra…',
+    nota: 'La fecha que registre aquí es la que arranca el plazo de 10 días hábiles para recursos (CPACA art. 76).',
+  },
+  firmeza: {
+    titulo: 'Registrar firmeza del acto',
+    etiquetaCampo: 'Constancia de la firmeza',
+    placeholder: 'Vencido el término para recursos sin que se interpusiera ninguno…',
+    nota: 'Por vencimiento del plazo, el servidor no admite una fecha anterior al vencimiento real: declararla antes le quitaría al ciudadano un recurso que todavía tenía.',
+  },
 };
 
 export interface RegistrarActuacionModalProps {

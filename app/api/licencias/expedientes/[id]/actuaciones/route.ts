@@ -40,6 +40,7 @@ import {
 } from '@/lib/server/expedientes-licencias';
 import { buildAvisoActaHtml, buildAvisoActaSubject } from '@/lib/email/templates/aviso-acta-observaciones';
 import { enviarEmail } from '@/lib/email/mailer';
+import type { RegistrarActuacionInput } from '@/lib/server/expedientes-licencias';
 import { logError } from '@/lib/logger';
 
 export const runtime = 'nodejs';
@@ -72,7 +73,14 @@ export async function POST(request: Request, context: RouteContext): Promise<Nex
       return NextResponse.json({ error: 'Tu rol no permite registrar actuaciones en este expediente.' }, { status: 403 });
     }
 
-    const body = await request.json().catch(() => null) as { tipo?: string; detalle?: string; fechaComunicacion?: string } | null;
+    const body = await request.json().catch(() => null) as {
+      tipo?: string;
+      detalle?: string;
+      fechaComunicacion?: string;
+      resolucion?: RegistrarActuacionInput['resolucion'];
+      notificacion?: RegistrarActuacionInput['notificacion'];
+      firmeza?: RegistrarActuacionInput['firmeza'];
+    } | null;
 
     // Se traen los documentos COMPLETOS (no solo `tipo`): además del guard
     // de acta única, `planRegistrarActuacion` recalcula el espejo
@@ -87,7 +95,15 @@ export async function POST(request: Request, context: RouteContext): Promise<Nex
       actuacionesExistentes,
       id,
       expediente.tenantId,
-      { tipo: body?.tipo ?? '', detalle: body?.detalle ?? '' },
+      {
+        tipo: body?.tipo ?? '',
+        detalle: body?.detalle ?? '',
+        /* La evidencia de cierre viaja TAL CUAL: el planificador la valida y
+           rechaza con el motivo. La ruta no la interpreta ni la completa. */
+        resolucion: body?.resolucion,
+        notificacion: body?.notificacion,
+        firmeza: body?.firmeza,
+      },
       { uid: usuario.uid, nombre: usuario.nombre, rol: usuario.rol },
       ahora,
     );
