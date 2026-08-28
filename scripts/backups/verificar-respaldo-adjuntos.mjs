@@ -48,12 +48,31 @@ if (credencial.project_id !== proyecto) {
 if (!getApps().length) initializeApp({ credential: cert(credencial), projectId: proyecto });
 const db = getFirestore();
 
-/* Los nueve prefijos que el sistema escribe: seis finales y tres de staging.
-   Los `_pendientes` se incluyen a propósito — nadie los limpia y contienen
-   binarios reales, así que un respaldo que los omita está incompleto. */
+/* Los prefijos que el sistema escribe y que el respaldo DEBE contener. Los
+   `_pendientes` se incluyen a propósito — nadie los limpia y contienen binarios
+   reales, así que un respaldo que los omita está incompleto. */
 const PREFIJOS = [
-  'radicados/', 'respuestas/', 'sellados/', 'salidas/', 'planillas/', 'expedientes/',
+  'radicados/', 'respuestas/', 'salidas/', 'planillas/', 'expedientes/',
 ];
+
+/**
+ * EXCLUIDOS DEL RESPALDO, con su razón. Excluir es legítimo; excluir sin
+ * darse cuenta no (ADR-0033 §4.6-bis).
+ *
+ * Se enumeran aquí y se aplican a AMBOS lados de la conciliación: no basta con
+ * no exigirlos en el respaldo, hay que dejar de contarlos como referencias
+ * pendientes — si solo se excluyeran de un lado, cada copia sellada aparecería
+ * como un adjunto perdido y el informe gritaría en falso hasta que alguien
+ * dejara de leerlo.
+ */
+const PREFIJOS_EXCLUIDOS = {
+  'sellados/':
+    'Copias SELLADAS: derivados desechables y regenerables. El original es el ' +
+    'expediente y es lo único que se respalda; una copia sellada se vuelve a ' +
+    'generar pidiéndola otra vez, y nunca prueba nada que el original no diga. ' +
+    'Respaldarlas duplicaría el almacenamiento de algo reconstruible y, peor, ' +
+    'las pondría al mismo nivel probatorio que el documento aportado.',
+};
 /* OJO con `[^\s]`: la primera versión de esta expresión excluía espacios y se
    dejaba fuera `respuestas/…/oficio firmado.pdf`. Los nombres de archivo del
    sistema SÍ admiten espacios (sanitizeFilename los conserva, hasta 120
@@ -67,7 +86,8 @@ const RE_RUTA = new RegExp(`^(${PREFIJOS.map((p) => p.replace('/', '\\/')).join(
 /** Recoge toda cadena con pinta de ruta de Storage dentro de un valor cualquiera. */
 function rutasEn(valor, encontradas = new Set()) {
   if (typeof valor === 'string') {
-    if (RE_RUTA.test(valor) && !valor.includes('://')) encontradas.add(valor);
+    const excluido = Object.keys(PREFIJOS_EXCLUIDOS).some((p) => valor.startsWith(p));
+    if (RE_RUTA.test(valor) && !valor.includes('://') && !excluido) encontradas.add(valor);
     return encontradas;
   }
   if (Array.isArray(valor)) {
@@ -136,6 +156,13 @@ function objetosEnRespaldo() {
 
 console.log(`Conciliando referencias de ${proyecto} contra gs://${bucketRespaldo}/espejo\n`);
 const referenciadas = await rutasReferenciadas();
+/* La exclusión se IMPRIME. Una exclusión que solo vive en el código es
+   indistinguible de un olvido para quien lee el informe. */
+for (const [prefijo, razon] of Object.entries(PREFIJOS_EXCLUIDOS)) {
+  console.log(`\nEXCLUIDO del respaldo — ${prefijo}`);
+  console.log(`  ${razon}`);
+}
+
 console.log(`\nRutas referenciadas por algún documento: ${referenciadas.size}`);
 
 let enRespaldo;
