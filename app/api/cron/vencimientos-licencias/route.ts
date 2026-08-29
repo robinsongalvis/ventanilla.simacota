@@ -4,6 +4,16 @@ import { autorizarCron }      from '@/lib/seguridad/autorizar-cron';
 import { logError }           from '@/lib/logger';
 import { soloOperacionReal }  from '@/lib/radicados/dato-de-prueba';
 import { diasHabilesTranscurridos, diasRestantesHabiles, sumarDiasHabiles } from '@/lib/tiempos-radicado';
+/* EL CRITERIO VIVE FUERA, y la ruta lo consume igual que la pantalla del
+   expediente. Antes estaba aquí dentro; moverlo fue la única forma de que el
+   correo y la pantalla no pudieran divergir. Se reexporta porque las pruebas
+   del vigía lo importan desde esta ruta —y son justo el testigo de que el
+   traslado no cambió nada—. */
+import {
+  clasificarFrenteAlTermino,
+  type FilaVigia,
+} from '@/lib/motor-expedientes/semaforo-termino';
+export { clasificarFrenteAlTermino };
 import { terminoResolucionSigueCorriendo } from '@/lib/motor-expedientes/estados-licencia';
 import type { ExpedienteLicenciaDoc } from '@/lib/server/expedientes-licencias';
 import type { TenantId } from '@/src/types/radicado';
@@ -47,13 +57,6 @@ export const maxDuration = 300;
    Seguridad: exige Authorization: Bearer <CRON_SECRET> (`autorizarCron`).
 ══════════════════════════════════════════════════════════════════════════ */
 
-/** Umbrales de alerta, en días hábiles restantes. Escalonados a propósito:
- *  un único aviso a dos días no da margen para reunir un concepto técnico. */
-const ESCALONES = [
-  { hasta: 0,  nivel: 'VENCIDO'  as const },
-  { hasta: 5,  nivel: 'CRITICO'  as const },
-  { hasta: 15, nivel: 'AVISO'    as const },
-];
 
 /* ── Edad máxima en estado previo ────────────────────────────────────────
    NO es una constante de código a propósito, y el porqué importa más que el
@@ -115,74 +118,9 @@ const TECHO_LECTURA = 1000;
 const COLECCION_MEMORIA = 'vigilancia_termino_licencias';
 const COLECCION_CORRIDAS = 'vigilancia_termino_corridas';
 
-type Situacion = 'CORRIENDO' | 'SUSPENDIDO' | 'SIN_ANCLAR' | 'RESUELTO';
 
-/* El estado en que el término está DETENIDO a la espera del ciudadano. Se
-   nombra explícito y NO se deduce de `terminoResolucionSigueCorriendo`: esa
-   función responde «¿ya se resolvió?» (CONCEDIDA, NEGADA, DESISTIDA…), no
-   «¿está suspendido?». Al escribir esto la primera vez las confundí, y
-   CON_ACTA_DE_OBSERVACIONES habría caído en CORRIENDO — el colapso de
-   situaciones que este vigía existe para evitar. */
-const ESTADO_TERMINO_SUSPENDIDO = 'CON_ACTA_DE_OBSERVACIONES';
 
-interface FilaVigia {
-  expedienteId: string;
-  numeroExpediente: string | null;
-  situacion: Situacion;
-  /** Solo en CORRIENDO. */
-  diasHabilesRestantes?: number;
-  nivel?: 'VENCIDO' | 'CRITICO' | 'AVISO';
-  /** Solo en SIN_ANCLAR. */
-  diasHabilesEnEspera?: number;
-}
 
-/**
- * Clasifica un expediente frente al reloj. Función PURA: sin Firestore y sin
- * `new Date()` propio — el instante entra por parámetro para que la prueba
- * pueda fijarlo y para que TODA la corrida use el mismo reloj.
- */
-export function clasificarFrenteAlTermino(
-  exp: Pick<ExpedienteLicenciaDoc, 'id' | 'estadoJuridico' | 'creadoEn'> & {
-    numeroExpediente?: { numero: string } | null;
-    fechaAlertaConservadora?: string | null;
-  },
-  ahora: Date,
-): FilaVigia {
-  const base = {
-    expedienteId: exp.id,
-    numeroExpediente: exp.numeroExpediente?.numero ?? null,
-  };
-
-  // SIN_ANCLAR primero: la ausencia de fecha es el discriminante más fuerte y
-  // no depende de interpretar el estado jurídico.
-  if (!exp.fechaAlertaConservadora) {
-    const diasHabilesEnEspera = diasHabilesTranscurridos(exp.creadoEn, ahora);
-    return { ...base, situacion: 'SIN_ANCLAR', diasHabilesEnEspera };
-  }
-
-  // RESUELTO: la Administración ya decidió; el plazo dejó de correr. Fuera del
-  // alcance del vigía — medirlo contra "hoy" convierte el paso del tiempo en
-  // una mora que no existe (el defecto que la E2E del 12-ago corrigió).
-  // OJO al añadir estados: esta función decide con un ARRAY, no con un Record,
-  // así que el compilador NO avisa (ADR-0033 §5).
-  if (!terminoResolucionSigueCorriendo(exp.estadoJuridico)) {
-    return { ...base, situacion: 'RESUELTO' };
-  }
-
-  // SUSPENDIDO: hay acta de observaciones y el reloj está detenido.
-  if (exp.estadoJuridico === ESTADO_TERMINO_SUSPENDIDO) {
-    return { ...base, situacion: 'SUSPENDIDO' };
-  }
-
-  const diasHabilesRestantes = diasRestantesHabiles(exp.fechaAlertaConservadora, ahora);
-  const escalon = ESCALONES.find((e) => diasHabilesRestantes <= e.hasta);
-  return {
-    ...base,
-    situacion: 'CORRIENDO',
-    diasHabilesRestantes,
-    ...(escalon ? { nivel: escalon.nivel } : {}),
-  };
-}
 
 
 /** Tenant dueño de los expedientes de licencias — el mismo del resto del módulo. */

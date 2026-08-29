@@ -130,12 +130,53 @@ export type TipoClaveContexto = 'string' | 'number' | 'boolean';
  * para rechazar, en el momento de PUBLICAR la Definición, cualquier
  * condición que referencie una clave no declarada.
  */
+/** Presentación de UNA opción. Ningún campo de aquí se evalúa jamás. */
+export interface OpcionPresentacion {
+  /** Lo que se lee en el botón. */
+  etiqueta: string;
+  /** Letra pequeña bajo el botón: qué cuesta esta respuesta. */
+  consecuencia?: string;
+  /**
+   * Lo que dice el chip UNA VEZ elegida. Es texto PROPIO, no la etiqueta más
+   * la consecuencia concatenadas: al decidir se puede ser más explícito que en
+   * un botón —«Baja — planos hidráulicos, sanitarios y estructurales
+   * firmados»— porque ya no compite por espacio con las otras opciones.
+   */
+  resumen?: string;
+}
+
 export interface ClaveContextoDeclarada {
   /** Nombre de la clave tal como aparece en `ContextoEvaluacionRequisito` y en `CondicionRequisito.clave`. */
   nombre: string;
   tipo: TipoClaveContexto;
   /** Dominio cerrado de valores permitidos (opcional). Si se omite, cualquier valor del `tipo` declarado es válido. */
   dominio?: Array<string | number | boolean>;
+  /**
+   * Etiquetas de cara al funcionario para cada valor del dominio, o para los
+   * dos valores de un booleano (`opciones.si` / `opciones.no`).
+   *
+   * PRESENTACIÓN PURA, aditiva: NINGUNA evaluación la mira. `evaluarCondicion`
+   * sigue trabajando con el valor, no con su etiqueta. Existe para que la
+   * pantalla pueda preguntar «¿Quién presenta la solicitud? · El titular del
+   * predio / Un apoderado» en vez de «¿Es apoderado? · Sí / No», sin que el
+   * texto viva en dos sitios: si la etiqueta estuviera en la pantalla y la
+   * pregunta en la Definición, acabarían divergiendo.
+   *
+   * `consecuencia` es la letra pequeña bajo cada opción —«exigirá poder +
+   * cédula»— para que la funcionaria vea lo que cuesta cada respuesta ANTES de
+   * elegirla, no después.
+   */
+  opciones?: {
+    si?: OpcionPresentacion;
+    no?: OpcionPresentacion;
+    porValor?: Record<string, OpcionPresentacion>;
+  };
+  /**
+   * Texto del enlace que abre la ayuda —«¿Cómo se clasifica?», «¿Qué es el
+   * Título E?»—. Cada pregunta merece el suyo: cuatro enlaces clonados no
+   * ayudan a nadie a decidir cuál abrir.
+   */
+  ayudaEnlace?: string;
   /**
    * Texto de cara al funcionario para los tres campos siguientes
    * (`pregunta`, `ayuda`, `efecto`) — TODOS OPCIONALES a propósito, mismo

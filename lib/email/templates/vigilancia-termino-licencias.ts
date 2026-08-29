@@ -18,6 +18,10 @@
  *    distingue «todo en orden» de «el sistema se cayó».
  */
 import type { NivelVigilancia, ResumenCorrida, Transicion } from '@/lib/server/vigilancia-termino';
+import {
+  COLOR_NIVEL_TERMINO,
+  ETIQUETA_NIVEL_TERMINO,
+} from '@/lib/motor-expedientes/semaforo-termino';
 
 export interface NovedadesParams {
   /** Entradas y agravamientos: lo que empeoró. */
@@ -49,16 +53,12 @@ function escapeHtml(str: string): string {
  * dejar claro que la acción está en su mano.
  */
 const ETIQUETA: Record<NivelVigilancia, string> = {
-  VENCIDO: 'Término vencido',
-  CRITICO: 'Vence en 5 días hábiles o menos',
-  AVISO: 'Vence en 15 días hábiles o menos',
+  ...ETIQUETA_NIVEL_TERMINO,
   ESPERA_EXCESIVA: 'Presentada hace demasiado y todavía sin radicar',
 };
 
 const COLOR: Record<NivelVigilancia, string> = {
-  VENCIDO: '#B42318',
-  CRITICO: '#B54708',
-  AVISO: '#5A4A16',
+  ...COLOR_NIVEL_TERMINO,
   ESPERA_EXCESIVA: '#5A4A16',
 };
 

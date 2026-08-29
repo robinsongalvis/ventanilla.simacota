@@ -157,6 +157,30 @@
           "order": "DESCENDING"
         }
       ]
+    },
+    {
+      "collectionGroup": "vigilancia_termino_corridas",
+      "queryScope": "COLLECTION",
+      "fields": [
+        {
+          "fieldPath": "__name__",
+          "order": "DESCENDING"
+        }
+      ]
+    },
+    {
+      "collectionGroup": "radicados",
+      "queryScope": "COLLECTION",
+      "fields": [
+        {
+          "fieldPath": "clasificacionIA.oficinaDestino",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "fechaCreacion",
+          "order": "DESCENDING"
+        }
+      ]
     }
   ],
   "fieldOverrides": []

@@ -21,6 +21,10 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { RadicarDebidaFormaModal, type VistaPreviaDebidaForma } from '../components/RadicarDebidaFormaModal';
 import { accionesDeCierreDisponibles, puedeExpedirEjecutoria } from '../acciones-de-cierre';
+import { CabeceraExpediente } from '../components/CabeceraExpediente';
+import { CaminoDelTramite } from '../components/CaminoDelTramite';
+import { CabeceraTermino } from '../components/CabeceraTermino';
+import { PestanasExpediente, type PestanaExpediente } from '../components/PestanasExpediente';
 import type { TipoActuacionPermitida } from '@/lib/server/expedientes-licencias';
 import type { ReactNode } from 'react';
 import Link from 'next/link';
@@ -94,6 +98,26 @@ export function DetalleLicenciaClient({ expedienteId, onVolver }: DetalleLicenci
   const [vinculando, setVinculando] = useState(false);
   const [modalActuacion, setModalActuacion] = useState<TipoActuacionPermitida | null>(null);
   const [modalRadicar, setModalRadicar] = useState(false);
+  const [pestana, setPestana] = useState<PestanaExpediente>('documentos');
+
+  /* Los contadores salen del MISMO evaluador que el checklist: no se cuentan
+     aparte, para que la pestaña y el listado no puedan decir cosas distintas. */
+  const conteoDocumentos = useMemo(() => {
+    const completitud = expediente?.completitud;
+    return {
+      aportados: Math.max(0, (completitud?.aplicables ?? 0) - (completitud?.faltantes?.length ?? 0)),
+      aplicables: completitud?.aplicables ?? 0,
+    };
+  }, [expediente]);
+
+  const conteoHechos = useMemo(() => {
+    const claves = DEFINICION_LICENCIA_CONSTRUCCION_PARCIAL.clavesContexto ?? [];
+    const ctx = expediente?.contexto ?? {};
+    return {
+      definidos: claves.filter((c) => ctx[c.nombre] !== undefined).length,
+      total: claves.length,
+    };
+  }, [expediente]);
   /** Bloque "Términos y vigencias protectores" (10-ago-2026) — `computos`/`borradorActoDesistimiento` YA CALCULADOS por el servidor (`GET .../[id]`), ver `../tipos-computos.ts`. */
   const [computos, setComputos] = useState<ComputosExpedienteUI | null>(null);
   /* La vista previa del acto de radicar. La ruta la devolvía desde #248 y nadie
@@ -177,6 +201,36 @@ export function DetalleLicenciaClient({ expedienteId, onVolver }: DetalleLicenci
 
   /** ISO de la primera `radicacion-debida-forma` — solo referencia del ancla para `PanelTerminoDual`, nunca insumo de cómputo (eso ya lo hizo el servidor). */
   const fechaRadicacion = actuaciones.find((a) => a.tipo === 'radicacion-debida-forma')?.fecha;
+
+  /**
+   * El ancla que muestra la tarjeta, con el campo PERSISTIDO por delante y la
+   * actuación como respaldo.
+   *
+   * EL DEFECTO QUE ESTO ARREGLA (29-ago-2026): la tarjeta se guardaba tras
+   * `expediente.fechaRadicacionDebidaForma`, que es OPCIONAL y solo lo escribe
+   * el acto de radicar (#248). El expediente de demostración nació EN debida
+   * forma el 24/08, antes de que ese acto existiera, así que el campo está
+   * vacío y la tarjeta no se pintaba nunca — mientras el panel de al lado sí
+   * mostraba el ancla, porque la deriva de la actuación. Lo mismo le pasa a
+   * TODO expediente anterior al acto.
+   *
+   * La guarda de la tarjeta ya no depende del ancla: depende del vencimiento,
+   * que es lo único que necesita para clasificar. Sin ancla la tarjeta
+   * simplemente omite la línea «Corre desde el …».
+   */
+  const anclaDelTermino = expediente?.fechaRadicacionDebidaForma ?? fechaRadicacion;
+
+  /**
+   * UNA SOLA CONDICIÓN, DOS USOS. Decide si se pinta la tarjeta Y si el panel
+   * de abajo cede su bloque destacado.
+   *
+   * Escrita dos veces podrían divergir, y la divergencia peligrosa no es la
+   * obvia: si la tarjeta deja de pintarse pero el panel sigue creyendo que
+   * alguien destaca el vencimiento, la pantalla se queda SIN NINGUNA fecha
+   * destacada. Un plazo que no se ve en ninguna parte es peor que verlo dos
+   * veces.
+   */
+  const hayVencimientoProyectado = Boolean(computos?.terminoDual.fechaAlertaConservadora);
 
   /**
    * "Vencimiento calculado" del timeline usa `fechaAlertaConservadora`
@@ -294,22 +348,25 @@ export function DetalleLicenciaClient({ expedienteId, onVolver }: DetalleLicenci
         className="rounded-xl p-4 md:p-5 flex flex-col gap-3"
         style={{ background: 'var(--bg-surface)', border: '1px solid var(--color-border)', boxShadow: 'var(--shadow-soft)' }}
       >
-        <div className="flex flex-wrap items-center gap-3">
-          <NumeroLegal value={numero} variant="expediente" size="lg" />
-          {expediente.esPrueba && <ChipPrueba />}
-          <ChipEstadoJuridico estado={expediente.estadoJuridico} />
-          <div className="flex flex-wrap gap-1.5">
-            {(expediente.subtipos ?? []).map((codigo) => (
-              <span
-                key={codigo}
-                className="text-[11px] font-semibold px-2 py-0.5 rounded-full"
-                style={{ background: 'var(--bg-surface-2)', color: 'var(--text-secondary)' }}
-              >
-                {nombreSubtipo(codigo)}
-              </span>
-            ))}
+        {/* CABECERA — quién, qué radicado, qué trámite, en qué estado, y el
+            PLAZO siempre visible arriba a la derecha. */}
+        <CabeceraExpediente
+          expediente={expediente}
+          desdeCuandoCorreElPlazo={anclaDelTermino ?? null}
+        />
+        {expediente.esPrueba && (
+          <div className="flex flex-wrap items-center gap-2">
+            <ChipPrueba />
           </div>
-        </div>
+        )}
+
+        {/* PESTAÑAS con contador: dicen dónde falta trabajo sin abrirlas. */}
+        <PestanasExpediente
+          activa={pestana}
+          onCambiar={setPestana}
+          documentos={conteoDocumentos}
+          hechos={conteoHechos}
+        />
         <div className="grid grid-cols-2 md:grid-cols-4 gap-4 pt-3" style={{ borderTop: '1px solid var(--color-border)' }}>
           <Metadato label="Solicitante">
             {expediente.solicitanteNombre}
@@ -362,14 +419,34 @@ export function DetalleLicenciaClient({ expedienteId, onVolver }: DetalleLicenci
       <div className="flex flex-col lg:flex-row gap-5 items-start">
         {/* ── Panel término (doble fecha) + vigencia + acciones ── */}
         <div className="w-full lg:w-[430px] shrink-0 flex flex-col gap-3">
+          {/* EL SEMÁFORO, ENCIMA. El módulo anterior estaba en rojo con 41
+              días por delante: un cronómetro que siempre grita acaba ignorado
+              justo el día que grita de verdad. La clasificación sale de la
+              MISMA función que usa el cron. */}
+          {hayVencimientoProyectado && computos?.terminoDual.fechaAlertaConservadora && (
+            <CabeceraTermino
+              expedienteId={expedienteId}
+              estadoJuridico={expediente.estadoJuridico}
+              desdeIso={anclaDelTermino}
+              venceIso={computos.terminoDual.fechaAlertaConservadora}
+            />
+          )}
+
           <PanelTerminoDual
             terminoDual={computos?.terminoDual ?? { suspension: null, reinicio: null, fechaAlertaConservadora: null }}
             origen={expediente.origen}
             estadoJuridico={expediente.estadoJuridico}
             fechaRadicacion={fechaRadicacion}
+            vencimientoDestacadoArriba={hayVencimientoProyectado}
           />
 
           {computos?.vigencia !== undefined && <PanelVigenciaActo vigencia={computos.vigencia} />}
+
+          {/* CAMINO DEL TRÁMITE, encima de las acciones: primero se ve DÓNDE
+              está el expediente y después qué se puede hacer con él. Va FUERA
+              del condicional de histórico: un expediente migrado también tiene
+              un punto en el camino, y ocultárselo no lo hace menos cierto. */}
+          <CaminoDelTramite estado={expediente.estadoJuridico} />
 
           {!esHistorico && (
             <div className="flex flex-col sm:flex-row gap-2 flex-wrap items-start">

@@ -142,8 +142,23 @@ describe('Bloque A·A3 — ChecklistRequisitos deriva estados del evaluador real
     );
 
     // 3 no-opcionales (2 obligatorios + 1 condicional) − 1 no-aplicable = 2 aplicables; de esos, 1 ya aportado.
-    const resumen = screen.getByText(/requisitos aplicables aportados/);
-    expect(resumen.textContent).toBe('1 de 2 requisitos aplicables aportados · faltan 1');
+    /* REDISEÑO 28-ago: el resumen pasó de una frase larga a una barra de
+       progreso —«1 de 2 documentos aportados»— y lo que antes iba en el
+       sufijo («faltan 1», «N sin definir») ahora vive en los encabezados de
+       grupo («Faltan · N») y en el contador de la pestaña de Hechos.
+
+       Se actualiza la FRASE, no la exigencia: sigue aseverándose el número
+       exacto que sale de las listas reales del evaluador, que es lo que esta
+       prueba existe para custodiar. */
+    /* Se leen por `aria` y no casando cadenas: los números viven en la barra de
+       progreso, que los expone semánticamente. Un `textContent` se rompería con
+       cualquier cambio de maquetación sin que nada hubiera cambiado de verdad. */
+    const barra = screen.getByRole('progressbar', { name: /documentos aportados/i });
+    expect(barra.getAttribute('aria-valuenow')).toBe('1');
+    expect(barra.getAttribute('aria-valuemax')).toBe('2');
+    /* Y el grupo «Faltan» cuenta el que falta: la información no desapareció,
+       cambió de sitio. */
+    expect(screen.getByText(/^Faltan · 1$/)).toBeTruthy();
     expect(screen.getByText('Incompleto')).toBeTruthy();
   });
 
@@ -177,9 +192,16 @@ describe('Bloque A·A3 — ChecklistRequisitos deriva estados del evaluador real
     expect(screen.queryByText('Reemplazar (nueva versión)')).toBeNull();
     expect(screen.queryByText('Adjuntar documento')).toBeNull();
 
-    // El panel "Hechos del caso" se sigue viendo, pero deshabilitado.
-    const selectApoderado = screen.getByLabelText('Es Apoderado') as HTMLSelectElement;
-    expect(selectApoderado.disabled).toBe(true);
+    /* El panel «Hechos del caso» se sigue viendo, pero no se puede tocar.
+       REDISEÑO 28-ago: los dropdowns pasaron a botones segmentados; lo que se
+       custodia —que en solo-lectura NO se pueda cambiar un hecho— es idéntico,
+       solo cambia el control en el que se comprueba. */
+    for (const opcion of ['Sí', 'No']) {
+      expect(
+        (screen.getByRole('button', { name: new RegExp(`^${opcion}$`) }) as HTMLButtonElement).disabled,
+        `la opción "${opcion}" debe estar deshabilitada en solo-lectura`,
+      ).toBe(true);
+    }
   });
 });
 
@@ -222,11 +244,17 @@ describe('Bloque A·A3 — ChecklistRequisitos reacciona EN VIVO a "Hechos del c
     // Antes: sin `esApoderado` en el contexto, el condicional es INDETERMINADO (fail-closed, NO "no aplica").
     expect(within(filaCondicional()).getByText('Falta definir')).toBeTruthy();
     expect(within(filaCondicional()).queryByText('Subir documento')).toBeNull();
-    const resumenAntes = screen.getByText(/requisitos aplicables aportados/);
-    expect(resumenAntes.textContent).toBe('0 de 2 requisitos aplicables aportados · faltan 2 · 1 sin definir en Hechos del caso');
+    const barraAntes = screen.getByRole('progressbar', { name: /documentos aportados/i });
+    expect(barraAntes.getAttribute('aria-valuenow')).toBe('0');
+    expect(barraAntes.getAttribute('aria-valuemax')).toBe('2');
+    /* «Faltan» cuenta los PENDIENTES (2). El condicional indeterminado va en su
+       propio grupo: no se sabe si se exige —el evaluador lo descuenta de
+       aplicables— y su acción es responder, no subir. */
+    expect(screen.getByText(/^Faltan · 2$/)).toBeTruthy();
+    expect(screen.getByText(/^Sin definir — dependen de Hechos del caso · 1$/)).toBeTruthy();
 
     // El funcionario marca "hay apoderado":
-    fireEvent.change(screen.getByLabelText('Es Apoderado'), { target: { value: 'true' } });
+    fireEvent.click(screen.getByRole('button', { name: /^Sí$/ }));
 
     expect(vi.mocked(fetch)).toHaveBeenCalledWith(
       '/api/licencias/expedientes/exp-1/contexto',
@@ -238,7 +266,13 @@ describe('Bloque A·A3 — ChecklistRequisitos reacciona EN VIVO a "Hechos del c
     expect(within(filaCondicional()).getByText('Subir documento')).toBeTruthy();
     expect(within(filaCondicional()).queryByText('Falta definir')).toBeNull();
 
-    const resumenDespues = screen.getByText(/requisitos aplicables aportados/);
-    expect(resumenDespues.textContent).toBe('0 de 3 requisitos aplicables aportados · faltan 3');
+    /* Al definir el hecho, el condicional deja de ser indeterminado y pasa a
+       EXIGIRSE: el denominador sube de 2 a 3 y el grupo «Sin definir»
+       desaparece. Eso es lo que esta prueba custodia. */
+    const barraDespues = screen.getByRole('progressbar', { name: /documentos aportados/i });
+    expect(barraDespues.getAttribute('aria-valuenow')).toBe('0');
+    expect(barraDespues.getAttribute('aria-valuemax')).toBe('3');
+    expect(screen.getByText(/^Faltan · 3$/)).toBeTruthy();
+    expect(screen.queryByText(/^Sin definir/)).toBeNull();
   });
 });

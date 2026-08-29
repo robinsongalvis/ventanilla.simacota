@@ -1,3 +1,6 @@
+'use client';
+
+import { useState } from 'react';
 import { formatFechaColombia } from '@/lib/fecha-colombia';
 import { diasRestantesHabiles } from '@/lib/tiempos-radicado';
 import type { OrigenActuacion } from '@/lib/motor-expedientes/tipos';
@@ -36,15 +39,30 @@ export interface PanelTerminoDualProps {
   origen?: OrigenActuacion;
   /** ISO de la actuación `radicacion-debida-forma`, si existe — se muestra solo como referencia del ancla, nunca altera el cómputo. */
   fechaRadicacion?: string;
+  /**
+   * ¿Hay una tarjeta ENCIMA que ya destaca `fechaAlertaConservadora`?
+   *
+   * Solo lo pone `DetalleLicenciaClient`, donde `CabeceraTermino` va montada
+   * justo arriba. Sin esto la pantalla enseña la misma fecha DOS VECES y con
+   * dos temperaturas distintas —verde en la tarjeta, rojo aquí—, que fue
+   * exactamente lo que el propietario vio el 29-ago-2026.
+   *
+   * NO es una forma de apagar la alarma: la tarjeta la asume entera, con el
+   * nivel correcto y con `role="alert"` cuando el término está vencido. Y el
+   * panel SUELTO —como lo montan sus pruebas— la sigue mostrando, que es donde
+   * se verifica el invariante de que la alerta lleva la fecha más temprana.
+   */
+  vencimientoDestacadoArriba?: boolean;
 }
 
-export function PanelTerminoDual({ terminoDual, origen, fechaRadicacion, estadoJuridico }: PanelTerminoDualProps) {
+export function PanelTerminoDual({ terminoDual, origen, fechaRadicacion, estadoJuridico, vencimientoDestacadoArriba }: PanelTerminoDualProps) {
   const { suspension, reinicio, fechaAlertaConservadora } = terminoDual;
   // Sin estado declarado se asume que el término corre (comportamiento
   // previo): este componente no puede adivinar, y errar hacia "mostrar la
   // alerta" es el lado seguro para un módulo cuyo fin es que no se pase un
   // plazo.
   const terminoCorriendo = estadoJuridico ? terminoResolucionSigueCorriendo(estadoJuridico) : true;
+  const [detalleAbierto, setDetalleAbierto] = useState(false);
 
   if (!suspension && !reinicio) {
     return (
@@ -55,7 +73,13 @@ export function PanelTerminoDual({ terminoDual, origen, fechaRadicacion, estadoJ
         <p className="text-[10.5px] font-bold uppercase tracking-widest" style={{ color: 'var(--text-secondary)' }}>
           Término para resolver
         </p>
-        <p className="text-sm mt-2" style={{ color: 'var(--text-secondary)' }}>
+        {/* La frase del ADR-0034 como TITULAR: la funcionaria tiene que poder
+            leérsela al ciudadano tal cual. El motivo concreto va debajo, en
+            gris, sin anillo ni fechas inventadas. */}
+        <p className="text-base font-bold mt-2" style={{ color: '#9A6206' }}>
+          El plazo aún no ha empezado a correr
+        </p>
+        <p className="text-sm mt-1" style={{ color: 'var(--text-secondary)' }}>
           {origen === 'RECONSTRUIDO'
             ? 'Expediente histórico migrado — sin cómputo de término.'
             : 'Sin radicación en debida forma registrada todavía — el término aún no arranca.'}
@@ -71,16 +95,22 @@ export function PanelTerminoDual({ terminoDual, origen, fechaRadicacion, estadoJ
       className="rounded-xl p-4 flex flex-col gap-3"
       style={{ background: 'var(--bg-surface)', border: '1px solid var(--color-border)', boxShadow: 'var(--shadow-soft)' }}
     >
-      <div>
-        <p className="text-[10.5px] font-bold uppercase tracking-widest" style={{ color: 'var(--text-secondary)' }}>
-          Término para resolver
-        </p>
-        <p className="text-xs mt-1 leading-relaxed" style={{ color: 'var(--text-secondary)' }}>
-          La interpretación jurídica de qué pasa con el plazo tras una subsanación sigue pendiente de concepto
-          escrito — el sistema muestra las dos fechas posibles y alerta sobre la más exigente para proteger a la
-          Administración.
-        </p>
-      </div>
+      {/* EL CÓMPUTO, PLEGADO. Deja de ser el encabezado y pasa a ser la letra
+          menuda que se abre cuando se necesita. No se pierde una palabra: el
+          texto sigue en el DOM —y las pruebas que lo custodian lo encuentran—,
+          solo cambia dónde vive. */}
+      <button
+        type="button"
+        onClick={() => setDetalleAbierto((v) => !v)}
+        aria-expanded={detalleAbierto}
+        aria-controls="detalle-computo"
+        className="inline-flex items-center gap-1.5 text-xs font-bold self-start focus-visible:outline-none focus-visible:ring-2 rounded"
+        style={{ color: '#14532D' }}
+      >
+        <span aria-hidden>ⓘ</span>
+        {detalleAbierto ? 'Ocultar el detalle del cómputo' : 'Detalle del cómputo (ancla, suspensiones, criterio)'}
+      </button>
+
 
       {/* Expediente YA RESUELTO: el plazo dejó de correr con la decisión.
           La fecha se conserva como REFERENCIA (cuándo vencía), en gris y sin
@@ -102,7 +132,7 @@ export function PanelTerminoDual({ terminoDual, origen, fechaRadicacion, estadoJ
         </div>
       )}
 
-      {fechaAlertaConservadora && terminoCorriendo && (
+      {fechaAlertaConservadora && terminoCorriendo && !vencimientoDestacadoArriba && (
         <div
           role="alert"
           aria-describedby="panel-termino-dual-detalle"
@@ -125,16 +155,23 @@ export function PanelTerminoDual({ terminoDual, origen, fechaRadicacion, estadoJ
         </div>
       )}
 
+      <div id="detalle-computo" hidden={!detalleAbierto} className="flex flex-col gap-3">
+        <p className="text-xs leading-relaxed" style={{ color: 'var(--text-secondary)' }}>
+          La interpretación jurídica de qué pasa con el plazo tras una subsanación sigue pendiente de concepto
+          escrito — el sistema muestra las dos fechas posibles y alerta sobre la más exigente para proteger a la
+          Administración. El vencimiento es una proyección: se recalcula en cada consulta a partir de los hechos.
+        </p>
       <div id="panel-termino-dual-detalle" className="flex flex-col gap-1.5 text-sm">
         <FilaFecha etiqueta="Si el término se suspende y reanuda" fecha={suspension} />
         <FilaFecha etiqueta="Si el término reinicia" fecha={reinicio} />
       </div>
 
-      {fechaRadicacion && (
-        <p className="text-xs" style={{ color: 'var(--text-secondary)' }}>
-          Ancla: radicación en debida forma ({formatFechaColombia(fechaRadicacion)})
-        </p>
-      )}
+        {fechaRadicacion && (
+          <p className="text-xs" style={{ color: 'var(--text-secondary)' }}>
+            Ancla: radicación en debida forma ({formatFechaColombia(fechaRadicacion)})
+          </p>
+        )}
+      </div>
     </div>
   );
 }

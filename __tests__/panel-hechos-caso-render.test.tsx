@@ -83,10 +83,17 @@ describe('PanelHechosCaso — pregunta en lenguaje natural con respaldo', () => 
     expect(screen.getByText(/se agrega el requisito "Poder del apoderado"/)).toBeTruthy();
   });
 
-  it('el efecto deja de mostrarse una vez el hecho ya fue respondido', () => {
-    renderPanel({ clavesContexto: [claveConTextos], contexto: { esApoderado: true } });
+  it('la línea de contexto SIGUE visible una vez respondido el hecho', () => {
+    /* REDISEÑO 28-ago: antes desaparecía, y con razón — el texto era una
+       consecuencia en futuro («Si responde "Sí", se exigirá…») que en pasado
+       sobraba. Ahora es CONTEXTO —«Solo decide qué planos técnicos se exigen»—
+       y sigue siendo cierto después de responder: ocultarlo obligaría a
+       recordar por qué se preguntó.
 
-    expect(screen.queryByText(/se agrega el requisito "Poder del apoderado"/)).toBeNull();
+       Lo que se conserva es la regla de fondo: no se inventa texto. Sin
+       `efecto` declarado no aparece nada, y eso lo cubre el caso siguiente. */
+    renderPanel({ clavesContexto: [claveConTextos], contexto: { esApoderado: true } });
+    expect(screen.getByText(claveConTextos.efecto)).toBeTruthy();
   });
 });
 
@@ -97,10 +104,16 @@ describe('PanelHechosCaso — aviso de faltantes', () => {
       contexto: { esApoderado: true }, // categoriaComplejidad queda sin definir
     });
 
-    // Localiza el aviso por su texto (hay varios role="status" en el panel: usar texto es más robusto).
-    const texto = screen.getByText(/Falta 1 hecho del caso por definir/);
+    /* REDISEÑO 28-ago: el banner ámbar de advertencia se sustituye por el
+       progreso «N de M definidas» —informa lo mismo sin regañar—. Lo que esta
+       prueba custodia NO era el texto sino el MECANISMO: que el recuento viva
+       en un nodo `aria-live` para que un lector de pantalla lo anuncie. Eso se
+       conserva y se sigue verificando. */
+    const texto = screen.getByText('1 de 2');
     expect(texto).toBeTruthy();
     expect(texto.closest('[aria-live="polite"]')).toBeTruthy();
+    /* Y el pie sigue diciendo cuántas faltan, en palabras. */
+    expect(screen.getByText(/Falta 1 respuesta/)).toBeTruthy();
   });
 
   it('pasa a confirmación breve cuando ya no queda ningún hecho sin definir', () => {
@@ -109,8 +122,10 @@ describe('PanelHechosCaso — aviso de faltantes', () => {
       contexto: { esApoderado: true, categoriaComplejidad: false },
     });
 
-    expect(screen.getByText('Todos los hechos del caso están definidos.')).toBeTruthy();
-    expect(screen.queryByText(/por definir/)).toBeNull();
+    expect(screen.getByText('2 de 2')).toBeTruthy();
+    /* Sin faltantes NO se muestra el recordatorio: un aviso que sigue ahí
+       cuando ya no hay nada que hacer entrena a ignorarlo. */
+    expect(screen.queryByText(/Falta/)).toBeNull();
   });
 
   it('la transición de "faltan" a "todos definidos" ocurre dentro del mismo nodo aria-live', async () => {
@@ -123,10 +138,13 @@ describe('PanelHechosCaso — aviso de faltantes', () => {
     const onActualizado = vi.fn((c: ContextoEvaluacionRequisito) => { contextoActual = c; });
     const { rerender } = renderPanel({ clavesContexto: [claveConTextos], contexto: contextoActual, onActualizado });
 
-    const avisoInicial = screen.getByText(/Falta 1 hecho del caso por definir/).closest('[role="status"]');
+    const avisoInicial = screen.getByText('0 de 1').closest('[role="status"]');
     expect(avisoInicial).toBeTruthy();
 
-    fireEvent.change(screen.getByLabelText('¿El solicitante actúa mediante apoderado?'), { target: { value: 'true' } });
+    /* Los dropdowns murieron: ahora se responde con botones segmentados. La
+       interacción cambia; lo que se verifica —que el anuncio ocurra en el MISMO
+       nodo— no. */
+    fireEvent.click(screen.getByRole('button', { name: /^Sí$/ }));
 
     await waitFor(() => expect(onActualizado).toHaveBeenCalledWith({ esApoderado: true }));
     rerender(
@@ -139,7 +157,7 @@ describe('PanelHechosCaso — aviso de faltantes', () => {
       />,
     );
 
-    const avisoFinal = screen.getByText('Todos los hechos del caso están definidos.').closest('[role="status"]');
+    const avisoFinal = screen.getByText('1 de 1').closest('[role="status"]');
     expect(avisoFinal).toBe(avisoInicial); // MISMO nodo del DOM — confiable para aria-live.
   });
 });
@@ -153,7 +171,7 @@ describe('PanelHechosCaso — confirmación honesta tras guardar (sin inventar e
 
     renderPanel({ clavesContexto: [claveConTextos], contexto: {} });
 
-    fireEvent.change(screen.getByLabelText('¿El solicitante actúa mediante apoderado?'), { target: { value: 'true' } });
+    fireEvent.click(screen.getByRole('button', { name: /^Sí$/ }));
 
     await waitFor(() => expect(screen.getByText('Guardado — el checklist de requisitos puede haber cambiado.')).toBeTruthy());
   });

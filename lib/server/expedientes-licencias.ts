@@ -40,7 +40,11 @@ import { calcularVencimientoDual, derivarEventosTermino } from '@/lib/motor-expe
  * default) — este es el DATO que la ruta de licencias le pasa; el motor
  * sigue sin conocer ningún número por defecto.
  */
-export const PLAZO_DECISION_LICENCIA_DIAS_HABILES = 45;
+/* Reexportado: la constante vive en `lib/motor-expedientes/semaforo-termino.ts`
+   para que la pantalla también pueda usarla sin arrastrar servidor. Quien ya la
+   importaba desde aquí sigue funcionando. */
+import { PLAZO_DECISION_LICENCIA_DIAS_HABILES } from '@/lib/motor-expedientes/semaforo-termino';
+export { PLAZO_DECISION_LICENCIA_DIAS_HABILES };
 
 /**
  * ⚖️ CANDADO DE EMISIÓN — NO NEGOCIABLE. La serie legal `expedientes`
