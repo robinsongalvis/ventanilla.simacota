@@ -44,6 +44,7 @@ import {
   describirModalidades,
 } from '@/lib/motor-expedientes/modalidad-construccion';
 import { ChipEstadoJuridico } from './ChipEstadoJuridico';
+import { AvisoComunicacionFallida } from './AvisoComunicacionFallida';
 import { BotonDescargarSellado } from './BotonDescargarSellado';
 import { ChipPrueba } from './ChipPrueba';
 import { NumeroLegal } from './NumeroLegal';
@@ -221,6 +222,10 @@ export function PanelDetalleExpediente({ expedienteId, onCerrar, textoColision =
               {hayColision && <EtiquetaColisionNumero explicacion={explicacionColision} />}
               {expediente && <ChipEstadoJuridico estado={expediente.estadoJuridico} />}
             </div>
+            {/* Lo primero que se ve si un correo al ciudadano no salió: la
+                funcionaria no debería tener que buscarlo. */}
+            {expediente && <AvisoComunicacionFallida marcas={expediente.comunicacionesFallidas} />}
+
             {subtipos.length > 0 && (
               <div className="flex flex-wrap gap-1">
                 {subtipos.map((s) => (

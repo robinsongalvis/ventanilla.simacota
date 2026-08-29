@@ -2,6 +2,7 @@ import type { TenantId } from '@/src/types/radicado';
 import { calcularCompletitudExpediente, type CompletitudExpediente } from '@/lib/server/completitud-expediente';
 import type { Expediente, Actuacion, ContextoEvaluacionRequisito, DefinicionTramite, NumeroExpedienteAsignado } from '@/lib/motor-expedientes/tipos';
 import { CATALOGO_FIGURAS_NORMATIVAS } from '@/lib/motor-expedientes/catalogo-subtipos-normativo';
+import type { ComunicacionesFallidas } from '@/lib/server/comunicacion-fallida';
 import {
   procedeDesistimientoTacito,
   validarEvidenciaFirmeza,
@@ -93,6 +94,13 @@ export interface ExpedienteLicenciaDoc extends Expediente {
   completitud?: CompletitudExpediente;
   /** `true` en TODO expediente creado en esta fase (candado de emisión) — nunca `undefined` en un documento real de esta colección. */
   esPrueba?: boolean;
+  /**
+   * Correos al ciudadano que NO salieron, por clase. Requisito vinculante del
+   * ADR-0033 §4.7-bis: la marca tiene que verse en la PANTALLA del expediente,
+   * no solo en un registro. Antes el resultado del envío viajaba en la
+   * respuesta HTTP y se evaporaba — ver `lib/server/comunicacion-fallida.ts`.
+   */
+  comunicacionesFallidas?: ComunicacionesFallidas;
   /**
    * Modalidades del art. 2.2.6.1.1.7 cuando el expediente incluye la figura
    * CONSTRUCCION. Lista porque el parágrafo 1 permite combinarlas.
