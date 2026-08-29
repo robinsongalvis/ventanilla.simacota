@@ -352,7 +352,7 @@ export function DetalleLicenciaClient({ expedienteId, onVolver }: DetalleLicenci
             PLAZO siempre visible arriba a la derecha. */}
         <CabeceraExpediente
           expediente={expediente}
-          desdeCuandoCorreElPlazo={expediente.fechaRadicacionDebidaForma ?? null}
+          desdeCuandoCorreElPlazo={anclaDelTermino ?? null}
         />
         {expediente.esPrueba && (
           <div className="flex flex-wrap items-center gap-2">
