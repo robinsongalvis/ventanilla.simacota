@@ -506,6 +506,53 @@ correo. Para esas personas, aplazar WhatsApp y SMS significa que los dos canales
 días corre igual aunque no se les pueda avisar de nada — por eso la constancia impresa (§4.8) no es
 un respaldo del correo sino una pieza con función propia, y por eso la consulta pública se mantiene.
 
+### 4.7-bis Lo que el correo abre, y que NO queda resuelto aquí
+
+Encender el correo tiene dos consecuencias operativas que este ADR **registra como
+pendientes de Planeación**, no como decididas por ingeniería:
+
+**El correo se vuelve canal de ENTRADA.** Los avisos salen desde `contactenos@`, que es el buzón
+que la Alcaldía publica — eso es lo correcto: si el ciudadano responde, su respuesta cae donde
+alguien la lee, no en un buzón muerto. Pero entonces **alguien tiene que revisarlo y radicar lo
+que llegue**, y con qué frecuencia. Sin esa decisión, el canal existe y nadie lo atiende, que es
+peor que no tenerlo: el ciudadano cree haber escrito a la entidad.
+
+**Quién actúa ante un envío fallido.** El comportamiento en código ya está resuelto — el sistema
+no afirma haber notificado si no notificó. Lo que falta es operativo: **quién mira la marca y qué
+hace**. Una alerta sin destinatario asignado es una alerta que nadie atiende.
+
+⚠️ **Requisito vinculante para la implementación del correo (punto 6).** La marca de envío
+fallido debe ser **visible en la pantalla del expediente**, no solo en un registro. Hoy
+`alertaNotificacionFallida` está cableada al tablero de PQRSD
+(`app/interno/dashboard/**`) y **no** al detalle del expediente de licencias: cuando el correo de
+licencias exista, esa marca hay que llevarla a esa pantalla. Si vive en un registro que nadie
+abre, es lo mismo que no tenerla.
+
+#### 28-ago-2026 — el punto 6 VENCIÓ: el correo de licencias ya existe
+
+Cuando se escribió lo de arriba, el correo de licencias era hipotético. Ya no:
+
+- acuse de recibo al abrir el expediente (#258),
+- aviso de acta de observaciones (anterior),
+- correos de hito —radicación en debida forma, decisión, desistimiento— (#265,
+  con su disparador en #267).
+
+**El requisito vinculante está incumplido.** Las tres rutas registran el
+resultado del envío en una variable —`constanciaEnviada`, `avisoEnviado`,
+`hitoEnviado`— que viaja en la respuesta HTTP **y se evapora al terminar la
+petición**. No se persiste nada, así que el detalle del expediente no puede
+mostrar que un correo no salió.
+
+Consecuencia concreta: la funcionaria ve la actuación registrada y **nada le
+dice** que el aviso al ciudadano falló. Es peor que no avisar, porque el sistema
+parece haber avisado.
+
+Es la misma familia que el fallo PT-2 del cron de PQRSD —reportar éxito sin
+haber cumplido—, esta vez en la pantalla en vez de en el panel de crons.
+
+Queda como trabajo pendiente identificado, no como decidido: persistir la marca
+en el expediente y mostrarla en su detalle.
+
 ### 4.8 La constancia impresa — pieza con nombre propio
 
 Aunque el correo entre, la constancia sigue siendo **lo único que el ciudadano se lleva en la
