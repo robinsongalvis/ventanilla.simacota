@@ -1,4 +1,4 @@
-import { afterEach, describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 import { cleanup, render, screen } from '@testing-library/react';
 import { CabeceraTermino } from '@/app/interno/licencias/components/CabeceraTermino';
 import {
@@ -136,5 +136,55 @@ describe('el avance se cuenta sobre el plazo real', () => {
   it('dice qué día de los 45 es hoy, no un porcentaje inventado', () => {
     pintar(20);
     expect(screen.getByText(new RegExp(`de ${PLAZO_DECISION_LICENCIA_DIAS_HABILES}`))).toBeTruthy();
+  });
+});
+
+describe('el expediente de demostración, con sus fechas reales', () => {
+  /* LA CAPTURA DEL PROPIETARIO (29-ago-2026), fielmente:
+       DEMO-26-130e665c · Radicada en debida forma
+       Ancla: 24/08/2026 · Vencimiento proyectado: 27/10/2026 · Quedan 41 días
+
+     El módulo VIEJO pintaba eso en ROJO, con la caja «FECHA CON LA QUE DEBE
+     TRABAJAR» en rojo y 41 días por delante. Ese es el defecto entero, y esta
+     prueba lo fija con los valores exactos en vez de con una fecha relativa.
+
+     El reloj va congelado a propósito: sin congelar, el mismo expediente
+     pasaría a AVISO en octubre y esta prueba cambiaría de veredicto sola —
+     una prueba que muda de opinión con el calendario no prueba nada. */
+  const DIA_DE_LA_CAPTURA = new Date('2026-08-29T12:00:00-05:00');
+
+  afterEach(() => vi.useRealTimers());
+
+  function pintarLaDemo() {
+    vi.useFakeTimers();
+    vi.setSystemTime(DIA_DE_LA_CAPTURA);
+    return render(
+      <CabeceraTermino
+        venceIso="2026-10-27T12:00:00.000Z"
+        desdeIso="2026-08-24T12:00:00.000Z"
+        estadoJuridico="RADICADA_EN_DEBIDA_FORMA"
+        expedienteId="DEMO-26-130e665c"
+      />,
+    );
+  }
+
+  it('sale en VERDE, no en rojo', () => {
+    const { container } = pintarLaDemo();
+    expect(screen.getByText('En término')).toBeTruthy();
+    expect(screen.queryByRole('alert')).toBeNull();
+    /* Ningún rojo de la paleta del vigía en toda la tarjeta. */
+    expect(container.innerHTML).not.toContain(COLOR_NIVEL_TERMINO.VENCIDO);
+    expect(container.innerHTML).not.toContain(COLOR_NIVEL_TERMINO.CRITICO);
+  });
+
+  it('conserva la fecha de vencimiento y el ancla que ya mostraba', () => {
+    pintarLaDemo();
+    expect(screen.getByText(/Vence el 27\/10\/2026/)).toBeTruthy();
+    expect(screen.getByText(/desde el 24\/08\/2026/)).toBeTruthy();
+  });
+
+  it('y dice que se puede trabajar con calma, en vez de alarmar', () => {
+    pintarLaDemo();
+    expect(screen.getByText(/puede avanzar con calma/i)).toBeTruthy();
   });
 });
