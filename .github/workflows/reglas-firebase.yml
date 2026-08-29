@@ -150,7 +150,7 @@ jobs:
 
       - name: Incidencia si el vigía encontró deriva REAL
         if: ${{ env.ACCION == 'verificar' && steps.deriva.outputs.ESTADO == 'deriva' }}
-        uses: actions/github-script@v8
+        uses: actions/github-script@v9
         env:
           # Por `env`, nunca interpolado dentro del script: un reporte con
           # comillas o backticks rompería el template literal (o algo peor).
@@ -169,7 +169,7 @@ jobs:
 
       - name: Cerrar la incidencia de deriva si volvió a coincidir
         if: ${{ env.ACCION == 'verificar' && steps.deriva.outputs.ESTADO == 'sin_deriva' }}
-        uses: actions/github-script@v8
+        uses: actions/github-script@v9
         with:
           script: |
             // Simétrico del smoke: sin esto la incidencia queda abierta
@@ -183,7 +183,7 @@ jobs:
 
       - name: Avisar si el vigía NO PUDO comprobar
         if: ${{ always() && env.ACCION == 'verificar' && steps.deriva.outputs.ESTADO == 'fallo' }}
-        uses: actions/github-script@v8
+        uses: actions/github-script@v9
         env:
           REPORTE: ${{ steps.deriva.outputs.REPORTE }}
         with:
