@@ -130,6 +130,21 @@ export type TipoClaveContexto = 'string' | 'number' | 'boolean';
  * para rechazar, en el momento de PUBLICAR la Definición, cualquier
  * condición que referencie una clave no declarada.
  */
+/** Presentación de UNA opción. Ningún campo de aquí se evalúa jamás. */
+export interface OpcionPresentacion {
+  /** Lo que se lee en el botón. */
+  etiqueta: string;
+  /** Letra pequeña bajo el botón: qué cuesta esta respuesta. */
+  consecuencia?: string;
+  /**
+   * Lo que dice el chip UNA VEZ elegida. Es texto PROPIO, no la etiqueta más
+   * la consecuencia concatenadas: al decidir se puede ser más explícito que en
+   * un botón —«Baja — planos hidráulicos, sanitarios y estructurales
+   * firmados»— porque ya no compite por espacio con las otras opciones.
+   */
+  resumen?: string;
+}
+
 export interface ClaveContextoDeclarada {
   /** Nombre de la clave tal como aparece en `ContextoEvaluacionRequisito` y en `CondicionRequisito.clave`. */
   nombre: string;
@@ -152,10 +167,16 @@ export interface ClaveContextoDeclarada {
    * elegirla, no después.
    */
   opciones?: {
-    si?: { etiqueta: string; consecuencia?: string };
-    no?: { etiqueta: string; consecuencia?: string };
-    porValor?: Record<string, { etiqueta: string; consecuencia?: string }>;
+    si?: OpcionPresentacion;
+    no?: OpcionPresentacion;
+    porValor?: Record<string, OpcionPresentacion>;
   };
+  /**
+   * Texto del enlace que abre la ayuda —«¿Cómo se clasifica?», «¿Qué es el
+   * Título E?»—. Cada pregunta merece el suyo: cuatro enlaces clonados no
+   * ayudan a nadie a decidir cuál abrir.
+   */
+  ayudaEnlace?: string;
   /**
    * Texto de cara al funcionario para los tres campos siguientes
    * (`pregunta`, `ayuda`, `efecto`) — TODOS OPCIONALES a propósito, mismo

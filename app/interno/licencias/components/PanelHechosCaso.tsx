@@ -205,11 +205,21 @@ export function PanelHechosCaso({ expedienteId, clavesContexto, contexto, soloLe
           El checklist queda <strong>completo y exacto</strong> al responder las {clavesLegibles.length} —
           hoy exige lo general mientras tanto.
         </p>
-        {sinDefinir > 0 && (
-          <span className="text-xs font-bold" style={{ color: '#9A6206' }}>
-            {`Falta${sinDefinir === 1 ? '' : 'n'} ${sinDefinir} respuesta${sinDefinir === 1 ? '' : 's'}`}
-          </span>
-        )}
+        {/* El pie cambia de estado al completarlas: mientras faltan avisa
+            cuántas; al terminar, CONFIRMA que el checklist quedó exacto — que
+            es el hecho que la funcionaria necesita para seguir. */}
+        <span
+          className="text-xs font-bold px-3 py-2 rounded-lg"
+          style={
+            sinDefinir === 0
+              ? { background: '#116932', color: '#fff' }
+              : { background: 'var(--bg-surface-1)', color: '#9A6206', border: '1px solid var(--color-border)' }
+          }
+        >
+          {sinDefinir === 0
+            ? '✓ Hechos completos — el checklist quedó exacto'
+            : `Falta${sinDefinir === 1 ? '' : 'n'} ${sinDefinir} respuesta${sinDefinir === 1 ? '' : 's'}`}
+        </span>
       </div>
 
       {error && (
@@ -245,7 +255,7 @@ function FilaHecho({
   contexto: ContextoEvaluacionRequisito;
   soloLectura: boolean;
   guardando: boolean;
-  onElegir: (valor: string) => void;
+  onElegir: (valor: string | number | boolean) => void;
 }) {
   const [ayudaAbierta, setAyudaAbierta] = useState(false);
   const definido = Object.prototype.hasOwnProperty.call(contexto, clave.nombre);
@@ -254,42 +264,56 @@ function FilaHecho({
   const idAyuda = `${idCampo}-ayuda`;
   const idEfecto = `${idCampo}-efecto`;
 
-  /* El efecto se muestra mientras el hecho está SIN DEFINIR: es ahí donde
-     orienta la decisión. Una vez respondido, repetirlo en pasado sería ruido. */
-  const mostrarEfecto = !definido && !!clave.efecto;
+  /* La línea corta de contexto se muestra SIEMPRE. Antes solo aparecía sin
+     definir, porque el texto era una consecuencia en futuro —«Si responde Sí,
+     se exigirá…»— que en pasado sobraba. Ahora es contexto —«Solo decide qué
+     planos técnicos se exigen»—, y eso sigue siendo cierto después de
+     responder. */
+  const mostrarEfecto = !!clave.efecto;
   const describedBy = [clave.ayuda ? idAyuda : null, mostrarEfecto ? idEfecto : null]
     .filter(Boolean).join(' ') || undefined;
 
   /* Las opciones salen de la Definición. Sin `opciones` declaradas se cae al
      comportamiento de siempre —Sí / No, o los valores del dominio— sin
      inventar ningún texto. */
-  const opciones: { valor: string; etiqueta: string; consecuencia?: string }[] =
+  /* EL VALOR VA TIPADO, NO COMO TEXTO.
+     Al pasar de `<select>` a botones perdí la conversión que hacía el
+     `onChange` (`value === 'true'`), y la pantalla empezó a enviar la CADENA
+     'true'. El servidor la rechazaba con «la clave "esApoderado" espera
+     boolean, se recibió string» — un error que las pruebas no vieron porque
+     mockean `fetch` y no validan el tipo.
+
+     Ahora `valor` ES el valor del dominio: `true`/`false` de verdad, o la
+     entrada tal cual de `dominio`. La etiqueta es SOLO presentación y no viaja
+     nunca. */
+  type OpcionRender = { valor: string | number | boolean; etiqueta: string; consecuencia?: string; resumen?: string };
+  const opciones: OpcionRender[] =
     clave.tipo === 'boolean'
       ? [
-          { valor: 'false', etiqueta: clave.opciones?.no?.etiqueta ?? 'No', consecuencia: clave.opciones?.no?.consecuencia },
-          { valor: 'true', etiqueta: clave.opciones?.si?.etiqueta ?? 'Sí', consecuencia: clave.opciones?.si?.consecuencia },
+          { valor: false, etiqueta: clave.opciones?.no?.etiqueta ?? 'No', consecuencia: clave.opciones?.no?.consecuencia, resumen: clave.opciones?.no?.resumen },
+          { valor: true, etiqueta: clave.opciones?.si?.etiqueta ?? 'Sí', consecuencia: clave.opciones?.si?.consecuencia, resumen: clave.opciones?.si?.resumen },
         ]
-      : (clave.dominio ?? []).map((v) => {
-          const k = String(v);
-          return {
-            valor: k,
-            etiqueta: clave.opciones?.porValor?.[k]?.etiqueta ?? k,
-            consecuencia: clave.opciones?.porValor?.[k]?.consecuencia,
-          };
-        });
+      : (clave.dominio ?? []).map((v) => ({
+          valor: v,
+          etiqueta: clave.opciones?.porValor?.[String(v)]?.etiqueta ?? String(v),
+          consecuencia: clave.opciones?.porValor?.[String(v)]?.consecuencia,
+          resumen: clave.opciones?.porValor?.[String(v)]?.resumen,
+        }));
 
-  const etiquetaDeValor = (v: unknown): string | null => {
-    const k = String(v);
-    const o = opciones.find((x) => x.valor === k);
-    return o ? o.etiqueta : null;
-  };
+  /* Se compara por VALOR, no por su texto: `String(v)` colapsaría `true` y
+     `'true'`, que es justo la confusión que causó el error. */
+  const opcionDeValor = (v: unknown) => opciones.find((x) => x.valor === v);
 
   return (
     <li
       className="px-5 py-4 flex flex-wrap items-start justify-between gap-x-6 gap-y-3"
       style={{
         borderTop: indice === 1 ? undefined : '1px solid var(--color-border)',
-        background: definido ? 'rgba(20,83,45,0.045)' : undefined,
+        /* El verde recorre la fila entera y se apaga hacia la derecha, para
+           que la respondida se distinga de un vistazo sin gritar. */
+        background: definido
+          ? 'linear-gradient(90deg, rgba(20,83,45,0.07) 0%, rgba(20,83,45,0.03) 60%, transparent 100%)'
+          : undefined,
       }}
     >
       <div className="min-w-0 flex-1">
@@ -318,12 +342,16 @@ function FilaHecho({
 
             {/* CHIP de lo decidido: la funcionaria ve la consecuencia ya
                 aplicada sin tener que recordar qué eligió. */}
-            {definido && etiquetaDeValor(valorActual) && (
+            {definido && opcionDeValor(valorActual) && (
               <span
                 className="inline-block mt-1.5 text-xs font-bold px-2.5 py-1 rounded-full"
                 style={{ background: '#E7F6EC', color: '#116932' }}
               >
-                {etiquetaDeValor(valorActual)}
+                {/* El chip tiene TEXTO PROPIO, no la etiqueta más la
+                    consecuencia pegadas: al decidir se puede ser más explícito
+                    que en un botón, porque ya no compite por espacio. */}
+                <span aria-hidden className="inline-block h-1.5 w-1.5 rounded-full mr-1.5" style={{ background: 'currentColor' }} />
+                {opcionDeValor(valorActual)!.resumen ?? opcionDeValor(valorActual)!.etiqueta}
               </span>
             )}
 
@@ -338,7 +366,9 @@ function FilaHecho({
                   style={{ color: '#14532D' }}
                 >
                   <span aria-hidden>ⓘ</span>
-                  {ayudaAbierta ? 'Ocultar ayuda' : '¿Cómo se clasifica?'}
+                  {/* Cada pregunta con SU enlace: cuatro «¿Cómo se clasifica?»
+                      clonados no ayudan a decidir cuál abrir. */}
+                  {ayudaAbierta ? 'Ocultar ayuda' : (clave.ayudaEnlace ?? 'Ver ayuda')}
                 </button>
                 {/* Sigue en el DOM y asociada por aria aunque esté plegada: lo
                     que importa es que exista y se pueda alcanzar. */}
@@ -361,19 +391,21 @@ function FilaHecho({
         role="group"
         aria-labelledby={idCampo}
         aria-describedby={describedBy}
-        className="flex rounded-xl overflow-hidden shrink-0"
-        style={{ border: '1px solid var(--color-border)', background: 'var(--bg-surface-2)' }}
+        /* Reparto UNIFORME: `flex-1 basis-0` en cada opción, para que «No» no
+           quede raquítico al lado de «No — rodeado de espacio público». */
+        className="flex gap-1 p-1 rounded-xl shrink-0 w-full sm:w-[360px]"
+        style={{ background: 'var(--bg-surface-2)' }}
       >
         {opciones.map((o) => {
-          const elegida = definido && String(valorActual) === o.valor;
+          const elegida = definido && valorActual === o.valor;
           return (
             <button
-              key={o.valor}
+              key={String(o.valor)}
               type="button"
               disabled={soloLectura || guardando}
               aria-pressed={elegida}
               onClick={() => onElegir(o.valor)}
-              className="px-4 py-2.5 text-sm text-center transition-colors disabled:opacity-60 focus-visible:outline-none focus-visible:ring-2"
+              className="flex-1 basis-0 px-4 py-2.5 text-sm text-center rounded-lg transition-colors disabled:opacity-60 focus-visible:outline-none focus-visible:ring-2"
               style={
                 elegida
                   ? { background: '#14532D', color: '#fff', fontWeight: 800 }

@@ -83,10 +83,17 @@ describe('PanelHechosCaso — pregunta en lenguaje natural con respaldo', () => 
     expect(screen.getByText(/se agrega el requisito "Poder del apoderado"/)).toBeTruthy();
   });
 
-  it('el efecto deja de mostrarse una vez el hecho ya fue respondido', () => {
-    renderPanel({ clavesContexto: [claveConTextos], contexto: { esApoderado: true } });
+  it('la línea de contexto SIGUE visible una vez respondido el hecho', () => {
+    /* REDISEÑO 28-ago: antes desaparecía, y con razón — el texto era una
+       consecuencia en futuro («Si responde "Sí", se exigirá…») que en pasado
+       sobraba. Ahora es CONTEXTO —«Solo decide qué planos técnicos se exigen»—
+       y sigue siendo cierto después de responder: ocultarlo obligaría a
+       recordar por qué se preguntó.
 
-    expect(screen.queryByText(/se agrega el requisito "Poder del apoderado"/)).toBeNull();
+       Lo que se conserva es la regla de fondo: no se inventa texto. Sin
+       `efecto` declarado no aparece nada, y eso lo cubre el caso siguiente. */
+    renderPanel({ clavesContexto: [claveConTextos], contexto: { esApoderado: true } });
+    expect(screen.getByText(claveConTextos.efecto)).toBeTruthy();
   });
 });
 
