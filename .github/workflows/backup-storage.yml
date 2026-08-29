@@ -185,7 +185,7 @@ jobs:
 
       - name: Abrir incidencia si el respaldo falló
         if: ${{ failure() }}
-        uses: actions/github-script@v8
+        uses: actions/github-script@v9
         with:
           script: |
             // Misma disciplina que el smoke: la incidencia se abre sola y se
@@ -209,7 +209,7 @@ jobs:
 
       - name: Cerrar la incidencia si el respaldo volvió a funcionar
         if: ${{ success() }}
-        uses: actions/github-script@v8
+        uses: actions/github-script@v9
         with:
           script: |
             const abiertas = await github.rest.issues.listForRepo({ ...context.repo, state: 'open', labels: 'respaldo-adjuntos' });
