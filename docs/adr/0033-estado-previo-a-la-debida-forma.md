@@ -528,6 +528,31 @@ fallido debe ser **visible en la pantalla del expediente**, no solo en un regist
 licencias exista, esa marca hay que llevarla a esa pantalla. Si vive en un registro que nadie
 abre, es lo mismo que no tenerla.
 
+#### 28-ago-2026 — el punto 6 VENCIÓ: el correo de licencias ya existe
+
+Cuando se escribió lo de arriba, el correo de licencias era hipotético. Ya no:
+
+- acuse de recibo al abrir el expediente (#258),
+- aviso de acta de observaciones (anterior),
+- correos de hito —radicación en debida forma, decisión, desistimiento— (#265,
+  con su disparador en #267).
+
+**El requisito vinculante está incumplido.** Las tres rutas registran el
+resultado del envío en una variable —`constanciaEnviada`, `avisoEnviado`,
+`hitoEnviado`— que viaja en la respuesta HTTP **y se evapora al terminar la
+petición**. No se persiste nada, así que el detalle del expediente no puede
+mostrar que un correo no salió.
+
+Consecuencia concreta: la funcionaria ve la actuación registrada y **nada le
+dice** que el aviso al ciudadano falló. Es peor que no avisar, porque el sistema
+parece haber avisado.
+
+Es la misma familia que el fallo PT-2 del cron de PQRSD —reportar éxito sin
+haber cumplido—, esta vez en la pantalla en vez de en el panel de crons.
+
+Queda como trabajo pendiente identificado, no como decidido: persistir la marca
+en el expediente y mostrarla en su detalle.
+
 ### 4.8 La constancia impresa — pieza con nombre propio
 
 Aunque el correo entre, la constancia sigue siendo **lo único que el ciudadano se lleva en la
