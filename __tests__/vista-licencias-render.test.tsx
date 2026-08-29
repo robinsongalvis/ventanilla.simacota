@@ -153,7 +153,10 @@ describe('VistaLicencias — Bloque B, Licencias embebida en el panel interno', 
 
     await waitFor(() =>
       expect(screen.getByRole('button', { name: /Bandeja de Licencias/ })).toBeTruthy());
-    expect(screen.getByText('Carlos Alberto Rojas')).toBeTruthy();
+    /* REDISEÑO 28-ago: el nombre aparece ahora en DOS sitios —la fila de la
+       bandeja y la cabecera del detalle—, así que `getByText` encuentra dos.
+       Se afirma lo que la prueba quiere: que el detalle se abrió. */
+    expect(screen.getAllByText('Carlos Alberto Rojas').length).toBeGreaterThan(0);
     // Las sub-pestañas no aplican mientras se ve un expediente puntual.
     expect(screen.queryByRole('tab', { name: 'Bandeja' })).toBeNull();
     expect(screen.queryByRole('heading', { name: 'Bandeja de Licencias' })).toBeNull();

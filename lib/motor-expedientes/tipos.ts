@@ -137,6 +137,26 @@ export interface ClaveContextoDeclarada {
   /** Dominio cerrado de valores permitidos (opcional). Si se omite, cualquier valor del `tipo` declarado es válido. */
   dominio?: Array<string | number | boolean>;
   /**
+   * Etiquetas de cara al funcionario para cada valor del dominio, o para los
+   * dos valores de un booleano (`opciones.si` / `opciones.no`).
+   *
+   * PRESENTACIÓN PURA, aditiva: NINGUNA evaluación la mira. `evaluarCondicion`
+   * sigue trabajando con el valor, no con su etiqueta. Existe para que la
+   * pantalla pueda preguntar «¿Quién presenta la solicitud? · El titular del
+   * predio / Un apoderado» en vez de «¿Es apoderado? · Sí / No», sin que el
+   * texto viva en dos sitios: si la etiqueta estuviera en la pantalla y la
+   * pregunta en la Definición, acabarían divergiendo.
+   *
+   * `consecuencia` es la letra pequeña bajo cada opción —«exigirá poder +
+   * cédula»— para que la funcionaria vea lo que cuesta cada respuesta ANTES de
+   * elegirla, no después.
+   */
+  opciones?: {
+    si?: { etiqueta: string; consecuencia?: string };
+    no?: { etiqueta: string; consecuencia?: string };
+    porValor?: Record<string, { etiqueta: string; consecuencia?: string }>;
+  };
+  /**
    * Texto de cara al funcionario para los tres campos siguientes
    * (`pregunta`, `ayuda`, `efecto`) — TODOS OPCIONALES a propósito, mismo
    * patrón aditivo que `dominio`: una Definición que no los declare sigue

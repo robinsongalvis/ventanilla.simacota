@@ -92,31 +92,60 @@ export function ChecklistRequisitos({
 
   return (
     <div className="flex flex-col gap-3">
+      {/* BARRA DE PROGRESO. Sustituye a la tarjeta de resumen: el mismo dato
+          —«aportados de aplicables»— pero visible de un vistazo y sin ocupar
+          una tarjeta entera. Los números NO cambian: salen de las mismas
+          listas del evaluador. */}
       <div
-        className="rounded-xl p-4"
-        style={{ background: 'var(--bg-surface)', border: '1px solid var(--color-border)', boxShadow: 'var(--shadow-soft)' }}
+        className="rounded-xl px-4 py-3 flex flex-wrap items-center gap-x-4 gap-y-2"
+        style={{ background: 'var(--bg-surface)', border: '1px solid var(--color-border)' }}
       >
-        <div className="flex flex-wrap items-center justify-between gap-2">
-          <p className="font-headline text-base" style={{ color: 'var(--text-primary)' }}>Checklist de requisitos</p>
-          <span
-            className="text-[11px] font-bold uppercase tracking-wider px-2.5 py-1 rounded-full"
-            style={resultado.completo ? { background: '#E7F6EC', color: '#116932' } : { background: '#FAEEDA', color: '#7A4F0A' }}
-          >
-            {resultado.completo ? 'Completo' : 'Incompleto'}
-          </span>
-        </div>
-
-        <p className="text-sm mt-1.5" style={{ color: 'var(--text-secondary)' }}>
-          {aportados} de {aplicables} requisitos aplicables aportados
-          {resultado.faltantes.length > 0 && <> · faltan {resultado.faltantes.length}</>}
-          {resultado.indeterminados.length > 0 && <> · {resultado.indeterminados.length} sin definir en Hechos del caso</>}
-          {resultado.aportesDuplicados.length > 0 && <> · {resultado.aportesDuplicados.length} con aportes duplicados</>}
+        <p className="text-sm shrink-0" style={{ color: 'var(--text-primary)' }}>
+          <strong>{aportados} de {aplicables}</strong>{' '}
+          <span style={{ color: 'var(--text-secondary)' }}>documentos aportados</span>
         </p>
 
-        {soloLectura && motivoSoloLectura && (
-          <p className="text-xs mt-1.5" style={{ color: 'var(--text-secondary)' }}>{motivoSoloLectura}</p>
+        <div
+          className="flex-1 min-w-[120px] h-2 rounded-full overflow-hidden"
+          role="progressbar"
+          aria-valuenow={aportados}
+          aria-valuemin={0}
+          aria-valuemax={aplicables}
+          aria-label="Documentos aportados"
+          style={{ background: 'var(--bg-surface-2)' }}
+        >
+          <div
+            className="h-full rounded-full"
+            style={{
+              width: aplicables > 0 ? `${Math.round((aportados / aplicables) * 100)}%` : '0%',
+              background: resultado.completo ? '#14532D' : '#4E9A5F',
+            }}
+          />
+        </div>
+
+        <span className="text-sm font-bold shrink-0" style={{ color: resultado.completo ? '#116932' : '#4E9A5F' }}>
+          {aplicables > 0 ? Math.round((aportados / aplicables) * 100) : 0}%
+        </span>
+
+        {/* El chip vuelve: lo quité al reemplazar la tarjeta de resumen y una
+            prueba lo cazó. Dice de un vistazo si el checklist está completo,
+            que es lo que decide si se puede radicar. */}
+        <span
+          className="text-[11px] font-bold uppercase tracking-wider px-2.5 py-1 rounded-full shrink-0"
+          style={resultado.completo ? { background: '#E7F6EC', color: '#116932' } : { background: '#FAEEDA', color: '#7A4F0A' }}
+        >
+          {resultado.completo ? 'Completo' : 'Incompleto'}
+        </span>
+
+        {resultado.aportesDuplicados.length > 0 && (
+          <span className="text-xs w-full" style={{ color: '#9A6206' }}>
+            {resultado.aportesDuplicados.length} con aportes duplicados
+          </span>
         )}
 
+        {soloLectura && motivoSoloLectura && (
+          <p className="text-xs w-full" style={{ color: 'var(--text-secondary)' }}>{motivoSoloLectura}</p>
+        )}
       </div>
 
       {definicion.clavesContexto && definicion.clavesContexto.length > 0 && (
@@ -129,30 +158,62 @@ export function ChecklistRequisitos({
         />
       )}
 
-      <div
-        className="rounded-xl p-4"
-        style={{ background: 'var(--bg-surface)', border: '1px solid var(--color-border)', boxShadow: 'var(--shadow-soft)' }}
-      >
-        <ul className="flex flex-col gap-2">
-          {definicion.requisitos.map((requisito) => {
-            const aporte = aportePorRequisito.get(requisito.id);
-            const documentoId = aporte?.documentoIds?.[0];
-            const indeterminado = resultado.indeterminados.find((i) => i.requisitoId === requisito.id);
-            return (
-              <RequisitoItem
-                key={requisito.id}
-                expedienteId={expedienteId}
-                requisito={requisito}
-                estado={estadoDe(requisito.id)}
-                documento={documentoId ? documentoPorId.get(documentoId) : undefined}
-                clavesFaltantesIndeterminado={indeterminado?.clavesFaltantes}
-                soloLectura={soloLectura}
-                onDocumentoSubido={onDocumentoSubido}
-              />
-            );
-          })}
-        </ul>
-      </div>
+      {/* AGRUPADO: lo que FALTA arriba, lo APORTADO abajo. Antes era una lista
+          plana donde un requisito pendiente y uno ya entregado se veían igual,
+          y la funcionaria tenía que leerlos todos para saber qué le queda.
+
+          Los NO APLICABLES van al final, atenuados, PERO SE LISTAN: la
+          funcionaria tiene derecho a saber qué no se le exige y por qué, y
+          esconderlos convertiría una decisión del sistema en algo invisible.
+          (Los escondí en la primera versión de este rediseño; una prueba que ya
+          existía lo cazó, y tenía razón.) */}
+      {([
+        { clave: 'faltan', titulo: 'Faltan', estados: ['PENDIENTE'] as const },
+        /* SIN DEFINIR va aparte de FALTAN, y no es un detalle de maquetación:
+           un indeterminado NO se sabe todavía si se exige —por eso el evaluador
+           lo descuenta de «aplicables»—, así que meterlo en «Faltan» haría que
+           el encabezado contara 3 mientras la barra dice «0 de 2». Y la acción
+           es otra: uno se sube, el otro se responde en Hechos del caso. */
+        { clave: 'sin-definir', titulo: 'Sin definir — dependen de Hechos del caso', estados: ['INDETERMINADO'] as const },
+        { clave: 'aportados', titulo: 'Aportados', estados: ['APORTADO'] as const },
+        { clave: 'no-aplican', titulo: 'No se exigen en este caso', estados: ['NO_APLICA'] as const },
+      ] as const).map((grupo) => {
+        const requisitos = definicion.requisitos.filter((r) =>
+          (grupo.estados as readonly string[]).includes(estadoDe(r.id)),
+        );
+        if (requisitos.length === 0) return null;
+        return (
+          <div key={grupo.clave} className="flex flex-col gap-1.5">
+            <p className="text-[10px] font-bold uppercase tracking-widest px-1" style={{ color: '#667085' }}>
+              {`${grupo.titulo} · ${requisitos.length}`}
+            </p>
+            <div
+              className="rounded-xl overflow-hidden"
+              style={{ background: 'var(--bg-surface)', border: '1px solid var(--color-border)' }}
+            >
+              <ul className="flex flex-col">
+                {requisitos.map((requisito) => {
+                  const aporte = aportePorRequisito.get(requisito.id);
+                  const documentoId = aporte?.documentoIds?.[0];
+                  const indeterminado = resultado.indeterminados.find((i) => i.requisitoId === requisito.id);
+                  return (
+                    <RequisitoItem
+                      key={requisito.id}
+                      expedienteId={expedienteId}
+                      requisito={requisito}
+                      estado={estadoDe(requisito.id)}
+                      documento={documentoId ? documentoPorId.get(documentoId) : undefined}
+                      clavesFaltantesIndeterminado={indeterminado?.clavesFaltantes}
+                      soloLectura={soloLectura}
+                      onDocumentoSubido={onDocumentoSubido}
+                    />
+                  );
+                })}
+              </ul>
+            </div>
+          </div>
+        );
+      })}
 
       <OtrosDocumentos
         expedienteId={expedienteId}

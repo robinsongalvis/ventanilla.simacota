@@ -104,7 +104,14 @@ export const DEFINICION_LICENCIA_CONSTRUCCION_PARCIAL: DefinicionTramite = {
     {
       nombre: 'esApoderado',
       tipo: 'boolean',
-      pregunta: '¿La solicitud la presenta un apoderado o autorizado, en representación del titular?',
+      /* REDISEÑO 28-ago: la pregunta pasa a lenguaje de mostrador. La CLAVE, su
+         tipo y su efecto sobre los requisitos no cambian — solo cómo se
+         pregunta. */
+      pregunta: '¿Quién presenta la solicitud?',
+      opciones: {
+        no: { etiqueta: 'El titular del predio' },
+        si: { etiqueta: 'Un apoderado', consecuencia: 'exigirá poder + cédula' },
+      },
       ayuda: 'Marque "Sí" si quien radica la solicitud no es el propietario o titular del predio, sino una persona que actúa en su nombre mediante poder o autorización escrita.',
       efecto: 'Si responde "Sí", se exigirá el poder o autorización del apoderado, con presentación personal de quien lo otorga y copia de la cédula del apoderado.',
     },
@@ -112,7 +119,14 @@ export const DEFINICION_LICENCIA_CONSTRUCCION_PARCIAL: DefinicionTramite = {
       nombre: 'categoriaComplejidad',
       tipo: 'string',
       dominio: ['BAJA', 'MEDIA', 'ALTA'],
-      pregunta: '¿Cuál es la categoría de complejidad de la obra?',
+      pregunta: 'Categoría de complejidad de la obra',
+      opciones: {
+        porValor: {
+          BAJA: { etiqueta: 'Baja', consecuencia: 'planos firmados' },
+          MEDIA: { etiqueta: 'Media', consecuencia: 'planos firmados' },
+          ALTA: { etiqueta: 'Alta' },
+        },
+      },
       ayuda: 'Clasificación técnica del proyecto en Baja, Media o Alta complejidad. No determina el plazo legal de respuesta (los plazos diferenciados por categoría de complejidad fueron derogados, D.1783/2021 art. 37) — aquí solo decide qué planos técnicos se exigen en el checklist.',
       efecto: 'Si la categoría es "Baja" o "Media", se exigirán los planos hidráulicos, sanitarios y estructurales firmados por Ingeniero Civil.',
     },
@@ -123,14 +137,27 @@ export const DEFINICION_LICENCIA_CONSTRUCCION_PARCIAL: DefinicionTramite = {
       // (vivienda de uno o dos pisos) y deja la referencia normativa al
       // final: quien llena el formulario sabe cuántos pisos tiene la obra,
       // no si "está sujeta al Título E".
-      pregunta: '¿Es una vivienda de uno o dos pisos que se acoge al procedimiento simplificado (Título E de la NSR-10)?',
+      pregunta: '¿Vivienda de 1 o 2 pisos con procedimiento simplificado?',
+      opciones: {
+        si: { etiqueta: 'Sí, se acoge' },
+        no: { etiqueta: 'No', consecuencia: 'exigirá estudio de suelos' },
+      },
       ayuda: 'El Título E del Reglamento Colombiano de Construcción Sismo Resistente (NSR-10) define un procedimiento simplificado para viviendas de uno y dos pisos que cumplan ciertas condiciones. Si el proyecto NO se acoge a ese procedimiento simplificado, debe sustentarse con un estudio de suelos y geotécnico completo, cuyo contenido regula el Título H (Estudios Geotécnicos) de la misma norma.',
       efecto: 'Si responde "No" (el proyecto no está sujeto al Título E), se exigirá el estudio de suelos y geotécnico, con memorias de cálculo estructural.',
     },
     {
       nombre: 'predioRodeadoEspacioPublico',
       tipo: 'boolean',
-      pregunta: '¿El predio está completamente rodeado por espacio público (vías, parques, zonas verdes)?',
+      /* OJO: la pregunta se reformula en POSITIVO —«¿tiene colindantes?»— pero
+         la clave sigue siendo `predioRodeadoEspacioPublico`, así que las
+         etiquetas van CRUZADAS: «Sí, tiene colindantes» es `no` (no está
+         rodeado). Se deja escrito porque es justo el sitio donde alguien
+         invertiría el valor por descuido. */
+      pregunta: '¿El predio tiene predios colindantes?',
+      opciones: {
+        no: { etiqueta: 'Sí, tiene', consecuencia: 'exigirá acta de colindancia' },
+        si: { etiqueta: 'No — rodeado de espacio público' },
+      },
       ayuda: 'Se refiere a que el lote no tenga predios colindantes porque todo su perímetro linda con espacio público. La norma también exime de este requisito a los predios en zona rural no suburbana, pero esa condición no está disponible todavía en este formulario.',
       efecto: 'Si responde "No" (el predio sí tiene colindantes), se exigirá la relación de direcciones de los predios colindantes y el acta de colindancia.',
     },
