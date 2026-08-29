@@ -61,6 +61,34 @@ export const ESTADO_TERMINO_SUSPENDIDO: EstadoJuridicoLicencia = 'CON_ACTA_DE_OB
 export type SituacionTermino = 'CORRIENDO' | 'SUSPENDIDO' | 'SIN_ANCLAR' | 'RESUELTO';
 export type NivelTermino = 'VENCIDO' | 'CRITICO' | 'AVISO';
 
+/* ── CÓMO SE LLAMA Y DE QUÉ COLOR ES CADA NIVEL ─────────────────────────
+   Vivían dentro de la plantilla del correo. Los sube aquí el mismo motivo que
+   subió el criterio: la pantalla pintaba CRÍTICO y AVISO EXACTAMENTE IGUAL
+   —mismo ámbar, mismo texto— mientras el correo los distinguía. Un escalón que
+   clasifica pero no se ve es un escalón que no existe para quien mira.
+
+   Las palabras y los hexadecimales son los del correo, carácter por carácter:
+   esto es un traslado, no un rediseño. `__tests__/vigia-termino-avisa.test.ts`
+   es el testigo.
+
+   ESPERA_EXCESIVA NO está aquí, y es deliberado: no es un nivel del término
+   —es la categoría de los expedientes cuyo término NO HA EMPEZADO—. Vive donde
+   se vigila la espera, no donde se clasifica el plazo. */
+
+/** Cómo se llama cada nivel de cara a una persona. */
+export const ETIQUETA_NIVEL_TERMINO: Record<NivelTermino, string> = {
+  VENCIDO: 'Término vencido',
+  CRITICO: 'Vence en 5 días hábiles o menos',
+  AVISO: 'Vence en 15 días hábiles o menos',
+};
+
+/** Un solo juego de colores para el correo y para la pantalla. */
+export const COLOR_NIVEL_TERMINO: Record<NivelTermino, string> = {
+  VENCIDO: '#B42318',
+  CRITICO: '#B54708',
+  AVISO: '#5A4A16',
+};
+
 export interface FilaVigia {
   expedienteId: string;
   numeroExpediente: string | null;
