@@ -23,6 +23,7 @@ import { RadicarDebidaFormaModal, type VistaPreviaDebidaForma } from '../compone
 import { accionesDeCierreDisponibles, puedeExpedirEjecutoria } from '../acciones-de-cierre';
 import { CabeceraExpediente } from '../components/CabeceraExpediente';
 import { CaminoDelTramite } from '../components/CaminoDelTramite';
+import { CabeceraTermino } from '../components/CabeceraTermino';
 import { PestanasExpediente, type PestanaExpediente } from '../components/PestanasExpediente';
 import type { TipoActuacionPermitida } from '@/lib/server/expedientes-licencias';
 import type { ReactNode } from 'react';
@@ -388,6 +389,19 @@ export function DetalleLicenciaClient({ expedienteId, onVolver }: DetalleLicenci
       <div className="flex flex-col lg:flex-row gap-5 items-start">
         {/* ── Panel término (doble fecha) + vigencia + acciones ── */}
         <div className="w-full lg:w-[430px] shrink-0 flex flex-col gap-3">
+          {/* EL SEMÁFORO, ENCIMA. El módulo anterior estaba en rojo con 41
+              días por delante: un cronómetro que siempre grita acaba ignorado
+              justo el día que grita de verdad. La clasificación sale de la
+              MISMA función que usa el cron. */}
+          {expediente.fechaRadicacionDebidaForma && computos?.terminoDual.fechaAlertaConservadora && (
+            <CabeceraTermino
+              expedienteId={expedienteId}
+              estadoJuridico={expediente.estadoJuridico}
+              desdeIso={expediente.fechaRadicacionDebidaForma}
+              venceIso={computos.terminoDual.fechaAlertaConservadora}
+            />
+          )}
+
           <PanelTerminoDual
             terminoDual={computos?.terminoDual ?? { suspension: null, reinicio: null, fechaAlertaConservadora: null }}
             origen={expediente.origen}
