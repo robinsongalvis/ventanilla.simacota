@@ -306,7 +306,7 @@ function FilaHecho({
 
   return (
     <li
-      className="px-5 py-4 flex flex-wrap items-start justify-between gap-x-6 gap-y-3"
+      className={`px-5 ${definido ? 'py-3' : 'py-4'} flex flex-wrap items-start justify-between gap-x-6 gap-y-3`}
       style={{
         borderTop: indice === 1 ? undefined : '1px solid var(--color-border)',
         /* El verde recorre la fila entera y se apaga hacia la derecha, para
@@ -392,8 +392,12 @@ function FilaHecho({
         aria-labelledby={idCampo}
         aria-describedby={describedBy}
         /* Reparto UNIFORME: `flex-1 basis-0` en cada opción, para que «No» no
-           quede raquítico al lado de «No — rodeado de espacio público». */
-        className="flex gap-1 p-1 rounded-xl shrink-0 w-full sm:w-[360px]"
+           quede raquítico al lado de «No — rodeado de espacio público».
+
+           LO RESPONDIDO SE COMPACTA. El grupo se estrecha cuando el hecho ya
+           está decidido: sin las consecuencias debajo de cada opción no
+           necesita el ancho que exigía para caberlas. */
+        className={`flex gap-1 p-1 rounded-xl shrink-0 w-full ${definido ? 'sm:w-[220px]' : 'sm:w-[360px]'}`}
         style={{ background: 'var(--bg-surface-2)' }}
       >
         {opciones.map((o) => {
@@ -405,7 +409,7 @@ function FilaHecho({
               disabled={soloLectura || guardando}
               aria-pressed={elegida}
               onClick={() => onElegir(o.valor)}
-              className="flex-1 basis-0 px-4 py-2.5 text-sm text-center rounded-lg transition-colors disabled:opacity-60 focus-visible:outline-none focus-visible:ring-2"
+              className={`flex-1 basis-0 ${definido ? 'px-3 py-1.5 text-[13px]' : 'px-4 py-2.5 text-sm'} text-center rounded-lg transition-colors disabled:opacity-60 focus-visible:outline-none focus-visible:ring-2`}
               style={
                 elegida
                   ? { background: '#14532D', color: '#fff', fontWeight: 800 }
@@ -413,7 +417,16 @@ function FilaHecho({
               }
             >
               <span className="block">{o.etiqueta}</span>
-              {o.consecuencia && (
+              {/* LA CONSECUENCIA ES AYUDA PARA DECIDIR, y una vez decidido deja
+                  de competir por espacio: cuatro hechos respondidos con su
+                  consecuencia debajo llenan la pantalla de texto que ya no
+                  cambia nada.
+
+                  NO SE PIERDE NADA: el chip de arriba lleva el `resumen`, que
+                  la Definición escribe precisamente para decir la consecuencia
+                  ya aplicada, y con más palabras de las que caben en un botón.
+                  Se compacta, no se borra. */}
+              {!definido && o.consecuencia && (
                 <span
                   className="block text-[11px] font-normal"
                   style={{ color: elegida ? 'rgba(255,255,255,0.8)' : '#94A3B8' }}
