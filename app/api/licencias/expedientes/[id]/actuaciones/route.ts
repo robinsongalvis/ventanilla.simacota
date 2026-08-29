@@ -39,7 +39,13 @@ import {
   type ActuacionLicenciaDoc,
 } from '@/lib/server/expedientes-licencias';
 import { buildAvisoActaHtml, buildAvisoActaSubject } from '@/lib/email/templates/aviso-acta-observaciones';
+import { FieldValue } from 'firebase-admin/firestore';
 import { enviarEmail } from '@/lib/email/mailer';
+import {
+  aplicarResultadoEnvio,
+  type ClaseComunicacion,
+  type ComunicacionesFallidas,
+} from '@/lib/server/comunicacion-fallida';
 import { componerCorreoHito } from '@/lib/email/hitos-licencia';
 import { buildHitoLicenciaHtml } from '@/lib/email/templates/hito-licencia';
 import type { RegistrarActuacionInput } from '@/lib/server/expedientes-licencias';
@@ -56,6 +62,34 @@ function jsonError(error: unknown) {
     return NextResponse.json({ error: error.message }, { status: error.status });
   }
   return NextResponse.json({ error: 'No fue posible registrar la actuación.' }, { status: 500 });
+}
+
+
+/**
+ * Persiste el resultado de un envío al ciudadano en la RAÍZ del expediente.
+ *
+ * Best-effort y post-commit, como el envío mismo: si esto falla, el hecho ya
+ * quedó registrado. Pero se registra el fallo del fallo, para que no se pierda
+ * en dos capas de silencio.
+ */
+async function registrarResultadoComunicacion(
+  db: FirebaseFirestore.Firestore,
+  expedienteId: string,
+  actual: ComunicacionesFallidas | undefined,
+  clase: ClaseComunicacion,
+  resultado: { exito: boolean; destinatario: string; fechaIso: string },
+): Promise<void> {
+  try {
+    const siguiente = aplicarResultadoEnvio(actual, clase, resultado);
+    await db.doc(`expedientes/${expedienteId}`).update({
+      /* `null` significa «no queda ninguna marca»: se BORRA el campo en vez de
+         guardar un objeto vacío, que al comprobar existencia se leería como
+         «hay algo». */
+      comunicacionesFallidas: siguiente ?? FieldValue.delete(),
+    });
+  } catch (error) {
+    logError({ radicadoId: expedienteId, modulo: 'licencias/marca-comunicacion', error });
+  }
 }
 
 export async function POST(request: Request, context: RouteContext): Promise<NextResponse> {
@@ -163,6 +197,11 @@ export async function POST(request: Request, context: RouteContext): Promise<Nex
         } catch (error) {
           logError({ radicadoId: id, modulo: 'licencias/actuaciones/hito', error });
         }
+        await registrarResultadoComunicacion(db, id, expediente.comunicacionesFallidas, 'HITO', {
+          exito: hitoEnviado,
+          destinatario: rad.solicitante.email,
+          fechaIso: ahora.toISOString(),
+        });
       }
     }
 
@@ -207,6 +246,14 @@ export async function POST(request: Request, context: RouteContext): Promise<Nex
         } catch (err) {
           logError({ radicadoId: id, modulo: 'licencias/expedientes/[id]/actuaciones/aviso-acta', error: err });
         }
+        /* El fallo del ACTA es el grave: el plazo de subsanación corre desde la
+           COMUNICACIÓN, así que si el correo no salió ese plazo no ha empezado
+           —y el desistimiento tácito no procede—. Que se vea en la pantalla. */
+        await registrarResultadoComunicacion(db, id, expediente.comunicacionesFallidas, 'ACTA', {
+          exito: avisoEnviado,
+          destinatario: email,
+          fechaIso: ahora.toISOString(),
+        });
       }
     }
 

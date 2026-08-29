@@ -40,6 +40,7 @@ import {
 } from '@/lib/email/templates/acuse-recibo-expediente-licencia';
 import { resumenDocumentosAcuse } from '@/lib/server/completitud-expediente';
 import { enviarEmail } from '@/lib/email/mailer';
+import { aplicarResultadoEnvio } from '@/lib/server/comunicacion-fallida';
 import { logError } from '@/lib/logger';
 
 export const runtime = 'nodejs';
@@ -188,6 +189,20 @@ export async function POST(request: Request): Promise<NextResponse> {
         );
       } catch (err) {
         logError({ radicadoId, modulo: 'licencias/expedientes/desde-radicado/constancia', error: err });
+      }
+      /* El expediente ACABA de crearse, así que no hay marca previa que
+         conservar: se pasa `undefined` en vez de leerlo otra vez. */
+      try {
+        const marca = aplicarResultadoEnvio(undefined, 'ACUSE', {
+          exito: constanciaEnviada,
+          destinatario: email,
+          fechaIso: new Date().toISOString(),
+        });
+        if (marca) {
+          await db.doc(`expedientes/${plan.expediente.id}`).update({ comunicacionesFallidas: marca });
+        }
+      } catch (err) {
+        logError({ radicadoId, modulo: 'licencias/desde-radicado/marca-comunicacion', error: err });
       }
     }
 

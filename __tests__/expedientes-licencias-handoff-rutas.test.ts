@@ -33,11 +33,33 @@ describe('POST .../expedientes/desde-radicado — candado R10 intacto', () => {
     expect(DESDE_RADICADO_ROUTE).toContain('EXPEDIENTE_LICENCIA_VINCULADO');
     expect(DESDE_RADICADO_ROUTE).toContain('appendTrazabilidadAdmin');
   });
-  it('un fallo de envío de constancia está dentro de un try/catch propio (no revierte la operación)', () => {
-    const idxTry = DESDE_RADICADO_ROUTE.lastIndexOf('try {');
+  it('un fallo de envío de constancia está dentro de un try/catch PROPIO (no revierte la operación)', () => {
+    /* Historia de esta prueba, porque explica su forma:
+       1. Comparaba contra `lastIndexOf('try {')` —asumía que el try del envío
+          era el ÚLTIMO del archivo—. Añadir código después la puso roja aunque
+          la propiedad seguía siendo cierta.
+       2. La reescribí buscando el try más cercano hacia atrás… y al simular la
+          regresión NO se puso roja: el `try` exterior del handler la satisfacía
+          igual. Verificaba «está dentro de algún try», no «tiene el suyo».
+
+       Lo que se comprueba ahora es SEMÁNTICO y no posicional: existe un `catch`
+       propio del envío, identificable por el módulo que registra. Si el envío
+       quedara colgando del try del handler, ese catch no existiría y el fallo
+       devolvería 500 sobre una operación YA CONFIRMADA. */
     const idxEnviar = DESDE_RADICADO_ROUTE.indexOf('buildAcuseReciboExpedienteSubject(numero)');
-    expect(idxTry).toBeGreaterThan(-1);
-    expect(idxEnviar).toBeGreaterThan(idxTry);
+    expect(idxEnviar, 'no se encontró el envío del acuse').toBeGreaterThan(-1);
+
+    const CATCH_PROPIO = "modulo: 'licencias/expedientes/desde-radicado/constancia'";
+    const idxCatch = DESDE_RADICADO_ROUTE.indexOf(CATCH_PROPIO, idxEnviar);
+    expect(
+      idxCatch,
+      'el envío del acuse no tiene un catch propio: su fallo escaparía al handler y ' +
+        'devolvería 500 sobre una operación ya confirmada',
+    ).toBeGreaterThan(idxEnviar);
+
+    /* Y ese catch va ANTES de la respuesta: si estuviera después, no envolvería
+       al envío. */
+    expect(idxCatch).toBeLessThan(DESDE_RADICADO_ROUTE.indexOf('return NextResponse.json({', idxEnviar));
   });
 });
 
