@@ -5,6 +5,7 @@ import { appendTrazabilidadAdmin } from '@/lib/server/radicados-security';
 import { debeProponerDesistimiento, planPropuestaDesistimiento } from '@/lib/server/subsanacion';
 import { logError } from '@/lib/logger';
 import type { VentanillaRadicado } from '@/src/types/ventanilla';
+import { registrarEventoNegocio } from '@/lib/observabilidad/eventos-negocio';
 
 export const runtime = 'nodejs';
 // Techo del plan (Vercel Hobby/Pro: 300s en funciones cron) — mismo estándar
@@ -32,6 +33,7 @@ const TECHO_LECTURA_CRON = 1000;
 ══════════════════════════════════════════════════════════════ */
 
 export async function GET(request: Request): Promise<NextResponse> {
+  const inicioCron = Date.now();
   const auth = autorizarCron({
     authorization: request.headers.get('authorization'),
     secret: process.env.CRON_SECRET,
@@ -80,6 +82,24 @@ export async function GET(request: Request): Promise<NextResponse> {
         logError({ radicadoId: id, modulo: 'cron/desistimiento-tacito', error: err });
       }
     }
+
+    /* DEJAR RASTRO DE LO QUE HIZO, no solo de que respondió 200. Los logs de
+       Vercel guardan el estado y la duración, no el cuerpo de la respuesta: sin
+       esto, una barrida que revisó cientos y una que no encontró nada se ven
+       idénticas. El silencio de un vigilante tiene que poder distinguirse de
+       «no hizo nada». */
+    registrarEventoNegocio({
+      operacion:  'desistimiento_tacito',
+      resultado:  'ok',
+      latenciaMs: Date.now() - inicioCron,
+      radicadoId: null,
+      actorRol:   'CRON',
+      tenant:     'VENTANILLA_UNICA',
+      docsLeidos: snap.size,
+      /* Actos PROPUESTOS, no confirmados: el desistimiento tácito lo decide un
+         funcionario con acto motivado. El cron propone, nunca resuelve. */
+      accionados: propuestos,
+    });
 
     return NextResponse.json({ ok: true, propuestos, errores, evaluados: snap.size });
   } catch (error) {

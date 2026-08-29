@@ -10,6 +10,7 @@ import { NextResponse }          from 'next/server';
 import { generateDeadlineAlerts } from '@/lib/simi-juridico/predictDeadlineAlerts';
 import { createNotification }    from '@/lib/simi-juridico/createNotification';
 import { autorizarCron }         from '@/lib/seguridad/autorizar-cron';
+import { registrarEventoNegocio } from '@/lib/observabilidad/eventos-negocio';
 
 export const runtime = 'nodejs';
 // Techo del plan (Vercel Hobby/Pro: 300s en funciones cron) — mismo estándar
@@ -52,6 +53,26 @@ export async function GET(request: Request): Promise<NextResponse> {
       });
     }
 
+    /* DEJAR RASTRO DE LO QUE HIZO, no solo de que respondió 200.
+       Hasta el 27-ago-2026 este cron terminaba en silencio: los logs de Vercel
+       guardan el estado y la duración, no el cuerpo de la respuesta. Así que
+       una corrida que analizó 500 radicados y una que no encontró ninguno se
+       veían EXACTAMENTE igual — y la única forma de saber qué hizo era
+       ejecutarlo a mano con el secreto, que no todo el mundo tiene.
+       Es la misma regla de siempre: el silencio de un vigilante tiene que poder
+       distinguirse de «no hizo nada». */
+    registrarEventoNegocio({
+      operacion:  'alertas_vencimiento_simi',
+      resultado:  'ok',
+      latenciaMs: Date.now() - inicio,
+      radicadoId: null,
+      actorRol:   'CRON',
+      tenant:     'VENTANILLA_UNICA',
+      docsLeidos: result.radicadosAnalizados,
+      alertasCreadas:  result.alertasCreadas,
+      alertasOmitidas: result.alertasOmitidas,
+    });
+
     return NextResponse.json({
       ok:                  true,
       duracionMs:          Date.now() - inicio,
@@ -64,6 +85,17 @@ export async function GET(request: Request): Promise<NextResponse> {
   } catch (err) {
     const msg = err instanceof Error ? err.message : String(err);
     console.error('[cron/simi/alertas]', msg);
+    /* Un fallo también deja rastro estructurado: sin esto, una corrida que
+       revienta y una que no encuentra nada se distinguen solo por el 500. */
+    registrarEventoNegocio({
+      operacion:  'alertas_vencimiento_simi',
+      resultado:  'error',
+      latenciaMs: Date.now() - inicio,
+      radicadoId: null,
+      actorRol:   'CRON',
+      tenant:     'VENTANILLA_UNICA',
+      error:      err,
+    });
     return NextResponse.json(
       { error: 'No fue posible ejecutar el cron.', duracionMs: Date.now() - inicio },
       { status: 500 },

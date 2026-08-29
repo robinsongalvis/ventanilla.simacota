@@ -93,12 +93,20 @@ const fakeDb = {
   collection: () => ({ add: async () => ({ id: 'trz' }) }),
   runTransaction: async (cb: (tx: unknown) => Promise<unknown>) => {
     const buffer: { ref: RefFake; data: unknown }[] = [];
+    const reservas: string[] = [];
     const tx = {
       get: async (ref: RefFake) => ({
         data: () => (contadores[ref.path] === undefined ? undefined : { ultimo: contadores[ref.path] }),
       }),
       set: (ref: RefFake, data: unknown) => {
         buffer.push({ ref, data });
+      },
+      /* Reserva de unicidad. No entra al buffer: el buffer distingue contadores
+         de "el radicado persistido", y una reserva no es ninguno de los dos —
+         mezclarla haría que la reserva se hiciera pasar por el radicado. */
+      create: (ref: RefFake) => {
+        if (reservas.includes(ref.path)) throw new Error(`ALREADY_EXISTS: ${ref.path}`);
+        reservas.push(ref.path);
       },
     };
     const result = await cb(tx);

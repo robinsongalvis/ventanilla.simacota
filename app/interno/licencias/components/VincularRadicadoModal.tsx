@@ -9,7 +9,7 @@ import { NumeroLegal } from './NumeroLegal';
    Modal «Vincular radicado» — repara un expediente creado SIN radicado.
 
    POR QUÉ EXISTE. En la Bandeja hay dos botones juntos: «Crear desde
-   radicado» (el camino correcto) y «Radicar solicitud», que crea el
+   radicado» (el camino correcto) y «Recibir solicitud», que crea el
    expediente sin radicado. Hasta el 13-ago-2026 equivocarse de botón era
    irreversible — el expediente quedaba huérfano para siempre y no podía
    llegar a ser un trámite real. Esto lo repara.

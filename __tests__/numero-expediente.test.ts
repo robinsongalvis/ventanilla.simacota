@@ -53,7 +53,13 @@ function fakeDb(): Firestore {
 }
 function fakeTx(contadores: Record<string, number | undefined>) {
   const escrituras: { path: string; data: Record<string, unknown> }[] = [];
+  const reservas: string[] = [];
   const tx = {
+    // Reserva de unicidad: mismo doble, semántica real (falla si ya existe).
+    create: vi.fn((ref: { path: string }) => {
+      if (reservas.includes(ref.path)) throw new Error(`ALREADY_EXISTS: ${ref.path}`);
+      reservas.push(ref.path);
+    }),
     get: vi.fn(async (ref: { path: string }) => {
       const ultimo = contadores[ref.path];
       return { data: () => (ultimo === undefined ? undefined : { ultimo }) };
@@ -62,7 +68,7 @@ function fakeTx(contadores: Record<string, number | undefined>) {
       escrituras.push({ path: ref.path, data });
     }),
   };
-  return { tx: tx as unknown as Transaction, escrituras };
+  return { tx: tx as unknown as Transaction, escrituras, reservas };
 }
 
 describe('flujo real: leerConsecutivosLegales + formatearNumeroExpediente sobre counter sembrado', () => {

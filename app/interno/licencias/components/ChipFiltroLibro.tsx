@@ -8,7 +8,7 @@
  *
  * El activo usa el dorado del sistema (`--color-accent` sobre
  * `--color-primary`) — mismo par que ya usan los botones primarios del
- * módulo (p. ej. "Radicar solicitud →" en `BandejaLicenciasClient`), para
+ * módulo (p. ej. "Recibir solicitud →" en `BandejaLicenciasClient`), para
  * que "seleccionado" se lea con el mismo lenguaje visual en toda la
  * pantalla.
  */

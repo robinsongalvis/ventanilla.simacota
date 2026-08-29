@@ -78,7 +78,9 @@ describe('planCrearExpedienteDemo — validaciones', () => {
     const plan = planOk(planCrearExpedienteDemo(INPUT_BASE, 'SEC_PLANEACION', ACTOR, AHORA));
     expect(plan.expediente.solicitanteNombre).toBe('Juan Pérez');
     expect(plan.expediente.subtipos).toEqual(['CONSTRUCCION']);
-    expect(plan.primeraActuacion.tipo).toBe('radicacion-debida-forma');
+    // ADR-0033: la primera actuación es la APERTURA, no la radicación. El slug
+    // no está en SLUG_A_TIPO_EVENTO, y por eso no arranca el término.
+    expect(plan.primeraActuacion.tipo).toBe('apertura-expediente');
   });
 
   it('nombre vacío → 400', () => {
@@ -116,8 +118,10 @@ describe('planCrearExpedienteDemo — forma del documento', () => {
   it('esPrueba SIEMPRE true', () => {
     expect(plan.expediente.esPrueba).toBe(true);
   });
-  it('estadoJuridico=RADICADA_EN_DEBIDA_FORMA, estado=EN_REVISION', () => {
-    expect(plan.expediente.estadoJuridico).toBe('RADICADA_EN_DEBIDA_FORMA');
+  it('estadoJuridico=PRESENTADA (ADR-0033: ya NO nace en debida forma), estado=EN_REVISION', () => {
+    // Antes afirmaba RADICADA_EN_DEBIDA_FORMA. El cambio es el punto entero del
+    // ADR-0033: nacer en debida forma era afirmar una verificación que nadie hizo.
+    expect(plan.expediente.estadoJuridico).toBe('PRESENTADA');
     expect(plan.expediente.estado).toBe('EN_REVISION');
   });
   it('numeroExpediente.numero tiene el prefijo DEMO- (nunca formato legal puro)', () => {
@@ -224,15 +228,24 @@ describe('planRegistrarActuacion — guards y transiciones', () => {
    debe coincidir EXACTAMENTE con el cómputo on-read para la misma serie.
 ────────────────────────────────────────────── */
 describe('planCrearExpedienteDemo — fechaAlertaConservadora (espejo R11)', () => {
-  it('nace poblado (no null, no undefined): coincide con calcularVencimientoDual sobre la primera actuación', () => {
+  it('nace VACÍO — y sigue coincidiendo con lo que calcula el motor', () => {
+    /* ADR-0033 §0 — el contrato CAMBIÓ a propósito: el expediente ya no nace en
+       debida forma. Esta prueba afirmaba el comportamiento anterior y ahora
+       afirma el nuevo. NO se invirtió la aserción sin más: el invariante que
+       protegía —que el espejo coincide con lo que calcula el motor— se conserva
+       intacto; lo que cambió es que ahora ambos valen null, porque no hay
+       término que proyectar hasta la transición a debida forma. */
     const plan = planOk(planCrearExpedienteDemo(INPUT_BASE, 'SEC_PLANEACION', ACTOR, AHORA));
     const esperado = calcularVencimientoDual(
       derivarEventosTermino([plan.primeraActuacion]),
       PLAZO_DIAS,
     ).fechaAlertaConservadora?.toISOString() ?? null;
 
-    expect(plan.expediente.fechaAlertaConservadora).not.toBeNull();
+    // El invariante que importa, intacto: espejo === calculador.
     expect(plan.expediente.fechaAlertaConservadora).toBe(esperado);
+    // Y lo que cambió: ambos valen null, porque no hay término que proyectar.
+    expect(esperado).toBeNull();
+    expect(plan.expediente.fechaAlertaConservadora).toBeNull();
   });
 });
 

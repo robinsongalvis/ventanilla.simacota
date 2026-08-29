@@ -86,6 +86,9 @@ describe('Crear desde radicado — envío y errores del servidor', () => {
     await waitFor(() => expect(screen.getByText('1-110-202608-00000123')).toBeTruthy());
     fireEvent.click(screen.getByRole('radio', { name: /1-110-202608-00000123/ }));
     fireEvent.click(screen.getByRole('checkbox', { name: /Licencia de construcción/i }));
+    // La figura CONSTRUCCION exige modalidad (art. 2.2.6.1.1.7, ADR-0035):
+    // sin marcarla el formulario ya no envía.
+    fireEvent.click(screen.getByRole('checkbox', { name: /Obra nueva/i }));
   }
 
   it('exige seleccionar un radicado y un subtipo antes de enviar', async () => {
@@ -127,7 +130,7 @@ describe('Crear desde radicado — envío y errores del servidor', () => {
     fireEvent.click(screen.getByRole('button', { name: /^Crear expediente$/i }));
 
     await waitFor(() => expect(screen.getByText('DEMO-26-abc12345')).toBeTruthy());
-    expect(screen.getByText(/Se envió la constancia de radicación al solicitante\./)).toBeTruthy();
+    expect(screen.getByText(/Se envió al solicitante el acuse de recibo de su solicitud\./)).toBeTruthy();
 
     const llamadaPost = fetchMock.mock.calls.find(([url]) => url === '/api/licencias/expedientes/desde-radicado');
     expect(llamadaPost).toBeTruthy();
@@ -162,8 +165,8 @@ describe('Crear desde radicado — envío y errores del servidor', () => {
     fireEvent.click(screen.getByRole('button', { name: /^Crear expediente$/i }));
 
     await waitFor(() => expect(screen.getByText('DEMO-26-sinCorreo')).toBeTruthy());
-    expect(screen.getByRole('alert').textContent).toMatch(/Constancia NO enviada al ciudadano/);
-    expect(screen.queryByText(/Se envió la constancia de radicación al solicitante\./)).toBeNull();
+    expect(screen.getByRole('alert').textContent).toMatch(/Acuse de recibo NO enviado al ciudadano/);
+    expect(screen.queryByText(/Se envió al solicitante el acuse de recibo de su solicitud\./)).toBeNull();
   });
 
   it('muestra el 409 de "radicado ya vinculado" tal cual llega del servidor', async () => {

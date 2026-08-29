@@ -25,11 +25,25 @@ function fakeDb(): Firestore {
  * Doble de Transaction: `get` sirve valores de contador desde un mapa por path;
  * `set` registra las escrituras en orden. Registra si hubo algún `set` antes
  * del último `get` (para verificar lecturas-antes-de-escrituras).
+ *
+ * `create` IMITA LA SEMÁNTICA REAL, no solo la firma: falla si el documento ya
+ * existe. Sin eso, la reserva de unicidad se probaría contra un doble que
+ * acepta todo, y una reserva que nunca puede fallar no prueba nada. `ocupados`
+ * permite sembrar documentos preexistentes (el duplicado que se quiere evitar).
  */
-function fakeTx(contadores: Record<string, number | undefined>) {
+function fakeTx(contadores: Record<string, number | undefined>, ocupados: string[] = []) {
   const escrituras: { path: string; data: Record<string, unknown> }[] = [];
+  const reservas: { path: string; data: Record<string, unknown> }[] = [];
+  const existentes = new Set(ocupados);
   let huboSetAntesDeGet = false;
   const tx = {
+    create: vi.fn((ref: { path: string }, data: Record<string, unknown>) => {
+      if (existentes.has(ref.path)) {
+        throw new Error(`ALREADY_EXISTS: el documento ${ref.path} ya existe`);
+      }
+      existentes.add(ref.path);
+      reservas.push({ path: ref.path, data });
+    }),
     get: vi.fn(async (ref: { path: string }) => {
       if (escrituras.length > 0) huboSetAntesDeGet = true;
       const ultimo = contadores[ref.path];
@@ -39,7 +53,12 @@ function fakeTx(contadores: Record<string, number | undefined>) {
       escrituras.push({ path: ref.path, data });
     }),
   };
-  return { tx: tx as unknown as Transaction, escrituras, get huboSetAntesDeGet() { return huboSetAntesDeGet; } };
+  return {
+    tx: tx as unknown as Transaction,
+    escrituras,
+    reservas,
+    get huboSetAntesDeGet() { return huboSetAntesDeGet; },
+  };
 }
 
 const fmtRadicado = (n: number, f: Date) => `1-110-${f.getFullYear()}-${String(n).padStart(8, '0')}`;
@@ -115,6 +134,7 @@ describe('consecutivo-legal — confirmarConsecutivosLegales', () => {
         ref: { path: 'counters/radicados-2026' } as never,
         consecutivo: 999,
         documentoId: 'x',
+        refUnicidad: { path: 'unicidad_radicados/x' } as never,
         ultimoActual: 998,
         origen: 'REAL',
       },
@@ -315,5 +335,60 @@ describe('consecutivo-legal — verificarAvanceCounter (guard monotónico D9, AD
     expect(() =>
       verificarAvanceCounter({ serie: 'expedientes', ultimoActual: 0, ultimoPropuesto: 1, origen: 'REAL' }),
     ).not.toThrow();
+  });
+});
+
+describe('consecutivo-legal — reserva de unicidad', () => {
+  it('reserva un documento por cada serie emitida, en unicidad_{serie}/{documentoId}', async () => {
+    const doble = fakeTx({ 'counters/radicados-2026': 41, 'counters/salidas-2026': 5 });
+    const pend = await leerConsecutivosLegales(doble.tx, fakeDb(), FECHA, [
+      { serie: 'radicados', formatear: fmtRadicado },
+      { serie: 'salidas', formatear: fmtSalida },
+    ]);
+    confirmarConsecutivosLegales(doble.tx, FECHA, pend);
+
+    expect(doble.reservas.map((r) => r.path)).toEqual([
+      'unicidad_radicados/1-110-2026-00000042',
+      'unicidad_salidas/2-110-2026-00000006',
+    ]);
+    expect(doble.reservas[0].data).toMatchObject({ serie: 'radicados', consecutivo: 42 });
+  });
+
+  /* EL CASO QUE MOTIVA TODO: alguien movió el contador hacia atrás POR FUERA,
+     así que la emisión propone un número que YA se entregó. El guard D9 lo
+     aprueba (41 > 40) porque solo mira que avance. La reserva es lo único que
+     lo ve. */
+  it('aborta si el consecutivo propuesto ya fue entregado (contador movido por fuera)', async () => {
+    const doble = fakeTx(
+      { 'counters/radicados-2026': 40 },
+      ['unicidad_radicados/1-110-2026-00000041'],
+    );
+    const pend = await leerConsecutivosLegales(doble.tx, fakeDb(), FECHA, [
+      { serie: 'radicados', formatear: fmtRadicado },
+    ]);
+    expect(() => confirmarConsecutivosLegales(doble.tx, FECHA, pend)).toThrow(/ALREADY_EXISTS/);
+  });
+
+  it('la reserva ocurre ANTES de avanzar el contador de esa serie', async () => {
+    const orden: string[] = [];
+    const doble = fakeTx({ 'counters/radicados-2026': 0 });
+    const tx = doble.tx as unknown as {
+      create: (r: { path: string }, d: Record<string, unknown>) => void;
+      set: (r: { path: string }, d: Record<string, unknown>) => void;
+    };
+    const createReal = tx.create;
+    const setReal = tx.set;
+    tx.create = (r, d) => { orden.push(`create:${r.path}`); createReal(r, d); };
+    tx.set = (r, d) => { orden.push(`set:${r.path}`); setReal(r, d); };
+
+    const pend = await leerConsecutivosLegales(doble.tx, fakeDb(), FECHA, [
+      { serie: 'radicados', formatear: fmtRadicado },
+    ]);
+    confirmarConsecutivosLegales(doble.tx, FECHA, pend);
+
+    expect(orden).toEqual([
+      'create:unicidad_radicados/1-110-2026-00000001',
+      'set:counters/radicados-2026',
+    ]);
   });
 });

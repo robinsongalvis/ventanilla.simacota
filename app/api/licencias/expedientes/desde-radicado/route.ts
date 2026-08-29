@@ -25,7 +25,7 @@ import {
 import { appendTrazabilidadAdmin } from '@/lib/server/radicados-security';
 import type { TenantId } from '@/src/types/radicado';
 import type { VentanillaRadicado } from '@/src/types/ventanilla';
-import { DEFINICION_LICENCIA_CONSTRUCCION_PARCIAL } from '@/lib/motor-expedientes/definiciones/licencia-construccion-parcial';
+import { describirTramiteDesdeSubtipos } from '@/lib/motor-expedientes/describir-tramite';
 import {
   planCrearExpedienteDesdeRadicado,
   esErrorExpediente,
@@ -35,9 +35,10 @@ import {
   type PlanCrearExpedienteDesdeRadicado,
 } from '@/lib/server/expedientes-licencias';
 import {
-  buildConstanciaExpedienteHtml,
-  buildConstanciaExpedienteSubject,
-} from '@/lib/email/templates/constancia-expediente-licencia';
+  buildAcuseReciboExpedienteHtml,
+  buildAcuseReciboExpedienteSubject,
+} from '@/lib/email/templates/acuse-recibo-expediente-licencia';
+import { resumenDocumentosAcuse } from '@/lib/server/completitud-expediente';
 import { enviarEmail } from '@/lib/email/mailer';
 import { logError } from '@/lib/logger';
 
@@ -55,6 +56,8 @@ function jsonError(error: unknown) {
 interface BodyDesdeRadicado {
   radicadoId?: string;
   subtipos?: string[];
+  /** Modalidades del art. 2.2.6.1.1.7 — solo con la figura CONSTRUCCION. */
+  modalidadesConstruccion?: string[];
   contexto?: Record<string, string | number | boolean>;
 }
 
@@ -89,7 +92,12 @@ export async function POST(request: Request): Promise<NextResponse> {
 
       const plan = planCrearExpedienteDesdeRadicado(
         radicado,
-        { subtipos: body?.subtipos ?? [], contexto: body?.contexto },
+        {
+          subtipos: body?.subtipos ?? [],
+          // Sin capturar = ausente. No se rellena con un valor por defecto.
+          modalidadesConstruccion: body?.modalidadesConstruccion,
+          contexto: body?.contexto,
+        },
         TENANT_LICENCIAS,
         actor,
         ahora,
@@ -123,27 +131,48 @@ export async function POST(request: Request): Promise<NextResponse> {
       metadata: { expedienteId: plan.vinculoRadicado.expedienteId, numeroExpediente: plan.vinculoRadicado.numeroExpediente },
     });
 
-    // Constancia (A5, dictamen gobierno-digital 8-ago) — post-commit,
-    // best-effort: un fallo de envío NUNCA revierte la vinculación ya
-    // confirmada. SOLO se emite aquí, en el acto de creación — no existe
-    // ninguna ruta de reenvío.
+    /* ACUSE DE RECIBO — post-commit, best-effort: un fallo de envío NUNCA
+       revierte la vinculación ya confirmada. SOLO se emite aquí, en el acto
+       de creación; no existe ninguna ruta de reenvío.
+
+       ANTES SE ENVIABA UNA CONSTANCIA DE RADICACIÓN EN LEGAL Y DEBIDA FORMA,
+       fechada el día en que se abrió la carpeta. Desde el ADR-0033 el
+       expediente NACE en `PRESENTADA`: ese hito NO ha ocurrido en este
+       momento, y certificarlo por escrito produce nulidades. El candado R10
+       lo tapaba —corta cualquier número `DEMO-`— pero eso solo aplazaba el
+       daño hasta el día del arranque real, que es el peor día para
+       descubrirlo.
+
+       El acuse afirma únicamente hechos verificables hoy: qué se recibió,
+       qué falta, y que el plazo legal todavía no corre. */
     let constanciaEnviada = false;
     const gate = debeEnviarComunicacionExpediente(plan.expediente.tramiteId, radicado, plan.expediente.numeroExpediente?.numero);
     if (gate.debeEnviar) {
       const email = radicado.solicitante.email!;
       const numero = plan.expediente.numeroExpediente!.numero;
       try {
+        const docs = resumenDocumentosAcuse(
+          plan.expediente.aportes ?? [],
+          plan.expediente.contexto ?? {},
+        );
         await enviarEmail({
           to: email,
-          subject: buildConstanciaExpedienteSubject(numero),
-          html: buildConstanciaExpedienteHtml({
-            numeroExpedienteFUN: numero,
+          subject: buildAcuseReciboExpedienteSubject(numero),
+          html: buildAcuseReciboExpedienteHtml({
+            numeroExpediente: numero,
             solicitanteNombre: plan.expediente.solicitanteNombre,
             solicitanteDocumento: plan.expediente.solicitanteDocumento,
             tipoDocumento: radicado.solicitante.tipoDocumento,
-            descripcionTramite: DEFINICION_LICENCIA_CONSTRUCCION_PARCIAL.nombre.toLowerCase(),
-            // Día CIVIL de la CREACIÓN del expediente — NUNCA la fecha del radicado de ventanilla.
-            fechaRadicacionLegal: plan.expediente.creadoEn,
+            // La figura sale del EXPEDIENTE (mismo motivo que en la
+            // constancia impresa): este correo afirmaba «obra nueva» a todo
+            // el mundo. La modalidad no se nombra: nadie la captura.
+            descripcionTramite: describirTramiteDesdeSubtipos(plan.expediente.subtipos, plan.expediente.modalidadesConstruccion),
+            // Día en que la Alcaldía RECIBIÓ la solicitud. No es una fecha con
+            // efecto de plazo, y el correo lo dice expresamente.
+            fechaRecepcion: plan.expediente.creadoEn,
+            documentosEntregados: docs.entregados,
+            documentosFaltantes: docs.faltantes,
+            requisitosAplicables: docs.aplicables,
             radicadoVentanillaId: radicadoId,
           }),
         });
@@ -152,7 +181,7 @@ export async function POST(request: Request): Promise<NextResponse> {
           construirActuacionComunicacionEnviada(
             plan.expediente.id,
             TENANT_LICENCIAS,
-            { tipoComunicacion: 'Constancia de radicación en legal y debida forma', destinatario: email, asunto: buildConstanciaExpedienteSubject(numero) },
+            { tipoComunicacion: 'Acuse de recibo de solicitud', destinatario: email, asunto: buildAcuseReciboExpedienteSubject(numero) },
             actor,
             new Date(),
           ),

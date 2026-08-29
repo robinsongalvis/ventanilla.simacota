@@ -128,6 +128,13 @@ async function leerContador(anio) {
   return Number(snap.data()?.ultimo ?? 0);
 }
 
+/**
+ * Devuelve el contador a su valor previo. SOLO es legítimo en un test, y SOLO
+ * si además se borran las reservas de unicidad de los números que se emitieron
+ * (ver `borrarRadicado`): en producción, retroceder un contador dejando las
+ * reservas puestas detiene la emisión de la serie, que es precisamente la
+ * salvaguarda que este repositorio añadió.
+ */
 async function restaurarContador(anio, valor) {
   await db.doc(`counters/radicados-${anio}`).set(
     { ultimo: valor, anio, actualizadoEn: new Date().toISOString() },
@@ -135,10 +142,20 @@ async function restaurarContador(anio, valor) {
   );
 }
 
+/**
+ * Borra TODO lo que produjo una radicación, incluida su reserva de unicidad.
+ *
+ * La reserva es parte de lo que crea un radicado, no un detalle interno: si se
+ * borra el documento y se deja el número reservado, ese número queda entregado
+ * para siempre y la siguiente emisión sobre él aborta. Entre casos de este
+ * archivo eso se manifestaba como un 500 inexplicable en el caso (c) —el
+ * contador restaurado reintentaba números que el caso (a) ya había reservado.
+ */
 async function borrarRadicado(radicadoId) {
   const trazSnap = await db.collection(`ventanilla_radicados/${radicadoId}/trazabilidad`).get();
   await Promise.all(trazSnap.docs.map((d) => d.ref.delete()));
   await db.doc(`ventanilla_radicados/${radicadoId}`).delete();
+  await db.doc(`unicidad_radicados/${radicadoId}`).delete().catch(() => {});
 }
 
 // ══════════════════════════════════════════════════════════════════════════
@@ -208,6 +225,16 @@ test('fallo inyectado (colisión de tx.create) → 500 y nada se compromete (con
   const consecutivoPredicho = baseline + 1;
   const ahora = new Date();
   const radicadoIdPredicho = formatearRadicadoInstitucional(consecutivoPredicho, ahora);
+
+  /* Higiene: el número predicho no debe venir ya reservado por un caso previo
+     de este archivo — si lo estuviera, la tx abortaría por la reserva y este
+     caso pasaría por el motivo equivocado (falso verde). */
+  const reservaPrevia = await db.doc(`unicidad_radicados/${radicadoIdPredicho}`).get();
+  assert.equal(
+    reservaPrevia.exists,
+    false,
+    'el número predicho no debe estar reservado: este caso prueba la colisión SEMBRADA, no la reserva',
+  );
 
   // Siembra la colisión: mismo id que tomará el próximo tx.create.
   await db.doc(`ventanilla_radicados/${radicadoIdPredicho}`).set({

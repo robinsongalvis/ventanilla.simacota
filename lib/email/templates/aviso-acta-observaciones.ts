@@ -138,8 +138,8 @@ export function buildAvisoActaHtml(p: TemplateAvisoActaParams): string {
                 La expedición del acta afecta el cómputo del término para resolver su solicitud, en
                 los términos del artículo 2.2.6.1.2.2.4 del Decreto 1077 de 2015: mientras esté en
                 curso su plazo para responder, dicho término no continúa corriendo de manera
-                ordinaria. Una vez definido el cómputo aplicable a su expediente, la información
-                actualizada del trámite le será comunicada por este mismo medio.
+                ordinaria. Puede consultar en cualquier momento el estado de su trámite y el cómputo
+                aplicable en la Secretaría de Planeación, indicando el número de su expediente.
               </p>
             </td>
           </tr>

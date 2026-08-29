@@ -39,7 +39,12 @@ import { formatFechaColombia, formatFechaHoraColombia } from '@/lib/fecha-colomb
 import type { ComputosExpedienteUI } from '../tipos-computos';
 import { construirTimelineDesdeActuaciones } from '../presentacion-actuaciones';
 import { subtiposConEstadoLibro } from '../presentacion-libro-consecutivo';
+import {
+  exigeModalidadConstruccion,
+  describirModalidades,
+} from '@/lib/motor-expedientes/modalidad-construccion';
 import { ChipEstadoJuridico } from './ChipEstadoJuridico';
+import { BotonDescargarSellado } from './BotonDescargarSellado';
 import { ChipPrueba } from './ChipPrueba';
 import { NumeroLegal } from './NumeroLegal';
 import { EtiquetaColisionNumero } from './EtiquetaColisionNumero';
@@ -163,6 +168,18 @@ export function PanelDetalleExpediente({ expedienteId, onCerrar, textoColision =
   }, [expediente, actuaciones, fechaAlertaConservadoraIso]);
 
   const subtipos = useMemo(() => subtiposConEstadoLibro(expediente?.subtipos ?? []), [expediente]);
+
+  /* La modalidad se muestra SOLO si la figura la tiene. Y si la figura la tiene
+     pero el expediente no la trae —los creados antes de que el campo
+     existiera—, se dice «sin capturar» con esas palabras: el hueco es un hecho
+     sobre el expediente, no un defecto de la pantalla, y rellenarlo con «obra
+     nueva» sería inventar el dato. */
+  const modalidad = useMemo(() => {
+    if (!expediente || !exigeModalidadConstruccion(expediente.subtipos ?? [])) return null;
+    return describirModalidades(expediente.modalidadesConstruccion);
+  }, [expediente]);
+  const faltaModalidad =
+    expediente != null && exigeModalidadConstruccion(expediente.subtipos ?? []) && modalidad === null;
   const contextoEntradas = useMemo(() => Object.entries(expediente?.contexto ?? {}), [expediente]);
 
   const numero = expediente?.numeroExpediente?.numero ?? expediente?.id ?? expedienteId;
@@ -221,6 +238,24 @@ export function PanelDetalleExpediente({ expedienteId, onCerrar, textoColision =
                     {s.nombre}
                   </span>
                 ))}
+                {modalidad && (
+                  <span
+                    className="text-[11px] font-semibold px-2 py-0.5 rounded-full"
+                    style={{ background: 'var(--bg-surface-2)', color: 'var(--text-secondary)' }}
+                    title="Modalidad de construcción (art. 2.2.6.1.1.7)"
+                  >
+                    {modalidad}
+                  </span>
+                )}
+                {faltaModalidad && (
+                  <span
+                    className="text-[11px] font-semibold px-2 py-0.5 rounded-full"
+                    style={{ background: 'var(--color-warning)', color: '#4A2E02' }}
+                    title="Este expediente se creó antes de que el sistema capturara la modalidad. El dato no se rellena solo: hay que preguntarlo."
+                  >
+                    modalidad sin capturar
+                  </span>
+                )}
               </div>
             )}
           </div>
@@ -329,10 +364,21 @@ export function PanelDetalleExpediente({ expedienteId, onCerrar, textoColision =
                 ) : (
                   <ul className="flex flex-col gap-2">
                     {documentos.map((doc) => (
-                      <li key={doc.id} className="flex flex-wrap items-center gap-x-2 gap-y-0.5 text-xs">
-                        <span className="truncate max-w-full font-medium" style={{ color: 'var(--text-primary)' }}>{doc.nombre}</span>
-                        <span className="shrink-0 font-mono" style={{ color: 'var(--text-secondary)' }}>v{doc.versionVigente.numeroVersion}</span>
-                        <span className="shrink-0" style={{ color: 'var(--text-muted)' }}>{formatFechaHoraColombia(doc.versionVigente.subidoEn)}</span>
+                      <li key={doc.id} className="flex flex-col gap-1 text-xs">
+                        <div className="flex flex-wrap items-center gap-x-2 gap-y-0.5">
+                          <span className="truncate max-w-full font-medium" style={{ color: 'var(--text-primary)' }}>{doc.nombre}</span>
+                          <span className="shrink-0 font-mono" style={{ color: 'var(--text-secondary)' }}>v{doc.versionVigente.numeroVersion}</span>
+                          <span className="shrink-0" style={{ color: 'var(--text-muted)' }}>{formatFechaHoraColombia(doc.versionVigente.subidoEn)}</span>
+                        </div>
+                        {/* El sello del mostrador, en digital: número y fecha en
+                            cada página de la COPIA. El original no se toca. */}
+                        {expediente && (
+                          <BotonDescargarSellado
+                            expedienteId={expediente.id}
+                            documentoId={doc.id}
+                            mimeType={doc.versionVigente.mimeType}
+                          />
+                        )}
                       </li>
                     ))}
                   </ul>

@@ -33,12 +33,28 @@ export {
   getFirebaseAdminDb,
 } from '../../../lib/firebase-admin.ts';
 
-const almacenFalso = new Map();
+/*
+ * ── Endurecimiento contra la DOBLE INSTANCIACIÓN del módulo ────────────────
+ * Mismo defecto (y misma cura) que `fase3-stub-internal-auth.mjs` — ver el
+ * comentario largo allí: los `ssrLoadModule` concurrentes de
+ * `fase3-entorno.mjs` pueden materializar DOS instancias de este módulo, y
+ * con `const almacenFalso = new Map()` en clausura de módulo, el handler
+ * escribiría los adjuntos en el Map de una instancia mientras
+ * `__inspeccionarAlmacenFalso()` (la instancia del test) leería el Map vacío
+ * de la otra. El Map vive en `globalThis` bajo una clave de `Symbol.for()`
+ * (registro global de símbolos: única por proceso, compartida por todas las
+ * instancias). Demostrado en `fase3-stub-doble-instanciacion.test.mjs`.
+ */
+const CLAVE_ALMACEN = Symbol.for('ventanilla.simacota/e2e/fase3-stub-firebase-admin.almacen');
+
+function almacenFalso() {
+  return (globalThis[CLAVE_ALMACEN] ??= new Map());
+}
 
 function archivoFalso(bucketNombre, rutaArchivo) {
   return {
     async save(buffer, opciones = {}) {
-      almacenFalso.set(rutaArchivo, {
+      almacenFalso().set(rutaArchivo, {
         buffer,
         contentType: opciones?.metadata?.contentType ?? null,
         bucketNombre,
@@ -46,7 +62,7 @@ function archivoFalso(bucketNombre, rutaArchivo) {
       });
     },
     async move(rutaDestino) {
-      const actual = almacenFalso.get(rutaArchivo);
+      const actual = almacenFalso().get(rutaArchivo);
       if (!actual) {
         throw new Error(
           `fase3-stub-firebase-admin: no existe '${rutaArchivo}' en el ` +
@@ -54,8 +70,8 @@ function archivoFalso(bucketNombre, rutaArchivo) {
             'move() sin save() previo?).',
         );
       }
-      almacenFalso.delete(rutaArchivo);
-      almacenFalso.set(rutaDestino, { ...actual, etapa: 'final' });
+      almacenFalso().delete(rutaArchivo);
+      almacenFalso().set(rutaDestino, { ...actual, etapa: 'final' });
     },
   };
 }
@@ -72,9 +88,9 @@ export function getFirebaseAdminStorage() {
 
 /** Instrumentación de verificación — no forma parte del contrato real de Storage. */
 export function __inspeccionarAlmacenFalso() {
-  return new Map(almacenFalso);
+  return new Map(almacenFalso());
 }
 
 export function __limpiarAlmacenFalso() {
-  almacenFalso.clear();
+  almacenFalso().clear();
 }

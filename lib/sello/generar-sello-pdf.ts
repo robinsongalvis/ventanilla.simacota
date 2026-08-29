@@ -2,6 +2,7 @@ import { PDFDocument, StandardFonts, rgb } from 'pdf-lib';
 import {
   calcularRectanguloSello,
   selloCabeEnPagina,
+  selloEsLegible,
   SELLO_MARGEN_PT,
 } from './posicion-sello';
 
@@ -35,6 +36,13 @@ export interface ResultadoSellado {
   paginasEstampadas: number;
 }
 
+/** Resultado del sellado multipágina. */
+export interface ResultadoSelladoTotal extends ResultadoSellado {
+  /** Números de página (base 1) que NO admitieron el sello. Vacío = todas. */
+  paginasSinSello: number[];
+  totalPaginas: number;
+}
+
 export class SelloPDFError extends Error {
   constructor(message: string, public readonly codigo: 'CIFRADO' | 'CORRUPTO' | 'SIN_PAGINAS' | 'CABE') {
     super(message);
@@ -48,146 +56,186 @@ const COLOR_TEXTO_OSCURO = rgb(0.122, 0.161, 0.200); // #1F2933
 const COLOR_TEXTO_GRIS   = rgb(0.400, 0.439, 0.522); // #667085
 const COLOR_FONDO        = rgb(1, 1, 1);              // blanco
 
-export async function sellarPrimeraPagina(
-  bytesOriginal: Uint8Array,
-  datos:         DatosSello,
-): Promise<ResultadoSellado> {
-  let doc: PDFDocument;
-  try {
-    // `ignoreEncryption: false` es el default. Si el PDF exige contraseña
-    // de owner que prohíbe modificación, pdf-lib arroja: mapeamos a
-    // SelloPDFError con código CIFRADO para respuesta legible del endpoint.
-    doc = await PDFDocument.load(bytesOriginal);
-  } catch (err) {
-    const msg = err instanceof Error ? err.message : String(err);
-    if (/encrypt/i.test(msg)) {
-      throw new SelloPDFError(
-        'El PDF está protegido/cifrado y no puede sellarse.',
-        'CIFRADO',
-      );
-    }
-    throw new SelloPDFError(
-      'El PDF está corrupto o no puede leerse.',
-      'CORRUPTO',
-    );
-  }
+interface FuentesSello {
+  bold: Awaited<ReturnType<PDFDocument['embedFont']>>;
+  regular: Awaited<ReturnType<PDFDocument['embedFont']>>;
+  mono: Awaited<ReturnType<PDFDocument['embedFont']>>;
+}
 
-  const paginas = doc.getPages();
-  if (paginas.length === 0) {
-    throw new SelloPDFError('El PDF no tiene páginas.', 'SIN_PAGINAS');
-  }
-
-  const primeraPagina = paginas[0];
-  const { width: ancho, height: alto } = primeraPagina.getSize();
+/**
+ * Estampa el sello en UNA página. Devuelve `false` —sin lanzar— cuando la
+ * página es demasiado pequeña para admitirlo.
+ *
+ * Que devuelva un booleano en vez de lanzar es la diferencia entre sellar un
+ * documento de 40 páginas y perderlo entero porque la 37 era un recorte: el
+ * llamador decide qué hacer con la página que no cupo, y en el modo multipágina
+ * la respuesta es «sellar las demás y decir cuál faltó».
+ */
+function estamparEnPagina(
+  pagina: ReturnType<PDFDocument['getPages']>[number],
+  datos: DatosSello,
+  fuentes: FuentesSello,
+  logoImage: Awaited<ReturnType<PDFDocument['embedPng']>> | null,
+): boolean {
+  const { width: ancho, height: alto } = pagina.getSize();
   const rect = calcularRectanguloSello({ ancho, alto });
+  /* Dos comprobaciones, y la segunda es la que de verdad ocurre: el sello se
+     ENCOGE para caber, así que «no cabe» casi nunca pasa — lo que pasa es que
+     cabe ilegible. Estampar un sello que nadie puede leer y contarlo como
+     estampado sería el silencio que este proyecto persigue. */
+  if (!selloCabeEnPagina(rect, { ancho, alto })) return false;
+  if (!selloEsLegible(rect)) return false;
 
-  if (!selloCabeEnPagina(rect, { ancho, alto })) {
-    throw new SelloPDFError(
-      'La página es demasiado pequeña para estampar el sello.',
-      'CABE',
-    );
-  }
-
-  // Fuentes estándar (Helvetica está embebida en todos los readers,
-  // no requiere subset — mantiene el output pequeño).
-  const fuenteBold    = await doc.embedFont(StandardFonts.HelveticaBold);
-  const fuenteRegular = await doc.embedFont(StandardFonts.Helvetica);
-  const fuenteMono    = await doc.embedFont(StandardFonts.Courier);
-
-  // Logo opcional.
-  let logoImage: Awaited<ReturnType<typeof doc.embedPng>> | null = null;
-  if (datos.logoPng && datos.logoPng.byteLength > 0) {
-    try {
-      logoImage = await doc.embedPng(datos.logoPng);
-    } catch {
-      // Si el PNG está corrupto, seguimos sin logo — el sello debe salir igual.
-      logoImage = null;
-    }
-  }
-
-  // Layout interno (coordenadas relativas al rect del sello).
   const padding = 6;
   const anchoContenido = rect.ancho - padding * 2;
-  const altoLogo       = 26;
-  const anchoLogo      = 26;
-  const gapLogoTexto   = 6;
+  const altoLogo = 26;
+  const anchoLogo = 26;
+  const gapLogoTexto = 6;
 
-  // Fondo semi-transparente + borde institucional.
-  primeraPagina.drawRectangle({
-    x:      rect.x,
-    y:      rect.y,
-    width:  rect.ancho,
+  pagina.drawRectangle({
+    x: rect.x,
+    y: rect.y,
+    width: rect.ancho,
     height: rect.alto,
-    color:       COLOR_FONDO,
-    opacity:     0.85,
+    color: COLOR_FONDO,
+    opacity: 0.85,
     borderColor: COLOR_VERDE_INST,
     borderWidth: 0.6,
   });
 
-  // Logo (opcional).
   let cursorX = rect.x + padding;
   const cursorTopY = rect.y + rect.alto - padding;
 
   if (logoImage) {
-    primeraPagina.drawImage(logoImage, {
-      x:      cursorX,
-      y:      cursorTopY - altoLogo,
-      width:  anchoLogo,
-      height: altoLogo,
-    });
+    pagina.drawImage(logoImage, { x: cursorX, y: cursorTopY - altoLogo, width: anchoLogo, height: altoLogo });
     cursorX += anchoLogo + gapLogoTexto;
   }
 
-  // Textos del sello — el bloque de texto arranca a la derecha del logo.
   const textoAncho = rect.ancho - (cursorX - rect.x) - padding;
 
-  // Línea 1: "RECIBIDO POR VENTANILLA ÚNICA"
-  primeraPagina.drawText('RECIBIDO POR VENTANILLA ÚNICA', {
-    x:    cursorX,
-    y:    cursorTopY - 8,
-    size: 6.5,
-    font: fuenteBold,
-    color: COLOR_VERDE_INST,
-    maxWidth: textoAncho,
+  pagina.drawText('RECIBIDO POR VENTANILLA ÚNICA', {
+    x: cursorX, y: cursorTopY - 8, size: 6.5, font: fuentes.bold, color: COLOR_VERDE_INST, maxWidth: textoAncho,
+  });
+  pagina.drawText(datos.radicadoId, {
+    x: cursorX, y: cursorTopY - 20, size: 8.5, font: fuentes.mono, color: COLOR_TEXTO_OSCURO, maxWidth: textoAncho,
+  });
+  pagina.drawText(datos.fechaHoraLegible, {
+    x: cursorX, y: cursorTopY - 32, size: 6.5, font: fuentes.regular, color: COLOR_TEXTO_GRIS, maxWidth: textoAncho,
+  });
+  pagina.drawText('Alcaldía Municipal de Simacota', {
+    x: rect.x + padding, y: rect.y + padding, size: 5.5, font: fuentes.regular, color: COLOR_TEXTO_GRIS, maxWidth: anchoContenido,
   });
 
-  // Línea 2: número de radicado en mono.
-  primeraPagina.drawText(datos.radicadoId, {
-    x:    cursorX,
-    y:    cursorTopY - 20,
-    size: 8.5,
-    font: fuenteMono,
-    color: COLOR_TEXTO_OSCURO,
-    maxWidth: textoAncho,
-  });
-
-  // Línea 3: fecha/hora.
-  primeraPagina.drawText(datos.fechaHoraLegible, {
-    x:    cursorX,
-    y:    cursorTopY - 32,
-    size: 6.5,
-    font: fuenteRegular,
-    color: COLOR_TEXTO_GRIS,
-    maxWidth: textoAncho,
-  });
-
-  // Línea 4 (pie del sello): "Alcaldía Municipal de Simacota"
-  primeraPagina.drawText('Alcaldía Municipal de Simacota', {
-    x:    rect.x + padding,
-    y:    rect.y + padding,
-    size: 5.5,
-    font: fuenteRegular,
-    color: COLOR_TEXTO_GRIS,
-    maxWidth: anchoContenido,
-  });
-
-  // Discard silencioso del margen interior — evita warnings de layout.
   void SELLO_MARGEN_PT;
+  return true;
+}
 
-  const salidaBytes = await doc.save({ useObjectStreams: false });
+/** Carga el PDF y prepara fuentes y logo. Errores tipados, legibles por el endpoint. */
+async function prepararDocumento(
+  bytesOriginal: Uint8Array,
+  datos: DatosSello,
+): Promise<{ doc: PDFDocument; fuentes: FuentesSello; logoImage: Awaited<ReturnType<PDFDocument['embedPng']>> | null }> {
+  let doc: PDFDocument;
+  try {
+    // `ignoreEncryption: false` es el default. Si el PDF exige contraseña de
+    // owner que prohíbe modificación, pdf-lib arroja: se mapea a CIFRADO.
+    doc = await PDFDocument.load(bytesOriginal);
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : String(err);
+    if (/encrypt/i.test(msg)) {
+      throw new SelloPDFError('El PDF está protegido/cifrado y no puede sellarse.', 'CIFRADO');
+    }
+    throw new SelloPDFError('El PDF está corrupto o no puede leerse.', 'CORRUPTO');
+  }
+
+  if (doc.getPages().length === 0) {
+    throw new SelloPDFError('El PDF no tiene páginas.', 'SIN_PAGINAS');
+  }
+
+  const fuentes: FuentesSello = {
+    // Helvetica y Courier están embebidas en todos los readers: no requieren
+    // subset y mantienen pequeña la copia.
+    bold: await doc.embedFont(StandardFonts.HelveticaBold),
+    regular: await doc.embedFont(StandardFonts.Helvetica),
+    mono: await doc.embedFont(StandardFonts.Courier),
+  };
+
+  let logoImage: Awaited<ReturnType<PDFDocument['embedPng']>> | null = null;
+  if (datos.logoPng && datos.logoPng.byteLength > 0) {
+    try {
+      logoImage = await doc.embedPng(datos.logoPng);
+    } catch {
+      // Si el PNG está corrupto seguimos sin logo — el sello debe salir igual.
+      logoImage = null;
+    }
+  }
+
+  return { doc, fuentes, logoImage };
+}
+
+/**
+ * Sella SOLO la primera página. Contrato original del sprint Ventanilla
+ * Operativa 3 — lo consume `POST /api/radicados/[radicadoId]/sellar-documento`
+ * y su comportamiento NO cambia: si la primera página no admite el sello, falla.
+ */
+export async function sellarPrimeraPagina(
+  bytesOriginal: Uint8Array,
+  datos: DatosSello,
+): Promise<ResultadoSellado> {
+  const { doc, fuentes, logoImage } = await prepararDocumento(bytesOriginal, datos);
+  const primeraPagina = doc.getPages()[0];
+
+  if (!estamparEnPagina(primeraPagina, datos, fuentes, logoImage)) {
+    throw new SelloPDFError('La página es demasiado pequeña para estampar un sello legible.', 'CABE');
+  }
+
+  return { bytes: await doc.save({ useObjectStreams: false }), paginasEstampadas: 1 };
+}
+
+/**
+ * Sella TODAS las páginas que lo admitan.
+ *
+ * ── LA PÁGINA QUE NO CUPO ─────────────────────────────────────────────────
+ *
+ * No aborta el documento entero: perder cuarenta sellos porque la página 37 era
+ * un recorte pequeño es un castigo desproporcionado. Pero tampoco pasa en
+ * silencio — devuelve `paginasSinSello` para que quien entrega el papel pueda
+ * decir cuáles quedaron sin estampar.
+ *
+ * POR QUÉ LA CONSTANCIA VA EN PANTALLA Y NO EN EL PAPEL: la página sin sello es,
+ * por definición, la que no tiene sitio para uno. Escribirle encima la nota de
+ * que no cabe sería el mismo problema con otro texto.
+ *
+ * SI NO SE PUDO SELLAR NINGUNA, falla. Entregar una «copia sellada» sin un solo
+ * sello sería afirmar con el nombre del archivo algo que el documento no dice.
+ */
+export async function sellarTodasLasPaginas(
+  bytesOriginal: Uint8Array,
+  datos: DatosSello,
+): Promise<ResultadoSelladoTotal> {
+  const { doc, fuentes, logoImage } = await prepararDocumento(bytesOriginal, datos);
+  const paginas = doc.getPages();
+
+  const paginasSinSello: number[] = [];
+  let estampadas = 0;
+
+  for (let i = 0; i < paginas.length; i += 1) {
+    if (estamparEnPagina(paginas[i], datos, fuentes, logoImage)) estampadas += 1;
+    // Número de página HUMANO (base 1): lo va a leer una persona en pantalla.
+    else paginasSinSello.push(i + 1);
+  }
+
+  if (estampadas === 0) {
+    throw new SelloPDFError(
+      'Ninguna página admite un sello legible: todas son más pequeñas que el espacio que necesita.',
+      'CABE',
+    );
+  }
 
   return {
-    bytes: salidaBytes,
-    paginasEstampadas: 1,
+    bytes: await doc.save({ useObjectStreams: false }),
+    paginasEstampadas: estampadas,
+    paginasSinSello,
+    totalPaginas: paginas.length,
   };
 }

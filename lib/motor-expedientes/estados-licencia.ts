@@ -25,6 +25,16 @@
 import type { Expediente } from './tipos';
 
 export type EstadoJuridicoLicencia =
+  /**
+   * La solicitud está en poder de la Alcaldía; su completitud AÚN NO se ha
+   * verificado. Un expediente aquí puede recibir documentos, NO tiene número
+   * de la serie oficial y NO tiene término corriendo (ADR-0033 §0).
+   *
+   * Es el estado del caso cotidiano: entrega parcial en mostrador — el
+   * ciudadano llega con 9 de 19 documentos y vuelve días después con el resto.
+   * Nombre PROVISIONAL: es lenguaje institucional y lo decide Planeación.
+   */
+  | 'PRESENTADA'
   | 'RADICADA_EN_DEBIDA_FORMA'
   | 'EN_REVISION'
   | 'CON_ACTA_DE_OBSERVACIONES'
@@ -121,6 +131,19 @@ const TRANSICIONES: Readonly<Record<EstadoJuridicoLicencia, readonly TransicionP
    * inventarle un desenlace — fail-closed, mismo criterio que el resto del
    * motor.
    */
+  /**
+   * ADR-0033 §0 — la solicitud está en poder de la Alcaldía y su completitud
+   * aún no se ha verificado. DOS salidas y ninguna más:
+   *  · a debida forma, cuando el checklist se verifica en SERVIDOR — y es ahí,
+   *    no antes, donde se emite el número oficial y arranca el término;
+   *  · a desistida, si el solicitante retira la solicitud antes de completarla.
+   * No hay arco a EN_REVISION: revisar algo que no consta completo es
+   * exactamente lo que este estado existe para impedir.
+   */
+  PRESENTADA: [
+    { hacia: 'RADICADA_EN_DEBIDA_FORMA', fundamento: 'D.1077/2015 art. 2.2.6.1.2.1.1 par. 1 — la radicación en legal y debida forma se declara cuando la documentación está completa; solo entonces ancla el término.' },
+    { hacia: 'DESISTIDA', fundamento: 'D.1077/2015 art. 2.2.6.1.2.3.4 — desistimiento expreso, procede antes de la decisión.' },
+  ],
   HISTORICO_SIN_RESOLVER: [],
   RADICADA_EN_DEBIDA_FORMA: [
     { hacia: 'EN_REVISION', fundamento: 'D.1077/2015 art. 2.2.6.1.2.1.1 par. 1 (ancla del término); art. 2.2.6.1.2.2.1-2 (citación/valla).' },
@@ -187,6 +210,14 @@ export const ESTADOS_RESUELTOS_LICENCIA: readonly EstadoJuridicoLicencia[] = [
  */
 export function terminoResolucionSigueCorriendo(estado: EstadoJuridicoLicencia): boolean {
   if (estado === 'HISTORICO_SIN_RESOLVER') return false;
+  /* PRESENTADA: el término NO ha arrancado todavía — ni siquiera está
+     suspendido, simplemente no existe. Esta rama es OBLIGATORIA y el
+     compilador NO la habría exigido: la función decide con un ARRAY
+     (`ESTADOS_RESUELTOS_LICENCIA`), no con un Record, así que sin ella un
+     estado nuevo devolvería `true` y el sistema afirmaría que los 45 días YA
+     CORREN para un expediente que aún no los ancló — lo contrario exacto del
+     propósito de este estado. Está registrado como Caso 1 en el ADR-0033 §4.6. */
+  if (estado === 'PRESENTADA') return false;
   return !ESTADOS_RESUELTOS_LICENCIA.includes(estado);
 }
 
@@ -202,7 +233,18 @@ export function puedeTransicionar(
   hacia: EstadoJuridicoLicencia,
   opciones: OpcionesTransicionLicencia = {},
 ): boolean {
-  const permitida = TRANSICIONES[desde].find((t) => t.hacia === hacia);
+  /* FAIL-CLOSED ANTE UN ESTADO DESCONOCIDO. `desde` viene tipado, pero en la
+     práctica sale de Firestore, donde cabe cualquier cosa: un expediente
+     escrito antes de que `estadoJuridico` existiera lo trae `undefined`, y un
+     documento migrado puede traer un valor legado. `TRANSICIONES[desde]` era
+     entonces `undefined` y `.find` LANZABA — tumbando al llamador entero.
+
+     Un guard que explota no es fail-closed: es un fallo. Lo correcto ante un
+     estado que no se reconoce es negar la transición, que es justo lo que un
+     guard debe hacer cuando no puede afirmar nada. */
+  const salidas = TRANSICIONES[desde];
+  if (!salidas) return false;
+  const permitida = salidas.find((t) => t.hacia === hacia);
   if (!permitida) return false;
   if (permitida.requiereNoHuboActaPrevia && opciones.yaHuboActa === true) return false;
   return true;
@@ -218,7 +260,7 @@ export function transicionesDesde(
   estado: EstadoJuridicoLicencia,
   opciones: OpcionesTransicionLicencia = {},
 ): { hacia: EstadoJuridicoLicencia; fundamento: string }[] {
-  return TRANSICIONES[estado]
+  return (TRANSICIONES[estado] ?? [])
     .filter((t) => !(t.requiereNoHuboActaPrevia && opciones.yaHuboActa === true))
     .map((t) => ({ hacia: t.hacia, fundamento: t.fundamento }));
 }

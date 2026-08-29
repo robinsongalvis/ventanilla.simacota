@@ -13,6 +13,8 @@ import {
   type RadicadoPublico,
 } from '@/src/types/simi-citizen';
 
+import type { LicenciaPublica } from '@/lib/seguridad/consulta-publica-licencia';
+
 const ESTADO_VISUAL: Record<EstadoCiudadano, { icono: string; color: string; fondo: string; borde: string }> = {
   radicado_recibido:       { icono: '✓', color: 'text-emerald-800', fondo: 'bg-emerald-50', borde: 'border-emerald-200' },
   en_revision:             { icono: '⌕', color: 'text-indigo-800', fondo: 'bg-indigo-50', borde: 'border-indigo-200' },
@@ -47,6 +49,9 @@ function ConsultaInterna() {
   const [datoVerificacion, setDatoVerificacion] = useState('');
   const [buscando, setBuscando] = useState(false);
   const [radicado, setRadicado] = useState<RadicadoPublico | null>(null);
+  /* El bloque de licencia, cuando el radicado tiene expediente vinculado.
+     Ausente para la inmensa mayoría de radicados, que no son licencias. */
+  const [licencia, setLicencia] = useState<LicenciaPublica | null>(null);
   const [mensaje, setMensaje] = useState('');
   const [fallos, setFallos] = useState(0);
   const [copiado, setCopiado] = useState(false);
@@ -55,6 +60,7 @@ function ConsultaInterna() {
 
   function limpiarResultado() {
     setRadicado(null);
+    setLicencia(null);
     setMensaje('');
   }
 
@@ -75,6 +81,7 @@ function ConsultaInterna() {
         body: JSON.stringify({ numeroRadicado: numero, datoVerificacion: dato }),
       });
       const payload = await response.json().catch(() => null) as {
+        licencia?: LicenciaPublica | null;
         ok?: boolean;
         error?: string;
         radicado?: RadicadoPublico;
@@ -92,6 +99,7 @@ function ConsultaInterna() {
       }
 
       setRadicado(payload.radicado);
+      setLicencia(payload.licencia ?? null);
       setFallos(0);
     } catch {
       setMensaje('No fue posible realizar la consulta. Revise su conexión e intente nuevamente.');
@@ -229,6 +237,37 @@ function ConsultaInterna() {
                 <p className="text-sm leading-relaxed text-slate-700">{ESTADO_CIUDADANO_DESC[radicado.estadoPublico]}</p>
               </div>
             </div>
+
+            {licencia && (
+              /* SU LICENCIA, EN SU IDIOMA. El estado jurídico traducido a lo que
+                 necesita saber: qué pasó y si le toca hacer algo. Las etiquetas
+                 internas («con acta de observaciones», «en viabilidad») son
+                 exactas y no significan nada fuera de Planeación. */
+              <div className="border-b border-[var(--border-soft)] px-6 py-5">
+                <p className="mb-3 text-[10px] font-bold uppercase tracking-widest text-slate-500">
+                  Su licencia urbanística
+                </p>
+                {licencia.numeroExpediente && (
+                  <p className="mb-2 font-mono text-xs text-slate-600">{licencia.numeroExpediente}</p>
+                )}
+                <h2 className="text-base font-black text-slate-900">{licencia.estado.titulo}</h2>
+                <p className="mt-1 text-sm leading-relaxed text-slate-700">{licencia.estado.explicacion}</p>
+
+                {licencia.estado.accionDelCiudadano !== 'NINGUNA' && (
+                  <p role="alert" className="mt-3 rounded-lg border border-amber-300 bg-amber-50 px-3 py-2 text-sm font-semibold text-amber-900">
+                    {licencia.estado.accionDelCiudadano === 'DEBE_COMPLETAR'
+                      ? 'Usted debe atender las observaciones para que su solicitud continúe.'
+                      : 'Usted debe notificarse de la decisión para que produzca efectos.'}
+                  </p>
+                )}
+
+                <p className="mt-3 text-xs text-slate-600">
+                  {licencia.avisoPlazo
+                    ? licencia.avisoPlazo
+                    : `El plazo de respuesta corre desde el ${formatearFecha(licencia.desdeCuandoCorreElPlazo!)}.`}
+                </p>
+              </div>
+            )}
 
             <div className="border-b border-[var(--border-soft)] px-6 py-5">
               <SelloRadicado

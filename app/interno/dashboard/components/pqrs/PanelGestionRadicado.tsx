@@ -22,6 +22,7 @@ const TABS: { id: TabId; label: string }[] = [
   { id: 'asignar', label: 'Asignar / trasladar' },
   { id: 'devolver', label: 'Devolver / prorroga' },
 ];
+import { EstadoTramiteLicencia } from './EstadoTramiteLicencia';
 
 export function PanelGestionRadicado({ radicado, trazabilidad, onAsignar, onDevolver, onProrroga }: Props) {
   const [tab, setTab] = useState<TabId>('info');
@@ -56,6 +57,14 @@ export function PanelGestionRadicado({ radicado, trazabilidad, onAsignar, onDevo
             <Info label="Dependencia" value={NOMBRES_TENANT[radicado.clasificacion.oficinaDestino]} />
             <Info label="Vencimiento" value={new Date(radicado.termino.fechaVencimiento).toLocaleDateString('es-CO')} />
             <Info label="Folios" value={String(radicado.detalle.numeroFolios)} />
+
+            {/* ADR-0034 — ventanilla ve el ESTADO del trámite, no el
+                expediente. El bloque se pinta solo si el radicado está
+                vinculado a un expediente de licencia; para todo lo demás no
+                existe. */}
+            <div className="md:col-span-3">
+              <EstadoTramiteLicencia radicadoId={radicado.radicadoId} />
+            </div>
 
             {radicado.analisisIa && (
               <div className="md:col-span-3 rounded-xl border border-indigo-500/20 bg-indigo-500/[0.03] p-4 mt-3">

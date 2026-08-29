@@ -40,6 +40,9 @@ import {
 } from '@/lib/server/expedientes-licencias';
 import { buildAvisoActaHtml, buildAvisoActaSubject } from '@/lib/email/templates/aviso-acta-observaciones';
 import { enviarEmail } from '@/lib/email/mailer';
+import { componerCorreoHito } from '@/lib/email/hitos-licencia';
+import { buildHitoLicenciaHtml } from '@/lib/email/templates/hito-licencia';
+import type { RegistrarActuacionInput } from '@/lib/server/expedientes-licencias';
 import { logError } from '@/lib/logger';
 
 export const runtime = 'nodejs';
@@ -72,7 +75,14 @@ export async function POST(request: Request, context: RouteContext): Promise<Nex
       return NextResponse.json({ error: 'Tu rol no permite registrar actuaciones en este expediente.' }, { status: 403 });
     }
 
-    const body = await request.json().catch(() => null) as { tipo?: string; detalle?: string; fechaComunicacion?: string } | null;
+    const body = await request.json().catch(() => null) as {
+      tipo?: string;
+      detalle?: string;
+      fechaComunicacion?: string;
+      resolucion?: RegistrarActuacionInput['resolucion'];
+      notificacion?: RegistrarActuacionInput['notificacion'];
+      firmeza?: RegistrarActuacionInput['firmeza'];
+    } | null;
 
     // Se traen los documentos COMPLETOS (no solo `tipo`): además del guard
     // de acta única, `planRegistrarActuacion` recalcula el espejo
@@ -87,7 +97,15 @@ export async function POST(request: Request, context: RouteContext): Promise<Nex
       actuacionesExistentes,
       id,
       expediente.tenantId,
-      { tipo: body?.tipo ?? '', detalle: body?.detalle ?? '' },
+      {
+        tipo: body?.tipo ?? '',
+        detalle: body?.detalle ?? '',
+        /* La evidencia de cierre viaja TAL CUAL: el planificador la valida y
+           rechaza con el motivo. La ruta no la interpreta ni la completa. */
+        resolucion: body?.resolucion,
+        notificacion: body?.notificacion,
+        firmeza: body?.firmeza,
+      },
       { uid: usuario.uid, nombre: usuario.nombre, rol: usuario.rol },
       ahora,
     );
@@ -106,6 +124,47 @@ export async function POST(request: Request, context: RouteContext): Promise<Nex
       fechaAlertaConservadora: plan.fechaAlertaConservadora,
     });
     await batch.commit();
+
+    /* ── EL CORREO DE HITO ─────────────────────────────────────────────
+       Los correos de hitos entraron en #265 y NO TENÍAN DISPARADOR: se
+       construyeron avisos para estados que ninguna ruta escribía. Este es el
+       disparador. `componerCorreoHito` devuelve `null` para los estados que no
+       se comunican, así que esta ruta no tiene que conocer la tabla — solo
+       respetar el null.
+
+       Post-commit y best-effort, igual que el aviso de acta: un fallo de envío
+       NUNCA revierte la actuación ya confirmada. */
+    let hitoEnviado = false;
+    const hito = componerCorreoHito(
+      plan.nuevoEstadoJuridico,
+      expediente.numeroExpediente?.numero ?? id,
+    );
+    if (hito && expediente.radicadoId) {
+      const radSnap = await db.doc(`ventanilla_radicados/${expediente.radicadoId}`).get();
+      const rad = radSnap.exists ? (radSnap.data() as VentanillaRadicado) : null;
+      const gateHito = debeEnviarComunicacionExpediente(
+        expediente.tramiteId,
+        rad,
+        expediente.numeroExpediente?.numero,
+      );
+      if (gateHito.debeEnviar && rad?.solicitante.email) {
+        try {
+          await enviarEmail({
+            to: rad.solicitante.email,
+            subject: hito.subject,
+            html: buildHitoLicenciaHtml({
+              hito,
+              numeroExpediente: expediente.numeroExpediente?.numero ?? id,
+              solicitanteNombre: expediente.solicitanteNombre,
+              urlConsulta: `${process.env.NEXT_PUBLIC_APP_URL ?? 'https://ventanilla-simacota.vercel.app'}/consulta`,
+            }),
+          });
+          hitoEnviado = true;
+        } catch (error) {
+          logError({ radicadoId: id, modulo: 'licencias/actuaciones/hito', error });
+        }
+      }
+    }
 
     // Aviso de acta (A5, dictamen gobierno-digital 8-ago) — SOLO para
     // 'acta-observaciones', post-commit, best-effort: un fallo de envío
@@ -151,7 +210,7 @@ export async function POST(request: Request, context: RouteContext): Promise<Nex
       }
     }
 
-    return NextResponse.json({ ok: true, actuacion: plan.actuacion, estadoJuridico: plan.nuevoEstadoJuridico, avisoEnviado });
+    return NextResponse.json({ ok: true, actuacion: plan.actuacion, estadoJuridico: plan.nuevoEstadoJuridico, avisoEnviado, hitoEnviado });
   } catch (error) {
     logError({ radicadoId: 'n/a', modulo: 'licencias/expedientes/[id]/actuaciones/POST', error });
     return jsonError(error);
