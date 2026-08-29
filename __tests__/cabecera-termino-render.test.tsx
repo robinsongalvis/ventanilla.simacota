@@ -188,3 +188,36 @@ describe('el expediente de demostración, con sus fechas reales', () => {
     expect(screen.getByText(/puede avanzar con calma/i)).toBeTruthy();
   });
 });
+
+describe('los expedientes anteriores al acto de radicar', () => {
+  /* EL DEFECTO QUE EL PROPIETARIO FOTOGRAFIÓ (29-ago-2026): la tarjeta no
+     aparecía. Se guardaba tras `expediente.fechaRadicacionDebidaForma`, campo
+     OPCIONAL que solo escribe el acto de radicar (#248). El expediente de
+     demostración nació EN debida forma el 24/08, antes de que ese acto
+     existiera: campo vacío, tarjeta invisible — mientras el panel de al lado sí
+     mostraba el ancla, porque la deriva de la actuación.
+
+     Le pasa a TODO expediente anterior al acto, que hoy son todos los reales. */
+  it('sin ancla persistida, el término se clasifica igual', () => {
+    render(
+      <CabeceraTermino
+        venceIso={venceEn(30)}
+        estadoJuridico="RADICADA_EN_DEBIDA_FORMA"
+        expedienteId="anterior-al-acto"
+      />,
+    );
+    expect(screen.getByText('En término')).toBeTruthy();
+  });
+
+  it('y en vez de inventarse una fecha de inicio, dice que no la hay', () => {
+    render(
+      <CabeceraTermino
+        venceIso={venceEn(30)}
+        estadoJuridico="RADICADA_EN_DEBIDA_FORMA"
+        expedienteId="anterior-al-acto"
+      />,
+    );
+    expect(screen.getByText(/Sin ancla registrada/)).toBeTruthy();
+    expect(screen.queryByText(/Corre desde/)).toBeNull();
+  });
+});

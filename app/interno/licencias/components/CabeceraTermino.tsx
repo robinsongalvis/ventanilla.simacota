@@ -26,8 +26,13 @@ import { formatFechaColombia } from '@/lib/fecha-colombia';
 export interface CabeceraTerminoProps {
   /** ISO — vencimiento proyectado (la fecha más exigente). */
   venceIso: string;
-  /** ISO — desde cuándo corre. */
-  desdeIso: string;
+  /**
+   * ISO — desde cuándo corre. OPCIONAL: los expedientes anteriores al acto de
+   * radicar (#248) no tienen el ancla persistida, y aun así su término corre y
+   * hay que clasificarlo. Sin ancla se omite la línea «Corre desde el …» en vez
+   * de inventarse una fecha.
+   */
+  desdeIso?: string;
   estadoJuridico: EstadoJuridicoLicencia;
   expedienteId: string;
 }
@@ -73,7 +78,10 @@ const VERDE_EN_TERMINO = '#116932';
 
 export function CabeceraTermino({ venceIso, desdeIso, estadoJuridico, expedienteId }: CabeceraTerminoProps) {
   const fila = clasificarFrenteAlTermino(
-    { id: expedienteId, estadoJuridico, creadoEn: desdeIso, fechaAlertaConservadora: venceIso },
+    /* `creadoEn` solo lo usa la rama SIN_ANCLAR, inalcanzable aquí porque
+       `venceIso` existe; se pasa el vencimiento como relleno para no fingir un
+       ancla que puede no haber. */
+    { id: expedienteId, estadoJuridico, creadoEn: desdeIso ?? venceIso, fechaAlertaConservadora: venceIso },
     new Date(),
   );
 
@@ -129,7 +137,9 @@ export function CabeceraTermino({ venceIso, desdeIso, estadoJuridico, expediente
               {vencido ? 'Venció el' : 'Vence el'} {formatFechaColombia(venceIso)}
             </p>
             <p className="text-xs" style={{ color: 'var(--text-secondary)' }}>
-              {vencido ? 'Corría' : 'Corre'} desde el {formatFechaColombia(desdeIso)}
+              {desdeIso
+                ? `${vencido ? 'Corría' : 'Corre'} desde el ${formatFechaColombia(desdeIso)}`
+                : 'Sin ancla registrada'}
               {!vencido && ` · día ${transcurridos} de ${PLAZO_DECISION_LICENCIA_DIAS_HABILES}`}
             </p>
           </div>

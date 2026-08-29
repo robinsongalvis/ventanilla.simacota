@@ -203,6 +203,36 @@ export function DetalleLicenciaClient({ expedienteId, onVolver }: DetalleLicenci
   const fechaRadicacion = actuaciones.find((a) => a.tipo === 'radicacion-debida-forma')?.fecha;
 
   /**
+   * El ancla que muestra la tarjeta, con el campo PERSISTIDO por delante y la
+   * actuación como respaldo.
+   *
+   * EL DEFECTO QUE ESTO ARREGLA (29-ago-2026): la tarjeta se guardaba tras
+   * `expediente.fechaRadicacionDebidaForma`, que es OPCIONAL y solo lo escribe
+   * el acto de radicar (#248). El expediente de demostración nació EN debida
+   * forma el 24/08, antes de que ese acto existiera, así que el campo está
+   * vacío y la tarjeta no se pintaba nunca — mientras el panel de al lado sí
+   * mostraba el ancla, porque la deriva de la actuación. Lo mismo le pasa a
+   * TODO expediente anterior al acto.
+   *
+   * La guarda de la tarjeta ya no depende del ancla: depende del vencimiento,
+   * que es lo único que necesita para clasificar. Sin ancla la tarjeta
+   * simplemente omite la línea «Corre desde el …».
+   */
+  const anclaDelTermino = expediente?.fechaRadicacionDebidaForma ?? fechaRadicacion;
+
+  /**
+   * UNA SOLA CONDICIÓN, DOS USOS. Decide si se pinta la tarjeta Y si el panel
+   * de abajo cede su bloque destacado.
+   *
+   * Escrita dos veces podrían divergir, y la divergencia peligrosa no es la
+   * obvia: si la tarjeta deja de pintarse pero el panel sigue creyendo que
+   * alguien destaca el vencimiento, la pantalla se queda SIN NINGUNA fecha
+   * destacada. Un plazo que no se ve en ninguna parte es peor que verlo dos
+   * veces.
+   */
+  const hayVencimientoProyectado = Boolean(computos?.terminoDual.fechaAlertaConservadora);
+
+  /**
    * "Vencimiento calculado" del timeline usa `fechaAlertaConservadora`
    * (`computos.terminoDual`, servidor) — la MISMA fecha que ya destaca
    * `PanelTerminoDual` con la alerta roja, nunca una recomputada aparte en
@@ -393,11 +423,11 @@ export function DetalleLicenciaClient({ expedienteId, onVolver }: DetalleLicenci
               días por delante: un cronómetro que siempre grita acaba ignorado
               justo el día que grita de verdad. La clasificación sale de la
               MISMA función que usa el cron. */}
-          {expediente.fechaRadicacionDebidaForma && computos?.terminoDual.fechaAlertaConservadora && (
+          {hayVencimientoProyectado && computos?.terminoDual.fechaAlertaConservadora && (
             <CabeceraTermino
               expedienteId={expedienteId}
               estadoJuridico={expediente.estadoJuridico}
-              desdeIso={expediente.fechaRadicacionDebidaForma}
+              desdeIso={anclaDelTermino}
               venceIso={computos.terminoDual.fechaAlertaConservadora}
             />
           )}
@@ -407,6 +437,7 @@ export function DetalleLicenciaClient({ expedienteId, onVolver }: DetalleLicenci
             origen={expediente.origen}
             estadoJuridico={expediente.estadoJuridico}
             fechaRadicacion={fechaRadicacion}
+            vencimientoDestacadoArriba={hayVencimientoProyectado}
           />
 
           {computos?.vigencia !== undefined && <PanelVigenciaActo vigencia={computos.vigencia} />}

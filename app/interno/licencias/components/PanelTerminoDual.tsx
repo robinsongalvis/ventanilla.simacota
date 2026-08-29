@@ -39,9 +39,23 @@ export interface PanelTerminoDualProps {
   origen?: OrigenActuacion;
   /** ISO de la actuación `radicacion-debida-forma`, si existe — se muestra solo como referencia del ancla, nunca altera el cómputo. */
   fechaRadicacion?: string;
+  /**
+   * ¿Hay una tarjeta ENCIMA que ya destaca `fechaAlertaConservadora`?
+   *
+   * Solo lo pone `DetalleLicenciaClient`, donde `CabeceraTermino` va montada
+   * justo arriba. Sin esto la pantalla enseña la misma fecha DOS VECES y con
+   * dos temperaturas distintas —verde en la tarjeta, rojo aquí—, que fue
+   * exactamente lo que el propietario vio el 29-ago-2026.
+   *
+   * NO es una forma de apagar la alarma: la tarjeta la asume entera, con el
+   * nivel correcto y con `role="alert"` cuando el término está vencido. Y el
+   * panel SUELTO —como lo montan sus pruebas— la sigue mostrando, que es donde
+   * se verifica el invariante de que la alerta lleva la fecha más temprana.
+   */
+  vencimientoDestacadoArriba?: boolean;
 }
 
-export function PanelTerminoDual({ terminoDual, origen, fechaRadicacion, estadoJuridico }: PanelTerminoDualProps) {
+export function PanelTerminoDual({ terminoDual, origen, fechaRadicacion, estadoJuridico, vencimientoDestacadoArriba }: PanelTerminoDualProps) {
   const { suspension, reinicio, fechaAlertaConservadora } = terminoDual;
   // Sin estado declarado se asume que el término corre (comportamiento
   // previo): este componente no puede adivinar, y errar hacia "mostrar la
@@ -118,7 +132,7 @@ export function PanelTerminoDual({ terminoDual, origen, fechaRadicacion, estadoJ
         </div>
       )}
 
-      {fechaAlertaConservadora && terminoCorriendo && (
+      {fechaAlertaConservadora && terminoCorriendo && !vencimientoDestacadoArriba && (
         <div
           role="alert"
           aria-describedby="panel-termino-dual-detalle"
