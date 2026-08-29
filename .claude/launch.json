@@ -8,7 +8,7 @@
         "run",
         "dev:stage"
       ],
-      "port": 3000
+      "autoPort": true
     },
     {
       "name": "ventanilla-dev",
@@ -17,7 +17,7 @@
         "run",
         "dev"
       ],
-      "port": 3000
+      "autoPort": true
     },
     {
       "name": "ventanilla-celular",
@@ -26,11 +26,9 @@
         "next",
         "dev",
         "-H",
-        "0.0.0.0",
-        "-p",
-        "3000"
+        "0.0.0.0"
       ],
-      "port": 3000
+      "autoPort": true
     },
     {
       "name": "rediseno-3100",
@@ -43,7 +41,8 @@
         "-p",
         "3100"
       ],
-      "port": 3100
+      "port": 3100,
+      "autoPort": false
     }
   ]
 }
