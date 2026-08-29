@@ -129,13 +129,50 @@ jobs:
           # El versionado es la red bajo la red: si un objeto del ORIGEN se
           # corrompe y el rsync copia la versión corrupta, la anterior sigue
           # recuperable en el destino. Sin él, el respaldo hereda la corrupción.
-          VERS="$(gcloud storage buckets describe "gs://${DESTINO_BUCKET}" --format='value(versioning.enabled)' 2>/dev/null)"
-          if [ "${VERS}" != "True" ] && [ "${VERS}" != "true" ]; then
-            echo "::error::gs://${DESTINO_BUCKET} NO tiene versionado de objetos."
-            echo "Actívelo: gcloud storage buckets update gs://${DESTINO_BUCKET} --versioning"
-            exit 1
-          fi
-          echo "Destino verificado: gs://${DESTINO_BUCKET} (versionado activo)."
+          #
+          # LA MISMA LECCIÓN DE SEIS LÍNEAS MÁS ARRIBA, QUE AQUÍ SE REPETÍA.
+          # Esto era una SEGUNDA llamada con `2>/dev/null` y
+          # `--format='value(versioning.enabled)'`. Cualquier fallo suyo —o un
+          # nombre de campo que esa versión de gcloud no exponga— se volvía
+          # cadena vacía, y el `if` declaraba «NO tiene versionado». El 29-ago-2026
+          # acusó a un bucket cuyo versionado estaba activo DESDE EL 25 (leído por
+          # la API de Storage: `versioning.enabled = true`, y su configuración sin
+          # tocar en cuatro días). El instrumento mintiendo sobre lo que pasó,
+          # otra vez, tres líneas debajo de donde ya estaba escrito que no.
+          #
+          # Ahora se determina sobre `SALIDA` —la MISMA lectura que acaba de
+          # pasar— en vez de volver a llamar: lo que ya se leyó no puede fallar
+          # de nuevo. Y se acepta cualquiera de las formas en que gcloud nombra
+          # el campo, porque el nombre exacto cambió entre versiones y NO es algo
+          # sobre lo que un control de respaldo deba apostar.
+          VERS="$(printf '%s\n' "${SALIDA}" | grep -iA1 'versioning' | head -4 | tr '[:upper:]' '[:lower:]')"
+          case "${VERS}" in
+            *true*)
+              echo "Destino verificado: gs://${DESTINO_BUCKET} (versionado activo)."
+              ;;
+            *false*)
+              echo "::error::gs://${DESTINO_BUCKET} NO tiene versionado de objetos."
+              echo "Actívelo: gcloud storage buckets update gs://${DESTINO_BUCKET} --versioning"
+              exit 1
+              ;;
+            *)
+              # NO se afirma que esté apagado: se afirma que no se pudo leer.
+              # Fallar cerrado es correcto —sin esa certeza una copia puede
+              # heredar la corrupción del origen— pero el motivo tiene que ser
+              # el verdadero.
+              echo "::error::NO PUDE DETERMINAR el versionado de gs://${DESTINO_BUCKET}."
+              echo "Esto NO afirma que esté apagado: afirma que no se pudo leer."
+              echo "El respaldo no corre igualmente, porque sin esa certeza la copia"
+              echo "podría heredar una corrupción del origen."
+              echo ""
+              echo "Pista: si la salida de abajo NO menciona 'versioning', lo más"
+              echo "probable es que gcloud omita el campo cuando está desactivado."
+              echo ""
+              echo "Salida completa de gcloud storage buckets describe:"
+              printf '%s\n' "${SALIDA}"
+              exit 1
+              ;;
+          esac
 
       - name: Medir el origen antes de copiar
         id: origen
