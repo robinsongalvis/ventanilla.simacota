@@ -52,7 +52,7 @@ export function CaminoDelTramite({ estado }: { estado: EstadoJuridicoLicencia })
                   {paso.titulo}
                 </span>
                 <span className="block text-xs" style={{ color: '#94A3B8' }}>
-                  {paso.subtexto}
+                  {paso.subtexto(situacion)}
                 </span>
               </span>
             </li>

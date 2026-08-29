@@ -18,18 +18,51 @@
  */
 import type { EstadoJuridicoLicencia } from '@/lib/motor-expedientes/estados-licencia';
 
+export type SituacionPaso = 'CUMPLIDO' | 'ACTUAL' | 'PENDIENTE';
+
 export interface PasoCamino {
   numero: 1 | 2 | 3 | 4;
   titulo: string;
-  /** Qué significa, en una línea. */
-  subtexto: string;
+  /**
+   * Qué significa, en una línea, SEGÚN LA SITUACIÓN DEL PASO.
+   *
+   * No es una cadena fija, y el motivo es un defecto real que se vio en
+   * pantalla: el paso 2 llevaba «el plazo aún no corre» escrito a secas, así
+   * que un expediente ya radicado lo mostraba ✓ CUMPLIDO y a la vez afirmaba
+   * que el plazo no corría — mientras la cabecera de la misma pantalla decía
+   * que vencía el 27/10. Dos afirmaciones contrarias sobre el mismo hecho, a
+   * diez centímetros una de otra.
+   *
+   * Una frase en presente solo es cierta mientras el paso es el ACTUAL. Al
+   * quedar atrás hay que hablar en pasado, o callar.
+   */
+  subtexto: (situacion: SituacionPaso) => string;
 }
 
 export const PASOS: readonly PasoCamino[] = [
-  { numero: 1, titulo: 'Solicitud recibida', subtexto: 'acuse enviado al ciudadano' },
-  { numero: 2, titulo: 'Completar documentos', subtexto: 'el plazo aún no corre' },
-  { numero: 3, titulo: 'Radicar en debida forma', subtexto: 'emite el número y arranca el plazo' },
-  { numero: 4, titulo: 'Revisión y decisión', subtexto: 'la Secretaría estudia y resuelve' },
+  {
+    numero: 1,
+    titulo: 'Solicitud recibida',
+    subtexto: () => 'acuse enviado al ciudadano',
+  },
+  {
+    numero: 2,
+    titulo: 'Completar documentos',
+    /* «El plazo aún no corre» SOLO mientras se está aquí. Una vez radicado, el
+       plazo sí corre y repetirlo sería contradecir la cabecera. */
+    subtexto: (s) =>
+      s === 'ACTUAL' ? 'el plazo aún no corre' : s === 'CUMPLIDO' ? 'documentación completa' : 'reunir los requisitos',
+  },
+  {
+    numero: 3,
+    titulo: 'Radicar en debida forma',
+    subtexto: (s) => (s === 'CUMPLIDO' ? 'el plazo empezó a correr' : 'emite el número y arranca el plazo'),
+  },
+  {
+    numero: 4,
+    titulo: 'Revisión y decisión',
+    subtexto: () => 'la Secretaría estudia y resuelve',
+  },
 ];
 
 /**
@@ -55,8 +88,6 @@ const PASO_POR_ESTADO: Readonly<Record<EstadoJuridicoLicencia, 1 | 2 | 3 | 4>> =
      pantalla lo acompaña de su chip de estado, que dice lo que de verdad es. */
   HISTORICO_SIN_RESOLVER: 4,
 };
-
-export type SituacionPaso = 'CUMPLIDO' | 'ACTUAL' | 'PENDIENTE';
 
 export function situacionDePaso(
   paso: PasoCamino,
