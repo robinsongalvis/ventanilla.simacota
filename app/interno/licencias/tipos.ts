@@ -58,9 +58,25 @@ export interface FilaLicencia {
 /** Evento mostrado en `EventoTimeline` (Pantalla 02, panel historial). */
 export interface EventoTimelineItem {
   /** `COMUNICACION` (Bloque A·A4/A5): constancia o aviso de acta enviados al ciudadano — tono INFORMATIVO, nunca el verde de éxito de `RADICACION`. */
-  tipo: 'RADICACION' | 'ACTA' | 'SUBSANACION' | 'VENCIMIENTO_CALCULADO' | 'COMUNICACION';
+  tipo: 'RADICACION' | 'ACTA' | 'SUBSANACION' | 'VENCIMIENTO_CALCULADO' | 'COMUNICACION' | 'APERTURA' | 'COMPLETITUD';
+  /** En lenguaje de persona: «Se abrió el expediente», no `apertura-expediente`. */
   titulo: string;
   meta: string;
+  /** Fecha y hora en que ocurrió, ya formateadas para leer. */
+  cuando?: string;
+  /** Quién lo hizo. Capturado en servidor, nunca lo que mande el cliente. */
+  quien?: string;
+  /**
+   * Lo que importa del hecho, en una línea: el número emitido, desde cuándo
+   * corre el plazo. Compuesto de campos, NUNCA parseando la prosa del `detalle`.
+   */
+  resumen?: string;
+  /**
+   * La jerga —handoff D2, esPrueba, R10, slugs— tal cual la escribió el
+   * servidor. Va PLEGADA tras «ⓘ Detalle técnico»: el auditor la encuentra, el
+   * funcionario no tropieza con ella.
+   */
+  detalleTecnico?: string;
 }
 
 /** Detalle completo de un expediente (Pantalla 02). */

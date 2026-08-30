@@ -12,14 +12,28 @@ import { formatFechaColombia } from '@/lib/fecha-colombia';
 import { PREFIJO_AVISO_ACTA_COMUNICACION } from '@/lib/motor-expedientes/comunicaciones-licencia';
 import type { EventoTimelineItem } from './tipos';
 
+/* EN LENGUAJE DE PERSONA, no el slug. Sin título, el mapa caía a `a.tipo` y la
+   pantalla imprimía literalmente `apertura-expediente` — la traza interna del
+   sistema delante de quien atiende a un ciudadano. Lo vio el propietario en
+   producción el 30-ago-2026. */
 export const TITULO_ACTUACION: Record<string, string> = {
-  'radicacion-debida-forma': 'Radicación en debida forma',
+  'apertura-expediente': 'Se abrió el expediente',
+  'vinculacion-radicado': 'Se vinculó con el radicado de ventanilla',
+  'inicio-revision': 'Empezó la revisión técnica',
+  /* El nombre COMPLETO del acto, como lo llama el Decreto 1077. El chip de
+     estado nombra el ESTADO («Radicada en debida forma»); aquí se nombra el
+     ACTO, que en la norma es «en legal y debida forma». No es divergencia: son
+     dos cosas distintas. */
+  'radicacion-debida-forma': 'Radicada en legal y debida forma',
   'acta-observaciones': 'Acta de observaciones',
   'respuesta-subsanacion': 'Respuesta de subsanación',
   'modificacion-solicitud': 'Modificación de la solicitud',
 };
 
 export const TIPO_TIMELINE: Record<string, EventoTimelineItem['tipo']> = {
+  'apertura-expediente': 'APERTURA',
+  'vinculacion-radicado': 'APERTURA',
+  'inicio-revision': 'SUBSANACION',
   'radicacion-debida-forma': 'RADICACION',
   'acta-observaciones': 'ACTA',
   'respuesta-subsanacion': 'SUBSANACION',
@@ -67,6 +81,12 @@ export function construirTimelineDesdeActuaciones(
   actuaciones: Actuacion[],
   origenExpediente: OrigenActuacion | undefined,
   vigente: Date | null,
+  /**
+   * ISO del instante en que la solicitud quedó completa. NO es una actuación
+   * —vive en `completitud.completoDesde`— y sin embargo es el hecho que ancla
+   * el término: el historial lo pintaba en ninguna parte.
+   */
+  completoDesde?: string | null,
 ): EventoTimelineItem[] {
   const items: EventoTimelineItem[] = actuaciones
     .slice()
@@ -74,16 +94,61 @@ export function construirTimelineDesdeActuaciones(
     .map((a) => ({
       tipo: TIPO_TIMELINE[a.tipo] ?? 'SUBSANACION',
       titulo: a.tipo === 'comunicacion-enviada' ? tituloComunicacionEnviada(a.detalle) : (TITULO_ACTUACION[a.tipo] ?? a.tipo),
-      meta: a.detalle ? `${formatFechaColombia(a.fecha)} · ${a.detalle}` : formatFechaColombia(a.fecha),
+      cuando: formatFechaHoraColombia(a.fecha),
+      quien: a.actorNombre || undefined,
+      /* EL RESUMEN SE COMPONE DE CAMPOS, NUNCA PARSEANDO EL `detalle`. Partir
+         prosa para extraer datos es frágil: el día que alguien cambie una coma,
+         el resumen miente. Lo que no esté estructurado se queda abajo. */
+      resumen: resumenDe(a),
+      /* La jerga entera, tal cual la escribió el servidor. Plegada. */
+      detalleTecnico: a.detalle || undefined,
+      meta: formatFechaColombia(a.fecha),
     }));
+
+  /* LA COMPLETITUD, que no es actuación pero sí es hecho. Se inserta en su sitio
+     cronológico, no al final: el historial cuenta una historia y el orden es
+     parte de lo que cuenta. */
+  if (completoDesde) {
+    items.push({
+      tipo: 'COMPLETITUD',
+      titulo: 'La documentación quedó completa',
+      cuando: formatFechaHoraColombia(completoDesde),
+      resumen: 'Desde este día se ancla el plazo para resolver.',
+      meta: formatFechaColombia(completoDesde),
+    });
+    items.sort((a, b) => (a.meta < b.meta ? -1 : a.meta > b.meta ? 1 : 0));
+  }
 
   if (origenExpediente !== 'RECONSTRUIDO' && vigente) {
     items.push({
       tipo: 'VENCIMIENTO_CALCULADO',
-      titulo: `Vencimiento calculado: ${formatFechaColombia(vigente)}`,
+      /* NO ES UN HECHO, y el título lo dice: «si nada lo detiene». Los demás
+         eventos ocurrieron; este se recalcula en cada consulta y un acta de
+         observaciones lo suspende. */
+      titulo: `Vencerá el ${formatFechaColombia(vigente)} — si nada lo detiene`,
+      resumen: 'Proyección, nunca almacenada: se recalcula a partir de los hechos anteriores. Un acta de observaciones la suspende.',
       meta: 'Proyección, nunca almacenado — se recalcula en cada consulta a partir de los hechos anteriores.',
     });
   }
 
   return items;
+}
+
+/** Lo que importa del hecho, compuesto de CAMPOS estructurados. */
+function resumenDe(a: Actuacion): string | undefined {
+  if (a.tipo === 'apertura-expediente') return undefined;
+  return undefined;
+}
+
+/** Fecha y hora en Bogotá, para leer. */
+function formatFechaHoraColombia(iso: string): string {
+  try {
+    return new Intl.DateTimeFormat('es-CO', {
+      timeZone: 'America/Bogota',
+      day: '2-digit', month: '2-digit', year: 'numeric',
+      hour: 'numeric', minute: '2-digit', hour12: true,
+    }).format(new Date(iso));
+  } catch {
+    return formatFechaColombia(iso);
+  }
 }

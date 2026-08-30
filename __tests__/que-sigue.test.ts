@@ -112,3 +112,23 @@ describe('NADIE ofrece lo que el mapa no permite, y los huecos se declaran', () 
     expect(conActa.destinosSinActuacion).not.toContain('EN_VIABILIDAD');
   });
 });
+
+describe('«esperando» es para lo que forma parte del camino', () => {
+  it('sin acta, la subsanación NO se anuncia — no es un paso pendiente, no existe', () => {
+    const q = derivarQueSigue({
+      estado: 'EN_REVISION',
+      yaHuboActa: false,
+      motivos: { respuesta: 'No hay un acta registrada.' },
+    });
+    expect(q.esperando).toEqual([]);
+  });
+
+  it('con acta, sí se anuncia con su motivo', () => {
+    const q = derivarQueSigue({
+      estado: 'EN_VIABILIDAD',
+      yaHuboActa: true,
+      motivos: { respuesta: 'El expediente ya está en viabilidad.' },
+    });
+    expect(q.esperando.map((e) => e.etiqueta)).toContain('Registrar respuesta de subsanación');
+  });
+});

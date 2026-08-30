@@ -169,14 +169,28 @@ export function derivarQueSigue(entrada: EntradaQueSigue): QueSigue {
       ...principales.slice(1).map((a) => ({ ...a, rango: 'DISPONIBLE' as const })),
       ...ofrecidas.filter((a) => a.rango === 'DISPONIBLE'),
     ],
-    esperando: motivoAEsperando(motivos),
+    esperando: motivoAEsperando(motivos, yaHuboActa),
     aparte: ofrecidas.filter((a) => a.rango === 'APARTE'),
   };
 }
 
-function motivoAEsperando(motivos: EntradaQueSigue['motivos']): AccionEsperando[] {
+function motivoAEsperando(
+  motivos: EntradaQueSigue['motivos'],
+  yaHuboActa: boolean,
+): AccionEsperando[] {
   const fuera: AccionEsperando[] = [];
   if (motivos?.acta) fuera.push({ etiqueta: 'Registrar acta de observaciones', porque: motivos.acta });
-  if (motivos?.respuesta) fuera.push({ etiqueta: 'Registrar respuesta de subsanación', porque: motivos.respuesta });
+  /* LA SUBSANACIÓN NO SE ANUNCIA SIN ACTA. «Esperando» es para lo que forma
+     parte del camino y todavía no procede; sin acta, responder a un acta no es
+     un paso pendiente: no existe. Anunciarlo le hablaría a la funcionaria de
+     algo que no le va a tocar, y el ruido en un panel de acciones se paga en
+     atención.
+
+     La primera versión lo mostraba siempre, y lo cazó la prueba del detalle
+     («sin acta previa todavía no existe el botón de respuesta»), que llevaba
+     ahí desde antes. */
+  if (yaHuboActa && motivos?.respuesta) {
+    fuera.push({ etiqueta: 'Registrar respuesta de subsanación', porque: motivos.respuesta });
+  }
   return fuera;
 }

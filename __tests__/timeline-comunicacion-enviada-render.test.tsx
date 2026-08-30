@@ -83,10 +83,12 @@ describe('EventoTimeline — comunicacion-enviada con etiqueta y tono propios', 
     const filas = container.querySelectorAll('li');
     expect(filas.length).toBe(2);
     filas.forEach((fila) => {
-      const puntos = fila.querySelectorAll('span[aria-hidden="true"]');
-      // El punto (dot) siempre es el ÚLTIMO `span[aria-hidden]` de la fila —
-      // el primero, si existe, es la línea conectora (ver `EventoTimeline.tsx`).
-      const punto = puntos[puntos.length - 1] as HTMLElement;
+      /* SE LOCALIZA POR SU ATRIBUTO, no por su posición. La heurística anterior
+         —«el último span[aria-hidden] de la fila»— se rompió el 30-ago-2026 al
+         añadir el icono del detalle técnico, que va después del punto: la prueba
+         empezó a medir el color del icono. El orden del DOM no es un contrato;
+         `data-punto-timeline` sí. */
+      const punto = fila.querySelector('[data-punto-timeline]') as HTMLElement;
       expect(punto.style.background).toBe('var(--color-info)');
       // Nunca el verde institucional de éxito/RADICACION ni el ámbar de ACTA.
       expect(punto.style.background).not.toBe('#14532D');
