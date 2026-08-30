@@ -50,6 +50,7 @@ import { PanelDesistimientoSemicontrolado } from '../components/PanelDesistimien
 import { BotonAccionPlaceholder } from '../components/BotonAccionPlaceholder';
 import { RegistrarActuacionModal } from '../components/RegistrarActuacionModal';
 import { ChecklistRequisitos } from '../components/ChecklistRequisitos';
+import type { DestinatarioResuelto } from '@/lib/motor-expedientes/destinatario-expediente';
 
 type EstadoCarga = 'cargando' | 'error' | 'no-encontrado' | 'listo';
 
@@ -124,6 +125,7 @@ export function DetalleLicenciaClient({ expedienteId, onVolver }: DetalleLicenci
      la consumía: el acto estaba construido y era inalcanzable desde el
      mostrador. */
   const [debidaForma, setDebidaForma] = useState<VistaPreviaDebidaForma | null>(null);
+  const [destinatario, setDestinatario] = useState<DestinatarioResuelto | null>(null);
   const [borradorActoDesistimiento, setBorradorActoDesistimiento] = useState<BorradorActoDesistimiento | null>(null);
 
   /**
@@ -163,10 +165,23 @@ export function DetalleLicenciaClient({ expedienteId, onVolver }: DetalleLicenci
           : null,
       );
       setComputos(body.computos && typeof body.computos === 'object' ? (body.computos as ComputosExpedienteUI) : null);
-      setDebidaForma(
-        body.debidaForma && typeof body.debidaForma === 'object'
-          ? (body.debidaForma as VistaPreviaDebidaForma)
+      setDestinatario(
+        body.destinatario && typeof body.destinatario === 'object'
+          ? (body.destinatario as DestinatarioResuelto)
           : null,
+      );
+      /* VIENE DENTRO DE `computos`, NO EN LA RAÍZ. Esto leía
+         `body.debidaForma`, que el servidor nunca ha mandado ahí: siempre daba
+         `undefined`, el estado quedaba en `null`, y como el botón se pinta
+         detrás de `{debidaForma && …}`, NO EXISTÍA EN LA PANTALLA. Ni
+         habilitado ni deshabilitado con su motivo: ausente.
+
+         Nadie lo vio porque el único expediente que se abría a diario ya estaba
+         radicado, y ahí no hay botón que echar en falta. Lo destapó el primer
+         expediente completo y sin radicar (stage, 29-ago-2026). */
+      const previa = (body.computos as { debidaForma?: unknown } | null)?.debidaForma;
+      setDebidaForma(
+        previa && typeof previa === 'object' ? (previa as VistaPreviaDebidaForma) : null,
       );
       setBorradorActoDesistimiento(
         body.borradorActoDesistimiento && typeof body.borradorActoDesistimiento === 'object'
@@ -343,6 +358,32 @@ export function DetalleLicenciaClient({ expedienteId, onVolver }: DetalleLicenci
       <div className="print:hidden flex flex-col gap-5">
       <VolverBandeja onVolver={onVolver} />
 
+      {/* ── ¿HAY A QUIÉN AVISARLE? ────────────────────────────────────────
+          Se advierte SOLO cuando no se puede escribir, y con el motivo que
+          resolvió el SERVIDOR — el mismo criterio que decide si sale el correo.
+          Sin esto, un expediente sin destinatario se veía exactamente igual que
+          uno con destinatario, y el silencio no se notaba hasta que hacía falta
+          escribirle. */}
+      {destinatario?.correo === null && (
+        <div
+          role="status"
+          className="rounded-xl px-4 py-3 flex items-start gap-3"
+          style={{ background: '#FDF6E3', border: '1px solid #D4A017' }}
+        >
+          <span aria-hidden className="text-lg leading-none" style={{ color: '#7A4F0A' }}>✉</span>
+          <div className="min-w-0">
+            <p className="text-sm font-bold" style={{ color: '#7A4F0A' }}>
+              {destinatario.origen === 'DECLARADO_SIN_CORREO'
+                ? 'Este ciudadano no recibirá avisos automáticos'
+                : 'Este expediente no tiene a quién avisarle'}
+            </p>
+            <p className="text-xs mt-0.5 leading-relaxed" style={{ color: '#7A4F0A' }}>
+              {destinatario.motivo}
+            </p>
+          </div>
+        </div>
+      )}
+
       {/* ── Tarjeta encabezado ── */}
       <div
         className="rounded-xl p-4 md:p-5 flex flex-col gap-3"
@@ -446,7 +487,10 @@ export function DetalleLicenciaClient({ expedienteId, onVolver }: DetalleLicenci
               está el expediente y después qué se puede hacer con él. Va FUERA
               del condicional de histórico: un expediente migrado también tiene
               un punto en el camino, y ocultárselo no lo hace menos cierto. */}
-          <CaminoDelTramite estado={expediente.estadoJuridico} />
+          <CaminoDelTramite
+            estado={expediente.estadoJuridico}
+            documentacionCompleta={expediente.completitud?.completo === true}
+          />
 
           {!esHistorico && (
             <div className="flex flex-col sm:flex-row gap-2 flex-wrap items-start">

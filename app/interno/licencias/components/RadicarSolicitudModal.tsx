@@ -37,6 +37,17 @@ export function RadicarSolicitudModal({ onCerrar, onCreado }: RadicarSolicitudMo
 
   const [solicitanteNombre, setSolicitanteNombre] = useState('');
   const [solicitanteDocumento, setSolicitanteDocumento] = useState('');
+  /* ── EL CONTACTO, QUE NO EXISTÍA ──────────────────────────────────────
+     Este formulario no pedía correo ni celular, y un expediente creado por
+     aquí NO tiene radicado del que heredarlos: era un ciudadano al que nunca
+     podríamos escribirle. Todo el sistema de avisos —acuse, aviso de acta,
+     hitos— se construyó sobre un dato que nadie recogía.
+
+     Se recoge aquí porque este es el ÚNICO momento en que se puede: el
+     ciudadano está delante. Después ya no está. */
+  const [correo, setCorreo] = useState('');
+  const [celular, setCelular] = useState('');
+  const [sinCorreo, setSinCorreo] = useState(false);
   const [subtipos, setSubtipos] = useState<string[]>([]);
   const [errorSubtipos, setErrorSubtipos] = useState<string | null>(null);
   const [modalidades, setModalidades] = useState<string[]>([]);
@@ -94,6 +105,12 @@ export function RadicarSolicitudModal({ onCerrar, onCreado }: RadicarSolicitudMo
           // Solo viaja si la figura la admite: el servidor rechaza una
           // modalidad descolgada de su figura.
           ...(exigeModalidadConstruccion(subtipos) ? { modalidadesConstruccion: modalidades } : {}),
+          /* El servidor rechaza el silencio: o correo, o la declaración. Aquí
+             se manda lo que la funcionaria decidió, sin normalizar nada. */
+          contacto: {
+            ...(sinCorreo ? { datosNoAportados: { correo: true } } : { correo: correo.trim() }),
+            ...(celular.trim() ? { celular: celular.trim() } : {}),
+          },
         }),
       });
       const body = await res.json().catch(() => ({}));
@@ -192,6 +209,72 @@ export function RadicarSolicitudModal({ onCerrar, onCreado }: RadicarSolicitudMo
                   className="input-internal"
                   placeholder="13456789"
                 />
+              </label>
+            </div>
+
+            {/* ── CÓMO SE LE AVISA AL CIUDADANO ──────────────────────────
+                No es un campo más: de esto depende que reciba el acuse, el
+                aviso del acta y los hitos. Por eso lleva su propio bloque y su
+                propia explicación, en vez de perderse entre nombre y
+                documento. */}
+            <div
+              className="rounded-xl p-4 flex flex-col gap-3"
+              style={{ background: 'var(--bg-surface-2)', border: '1px solid var(--color-border)' }}
+            >
+              <div>
+                <p className="text-sm font-bold" style={{ color: 'var(--text-primary)' }}>
+                  ¿Cómo se le avisa al ciudadano?
+                </p>
+                <p className="text-xs mt-0.5" style={{ color: 'var(--text-secondary)' }}>
+                  Con el correo recibirá el acuse, el aviso si hay observaciones y los avisos del
+                  trámite. Sin él, habrá que citarlo por otro medio.
+                </p>
+              </div>
+
+              <label>
+                <span className={labelCls} style={labelStyle}>Correo electrónico</span>
+                <input
+                  type="email"
+                  value={correo}
+                  onChange={(e) => setCorreo(e.target.value)}
+                  disabled={sinCorreo}
+                  required={!sinCorreo}
+                  className="input-internal"
+                  placeholder="nombre@ejemplo.com"
+                />
+              </label>
+
+              {/* LA AUSENCIA SE DECLARA, NO SE CALLA. Un vacío en silencio y un
+                  «no tiene» son hechos distintos: el primero es un descuido que
+                  hay que corregir, el segundo una constancia del expediente. */}
+              <label className="flex items-start gap-2.5 cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={sinCorreo}
+                  onChange={(e) => { setSinCorreo(e.target.checked); if (e.target.checked) setCorreo(''); }}
+                  className="mt-0.5 h-4 w-4 shrink-0"
+                />
+                <span className="text-sm" style={{ color: 'var(--text-primary)' }}>
+                  El solicitante manifiesta no tener correo electrónico
+                  <span className="block text-xs" style={{ color: 'var(--text-secondary)' }}>
+                    Queda escrito en el expediente. No recibirá avisos automáticos.
+                  </span>
+                </span>
+              </label>
+
+              <label>
+                <span className={labelCls} style={labelStyle}>Celular (opcional)</span>
+                <input
+                  type="tel"
+                  value={celular}
+                  onChange={(e) => setCelular(e.target.value)}
+                  className="input-internal"
+                  placeholder="300 123 4567"
+                />
+                <span className="block text-xs mt-1" style={{ color: 'var(--text-secondary)' }}>
+                  Se guarda desde ya. Los avisos por WhatsApp o SMS están aplazados, pero pedirlo
+                  ahora evita tener que buscar después a quien ya se atendió.
+                </span>
               </label>
             </div>
 

@@ -57,6 +57,7 @@ function intentar<T>(calculo: () => T): T | null {
 import { calcularVencimientoDual, derivarEventosTermino } from '@/lib/motor-expedientes/termino';
 import { calcularVencimientoVigencia, esErrorVigencia } from '@/lib/motor-expedientes/vigencias';
 import { logError } from '@/lib/logger';
+import { resolverDestinatario } from '@/lib/motor-expedientes/destinatario-expediente';
 
 export const runtime = 'nodejs';
 
@@ -100,14 +101,30 @@ export async function GET(request: Request, context: RouteContext): Promise<Next
     // propósito: la UI que necesite más detalle del radicado lo pide por
     // su propia ruta).
     let radicadoVinculado: { id: string; fecha: string } | null = null;
+    /* Los datos del radicado que hacen falta para saber A QUIÉN se le escribe.
+       Se toman de la MISMA lectura que ya se hacía para el vínculo: cero
+       consultas nuevas (R11). */
+    let contactoDelRadicado: Parameters<typeof resolverDestinatario>[0]['radicado'] = null;
     const radicadoId = (expediente as { radicadoId?: string | null }).radicadoId;
     if (radicadoId) {
       const radicadoSnap = await db.doc(`ventanilla_radicados/${radicadoId}`).get();
-      const vinculo = radicadoSnap.exists
-        ? (radicadoSnap.data() as { vinculoExpediente?: { fecha: string } | null })?.vinculoExpediente
+      const datos = radicadoSnap.exists
+        ? (radicadoSnap.data() as {
+            vinculoExpediente?: { fecha: string } | null;
+            esAnonimo?: boolean;
+            tipoPresentacion?: 'IDENTIFICADA' | 'ANONIMA' | 'RESERVADA';
+            solicitante?: { email?: string | null };
+          })
         : null;
-      if (vinculo) {
-        radicadoVinculado = { id: radicadoId, fecha: vinculo.fecha };
+      if (datos?.vinculoExpediente) {
+        radicadoVinculado = { id: radicadoId, fecha: datos.vinculoExpediente.fecha };
+      }
+      if (datos) {
+        contactoDelRadicado = {
+          esAnonimo: datos.esAnonimo,
+          tipoPresentacion: datos.tipoPresentacion,
+          solicitante: { email: datos.solicitante?.email ?? null },
+        };
       }
     }
 
@@ -201,6 +218,19 @@ export async function GET(request: Request, context: RouteContext): Promise<Next
             requisitoQueFijaElAncla: evaluacion.evidencia.requisitoId,
             documentoQueFijaElAncla: evaluacion.evidencia.documentoId,
             requisitosAplicables: evaluacion.completitud.aplicables,
+            /* EL PREFIJO SUGERIDO PARA TRANSCRIBIR, calculado AQUÍ y no en el
+               navegador. La funcionaria copia del libro de papel, y averiguar
+               el formato le cuesta más tiempo que escribir el número; pero el
+               año y el mes NO pueden salir del reloj del equipo: un portátil
+               con la fecha corrida propondría un mes que no existe en el libro.
+               El servidor sabe qué día es, en hora de Bogotá.
+
+               ES UNA SUGERENCIA DE FORMATO, NO EL NÚMERO: el consecutivo lo
+               escribe ella, y el mes queda editable porque un radicado puede
+               ser de un mes anterior. */
+            prefijoRadicadoSugerido: `1-110-${new Intl.DateTimeFormat('en-CA', {
+              timeZone: 'America/Bogota', year: 'numeric', month: '2-digit',
+            }).format(ahora).replace('-', '')}-`,
             /* El caso duro, dicho antes y no después: si el último documento
                entró hace más de 45 días hábiles, el término nace vencido. El
                acto procede igual —es un hecho verdadero— pero nadie debería
@@ -220,6 +250,15 @@ export async function GET(request: Request, context: RouteContext): Promise<Next
       expediente,
       actuaciones,
       documentos,
+      /* ── A QUIÉN SE LE ESCRIBE, RESUELTO EN EL SERVIDOR ──────────────
+         Una fuente, dos salidas: el mismo `resolverDestinatario` que decide si
+         sale un correo decide lo que la pantalla advierte. Si la pantalla lo
+         dedujera por su cuenta, tendríamos dos criterios que hoy coinciden y
+         mañana no — el patrón que este proyecto lleva un mes corrigiendo. */
+      destinatario: resolverDestinatario({
+        radicado: contactoDelRadicado,
+        capturaPropia: (expediente as { solicitanteContacto?: Parameters<typeof resolverDestinatario>[0]['capturaPropia'] }).solicitanteContacto,
+      }),
       radicadoVinculado,
       // Placeholder: única Definición sembrada hoy (Bloque A·A2). Cuando
       // exista resolución real por `expediente.tramiteId` (persistencia de

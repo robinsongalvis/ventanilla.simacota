@@ -85,9 +85,62 @@ export function CabeceraTermino({ venceIso, desdeIso, estadoJuridico, expediente
     new Date(),
   );
 
-  /* Solo se pinta el semáforo cuando el término CORRE. Suspendido o resuelto
-     tienen su propio tratamiento en el panel; inventarles un anillo diría que
-     hay un reloj andando donde no lo hay. */
+  /* ── EL RELOJ DETENIDO SE VE. ─────────────────────────────────────────
+     Antes, con el término suspendido, esta tarjeta DESAPARECÍA. Y desaparecer
+     no dice «está parado»: dice «aquí no hay nada», que es lo mismo que decía
+     para un expediente sin ancla. El funcionario no puede distinguir «el plazo
+     no ha empezado» de «el plazo está congelado», y son situaciones opuestas —
+     en una espera papeles, en la otra el ciudadano tiene la pelota.
+
+     Lo pidió el propietario el 29-ago-2026: que se vea que el reloj está
+     parado, no que no exista.
+
+     NO SE PINTA ANILLO NI CUENTA ATRÁS, y eso es deliberado: cuántos días
+     quedaban al congelarse depende de la serie de eventos, y el servidor
+     todavía no manda ese dato. Inventarlo aquí sería peor que no darlo. Se
+     dice lo que se sabe con certeza: que está detenido y por qué. */
+  if (fila.situacion === 'SUSPENDIDO') {
+    return (
+      <div
+        className="rounded-xl overflow-hidden"
+        style={{ background: 'var(--bg-surface)', border: '1px solid var(--color-border)', borderTop: '3px solid #64748B' }}
+      >
+        <div className="p-4 flex flex-col gap-3">
+          <p className="text-[10px] font-bold uppercase tracking-widest" style={{ color: '#667085' }}>
+            Término para resolver
+          </p>
+          <div className="flex items-center gap-4">
+            {/* Anillo PARTIDO y en gris: la forma dice «detenido» sin números. */}
+            <svg width="72" height="72" viewBox="0 0 72 72" aria-hidden className="shrink-0">
+              <circle cx="36" cy="36" r="30" fill="none" stroke="var(--bg-surface-2)" strokeWidth="7" />
+              <circle
+                cx="36" cy="36" r="30" fill="none" stroke="#94A3B8" strokeWidth="7" strokeLinecap="round"
+                strokeDasharray="10 10" transform="rotate(-90 36 36)"
+              />
+              <rect x="29" y="27" width="5.5" height="18" rx="1.6" fill="#475569" />
+              <rect x="37.5" y="27" width="5.5" height="18" rx="1.6" fill="#475569" />
+            </svg>
+            <div className="min-w-0">
+              <p className="text-sm font-bold" style={{ color: '#475569' }}>Reloj detenido</p>
+              <p className="font-headline text-xl font-black" style={{ color: 'var(--text-primary)' }}>
+                El término no está corriendo
+              </p>
+              <p className="text-xs" style={{ color: 'var(--text-secondary)' }}>
+                Hay un acta de observaciones: el plazo se suspendió al notificarla.
+              </p>
+            </div>
+          </div>
+          <p className="rounded-lg px-3 py-2 text-sm" style={{ background: '#F1F5F9', color: '#334155' }}>
+            El turno es del ciudadano: tiene 30 días hábiles para subsanar desde que se le
+            notificó. Nada corre contra la Secretaría mientras tanto.
+          </p>
+        </div>
+      </div>
+    );
+  }
+
+  /* Sin ancla o ya resuelto: el panel de abajo lo dice con sus palabras;
+     inventarles un anillo afirmaría un reloj que no existe. */
   if (fila.situacion !== 'CORRIENDO') return null;
 
   const restantes = fila.diasHabilesRestantes ?? diasRestantesHabiles(venceIso);

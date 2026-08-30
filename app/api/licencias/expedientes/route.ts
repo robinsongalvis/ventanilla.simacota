@@ -64,6 +64,8 @@ interface BodyCrearExpediente {
   /** Modalidades del art. 2.2.6.1.1.7 — solo con la figura CONSTRUCCION. */
   modalidadesConstruccion?: string[];
   contexto?: CrearExpedienteInput['contexto'];
+  /** Contacto del solicitante. Obligatorio decidirlo: correo, o la declaración de que no lo tiene. */
+  contacto?: CrearExpedienteInput['contacto'];
 }
 
 export async function POST(request: Request): Promise<NextResponse> {
@@ -87,6 +89,9 @@ export async function POST(request: Request): Promise<NextResponse> {
         // las figuras del propio expediente. `undefined` = sin capturar.
         modalidadesConstruccion: body?.modalidadesConstruccion,
         contexto: body?.contexto,
+        /* Sin radicado del que heredarlo, este es el ÚNICO momento en que se
+           puede recoger. El planificador rechaza el silencio. */
+        contacto: body?.contacto,
       },
       TENANT_LICENCIAS,
       { uid: usuario.uid, nombre: usuario.nombre, rol: usuario.rol },

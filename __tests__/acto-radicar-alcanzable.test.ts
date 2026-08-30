@@ -35,7 +35,23 @@ describe('la cadena completa, del botón al endpoint', () => {
     /* Estuvo devuelta y sin consumir desde #248: el servidor decía si procedía
        y nadie lo leía. */
     expect(DETALLE).toMatch(/setDebidaForma\(/);
-    expect(DETALLE).toMatch(/body\.debidaForma/);
+    /* SE ACTUALIZA A CONCIENCIA, y esta prueba es la lección.
+
+       Aseveraba `body.debidaForma` y pasaba en verde… sobre la línea
+       EQUIVOCADA. El servidor manda la vista previa dentro de `computos`, así
+       que el cliente leía `undefined` y el botón no se pintaba NUNCA. La prueba
+       existía para impedir que el acto quedara inalcanzable y confirmaba
+       exactamente el defecto que debía cazar, porque comprueba leyendo el
+       ARCHIVO en vez de montar la pantalla.
+
+       Ahora exige la ruta real. Y no basta con eso: `boton-radicar-render`
+       monta el componente, que es lo único que prueba que el botón sale. */
+    expect(DETALLE, 'la vista previa se lee de `computos`, que es donde el servidor la manda')
+      .toMatch(/body\.computos[\s\S]{0,160}?debidaForma/);
+    /* LA AFIRMACIÓN FUERTE: la lectura de la RAÍZ no puede volver. Es la que
+       estaba mal y la que dejó el botón sin pintar. */
+    expect(DETALLE, 'volvió la lectura de `body.debidaForma`, que el servidor NUNCA manda ahí')
+      .not.toMatch(/body\.debidaForma/);
   });
 
   it('el detalle monta el modal del acto', () => {

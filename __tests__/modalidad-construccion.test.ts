@@ -101,6 +101,7 @@ describe('la ausencia, que es el caso de todos los expedientes viejos', () => {
       {
         solicitanteNombre: 'Ana Ruiz',
         solicitanteDocumento: '1098765432',
+        contacto: { correo: 'solicitante@ejemplo.com' },
         subtipos: ['CONSTRUCCION'],
       },
       'SEC_PLANEACION',

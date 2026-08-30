@@ -44,6 +44,7 @@ import { calcularVencimientoDual, derivarEventosTermino } from '@/lib/motor-expe
    para que la pantalla también pueda usarla sin arrastrar servidor. Quien ya la
    importaba desde aquí sigue funcionando. */
 import { PLAZO_DECISION_LICENCIA_DIAS_HABILES } from '@/lib/motor-expedientes/semaforo-termino';
+import { resolverDestinatario, type ContactoCapturado } from '@/lib/motor-expedientes/destinatario-expediente';
 export { PLAZO_DECISION_LICENCIA_DIAS_HABILES };
 
 /**
@@ -89,6 +90,16 @@ export function esErrorExpediente(x: unknown): x is ErrorExpediente {
  * (`./estados-licencia.ts`) ya es, por diseño, específico de licencias.
  */
 export interface ExpedienteLicenciaDoc extends Expediente {
+  /**
+   * Contacto recogido EN EL PROPIO EXPEDIENTE, para los que nacen sin radicado.
+   *
+   * NUNCA es una copia del radicado. Si hay radicado vinculado, él manda y esto
+   * queda como HISTÓRICO de lo recogido en mostrador — el dato no se borra, se
+   * le retira la autoridad. La precedencia vive en un solo sitio,
+   * `resolverDestinatario` (`lib/motor-expedientes/destinatario-expediente.ts`),
+   * y ni la pantalla ni el correo la repiten.
+   */
+  solicitanteContacto?: ContactoCapturado;
   /** DF-5: estado JURÍDICO del ciclo, convive con `estado` (operativo del panel) sin sustituirlo. */
   estadoJuridico: EstadoJuridicoLicencia;
   /** Completitud calculada EN EL SERVIDOR y recalculada con cada cambio de aportes.
@@ -346,6 +357,16 @@ function calcularFechaAlertaConservadoraMirror(actuaciones: ActuacionLicenciaDoc
 export interface CrearExpedienteInput {
   solicitanteNombre: string;
   solicitanteDocumento: string;
+  /**
+   * Contacto recogido EN EL PROPIO EXPEDIENTE, para los que nacen sin radicado.
+   *
+   * NO es una copia del radicado y nunca lo es: si hay radicado vinculado, él
+   * manda y esto queda como HISTÓRICO de lo recogido en mostrador. La
+   * precedencia vive en un solo sitio —`resolverDestinatario`
+   * (`lib/motor-expedientes/destinatario-expediente.ts`)— y ni la pantalla ni
+   * el correo la repiten.
+   */
+  contacto?: ContactoCapturado;
   subtipos: string[];
   /** Modalidades del art. 2.2.6.1.1.7 — solo si `subtipos` incluye CONSTRUCCION. */
   modalidadesConstruccion?: string[];
@@ -395,8 +416,7 @@ export function planCrearExpedienteDemo(
 ): PlanCrearExpedienteDemo | ErrorExpediente {
   const nombre = input.solicitanteNombre?.trim() ?? '';
   const documento = input.solicitanteDocumento?.trim() ?? '';
-  if (!nombre) return { status: 400, mensaje: 'El nombre del solicitante es obligatorio.' };
-  if (!documento) return { status: 400, mensaje: 'El documento del solicitante es obligatorio.' };
+
   if (!Array.isArray(input.subtipos) || input.subtipos.length === 0) {
     return { status: 400, mensaje: 'Debe indicar al menos un subtipo (figura normativa) para el expediente.' };
   }
@@ -409,6 +429,38 @@ export function planCrearExpedienteDemo(
       };
     }
   }
+
+  /* ── CONTACTO: SE EXIGE DECIDIR, NO SE PERMITE CALLAR ─
+     VA AL FINAL DE LAS VALIDACIONES A PROPÓSITO. Puesta arriba, esta guarda se
+     adelantaba a las que ya existían: un subtipo en cuarentena devolvía 400
+     «falta el correo» en vez de su 422 propio, y el llamador dejaba de saber
+     qué estaba mal de verdad. Una comprobación nueva no reordena los modos de
+     fallo que ya tenía el sistema.────────────────
+     Un expediente que nace por esta vía NO tiene radicado del que heredar
+     contacto: si no se recoge aquí, ese ciudadano no recibirá jamás un aviso
+     y nadie lo sabrá hasta que haga falta escribirle.
+
+     Por eso hay tres respuestas válidas y el vacío no es una: correo, o la
+     declaración de que no lo tiene. Callar se rechaza. */
+  const correoCapturado = input.contacto?.correo?.trim() ?? '';
+  const declaraSinCorreo = input.contacto?.datosNoAportados?.correo === true;
+  if (!correoCapturado && !declaraSinCorreo) {
+    return {
+      status: 400,
+      mensaje:
+        'Falta el correo del solicitante. Si no tiene, márquelo como «el solicitante ' +
+        'manifiesta no tener correo»: sin una de las dos, no podrá recibir ningún aviso ' +
+        'del trámite y el expediente no dejará constancia de por qué.',
+    };
+  }
+  if (correoCapturado && declaraSinCorreo) {
+    return {
+      status: 400,
+      mensaje: 'No se puede declarar que no tiene correo y a la vez registrar uno.',
+    };
+  }
+  if (!nombre) return { status: 400, mensaje: 'El nombre del solicitante es obligatorio.' };
+  if (!documento) return { status: 400, mensaje: 'El documento del solicitante es obligatorio.' };
 
   /* La MODALIDAD (art. 2.2.6.1.1.7) es un eje DISTINTO de la figura: se valida
      contra el catálogo y contra las figuras del propio expediente, para que no
@@ -466,6 +518,15 @@ export function planCrearExpedienteDemo(
     ...(exigeModalidadConstruccion(input.subtipos) && input.modalidadesConstruccion?.length
       ? { modalidadesConstruccion: [...input.modalidadesConstruccion] }
       : {}),
+    /* Se guarda LO DECIDIDO, incluida la declaración de ausencia. Un vacío
+       en silencio y un «declara no tener» son hechos distintos: el primero es
+       un descuido, el segundo una constancia. */
+    solicitanteContacto: {
+      ...(correoCapturado ? { correo: correoCapturado } : {}),
+      ...(input.contacto?.celular?.trim() ? { celular: input.contacto.celular.trim() } : {}),
+      ...(declaraSinCorreo ? { datosNoAportados: { correo: true } } : {}),
+      capturadoEn: nowIso,
+    },
     origen: 'REAL',
     numeroExpediente: {
       numero: formatearNumeroExpedienteDemo(ahora),
@@ -1083,6 +1144,8 @@ export function debeEnviarComunicacionExpediente(
   tramiteId: string,
   radicado: RadicadoParaComunicacion | null | undefined,
   numeroExpediente?: string,
+  /** Captura propia del expediente — solo manda cuando NO hay radicado vinculado. */
+  contactoDelExpediente?: ContactoCapturado | null,
 ): GateComunicacionExpediente {
   // NUNCA se comunica al ciudadano un número de DEMOSTRACIÓN.
   //
@@ -1105,14 +1168,20 @@ export function debeEnviarComunicacionExpediente(
   if (!DEFINICIONES_HABILITADAS_COMUNICACION_EXPEDIENTE.has(tramiteId)) {
     return { debeEnviar: false, motivo: 'La Definición de este expediente no está habilitada para comunicaciones por correo en v1 (solo licencia de construcción).' };
   }
-  if (!radicado) {
-    return { debeEnviar: false, motivo: 'El expediente no tiene radicado vinculado con datos de contacto (no se copia email al expediente, proyección mínima D2).' };
-  }
-  if (radicado.solicitante.datosNoAportados?.correo) {
-    return { debeEnviar: false, motivo: 'El solicitante marcó que no aporta correo.' };
-  }
-  if (!debeNotificarCiudadano(radicado)) {
-    return { debeEnviar: false, motivo: 'No hay un correo válido para notificar, o la presentación es anónima/reservada.' };
+  /* ── EL DESTINATARIO SALE DE UN SOLO SITIO ─────────────────────────────
+     Antes esto decidía aquí mismo, con tres condiciones encadenadas, y el
+     primer `if` era literal: «no se copia email al expediente». O sea que un
+     expediente sin radicado NO TENÍA A QUIÉN ESCRIBIRLE, nunca, por diseño.
+     Todo el sistema de avisos se apoyaba en un dato que el expediente no
+     guardaba.
+
+     Ahora la precedencia —radicado manda; sin radicado, la captura propia; el
+     «declara no tener» es un hecho y no un vacío— vive en
+     `resolverDestinatario`, y esta función la consulta. Un solo criterio para
+     la pantalla y para el correo: nunca dos cálculos. */
+  const destinatario = resolverDestinatario({ radicado, capturaPropia: contactoDelExpediente });
+  if (destinatario.correo === null) {
+    return { debeEnviar: false, motivo: destinatario.motivo ?? 'No hay destinatario para este expediente.' };
   }
   return { debeEnviar: true };
 }

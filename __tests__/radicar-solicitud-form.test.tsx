@@ -19,6 +19,13 @@ afterEach(() => {
 function llenarDatosBasicos() {
   fireEvent.change(screen.getByLabelText('Nombre del solicitante'), { target: { value: 'Carlos Alberto Rojas' } });
   fireEvent.change(screen.getByLabelText('Documento del solicitante'), { target: { value: '13456789' } });
+  /* EL CONTACTO ES OBLIGATORIO DESDE EL 29-ago-2026, y el campo lleva
+     `required`: sin él el navegador ni siquiera envía el formulario, que es
+     justo lo que debe pasar. Estas pruebas miran otra cosa —subtipos,
+     modalidades, errores del servidor— así que llenan el correo para poder
+     llegar hasta donde prueban. La regla en sí la cubre
+     `contacto-obligatorio-en-el-formulario`, más abajo. */
+  fireEvent.change(screen.getByLabelText('Correo electrónico'), { target: { value: 'carlos@ejemplo.com' } });
 }
 
 describe('Recibir solicitud — validación de subtipos', () => {
@@ -134,5 +141,33 @@ describe('Recibir solicitud — la modalidad de construcción (ADR-0035)', () =>
       expect(alertas).toMatch(/modalidad/i);
     });
     expect(fetchMock, 'sin modalidad no se llama al servidor').not.toHaveBeenCalled();
+  });
+});
+
+describe('contacto obligatorio en el formulario', () => {
+  /* El formulario NO pedía contacto, y un expediente creado por aquí no tiene
+     radicado del que heredarlo: era un ciudadano al que nunca podríamos
+     escribirle. Ahora hay que decidir — y decidir incluye poder decir «no
+     tiene», que es un hecho y no un vacío. */
+  it('el campo de correo existe y es obligatorio', () => {
+    render(<RadicarSolicitudModal onCerrar={() => {}} />);
+    const correo = screen.getByLabelText('Correo electrónico') as HTMLInputElement;
+    expect(correo.required).toBe(true);
+    expect(correo.type).toBe('email');
+  });
+
+  it('declarar que no tiene correo lo desactiva y lo deja de exigir', () => {
+    render(<RadicarSolicitudModal onCerrar={() => {}} />);
+    const correo = screen.getByLabelText('Correo electrónico') as HTMLInputElement;
+    fireEvent.click(screen.getByLabelText(/manifiesta no tener correo/i));
+    expect(correo.disabled).toBe(true);
+    expect(correo.required).toBe(false);
+  });
+
+  it('el celular se pide, y es opcional', () => {
+    render(<RadicarSolicitudModal onCerrar={() => {}} />);
+    const cel = screen.getByLabelText(/Celular/i) as HTMLInputElement;
+    expect(cel).toBeTruthy();
+    expect(cel.required).toBe(false);
   });
 });
