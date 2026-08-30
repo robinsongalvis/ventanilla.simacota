@@ -163,10 +163,18 @@ export function DetalleLicenciaClient({ expedienteId, onVolver }: DetalleLicenci
           : null,
       );
       setComputos(body.computos && typeof body.computos === 'object' ? (body.computos as ComputosExpedienteUI) : null);
+      /* VIENE DENTRO DE `computos`, NO EN LA RAÍZ. Esto leía
+         `body.debidaForma`, que el servidor nunca ha mandado ahí: siempre daba
+         `undefined`, el estado quedaba en `null`, y como el botón se pinta
+         detrás de `{debidaForma && …}`, NO EXISTÍA EN LA PANTALLA. Ni
+         habilitado ni deshabilitado con su motivo: ausente.
+
+         Nadie lo vio porque el único expediente que se abría a diario ya estaba
+         radicado, y ahí no hay botón que echar en falta. Lo destapó el primer
+         expediente completo y sin radicar (stage, 29-ago-2026). */
+      const previa = (body.computos as { debidaForma?: unknown } | null)?.debidaForma;
       setDebidaForma(
-        body.debidaForma && typeof body.debidaForma === 'object'
-          ? (body.debidaForma as VistaPreviaDebidaForma)
-          : null,
+        previa && typeof previa === 'object' ? (previa as VistaPreviaDebidaForma) : null,
       );
       setBorradorActoDesistimiento(
         body.borradorActoDesistimiento && typeof body.borradorActoDesistimiento === 'object'
@@ -446,7 +454,10 @@ export function DetalleLicenciaClient({ expedienteId, onVolver }: DetalleLicenci
               está el expediente y después qué se puede hacer con él. Va FUERA
               del condicional de histórico: un expediente migrado también tiene
               un punto en el camino, y ocultárselo no lo hace menos cierto. */}
-          <CaminoDelTramite estado={expediente.estadoJuridico} />
+          <CaminoDelTramite
+            estado={expediente.estadoJuridico}
+            documentacionCompleta={expediente.completitud?.completo === true}
+          />
 
           {!esHistorico && (
             <div className="flex flex-col sm:flex-row gap-2 flex-wrap items-start">
