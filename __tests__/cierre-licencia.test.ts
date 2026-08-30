@@ -3,6 +3,7 @@ import { sumarDiasHabiles } from '@/lib/tiempos-radicado';
 import {
   DIAS_HABILES_RECURSOS,
   DIAS_HABILES_SUBSANACION_TACITO,
+  DIAS_HABILES_PAGO_VIABILIDAD,
   procedeDesistimientoTacito,
   validarEvidenciaFirmeza,
   validarEvidenciaNotificacion,
@@ -200,5 +201,21 @@ describe('la prórroga de 15 días hábiles (ADR-0038 §2.3)', () => {
       fechaComunicacionActa: COMUNICADA, huboRespuestaSubsanacion: false, ahora: alDia(31),
       prorrogaConcedida: false,
     })).toBeNull();
+  });
+});
+
+describe('el plazo del ciudadano en viabilidad (ADR-0038 §9.3)', () => {
+  it('son treinta días HÁBILES, y su fuente es el artículo al que se remite', () => {
+    /* Estuvo en duda: el art. 2.2.6.1.2.3.1 par. 1 dice «treinta (30) días» sin
+       la palabra. No la dice porque REMITE al 2.2.6.6.8.2, que sí la escribe.
+       Un artículo que remite a otro no está callando: está citando. */
+    expect(DIAS_HABILES_PAGO_VIABILIDAD).toBe(30);
+  });
+
+  it('es el MISMO número que el de la subsanación, y aun así son plazos distintos', () => {
+    /* Coinciden hoy y podrían dejar de coincidir: son artículos distintos, con
+       hechos que los disparan distintos. Colapsarlos en una constante los ataría
+       para siempre. */
+    expect(DIAS_HABILES_PAGO_VIABILIDAD).toBe(DIAS_HABILES_SUBSANACION_TACITO);
   });
 });

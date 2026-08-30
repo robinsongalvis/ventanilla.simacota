@@ -64,6 +64,24 @@ export const DIAS_HABILES_SUBSANACION_TACITO = 30;
 export const DIAS_HABILES_PRORROGA_SUBSANACION = 15;
 
 /**
+ * El plazo del ciudadano para aportar los comprobantes de pago cuando el
+ * expediente entra en VIABILIDAD — D.1077/2015 art. 2.2.6.6.8.2:
+ *
+ *   «contará con un término de treinta (30) días hábiles, contados a partir del
+ *    requerimiento de aportar los comprobantes de pago por tales conceptos.
+ *    Dentro de este mismo término se deberán cancelar al curador urbano las
+ *    expensas correspondientes al cargo variable.»
+ *
+ * ADR-0038 §9.3. Estuvo en duda porque el art. 2.2.6.1.2.3.1 par. 1 —el que
+ * declara la suspensión— dice «treinta (30) días» sin la palabra «hábiles»: no
+ * la dice porque REMITE a este artículo, que sí la escribe.
+ *
+ * UN ARTÍCULO QUE REMITE A OTRO NO ESTÁ CALLANDO: ESTÁ CITANDO. Leer solo el
+ * que remite habría dejado la duda abierta para siempre.
+ */
+export const DIAS_HABILES_PAGO_VIABILIDAD = 30;
+
+/**
  * Motivos por los que un acto queda en firme (CPACA art. 87). Se enumeran
  * porque la firmeza NO es solo «pasó el plazo»: hay tres caminos, y cada uno
  * exige comprobar algo distinto.
