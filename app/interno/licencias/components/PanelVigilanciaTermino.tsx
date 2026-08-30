@@ -107,7 +107,7 @@ export function PanelVigilanciaTermino() {
               style={
                 c.porNivel[nivel] > 0 && (nivel === 'VENCIDO' || nivel === 'CRITICO')
                   ? { background: 'var(--color-danger)', color: '#fff' }
-                  : { background: 'var(--bg-surface-1)', color: 'var(--text-secondary)' }
+                  : { background: 'var(--bg-surface)', color: 'var(--text-secondary)' }
               }
             >
               {ETIQUETA[nivel]}: {c.porNivel[nivel]}

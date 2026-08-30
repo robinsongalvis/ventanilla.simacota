@@ -213,7 +213,7 @@ export function PanelHechosCaso({ expedienteId, clavesContexto, contexto, soloLe
           style={
             sinDefinir === 0
               ? { background: '#116932', color: '#fff' }
-              : { background: 'var(--bg-surface-1)', color: '#9A6206', border: '1px solid var(--color-border)' }
+              : { background: 'var(--bg-surface)', color: '#9A6206', border: '1px solid var(--color-border)' }
           }
         >
           {sinDefinir === 0

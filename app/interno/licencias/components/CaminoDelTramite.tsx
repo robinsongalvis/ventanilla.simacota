@@ -10,12 +10,19 @@ import { PASOS, situacionDePaso } from '../camino-del-tramite';
    persona reconoce. No decide nada; el motor sigue mandando.
 ══════════════════════════════════════════════════════════════ */
 
-export function CaminoDelTramite({ estado }: { estado: EstadoJuridicoLicencia }) {
+export function CaminoDelTramite({
+  estado,
+  documentacionCompleta,
+}: {
+  estado: EstadoJuridicoLicencia;
+  /** Del servidor (`completitud.completo`). Sin él, el camino se comporta como antes. */
+  documentacionCompleta?: boolean;
+}) {
   return (
     <section
       aria-label="Camino del trámite"
       className="rounded-xl p-4"
-      style={{ background: 'var(--bg-surface-1)', border: '1px solid var(--color-border)' }}
+      style={{ background: 'var(--bg-surface)', border: '1px solid var(--color-border)' }}
     >
       <p className="text-[10px] font-bold uppercase tracking-widest mb-3" style={{ color: '#667085' }}>
         Camino del trámite
@@ -23,7 +30,7 @@ export function CaminoDelTramite({ estado }: { estado: EstadoJuridicoLicencia })
 
       <ol className="flex flex-col gap-3">
         {PASOS.map((paso) => {
-          const situacion = situacionDePaso(paso, estado);
+          const situacion = situacionDePaso(paso, estado, documentacionCompleta);
           const cumplido = situacion === 'CUMPLIDO';
           const actual = situacion === 'ACTUAL';
           return (
