@@ -66,3 +66,35 @@ describe('en qué paso cae cada estado', () => {
     }
   });
 });
+
+describe('presentada e incompleta NO es presentada y completa', () => {
+  /* Lo vio el propietario en pantalla (29-ago-2026): «17 de 17 · COMPLETO» en
+     la barra, y el camino señalando «Completar documentos» como paso ACTUAL.
+     Le pedía hacer algo ya hecho, y dejaba sin señalar lo que de verdad
+     faltaba: radicar.
+
+     El estado jurídico `PRESENTADA` no distingue los dos momentos. Son
+     distintos en el mostrador: uno espera papeles del ciudadano, el otro
+     espera un acto de la Administración. */
+  const paso2 = PASOS.find((p) => p.numero === 2)!;
+  const paso3 = PASOS.find((p) => p.numero === 3)!;
+
+  it('sin completar, el paso actual sigue siendo reunir documentos', () => {
+    expect(situacionDePaso(paso2, 'PRESENTADA', false)).toBe('ACTUAL');
+    expect(situacionDePaso(paso3, 'PRESENTADA', false)).toBe('PENDIENTE');
+  });
+
+  it('completa, el paso 2 queda CUMPLIDO y el actual pasa a radicar', () => {
+    expect(situacionDePaso(paso2, 'PRESENTADA', true)).toBe('CUMPLIDO');
+    expect(situacionDePaso(paso3, 'PRESENTADA', true)).toBe('ACTUAL');
+  });
+
+  it('y entonces el paso 2 habla en pasado, no en presente', () => {
+    expect(paso2.subtexto(situacionDePaso(paso2, 'PRESENTADA', true))).toBe('documentación completa');
+    expect(paso2.subtexto(situacionDePaso(paso2, 'PRESENTADA', false))).toBe('el plazo aún no corre');
+  });
+
+  it('SIN el dato no se supone que esté completa: no saber no es estar completo', () => {
+    expect(situacionDePaso(paso2, 'PRESENTADA')).toBe('ACTUAL');
+  });
+});

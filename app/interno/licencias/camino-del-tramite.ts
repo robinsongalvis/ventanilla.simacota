@@ -89,11 +89,35 @@ const PASO_POR_ESTADO: Readonly<Record<EstadoJuridicoLicencia, 1 | 2 | 3 | 4>> =
   HISTORICO_SIN_RESOLVER: 4,
 };
 
+/**
+ * En qué paso está, mirando TAMBIÉN si la documentación ya está completa.
+ *
+ * EL DEFECTO QUE ESTO CORRIGE (29-ago-2026, visto por el propietario en
+ * pantalla): con los 17 requisitos aportados, la barra decía «17 de 17 ·
+ * COMPLETO» y el camino seguía señalando «Completar documentos» como el paso
+ * ACTUAL, en ámbar. Le pedía a la funcionaria que hiciera algo que ya estaba
+ * hecho, mientras el botón de radicar —lo que de verdad faltaba— quedaba sin
+ * señalar.
+ *
+ * La causa: el paso salía SOLO del estado jurídico, y `PRESENTADA` no
+ * distingue «presentada e incompleta» de «presentada y completa». Son dos
+ * momentos distintos del mostrador aunque el estado jurídico sea el mismo:
+ * el primero espera papeles del ciudadano, el segundo espera un acto de la
+ * Administración.
+ *
+ * `documentacionCompleta` es OPCIONAL a propósito: sin ese dato se comporta
+ * como antes en vez de suponer que está completa. No saber no es estar
+ * completo.
+ */
 export function situacionDePaso(
   paso: PasoCamino,
   estado: EstadoJuridicoLicencia,
+  documentacionCompleta?: boolean,
 ): SituacionPaso {
-  const actual = PASO_POR_ESTADO[estado];
+  const actual =
+    estado === 'PRESENTADA' && documentacionCompleta === true
+      ? 3
+      : PASO_POR_ESTADO[estado];
   if (paso.numero < actual) return 'CUMPLIDO';
   if (paso.numero === actual) return 'ACTUAL';
   return 'PENDIENTE';

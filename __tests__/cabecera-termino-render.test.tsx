@@ -111,9 +111,26 @@ describe('crítico y aviso NO se ven iguales', () => {
 });
 
 describe('cuando el reloj no corre, la tarjeta no lo inventa', () => {
-  it('con acta de observaciones el término está suspendido: no hay anillo', () => {
+  /* CAMBIO DELIBERADO (29-ago-2026, a petición del propietario). Antes esta
+     prueba exigía que la tarjeta DESAPARECIERA con el término suspendido, y
+     desaparecer no dice «está parado»: dice «aquí no hay nada» — lo mismo que
+     decía para un expediente sin ancla. Son situaciones OPUESTAS: en una se
+     esperan papeles, en la otra el reloj está congelado y el turno es del
+     ciudadano. Ahora se pinta el reloj detenido, SIN anillo de cuenta atrás. */
+  it('con acta de observaciones el reloj SE VE, y se ve detenido', () => {
+    pintar(10, 'CON_ACTA_DE_OBSERVACIONES');
+    expect(screen.getByText('Reloj detenido')).toBeTruthy();
+    expect(screen.getByText(/El término no está corriendo/)).toBeTruthy();
+    expect(screen.getByText(/30 días hábiles para subsanar/)).toBeTruthy();
+  });
+
+  it('y no inventa cuántos días quedaban: no hay cuenta atrás', () => {
+    /* Cuántos días quedaban al congelarse depende de la serie de eventos, y el
+       servidor todavía no manda ese dato. Mostrar un número aquí sería
+       inventarlo. */
     const { container } = pintar(10, 'CON_ACTA_DE_OBSERVACIONES');
-    expect(container.innerHTML).toBe('');
+    expect(screen.queryByText('En término')).toBeNull();
+    expect(container.textContent).not.toMatch(/día \d+ de 45/);
   });
 
   /* Los cinco estados en que la Administración YA se pronunció. Va como
