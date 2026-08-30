@@ -21,7 +21,7 @@
  * Reutiliza (nunca reimplementa) las piezas REALES del motor:
  *  - `resolverEquivalencia`/`EQUIVALENCIAS_MIGRACION_SEMILLA_LICENCIAS`
  *    (DF-4) para el CÓDIGO de subtipo (eje P1′).
- *  - `derivarEventosTermino`/`calcularVencimientoDual` (`./termino.ts`) para
+ *  - `derivarEventosTermino`/`calcularVencimientoTermino` (`./termino.ts`) para
  *    verificar R9 END-TO-END (ver más abajo) — no se asume el resultado, se
  *    CALCULA con las mismas funciones que usa el servidor.
  *
@@ -86,7 +86,7 @@
  * un motivo para dejar el registro fuera del libro.
  *
  * R9 END-TO-END: cada expediente importado recibe, en el MISMO cálculo que
- * hace el servidor (`derivarEventosTermino` + `calcularVencimientoDual`,
+ * hace el servidor (`derivarEventosTermino` + `calcularVencimientoTermino`,
  * `./termino.ts`), `fechaAlertaConservadora: null` — se VERIFICA, no se
  * asume: se construye la actuación de radicación `origen: 'RECONSTRUIDO'`
  * que el ejecutor `.mjs` escribirá de verdad
@@ -119,7 +119,7 @@ import {
   type RevisionHistoricaLicencia,
   type EjeCompletitudHistorico,
 } from '@/lib/motor-expedientes/estados-licencia';
-import { derivarEventosTermino, calcularVencimientoDual } from '@/lib/motor-expedientes/termino';
+import { derivarEventosTermino, calcularVencimientoTermino } from '@/lib/motor-expedientes/termino';
 import type { DatosPredio, Actuacion } from '@/lib/motor-expedientes/tipos';
 // Import type-only (se borra en compilación, CERO acoplamiento en tiempo de
 // ejecución con `lib/server/`): reutiliza la forma exacta del documento que
@@ -539,7 +539,7 @@ const FUENTE_PROVENANCE = 'xlsx-consecutivo-2022-2026';
  * `plazoDias` arbitrario, usado SOLO para verificar R9 end-to-end (ver
  * `fechaAlertaConservadoraHistorico` más abajo) — con una ÚNICA actuación
  * de radicación `origen: 'RECONSTRUIDO'`, `derivarEventosTermino` la
- * EXCLUYE (R9) antes de que `calcularVencimientoDual` vea ningún evento: el
+ * EXCLUYE (R9) antes de que `calcularVencimientoTermino` vea ningún evento: el
  * resultado es `fechaAlertaConservadora: null` sin importar qué plazo se le
  * pase (no hay ancla `RADICACION_DEBIDA_FORMA` reconocida — ver
  * `calcularVencimiento`, `./termino.ts`). El valor exacto es irrelevante A
@@ -556,7 +556,7 @@ const PLAZO_IRRELEVANTE_PARA_VERIFICAR_R9 = 45;
  * de radicación reconstruida que `scripts/migracion/importar-consecutivo-
  * licencias.mjs` (`construirActuacionRadicacion`) escribirá de verdad, y la
  * corre por las funciones REALES del motor (`derivarEventosTermino` +
- * `calcularVencimientoDual`) — exactamente el mismo camino que
+ * `calcularVencimientoTermino`) — exactamente el mismo camino que
  * `lib/server/expedientes-licencias.ts` usa para expedientes reales
  * (`calcularFechaAlertaConservadoraMirror`), sin reimplementarlo. Siempre
  * `null` para estos expedientes: R9 excluye la única actuación (RECONSTRUIDA)
@@ -564,7 +564,7 @@ const PLAZO_IRRELEVANTE_PARA_VERIFICAR_R9 = 45;
  */
 function fechaAlertaConservadoraHistorico(actuacionRadicacion: Actuacion): string | null {
   const eventos = derivarEventosTermino([actuacionRadicacion]);
-  const { fechaAlertaConservadora } = calcularVencimientoDual(eventos, PLAZO_IRRELEVANTE_PARA_VERIFICAR_R9);
+  const { vencimiento: fechaAlertaConservadora } = calcularVencimientoTermino(eventos, PLAZO_IRRELEVANTE_PARA_VERIFICAR_R9);
   return fechaAlertaConservadora ? fechaAlertaConservadora.toISOString() : null;
 }
 

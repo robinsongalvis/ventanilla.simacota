@@ -22,7 +22,7 @@ import { DEFINICION_LICENCIA_CONSTRUCCION_PARCIAL } from '@/lib/motor-expediente
 import { sumarDiasHabiles, diasRestantesHabiles, atLocalNoon } from '@/lib/tiempos-radicado';
 import { debeNotificarCiudadano, type CriterioNotificacion } from '@/lib/email/debe-notificar-ciudadano';
 import { PREFIJO_AVISO_ACTA_COMUNICACION } from '@/lib/motor-expedientes/comunicaciones-licencia';
-import { calcularVencimientoDual, derivarEventosTermino } from '@/lib/motor-expedientes/termino';
+import { calcularVencimientoTermino, derivarEventosTermino } from '@/lib/motor-expedientes/termino';
 
 /* ══════════════════════════════════════════════════════════════
    Lógica de DECISIÓN de expedientes de licencias — bloque "Integración UI
@@ -346,7 +346,7 @@ export function evaluarCandadoEmisionReal(
  */
 function calcularFechaAlertaConservadoraMirror(actuaciones: ActuacionLicenciaDoc[]): string | null {
   const eventos = derivarEventosTermino(actuaciones);
-  const { fechaAlertaConservadora } = calcularVencimientoDual(eventos, PLAZO_DECISION_LICENCIA_DIAS_HABILES);
+  const { vencimiento: fechaAlertaConservadora } = calcularVencimientoTermino(eventos, PLAZO_DECISION_LICENCIA_DIAS_HABILES);
   return fechaAlertaConservadora ? fechaAlertaConservadora.toISOString() : null;
 }
 

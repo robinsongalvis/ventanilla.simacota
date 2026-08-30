@@ -54,7 +54,7 @@ function intentar<T>(calculo: () => T): T | null {
     return null;
   }
 }
-import { calcularVencimientoDual, derivarEventosTermino } from '@/lib/motor-expedientes/termino';
+import { calcularVencimientoTermino, derivarEventosTermino } from '@/lib/motor-expedientes/termino';
 import { calcularVencimientoVigencia, esErrorVigencia } from '@/lib/motor-expedientes/vigencias';
 import { logError } from '@/lib/logger';
 import { resolverDestinatario } from '@/lib/motor-expedientes/destinatario-expediente';
@@ -135,7 +135,14 @@ export async function GET(request: Request, context: RouteContext): Promise<Next
     const expedienteLicencia = expediente as unknown as ExpedienteLicenciaDoc;
 
     const eventos = derivarEventosTermino(actuacionesLicencia);
-    const terminoDual = calcularVencimientoDual(eventos, PLAZO_DECISION_LICENCIA_DIAS_HABILES);
+    /* UNA fecha y su artículo. Se sigue enviando bajo la clave `terminoDual`
+       para no romper a la pantalla en el mismo commit; el nombre del campo
+       persistido tampoco cambia (ver `TerminoUI`). */
+    const vencimientoTermino = calcularVencimientoTermino(eventos, PLAZO_DECISION_LICENCIA_DIAS_HABILES);
+    const terminoDual = {
+      fechaAlertaConservadora: vencimientoTermino.vencimiento?.toISOString() ?? null,
+      fundamento: vencimientoTermino.fundamento,
+    };
 
     const plazoSubsanacion = evaluarPlazoSubsanacion(actuacionesLicencia, new Date());
     const borradorActoDesistimiento = generarBorradorActoDesistimiento(expedienteLicencia, plazoSubsanacion);

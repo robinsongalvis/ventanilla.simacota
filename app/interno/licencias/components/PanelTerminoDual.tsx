@@ -56,7 +56,7 @@ export interface PanelTerminoDualProps {
 }
 
 export function PanelTerminoDual({ terminoDual, origen, fechaRadicacion, estadoJuridico, vencimientoDestacadoArriba }: PanelTerminoDualProps) {
-  const { suspension, reinicio, fechaAlertaConservadora } = terminoDual;
+  const { fechaAlertaConservadora, fundamento } = terminoDual;
   // Sin estado declarado se asume que el término corre (comportamiento
   // previo): este componente no puede adivinar, y errar hacia "mostrar la
   // alerta" es el lado seguro para un módulo cuyo fin es que no se pase un
@@ -64,7 +64,7 @@ export function PanelTerminoDual({ terminoDual, origen, fechaRadicacion, estadoJ
   const terminoCorriendo = estadoJuridico ? terminoResolucionSigueCorriendo(estadoJuridico) : true;
   const [detalleAbierto, setDetalleAbierto] = useState(false);
 
-  if (!suspension && !reinicio) {
+  if (!fechaAlertaConservadora) {
     return (
       <div
         className="rounded-xl p-4"
@@ -156,15 +156,19 @@ export function PanelTerminoDual({ terminoDual, origen, fechaRadicacion, estadoJ
       )}
 
       <div id="detalle-computo" hidden={!detalleAbierto} className="flex flex-col gap-3">
+        {/* ── DE DOS HIPÓTESIS A UN ARTÍCULO (ADR-0038) ──────────────────
+            Aquí decía que «la interpretación jurídica sigue pendiente de
+            concepto escrito» y se mostraban las dos fechas posibles. No había
+            tal pendiente: el Decreto lo dice, y este proyecto ya citaba ese
+            mismo artículo veinte veces para otras cosas. Ahora se cita en vez
+            de explicar una duda que no existe. */}
         <p className="text-xs leading-relaxed" style={{ color: 'var(--text-secondary)' }}>
-          La interpretación jurídica de qué pasa con el plazo tras una subsanación sigue pendiente de concepto
-          escrito — el sistema muestra las dos fechas posibles y alerta sobre la más exigente para proteger a la
-          Administración. El vencimiento es una proyección: se recalcula en cada consulta a partir de los hechos.
+          El término se <strong>suspende y se reanuda</strong> donde se detuvo: no vuelve a empezar.
+          El vencimiento es una proyección — se recalcula en cada consulta a partir de los hechos.
         </p>
-      <div id="panel-termino-dual-detalle" className="flex flex-col gap-1.5 text-sm">
-        <FilaFecha etiqueta="Si el término se suspende y reanuda" fecha={suspension} />
-        <FilaFecha etiqueta="Si el término reinicia" fecha={reinicio} />
-      </div>
+        <p id="panel-termino-dual-detalle" className="text-xs leading-relaxed font-mono" style={{ color: 'var(--text-secondary)' }}>
+          {fundamento}
+        </p>
 
         {fechaRadicacion && (
           <p className="text-xs" style={{ color: 'var(--text-secondary)' }}>
@@ -176,13 +180,4 @@ export function PanelTerminoDual({ terminoDual, origen, fechaRadicacion, estadoJ
   );
 }
 
-function FilaFecha({ etiqueta, fecha }: { etiqueta: string; fecha: string | null }) {
-  return (
-    <div className="flex items-baseline justify-between gap-3">
-      <span style={{ color: 'var(--text-secondary)' }}>{etiqueta}</span>
-      <span className="font-mono font-semibold whitespace-nowrap" style={{ color: 'var(--text-primary)' }}>
-        {fecha ? formatFechaColombia(fecha) : '—'}
-      </span>
-    </div>
-  );
-}
+

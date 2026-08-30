@@ -25,11 +25,24 @@ import type { ErrorVigencia, ReglaVigencia } from '@/lib/motor-expedientes/vigen
 export type { EvaluacionPlazoSubsanacion, BorradorActoDesistimiento };
 
 /** `VencimientoDual` (`lib/motor-expedientes/termino.ts`) tras `NextResponse.json`. */
-export interface TerminoDualUI {
-  suspension: string | null;
-  reinicio: string | null;
+/**
+ * El término, con UNA fecha y su artículo (ADR-0038).
+ *
+ * Se llamaba `TerminoDualUI` y traía `suspension` y `reinicio` — las dos
+ * lecturas del «hueco 1» del ADR-0029— porque nadie sabía cuál regía. El
+ * artículo 2.2.6.1.2.2.4 lo dice: «se suspenderá». Se conserva el nombre del
+ * campo `fechaAlertaConservadora` porque está DENORMALIZADO en producción y
+ * renombrarlo exigiría migrar cada documento; su significado ya no es «la más
+ * temprana de dos», sino la fecha, a secas.
+ */
+export interface TerminoUI {
   fechaAlertaConservadora: string | null;
+  /** El artículo que sostiene el cómputo, para citarlo en vez de explicar dudas. */
+  fundamento: string;
 }
+
+/** @deprecated Nombre anterior. Se conserva para no romper llamadores externos. */
+export type TerminoDualUI = TerminoUI;
 
 /** Caso exitoso de `ResultadoVencimientoVigencia` (`lib/motor-expedientes/vigencias.ts`) tras `NextResponse.json`. */
 export interface VigenciaOkUI {

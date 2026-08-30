@@ -1,4 +1,5 @@
 import { describe, it, expect } from 'vitest';
+import { sumarDiasHabiles } from '@/lib/tiempos-radicado';
 import {
   DIAS_HABILES_RECURSOS,
   DIAS_HABILES_SUBSANACION_TACITO,
@@ -155,5 +156,49 @@ describe('el desistimiento tácito', () => {
       ahora: AHORA,
     });
     expect(e?.mensaje).toMatch(/no consta la fecha en que el acta se comunicó/i);
+  });
+});
+
+describe('la prórroga de 15 días hábiles (ADR-0038 §2.3)', () => {
+  /* Vivía SOLO en el texto del correo al ciudadano: el correo prometía quince
+     días que el reloj no sabía contar, y un desistimiento tácito podía
+     declararse mientras la prórroga corría. */
+  const COMUNICADA = '2026-06-01T12:00:00.000Z';
+  const alDia = (n: number) => sumarDiasHabiles(COMUNICADA, n);
+
+  it('sin prórroga, a los 30 días hábiles procede', () => {
+    expect(procedeDesistimientoTacito({
+      fechaComunicacionActa: COMUNICADA, huboRespuestaSubsanacion: false, ahora: alDia(30),
+    })).toBeNull();
+  });
+
+  it('CON prórroga concedida, a los 30 NO procede — y el motivo la nombra', () => {
+    const e = procedeDesistimientoTacito({
+      fechaComunicacionActa: COMUNICADA, huboRespuestaSubsanacion: false, ahora: alDia(30),
+      prorrogaConcedida: true,
+    });
+    expect(e).not.toBeNull();
+    expect(e!.mensaje).toMatch(/45/);
+    expect(e!.mensaje).toMatch(/prórroga concedida/);
+    expect(e!.mensaje).toMatch(/2\.2\.6\.1\.2\.2\.4/);
+  });
+
+  it('con prórroga, a los 45 sí procede', () => {
+    expect(procedeDesistimientoTacito({
+      fechaComunicacionActa: COMUNICADA, huboRespuestaSubsanacion: false, ahora: alDia(45),
+      prorrogaConcedida: true,
+    })).toBeNull();
+  });
+
+  it('LA AUSENCIA DEL DATO NO ES UNA PRÓRROGA: «a solicitud de parte» no se presume', () => {
+    /* Si no consta que se concedió, el plazo son 30. Presumirla protegería al
+       ciudadano de un archivo — pero inventaría un hecho que nadie registró. */
+    expect(procedeDesistimientoTacito({
+      fechaComunicacionActa: COMUNICADA, huboRespuestaSubsanacion: false, ahora: alDia(31),
+    })).toBeNull();
+    expect(procedeDesistimientoTacito({
+      fechaComunicacionActa: COMUNICADA, huboRespuestaSubsanacion: false, ahora: alDia(31),
+      prorrogaConcedida: false,
+    })).toBeNull();
   });
 });

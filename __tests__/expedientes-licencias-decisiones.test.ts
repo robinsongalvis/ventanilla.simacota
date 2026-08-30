@@ -11,7 +11,7 @@ import {
   type ErrorExpediente,
   type ActuacionLicenciaDoc,
 } from '@/lib/server/expedientes-licencias';
-import { calcularVencimientoDual, derivarEventosTermino } from '@/lib/motor-expedientes/termino';
+import { calcularVencimientoTermino, derivarEventosTermino } from '@/lib/motor-expedientes/termino';
 
 /* Bloque "Integración UI y demo" — decisiones puras de expedientes de licencias. */
 
@@ -242,7 +242,7 @@ describe('planRegistrarActuacion — guards y transiciones', () => {
    son 2 de los 3 puntos que lo calculan (el tercero, `planCrearExpedienteDesdeRadicado`,
    se prueba en `expedientes-licencias-handoff-decisiones.test.ts`, que ya
    trae su propio fixture de radicado). Todas las aserciones aquí comparan
-   contra `calcularVencimientoDual(derivarEventosTermino(...))` invocado
+   contra `calcularVencimientoTermino(derivarEventosTermino(...))` invocado
    DIRECTAMENTE en el test — anti-divergencia: el valor que persiste el plan
    debe coincidir EXACTAMENTE con el cómputo on-read para la misma serie.
 ────────────────────────────────────────────── */
@@ -255,10 +255,10 @@ describe('planCrearExpedienteDemo — fechaAlertaConservadora (espejo R11)', () 
        intacto; lo que cambió es que ahora ambos valen null, porque no hay
        término que proyectar hasta la transición a debida forma. */
     const plan = planOk(planCrearExpedienteDemo(INPUT_BASE, 'SEC_PLANEACION', ACTOR, AHORA));
-    const esperado = calcularVencimientoDual(
+    const esperado = calcularVencimientoTermino(
       derivarEventosTermino([plan.primeraActuacion]),
       PLAZO_DIAS,
-    ).fechaAlertaConservadora?.toISOString() ?? null;
+    ).vencimiento?.toISOString() ?? null;
 
     // El invariante que importa, intacto: espejo === calculador.
     expect(plan.expediente.fechaAlertaConservadora).toBe(esperado);
@@ -282,10 +282,10 @@ describe('planRegistrarActuacion — fechaAlertaConservadora (espejo R11)', () =
       'EN_REVISION', existentes, EXPEDIENTE_ID, TENANT, { tipo: 'acta-observaciones', detalle: DETALLE_OK }, ACTOR, AHORA,
     ));
 
-    const esperado = calcularVencimientoDual(
+    const esperado = calcularVencimientoTermino(
       derivarEventosTermino([...existentes, plan.actuacion]),
       PLAZO_DIAS,
-    ).fechaAlertaConservadora?.toISOString() ?? null;
+    ).vencimiento?.toISOString() ?? null;
 
     expect(plan.fechaAlertaConservadora).not.toBeNull();
     expect(plan.fechaAlertaConservadora).toBe(esperado);
@@ -305,10 +305,10 @@ describe('planRegistrarActuacion — fechaAlertaConservadora (espejo R11)', () =
 
     expect(trasRespuesta.fechaAlertaConservadora).not.toBe(trasActa.fechaAlertaConservadora);
 
-    const esperado = calcularVencimientoDual(
+    const esperado = calcularVencimientoTermino(
       derivarEventosTermino([...existentesTrasActa, trasRespuesta.actuacion]),
       PLAZO_DIAS,
-    ).fechaAlertaConservadora?.toISOString() ?? null;
+    ).vencimiento?.toISOString() ?? null;
     expect(trasRespuesta.fechaAlertaConservadora).toBe(esperado);
   });
 

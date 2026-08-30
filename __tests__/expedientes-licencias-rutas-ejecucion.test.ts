@@ -190,15 +190,20 @@ describe('GET /api/licencias/expedientes/[id] — detalle + actuaciones ordenada
 });
 
 describe('GET /api/licencias/expedientes/[id] — computos (Bloque "Términos y vigencias protectores")', () => {
-  it('solo radicación: terminoDual.suspension === terminoDual.reinicio, plazoSubsanacion NO_APLICA, vigencia ausente (sin firmeza), sin borrador', async () => {
+  it('solo radicación: el término trae UNA fecha con su artículo, plazoSubsanacion NO_APLICA, vigencia ausente (sin firmeza), sin borrador', async () => {
     store.set('expedientes/e2', { id: 'e2', tenantId: 'SEC_PLANEACION' });
     store.set('expedientes/e2/actuaciones/a1', { id: 'a1', tipo: 'radicacion-debida-forma', fecha: '2026-06-01T12:00:00.000Z', origen: 'REAL' });
 
     const res = await detalleGET(req(null, 'GET'), ctx('e2'));
     const data = await res.json();
 
-    expect(data.computos.terminoDual.suspension).toBe(data.computos.terminoDual.reinicio);
-    expect(data.computos.terminoDual.fechaAlertaConservadora).toBe(data.computos.terminoDual.suspension);
+    /* ADR-0038: la ruta ya no manda dos hipótesis. Manda UNA fecha y el
+       artículo que la sostiene — `suspension` y `reinicio` desaparecieron
+       porque no había dos lecturas que elegir. */
+    expect(data.computos.terminoDual.suspension).toBeUndefined();
+    expect(data.computos.terminoDual.reinicio).toBeUndefined();
+    expect(data.computos.terminoDual.fechaAlertaConservadora).toBeTruthy();
+    expect(data.computos.terminoDual.fundamento).toMatch(/2\.2\.6\.1\.2\.2\.4/);
     expect(data.computos.plazoSubsanacion.resultado).toBe('NO_APLICA');
     expect(data.computos.vigencia).toBeUndefined();
     expect(data.borradorActoDesistimiento).toBeNull();
