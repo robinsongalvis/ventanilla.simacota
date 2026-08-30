@@ -78,8 +78,17 @@ export interface DestinatarioResuelto {
 }
 
 export interface EntradaDestinatario {
-  /** El radicado de ventanilla vinculado, si lo hay. `null`/`undefined` = expediente huérfano. */
-  radicado?: CriterioNotificacion | null;
+  /**
+   * El radicado de ventanilla vinculado, si lo hay. `null`/`undefined` =
+   * expediente huérfano.
+   *
+   * Se acepta también su `datosNoAportados`, porque la DECLARACIÓN de no tener
+   * correo es un hecho del expediente esté donde esté — y `debeNotificarCiudadano`
+   * no la mira: solo valida el campo `email`.
+   */
+  radicado?: (CriterioNotificacion & {
+    solicitante?: { email?: string | null; datosNoAportados?: { correo?: boolean } };
+  }) | null;
   /** Lo capturado en el propio expediente. */
   capturaPropia?: ContactoCapturado | null;
 }
@@ -100,6 +109,25 @@ export function resolverDestinatario(entrada: EntradaDestinatario): Destinatario
      radicado viene sin correo: caerse sería tener dos fuentes disfrazadas de
      una, que es justo lo que esta precedencia existe para impedir. */
   if (radicado) {
+    /* LA DECLARACIÓN MANDA SOBRE EL CAMPO. Un radicado puede traer un correo
+       en el campo Y la marca de que el ciudadano NO lo aportó — por ejemplo si
+       se tecleó y luego se corrigió con la declaración. Escribirle sería pasar
+       por encima de lo que él dijo.
+
+       Esto se perdió al unificar la cadena de condiciones el 29-ago-2026 y lo
+       cazó la prueba que ya existía («marca datosNoAportados.correo →
+       debeEnviar:false»). `debeNotificarCiudadano` no lo mira: valida el campo
+       `email`, no las declaraciones. */
+    if (radicado.solicitante?.datosNoAportados?.correo === true) {
+      return {
+        correo: null,
+        origen: 'DECLARADO_SIN_CORREO',
+        motivo:
+          'El solicitante manifestó no tener correo electrónico al radicar en ventanilla. ' +
+          'No recibirá avisos automáticos: las comunicaciones deben entregarse por otro medio.',
+        capturaPropiaDesplazada: hayCapturaPropia,
+      };
+    }
     if (debeNotificarCiudadano(radicado)) {
       return {
         correo: radicado.solicitante?.email?.trim() ?? null,

@@ -57,6 +57,7 @@ function intentar<T>(calculo: () => T): T | null {
 import { calcularVencimientoDual, derivarEventosTermino } from '@/lib/motor-expedientes/termino';
 import { calcularVencimientoVigencia, esErrorVigencia } from '@/lib/motor-expedientes/vigencias';
 import { logError } from '@/lib/logger';
+import { resolverDestinatario } from '@/lib/motor-expedientes/destinatario-expediente';
 
 export const runtime = 'nodejs';
 
@@ -100,14 +101,30 @@ export async function GET(request: Request, context: RouteContext): Promise<Next
     // propósito: la UI que necesite más detalle del radicado lo pide por
     // su propia ruta).
     let radicadoVinculado: { id: string; fecha: string } | null = null;
+    /* Los datos del radicado que hacen falta para saber A QUIÉN se le escribe.
+       Se toman de la MISMA lectura que ya se hacía para el vínculo: cero
+       consultas nuevas (R11). */
+    let contactoDelRadicado: Parameters<typeof resolverDestinatario>[0]['radicado'] = null;
     const radicadoId = (expediente as { radicadoId?: string | null }).radicadoId;
     if (radicadoId) {
       const radicadoSnap = await db.doc(`ventanilla_radicados/${radicadoId}`).get();
-      const vinculo = radicadoSnap.exists
-        ? (radicadoSnap.data() as { vinculoExpediente?: { fecha: string } | null })?.vinculoExpediente
+      const datos = radicadoSnap.exists
+        ? (radicadoSnap.data() as {
+            vinculoExpediente?: { fecha: string } | null;
+            esAnonimo?: boolean;
+            tipoPresentacion?: 'IDENTIFICADA' | 'ANONIMA' | 'RESERVADA';
+            solicitante?: { email?: string | null };
+          })
         : null;
-      if (vinculo) {
-        radicadoVinculado = { id: radicadoId, fecha: vinculo.fecha };
+      if (datos?.vinculoExpediente) {
+        radicadoVinculado = { id: radicadoId, fecha: datos.vinculoExpediente.fecha };
+      }
+      if (datos) {
+        contactoDelRadicado = {
+          esAnonimo: datos.esAnonimo,
+          tipoPresentacion: datos.tipoPresentacion,
+          solicitante: { email: datos.solicitante?.email ?? null },
+        };
       }
     }
 
@@ -233,6 +250,15 @@ export async function GET(request: Request, context: RouteContext): Promise<Next
       expediente,
       actuaciones,
       documentos,
+      /* ── A QUIÉN SE LE ESCRIBE, RESUELTO EN EL SERVIDOR ──────────────
+         Una fuente, dos salidas: el mismo `resolverDestinatario` que decide si
+         sale un correo decide lo que la pantalla advierte. Si la pantalla lo
+         dedujera por su cuenta, tendríamos dos criterios que hoy coinciden y
+         mañana no — el patrón que este proyecto lleva un mes corrigiendo. */
+      destinatario: resolverDestinatario({
+        radicado: contactoDelRadicado,
+        capturaPropia: (expediente as { solicitanteContacto?: Parameters<typeof resolverDestinatario>[0]['capturaPropia'] }).solicitanteContacto,
+      }),
       radicadoVinculado,
       // Placeholder: única Definición sembrada hoy (Bloque A·A2). Cuando
       // exista resolución real por `expediente.tramiteId` (persistencia de

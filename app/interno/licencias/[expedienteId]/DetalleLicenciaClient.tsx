@@ -50,6 +50,7 @@ import { PanelDesistimientoSemicontrolado } from '../components/PanelDesistimien
 import { BotonAccionPlaceholder } from '../components/BotonAccionPlaceholder';
 import { RegistrarActuacionModal } from '../components/RegistrarActuacionModal';
 import { ChecklistRequisitos } from '../components/ChecklistRequisitos';
+import type { DestinatarioResuelto } from '@/lib/motor-expedientes/destinatario-expediente';
 
 type EstadoCarga = 'cargando' | 'error' | 'no-encontrado' | 'listo';
 
@@ -124,6 +125,7 @@ export function DetalleLicenciaClient({ expedienteId, onVolver }: DetalleLicenci
      la consumía: el acto estaba construido y era inalcanzable desde el
      mostrador. */
   const [debidaForma, setDebidaForma] = useState<VistaPreviaDebidaForma | null>(null);
+  const [destinatario, setDestinatario] = useState<DestinatarioResuelto | null>(null);
   const [borradorActoDesistimiento, setBorradorActoDesistimiento] = useState<BorradorActoDesistimiento | null>(null);
 
   /**
@@ -163,6 +165,11 @@ export function DetalleLicenciaClient({ expedienteId, onVolver }: DetalleLicenci
           : null,
       );
       setComputos(body.computos && typeof body.computos === 'object' ? (body.computos as ComputosExpedienteUI) : null);
+      setDestinatario(
+        body.destinatario && typeof body.destinatario === 'object'
+          ? (body.destinatario as DestinatarioResuelto)
+          : null,
+      );
       /* VIENE DENTRO DE `computos`, NO EN LA RAÍZ. Esto leía
          `body.debidaForma`, que el servidor nunca ha mandado ahí: siempre daba
          `undefined`, el estado quedaba en `null`, y como el botón se pinta
@@ -350,6 +357,32 @@ export function DetalleLicenciaClient({ expedienteId, onVolver }: DetalleLicenci
           del final, nunca la bandeja de botones ni los demás paneles. */}
       <div className="print:hidden flex flex-col gap-5">
       <VolverBandeja onVolver={onVolver} />
+
+      {/* ── ¿HAY A QUIÉN AVISARLE? ────────────────────────────────────────
+          Se advierte SOLO cuando no se puede escribir, y con el motivo que
+          resolvió el SERVIDOR — el mismo criterio que decide si sale el correo.
+          Sin esto, un expediente sin destinatario se veía exactamente igual que
+          uno con destinatario, y el silencio no se notaba hasta que hacía falta
+          escribirle. */}
+      {destinatario?.correo === null && (
+        <div
+          role="status"
+          className="rounded-xl px-4 py-3 flex items-start gap-3"
+          style={{ background: '#FDF6E3', border: '1px solid #D4A017' }}
+        >
+          <span aria-hidden className="text-lg leading-none" style={{ color: '#7A4F0A' }}>✉</span>
+          <div className="min-w-0">
+            <p className="text-sm font-bold" style={{ color: '#7A4F0A' }}>
+              {destinatario.origen === 'DECLARADO_SIN_CORREO'
+                ? 'Este ciudadano no recibirá avisos automáticos'
+                : 'Este expediente no tiene a quién avisarle'}
+            </p>
+            <p className="text-xs mt-0.5 leading-relaxed" style={{ color: '#7A4F0A' }}>
+              {destinatario.motivo}
+            </p>
+          </div>
+        </div>
+      )}
 
       {/* ── Tarjeta encabezado ── */}
       <div

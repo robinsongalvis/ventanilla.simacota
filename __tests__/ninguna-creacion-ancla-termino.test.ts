@@ -19,7 +19,10 @@ import { derivarEventosTermino } from '@/lib/motor-expedientes/termino';
 
 const ARGUMENTOS_POR_PLANIFICADOR: Record<string, unknown[]> = {
   planCrearExpedienteDemo: [
-    { solicitanteNombre: 'C', solicitanteDocumento: '1', subtipos: ['URBANIZACION'] },
+    /* La creación EXIGE decidir sobre el correo desde el 29-ago-2026: o se registra,
+       o se declara que no lo tiene. Estas pruebas miran otra cosa; traen el dato
+       para poder llegar hasta donde prueban. */
+    { solicitanteNombre: 'C', solicitanteDocumento: '1', subtipos: ['URBANIZACION'], contacto: { correo: 'c@ejemplo.com' } },
     'SEC_PLANEACION',
     { uid: 'u', nombre: 'F', rol: 'FUNCIONARIO' },
     new Date('2026-08-28T09:00:00.000Z'),

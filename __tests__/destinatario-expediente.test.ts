@@ -161,3 +161,24 @@ describe('un expediente sin radicado no puede nacer sin decidir el correo', () =
     expect(plan.expediente.solicitanteContacto?.celular).toBe('3009998877');
   });
 });
+
+describe('la declaración manda sobre el campo, también en el radicado', () => {
+  /* REGRESIÓN REAL, introducida al unificar la cadena de condiciones el
+     29-ago-2026 y cazada por la prueba que ya existía en
+     `expedientes-licencias-handoff-decisiones.test.ts`.
+
+     Un radicado puede traer correo en el campo Y la marca de que el ciudadano
+     NO lo aportó. Escribirle sería pasar por encima de lo que él dijo — y
+     `debeNotificarCiudadano` no lo impide: valida el campo, no las
+     declaraciones. */
+  it('con correo en el campo pero «no aporta» declarado, NO se le escribe', () => {
+    const d = resolverDestinatario({
+      radicado: {
+        solicitante: { email: 'quedo-escrito@ejemplo.com', datosNoAportados: { correo: true } },
+      },
+    });
+    expect(d.correo).toBeNull();
+    expect(d.origen).toBe('DECLARADO_SIN_CORREO');
+    expect(d.motivo).toMatch(/al radicar en ventanilla/);
+  });
+});

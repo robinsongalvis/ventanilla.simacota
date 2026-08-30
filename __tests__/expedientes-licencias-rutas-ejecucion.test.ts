@@ -96,7 +96,10 @@ function ctx(id: string) {
   return { params: Promise.resolve({ id }) };
 }
 
-const BODY_VALIDO = { solicitanteNombre: 'Juan Pérez', solicitanteDocumento: '12345678', subtipos: ['CONSTRUCCION'] };
+/* La creación EXIGE decidir sobre el correo desde el 29-ago-2026: o se registra,
+   o se declara que no lo tiene. Estas pruebas miran otra cosa; traen el dato
+   para poder llegar hasta donde prueban. */
+const BODY_VALIDO = { solicitanteNombre: 'Juan Pérez', solicitanteDocumento: '12345678', subtipos: ['CONSTRUCCION'], contacto: { correo: 'juan@ejemplo.com' } };
 
 beforeEach(() => {
   store = new Map();

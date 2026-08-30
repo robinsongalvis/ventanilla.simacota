@@ -417,7 +417,25 @@ export function planCrearExpedienteDemo(
   const nombre = input.solicitanteNombre?.trim() ?? '';
   const documento = input.solicitanteDocumento?.trim() ?? '';
 
-  /* ── CONTACTO: SE EXIGE DECIDIR, NO SE PERMITE CALLAR ─────────────────
+  if (!Array.isArray(input.subtipos) || input.subtipos.length === 0) {
+    return { status: 400, mensaje: 'Debe indicar al menos un subtipo (figura normativa) para el expediente.' };
+  }
+
+  for (const codigo of input.subtipos) {
+    if (!CODIGOS_CATALOGO_NORMATIVO.has(codigo)) {
+      return {
+        status: 422,
+        mensaje: `El subtipo "${codigo}" no está en el catálogo normativo de figuras (DF-4, ADR-0029). Si es un código local histórico (p. ej. "LA", "LCR VISR", "LRC"), su significado está pendiente del ingeniero (P1′) y no puede usarse para radicar todavía.`,
+      };
+    }
+  }
+
+  /* ── CONTACTO: SE EXIGE DECIDIR, NO SE PERMITE CALLAR ─
+     VA AL FINAL DE LAS VALIDACIONES A PROPÓSITO. Puesta arriba, esta guarda se
+     adelantaba a las que ya existían: un subtipo en cuarentena devolvía 400
+     «falta el correo» en vez de su 422 propio, y el llamador dejaba de saber
+     qué estaba mal de verdad. Una comprobación nueva no reordena los modos de
+     fallo que ya tenía el sistema.────────────────
      Un expediente que nace por esta vía NO tiene radicado del que heredar
      contacto: si no se recoge aquí, ese ciudadano no recibirá jamás un aviso
      y nadie lo sabrá hasta que haga falta escribirle.
@@ -443,18 +461,6 @@ export function planCrearExpedienteDemo(
   }
   if (!nombre) return { status: 400, mensaje: 'El nombre del solicitante es obligatorio.' };
   if (!documento) return { status: 400, mensaje: 'El documento del solicitante es obligatorio.' };
-  if (!Array.isArray(input.subtipos) || input.subtipos.length === 0) {
-    return { status: 400, mensaje: 'Debe indicar al menos un subtipo (figura normativa) para el expediente.' };
-  }
-
-  for (const codigo of input.subtipos) {
-    if (!CODIGOS_CATALOGO_NORMATIVO.has(codigo)) {
-      return {
-        status: 422,
-        mensaje: `El subtipo "${codigo}" no está en el catálogo normativo de figuras (DF-4, ADR-0029). Si es un código local histórico (p. ej. "LA", "LCR VISR", "LRC"), su significado está pendiente del ingeniero (P1′) y no puede usarse para radicar todavía.`,
-      };
-    }
-  }
 
   /* La MODALIDAD (art. 2.2.6.1.1.7) es un eje DISTINTO de la figura: se valida
      contra el catálogo y contra las figuras del propio expediente, para que no
