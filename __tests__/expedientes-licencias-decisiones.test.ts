@@ -50,7 +50,11 @@ function actuacionExistente(over: Partial<ActuacionLicenciaDoc>): ActuacionLicen
   };
 }
 
-const INPUT_BASE = { solicitanteNombre: 'Juan Pérez', solicitanteDocumento: '12345678', subtipos: ['CONSTRUCCION'] };
+const INPUT_BASE = {
+  /* La creación EXIGE decidir sobre el correo desde el 29-ago-2026: o se
+     registra, o se declara que no lo tiene. Estas pruebas miran otra cosa,
+     así que traen el dato para poder llegar hasta donde prueban. */
+  contacto: { correo: 'solicitante@ejemplo.com' }, solicitanteNombre: 'Juan Pérez', solicitanteDocumento: '12345678', subtipos: ['CONSTRUCCION'] };
 
 describe('EMISION_REAL_EXPEDIENTES_HABILITADA — candado', () => {
   it('es false (la doctrina R10 no se activa por accidente)', () => {
