@@ -51,6 +51,10 @@ import { BotonAccionPlaceholder } from '../components/BotonAccionPlaceholder';
 import { RegistrarActuacionModal } from '../components/RegistrarActuacionModal';
 import { ChecklistRequisitos } from '../components/ChecklistRequisitos';
 import type { DestinatarioResuelto } from '@/lib/motor-expedientes/destinatario-expediente';
+import { PanelQueSigue } from '../components/PanelQueSigue';
+import { derivarQueSigue } from '../que-sigue';
+import { PASOS, situacionDePaso } from '../camino-del-tramite';
+import { ResumenDocumentos } from '../components/ResumenDocumentos';
 
 type EstadoCarga = 'cargando' | 'error' | 'no-encontrado' | 'listo';
 
@@ -260,7 +264,7 @@ export function DetalleLicenciaClient({ expedienteId, onVolver }: DetalleLicenci
   const timeline = useMemo(() => {
     if (!expediente) return [];
     const vigenteParaTimeline = fechaAlertaConservadoraIso ? new Date(fechaAlertaConservadoraIso) : null;
-    return construirTimelineDesdeActuaciones(actuaciones, expediente.origen, vigenteParaTimeline);
+    return construirTimelineDesdeActuaciones(actuaciones, expediente.origen, vigenteParaTimeline, expediente.completitud?.completoDesde ?? null);
   }, [expediente, actuaciones, fechaAlertaConservadoraIso]);
 
   function alRegistrarActuacion(actuacion: ActuacionLicenciaDoc, nuevoEstadoJuridico: EstadoJuridicoLicencia) {
@@ -336,6 +340,33 @@ export function DetalleLicenciaClient({ expedienteId, onVolver }: DetalleLicenci
   const notaRespuestaDeshabilitada = puedeRegistrarRespuesta
     ? undefined
     : `La respuesta de subsanación solo procede con el expediente "con acta de observaciones" — estado actual: "${etiquetaEstadoActual}".`;
+
+  /* QUÉ SIGUE — derivado del mapa de transiciones, con los motivos que da el
+     SERVIDOR. La pantalla no decide qué se ofrece ni redacta por qué algo no
+     procede: coloca lo que el dominio ya decidió.
+
+     Va AQUÍ y no arriba porque consume las notas del servidor, que se calculan
+     después de la guarda de `expediente`. `tsc` lo cazó cuando lo puse antes. */
+  const queSigue = derivarQueSigue({
+    estado: expediente.estadoJuridico,
+    yaHuboActa,
+    motivos: { acta: notaActaDeshabilitada, respuesta: notaRespuestaDeshabilitada },
+  });
+
+  /* PAPEL: no cambian el expediente, lo imprimen o lo descargan. La constancia
+     de ejecutoria SOLO con el acto en firme — sin los hechos no se compone un
+     papel «provisional», que sería certificar algo que no consta. */
+  const accionesDePapel = [
+    { etiqueta: 'Imprimir constancia de radicación', href: `/api/licencias/expedientes/${encodeURIComponent(expedienteId)}/constancia` },
+    { etiqueta: 'Descargar documentos con sello', href: `/api/licencias/expedientes/${encodeURIComponent(expedienteId)}/sellados` },
+    ...(puedeExpedirEjecutoria(expediente.estadoJuridico)
+      ? [{ etiqueta: 'Constancia de ejecutoria', href: `/api/licencias/expedientes/${encodeURIComponent(expedienteId)}/ejecutoria` }]
+      : []),
+  ];
+
+  /* El paso del camino en que está, para encabezar el panel: la funcionaria ve
+     «paso 3 de 4» y la acción de ese paso en el mismo sitio. */
+  const pasoActualDelCamino = PASOS.find((x) => situacionDePaso(x, expediente.estadoJuridico, expediente.completitud?.completo === true) === 'ACTUAL') ?? null;
 
   // Checklist (Bloque A·A3) — solo-lectura para histórico migrado (no se
   // "aporta" a un expediente reconstruido) o expediente ya EN_FIRME (mismo
@@ -518,81 +549,19 @@ export function DetalleLicenciaClient({ expedienteId, onVolver }: DetalleLicenci
                   )}
                 </div>
               )}
-              {/* LA CADENA DE CIERRE. Sin estos botones el expediente llegaba a
-                  EN_VIABILIDAD y se quedaba ahí para siempre. */}
-              {accionesDeCierre.map((accion) => (
-                <div key={accion.tipo} className="flex flex-col gap-1.5">
-                  <button
-                    type="button"
-                    onClick={() => setModalActuacion(accion.tipo)}
-                    className="inline-flex items-center gap-2 rounded-[10px] px-4 py-2.5 text-sm font-bold transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-1 hover:brightness-95 active:scale-[0.98]"
-                    style={
-                      accion.esDecisionDeFondo
-                        ? { background: '#14532D', color: '#fff', boxShadow: '0 2px 8px rgba(20,83,45,0.25)' }
-                        : { background: 'transparent', color: '#14532D', border: '1px solid #14532D' }
-                    }
-                  >
-                    {accion.etiqueta}
-                  </button>
-                </div>
-              ))}
+              {/* ── QUÉ SIGUE ────────────────────────────────────────────
+                  Sustituye la PILA PLANA de botones que había aquí: cierre,
+                  acta, respuesta y desistimiento uno tras otro, todos del mismo
+                  tamaño, con lo destructivo arriba y en verde.
 
-              {/* La constancia de ejecutoria SOLO cuando el acto está en firme:
-                  sin los hechos no se compone un papel «provisional», que sería
-                  certificar algo que no consta. */}
-              {expediente && puedeExpedirEjecutoria(expediente.estadoJuridico) && (
-                <a
-                  href={`/api/licencias/expedientes/${encodeURIComponent(expedienteId)}/ejecutoria`}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="inline-flex items-center gap-2 rounded-[10px] px-4 py-2.5 text-sm font-bold"
-                  style={{ background: '#D4A017', color: '#14532D' }}
-                >
-                  Constancia de ejecutoria
-                </a>
-              )}
-
-              <div className="flex flex-col gap-1.5">
-                <button
-                  type="button"
-                  disabled={!puedeRegistrarActa}
-                  onClick={() => setModalActuacion('acta-observaciones')}
-                  aria-describedby={notaActaDeshabilitada ? 'registrar-acta-nota' : undefined}
-                  className="inline-flex items-center gap-2 rounded-[10px] px-4 py-2.5 text-sm font-bold transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-1 disabled:opacity-50 disabled:cursor-not-allowed hover:brightness-95 active:scale-[0.98]"
-                  style={{ background: '#D4A017', color: '#14532D', boxShadow: '0 2px 8px rgba(212,160,23,0.25)' }}
-                >
-                  Registrar acta de observaciones
-                </button>
-                {notaActaDeshabilitada && (
-                  <p id="registrar-acta-nota" className="text-xs" style={{ color: '#9A6206' }}>
-                    {notaActaDeshabilitada}
-                  </p>
-                )}
-              </div>
-              {yaHuboActa && (
-                <div className="flex flex-col gap-1.5">
-                  <button
-                    type="button"
-                    disabled={!puedeRegistrarRespuesta}
-                    onClick={() => setModalActuacion('respuesta-subsanacion')}
-                    aria-describedby={notaRespuestaDeshabilitada ? 'registrar-respuesta-nota' : undefined}
-                    className="inline-flex items-center gap-2 rounded-[10px] px-4 py-2.5 text-sm font-bold transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-1 disabled:opacity-50 disabled:cursor-not-allowed hover:brightness-95 active:scale-[0.98]"
-                    style={{ background: 'transparent', color: '#14532D', border: '1px solid #14532D' }}
-                  >
-                    Registrar respuesta de subsanación
-                  </button>
-                  {notaRespuestaDeshabilitada && (
-                    <p id="registrar-respuesta-nota" className="text-xs" style={{ color: '#9A6206' }}>
-                      {notaRespuestaDeshabilitada}
-                    </p>
-                  )}
-                </div>
-              )}
-              <BotonAccionPlaceholder
-                label="Emitir acto final"
-                variant="outline"
-                disabled
-                notaDeshabilitado="⚖️ emisión real pendiente de siembra autorizada (R10) y serie del acto (P3)"
+                  El panel no decide nada — `derivarQueSigue` lo hace desde el
+                  mapa de transiciones — y los motivos de lo que no procede son
+                  los que devuelve el servidor, colocados, no redactados. */}
+              <PanelQueSigue
+                queSigue={queSigue}
+                pasoActual={pasoActualDelCamino}
+                onAccion={(tipo) => setModalActuacion(tipo)}
+                papel={accionesDePapel}
               />
             </div>
           )}
@@ -604,10 +573,22 @@ export function DetalleLicenciaClient({ expedienteId, onVolver }: DetalleLicenci
           style={{ background: 'var(--bg-surface)', border: '1px solid var(--color-border)', boxShadow: 'var(--shadow-soft)' }}
         >
           <p className="text-[10.5px] font-bold uppercase tracking-widest mb-3" style={{ color: 'var(--text-secondary)' }}>
-            Historial del expediente{' '}
-            <span className="normal-case font-normal">(los eventos son los hechos; el vencimiento se calcula)</span>
+            Historial del expediente
           </p>
           <EventoTimeline eventos={timeline} />
+
+          {/* ── RESUMEN DE DOCUMENTOS ────────────────────────────────────
+              Junto al historial y NO en la columna de acciones: quien mira lo
+              que ha pasado suele querer ver también qué hay, sin cambiar de
+              pestaña. Solo lectura y cero lógica — el checklist sigue siendo el
+              único que evalúa. */}
+          <div className="mt-4">
+            <ResumenDocumentos
+              documentos={documentos}
+              aportados={expediente.completitud ? expediente.completitud.aplicables - expediente.completitud.faltantes.length : undefined}
+              aplicables={expediente.completitud?.aplicables}
+            />
+          </div>
         </div>
       </div>
 

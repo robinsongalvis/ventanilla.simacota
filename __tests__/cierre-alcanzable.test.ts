@@ -69,7 +69,14 @@ describe('la constancia de ejecutoria', () => {
 describe('la cadena es alcanzable de verdad', () => {
   it('el detalle monta los botones derivados', () => {
     expect(DETALLE).toMatch(/accionesDeCierreDisponibles\(/);
-    expect(DETALLE).toMatch(/accionesDeCierre\.map\(/);
+    /* ACTUALIZADA A CONCIENCIA (30-ago-2026). El invariante NO cambia —los
+       botones salen del mapa de transiciones y no de una lista a mano— pero su
+       expresión sí: la pila plana de `accionesDeCierre.map()` se sustituyó por
+       `PanelQueSigue`, que consume `derivarQueSigue`, que consume el MISMO
+       `transicionesDesde`. La prueba sigue el invariante, no la implementación
+       que tenía ayer. */
+    expect(DETALLE).toMatch(/derivarQueSigue\(/);
+    expect(DETALLE).toMatch(/<PanelQueSigue/);
   });
 
   it('y el enlace a la constancia de ejecutoria', () => {
