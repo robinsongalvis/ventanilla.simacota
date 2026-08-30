@@ -293,8 +293,13 @@ describe('POST /api/licencias/expedientes/[id]/actuaciones — acta única + tra
     expect(res.status).toBe(409);
   });
 
-  it('tipo no permitido → 400, no escribe', async () => {
-    const res = await actuacionPOST(req({ tipo: 'acto-viabilidad', detalle: DETALLE_OK }), ctx('e1'));
+  /* USABA `acto-viabilidad` COMO EJEMPLO DE TIPO NO PERMITIDO, y esa asimetría
+     era el defecto R19: el motor del término conocía el evento, el mapa
+     declaraba la transición, y ninguna ruta la podía escribir. Ahora es una
+     actuación registrable con su artículo (ADR-0038 §9.1), así que el ejemplo
+     pasa a ser un tipo que de verdad no existe. */
+  it('tipo inexistente → 400, no escribe', async () => {
+    const res = await actuacionPOST(req({ tipo: 'no-existe-esta-actuacion', detalle: DETALLE_OK }), ctx('e1'));
     expect(res.status).toBe(400);
     expect(escrituras).toHaveLength(0);
   });

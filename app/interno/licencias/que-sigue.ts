@@ -58,6 +58,21 @@ export interface AccionQueSigue {
  * Los dos van APARTE: archivar un trámite no puede ser nunca el botón que
  * primero se encuentra la mano.
  */
+/**
+ * Destinos que NO se alcanzan con una actuación registrable porque tienen RUTA
+ * PROPIA, y por eso no cuentan como hueco.
+ *
+ * `RADICADA_EN_DEBIDA_FORMA` es el caso: el acto de radicar vive en
+ * `POST /api/licencias/expedientes/[id]/radicar` con su transacción, su reserva
+ * de unicidad del número y su modal — no es una «actuación» más del catálogo.
+ * Su botón lo pinta la pantalla aparte.
+ *
+ * Se declara AQUÍ y no se esconde: sin esta lista, el invariante «ningún destino
+ * sin actuación» daría un falso positivo, y ablandarlo para que pasara habría
+ * apagado la alarma que sirve para el resto.
+ */
+const DESTINOS_CON_RUTA_PROPIA = new Set<string>(['RADICADA_EN_DEBIDA_FORMA']);
+
 /** Actuaciones que solo tienen sentido si ya hubo acta de observaciones. */
 const EXIGEN_ACTA_PREVIA = new Set<TipoActuacionPermitida>(['desistimiento-tacito', 'respuesta-subsanacion']);
 
@@ -82,12 +97,32 @@ const ACCIONES_POR_DESTINO: Readonly<Record<string, AccionQueSigue[]>> = {
      actuación producía este estado y llegué a inventarme un `acto-viabilidad`
      que no existe. Lo cazó `tsc`. La actuación existía; lo que no existe es
      otra cosa, más estrecha y más interesante — ver `destinosSinActuacion`. */
-  EN_VIABILIDAD: [{
-    tipo: 'respuesta-subsanacion',
-    etiqueta: 'Registrar respuesta de subsanación',
-    nota: 'reanuda el término donde se detuvo (D.1077 art. 2.2.6.1.2.2.4)',
-    rango: 'PRINCIPAL',
-  }],
+  /* DOS CAMINOS AL MISMO DESTINO, y EL ORDEN LLEVA EL SENTIDO.
+     `derivarQueSigue` toma la PRIMERA principal y baja las demás a disponibles,
+     así que este orden decide qué se ofrece como acción del momento:
+
+       · CON acta → la respuesta del ciudadano va primera. Es lo que se espera.
+       · SIN acta → la respuesta se filtra (exige acta) y queda el acto de
+         trámite, que es justo lo que R19 echaba en falta.
+
+     Un expediente que ya tuvo acta puede recibir las dos: el mapa lo permite y
+     el servidor lo acepta. Si eso es correcto es la pregunta que el ADR-0038
+     §9.4 NOMBRA sin decidir — por la norma, a viabilidad se llega por un acto de
+     la AUTORIDAD, y cabe que la respuesta deba devolver a revisión. */
+  EN_VIABILIDAD: [
+    {
+      tipo: 'respuesta-subsanacion',
+      etiqueta: 'Registrar respuesta de subsanación',
+      nota: 'reanuda el término donde se detuvo (D.1077 art. 2.2.6.1.2.2.4)',
+      rango: 'PRINCIPAL',
+    },
+    {
+      tipo: 'acto-viabilidad',
+      etiqueta: 'Declarar viable y requerir los pagos',
+      nota: 'detiene el plazo mientras el ciudadano aporta los documentos de pago',
+      rango: 'PRINCIPAL',
+    },
+  ],
   CONCEDIDA: [{ tipo: 'resolucion-concede', etiqueta: 'Registrar resolución que concede', rango: 'PRINCIPAL' }],
   NEGADA: [{ tipo: 'resolucion-niega', etiqueta: 'Registrar resolución que niega', rango: 'DISPONIBLE' }],
   NOTIFICADA: [{ tipo: 'notificacion', etiqueta: 'Registrar notificación', rango: 'PRINCIPAL' }],
@@ -157,7 +192,8 @@ export function derivarQueSigue(entrada: EntradaQueSigue): QueSigue {
   const destinos = transicionesDesde(estado, { yaHuboActa }).map((t) => t.hacia);
   const ofrecidos = new Set(ofrecidas.map((a) => a.tipo));
   const destinosSinActuacion = destinos.filter(
-    (d) => !(ACCIONES_POR_DESTINO[d] ?? []).some((a) => ofrecidos.has(a.tipo)),
+    (d) => !DESTINOS_CON_RUTA_PROPIA.has(d)
+      && !(ACCIONES_POR_DESTINO[d] ?? []).some((a) => ofrecidos.has(a.tipo)),
   );
 
   return {

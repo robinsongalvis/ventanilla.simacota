@@ -95,15 +95,19 @@ describe('NADIE ofrece lo que el mapa no permite, y los huecos se declaran', () 
     }
   });
 
-  it('un expediente LIMPIO en revisión no tiene por dónde avanzar — y se declara', () => {
-    /* EL HUECO REAL, más estrecho que el que creí primero: `respuesta-subsanacion`
-       SÍ produce EN_VIABILIDAD, pero es la respuesta A UN ACTA. Sin acta previa,
-       el mapa dice «si no requiere acta, pasa directo al concepto» y no hay
-       ninguna actuación que lo lleve. Un expediente sin observaciones se queda
-       en EN_REVISION. */
-    const limpio = derivarQueSigue({ estado: 'EN_REVISION', yaHuboActa: false });
-    expect(limpio.destinosSinActuacion).toContain('EN_VIABILIDAD');
-    expect(limpio.principal).toBeNull();
+  /* ESTA PRUEBA DOCUMENTABA R19 y ahora documenta su cierre. Decía que un
+     expediente limpio en EN_REVISION no tenía por dónde avanzar; con el acto de
+     trámite (ADR-0038 §9.1) ya lo tiene, así que se convierte en el invariante
+     GENERAL, que es más fuerte que el caso concreto: NINGÚN estado puede
+     declarar un destino alcanzable sin una actuación que lo produzca.
+
+     Si mañana el mapa gana una transición sin su actuación, esto lo dice —
+     antes de que alguien descubra el cuarto sin puerta en producción. */
+  it.each(TODOS)('en %s, ningún destino del mapa se queda sin actuación', (estado) => {
+    for (const yaHuboActa of [false, true]) {
+      const q = derivarQueSigue({ estado, yaHuboActa });
+      expect(q.destinosSinActuacion, `${estado} (acta=${yaHuboActa}) deja destinos sin puerta`).toEqual([]);
+    }
   });
 
   it('con acta de por medio, la subsanación SÍ es la acción del momento', () => {
@@ -130,5 +134,42 @@ describe('«esperando» es para lo que forma parte del camino', () => {
       motivos: { respuesta: 'El expediente ya está en viabilidad.' },
     });
     expect(q.esperando.map((e) => e.etiqueta)).toContain('Registrar respuesta de subsanación');
+  });
+});
+
+describe('R19 cerrado: el expediente limpio ya tiene por dónde salir', () => {
+  it('EN_REVISION sin acta ofrece el ACTO DE TRÁMITE como acción del momento', () => {
+    const q = derivarQueSigue({ estado: 'EN_REVISION', yaHuboActa: false });
+    expect(q.principal?.tipo).toBe('acto-viabilidad');
+    expect(q.principal?.nota).toMatch(/detiene el plazo/);
+  });
+
+  it('y ya NO queda ningún destino sin actuación', () => {
+    /* Era el hueco: el mapa permitía EN_VIABILIDAD y nada lo producía. */
+    expect(derivarQueSigue({ estado: 'EN_REVISION', yaHuboActa: false }).destinosSinActuacion).toEqual([]);
+  });
+
+  it('CON acta, la respuesta del ciudadano sigue siendo lo que se espera', () => {
+    const q = derivarQueSigue({ estado: 'CON_ACTA_DE_OBSERVACIONES', yaHuboActa: true });
+    expect(q.principal?.tipo).toBe('respuesta-subsanacion');
+  });
+
+  it('sin acta, la respuesta NO se ofrece — no hay a qué responder', () => {
+    const q = derivarQueSigue({ estado: 'EN_REVISION', yaHuboActa: false });
+    const todas = [q.principal, ...q.disponibles].filter(Boolean).map((a) => a!.tipo);
+    expect(todas).not.toContain('respuesta-subsanacion');
+  });
+});
+
+describe('lo que tiene ruta propia no es un hueco', () => {
+  it('radicar no es una «actuación», y se declara para no dar falso positivo', () => {
+    /* El acto de radicar tiene su transacción, su reserva de número y su modal:
+       no cabe en el catálogo de actuaciones. Ablandar el invariante para que
+       pasara habría apagado la alarma que sirve para todo lo demás. */
+    const q = derivarQueSigue({ estado: 'PRESENTADA', yaHuboActa: false });
+    expect(q.destinosSinActuacion).toEqual([]);
+    /* Y sigue sin ofrecerse aquí: lo pinta la pantalla aparte. */
+    const todas = [q.principal, ...q.disponibles].filter(Boolean).map((a) => a!.tipo);
+    expect(todas.join(' ')).not.toMatch(/radicar/);
   });
 });

@@ -199,9 +199,24 @@ describe('planRegistrarActuacion — guards y transiciones', () => {
     expect(e.status).toBe(409);
   });
 
-  it('tipo no permitido (p. ej. "acto-viabilidad", un TipoEventoTermino pero no una actuación registrable aquí) → 400', () => {
-    const e = err(planRegistrarActuacion(
+  /* CAMBIO DELIBERADO (ADR-0038 §9.1). Esta prueba usaba `acto-viabilidad`
+     como EJEMPLO de algo que el motor del término conocía y que NO era una
+     actuación registrable — y esa asimetría era precisamente el defecto R19:
+     un expediente limpio no tenía cómo llegar a viabilidad, y como CONCEDIDA y
+     NEGADA solo se alcanzan desde ahí, no podía resolverse.
+
+     Ahora SÍ es registrable, con el fundamento del art. 2.2.6.1.2.3.1 par. 1.
+     El ejemplo de «tipo no permitido» pasa a ser uno que de verdad no existe. */
+  it('acto-viabilidad SÍ se registra: es el acto de trámite que faltaba (R19)', () => {
+    const plan = planRegistrarActuacion(
       'EN_REVISION', [], EXPEDIENTE_ID, TENANT, { tipo: 'acto-viabilidad', detalle: DETALLE_OK }, ACTOR, AHORA,
+    ) as { nuevoEstadoJuridico: string };
+    expect(plan.nuevoEstadoJuridico).toBe('EN_VIABILIDAD');
+  });
+
+  it('un tipo inexistente sigue rechazándose con 400', () => {
+    const e = err(planRegistrarActuacion(
+      'EN_REVISION', [], EXPEDIENTE_ID, TENANT, { tipo: 'no-existe-esta-actuacion', detalle: DETALLE_OK } as never, ACTOR, AHORA,
     ));
     expect(e.status).toBe(400);
   });

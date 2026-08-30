@@ -24,6 +24,14 @@ const COPIA: Record<TipoActuacionPermitida, { titulo: string; etiquetaCampo: str
     placeholder: 'Asume la revisión el arquitecto de Planeación; se verificarán planos, cesiones y aportes urbanísticos…',
     nota: 'No detiene el plazo: el término de 45 días hábiles sigue corriendo. Registrar el inicio de la revisión es lo que habilita levantar el acta de observaciones, que sí lo suspende.',
   },
+  'acto-viabilidad': {
+    titulo: 'Declarar la viabilidad y requerir los documentos de pago',
+    etiquetaCampo: 'Qué se revisó y qué se le requiere al solicitante',
+    placeholder: 'Revisado el proyecto sin observaciones; se requieren los documentos de pago de expensas…',
+    /* La consecuencia, dicha antes de pulsar: este acto DETIENE el reloj de la
+       Secretaría y le pasa el turno al ciudadano. */
+    nota: 'Detiene el plazo de la Secretaría: durante el término para aportar los documentos de pago se entiende suspendido el trámite (D.1077/2015 art. 2.2.6.1.2.3.1 par. 1). Es acto de trámite: no concede ni niega.',
+  },
   'acta-observaciones': {
     titulo: 'Registrar acta de observaciones',
     etiquetaCampo: 'Observaciones formuladas',
