@@ -4,6 +4,7 @@
 - **Fecha:** 30-ago-2026
 - **Decide:** el propietario, sobre la norma
 - **Relacionado:** ADR-0029 (cierra su «hueco 1»), ADR-0037 (correos de hitos), ADR-0033 §4.6-bis
+- **Ampliado:** 30-ago-2026 — ver §9. Absorbe R19 y una SEGUNDA causa de suspensión.
 
 ---
 
@@ -174,8 +175,100 @@ captura**, porque eso serían dos fuentes disfrazadas de una.
   ningún requisito se toca hasta que el propietario lo consulte con la ingeniera
   de Planeación.
 
+## 9. AMPLIACIÓN (30-ago-2026) — la segunda suspensión, y el acto que faltaba
+
+Al ir a cerrar **R19** —«un expediente limpio se queda parado en `EN_REVISION`»—
+se leyó completo el artículo que el propio mapa de transiciones ya citaba para esa
+rama. Aplicando la regla del §4: **el artículo entero, no la frase**.
+
+**D.1077/2015 art. 2.2.6.1.2.3.1, parágrafo 1** — texto literal:
+
+> «Cuando se encuentre viable la expedición de la licencia, se proferirá un
+> **acto de trámite** que se comunicará al interesado por escrito, y en el que
+> además se le requerirá para que aporte los documentos señalados en el artículo
+> 2.2.6.6.8.2 del presente decreto, los cuales deberán ser presentados en un
+> término máximo de **treinta (30) días** contados a partir del recibo de la
+> comunicación. **Durante este término se entenderá suspendido el trámite para la
+> expedición de la licencia.**»
+
+De ahí salen tres cosas, y solo la primera era R19.
+
+### 9.1 La actuación que falta tiene nombre en la norma
+
+Es un **acto de trámite**: la autoridad declara viable y requiere los documentos
+de pago. No es una decisión de fondo — no concede ni niega.
+
+**Se añade `acto-viabilidad` a `TipoActuacionPermitida`**, produciendo
+`EN_REVISION → EN_VIABILIDAD`. Con eso, un expediente sin observaciones deja de
+estar en un cuarto sin puerta, y `CONCEDIDA`/`NEGADA` —que solo se alcanzan desde
+`EN_VIABILIDAD`— vuelven a ser alcanzables.
+
+### 9.2 `EN_VIABILIDAD` SUSPENDE el término — y el sistema no lo sabía
+
+**Comprobado en el código el 30-ago-2026:** `clasificarFrenteAlTermino` devuelve
+para `EN_VIABILIDAD` la situación **`CORRIENDO`**, nivel `AVISO`. Es decir:
+durante los días en que el ciudadano reúne los documentos de pago, la pantalla y
+el cron **cuentan tiempo contra la Secretaría que la norma no cuenta**.
+
+Es la misma familia que el defecto original de este módulo —el rojo con 41 días
+por delante— pero al revés: aquí el sistema **apura a quien la ley no apura**.
+
+`ESTADO_TERMINO_SUSPENDIDO` es hoy un valor único
+(`CON_ACTA_DE_OBSERVACIONES`). **Pasa a ser un conjunto**, con las dos causas que
+la norma declara:
+
+| Estado | Artículo | Qué suspende |
+|---|---|---|
+| `CON_ACTA_DE_OBSERVACIONES` | 2.2.6.1.2.2.4 | «Durante este plazo se suspenderá el término para la expedición de la licencia» |
+| `EN_VIABILIDAD` | 2.2.6.1.2.3.1 par. 1 | «Durante este término se entenderá suspendido el trámite para la expedición de la licencia» |
+
+Un `Set` y no un `if` encadenado, por el mismo motivo de siempre: que añadir una
+tercera causa mañana sea un dato y no una rama.
+
+### 9.3 Una discrepancia que este ADR NO resuelve: ¿días hábiles o calendario?
+
+El comentario del mapa dice «máx. 30 días **hábiles**». El artículo dice
+**«treinta (30) días»**, sin la palabra — y eso contrasta con el art.
+2.2.6.1.2.2.4, que sí escribe «treinta (30) días **hábiles**» para el acta.
+
+Si son calendario, el plazo del ciudadano es **notablemente más corto** de lo que
+el sistema asumiría, y un desistimiento podría declararse tarde o temprano por
+contar mal.
+
+**Queda ABIERTO y marcado.** Alguien escribió «hábiles» ahí y puede tener razón
+por otra vía —una modificación posterior, una regla general de cómputo—. Se
+resuelve leyendo el art. 2.2.6.6.8.2 y las modificaciones del D.1783/2021 antes
+de implementar el plazo, **no suponiendo**.
+
+Mientras no se resuelva: el sistema **no computa** ese plazo del ciudadano. Ya
+sabe que el término de la Administración está suspendido, que es lo que protege a
+la Secretaría; el plazo del ciudadano se implementa cuando se sepa su unidad.
+
+### 9.4 Y una pregunta de máquina de estados que este ADR SOLO NOMBRA
+
+Por la norma, a viabilidad se llega por un **acto de la autoridad**. El mapa hace
+que también se llegue desde `CON_ACTA_DE_OBSERVACIONES` con la **respuesta del
+ciudadano** (`respuesta-subsanacion → EN_VIABILIDAD`).
+
+Cabe que lo correcto sea: la respuesta **devuelve a `EN_REVISION`** —se reanuda el
+término y la revisión continúa— y la viabilidad sea **siempre** el acto de
+trámite, venga de donde venga.
+
+**Eso es rediseñar la máquina de estados y no se decide aquí.** Se nombra para que
+no se pierda, y porque afecta a dónde se reanuda el reloj.
+
+### 9.5 Consecuencia sobre el costo
+
+El ADR pasa de **6–8** a **8–10 unidades** de implementación: entran la actuación
+nueva, el conjunto de estados que suspenden, y sus pruebas.
+
+**R19 queda absorbido por este ADR.** Deja de ser un riesgo suelto: es una de las
+piezas de la misma implementación.
+
 ## Fuentes
 
 - Decreto 1077 de 2015, art. 2.2.6.1.2.2.4 (redacción del D.1783/2021 art. 19)
+- Decreto 1077 de 2015, art. 2.2.6.1.2.3.1 par. 1 — el acto de trámite y la segunda suspensión
+- Decreto 1077 de 2015, art. 2.2.6.6.8.2 — documentos de pago (POR LEER: decide la unidad del plazo)
 - Ley 1437 de 2011 (CPACA) art. 87 — firmeza
 - ADR-0029 (hueco 1, que este cierra) · ADR-0037 · ADR-0033 §4.6-bis
