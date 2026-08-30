@@ -156,3 +156,35 @@ describe('el envío', () => {
     await waitFor(() => expect(onRadicado).toHaveBeenCalled());
   });
 });
+
+describe('el prefijo del radicado viene puesto', () => {
+  /* DECISIÓN DEL PROPIETARIO (29-ago-2026): la funcionaria transcribe del libro
+     de papel, y averiguar el formato le cuesta más que escribir el número. El
+     campo nace con `1-110-AAAAMM-` y ella solo teclea los ocho dígitos.
+
+     LO QUE ESTAS PRUEBAS PROTEGEN es que siga siendo una SUGERENCIA DE FORMATO
+     y no un número inventado: el prefijo lo manda el SERVIDOR —nunca el reloj
+     del navegador, que puede estar corrido— y el consecutivo sigue siendo
+     obligatorio. */
+  it('usa el prefijo que manda el servidor, no uno calculado aquí', () => {
+    abrir({ ...procede, prefijoRadicadoSugerido: '1-110-202512-' });
+    expect((screen.getByLabelText(/número de radicado/i) as HTMLInputElement).value)
+      .toBe('1-110-202512-');
+  });
+
+  it('sin prefijo del servidor cae a la serie fija, sin inventarse el mes', () => {
+    const { prefijoRadicadoSugerido: _omitido, ...sinPrefijo } = { ...procede, prefijoRadicadoSugerido: 'x' };
+    abrir(sinPrefijo as typeof procede);
+    expect((screen.getByLabelText(/número de radicado/i) as HTMLInputElement).value).toBe('1-110-');
+  });
+
+  it('el prefijo SOLO no vale como número escrito', async () => {
+    /* Sin esto, el campo prellenado pasaría por «ya escribió algo» y se
+       enviaría `1-110-202512-` como si fuera un radicado. */
+    const f = responder({});
+    abrir({ ...procede, prefijoRadicadoSugerido: '1-110-202512-' });
+    fireEvent.click(screen.getByRole('button', { name: /radicar en debida forma/i }));
+    await waitFor(() => expect(screen.getByRole('alert').textContent).toMatch(/libro de ventanilla/i));
+    expect(f).not.toHaveBeenCalled();
+  });
+});

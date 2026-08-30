@@ -40,6 +40,8 @@ export interface VistaPreviaDebidaForma {
   anclaIso?: string;
   baseDelAncla?: 'MOMENTO_REGISTRADO_DE_COMPLETITUD' | 'PRIMERA_VERSION_DEL_ULTIMO_DOCUMENTO';
   requisitosAplicables?: number;
+  /** `1-110-AAAAMM-` con el año y el mes DEL SERVIDOR — sugerencia de formato, no el número. */
+  prefijoRadicadoSugerido?: string;
   venceraEl?: string;
   naceVencido?: boolean;
 }
@@ -75,7 +77,22 @@ export function RadicarDebidaFormaModal({
   onCerrar,
   onRadicado,
 }: RadicarDebidaFormaModalProps) {
-  const [numero, setNumero] = useState('');
+  /* EL RADICADO YA ESCRITO HASTA EL GUION FINAL — solo faltan los dígitos.
+
+     Decisión del propietario (29-ago-2026), con su motivo: si la funcionaria
+     no se sabe el formato de memoria, averiguarlo le cuesta más que escribir el
+     número entero, y el ahorro se vuelve estorbo.
+
+     EL AÑO Y EL MES VIENEN DEL SERVIDOR (`prefijoRadicadoSugerido`), NO del
+     reloj del navegador. Un equipo con la fecha corrida propondría un mes que
+     no existe en el libro. Y así esta ventana sigue sin calcular fechas por su
+     cuenta, que es lo que vigila `acto-radicar-alcanzable.test.ts`.
+
+     SIGUE SIENDO UNA SUGERENCIA DE FORMATO, NO EL NÚMERO: el consecutivo —el
+     dato— lo escribe ella, y el mes queda editable porque el radicado puede ser
+     de un mes anterior. La ayuda debajo lo dice con esas palabras. */
+  const PREFIJO_SERIE = previa.prefijoRadicadoSugerido ?? '1-110-';
+  const [numero, setNumero] = useState(PREFIJO_SERIE);
   const [observacion, setObservacion] = useState('');
   const [enviando, setEnviando] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -83,7 +100,11 @@ export function RadicarDebidaFormaModal({
 
   async function radicar() {
     setError(null);
-    if (numero.trim().length === 0) {
+    /* NO BASTA CON «NO ESTÁ VACÍO»: desde que el campo nace con el prefijo
+       puesto, `1-110-` a secas pasaría por número escrito. Se exige que haya
+       algo DESPUÉS del prefijo — el consecutivo, que es el dato real y el único
+       que el sistema no pone. */
+    if (numero.trim().replace(PREFIJO_SERIE, '').trim().length === 0) {
       setError('Escriba el número de radicado tal como aparece en el libro de ventanilla.');
       return;
     }
@@ -130,9 +151,21 @@ export function RadicarDebidaFormaModal({
   const etiqueta = 'mb-1 block text-[10px] font-bold uppercase tracking-widest';
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4" style={{ background: 'rgba(15,23,42,.55)' }}>
+    /* EL FONDO NO SE APAGA. Estaba al 55 % de tinta oscura, que deja el
+       expediente detrás legible a medias y parece desenfoque. Baja al 22 %: se
+       sigue viendo QUÉ expediente se está radicando —el nombre, los documentos,
+       el camino— mientras se confirma el acto. Es un acto sobre algo concreto,
+       no un formulario suelto, y ver ese algo mientras se firma importa. */
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4" style={{ background: 'rgba(15,23,42,.22)' }}>
+      {/* Con el fondo claro, la ventana necesita elevación PROPIA para no
+          confundirse con lo de atrás: sombra marcada y un filo verde. */}
       <div role="dialog" aria-modal="true" aria-labelledby="titulo-radicar"
-           className="w-full max-w-lg rounded-xl overflow-hidden" style={{ background: 'var(--bg-surface-1)' }}>
+           className="w-full max-w-lg rounded-2xl overflow-hidden"
+           style={{
+             background: 'var(--bg-surface)',
+             boxShadow: '0 24px 60px rgba(15,23,42,.34), 0 4px 12px rgba(15,23,42,.18)',
+             border: '1px solid rgba(20,83,45,.22)',
+           }}>
         <div className="px-5 py-4" style={{ background: '#14532D' }}>
           <p className="text-[10px] font-bold uppercase tracking-widest" style={{ color: '#FDF6E3' }}>
             Secretaría de Planeación
@@ -187,8 +220,10 @@ export function RadicarDebidaFormaModal({
           ) : (
             <>
               <div className="rounded-lg px-3 py-2 flex flex-col gap-1" style={{ background: 'var(--bg-surface-2)' }}>
-                <p className={etiqueta} style={{ color: '#667085' }}>El plazo empezará a correr el</p>
-                <p className="text-base font-extrabold" style={{ color: '#14532D' }}>
+                <p className={etiqueta} style={{ color: '#3F6B4E' }}>El plazo empezará a correr el</p>
+                {/* ES EL DATO DEL ACTO, no una línea más: desde esta fecha
+                    corren los 45 días hábiles. Se lee de lejos. */}
+                <p className="font-headline text-3xl font-black leading-tight" style={{ color: '#14532D' }}>
                   {previa.anclaPropuesta ? formatFechaColombia(previa.anclaPropuesta) : '—'}
                 </p>
                 {previa.baseDelAncla && (
@@ -227,11 +262,32 @@ export function RadicarDebidaFormaModal({
                   id="numero-radicado"
                   value={numero}
                   onChange={(e) => setNumero(e.target.value)}
+                  onFocus={(e) => e.currentTarget.setSelectionRange(e.currentTarget.value.length, e.currentTarget.value.length)}
+                  onKeyDown={(e) => {
+                    /* TAB DEVUELVE EL PREFIJO, y solo si el campo quedó vacío.
+                       Con el campo relleno —el caso normal— Tab hace lo de
+                       siempre y pasa al campo siguiente: secuestrar el tabulador
+                       dejaría atrapado a quien navegue con teclado. */
+                    if (e.key === 'Tab' && !e.shiftKey && numero.trim().length === 0) {
+                      e.preventDefault();
+                      setNumero(PREFIJO_SERIE);
+                      requestAnimationFrame(() => {
+                        const el = e.target as HTMLInputElement;
+                        el.setSelectionRange(PREFIJO_SERIE.length, PREFIJO_SERIE.length);
+                      });
+                    }
+                  }}
                   placeholder="1-110-202608-00000123"
                   autoComplete="off"
-                  className="w-full rounded-lg px-3 py-2 text-sm font-mono"
-                  style={{ background: 'var(--bg-surface-2)', color: 'var(--text-primary)', border: '1px solid #D9E2D9' }}
+                  inputMode="numeric"
+                  className="w-full rounded-lg px-3.5 py-3 text-base font-mono tracking-wide"
+                  style={{ background: 'var(--bg-surface)', color: 'var(--text-primary)', border: '2px solid #14532D' }}
                 />
+                <p className="text-xs mt-1.5 leading-relaxed" style={{ color: 'var(--text-secondary)' }}>
+                  Escriba solo los <strong>ocho dígitos finales</strong>. El año y el mes vienen puestos
+                  con la fecha de hoy — <strong>si el radicado es de otro mes, corríjalos</strong>: el sistema
+                  sugiere el formato, no el número.
+                </p>
                 <p className="text-xs mt-1" style={{ color: '#94A3B8' }}>
                   Escríbalo tal como aparece en el libro. El sistema lo completa al formato oficial
                   si hace falta; no lo inventa ni lo corrige.

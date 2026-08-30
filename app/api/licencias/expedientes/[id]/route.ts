@@ -201,6 +201,19 @@ export async function GET(request: Request, context: RouteContext): Promise<Next
             requisitoQueFijaElAncla: evaluacion.evidencia.requisitoId,
             documentoQueFijaElAncla: evaluacion.evidencia.documentoId,
             requisitosAplicables: evaluacion.completitud.aplicables,
+            /* EL PREFIJO SUGERIDO PARA TRANSCRIBIR, calculado AQUÍ y no en el
+               navegador. La funcionaria copia del libro de papel, y averiguar
+               el formato le cuesta más tiempo que escribir el número; pero el
+               año y el mes NO pueden salir del reloj del equipo: un portátil
+               con la fecha corrida propondría un mes que no existe en el libro.
+               El servidor sabe qué día es, en hora de Bogotá.
+
+               ES UNA SUGERENCIA DE FORMATO, NO EL NÚMERO: el consecutivo lo
+               escribe ella, y el mes queda editable porque un radicado puede
+               ser de un mes anterior. */
+            prefijoRadicadoSugerido: `1-110-${new Intl.DateTimeFormat('en-CA', {
+              timeZone: 'America/Bogota', year: 'numeric', month: '2-digit',
+            }).format(ahora).replace('-', '')}-`,
             /* El caso duro, dicho antes y no después: si el último documento
                entró hace más de 45 días hábiles, el término nace vencido. El
                acto procede igual —es un hecho verdadero— pero nadie debería
