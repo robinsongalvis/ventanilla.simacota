@@ -10,7 +10,7 @@ import {
 } from '@/lib/server/expedientes-licencias';
 import { DEFINICION_LICENCIA_CONSTRUCCION_PARCIAL } from '@/lib/motor-expedientes/definiciones/licencia-construccion-parcial';
 import { sumarDiasHabiles } from '@/lib/tiempos-radicado';
-import { calcularVencimientoDual, derivarEventosTermino } from '@/lib/motor-expedientes/termino';
+import { calcularVencimientoTermino, derivarEventosTermino } from '@/lib/motor-expedientes/termino';
 
 /* Bloque A·A4/A5 — decisiones puras del handoff radicado⇄expediente y las comunicaciones. */
 
@@ -99,10 +99,10 @@ describe('planCrearExpedienteDesdeRadicado — proyección MÍNIMA D2 (sin copia
 
   it('fechaAlertaConservadora (espejo R11): nace VACÍO — y sigue coincidiendo con lo que calcula el motor', () => {
     const plan = ok(planCrearExpedienteDesdeRadicado(radicadoBase(), { subtipos: ['CONSTRUCCION'] }, 'SEC_PLANEACION', ACTOR, AHORA));
-    const esperado = calcularVencimientoDual(
+    const esperado = calcularVencimientoTermino(
       derivarEventosTermino([plan.primeraActuacion]),
       45, // PLAZO_DECISION_LICENCIA_DIAS_HABILES — solo como literal de comparación, no reimplementa el cómputo.
-    ).fechaAlertaConservadora?.toISOString() ?? null;
+    ).vencimiento?.toISOString() ?? null;
 
     /* ADR-0033 §0 — el contrato CAMBIÓ a propósito: el expediente ya no nace en
        debida forma. Esta prueba afirmaba el comportamiento anterior y ahora

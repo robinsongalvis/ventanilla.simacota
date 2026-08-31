@@ -2,7 +2,8 @@ import { describe, expect, it } from 'vitest';
 import { diasRestantesHabiles, sumarDiasHabiles } from '@/lib/tiempos-radicado';
 import {
   calcularVencimiento,
-  calcularVencimientoDual,
+  calcularVencimientoTermino,
+  FUNDAMENTO_SUSPENSION_REANUDACION,
   derivarEventosTermino,
   type EventoTermino,
   type PoliticaTermino,
@@ -208,20 +209,32 @@ describe('DF-7 — exhaustividad del vocabulario de eventos (defensa en tiempo d
 });
 
 /* ══════════════════════════════════════════════════════════════
-   calcularVencimientoDual (Bloque "Términos y vigencias protectores", 10-ago-2026)
+   calcularVencimientoTermino — UNA fecha, con su artículo (ADR-0038)
+
+   Este bloque probaba `calcularVencimientoDual`, que calculaba el vencimiento
+   bajo las DOS lecturas del «hueco 1» —suspensión y reinicio— y alertaba sobre
+   la más temprana, porque nadie sabía cuál regía.
+
+   NO HABÍA TAL HUECO: el art. 2.2.6.1.2.2.4 dice «se suspenderá», y este
+   proyecto ya citaba ese mismo artículo veinte veces para otras cosas. Las
+   pruebas se reescriben a conciencia — no porque el rediseño las incomodara,
+   sino porque el ADR-0038 retiró lo que probaban.
+
+   LO QUE SOBREVIVE, y por eso sigue probado: que sin radicación no hay nada que
+   proyectar, y que los eventos DF-7 siguen inertes.
 ══════════════════════════════════════════════════════════════ */
 
-describe('calcularVencimientoDual — sin default, expone AMBAS fechas + la más temprana', () => {
-  it('sin más eventos que la radicación: suspension === reinicio === fechaAlertaConservadora', () => {
+describe('calcularVencimientoTermino — se suspende y se reanuda, no se reinicia', () => {
+  it('sin más eventos que la radicación, vence a los 45 días hábiles', () => {
     const eventos: EventoTermino[] = [{ tipo: 'RADICACION_DEBIDA_FORMA', fecha: RADICACION_FECHA }];
-    const dual = calcularVencimientoDual(eventos, 45);
-    const esperado = sumarDiasHabiles(RADICACION_FECHA, 45);
-    expect(dual.suspension!.getTime()).toBe(esperado.getTime());
-    expect(dual.reinicio!.getTime()).toBe(esperado.getTime());
-    expect(dual.fechaAlertaConservadora!.getTime()).toBe(esperado.getTime());
+    const r = calcularVencimientoTermino(eventos, 45);
+    expect(r.vencimiento!.getTime()).toBe(sumarDiasHabiles(RADICACION_FECHA, 45).getTime());
   });
 
-  it('con acta+respuesta: reinicio vence DESPUÉS de suspension → fechaAlertaConservadora = suspension (la más temprana)', () => {
+  it('con acta y respuesta, el reloj REANUDA donde se detuvo — no vuelve a empezar', () => {
+    /* La diferencia que el ADR resolvió: bajo reinicio, el vencimiento se
+       correría hasta 45 días DESPUÉS de la respuesta. Bajo suspensión —que es lo
+       que dice la norma— solo se descuenta lo que el reloj estuvo parado. */
     const actaFecha = sumarDiasHabiles(RADICACION_FECHA, 15);
     const respuestaFecha = sumarDiasHabiles(actaFecha, 5);
     const eventos: EventoTermino[] = [
@@ -229,42 +242,41 @@ describe('calcularVencimientoDual — sin default, expone AMBAS fechas + la más
       { tipo: 'ACTA_OBSERVACIONES', fecha: actaFecha },
       { tipo: 'RESPUESTA_SUBSANACION', fecha: respuestaFecha },
     ];
-    const dual = calcularVencimientoDual(eventos, 45);
-    expect(dual.suspension!.getTime()).toBeLessThan(dual.reinicio!.getTime());
-    expect(dual.fechaAlertaConservadora!.getTime()).toBe(dual.suspension!.getTime());
+    const conPausa = calcularVencimientoTermino(eventos, 45).vencimiento!;
+    const siReiniciara = sumarDiasHabiles(respuestaFecha, 45);
+    expect(conPausa.getTime()).toBeLessThan(siReiniciara.getTime());
+    /* Y se corre exactamente lo que duró la pausa, ni más ni menos. */
+    const sinPausa = sumarDiasHabiles(RADICACION_FECHA, 45);
+    expect(conPausa.getTime()).toBeGreaterThan(sinPausa.getTime());
   });
 
-  it('sin RADICACION_DEBIDA_FORMA: las tres fechas son null (nada que proyectar, D5)', () => {
-    const dual = calcularVencimientoDual([], 45);
-    expect(dual.suspension).toBeNull();
-    expect(dual.reinicio).toBeNull();
-    expect(dual.fechaAlertaConservadora).toBeNull();
+  it('sin RADICACION_DEBIDA_FORMA no hay nada que proyectar (D5)', () => {
+    expect(calcularVencimientoTermino([], 45).vencimiento).toBeNull();
   });
 
-  it('eventos reales DF-7 (comunicación del acta, renuncia, viabilidad, entrega de pago, prórroga administrativa) siguen INERTES bajo AMBAS políticas del cómputo dual', () => {
-    const eventos: EventoTermino[] = [
+  it('devuelve SU ARTÍCULO, para que la pantalla lo cite en vez de explicar dudas', () => {
+    const r = calcularVencimientoTermino([{ tipo: 'RADICACION_DEBIDA_FORMA', fecha: RADICACION_FECHA }], 45);
+    expect(r.fundamento).toBe(FUNDAMENTO_SUSPENSION_REANUDACION);
+    expect(r.fundamento).toMatch(/2\.2\.6\.1\.2\.2\.4/);
+    expect(r.fundamento).toMatch(/se suspenderá/);
+  });
+
+  it('los eventos DF-7 siguen INERTES: activarlos no es lo que el ADR-0038 decidió', () => {
+    const base: EventoTermino[] = [
       { tipo: 'RADICACION_DEBIDA_FORMA', fecha: RADICACION_FECHA },
       { tipo: 'ACTA_OBSERVACIONES', fecha: sumarDiasHabiles(RADICACION_FECHA, 10) },
+      { tipo: 'RESPUESTA_SUBSANACION', fecha: sumarDiasHabiles(RADICACION_FECHA, 15) },
+    ];
+    const conInertes: EventoTermino[] = [
+      ...base,
       { tipo: 'COMUNICACION_ACTA', fecha: sumarDiasHabiles(RADICACION_FECHA, 11) },
       { tipo: 'RENUNCIA_PLAZO_RESTANTE', fecha: sumarDiasHabiles(RADICACION_FECHA, 12) },
-      { tipo: 'RESPUESTA_SUBSANACION', fecha: sumarDiasHabiles(RADICACION_FECHA, 15) },
-      { tipo: 'ACTO_VIABILIDAD', fecha: sumarDiasHabiles(RADICACION_FECHA, 20) },
-      { tipo: 'ENTREGA_DOCUMENTOS_PAGO', fecha: sumarDiasHabiles(RADICACION_FECHA, 22) },
-      { tipo: 'PRORROGA_TERMINO_ADMINISTRACION', fecha: sumarDiasHabiles(RADICACION_FECHA, 25) },
+      { tipo: 'ACTO_VIABILIDAD', fecha: sumarDiasHabiles(RADICACION_FECHA, 16) },
+      { tipo: 'ENTREGA_DOCUMENTOS_PAGO', fecha: sumarDiasHabiles(RADICACION_FECHA, 17) },
+      { tipo: 'PRORROGA_TERMINO_ADMINISTRACION', fecha: sumarDiasHabiles(RADICACION_FECHA, 18) },
     ];
-    const eventosSinInertes = eventos.filter((e) => e.tipo === 'RADICACION_DEBIDA_FORMA' || e.tipo === 'ACTA_OBSERVACIONES' || e.tipo === 'RESPUESTA_SUBSANACION');
-
-    const dualConInertes = calcularVencimientoDual(eventos, 45);
-    const dualSinInertes = calcularVencimientoDual(eventosSinInertes, 45);
-
-    expect(dualConInertes.suspension!.getTime()).toBe(dualSinInertes.suspension!.getTime());
-    expect(dualConInertes.reinicio!.getTime()).toBe(dualSinInertes.reinicio!.getTime());
-  });
-
-  it('NADA en el resultado indica cuál política "ganó" — ambas fechas están siempre presentes, sin campo de política elegida', () => {
-    const eventos: EventoTermino[] = [{ tipo: 'RADICACION_DEBIDA_FORMA', fecha: RADICACION_FECHA }];
-    const dual = calcularVencimientoDual(eventos, 45);
-    expect(Object.keys(dual).sort()).toEqual(['fechaAlertaConservadora', 'reinicio', 'suspension']);
+    expect(calcularVencimientoTermino(conInertes, 45).vencimiento!.getTime())
+      .toBe(calcularVencimientoTermino(base, 45).vencimiento!.getTime());
   });
 });
 

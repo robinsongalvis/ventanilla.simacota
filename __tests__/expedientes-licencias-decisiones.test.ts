@@ -11,7 +11,7 @@ import {
   type ErrorExpediente,
   type ActuacionLicenciaDoc,
 } from '@/lib/server/expedientes-licencias';
-import { calcularVencimientoDual, derivarEventosTermino } from '@/lib/motor-expedientes/termino';
+import { calcularVencimientoTermino, derivarEventosTermino } from '@/lib/motor-expedientes/termino';
 
 /* Bloque "Integración UI y demo" — decisiones puras de expedientes de licencias. */
 
@@ -199,9 +199,24 @@ describe('planRegistrarActuacion — guards y transiciones', () => {
     expect(e.status).toBe(409);
   });
 
-  it('tipo no permitido (p. ej. "acto-viabilidad", un TipoEventoTermino pero no una actuación registrable aquí) → 400', () => {
-    const e = err(planRegistrarActuacion(
+  /* CAMBIO DELIBERADO (ADR-0038 §9.1). Esta prueba usaba `acto-viabilidad`
+     como EJEMPLO de algo que el motor del término conocía y que NO era una
+     actuación registrable — y esa asimetría era precisamente el defecto R19:
+     un expediente limpio no tenía cómo llegar a viabilidad, y como CONCEDIDA y
+     NEGADA solo se alcanzan desde ahí, no podía resolverse.
+
+     Ahora SÍ es registrable, con el fundamento del art. 2.2.6.1.2.3.1 par. 1.
+     El ejemplo de «tipo no permitido» pasa a ser uno que de verdad no existe. */
+  it('acto-viabilidad SÍ se registra: es el acto de trámite que faltaba (R19)', () => {
+    const plan = planRegistrarActuacion(
       'EN_REVISION', [], EXPEDIENTE_ID, TENANT, { tipo: 'acto-viabilidad', detalle: DETALLE_OK }, ACTOR, AHORA,
+    ) as { nuevoEstadoJuridico: string };
+    expect(plan.nuevoEstadoJuridico).toBe('EN_VIABILIDAD');
+  });
+
+  it('un tipo inexistente sigue rechazándose con 400', () => {
+    const e = err(planRegistrarActuacion(
+      'EN_REVISION', [], EXPEDIENTE_ID, TENANT, { tipo: 'no-existe-esta-actuacion', detalle: DETALLE_OK } as never, ACTOR, AHORA,
     ));
     expect(e.status).toBe(400);
   });
@@ -227,7 +242,7 @@ describe('planRegistrarActuacion — guards y transiciones', () => {
    son 2 de los 3 puntos que lo calculan (el tercero, `planCrearExpedienteDesdeRadicado`,
    se prueba en `expedientes-licencias-handoff-decisiones.test.ts`, que ya
    trae su propio fixture de radicado). Todas las aserciones aquí comparan
-   contra `calcularVencimientoDual(derivarEventosTermino(...))` invocado
+   contra `calcularVencimientoTermino(derivarEventosTermino(...))` invocado
    DIRECTAMENTE en el test — anti-divergencia: el valor que persiste el plan
    debe coincidir EXACTAMENTE con el cómputo on-read para la misma serie.
 ────────────────────────────────────────────── */
@@ -240,10 +255,10 @@ describe('planCrearExpedienteDemo — fechaAlertaConservadora (espejo R11)', () 
        intacto; lo que cambió es que ahora ambos valen null, porque no hay
        término que proyectar hasta la transición a debida forma. */
     const plan = planOk(planCrearExpedienteDemo(INPUT_BASE, 'SEC_PLANEACION', ACTOR, AHORA));
-    const esperado = calcularVencimientoDual(
+    const esperado = calcularVencimientoTermino(
       derivarEventosTermino([plan.primeraActuacion]),
       PLAZO_DIAS,
-    ).fechaAlertaConservadora?.toISOString() ?? null;
+    ).vencimiento?.toISOString() ?? null;
 
     // El invariante que importa, intacto: espejo === calculador.
     expect(plan.expediente.fechaAlertaConservadora).toBe(esperado);
@@ -267,10 +282,10 @@ describe('planRegistrarActuacion — fechaAlertaConservadora (espejo R11)', () =
       'EN_REVISION', existentes, EXPEDIENTE_ID, TENANT, { tipo: 'acta-observaciones', detalle: DETALLE_OK }, ACTOR, AHORA,
     ));
 
-    const esperado = calcularVencimientoDual(
+    const esperado = calcularVencimientoTermino(
       derivarEventosTermino([...existentes, plan.actuacion]),
       PLAZO_DIAS,
-    ).fechaAlertaConservadora?.toISOString() ?? null;
+    ).vencimiento?.toISOString() ?? null;
 
     expect(plan.fechaAlertaConservadora).not.toBeNull();
     expect(plan.fechaAlertaConservadora).toBe(esperado);
@@ -290,10 +305,10 @@ describe('planRegistrarActuacion — fechaAlertaConservadora (espejo R11)', () =
 
     expect(trasRespuesta.fechaAlertaConservadora).not.toBe(trasActa.fechaAlertaConservadora);
 
-    const esperado = calcularVencimientoDual(
+    const esperado = calcularVencimientoTermino(
       derivarEventosTermino([...existentesTrasActa, trasRespuesta.actuacion]),
       PLAZO_DIAS,
-    ).fechaAlertaConservadora?.toISOString() ?? null;
+    ).vencimiento?.toISOString() ?? null;
     expect(trasRespuesta.fechaAlertaConservadora).toBe(esperado);
   });
 

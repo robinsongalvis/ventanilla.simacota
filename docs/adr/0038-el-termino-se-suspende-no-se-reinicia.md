@@ -73,6 +73,23 @@ Los tres niveles son norma y los tres sirven de fundamento: **nacional** (ley),
 **reglamentario** (decreto, resolución) y **municipal** (acuerdo). Un requisito
 fundado en el Acuerdo Municipal 026 está tan fundado como uno del Decreto 1077.
 
+### Corolario
+
+> **Este sistema no inventa hechos ni para bien.**
+
+El caso que lo fija es la **prórroga de 15 días hábiles**. Es «a solicitud de
+parte»: no se concede sola. El cómputo podría presumirla cuando falta el dato —y
+presumirla *protegería* al ciudadano, porque retrasaría un archivo por
+desistimiento— pero estaría afirmando que alguien la pidió y que alguien la
+concedió, cuando nadie registró ni lo uno ni lo otro.
+
+Un sistema que inventa hechos favorables inventa hechos. La dirección del favor
+no cambia la naturaleza del acto, y un expediente que afirma lo que no consta
+deja de servir como prueba de nada.
+
+Va probado en las dos direcciones: sin el dato el plazo son 30, con él son 45, y
+`prorrogaConcedida: false` y la ausencia del campo se tratan igual.
+
 ## 4. La lección de las 19 citas
 
 **Este artículo estaba citado DIECINUEVE VECES en el código** antes de este ADR.
@@ -150,6 +167,29 @@ destinatario— y probada. La precedencia vive en un solo sitio
 (`lib/motor-expedientes/destinatario-expediente.ts`): el radicado manda siempre;
 sin radicado manda la captura propia; y **sin correo en el radicado NO se cae a la
 captura**, porque eso serían dos fuentes disfrazadas de una.
+
+## 6-bis. Cuándo SÍ se reescribe una prueba custodiada
+
+La regla de la casa es que los textos custodiados no se negocian: **si una prueba
+de *wording* se pone roja, el que está mal es el rediseño**. Esa regla sigue en
+pie y esa dirección es siempre la equivocada.
+
+Este ADR reescribió una: `panel-termino-dual-render`, que custodiaba las dos
+fechas del cómputo dual y la alerta sobre la más temprana.
+
+**La distinción, escrita para que no se use como excusa:**
+
+| Se reescribe | NO se reescribe |
+|---|---|
+| Una **decisión documentada** retira lo que la prueba custodiaba, **con su fundamento delante** | Un cambio visual se topa con ella y resulta incómoda |
+| El invariante que sobrevive se conserva y se sigue probando | Se afloja «porque ahora se ve mejor» |
+| Queda escrito qué se retiró, por qué, y qué se conservó | Se actualiza en silencio para poner el verde |
+
+Aquí: el ADR retiró el doble cómputo citando el artículo. Lo que sobrevive —que
+la alerta va sobre la fecha operativa con su `role="alert"`, y que el estado
+vacío distingue el histórico migrado del real sin radicar— sigue custodiado, y
+se añadió lo que la decisión exige: que la pantalla **cite el artículo** y ya no
+diga «pendiente de concepto».
 
 ## 7. Consecuencias
 
@@ -235,14 +275,23 @@ Si son calendario, el plazo del ciudadano es **notablemente más corto** de lo q
 el sistema asumiría, y un desistimiento podría declararse tarde o temprano por
 contar mal.
 
-**Queda ABIERTO y marcado.** Alguien escribió «hábiles» ahí y puede tener razón
-por otra vía —una modificación posterior, una regla general de cómputo—. Se
-resuelve leyendo el art. 2.2.6.6.8.2 y las modificaciones del D.1783/2021 antes
-de implementar el plazo, **no suponiendo**.
+**RESUELTO el 30-ago-2026 leyendo el artículo al que remite.** Son **días
+hábiles**, y el motivo de la aparente discrepancia es que el 2.2.6.1.2.3.1 no lo
+dice porque REMITE al 2.2.6.6.8.2, que sí lo escribe:
 
-Mientras no se resuelva: el sistema **no computa** ese plazo del ciudadano. Ya
-sabe que el término de la Administración está suspendido, que es lo que protege a
-la Secretaría; el plazo del ciudadano se implementa cuando se sepa su unidad.
+> «los curadores sólo podrán expedir la licencia cuando el interesado demuestre
+> la cancelación de las correspondientes obligaciones, para lo cual contará con
+> un término de **treinta (30) días hábiles**, contados a partir del
+> requerimiento de aportar los comprobantes de pago por tales conceptos. Dentro
+> de este mismo término se deberán cancelar al curador urbano las expensas
+> correspondientes al cargo variable.»
+
+Quien escribió «hábiles» en el comentario del mapa tenía razón. **Un artículo que
+remite a otro no está callando: está citando** — y leer solo el que remite habría
+dejado la duda abierta para siempre.
+
+El plazo del ciudadano en viabilidad se puede implementar: son 30 días hábiles
+desde el requerimiento, y en el mismo término se paga el cargo variable.
 
 ### 9.4 Y una pregunta de máquina de estados que este ADR SOLO NOMBRA
 
@@ -254,8 +303,28 @@ Cabe que lo correcto sea: la respuesta **devuelve a `EN_REVISION`** —se reanud
 término y la revisión continúa— y la viabilidad sea **siempre** el acto de
 trámite, venga de donde venga.
 
-**Eso es rediseñar la máquina de estados y no se decide aquí.** Se nombra para que
-no se pierda, y porque afecta a dónde se reanuda el reloj.
+**LO QUE LA NORMA SÍ CONTESTA (leído el 30-ago-2026).** El art. 2.2.6.1.2.2.4
+completo **calla** sobre el efecto de la respuesta: solo dice que durante el
+plazo se suspende el término. Pero el 2.2.6.1.2.3.1 par. 1 empieza así:
+
+> «**Cuando se encuentre viable** la expedición de la licencia, se proferirá un
+> acto de trámite…»
+
+La viabilidad es, por tanto, una **determinación de la autoridad**, materializada
+en un acto suyo. **No es un efecto automático de la respuesta del ciudadano.**
+
+Eso basta para afirmar que el modelo actual —`respuesta-subsanacion →
+EN_VIABILIDAD`— pone al expediente en viabilidad por un acto del ciudadano, y la
+norma reserva esa declaración a la autoridad.
+
+**LO QUE LA NORMA NO CONTESTA:** en qué estado queda el expediente entre la
+respuesta y el acto de trámite. No dice si vuelve formalmente a revisión ni si la
+autoridad puede proferir el acto en el mismo momento de recibir la respuesta.
+
+**Por eso queda como DEFINICIÓN PENDIENTE, para consultar — no se decide por
+lógica nuestra.** Deducir el estado intermedio sería exactamente lo que el
+corolario del §3 prohíbe: afirmar un hecho que no consta, aunque la deducción
+parezca razonable.
 
 ### 9.5 Consecuencia sobre el costo
 

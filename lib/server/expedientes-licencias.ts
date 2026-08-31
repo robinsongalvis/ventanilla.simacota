@@ -22,7 +22,7 @@ import { DEFINICION_LICENCIA_CONSTRUCCION_PARCIAL } from '@/lib/motor-expediente
 import { sumarDiasHabiles, diasRestantesHabiles, atLocalNoon } from '@/lib/tiempos-radicado';
 import { debeNotificarCiudadano, type CriterioNotificacion } from '@/lib/email/debe-notificar-ciudadano';
 import { PREFIJO_AVISO_ACTA_COMUNICACION } from '@/lib/motor-expedientes/comunicaciones-licencia';
-import { calcularVencimientoDual, derivarEventosTermino } from '@/lib/motor-expedientes/termino';
+import { calcularVencimientoTermino, derivarEventosTermino } from '@/lib/motor-expedientes/termino';
 
 /* ══════════════════════════════════════════════════════════════
    Lógica de DECISIÓN de expedientes de licencias — bloque "Integración UI
@@ -346,7 +346,7 @@ export function evaluarCandadoEmisionReal(
  */
 function calcularFechaAlertaConservadoraMirror(actuaciones: ActuacionLicenciaDoc[]): string | null {
   const eventos = derivarEventosTermino(actuaciones);
-  const { fechaAlertaConservadora } = calcularVencimientoDual(eventos, PLAZO_DECISION_LICENCIA_DIAS_HABILES);
+  const { vencimiento: fechaAlertaConservadora } = calcularVencimientoTermino(eventos, PLAZO_DECISION_LICENCIA_DIAS_HABILES);
   return fechaAlertaConservadora ? fechaAlertaConservadora.toISOString() : null;
 }
 
@@ -553,6 +553,20 @@ export type TipoActuacionPermitida =
   | 'inicio-revision'
   | 'acta-observaciones'
   | 'respuesta-subsanacion'
+  /**
+   * EL ACTO DE TRÁMITE del art. 2.2.6.1.2.3.1 par. 1 (ADR-0038 §9.1).
+   *
+   * Cerraba R19. El mapa declaraba `EN_REVISION → EN_VIABILIDAD` —«si no
+   * requiere acta, pasa directo al acto de viabilidad»— y NINGUNA actuación lo
+   * producía: la única que llegaba a ese estado era `respuesta-subsanacion`, que
+   * es la respuesta A UN ACTA. Un expediente limpio se quedaba parado, y como
+   * CONCEDIDA y NEGADA solo se alcanzan desde EN_VIABILIDAD, no podía
+   * resolverse.
+   *
+   * NO es decisión de fondo: la autoridad declara viable y requiere los
+   * documentos de pago. Y ese requerimiento SUSPENDE el término.
+   */
+  | 'acto-viabilidad'
   /* ── LA CADENA DE CIERRE ────────────────────────────────────────────────
      El mapa de transiciones admitía estos cinco estados desde siempre, con su
      fundamento normativo escrito, y NINGUNA ruta los escribía: el expediente
@@ -583,6 +597,8 @@ const ETAPA_POR_TIPO_ACTUACION: Readonly<Record<TipoActuacionPermitida, string>>
   'inicio-revision': 'revision',
   'acta-observaciones': 'revision',
   'respuesta-subsanacion': 'subsanacion',
+  /* Es acto de TRÁMITE, no decisión: no concede ni niega. */
+  'acto-viabilidad': 'revision',
   'resolucion-concede': 'decision',
   'resolucion-niega': 'decision',
   'desistimiento-expreso': 'decision',
@@ -634,6 +650,15 @@ const ESTADO_DESTINO_POR_TIPO_ACTUACION: Readonly<Record<TipoActuacionPermitida,
      Empezar a revisar es un hecho operativo, no uno de los cuatro eventos que
      el Decreto 1077 reconoce como relevantes para el cómputo. */
   'inicio-revision': 'EN_REVISION',
+  /* EL ACTO DE TRÁMITE del art. 2.2.6.1.2.3.1 par. 1 (ADR-0038 §9.1). Cerraba
+     R19: un expediente LIMPIO —sin observaciones— no tenía ninguna actuación que
+     lo llevara a viabilidad, y como CONCEDIDA y NEGADA solo se alcanzan desde
+     ahí, no podía resolverse. Cuarto sin puerta.
+
+     NO ES DECISIÓN DE FONDO: la autoridad declara viable y requiere los
+     documentos de pago. Y ese requerimiento SUSPENDE el término — por eso
+     `EN_VIABILIDAD` está en `ESTADOS_QUE_SUSPENDEN_EL_TERMINO`. */
+  'acto-viabilidad': 'EN_VIABILIDAD',
   'acta-observaciones': 'CON_ACTA_DE_OBSERVACIONES',
   'respuesta-subsanacion': 'EN_VIABILIDAD',
   'resolucion-concede': 'CONCEDIDA',
@@ -647,7 +672,8 @@ const ESTADO_DESTINO_POR_TIPO_ACTUACION: Readonly<Record<TipoActuacionPermitida,
 function esTipoActuacionPermitida(tipo: string): tipo is TipoActuacionPermitida {
   return tipo === 'inicio-revision'
     || tipo === 'acta-observaciones'
-    || tipo === 'respuesta-subsanacion';
+    || tipo === 'respuesta-subsanacion'
+    || tipo === 'acto-viabilidad';
 }
 
 /**

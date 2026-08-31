@@ -55,8 +55,33 @@ export const ESCALONES = [
  * escribir esto la primera vez se confundieron, y CON_ACTA_DE_OBSERVACIONES
  * habría caído en CORRIENDO — el colapso de situaciones que este vigía existe
  * para evitar.
+ *
+ * ── SON DOS CAUSAS, NO UNA (ADR-0038 §9.2) ───────────────────────────────
+ *
+ * Esto era un VALOR ÚNICO, y por eso `EN_VIABILIDAD` se clasificaba CORRIENDO:
+ * durante los días en que el ciudadano reúne los documentos de pago, la pantalla
+ * y el cron contaban tiempo contra la Secretaría que la norma NO cuenta. Es la
+ * misma familia que el rojo con 41 días por delante, pero al revés — el sistema
+ * apurando a quien la ley no apura.
+ *
+ * Un CONJUNTO y no un `if` encadenado: que una tercera causa mañana sea un dato
+ * y no una rama.
  */
-export const ESTADO_TERMINO_SUSPENDIDO: EstadoJuridicoLicencia = 'CON_ACTA_DE_OBSERVACIONES';
+export const ESTADOS_QUE_SUSPENDEN_EL_TERMINO: ReadonlyMap<EstadoJuridicoLicencia, string> = new Map([
+  [
+    'CON_ACTA_DE_OBSERVACIONES',
+    'D.1077/2015 art. 2.2.6.1.2.2.4 — «Durante este plazo se suspenderá el término para la expedición de la licencia».',
+  ],
+  [
+    'EN_VIABILIDAD',
+    'D.1077/2015 art. 2.2.6.1.2.3.1 par. 1 — «Durante este término se entenderá suspendido el trámite para la expedición de la licencia».',
+  ],
+]);
+
+/** ¿Este estado suspende el término? Y si sí, con qué fundamento. */
+export function suspendeElTermino(estado: EstadoJuridicoLicencia): string | null {
+  return ESTADOS_QUE_SUSPENDEN_EL_TERMINO.get(estado) ?? null;
+}
 
 export type SituacionTermino = 'CORRIENDO' | 'SUSPENDIDO' | 'SIN_ANCLAR' | 'RESUELTO';
 export type NivelTermino = 'VENCIDO' | 'CRITICO' | 'AVISO';
@@ -96,6 +121,8 @@ export interface FilaVigia {
   /** Solo en CORRIENDO. */
   diasHabilesRestantes?: number;
   nivel?: NivelTermino;
+  /** Solo en SUSPENDIDO: el artículo que detiene el reloj, para poder citarlo. */
+  fundamentoSuspension?: string;
   /** Solo en SIN_ANCLAR. */
   diasHabilesEnEspera?: number;
 }
@@ -137,9 +164,10 @@ export function clasificarFrenteAlTermino(
     return { ...base, situacion: 'RESUELTO' };
   }
 
-  // SUSPENDIDO: hay acta de observaciones y el reloj está detenido.
-  if (exp.estadoJuridico === ESTADO_TERMINO_SUSPENDIDO) {
-    return { ...base, situacion: 'SUSPENDIDO' };
+  // SUSPENDIDO: la norma detiene el reloj. Dos causas hoy — ver el mapa.
+  const fundamentoSuspension = suspendeElTermino(exp.estadoJuridico);
+  if (fundamentoSuspension) {
+    return { ...base, situacion: 'SUSPENDIDO', fundamentoSuspension };
   }
 
   const diasHabilesRestantes = diasRestantesHabiles(exp.fechaAlertaConservadora, ahora);

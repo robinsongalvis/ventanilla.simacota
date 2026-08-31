@@ -185,53 +185,59 @@ export function calcularVencimiento(eventos: EventoTermino[], politica: Politica
    Doble cómputo (Bloque "Términos y vigencias protectores", 10-ago-2026)
 ────────────────────────────────────────────── */
 
-export interface VencimientoDual {
-  /** `calcularVencimiento` bajo `efectoSubsanacion: 'SUSPENSION_REANUDACION'`. */
-  suspension: Date | null;
-  /** `calcularVencimiento` bajo `efectoSubsanacion: 'REINICIO_A_CERO'`. */
-  reinicio: Date | null;
-  /** La MÁS TEMPRANA de las dos no-nulas (`null` si ambas lo son — sin radicación en debida forma). */
-  fechaAlertaConservadora: Date | null;
+export interface VencimientoTermino {
+  /** La fecha en que vence el término. `null` sin radicación en debida forma. */
+  vencimiento: Date | null;
+  /**
+   * El artículo que sostiene el cómputo. Se devuelve para que la pantalla lo
+   * CITE en vez de explicar una incertidumbre que ya no existe.
+   */
+  fundamento: string;
 }
 
 /**
- * Calcula el vencimiento bajo AMBAS políticas de `PoliticaTermino.efectoSubsanacion`
- * (`SUSPENSION_REANUDACION` y `REINICIO_A_CERO`) y expone la MÁS TEMPRANA de
- * las dos como `fechaAlertaConservadora` — NADA elige una política: el
- * hueco 1 (⚖️, ADR-0029, efecto de la subsanación sobre el término) sigue
- * SIN default, exactamente igual que antes de esta función. Propuesta
- * técnica autorizada por el propietario el 10-ago-2026 (acta de la mesa
- * Jurídica+Planeación, `docs/planes/ACTA_MESA_JURIDICA_PLANEACION_2026-08-10.md`,
- * PR #178, "Qué sigue" #3): "mostrar ambas fechas de vencimiento
- * (suspensión/reinicio) y alertar sobre la más temprana".
+ * ── UNA SOLA FECHA, CON SU ARTÍCULO (ADR-0038) ────────────────────────────
  *
- * La alerta va sobre la fecha MÁS TEMPRANA (nunca la más tardía, nunca un
- * promedio) porque protege a la ADMINISTRACIÓN bajo cualquiera de las dos
- * lecturas posibles del hueco 1: si el régimen real termina siendo
- * `REINICIO_A_CERO` pero el sistema solo hubiera alertado sobre la fecha
- * (más tardía) de `SUSPENSION_REANUDACION`, la alerta llegaría TARDE
- * respecto del plazo real — el riesgo documentado en el acta es
- * precisamente que el silencio administrativo positivo (SAP, ⚖️ hueco 2)
- * corra sin que nadie lo haya visto venir. Alertar temprano nunca perjudica
- * al ciudadano (es una alerta INTERNA de la administración, no un plazo que
- * se le comunique a él); alertar tarde sí podría.
+ * Aquí hubo un DOBLE CÓMPUTO: se calculaba el vencimiento bajo las dos lecturas
+ * posibles —suspensión con reanudación, y reinicio a cero— y se alertaba sobre
+ * la más temprana, porque el «hueco 1» del ADR-0029 declaraba que nadie sabía
+ * cuál regía. La pantalla mostraba las dos fechas y una nota que decía que la
+ * interpretación seguía «pendiente de concepto escrito de Jurídica».
  *
- * `plazoDias` es un parámetro OBLIGATORIO (sin default, mismo principio que
- * `PoliticaTermino.plazoDias`) — el caller (una ruta de un trámite
- * concreto) declara el plazo normativo de SU régimen; este módulo sigue
- * siendo trámite-agnóstico (A3, ADR-0026 §A3).
+ * NO HABÍA TAL HUECO. El Decreto 1077 lo dice expresamente en el art.
+ * 2.2.6.1.2.2.4 — el MISMO artículo que este proyecto ya citaba veinte veces
+ * para el acta única, el desistimiento y los 30 días:
+ *
+ *   «Durante este plazo se suspenderá el término para la expedición de la
+ *    licencia»
+ *
+ * «Se suspenderá». En derecho administrativo eso es preciso: parar y continuar
+ * donde iba. Reiniciar exigiría decirlo, y no lo dice. Se construyó un cómputo
+ * entero para una pregunta que el artículo contestaba en una línea.
+ *
+ * `REINICIO_A_CERO` se conserva en `PoliticaTermino` porque el motor es
+ * TRÁMITE-AGNÓSTICO (A3, ADR-0026): otro trámite, con otra norma, podría
+ * reiniciar. Lo que se retira es su uso para LICENCIAS.
+ *
+ * `plazoDias` sigue siendo OBLIGATORIO: el caller declara el plazo de SU
+ * régimen y este módulo no conoce ninguno.
  */
-export function calcularVencimientoDual(eventos: EventoTermino[], plazoDias: number): VencimientoDual {
-  const base = { plazoDias, computo: 'HABILES' as const, anclaje: 'RADICACION_EN_DEBIDA_FORMA' as const };
-  const suspension = calcularVencimiento(eventos, { ...base, efectoSubsanacion: 'SUSPENSION_REANUDACION' });
-  const reinicio = calcularVencimiento(eventos, { ...base, efectoSubsanacion: 'REINICIO_A_CERO' });
+export const FUNDAMENTO_SUSPENSION_REANUDACION =
+  'D.1077/2015 art. 2.2.6.1.2.2.4 — «Durante este plazo se suspenderá el término para la expedición de la licencia».';
 
-  const noNulos = [suspension, reinicio].filter((d): d is Date => d !== null);
-  const fechaAlertaConservadora = noNulos.length === 0
-    ? null
-    : noNulos.reduce((masTemprana, d) => (d.getTime() < masTemprana.getTime() ? d : masTemprana));
-
-  return { suspension, reinicio, fechaAlertaConservadora };
+export function calcularVencimientoTermino(
+  eventos: EventoTermino[],
+  plazoDias: number,
+): VencimientoTermino {
+  return {
+    vencimiento: calcularVencimiento(eventos, {
+      plazoDias,
+      computo: 'HABILES',
+      anclaje: 'RADICACION_EN_DEBIDA_FORMA',
+      efectoSubsanacion: 'SUSPENSION_REANUDACION',
+    }),
+    fundamento: FUNDAMENTO_SUSPENSION_REANUDACION,
+  };
 }
 
 /* ──────────────────────────────────────────────

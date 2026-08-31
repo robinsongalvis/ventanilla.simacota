@@ -48,6 +48,40 @@ export const DIAS_HABILES_RECURSOS = 10;
 export const DIAS_HABILES_SUBSANACION_TACITO = 30;
 
 /**
+ * La PRÓRROGA del ciudadano — D.1077/2015 art. 2.2.6.1.2.2.4:
+ *
+ *   «Este plazo podrá ser ampliado, a solicitud de parte, hasta por un término
+ *    adicional de quince (15) días hábiles»
+ *
+ * ADR-0038 §2.3. Hasta ahora esto vivía SOLO en el texto del correo al
+ * ciudadano (`lib/email/templates/aviso-acta-observaciones.ts`, que ya la
+ * nombra): el correo prometía quince días que el reloj no sabía contar, y un
+ * desistimiento tácito podía declararse mientras la prórroga corría.
+ *
+ * «A SOLICITUD DE PARTE»: no se concede sola. Por eso el cómputo la aplica solo
+ * cuando consta que se concedió — la ausencia del dato NO es una prórroga.
+ */
+export const DIAS_HABILES_PRORROGA_SUBSANACION = 15;
+
+/**
+ * El plazo del ciudadano para aportar los comprobantes de pago cuando el
+ * expediente entra en VIABILIDAD — D.1077/2015 art. 2.2.6.6.8.2:
+ *
+ *   «contará con un término de treinta (30) días hábiles, contados a partir del
+ *    requerimiento de aportar los comprobantes de pago por tales conceptos.
+ *    Dentro de este mismo término se deberán cancelar al curador urbano las
+ *    expensas correspondientes al cargo variable.»
+ *
+ * ADR-0038 §9.3. Estuvo en duda porque el art. 2.2.6.1.2.3.1 par. 1 —el que
+ * declara la suspensión— dice «treinta (30) días» sin la palabra «hábiles»: no
+ * la dice porque REMITE a este artículo, que sí la escribe.
+ *
+ * UN ARTÍCULO QUE REMITE A OTRO NO ESTÁ CALLANDO: ESTÁ CITANDO. Leer solo el
+ * que remite habría dejado la duda abierta para siempre.
+ */
+export const DIAS_HABILES_PAGO_VIABILIDAD = 30;
+
+/**
  * Motivos por los que un acto queda en firme (CPACA art. 87). Se enumeran
  * porque la firmeza NO es solo «pasó el plazo»: hay tres caminos, y cada uno
  * exige comprobar algo distinto.
@@ -195,6 +229,11 @@ export function procedeDesistimientoTacito(entrada: {
   fechaComunicacionActa: string | undefined;
   huboRespuestaSubsanacion: boolean;
   ahora: Date;
+  /**
+   * ¿Consta que se concedió la prórroga de 15 días hábiles? Solo con este dato
+   * se amplía el plazo: «a solicitud de parte» significa que no se presume.
+   */
+  prorrogaConcedida?: boolean;
 }): ErrorCierre | null {
   if (entrada.huboRespuestaSubsanacion) {
     return {
@@ -216,13 +255,21 @@ export function procedeDesistimientoTacito(entrada: {
     };
   }
   const transcurridos = diasHabilesTranscurridos(entrada.fechaComunicacionActa, entrada.ahora);
-  if (transcurridos < DIAS_HABILES_SUBSANACION_TACITO) {
+  /* CON PRÓRROGA CONCEDIDA, el plazo del ciudadano son 45, no 30. Archivar a los
+     30 con la prórroga corriendo sería declarar un incumplimiento que no
+     ocurrió. */
+  const plazo = entrada.prorrogaConcedida === true
+    ? DIAS_HABILES_SUBSANACION_TACITO + DIAS_HABILES_PRORROGA_SUBSANACION
+    : DIAS_HABILES_SUBSANACION_TACITO;
+  if (transcurridos < plazo) {
     return {
       campo: 'plazo',
       mensaje:
         `Han transcurrido ${transcurridos} días hábiles desde la comunicación del acta; el ` +
-        `desistimiento tácito procede a los ${DIAS_HABILES_SUBSANACION_TACITO} ` +
-        '(D.1077/2015 art. 2.2.6.1.2.3.4).',
+        `desistimiento tácito procede a los ${plazo}` +
+        (entrada.prorrogaConcedida === true
+          ? ` (30 + ${DIAS_HABILES_PRORROGA_SUBSANACION} de prórroga concedida, D.1077/2015 art. 2.2.6.1.2.2.4)`
+          : ' (D.1077/2015 art. 2.2.6.1.2.3.4)') + '.',
     };
   }
   return null;
