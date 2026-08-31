@@ -28,8 +28,16 @@ describe('el inventario sale de las reglas, no de una lista a mano', () => {
   });
 
   /* La que motivó todo: si `users` volviera a caerse del inventario, la
-     plataforma restaurada sería inservible y el ensayo no lo diría. */
-  it('`users` está, y el verificador exige que traiga datos', () => {
+     plataforma restaurada sería inservible y el ensayo no lo diría.
+
+     ALCANCE DECLARADO (ADR-0033 §4.6-bis): esto MIRA TEXTO, NO MECANISMO.
+     Comprueba que `users` sale de las reglas y que la razón sigue REDACTADA en
+     el verificador. NO comprueba que el verificador FALLE cuando `users` viene
+     vacía: con la frase escrita, el `if` que la usa puede estar desactivado y
+     esta prueba seguiría verde — que es literalmente el incidente que originó
+     el guion. Quien vigila eso EJECUTÁNDOLO es
+     `__tests__/verificar-restauracion-ejecucion.test.ts`. */
+  it('`users` está en el inventario y su razón sigue redactada en el verificador (texto, no mecanismo)', () => {
     expect(inventarioDesdeReglas().raiz).toContain('users');
     expect(VERIFICADOR).toMatch(/users:\s*'Sin usuarios nadie puede autenticarse/);
   });

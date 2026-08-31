@@ -77,9 +77,18 @@ describe('plantilla del acto de desistimiento', () => {
   });
 });
 
-describe('cableado del cron — nunca decide', () => {
+/* ALCANCE DECLARADO (ADR-0033 §4.6-bis): este bloque solo LEE EL FUENTE. Que
+   una cadena aparezca en el archivo no prueba que el mecanismo funcione: al
+   quitar del `.filter(...)` la exclusión de datos de prueba, la palabra
+   «isTest» sobrevive en el `.map(...)` de la línea anterior y esto seguía en
+   verde. Lo EJECUTABLE —que solo la operación real sale propuesta, y que sin
+   credencial el trabajo ni empieza— vive en
+   `__tests__/subsanacion-cron-ejecucion.test.ts`. Se conserva porque las
+   ausencias (`not.toContain`) sí son concluyentes sobre el texto: afirman que
+   algo NO está escrito, y para eso leer el archivo es la herramienta correcta. */
+describe('cableado del cron — lectura del FUENTE, no ejecución', () => {
   const s = readFileSync('app/api/cron/desistimiento-tacito/route.ts', 'utf8');
-  it('autoriza con autorizarCron y filtra isTest', () => {
+  it('el fuente NOMBRA autorizarCron e isTest (solo eso: no prueba que filtren)', () => {
     expect(s).toContain('autorizarCron');
     expect(s).toContain('isTest');
   });
