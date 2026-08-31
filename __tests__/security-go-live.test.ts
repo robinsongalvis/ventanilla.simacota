@@ -7,21 +7,52 @@ function read(path: string): string {
   return readFileSync(`${root}/${path}`, 'utf8');
 }
 
+/**
+ * Devuelve el CUERPO de un bloque `match` de firestore.rules, de su llave de
+ * apertura a la que la cierra.
+ *
+ * Por qué existe (barrido de dobles verdes, 30-ago-2026): las dos pruebas de
+ * abajo aseveraban `expect(rules).toContain('allow update: if false;')` sobre
+ * el ARCHIVO ENTERO. Esa línea existe en varios bloques a la vez, así que la
+ * aserción se satisfacía con la de OTRA colección. Se abrió el bloque de
+ * `ventanilla_radicados` de par en par —`allow update: if isAdmin();`— y las
+ * siete pruebas del archivo siguieron en verde.
+ *
+ * Contar llaves basta aunque los comodines de ruta lleven las suyas
+ * (`{radicadoId}`): abren y cierran en la misma línea, así que la profundidad
+ * cuadra. Se arranca en el FIN de la línea del encabezado, con profundidad 1,
+ * justamente para no confundir el comodín del propio encabezado con el bloque.
+ */
+function bloqueMatch(reglas: string, encabezado: string): string {
+  const inicio = reglas.indexOf(`${encabezado} {`);
+  if (inicio === -1) throw new Error(`firestore.rules no declara «${encabezado}»`);
+
+  let profundidad = 1;
+  for (let i = reglas.indexOf('\n', inicio); i < reglas.length; i++) {
+    if (reglas[i] === '{') profundidad++;
+    else if (reglas[i] === '}' && --profundidad === 0) return reglas.slice(inicio, i + 1);
+  }
+  throw new Error(`El bloque «${encabezado}» no cierra en firestore.rules`);
+}
+
 describe('cierre seguridad go-live', () => {
   it('bloquea escrituras nuevas en la colección legacy radicados', () => {
-    const rules = read('firestore.rules');
+    const legacy = bloqueMatch(read('firestore.rules'), 'match /radicados/{radicadoId}');
 
-    expect(rules).toContain('match /radicados/{radicadoId}');
-    expect(rules).toContain('allow create: if false;');
-    expect(rules).toContain('allow update: if false;');
+    expect(legacy).toContain('allow create: if false;');
+    expect(legacy).toContain('allow update: if false;');
   });
 
   it('bloquea mutaciones críticas directas en ventanilla_radicados', () => {
     const rules = read('firestore.rules');
+    const coleccion = bloqueMatch(rules, 'match /ventanilla_radicados/{radicadoId}');
 
-    expect(rules).toContain('match /ventanilla_radicados/{radicadoId}');
-    expect(rules).toContain('allow update: if false;');
-    expect(rules).toContain('cumplioTermino');
+    // DENTRO del bloque de la colección, no en cualquier parte del archivo.
+    expect(coleccion).toContain('allow update: if false;');
+    // Y que sea la ÚNICA cláusula de update del bloque: una segunda, más
+    // permisiva, dejaría la primera intacta y esta prueba ciega.
+    expect(coleccion.match(/allow update:/g)).toHaveLength(1);
+    expect(coleccion).toContain('cumplioTermino');
   });
 
   it('impide TODA subida directa a Storage — el bucket es Admin-SDK-only (PT-3)', () => {
@@ -49,7 +80,16 @@ describe('cierre seguridad go-live', () => {
     expect(magic).not.toContain("application/*");
   });
 
-  it('revoca tokens al desactivar usuarios internos', () => {
+  // ALCANCE (ADR-0033 §4.6-bis): esta prueba solo comprueba que la ruta
+  // NOMBRA la revocación y su etiqueta de auditoría. NO comprueba que se
+  // ejecute — eso lo hace, ejecutando el handler,
+  // `seguridad-go-live-comportamiento.test.ts`.
+  //
+  // El nombre anterior era «revoca tokens al desactivar usuarios internos», y
+  // prometía justo lo que no miraba: se borró la revocación entera de la rama
+  // de desactivación y esta prueba siguió pasando, porque la cadena sobrevive
+  // en un comentario y en la rama de archivado.
+  it('la ruta de usuarios nombra la revocación y su etiqueta de auditoría', () => {
     const route = read('app/api/admin/usuarios/[uid]/route.ts');
 
     expect(route).toContain('revokeRefreshTokens');
