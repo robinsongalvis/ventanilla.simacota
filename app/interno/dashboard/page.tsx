@@ -96,7 +96,7 @@ import type { FuncionarioTenant }             from '@/lib/hooks/useFuncionariosT
 import type { ResponsableFuncionario }        from '@/lib/actions/asignarRadicado';
 import type { TrazabilidadRadicado, VentanillaRadicado } from '@/src/types/ventanilla';
 import type { UsuarioAutenticado }        from '@/lib/hooks/useAuth';
-import { buildOficioInstitucional } from '@/lib/respuesta-oficial/oficio-institucional';
+import { buildOficioInstitucional, ciudadanoOficioDesdeRadicado } from '@/lib/respuesta-oficial/oficio-institucional';
 import { ResumenDiarioModal, type ResumenDiarioData } from '@/app/interno/dashboard/components/ResumenDiarioModal';
 import {
   filtrarSoloDatosIncompletos,
@@ -1774,13 +1774,9 @@ function PanelDerecho({
     const texto = buildOficioInstitucional({
       radicadoId: radicado.radicadoId,
       fecha:      new Date(),
-      ciudadano: {
-        nombre:    radicado.solicitante?.nombreCompleto,
-        correo:    radicado.solicitante?.email ?? undefined,
-        direccion: radicado.solicitante?.direccion ?? undefined,
-        esAnonimo: radicado.esAnonimo,
-        reservado: radicado.tipoPresentacion === 'RESERVADA' || radicado.identidadReservada === true,
-      },
+      /* Mapeo por la función CANÓNICA (issue #301): el inline anterior
+         reconocía dos marcadores de cuatro y ANONIMA se le escapaba. */
+      ciudadano: ciudadanoOficioDesdeRadicado(radicado),
       dependencia: dependenciaNombre,
       funcionario: {
         nombre: responsable ?? usuario.nombre,

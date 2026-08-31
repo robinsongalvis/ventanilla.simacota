@@ -1,5 +1,6 @@
 import { INSTITUCION } from '@/lib/institucion';
 import type { RolInterno } from '@/lib/hooks/useAuth';
+import { identidadProtegida, type RadicadoConReserva } from '@/lib/seguridad/identidad-protegida';
 
 /* ══════════════════════════════════════════════════════════════
    buildOficioInstitucional — Generador de respuesta tipo oficio
@@ -48,6 +49,44 @@ export interface OficioCiudadano {
   esAnonimo?: boolean;
   /** `tipoPresentacion === 'ANONIMA' | 'RESERVADA'` también se tratan como anónimo en el texto. */
   reservado?: boolean;
+}
+
+/* ══════════════════════════════════════════════════════════════
+   EL MAPEO RADICADO → CIUDADANO DEL OFICIO (issue #301).
+
+   Hasta el 31-ago-2026 este mapeo vivía inline en el dashboard, y reconocía
+   DOS marcadores de cuatro: `tipoPresentacion === 'RESERVADA'` e
+   `identidadReservada`. El JSDoc de `reservado` (arriba) prometía que ANONIMA
+   también se trataba como anónimo — y el llamador nunca lo mapeó. Un radicado
+   ANONIMA con `esAnonimo` ausente habría impreso nombre, correo y dirección
+   REALES en el papel que se le entrega al ciudadano. No ocurría por accidente
+   de las rutas de radicación, no por diseño.
+
+   La corrección NO añade una quinta copia del criterio: reutiliza el canónico
+   `identidadProtegida` (lib/seguridad/identidad-protegida.ts, ADR-0006), que
+   enumera los cuatro marcadores. La consolidación de las copias restantes es
+   el issue #294 (ADR aparte) — esto solo cierra la salida al papel.
+══════════════════════════════════════════════════════════════ */
+
+/** Lo que el mapeo necesita del radicado — estructural, para no acoplarse. */
+export type RadicadoParaOficio = RadicadoConReserva & {
+  solicitante?: {
+    nombreCompleto?: string | null;
+    email?: string | null;
+    direccion?: string | null;
+  } | null;
+};
+
+/** Construye el `ciudadano` del oficio desde el radicado, con el criterio
+ *  CANÓNICO de reserva — los cuatro marcadores, no dos. */
+export function ciudadanoOficioDesdeRadicado(r: RadicadoParaOficio): OficioCiudadano {
+  return {
+    nombre:    r.solicitante?.nombreCompleto,
+    correo:    r.solicitante?.email ?? undefined,
+    direccion: r.solicitante?.direccion ?? undefined,
+    esAnonimo: r.esAnonimo === true,
+    reservado: identidadProtegida(r),
+  };
 }
 
 export interface OficioInput {

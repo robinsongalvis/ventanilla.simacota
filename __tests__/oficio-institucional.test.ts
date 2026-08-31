@@ -8,7 +8,7 @@
  * nombre/cargo/dependencia (que sí son públicos en un oficio).
  */
 import { describe, it, expect } from 'vitest';
-import { buildOficioInstitucional, PLACEHOLDER_CUERPO } from '@/lib/respuesta-oficial/oficio-institucional';
+import { buildOficioInstitucional, PLACEHOLDER_CUERPO, ciudadanoOficioDesdeRadicado, type RadicadoParaOficio } from '@/lib/respuesta-oficial/oficio-institucional';
 
 const RADICADO_ID = '1-WEB-2026-00000042';
 const FECHA = new Date('2026-06-15T14:30:00.000Z');
@@ -247,5 +247,90 @@ describe('buildOficioInstitucional — estructura general', () => {
     expect(oficio).not.toContain('<');
     expect(oficio).not.toContain('**');
     expect(oficio).not.toContain('##');
+  });
+});
+
+
+/* ══════════════════════════════════════════════════════════════
+   EL MAPEO RADICADO → CIUDADANO reconoce LOS CUATRO marcadores (issue #301).
+
+   El defecto que esto custodia: el mapeo inline del dashboard reconocía DOS
+   marcadores (`RESERVADA` e `identidadReservada`) y ANONIMA se le escapaba —
+   un radicado ANONIMA con `esAnonimo` ausente habría impreso nombre, correo y
+   dirección REALES en el oficio que se entrega al ciudadano. El JSDoc de
+   `reservado` prometía lo contrario. Es el único punto del barrido donde el
+   dato salía al PAPEL.
+
+   Cada marcador se prueba EN SOLITARIO, con los otros tres apagados —
+   combinarlos es exactamente lo que dejaba ciega a la prueba del predicado de
+   SIMI (mismo barrido): basta que UNO siga reconocido para que todo salga bien
+   y el hueco no se note.
+
+   ALCANCE DECLARADO (ADR-0033 §4.6-bis). Esto MIRA: que `ciudadanoOficioDesdeRadicado`
+   + `buildOficioInstitucional` oculten la identidad con cada marcador en
+   solitario, de punta a punta sobre el texto del oficio. NO MIRA: que el
+   dashboard LLAME al mapeador (el cableado de `app/interno/dashboard/page.tsx`
+   es visible en el diff de la PR pero no tiene prueba de render — reincidir en
+   el inline lo taparía; la solución estructural es la consolidación del
+   issue #294). Tampoco mira las otras copias del predicado (#294).
+══════════════════════════════════════════════════════════════ */
+
+describe('ciudadanoOficioDesdeRadicado — los cuatro marcadores, cada uno en solitario (#301)', () => {
+  const NOMBRE = 'Carlos Alberto Rojas Mantilla';
+
+  function radicado(sobre: Partial<RadicadoParaOficio>): RadicadoParaOficio {
+    return {
+      esAnonimo: false,
+      identidadReservada: false,
+      tipoPresentacion: 'IDENTIFICADA',
+      solicitante: { nombreCompleto: NOMBRE, email: 'carlos@ejemplo.com', direccion: 'Calle 5 # 3-21' },
+      ...sobre,
+    } as RadicadoParaOficio;
+  }
+
+  function oficioCon(sobre: Partial<RadicadoParaOficio>): string {
+    return buildOficioInstitucional({
+      radicadoId: '1-110-202608-00000041',
+      fecha: '2026-08-31T12:00:00.000Z',
+      ciudadano: ciudadanoOficioDesdeRadicado(radicado(sobre)),
+      dependencia: 'Secretaría de Gobierno',
+      funcionario: { nombre: 'Funcionaria Prueba', rol: 'FUNCIONARIO' },
+      cuerpo: 'Respuesta de prueba.',
+    });
+  }
+
+  it.each([
+    ['esAnonimo = true',            { esAnonimo: true }],
+    ['identidadReservada = true',   { identidadReservada: true }],
+    ["tipoPresentacion = ANONIMA",  { tipoPresentacion: 'ANONIMA' as const }],
+    ["tipoPresentacion = RESERVADA",{ tipoPresentacion: 'RESERVADA' as const }],
+  ])('con %s EN SOLITARIO, el oficio no imprime nombre, correo ni dirección', (_marcador, sobre) => {
+    const texto = oficioCon(sobre);
+
+    expect(
+      texto,
+      `El oficio imprimió el nombre real de una persona con identidad protegida («${_marcador}» en solitario). `
+      + 'Este papel se le entrega al ciudadano: la identidad tiene que salir como «Solicitante».',
+    ).not.toContain(NOMBRE);
+    expect(texto).not.toContain('carlos@ejemplo.com');
+    expect(texto).not.toContain('Calle 5 # 3-21');
+    expect(texto).toContain('Solicitante');
+  });
+
+  it('el caso exacto del hueco: ANONIMA con esAnonimo AUSENTE tampoco imprime', () => {
+    /* Sin `esAnonimo` en el documento — el booleano que la radicación deriva
+       hoy, pero que ninguna regla obliga a que exista. Antes del arreglo, este
+       radicado imprimía el nombre real. */
+    const texto = oficioCon({ tipoPresentacion: 'ANONIMA', esAnonimo: undefined });
+
+    expect(texto).not.toContain(NOMBRE);
+    expect(texto).toContain('Solicitante');
+  });
+
+  it('identificado sin ningún marcador: el oficio SÍ saluda por su nombre', () => {
+    /* La otra dirección — sin ella, «ocultar siempre» pasaría las de arriba. */
+    const texto = oficioCon({});
+
+    expect(texto).toContain(NOMBRE);
   });
 });
