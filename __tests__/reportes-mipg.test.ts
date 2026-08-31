@@ -97,21 +97,69 @@ const USUARIO_FUNC_GOBIERNO: UsuarioReporte = {
 };
 
 describe('sanitizar — anonimato y reserva', () => {
-  it('enmascara nombre, documento, correo y dirección cuando esAnonimo', () => {
-    const r = radicado({ esAnonimo: true, tipoPresentacion: 'ANONIMA' });
-    const sv = solicitanteVisible(r);
-    expect(sv.nombre).toBe('Anónimo / Reservado');
-    expect(sv.documento).toBe('No disponible');
-    expect(sv.correo).toBe('No disponible');
-    expect(sv.direccion).toBe('No disponible');
-    expect(debeOcultarIdentidad(r)).toBe(true);
-  });
+  /* Los CUATRO marcadores, cada uno EN SOLITARIO. Los dos casos que vivían
+     aquí los fijaban DE A PARES (`esAnonimo` + ANONIMA; RESERVADA +
+     `identidadReservada`), y eso deja pasar el borrado de cualquiera de las dos
+     cláusulas emparejadas: basta con que UNA siga reconocida. Aquí la mutación
+     fuga PII REAL — `solicitanteVisible` alimenta las columnas «Solicitante» y
+     «Documento» del libro Excel MIPG que sale de la entidad
+     (lib/reportes-mipg/excel.ts:433-434).
 
-  it('enmascara cuando tipoPresentacion es RESERVADA', () => {
-    const r = radicado({ tipoPresentacion: 'RESERVADA', identidadReservada: true });
-    const sv = solicitanteVisible(r);
-    expect(sv.nombre).toBe('Anónimo / Reservado');
-  });
+     Criterio canónico del repositorio: `identidadProtegida`
+     (lib/seguridad/identidad-protegida.ts, ADR-0006); su prueba
+     __tests__/identidad-protegida.test.ts:54-58 ya aísla igual.
+
+     Hoy ninguna ruta de escritura produce estos estados en solitario: la
+     radicación deriva `esAnonimo` e `identidadReservada` desde
+     `tipoPresentacion` (app/api/radicacion/route.ts:323-324,
+     lib/recepcion/construir-radicado.ts:198-199). Se prueban aislados A
+     PROPÓSITO: cada cláusula es una redundancia defensiva para históricos y
+     migraciones. NO borrar estas filas alegando que el estado «no se da».
+
+     Alcance declarado (ADR-0033 §4.6-bis). VIGILAN `debeOcultarIdentidad` y
+     `solicitanteVisible` de lib/reportes-mipg/sanitizar.ts. NO VIGILAN: las
+     celdas `tipoPresentacion` / `esAnonimo` / `reservada` del propio Excel
+     (excel.ts:438-440), que se calculan aparte; ni las otras copias del
+     predicado — lib/simi/contexto-radicado.ts:103 (tabla propia en
+     __tests__/simi-confiable.test.ts), lib/busqueda/filtros-radicado.ts:83, y
+     lib/respuesta-oficial/oficio-institucional.ts:78, que reconoce sólo DOS de
+     los cuatro marcadores y no tiene cobertura. */
+  const MARCADORES_DE_RESERVA: { marcador: string; r: Partial<VentanillaRadicado> }[] = [
+    { marcador: 'esAnonimo = true',             r: { esAnonimo: true,  tipoPresentacion: 'IDENTIFICADA', identidadReservada: false } },
+    { marcador: 'tipoPresentacion = ANONIMA',   r: { esAnonimo: false, tipoPresentacion: 'ANONIMA',      identidadReservada: false } },
+    { marcador: 'tipoPresentacion = RESERVADA', r: { esAnonimo: false, tipoPresentacion: 'RESERVADA',    identidadReservada: false } },
+    { marcador: 'identidadReservada = true',    r: { esAnonimo: false, tipoPresentacion: 'IDENTIFICADA', identidadReservada: true  } },
+  ];
+
+  for (const caso of MARCADORES_DE_RESERVA) {
+    it(`«${caso.marcador}» por sí solo enmascara nombre y documento en el reporte MIPG`, () => {
+      const r  = radicado(caso.r);
+      const sv = solicitanteVisible(r);
+
+      expect(
+        sv.nombre,
+        'FUGA DE RESERVA DE IDENTIDAD (Ley 1581/2012 art. 4 lit. f — acceso y circulación restringida). '
+        + `Con «${caso.marcador}» como único marcador, el libro Excel MIPG que sale de la entidad `
+        + `(lib/reportes-mipg/excel.ts:433, columna «Solicitante») escribe «${sv.nombre}» — el nombre real `
+        + 'del ciudadano. Causa: debeOcultarIdentidad() en lib/reportes-mipg/sanitizar.ts dejó de reconocer '
+        + 'ese marcador.',
+      ).toBe('Anónimo / Reservado');
+
+      expect(
+        sv.documento,
+        `Con «${caso.marcador}» la columna «Documento» del reporte MIPG (lib/reportes-mipg/excel.ts:434) `
+        + 'escribe el número de documento real del ciudadano.',
+      ).toBe('No disponible');
+      expect(sv.correo).toBe('No disponible');
+      expect(sv.direccion).toBe('No disponible');
+
+      expect(
+        debeOcultarIdentidad(r),
+        `El predicado de lib/reportes-mipg/sanitizar.ts dejó de reconocer «${caso.marcador}» como marcador `
+        + 'de identidad protegida.',
+      ).toBe(true);
+    });
+  }
 
   it('muestra datos cuando es identificado', () => {
     const sv = solicitanteVisible(radicado());

@@ -81,11 +81,28 @@ export type ResultadoAutorizacion =
 /**
  * Estructura esperada: `<prefijo>/<radicadoId>/<nombreArchivo>`.
  * Solo se permiten los prefijos definidos en `PREFIJOS_PERMITIDOS`.
- * `<radicadoId>` y `<nombreArchivo>` tienen un alfabeto seguro y limitado
- * para evitar trucos de codificación o path traversal.
+ * `<radicadoId>` y `<nombreArchivo>` tienen un alfabeto cerrado que deja
+ * fuera los trucos de codificación (`%2f`, caracteres de control…).
  *
- * Esta expresión es deliberadamente restrictiva: no admite `..`, ni `/`
- * extra, ni caracteres de control.
+ * ATENCIÓN — LO QUE ESTA EXPRESIÓN NO RECHAZA: `..` le encaja como
+ * segmento, porque el punto vive DENTRO de la clase `[A-Za-z0-9._-]`.
+ * Comprobado ejecutándola:
+ *
+ *     ACEPTA   radicados/../archivo.pdf
+ *     ACEPTA   radicados/1-WEB-2026-00000001/..
+ *     rechaza  radicados/x/../y.pdf       (4 segmentos; exige exactamente 3)
+ *     rechaza  radicados/../etc/passwd    (4 segmentos)
+ *     rechaza  radicados/..%2f/x.pdf      (`%` fuera del alfabeto)
+ *
+ * Lo deliberadamente restrictivo es la FORMA —prefijo de la lista,
+ * exactamente 3 segmentos, sin `/` de más, sin caracteres de control—, no
+ * el CONTENIDO del segmento. Por eso la guarda
+ * `if (path.includes('..')) return null;` de `parsearPathArchivo` NO es
+ * redundante: es la ÚNICA barrera contra la travesía de 3 segmentos, y
+ * borrarla la abre de par en par. Su gemela vive en
+ * `parsearPathDocumentoExpediente` y cumple el mismo papel. A las dos las
+ * vigila el bloque «travesía de directorios» de
+ * `__tests__/autorizar-descarga-archivo.test.ts`.
  */
 const PATH_REGEX = /^(radicados|respuestas|salidas)\/[A-Za-z0-9._-]+\/[A-Za-z0-9._\- ]+$/;
 
