@@ -41,10 +41,28 @@ describe('Recibir solicitud — validación de subtipos', () => {
     expect(fetchMock).not.toHaveBeenCalled();
   });
 
-  it('muestra el catálogo normativo con nombre y código', () => {
+  /* REESCRITA el 31-ago-2026 (ADR-0038 §6-bis: cuándo SÍ se reescribe una
+     prueba custodiada). Se llamaba «muestra el catálogo normativo con nombre y
+     CÓDIGO» y exigía ver `CONSTRUCCION` y `RECONOCIMIENTO` en el nombre
+     accesible de cada casilla.
+
+     QUÉ SE RETIRA Y CON QUÉ FUNDAMENTO: la exigencia del código interno. El
+     propietario decidió no mostrarlos, y no por estética — está verificado
+     contra la fuente: el ingeniero de Planeación escribe `LSR`, `LSU`, `LC`,
+     `LU`, `LR`, `PH` en su planilla, y el catálogo tiene una tabla
+     (`EQUIVALENCIAS_MIGRACION_SEMILLA_LICENCIAS`) cuyo único trabajo es
+     traducir esa columna a estos códigos. Son dos vocabularios distintos, y ni
+     uno a uno: `LC y PH` se traduce en DOS. El código nuestro no casa con
+     ningún papel que ella maneje.
+
+     QUÉ SE CONSERVA: que cada figura del catálogo sea alcanzable por su NOMBRE
+     como casilla accesible — que es lo que esta prueba protegía de verdad, y
+     sigue protegiendo. Que el código no se pinte lo vigila aparte
+     `__tests__/subtipos-sin-codigos-internos.test.tsx`. */
+  it('muestra el catálogo normativo, cada figura alcanzable por su nombre', () => {
     render(<RadicarSolicitudModal onCerrar={vi.fn()} />);
-    expect(screen.getByRole('checkbox', { name: /Licencia de construcción.*CONSTRUCCION/i })).toBeTruthy();
-    expect(screen.getByRole('checkbox', { name: /Acto de reconocimiento.*RECONOCIMIENTO/i })).toBeTruthy();
+    expect(screen.getByRole('checkbox', { name: /Licencia de construcción/i })).toBeTruthy();
+    expect(screen.getByRole('checkbox', { name: /Acto de reconocimiento de edificaciones/i })).toBeTruthy();
   });
 });
 

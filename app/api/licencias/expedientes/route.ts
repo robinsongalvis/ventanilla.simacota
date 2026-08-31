@@ -139,10 +139,18 @@ export async function GET(): Promise<NextResponse> {
       .map((d) => d.data())
       .sort((a, b) => String(b.creadoEn ?? '').localeCompare(String(a.creadoEn ?? '')));
 
-    // RESUELTO (Bloque "Términos y vigencias protectores", 10-ago-2026):
-    // la bandeja SÍ trae `fechaAlertaConservadora` por expediente, sin
-    // ninguna lectura nueva — viene incluida en `expedientes` porque cada
-    // `d.data()` ya trae el documento raíz completo. El valor NO se calcula
+    // La bandeja SÍ trae `fechaAlertaConservadora` por expediente, sin ninguna
+    // lectura nueva — viene incluida en `expedientes` porque cada `d.data()`
+    // ya trae el documento raíz completo.
+    //
+    // ESTE COMENTARIO DECÍA «RESUELTO» DESDE EL 10-ago-2026 Y DESCRIBÍA MEDIA
+    // ENTREGA. El dato se persistió y se envió; la bandeja no lo pintaba, y
+    // su propia cabecera declaraba que nunca lo haría. Servirlo no es
+    // mostrarlo: durante veinte días esta respuesta cargó una fecha que
+    // ninguna pantalla leía. La columna «Vence» se añadió el 31-ago-2026
+    // (`BandejaLicenciasClient`), y `__tests__/bandeja-vence-alcanzable.test.tsx`
+    // se pone roja si desaparece — porque un campo servido sin consumidor no
+    // tiene quien lo eche de menos. El valor NO se calcula
     // aquí (eso seguiría siendo N+1, el antipatrón que R11 vigila): es un
     // ESPEJO denormalizado que `lib/server/expedientes-licencias.ts`
     // recalcula y persiste en el documento raíz, en el MISMO batch/tx que

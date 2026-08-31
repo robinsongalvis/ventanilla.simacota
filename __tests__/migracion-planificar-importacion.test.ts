@@ -182,6 +182,53 @@ describe('planificarImportacion — "histórico sin resolver" NUNCA infla "en tr
 });
 
 describe('planificarImportacion — código sin resolver (P1′) se IMPORTA con el texto crudo (DF-10)', () => {
+  /* ══════════════════════════════════════════════════════════════
+     UN RENGLÓN DEL INGENIERO PUEDE VALER MÁS DE UN SUBTIPO.
+
+     La traducción NO es uno a uno: el ingeniero escribe «LC y PH» —una sola
+     casilla en su planilla— y eso son DOS figuras normativas, porque la
+     licencia de construcción conlleva la aprobación de propiedad horizontal.
+     `LC, PH y LSU` son tres.
+
+     POR QUÉ ESTA PRUEBA EXISTE AQUÍ, si `catalogo-subtipos-normativo.test.ts`
+     ya cubre la expansión: porque cubre el RESOLUTOR, no a quien lo consume.
+     Medido por mutación el 31-ago-2026 — con `resolverEquivalencia` devolviendo
+     solo el primer código (`fila.codigos.slice(0, 1)`), la prueba del catálogo
+     se pone en 5 rojas y ESTE archivo seguía en 47 verdes. Es decir: nadie
+     comprobaba que el expediente MIGRADO naciera con sus dos subtipos.
+
+     Lo que se perdería en silencio no es cosmético: un expediente con
+     `['CONSTRUCCION']` en vez de `['CONSTRUCCION','APROBACION_PH']` pierde la
+     figura de PH —y con ella los requisitos y las vigencias que le
+     correspondan— sin que ningún rojo lo diga. */
+  it('un solo texto histórico puede expandirse a VARIOS subtipos en el expediente planificado', () => {
+    const plan = planificarImportacion(
+      snapshot([
+        registro({ radicado: '68745-0-26-0001', fila: 2, tipo: 'LC y PH' }),
+        registro({ radicado: '68745-0-26-0002', fila: 3, tipo: 'LC, PH y LSU' }),
+      ]),
+      AHORA,
+    );
+
+    const dos = plan.expedientes.find((e) => e.numeroExpediente?.numero === '68745-0-26-0001')
+      ?? plan.expedientes[0]!;
+    const tres = plan.expedientes.find((e) => e.numeroExpediente?.numero === '68745-0-26-0002')
+      ?? plan.expedientes[1]!;
+
+    expect(
+      dos.subtipos,
+      '«LC y PH» dejó de expandirse: el expediente perdió la figura de propiedad horizontal',
+    ).toEqual(['CONSTRUCCION', 'APROBACION_PH']);
+
+    expect(
+      tres.subtipos,
+      '«LC, PH y LSU» dejó de expandirse a sus tres figuras',
+    ).toEqual(['CONSTRUCCION', 'APROBACION_PH', 'SUBDIVISION_URBANA']);
+
+    // Y expandirse no es «no resolverse»: nada de esto va al informe de huecos.
+    expect(plan.subtiposSinResolver).toHaveLength(0);
+  });
+
   it('"LRC" (no sembrado, JAMÁS se mapea por norma) → se planifica con subtipos: ["LRC"], reportado en subtiposSinResolver', () => {
     const plan = planificarImportacion(snapshot([registro({ tipo: 'LRC', solicitanteDocumento: '1' })]), AHORA);
     expect(plan.reconciliacion.planificados).toBe(1);

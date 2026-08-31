@@ -3,7 +3,7 @@
 - **Estado:** ACEPTADO
 - **Fecha:** 30-ago-2026
 - **Decide:** el propietario, sobre la norma
-- **Relacionado:** ADR-0029 (cierra su «hueco 1»), ADR-0037 (correos de hitos), ADR-0033 §4.6-bis
+- **Relacionado:** ADR-0029 (cierra su «hueco 1»), ADR-0037 (correos de hitos), ADR-0033 §4.6-bis, **ADR-0039** (§6-bis se extrajo allí)
 - **Ampliado:** 30-ago-2026 — ver §9. Absorbe R19 y una SEGUNDA causa de suspensión.
 
 ---
@@ -170,26 +170,76 @@ captura**, porque eso serían dos fuentes disfrazadas de una.
 
 ## 6-bis. Cuándo SÍ se reescribe una prueba custodiada
 
-La regla de la casa es que los textos custodiados no se negocian: **si una prueba
-de *wording* se pone roja, el que está mal es el rediseño**. Esa regla sigue en
-pie y esa dirección es siempre la equivocada.
+> **La regla general vive ahora en el ADR-0039 — «Gobierno de las pruebas
+> custodias: cómo se prueba una, y cuándo se reescribe».**
+>
+> Esta sección NO desaparece: se conserva para que las citas existentes
+> —`ADR-0038 §6-bis`, en comentarios de pruebas y en commits— sigan
+> resolviendo. Lo que ya no está aquí es el criterio, para que no haya dos
+> copias que puedan divergir.
 
-Este ADR reescribió una: `panel-termino-dual-render`, que custodiaba las dos
-fechas del cómputo dual y la alerta sobre la más temprana.
+Se extrajo el 31-ago-2026. La regla llegó a este ADR porque **este ADR reescribió
+una custodiada** y documentó el criterio en el sitio; pero gobierna *cualquier*
+reescritura, y archivada bajo «el término se suspende» no la encontraba quien la
+necesitaba.
 
-**La distinción, escrita para que no se use como excusa:**
+**Lo que queda aquí es el caso, que sí es de este ADR:**
 
-| Se reescribe | NO se reescribe |
-|---|---|
-| Una **decisión documentada** retira lo que la prueba custodiaba, **con su fundamento delante** | Un cambio visual se topa con ella y resulta incómoda |
-| El invariante que sobrevive se conserva y se sigue probando | Se afloja «porque ahora se ve mejor» |
-| Queda escrito qué se retiró, por qué, y qué se conservó | Se actualiza en silencio para poner el verde |
+`panel-termino-dual-render` custodiaba las dos fechas del cómputo dual y la
+alerta sobre la más temprana. Este ADR retiró el doble cómputo **citando el
+artículo**. Lo que sobrevive —que la alerta va sobre la fecha operativa con su
+`role="alert"`, y que el estado vacío distingue el histórico migrado del real sin
+radicar— sigue custodiado, y se añadió lo que la decisión exige: que la pantalla
+**cite el artículo** y ya no diga «pendiente de concepto».
 
-Aquí: el ADR retiró el doble cómputo citando el artículo. Lo que sobrevive —que
-la alerta va sobre la fecha operativa con su `role="alert"`, y que el estado
-vacío distingue el histórico migrado del real sin radicar— sigue custodiado, y
-se añadió lo que la decisión exige: que la pantalla **cite el artículo** y ya no
-diga «pendiente de concepto».
+Los tres criterios que lo autorizaron —decisión documentada con su fundamento
+delante, invariante superviviente conservado, y constancia escrita de qué se
+retiró— están en el **ADR-0039 §3**.
+
+## 6-ter. «Construido y nunca pintado» — el patrón, y la regla que lo cierra
+
+Cuarta aparición, y con la cuarta deja de ser anécdota. Decisión del propietario,
+31-ago-2026:
+
+> **Cada vez que un dato se persiste «para que la pantalla lo muestre», el mismo
+> PR abre la pantalla o deja la prueba que falla si no la abre. Persistir sin
+> consumidor es la mitad de un trabajo que se cuenta como entero.**
+
+### Las cuatro
+
+| # | Qué se construyó | Qué faltó | Cómo se descubrió |
+|---|---|---|---|
+| 1 | El cómputo de la debida forma, servido en `computos.debidaForma` | El cliente leía `body.debidaForma` — **el botón nunca se pintó** | El propietario, mirando la pantalla |
+| 2 | El resolutor de destinatario, con su precedencia y sus pruebas | El expediente no guardaba correo: **el correo salía perfecto hacia nadie** | Leyendo la decisión D2, que lo decía literal |
+| 3 | El acto de trámite del art. 2.2.6.1.2.3.1 | Ninguna actuación lo producía: **cuarto sin puerta** (R19) | Derivando la pantalla del mapa de transiciones |
+| 4 | `fechaAlertaConservadora`, persistida y servida por fila | **Ninguna pantalla la leía.** Veinte días | El propietario, preguntando qué faltaba en la bandeja |
+
+### Por qué la cuarta es la más instructiva
+
+No fue un olvido: fue **una contradicción documentada en tres sitios a la vez**.
+
+- La ruta la daba por **«RESUELTO»** — y servir no es mostrar.
+- El panel del vigía omitía la fecha por expediente *«porque la bandeja ya lo
+  muestra en cada fila»*.
+- La bandeja declaraba que **«NUNCA muestra una fecha de vence»**, por una razón
+  —«sin actuaciones no hay forma honesta de proyectarlo»— que **era cierta cuando
+  se escribió y dejó de serlo** al persistirse el espejo, sin que nadie volviera a
+  esa cabecera.
+
+Cada uno omitía la fecha creyendo que la ponía otro. **Un comentario que envejece
+mal no es documentación desactualizada: es una instrucción vigente que manda hacer
+lo contrario de lo que hace falta.**
+
+### Cómo se cumple la regla
+
+Con una prueba de ALCANZABILIDAD, que se pone roja si la pantalla deja de pintar
+el dato. La de esta cuarta es `__tests__/bandeja-vence-alcanzable.test.tsx`, y está
+verificada por mutación en sus dos mitades: arrancar la celda pone **6 pruebas en
+rojo**; arrancar la cabecera, **1**.
+
+No sirve una prueba que compruebe que el dato SE PERSISTE —esa ya existía en las
+cuatro— ni que el `fetch` lo trae. Tiene que montar la pantalla y buscar el dato
+donde lo vería una persona.
 
 ## 7. Consecuencias
 
