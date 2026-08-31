@@ -3,7 +3,7 @@
 - **Estado:** ACEPTADO
 - **Fecha:** 30-ago-2026
 - **Decide:** el propietario, sobre la norma
-- **Relacionado:** ADR-0029 (cierra su «hueco 1»), ADR-0037 (correos de hitos), ADR-0033 §4.6-bis
+- **Relacionado:** ADR-0029 (cierra su «hueco 1»), ADR-0037 (correos de hitos), ADR-0033 §4.6-bis, **ADR-0039** (§6-bis se extrajo allí)
 - **Ampliado:** 30-ago-2026 — ver §9. Absorbe R19 y una SEGUNDA causa de suspensión.
 
 ---
@@ -170,26 +170,31 @@ captura**, porque eso serían dos fuentes disfrazadas de una.
 
 ## 6-bis. Cuándo SÍ se reescribe una prueba custodiada
 
-La regla de la casa es que los textos custodiados no se negocian: **si una prueba
-de *wording* se pone roja, el que está mal es el rediseño**. Esa regla sigue en
-pie y esa dirección es siempre la equivocada.
+> **La regla general vive ahora en el ADR-0039 — «Gobierno de las pruebas
+> custodias: cómo se prueba una, y cuándo se reescribe».**
+>
+> Esta sección NO desaparece: se conserva para que las citas existentes
+> —`ADR-0038 §6-bis`, en comentarios de pruebas y en commits— sigan
+> resolviendo. Lo que ya no está aquí es el criterio, para que no haya dos
+> copias que puedan divergir.
 
-Este ADR reescribió una: `panel-termino-dual-render`, que custodiaba las dos
-fechas del cómputo dual y la alerta sobre la más temprana.
+Se extrajo el 31-ago-2026. La regla llegó a este ADR porque **este ADR reescribió
+una custodiada** y documentó el criterio en el sitio; pero gobierna *cualquier*
+reescritura, y archivada bajo «el término se suspende» no la encontraba quien la
+necesitaba.
 
-**La distinción, escrita para que no se use como excusa:**
+**Lo que queda aquí es el caso, que sí es de este ADR:**
 
-| Se reescribe | NO se reescribe |
-|---|---|
-| Una **decisión documentada** retira lo que la prueba custodiaba, **con su fundamento delante** | Un cambio visual se topa con ella y resulta incómoda |
-| El invariante que sobrevive se conserva y se sigue probando | Se afloja «porque ahora se ve mejor» |
-| Queda escrito qué se retiró, por qué, y qué se conservó | Se actualiza en silencio para poner el verde |
+`panel-termino-dual-render` custodiaba las dos fechas del cómputo dual y la
+alerta sobre la más temprana. Este ADR retiró el doble cómputo **citando el
+artículo**. Lo que sobrevive —que la alerta va sobre la fecha operativa con su
+`role="alert"`, y que el estado vacío distingue el histórico migrado del real sin
+radicar— sigue custodiado, y se añadió lo que la decisión exige: que la pantalla
+**cite el artículo** y ya no diga «pendiente de concepto».
 
-Aquí: el ADR retiró el doble cómputo citando el artículo. Lo que sobrevive —que
-la alerta va sobre la fecha operativa con su `role="alert"`, y que el estado
-vacío distingue el histórico migrado del real sin radicar— sigue custodiado, y
-se añadió lo que la decisión exige: que la pantalla **cite el artículo** y ya no
-diga «pendiente de concepto».
+Los tres criterios que lo autorizaron —decisión documentada con su fundamento
+delante, invariante superviviente conservado, y constancia escrita de qué se
+retiró— están en el **ADR-0039 §3**.
 
 ## 7. Consecuencias
 
