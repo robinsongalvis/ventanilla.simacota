@@ -11,6 +11,21 @@ import { CATALOGO_FIGURAS_NORMATIVAS, type TipoFigura } from '@/lib/motor-expedi
    Presentación PURA: el estado de selección vive en el formulario que lo
    usa (mismo patrón `checked` + `onChange` que tenía el modal original) —
    este componente no llama al servidor ni conoce el resto del formulario.
+
+   SIN CÓDIGOS INTERNOS (31-ago-2026, decisión del propietario). Cada opción
+   mostraba su `codigo` entre paréntesis —`(SUBDIVISION_RURAL)`, `(CONSTRUCCION)`—
+   ocupando casi la mitad del renglón. Se quitaron porque NO le sirven a nadie
+   de este lado del mostrador, y eso está verificado contra la fuente, no
+   supuesto: el ingeniero de Planeación escribe `LSR`, `LSU`, `LC`, `LU`, `LR`,
+   `PH` en su planilla, y existe una tabla —`EQUIVALENCIAS_MIGRACION_SEMILLA_
+   LICENCIAS`, en el catálogo— cuyo único trabajo es traducir lo suyo a estos
+   códigos. Son dos vocabularios distintos, y ni siquiera uno a uno: `LC y PH`
+   se traduce en DOS códigos. Mostrar el nuestro no ayuda a casar con el
+   expediente físico; solo estorba la lectura.
+
+   El código sigue siendo la identidad del subtipo en los datos y en la API —
+   solo deja de pintarse. `__tests__/subtipos-sin-codigos-internos.test.tsx`
+   se pone rojo si vuelve.
 ══════════════════════════════════════════════════════════════ */
 
 const TITULO_GRUPO: Record<TipoFigura, string> = {
@@ -55,9 +70,7 @@ export function SelectorSubtiposNormativos({ seleccionados, onAlternar, error }:
                       onChange={() => onAlternar(f.codigo)}
                       className="mt-0.5 h-4 w-4 rounded border-[#D9E2D9] accent-[#14532D] focus-visible:outline-none focus-visible:ring-2"
                     />
-                    <span>
-                      {f.nombre} <span className="font-mono text-[11px]" style={{ color: '#94A3B8' }}>({f.codigo})</span>
-                    </span>
+                    <span>{f.nombre}</span>
                   </label>
                 ))}
               </div>
