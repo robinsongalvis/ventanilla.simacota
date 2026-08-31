@@ -191,6 +191,51 @@ vacío distingue el histórico migrado del real sin radicar— sigue custodiado,
 se añadió lo que la decisión exige: que la pantalla **cite el artículo** y ya no
 diga «pendiente de concepto».
 
+## 6-ter. «Construido y nunca pintado» — el patrón, y la regla que lo cierra
+
+Cuarta aparición, y con la cuarta deja de ser anécdota. Decisión del propietario,
+31-ago-2026:
+
+> **Cada vez que un dato se persiste «para que la pantalla lo muestre», el mismo
+> PR abre la pantalla o deja la prueba que falla si no la abre. Persistir sin
+> consumidor es la mitad de un trabajo que se cuenta como entero.**
+
+### Las cuatro
+
+| # | Qué se construyó | Qué faltó | Cómo se descubrió |
+|---|---|---|---|
+| 1 | El cómputo de la debida forma, servido en `computos.debidaForma` | El cliente leía `body.debidaForma` — **el botón nunca se pintó** | El propietario, mirando la pantalla |
+| 2 | El resolutor de destinatario, con su precedencia y sus pruebas | El expediente no guardaba correo: **el correo salía perfecto hacia nadie** | Leyendo la decisión D2, que lo decía literal |
+| 3 | El acto de trámite del art. 2.2.6.1.2.3.1 | Ninguna actuación lo producía: **cuarto sin puerta** (R19) | Derivando la pantalla del mapa de transiciones |
+| 4 | `fechaAlertaConservadora`, persistida y servida por fila | **Ninguna pantalla la leía.** Veinte días | El propietario, preguntando qué faltaba en la bandeja |
+
+### Por qué la cuarta es la más instructiva
+
+No fue un olvido: fue **una contradicción documentada en tres sitios a la vez**.
+
+- La ruta la daba por **«RESUELTO»** — y servir no es mostrar.
+- El panel del vigía omitía la fecha por expediente *«porque la bandeja ya lo
+  muestra en cada fila»*.
+- La bandeja declaraba que **«NUNCA muestra una fecha de vence»**, por una razón
+  —«sin actuaciones no hay forma honesta de proyectarlo»— que **era cierta cuando
+  se escribió y dejó de serlo** al persistirse el espejo, sin que nadie volviera a
+  esa cabecera.
+
+Cada uno omitía la fecha creyendo que la ponía otro. **Un comentario que envejece
+mal no es documentación desactualizada: es una instrucción vigente que manda hacer
+lo contrario de lo que hace falta.**
+
+### Cómo se cumple la regla
+
+Con una prueba de ALCANZABILIDAD, que se pone roja si la pantalla deja de pintar
+el dato. La de esta cuarta es `__tests__/bandeja-vence-alcanzable.test.tsx`, y está
+verificada por mutación en sus dos mitades: arrancar la celda pone **6 pruebas en
+rojo**; arrancar la cabecera, **1**.
+
+No sirve una prueba que compruebe que el dato SE PERSISTE —esa ya existía en las
+cuatro— ni que el `fetch` lo trae. Tiene que montar la pantalla y buscar el dato
+donde lo vería una persona.
+
 ## 7. Consecuencias
 
 - **El panel deja de mostrar dos fechas.** La funcionaria ve una, con su artículo.

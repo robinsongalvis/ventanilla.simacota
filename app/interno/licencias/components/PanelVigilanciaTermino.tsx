@@ -11,8 +11,15 @@ import type { ResumenCorrida } from '@/lib/server/vigilancia-termino';
    recalculara, podría decir algo distinto del correo del mismo día y habría dos
    verdades sobre el mismo hecho.
 
-   No repite el «vence» por expediente —la bandeja ya lo muestra en cada fila—:
-   aquí va solo el agregado, que es lo que no existía.
+   No repite el «vence» por expediente —la columna «Vence» de la bandeja lo
+   muestra en cada fila—: aquí va solo el agregado, que es lo que no existía.
+
+   OJO, PORQUE ESTA FRASE FUE FALSA DURANTE VEINTE DÍAS. Este panel se escribió
+   dando por hecho que la bandeja pintaba el «vence» por fila, y la bandeja
+   declaraba en su cabecera que NUNCA lo pintaría. Cada uno omitía la fecha
+   creyendo que la ponía el otro, así que no la ponía nadie: el dato viajaba
+   hasta el navegador y ninguna pantalla lo consumía. Se cerró el 31-ago-2026
+   añadiendo la columna. Si algún día se quita, hay que volver AQUÍ.
 
    LOS TRES SILENCIOS, QUE NO SON EL MISMO:
      · nunca ha corrido  → el vigía no se ha ejecutado. Eso es una avería.

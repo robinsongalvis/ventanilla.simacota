@@ -9,15 +9,30 @@
    'include'})`, igual que el resto de `/interno/*` (`app/interno/
    dashboard/page.tsx`).
 
-   DIFERENCIA DE ALCANCE frente a los fixtures que reemplaza: la lista NO
-   trae `actuaciones` (evitar N+1 lecturas por fila — el detalle sí las
-   trae). Sin actuaciones no hay forma honesta de proyectar un vencimiento
-   por fila aquí (el cómputo dual vive en el Detalle, que sí tiene los
-   hechos). Por eso esta bandeja NUNCA muestra una fecha de "vence" ni un
-   semáforo por fecha — el Estado que se pinta es el ESTADO JURÍDICO real
-   (`ChipEstadoJuridico`), no el semáforo `EstadoLicenciaUI` que usaban los
-   fixtures (ese sigue vivo en `ChipEstado`, pero solo para el preview de
-   componentes — ver `fixtures.ts`).
+   LA COLUMNA «VENCE» (31-ago-2026). Esta cabecera decía, hasta hoy, que la
+   bandeja «NUNCA muestra una fecha de vence ni un semáforo por fecha»,
+   porque la lista no trae `actuaciones` y sin ellas no había forma honesta
+   de proyectar un vencimiento por fila.
+
+   ERA CIERTO CUANDO SE ESCRIBIÓ Y DEJÓ DE SERLO. El bloque «Términos y
+   vigencias protectores» (10-ago-2026) persistió `fechaAlertaConservadora`
+   en el documento raíz del expediente PRECISAMENTE para que esta lista
+   pudiera pintarlo sin lecturas nuevas — y nadie volvió a corregir este
+   párrafo. Durante veinte días el dato viajó hasta el navegador y ninguna
+   pantalla lo pintó: la funcionaria abría la bandeja y no podía ver a cuál
+   se le acababa el tiempo sin entrar uno por uno.
+
+   Sigue en pie lo que no ha cambiado: la lista NO trae `actuaciones`
+   (evitar N+1 — el detalle sí las trae) y aquí NO se calcula nada. Se lee
+   el espejo denormalizado y se clasifica con `clasificarFrenteAlTermino`,
+   LA MISMA función que usa el cron del vigía y que pinta el detalle: si
+   cada pantalla tuviera la suya, el correo diría una cosa y la bandeja otra
+   sobre el mismo plazo.
+
+   El Estado que se pinta sigue siendo el ESTADO JURÍDICO real
+   (`ChipEstadoJuridico`), no el semáforo `EstadoLicenciaUI` de los fixtures
+   (ese sigue vivo en `ChipEstado`, solo para el preview — ver
+   `fixtures.ts`). Son dos cosas distintas y ahora conviven en dos columnas.
 
    Bloque C: el botón "Exportar libro consecutivo ↓" del pie YA NO es
    `BotonAccionPlaceholder` — el Libro Consecutivo real existe
@@ -36,6 +51,11 @@ import type { EstadoJuridicoLicencia } from '@/lib/motor-expedientes/estados-lic
 import { formatFechaColombia } from '@/lib/fecha-colombia';
 import { nombreSubtipo } from '../presentacion-subtipos';
 import { camposBusquedaDesdeExpediente, coincideBusquedaLibro } from '../presentacion-libro-consecutivo';
+import {
+  clasificarFrenteAlTermino,
+  ETIQUETA_NIVEL_TERMINO,
+  COLOR_NIVEL_TERMINO,
+} from '@/lib/motor-expedientes/semaforo-termino';
 import { ChipEstadoJuridico } from './ChipEstadoJuridico';
 import { ChipPrueba } from './ChipPrueba';
 import { NumeroLegal } from './NumeroLegal';
@@ -172,6 +192,11 @@ export function BandejaLicenciasClient({ onAbrirExpediente, onIrALibroConsecutiv
     return { enTramite, conActa, resueltos, esperandoHaceMas, totalContable: contables.length };
   }, [expedientes]);
 
+  /* Una sola lectura del reloj por montaje: si cada fila llamara a `new Date()`
+     por su cuenta, dos filas de la misma tabla podrían caer a lados distintos de
+     la medianoche y la lista se contradiría consigo misma. */
+  const ahora = useMemo(() => new Date(), []);
+
   const totalPrueba = useMemo(() => expedientes.filter((e) => e.esPrueba).length, [expedientes]);
 
   const terminoBusqueda = busqueda.trim();
@@ -296,20 +321,21 @@ export function BandejaLicenciasClient({ onAbrirExpediente, onIrALibroConsecutiv
                 <Th>Solicitante</Th>
                 <Th ancho={220}>Subtipos</Th>
                 <Th ancho={200}>Estado jurídico</Th>
+                <Th ancho={190}>Vence</Th>
                 <Th ancho={120}>Creado</Th>
               </tr>
             </thead>
             <tbody>
               {cargando && (
                 <tr>
-                  <td colSpan={5} className="px-3 py-8 text-center text-sm" style={{ color: 'var(--text-secondary)' }}>
+                  <td colSpan={6} className="px-3 py-8 text-center text-sm" style={{ color: 'var(--text-secondary)' }}>
                     Cargando expedientes…
                   </td>
                 </tr>
               )}
               {!cargando && !error && expedientes.length === 0 && (
                 <tr>
-                  <td colSpan={5} className="px-3 py-10 text-center">
+                  <td colSpan={6} className="px-3 py-10 text-center">
                     <p className="text-sm font-medium" style={{ color: 'var(--text-primary)' }}>
                       Sin expedientes aún — radica el primero
                     </p>
@@ -326,7 +352,7 @@ export function BandejaLicenciasClient({ onAbrirExpediente, onIrALibroConsecutiv
               )}
               {!cargando && expedientes.length > 0 && expedientesVisibles.length === 0 && (
                 <tr>
-                  <td colSpan={5} className="px-3 py-10 text-center text-sm" style={{ color: 'var(--text-primary)' }}>
+                  <td colSpan={6} className="px-3 py-10 text-center text-sm" style={{ color: 'var(--text-primary)' }}>
                     <div className="flex flex-col items-center gap-2">
                       <p className="font-medium">Sin resultados para &quot;{terminoBusqueda}&quot;</p>
                       <button
@@ -378,6 +404,9 @@ export function BandejaLicenciasClient({ onAbrirExpediente, onIrALibroConsecutiv
                     <td className="px-3 py-2.5 align-top">
                       <ChipEstadoJuridico estado={exp.estadoJuridico} />
                     </td>
+                    <td className="px-3 py-2.5 align-top">
+                      <CeldaVence expediente={exp} ahora={ahora} />
+                    </td>
                     <td className="px-3 py-2.5 align-top" style={{ color: 'var(--text-primary)' }}>
                       {formatFechaColombia(exp.creadoEn)}
                     </td>
@@ -406,6 +435,82 @@ export function BandejaLicenciasClient({ onAbrirExpediente, onIrALibroConsecutiv
         <CrearDesdeRadicadoModal onCerrar={() => setModalDesdeRadicadoAbierto(false)} onCreado={() => void cargar()} />
       )}
     </div>
+  );
+}
+
+/* ══════════════════════════════════════════════════════════════
+   LA CELDA «VENCE».
+
+   No calcula: lee el espejo `fechaAlertaConservadora` que el servidor persiste
+   y lo pasa por `clasificarFrenteAlTermino` — la MISMA función del cron del
+   vigía y del detalle. Las etiquetas y los colores también son los suyos
+   (`ETIQUETA_NIVEL_TERMINO`, `COLOR_NIVEL_TERMINO`), que a su vez son los del
+   correo carácter por carácter. Una sola verdad sobre el plazo.
+
+   LAS CUATRO SITUACIONES SE PINTAN DISTINTO, y eso es el punto: un panel que
+   pinta igual «no ha empezado», «está detenido» y «ya se resolvió» es el fallo
+   PT-2 llevado a la pantalla. Ninguna de las tres es «le quedan N días».
+
+   OJO CON `SIN_ANCLAR` (ADR-0033 §4.6-bis): tapa dos casos que el contrato del
+   campo distingue — `undefined` (expediente anterior al campo: no se sabe) y
+   `null` (histórico reconstruido: no hay término vivo que proyectar). Aquí se
+   pintan igual, y NO se separan a propósito: quien conflaciona es
+   `clasificarFrenteAlTermino`, y separarlos solo aquí haría que la pantalla
+   dijera algo distinto del correo del mismo día. Si un día hay que
+   distinguirlos, se distingue EN LA FUNCIÓN, y las dos lo heredan.
+══════════════════════════════════════════════════════════════ */
+function CeldaVence({ expediente, ahora }: { expediente: ExpedienteLicenciaDoc; ahora: Date }) {
+  const fila = clasificarFrenteAlTermino(
+    {
+      id: expediente.id,
+      estadoJuridico: expediente.estadoJuridico,
+      creadoEn: expediente.creadoEn,
+      numeroExpediente: expediente.numeroExpediente,
+      fechaAlertaConservadora: expediente.fechaAlertaConservadora,
+    },
+    ahora,
+  );
+
+  if (fila.situacion === 'RESUELTO') {
+    return <span style={{ color: 'var(--text-secondary)' }}>Resuelto</span>;
+  }
+
+  if (fila.situacion === 'SUSPENDIDO') {
+    return (
+      <span style={{ color: 'var(--text-secondary)' }} title={fila.fundamentoSuspension}>
+        Suspendido
+      </span>
+    );
+  }
+
+  if (fila.situacion === 'SIN_ANCLAR') {
+    return (
+      <span style={{ color: 'var(--text-secondary)' }}>
+        Sin anclar
+        {typeof fila.diasHabilesEnEspera === 'number' && (
+          <>
+            {' · '}
+            <span>{fila.diasHabilesEnEspera} d. hábiles esperando</span>
+          </>
+        )}
+      </span>
+    );
+  }
+
+  // CORRIENDO — la única situación con fecha y con escalón.
+  const color = fila.nivel ? COLOR_NIVEL_TERMINO[fila.nivel] : 'var(--text-primary)';
+  return (
+    <span style={{ color }} title={fila.nivel ? ETIQUETA_NIVEL_TERMINO[fila.nivel] : undefined}>
+      {formatFechaColombia(expediente.fechaAlertaConservadora as string)}
+      {typeof fila.diasHabilesRestantes === 'number' && (
+        <>
+          {' · '}
+          <span className={fila.nivel ? 'font-semibold' : undefined}>
+            {fila.diasHabilesRestantes} d. hábiles
+          </span>
+        </>
+      )}
+    </span>
   );
 }
 
