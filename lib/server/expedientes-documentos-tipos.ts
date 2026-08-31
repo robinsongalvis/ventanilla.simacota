@@ -197,8 +197,17 @@ export function construirStoragePathStaging(requestId: string, archivo: string):
 /**
  * Validación estructural de una ruta FINAL para la futura descarga
  * autorizada (patrón `parsearPathArchivo`,
- * lib/seguridad/autorizar-descarga-archivo.ts — deliberadamente
- * restrictiva: sin `..`, sin `//`, sin caracteres de control).
+ * lib/seguridad/autorizar-descarga-archivo.ts).
+ *
+ * ATENCIÓN — lo que esta expresión NO rechaza: `..` como NOMBRE DE
+ * ARCHIVO. En `expedienteId`/`documentoId` no cabe (su alfabeto no tiene
+ * punto) y en la versión tampoco (`v\d{4}`), pero el último segmento sí
+ * lo admite: `expedientes/<exp>/<doc>/v0001/..` le encaja entero.
+ * Comprobado ejecutándola. Quien filtra eso es la guarda
+ * `path.includes('..')` de `parsearPathDocumentoExpediente` —gemela de
+ * la de `parsearPathArchivo`—, NO este regex: no la quites. La vigila
+ * `__tests__/autorizar-descarga-archivo.test.ts`, bloque «travesía de
+ * directorios».
  *
  * Alfabeto de `expedienteId`/`documentoId`: `[A-Za-z0-9-]` (UUID y
  * auto-id de Firestore) — SIN `_`, para que `_pendientes` (staging)
