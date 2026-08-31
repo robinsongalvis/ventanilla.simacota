@@ -1,6 +1,14 @@
 import { readFileSync } from 'node:fs';
 import { describe, it, expect } from 'vitest';
 import {
+  leerWorkflowCI,
+  pasosDelJob,
+  pasoConId,
+  salidasDelJob,
+  clavesDelJob,
+  dependenciasDelJob,
+} from './utiles/workflow-ci';
+import {
   encontrarBloques,
   extraerCampos,
   existeIndiceCompuesto,
@@ -324,21 +332,108 @@ describe('cableado del gate — package.json y CI', () => {
     expect(pkg.scripts['verificar:indices']).toBe('node scripts/laboratorio/verificar-indices.mjs');
   });
 
-  it('ci.yml corre el gate en el job validate, después del presupuesto de rendimiento', () => {
-    const ci = readFileSync('.github/workflows/ci.yml', 'utf8');
-    expect(ci).toContain('id: indices');
-    expect(ci).toContain('run: npm run verificar:indices');
+  /*
+   * ALCANCE (ADR-0033 §4.6-bis) — lo que miran las pruebas de abajo: el
+   * CABLEADO del gate en `.github/workflows/ci.yml`. Que el paso exista en el
+   * job de controles, que su comando sea el del gate y NADA MÁS, que un fallo
+   * suyo ponga el job en rojo, y que su veredicto llegue al informe de
+   * gobernanza por sus TRES eslabones: salida del job → `needs` → `env`. Lo
+   * que NO miran: qué detecta el gate —eso es todo lo de arriba, sobre el
+   * analizador—, los disparadores del workflow (`on:`) ni que la rama esté
+   * protegida en GitHub, que vive fuera del repositorio.
+   *
+   * POR QUÉ YA NO SON `toContain` (barrido de dobles verdes, 30-ago-2026): la
+   * versión anterior aseveraba `toContain('run: npm run verificar:indices')`
+   * sobre el archivo ENTERO. Se le añadió al paso un `|| true` —con lo que el
+   * gate deja de poder fallar el job y encima reporta `success` al informe de
+   * gobernanza, que lo pinta VERDE— y la prueba siguió pasando: la subcadena
+   * seguía ahí, con la neutralización detrás. Un gate que no puede fallar es
+   * peor que no tenerlo: ocupa la casilla y nadie vuelve a mirar. Y este
+   * existe por el incidente del Reparto.
+   */
 
-    const posPresupuesto = ci.indexOf('id: presupuesto');
-    const posIndices = ci.indexOf('id: indices');
-    expect(posPresupuesto).toBeGreaterThan(-1);
-    expect(posIndices).toBeGreaterThan(posPresupuesto);
+  // El workflow se lee DENTRO de cada prueba, no en el cuerpo del `describe`:
+  // el lector LANZA cuando no encuentra la forma que espera, y esa explosión
+  // debe tumbar la prueba que lo afirma — no la recolección del archivo, que
+  // se llevaría por delante las 30 pruebas del analizador con un error de
+  // importación.
+  const workflow = () => leerWorkflowCI();
+  const pasosDeControl = () => pasosDelJob(workflow(), 'validate');
+  const gateDeIndices = () => pasoConId(pasosDeControl(), 'indices', 'validate');
+
+  /* `||` y `;` se comen el código de salida de lo que llevan delante (`cmd ||
+     true`, `cmd ; true`). `&&` y `|` no: con `-eo pipefail` —el shell por
+     defecto de un `run:` en Linux— siguen propagando el fallo. Es una lista de
+     patrones conocidos, no una demostración: cierra la forma barata de
+     neutralizar un control, no todas las imaginables. La igualdad exacta sobre
+     el `run` del gate de índices, más abajo, ésa sí es cierre completo. */
+  const NEUTRALIZADORES = /(\|\||;)/;
+
+  it('el lector del workflow ve de verdad los pasos del job (si viera una lista vacía, lo demás sería vacuo)', () => {
+    const pasos = pasosDeControl();
+
+    expect(pasos.map((paso) => paso.id)).toEqual(
+      expect.arrayContaining(['lint', 'tsc', 'test', 'presupuesto', 'indices', 'audit', 'build']),
+    );
+    // Todo paso hace algo: o corre un comando, o usa una acción.
+    expect(pasos.filter((paso) => paso.run === null && paso.usa === null)).toEqual([]);
+  });
+
+  it('el gate corre en el job validate, después del presupuesto de rendimiento', () => {
+    const ids = pasosDeControl().map((paso) => paso.id);
+
+    expect(ids.indexOf('presupuesto')).toBeGreaterThan(-1);
+    expect(ids.indexOf('indices')).toBeGreaterThan(ids.indexOf('presupuesto'));
+  });
+
+  it('el comando del paso es EXACTAMENTE el del gate: nada detrás que se coma su código de salida', () => {
+    // Igualdad, no `toContain`: `|| true`, `; true` o un segundo comando dejan
+    // la subcadena intacta y el paso en verde pase lo que pase.
+    expect(gateDeIndices().run).toBe('npm run verificar:indices');
+  });
+
+  it('el gate NO lleva continue-on-error: si el gate falla, el job queda en rojo', () => {
+    expect(gateDeIndices().continuarSiFalla).toBeNull();
+  });
+
+  it('el JOB tampoco lleva continue-on-error: no se neutralizan los siete controles de una vez', () => {
+    // `continue-on-error: true` a la altura del job —dos líneas más arriba que
+    // el paso, igual de fácil de escribir— deja el job en VERDE aunque los
+    // siete controles fallen, y la comprobación por paso no lo ve.
+    expect(clavesDelJob(workflow(), 'validate')['continue-on-error']).toBeUndefined();
   });
 
   it('el paso corre con if: !cancelled(), igual que los demás controles del job', () => {
-    const ci = readFileSync('.github/workflows/ci.yml', 'utf8');
-    const bloque = ci.slice(ci.indexOf('id: indices') - 60, ci.indexOf('id: indices') + 120);
-    expect(bloque).toContain("if: ${{ !cancelled() }}");
+    expect(gateDeIndices().si).toBe('${{ !cancelled() }}');
+  });
+
+  it('el veredicto del gate llega al informe de gobernanza por sus tres eslabones (ADR-0013)', () => {
+    // El informe pinta la categoría con lo que el job publique. Romper
+    // CUALQUIERA de los tres eslabones deja la fuente sin dato, y una fuente
+    // sin dato no se pinta verde pero sí AMBER (`desdeOutcome`), que sale con
+    // exit 0 y NO bloquea el merge: el semáforo deja de bloquear por ausencia
+    // de señal en vez de por mérito. Ésa es la otra mitad del daño de un
+    // `|| true`. El eslabón `needs` importa tanto como los otros dos: sin
+    // `validate` en él, `needs.validate.outputs.*` se evalúa a vacío y los
+    // NUEVE OUTCOME_* se apagan de golpe sin tocar una letra del `env:`.
+    expect(salidasDelJob(workflow(), 'validate').indices).toBe('${{ steps.indices.outcome }}');
+    expect(dependenciasDelJob(workflow(), 'informe-despliegue')).toContain('validate');
+
+    const generarInforme = pasosDelJob(workflow(), 'informe-despliegue')
+      .filter((paso) => paso.run?.includes('informe-despliegue.mjs'));
+    expect(generarInforme).toHaveLength(1);
+    expect(generarInforme[0]!.env.OUTCOME_INDICES).toBe('${{ needs.validate.outputs.indices }}');
+  });
+
+  it('NINGÚN control del job se neutraliza a sí mismo — el mismo fallo, en los hermanos', () => {
+    // Se comprueba en todos porque el defecto es de familia, no del gate de
+    // índices: el `|| true` cabe igual en lint, en tsc o en la auditoría. Si
+    // algún día un paso necesitara de verdad no fallar, la decisión se toma
+    // aquí, a la vista, y no de tapadillo en el YAML.
+    const debiles = pasosDeControl().filter(
+      (paso) => paso.continuarSiFalla !== null || (paso.run !== null && NEUTRALIZADORES.test(paso.run)),
+    );
+    expect(debiles.map((paso) => paso.id ?? paso.nombre)).toEqual([]);
   });
 });
 

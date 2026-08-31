@@ -53,6 +53,11 @@ vi.mock('@/lib/observabilidad/eventos-negocio', () => ({
 }));
 
 import { GET, auditarCounterExpedientes } from '@/app/api/cron/auditoria-consecutivos/route';
+/* Los nombres de colección salen del MISMO registro que recorre el cron. Si
+   alguien renombra una colección, el fixture la sigue; escritos a mano, el mock
+   dejaría de coincidir en silencio, la barrida leería una colección vacía y las
+   pruebas de más abajo volverían a pasar por el motivo equivocado. */
+import { COLECCION_POR_SERIE } from '@/scripts/laboratorio/detectar-consecutivos-fantasma.mjs';
 
 const ENV_ORIGINAL = { ...process.env };
 
@@ -329,11 +334,30 @@ describe('cron/auditoria-consecutivos — vigilancia de coherencia con la apertu
     process.env.CRON_SECRET = 'secreto-real';
   });
 
+  /** Los documentos 1..n REALMENTE persistidos de una serie, con el formato de
+      id que cada una usa (`1-110-{año}-{8 dígitos}` radicados, `2-110-…`
+      salidas) — el único que `perteneceAlAnio`/`consecutivoDeId` reconocen. */
+  function docsPersistidos(prefijo: string, n: number, anio: number) {
+    return Array.from({ length: n }, (_, i) => ({
+      id: `${prefijo}-${anio}-${String(i + 1).padStart(8, '0')}`,
+    }));
+  }
+
   /* El caso que motiva la vigilancia: el contador declara haberse abierto en
-     1600 y está en 27. No hay huecos ni duplicados que ver —los documentos de
-     la serie ni siquiera existen todavía— así que las dos capas anteriores
-     callan y solo esta lo nota. */
-  it('detecta un contador movido hacia atrás por fuera y lo reporta como hallazgo', async () => {
+     1600 y está en 27. Las dos capas anteriores no tienen nada que decir —la
+     serie está impecable: 27 consecutivos consumidos y sus 27 documentos
+     existen, ni un hueco ni un duplicado— y solo esta lo nota.
+
+     POR QUÉ EL FIXTURE TRAE LOS 27 DOCUMENTOS (ADR-0033 §4.6-ter: un detector
+     no se da por bueno hasta verlo fallar). Antes la colección se dejaba
+     VACÍA, y un contador en 27 sin documentos son 27 HUECOS: el correo salía
+     por ellos y la incoherencia viajaba de polizón. Se comprobó por mutación —
+     quitando `contadoresIncoherentes.length` del total de hallazgos, la prueba
+     seguía verde. Con la serie limpia, el contador incoherente es el ÚNICO
+     motivo posible del aviso: si deja de sumar, el cron se calla y esto se
+     pone rojo. */
+  it('un contador movido hacia atrás es, él solo, motivo suficiente para que el cron avise', async () => {
+    const anio = new Date().getFullYear();
     mockCounterGet.mockImplementation(async (path: string) =>
       path.startsWith('counters/radicados-')
         ? {
@@ -348,33 +372,71 @@ describe('cron/auditoria-consecutivos — vigilancia de coherencia con la apertu
           }
         : { data: () => ({ ultimo: 0 }) },
     );
+    mockCollectionGet.mockImplementation(async (coleccion: string) =>
+      coleccion === COLECCION_POR_SERIE.radicados
+        ? { docs: docsPersistidos('1-110', 27, anio) }
+        : { docs: [] },
+    );
 
     const res = await GET(reqConSecreto());
     const data = await res.json();
 
     expect(res.status).toBe(200);
+
+    /* 1. La premisa, aseverada y no supuesta: continuidad y unicidad callan.
+          Si algún día dejan de callar, esta prueba deja de probar lo que
+          promete — y hay que enterarse aquí, no por una mutación. */
+    expect(data.series.radicados.documentos).toBe(27);
+    expect(data.series.radicados.huecos).toEqual([]);
+    expect(data.series.radicados.duplicados).toEqual([]);
+
+    // 2. El hallazgo, con su serie y sus dos números.
     expect(data.contadoresIncoherentes).toHaveLength(1);
     expect(data.contadoresIncoherentes[0]).toMatch(/radicados/);
     expect(data.contadoresIncoherentes[0]).toMatch(/1600/);
     expect(data.contadoresIncoherentes[0]).toMatch(/27/);
-    // Cuenta como hallazgo: si no contara, el cron guardaría silencio.
-    expect(data.hallazgos).toBeGreaterThanOrEqual(1);
+
+    /* 3. LA CONSECUENCIA OBSERVABLE, que es lo que de verdad se vigila: el
+          contador incoherente SUMA al total y por eso el cron rompe su
+          silencio. Sin ese sumando el total sería 0, el handler saldría por la
+          rama del silencio y una serie legal saboteada pasaría la semana
+          entera sin que nadie se entere (Acuerdo AGN 060/2001 art. 5). */
+    expect(data.hallazgos).toBe(1);
+    expect(data.correoEnviado).toBe(true);
     expect(mockEnviarEmail).toHaveBeenCalledTimes(1);
-    // Y queda en el registro de errores aunque el correo falle.
+    // Anclado en el `]` del prefijo: '1 hallazgo(s)' a secas también casaría
+    // con «21 hallazgo(s)».
+    expect(mockEnviarEmail.mock.calls[0]![0].subject).toContain('] 1 hallazgo(s)');
+
+    // 4. Y queda en el registro de errores, aunque el correo no llegue a salir.
     expect(mockLogError).toHaveBeenCalledWith(
       expect.objectContaining({ modulo: 'cron/auditoria-consecutivos/coherencia-apertura' }),
     );
   });
 
-  it('el correo nombra la incoherencia en su cuerpo', async () => {
+  /* Mismo fixture limpio que arriba, y por la misma razón: con la colección de
+     salidas vacía, el contador en 3 producía 3 huecos y el correo salía por
+     ellos — esta prueba comprobaba que el HTML nombra una incoherencia en un
+     correo que la incoherencia no había provocado. Ahora el correo existe SOLO
+     por ella. */
+  it('el correo que dispara la incoherencia la nombra en su cuerpo', async () => {
+    const anio = new Date().getFullYear();
     mockCounterGet.mockImplementation(async (path: string) =>
       path.startsWith('counters/salidas-')
         ? { data: () => ({ ultimo: 3, apertura: { abiertoEn: 900, autorizadoPor: 'Planeación' } }) }
         : { data: () => ({ ultimo: 0 }) },
     );
+    mockCollectionGet.mockImplementation(async (coleccion: string) =>
+      coleccion === COLECCION_POR_SERIE.salidas
+        ? { docs: docsPersistidos('2-110', 3, anio) }
+        : { docs: [] },
+    );
 
     await GET(reqConSecreto());
 
+    // Que el correo SALGA es parte de lo que se afirma: sin la incoherencia no
+    // habría llamada que inspeccionar.
+    expect(mockEnviarEmail).toHaveBeenCalledTimes(1);
     const html = mockEnviarEmail.mock.calls[0][0].html;
     expect(html).toMatch(/contador\(es\) incoherente\(s\)/i);
     expect(html).toMatch(/900/);
