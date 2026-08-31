@@ -9,6 +9,7 @@ import { NumeroLegal } from './NumeroLegal';
 import { SelectorSubtiposNormativos } from './SelectorSubtiposNormativos';
 import { SelectorModalidadesConstruccion } from './SelectorModalidadesConstruccion';
 import { exigeModalidadConstruccion } from '@/lib/motor-expedientes/modalidad-construccion';
+import './licencias-tema.css';
 
 /* ══════════════════════════════════════════════════════════════
    Modal "Crear desde radicado" — Bloque A·A4 (handoff radicado⇄expediente).
@@ -24,6 +25,19 @@ import { exigeModalidadConstruccion } from '@/lib/motor-expedientes/modalidad-co
    El vínculo es ÚNICO en el servidor: un 409 ("radicado ya vinculado") es
    el error más probable con uso concurrente (dos funcionarios viendo la
    misma lista) — se muestra literal, igual que cualquier otro error.
+
+   REDISEÑO VISUAL (mockup de Figma aprobado por el propietario, 31-ago-2026).
+   Presentación pura, usa `./licencias-tema.css` igual que `RadicarSolicitud
+   Modal`. El selector de radicado candidato (buscador + `radiogroup`) y la
+   pantalla de confirmación NO están en el alcance del encargo — se dejan
+   intactos.
+
+   El párrafo de esPrueba del encabezado aquí NO menciona el candado R10 (ese
+   aviso vive, sin tocar, en la vista de confirmación de más abajo cuando
+   `!constanciaEnviada`) — solo declara el vínculo único. Por eso su versión
+   en banner ámbar lleva un "resto" distinto al de `RadicarSolicitudModal`:
+   mismo lead «Modo demostración (esPrueba)», pero sin inventarle una mención
+   al candado que este texto nunca tuvo.
 ══════════════════════════════════════════════════════════════ */
 
 export interface CrearDesdeRadicadoModalProps {
@@ -170,7 +184,7 @@ export function CrearDesdeRadicadoModal({ onCerrar, onCreado }: CrearDesdeRadica
 
   return (
     <div
-      className="fixed inset-0 z-50 flex items-center justify-center px-3 py-3"
+      className="fixed inset-0 z-50 flex items-center justify-center px-3 py-3 tema-licencias"
       role="dialog"
       aria-modal="true"
       aria-label="Crear expediente desde radicado"
@@ -178,19 +192,38 @@ export function CrearDesdeRadicadoModal({ onCerrar, onCreado }: CrearDesdeRadica
       <button type="button" aria-label="Cerrar" onClick={onCerrar} className="absolute inset-0 bg-black/55" />
 
       <div
-        className="relative w-full max-w-2xl bg-white rounded-2xl shadow-2xl overflow-hidden flex flex-col"
-        style={{ border: '1px solid #D9E2D9', maxHeight: 'calc(100dvh - 24px)' }}
+        className="relative w-full max-w-2xl shadow-2xl overflow-hidden flex flex-col"
+        style={{
+          background: 'var(--superficie)',
+          border: '1px solid var(--borde)',
+          borderRadius: 'var(--radio-modal)',
+          maxHeight: 'calc(100dvh - 24px)',
+        }}
       >
-        <header className="px-5 py-4" style={{ borderBottom: '1px solid #D9E2D9' }}>
-          <p className="text-[10px] font-bold uppercase tracking-[0.12em]" style={{ color: '#8A6A12' }}>
+        <header className="px-5 py-4" style={{ borderBottom: '1px solid var(--borde)' }}>
+          <p
+            className="text-[11px] font-semibold uppercase"
+            style={{ color: 'var(--dorado)', letterSpacing: '0.08em' }}
+          >
             Secretaría de Planeación · Licencias Urbanísticas
           </p>
-          <h2 className="text-lg font-black leading-tight" style={{ color: '#12261A' }}>
+          <h2 className="text-[26px] font-semibold leading-tight" style={{ color: 'var(--verde-institucional)' }}>
             Crear expediente desde radicado
           </h2>
-          <p className="text-xs mt-1" style={{ color: '#5F6F64' }}>
-            Vincula un radicado de Ventanilla ya existente con un expediente de demostración (esPrueba) nuevo — el vínculo es único, un radicado ya vinculado no puede volver a usarse.
-          </p>
+          <div
+            className="mt-3"
+            style={{
+              background: 'var(--ambar-fondo)',
+              border: '1px solid var(--ambar-borde)',
+              borderRadius: '8px',
+              padding: '10px 14px',
+            }}
+          >
+            <p className="text-[12.5px] leading-snug" style={{ color: 'var(--ambar-texto)' }}>
+              <span className="font-semibold">Modo demostración (esPrueba)</span>
+              {' — vincula un radicado de Ventanilla ya existente con este expediente nuevo; el vínculo es único, un radicado ya vinculado no puede volver a usarse.'}
+            </p>
+          </div>
         </header>
 
         {creado ? (
@@ -341,20 +374,29 @@ export function CrearDesdeRadicadoModal({ onCerrar, onCreado }: CrearDesdeRadica
               </p>
             )}
 
-            <footer className="flex items-center justify-end gap-2 pt-1">
+            <footer
+              className="flex items-center justify-end gap-2 mt-1 pt-3"
+              style={{ borderTop: '1px solid var(--borde)' }}
+            >
               <button
                 type="button"
                 onClick={onCerrar}
-                className="px-4 py-2 rounded-xl text-sm font-bold"
-                style={{ border: '1px solid #D9E2D9', color: '#475569' }}
+                className="text-sm font-medium focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--verde-institucional)]"
+                style={{
+                  padding: '12px 22px',
+                  borderRadius: 'var(--radio-control)',
+                  border: '1px solid var(--borde)',
+                  background: 'var(--superficie)',
+                  color: 'var(--texto)',
+                }}
               >
                 Cancelar
               </button>
               <button
                 type="submit"
                 disabled={guardando}
-                className="px-5 py-2 rounded-xl text-sm font-bold text-white disabled:opacity-60"
-                style={{ background: '#14532D' }}
+                className="text-sm font-semibold text-white disabled:opacity-60 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--verde-institucional)]"
+                style={{ padding: '12px 22px', borderRadius: 'var(--radio-control)', background: 'var(--verde-institucional)' }}
               >
                 {guardando ? 'Creando…' : 'Crear expediente'}
               </button>

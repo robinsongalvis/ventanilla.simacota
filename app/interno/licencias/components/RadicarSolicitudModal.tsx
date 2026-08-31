@@ -6,6 +6,7 @@ import type { ExpedienteLicenciaDoc } from '@/lib/server/expedientes-licencias';
 import { SelectorSubtiposNormativos } from './SelectorSubtiposNormativos';
 import { SelectorModalidadesConstruccion } from './SelectorModalidadesConstruccion';
 import { exigeModalidadConstruccion } from '@/lib/motor-expedientes/modalidad-construccion';
+import './licencias-tema.css';
 
 /* ══════════════════════════════════════════════════════════════
    Formulario "Recibir solicitud" — bloque "Integración UI y demo".
@@ -24,6 +25,14 @@ import { exigeModalidadConstruccion } from '@/lib/motor-expedientes/modalidad-co
    Mismo patrón visual que el resto de modales del panel (`RegistroExpres
    Modal`, `app/interno/dashboard/components/`): overlay + card, `role=
    dialog`, error del servidor mostrado literal en `role=alert`.
+
+   REDISEÑO VISUAL (mockup de Figma aprobado por el propietario, 31-ago-2026).
+   Presentación pura: mismos datos, mismos nombres accesibles, cero cambios
+   de validación. Usa `./licencias-tema.css` (clase `.tema-licencias`,
+   aplicada en el `<div role="dialog">` de más abajo) en vez de hex sueltos.
+   El campo celular deja de vivir dentro de la tarjeta de contacto —pasa a
+   ser un campo suelto con su propio estilo— pero el correo y la declaración
+   "no tiene correo" NO se tocan (el encargo solo hablaba del celular).
 ══════════════════════════════════════════════════════════════ */
 
 export interface RadicarSolicitudModalProps {
@@ -132,7 +141,7 @@ export function RadicarSolicitudModal({ onCerrar, onCreado }: RadicarSolicitudMo
 
   return (
     <div
-      className="fixed inset-0 z-50 flex items-center justify-center px-3 py-3"
+      className="fixed inset-0 z-50 flex items-center justify-center px-3 py-3 tema-licencias"
       role="dialog"
       aria-modal="true"
       aria-label="Recibir solicitud de licencia"
@@ -140,19 +149,38 @@ export function RadicarSolicitudModal({ onCerrar, onCreado }: RadicarSolicitudMo
       <button type="button" aria-label="Cerrar" onClick={onCerrar} className="absolute inset-0 bg-black/55" />
 
       <div
-        className="relative w-full max-w-2xl bg-white rounded-2xl shadow-2xl overflow-hidden flex flex-col"
-        style={{ border: '1px solid #D9E2D9', maxHeight: 'calc(100dvh - 24px)' }}
+        className="relative w-full max-w-2xl shadow-2xl overflow-hidden flex flex-col"
+        style={{
+          background: 'var(--superficie)',
+          border: '1px solid var(--borde)',
+          borderRadius: 'var(--radio-modal)',
+          maxHeight: 'calc(100dvh - 24px)',
+        }}
       >
-        <header className="px-5 py-4" style={{ borderBottom: '1px solid #D9E2D9' }}>
-          <p className="text-[10px] font-bold uppercase tracking-[0.12em]" style={{ color: '#8A6A12' }}>
+        <header className="px-5 py-4" style={{ borderBottom: '1px solid var(--borde)' }}>
+          <p
+            className="text-[11px] font-semibold uppercase"
+            style={{ color: 'var(--dorado)', letterSpacing: '0.08em' }}
+          >
             Secretaría de Planeación · Licencias Urbanísticas
           </p>
-          <h2 className="text-lg font-black leading-tight" style={{ color: '#12261A' }}>
+          <h2 className="text-[26px] font-semibold leading-tight" style={{ color: 'var(--verde-institucional)' }}>
             Recibir solicitud
           </h2>
-          <p className="text-xs mt-1" style={{ color: '#5F6F64' }}>
-            Crea un expediente de demostración (esPrueba) — la emisión con consecutivo legal está bloqueada hasta autorizar la siembra (R10).
-          </p>
+          <div
+            className="mt-3"
+            style={{
+              background: 'var(--ambar-fondo)',
+              border: '1px solid var(--ambar-borde)',
+              borderRadius: '8px',
+              padding: '10px 14px',
+            }}
+          >
+            <p className="text-[12.5px] leading-snug" style={{ color: 'var(--ambar-texto)' }}>
+              <span className="font-semibold">Modo demostración (esPrueba)</span>
+              {' — la emisión con consecutivo legal está bloqueada hasta autorizar la siembra (R10).'}
+            </p>
+          </div>
         </header>
 
         {creado ? (
@@ -261,22 +289,37 @@ export function RadicarSolicitudModal({ onCerrar, onCreado }: RadicarSolicitudMo
                   </span>
                 </span>
               </label>
-
-              <label>
-                <span className={labelCls} style={labelStyle}>Celular (opcional)</span>
-                <input
-                  type="tel"
-                  value={celular}
-                  onChange={(e) => setCelular(e.target.value)}
-                  className="input-internal"
-                  placeholder="300 123 4567"
-                />
-                <span className="block text-xs mt-1" style={{ color: 'var(--text-secondary)' }}>
-                  Se guarda desde ya. Los avisos por WhatsApp o SMS están aplazados, pero pedirlo
-                  ahora evita tener que buscar después a quien ya se atendió.
-                </span>
-              </label>
             </div>
+
+            {/* CELULAR, FUERA DE LA TARJETA DE CONTACTO (sección 2 del rediseño,
+                encargo del propietario 31-ago-2026) — la tarjeta grande de arriba
+                queda solo para correo, que es el canal con avisos activos hoy. */}
+            <label className="block">
+              <span
+                className="mb-1 block text-[11px] font-semibold uppercase"
+                style={{ color: 'var(--texto-suave)', letterSpacing: '0.06em' }}
+              >
+                Celular (opcional)
+              </span>
+              <input
+                type="tel"
+                value={celular}
+                onChange={(e) => setCelular(e.target.value)}
+                className="w-full text-[15px] font-medium outline-none"
+                style={{
+                  height: '48px',
+                  padding: '0 14px',
+                  border: '1.5px solid var(--verde-institucional)',
+                  borderRadius: 'var(--radio-control)',
+                  color: 'var(--texto)',
+                  background: 'var(--superficie)',
+                }}
+                placeholder="300 123 4567"
+              />
+              <span className="block text-xs mt-1" style={{ color: 'var(--texto-suave)' }}>
+                Se guarda desde ya · los avisos por WhatsApp o SMS llegarán cuando se activen.
+              </span>
+            </label>
 
             <SelectorSubtiposNormativos seleccionados={subtipos} onAlternar={alternarSubtipo} error={errorSubtipos} />
 
@@ -294,15 +337,30 @@ export function RadicarSolicitudModal({ onCerrar, onCreado }: RadicarSolicitudMo
               </p>
             )}
 
-            <footer className="flex items-center justify-end gap-2 pt-1">
-              <button type="button" onClick={onCerrar}
-                className="px-4 py-2 rounded-xl text-sm font-bold"
-                style={{ border: '1px solid #D9E2D9', color: '#475569' }}>
+            <footer
+              className="flex items-center justify-end gap-2 mt-1 pt-3"
+              style={{ borderTop: '1px solid var(--borde)' }}
+            >
+              <button
+                type="button"
+                onClick={onCerrar}
+                className="text-sm font-medium focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--verde-institucional)]"
+                style={{
+                  padding: '12px 22px',
+                  borderRadius: 'var(--radio-control)',
+                  border: '1px solid var(--borde)',
+                  background: 'var(--superficie)',
+                  color: 'var(--texto)',
+                }}
+              >
                 Cancelar
               </button>
-              <button type="submit" disabled={guardando}
-                className="px-5 py-2 rounded-xl text-sm font-bold text-white disabled:opacity-60"
-                style={{ background: '#14532D' }}>
+              <button
+                type="submit"
+                disabled={guardando}
+                className="text-sm font-semibold text-white disabled:opacity-60 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--verde-institucional)]"
+                style={{ padding: '12px 22px', borderRadius: 'var(--radio-control)', background: 'var(--verde-institucional)' }}
+              >
                 {guardando ? 'Recibiendo…' : 'Recibir solicitud'}
               </button>
             </footer>
