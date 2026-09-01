@@ -26,5 +26,7 @@ if (env.NEXT_PUBLIC_FIREBASE_PROJECT_ID === PROYECTO_PROD) {
 }
 
 console.log(`▶ next dev contra ${env.NEXT_PUBLIC_FIREBASE_PROJECT_ID}`);
-const hijo = spawn('npx', ['next', 'dev'], { env, stdio: 'inherit' });
+/* Reenvía los argumentos (p. ej. -H 0.0.0.0 -p 3200) para poder abrir stage
+   desde el celular en la LAN — mismo patrón que la config «ventanilla-celular». */
+const hijo = spawn('npx', ['next', 'dev', ...process.argv.slice(2)], { env, stdio: 'inherit' });
 hijo.on('exit', (code) => process.exit(code ?? 0));
