@@ -131,7 +131,7 @@ async function paginaDesdeImagen(bytes: Uint8Array, mimeType: string): Promise<U
 export async function construirPaqueteSellado(entrada: {
   constancia: DatosConstanciaPaquete;
   documentos: DocumentoParaPaquete[];
-  sello: { radicadoId: string; fechaHoraLegible: string };
+  sello: { radicadoId: string; fechaHoraLegible: string; logoPng?: Uint8Array | null };
 }): Promise<ResultadoPaqueteSellado> {
   const incluidos: ResultadoPaqueteSellado['incluidos'] = [];
   const aparte: ResultadoPaqueteSellado['aparte'] = [];
@@ -176,8 +176,23 @@ export async function construirPaqueteSellado(entrada: {
   const fuenteNegrita = await paquete.embedFont(StandardFonts.HelveticaBold);
   const portada = paquete.addPage([CARTA.ancho, CARTA.alto]);
   const { titulo, lineas } = lineasConstanciaPaquete(entrada.constancia, incluidos, aparte);
-  portada.drawText(titulo, { x: MARGEN, y: CARTA.alto - MARGEN - 14, size: 12, font: fuenteNegrita, color: rgb(0.07, 0.15, 0.1) });
-  let y = CARTA.alto - MARGEN - 44;
+
+  /* El ESCUDO encabeza la carátula — el propietario cazó la hoja «en blanco,
+     muy fea» del primer render: un papel institucional sin escudo no se ve
+     institucional. Mismo PNG que estampan los sellos de página. */
+  let y = CARTA.alto - MARGEN;
+  if (entrada.sello.logoPng && entrada.sello.logoPng.byteLength > 0) {
+    try {
+      const escudo = await paquete.embedPng(entrada.sello.logoPng);
+      const altoEscudo = 64;
+      const anchoEscudo = (escudo.width / escudo.height) * altoEscudo;
+      portada.drawImage(escudo, { x: (CARTA.ancho - anchoEscudo) / 2, y: y - altoEscudo, width: anchoEscudo, height: altoEscudo });
+      y -= altoEscudo + 18;
+    } catch { /* PNG corrupto: la carátula sale sin escudo, como el sello lo tolera */ }
+  }
+  portada.drawText(titulo, { x: MARGEN, y: y - 14, size: 12, font: fuenteNegrita, color: rgb(0.07, 0.15, 0.1) });
+  portada.drawLine({ start: { x: MARGEN, y: y - 24 }, end: { x: CARTA.ancho - MARGEN, y: y - 24 }, thickness: 1.2, color: rgb(0.08, 0.27, 0.18) });
+  y = y - 48;
   for (const linea of lineas) {
     portada.drawText(linea.slice(0, 110), { x: MARGEN, y, size: 10, font: fuente, color: rgb(0.13, 0.17, 0.14) });
     y -= 15;
