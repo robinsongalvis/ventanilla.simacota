@@ -103,7 +103,10 @@ describe('construirPaqueteSellado — la composición del paquete', () => {
     /* La mitad que NO se puede callar: el ciudadano tiene que leer en el papel
        qué NO va adentro y por qué — si no, el paquete afirma completitud que
        no tiene. */
-    expect(texto, 'la constancia dejó de declarar los documentos no incluidos').toContain('No incluidos');
+    /* Sin exigir caja tipográfica: el rediseño del 1-sep (lenguaje del
+       comprobante) puso la sección en mayúsculas. El invariante es que la
+       sección EXISTA, no cómo grita. */
+    expect(texto, 'la constancia dejó de declarar los documentos no incluidos').toMatch(/no incluidos/i);
     expect(texto).toContain('Memorial.docx');
   });
 
