@@ -1,5 +1,6 @@
 import { PDFDocument, StandardFonts, rgb } from 'pdf-lib';
 import { sellarTodasLasPaginas, SelloPDFError } from '@/lib/sello/generar-sello-pdf';
+import type { EsquinaSello } from '@/lib/sello/posicion-sello';
 
 /* ══════════════════════════════════════════════════════════════
    EL PAQUETE SELLADO — un solo PDF con la constancia de primera hoja y
@@ -168,7 +169,7 @@ async function paginaDesdeImagen(bytes: Uint8Array, mimeType: string): Promise<U
 export async function construirPaqueteSellado(entrada: {
   constancia: DatosConstanciaPaquete;
   documentos: DocumentoParaPaquete[];
-  sello: { radicadoId: string; fechaHoraLegible: string; logoPng?: Uint8Array | null };
+  sello: { radicadoId: string; fechaHoraLegible: string; logoPng?: Uint8Array | null; esquina?: EsquinaSello };
 }): Promise<ResultadoPaqueteSellado> {
   const incluidos: ResultadoPaqueteSellado['incluidos'] = [];
   const aparte: ResultadoPaqueteSellado['aparte'] = [];

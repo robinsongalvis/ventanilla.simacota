@@ -5,6 +5,7 @@ import {
   SELLO_ANCHO_PT,
   SELLO_ALTO_PT,
   SELLO_MARGEN_PT,
+  calcularRectanguloSelloEnEsquina,
 } from '@/lib/sello/posicion-sello';
 
 /* ══════════════════════════════════════════════════════════════
@@ -66,5 +67,36 @@ describe('Sprint Op 3 — calcularRectanguloSello', () => {
     expect(selloCabeEnPagina(rect, HALF_LETTER)).toBe(true);
     expect(rect.x + rect.ancho).toBeLessThanOrEqual(HALF_LETTER.ancho);
     expect(rect.y).toBeGreaterThanOrEqual(0);
+  });
+});
+
+
+/* ══════════════════════════════════════════════════════════════
+   LAS CUATRO ESQUINAS (1-sep-2026) — el propietario descongeló la posición
+   para el paquete sellado: la marca la ubica quien descarga, con el patrón
+   del «Sello de recibido» de ventanilla. SUP_IZQ delega en la función nueva,
+   así que los casos históricos de arriba también la vigilan.
+══════════════════════════════════════════════════════════════ */
+describe('calcularRectanguloSelloEnEsquina — las cuatro esquinas en carta', () => {
+  const CARTA = { ancho: 612, alto: 792 };
+
+  it.each([
+    ['SUP_IZQ', 12, 792 - 12 - 70],
+    ['SUP_DER', 612 - 12 - 150, 792 - 12 - 70],
+    ['INF_IZQ', 12, 12],
+    ['INF_DER', 612 - 12 - 150, 12],
+  ] as const)('%s → x=%d, y=%d', (esquina, x, y) => {
+    const r = calcularRectanguloSelloEnEsquina(CARTA, esquina);
+    expect(r.x, `x de ${esquina}`).toBe(x);
+    expect(r.y, `y de ${esquina}`).toBe(y);
+    expect(r.ancho).toBe(150);
+    expect(r.alto).toBe(70);
+  });
+
+  it('las cuatro producen rectángulos DISTINTOS — si dos coinciden, el selector miente', () => {
+    const rects = (['SUP_IZQ', 'SUP_DER', 'INF_IZQ', 'INF_DER'] as const)
+      .map((e) => calcularRectanguloSelloEnEsquina(CARTA, e))
+      .map((r) => `${r.x},${r.y}`);
+    expect(new Set(rects).size).toBe(4);
   });
 });

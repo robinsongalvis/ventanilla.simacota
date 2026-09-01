@@ -363,7 +363,17 @@ export function DetalleLicenciaClient({ expedienteId, onVolver }: DetalleLicenci
        (un solo PDF: constancia de primera hoja + documentos sellados). El
        custodio `acciones-papel-alcanzables.test.ts` exige que este href tenga
        su route.ts en disco. */
-    { etiqueta: 'Descargar documentos con sello', href: `/api/licencias/expedientes/${encodeURIComponent(expedienteId)}/sellados` },
+    /* La marca de agua la posiciona quien descarga — el patrón de 4 chips del
+       «Sello de recibido» de ventanilla, pedido por el propietario (1-sep). */
+    {
+      etiqueta: 'Descargar documentos con sello',
+      opciones: [
+        { etiqueta: '↖ Sup. izq.', href: `/api/licencias/expedientes/${encodeURIComponent(expedienteId)}/sellados?esquina=SUP_IZQ` },
+        { etiqueta: '↗ Sup. der.', href: `/api/licencias/expedientes/${encodeURIComponent(expedienteId)}/sellados?esquina=SUP_DER` },
+        { etiqueta: '↙ Inf. izq.', href: `/api/licencias/expedientes/${encodeURIComponent(expedienteId)}/sellados?esquina=INF_IZQ` },
+        { etiqueta: '↘ Inf. der.', href: `/api/licencias/expedientes/${encodeURIComponent(expedienteId)}/sellados?esquina=INF_DER` },
+      ],
+    },
     ...(puedeExpedirEjecutoria(expediente.estadoJuridico)
       ? [{ etiqueta: 'Constancia de ejecutoria', href: `/api/licencias/expedientes/${encodeURIComponent(expedienteId)}/ejecutoria` }]
       : []),
