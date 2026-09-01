@@ -13,7 +13,7 @@ import { getFirebaseAdminDb, getFirebaseAdminStorage } from '@/lib/firebase-admi
 import { verificarMagicBytes } from '@/lib/seguridad/magic-bytes';
 import { sellarPrimeraPagina, SelloPDFError } from '@/lib/sello/generar-sello-pdf';
 import { formatFechaHoraColombia } from '@/lib/fecha-colombia';
-import { cargarLogo } from '@/lib/sello/cargar-logo';
+import { cargarEscudo } from '@/lib/sello/cargar-logo';
 import { logError } from '@/lib/logger';
 import { removeUndefinedDeep } from '@/lib/firestore/removeUndefined';
 import type { SelloDocumento } from '@/src/types/ventanilla';
@@ -145,7 +145,8 @@ export async function POST(
     }
 
     const hashOriginal = sha256Hex(bytesOriginal);
-    const logoPng = await cargarLogo();
+    // El escudo cuadrado: el lockup completo no cabe en el cuadro del sello.
+    const logoPng = await cargarEscudo();
     const ahora = new Date();
 
     // Sellar (puede lanzar SelloPDFError → jsonError lo mapea).

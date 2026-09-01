@@ -14,8 +14,14 @@ import { join } from 'node:path';
 export const LOGO_PROJECT_PATH = 'public/brand/logo-alcaldia-simacota-print.png';
 const LOGO_RESPALDO = 'public/brand/logo-alcaldia-simacota.png';
 
-export async function cargarLogo(): Promise<Uint8Array | null> {
-  for (const ruta of [LOGO_PROJECT_PATH, LOGO_RESPALDO]) {
+/* El escudo SOLO (recortado del lockup, cuadrado): es lo que va en el cuadro
+   pequeño del sello. El lockup completo ahí dentro era la mancha que el
+   propietario rechazó el 1-sep — por eso su respaldo es NINGUNO y no el
+   lockup: mejor un sello sin escudo (tolerado) que uno ilegible. */
+export const ESCUDO_PROJECT_PATH = 'public/brand/escudo-alcaldia-simacota.png';
+
+async function leerPrimero(rutas: string[]): Promise<Uint8Array | null> {
+  for (const ruta of rutas) {
     try {
       const buf = await readFile(join(process.cwd(), ruta));
       return new Uint8Array(buf);
@@ -23,4 +29,14 @@ export async function cargarLogo(): Promise<Uint8Array | null> {
   }
   // Sin logo el sello igual sale — generar-sello-pdf.ts lo tolera.
   return null;
+}
+
+/** El lockup horizontal (escudo + wordmark) — para membretes y carátulas. */
+export async function cargarLogo(): Promise<Uint8Array | null> {
+  return leerPrimero([LOGO_PROJECT_PATH, LOGO_RESPALDO]);
+}
+
+/** El escudo cuadrado — para el cuadro pequeño del sello estampado. */
+export async function cargarEscudo(): Promise<Uint8Array | null> {
+  return leerPrimero([ESCUDO_PROJECT_PATH]);
 }

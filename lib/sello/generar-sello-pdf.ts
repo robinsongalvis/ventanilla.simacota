@@ -1,11 +1,19 @@
 import { PDFDocument, StandardFonts, rgb } from 'pdf-lib';
 import {
   calcularRectanguloSelloEnEsquina,
+  encajarEnCaja,
   type EsquinaSello,
   selloCabeEnPagina,
   selloEsLegible,
-  SELLO_MARGEN_PT,
 } from './posicion-sello';
+
+/**
+ * Versión del DIBUJO del sello. Las rutas que materializan copias derivadas la
+ * incluyen en su clave: subirla invalida todo render viejo de golpe. Historia:
+ * v4 = esquina elegible + logo compartido; v5 = escudo cuadrado sin deformar y
+ * líneas medidas que no se pisan (la muestra del 1-sep las mostró chocando).
+ */
+export const VERSION_RENDER_SELLO = '5';
 
 /**
  * Sprint Ventanilla Operativa 3 — sellado digital de PDF.
@@ -66,6 +74,21 @@ interface FuentesSello {
 }
 
 /**
+ * El tamaño con el que `texto` cabe en UNA línea de `anchoMax` puntos.
+ * Devuelve el tamaño base si ya cabe; si no, lo reduce en proporción exacta.
+ * Nunca amplía. Exportada para que su custodio la vea fallar.
+ */
+export function tamanoQueCabe(
+  font: FuentesSello[keyof FuentesSello],
+  texto: string,
+  tamanoBase: number,
+  anchoMax: number,
+): number {
+  const medida = font.widthOfTextAtSize(texto, tamanoBase);
+  return medida <= anchoMax ? tamanoBase : tamanoBase * (anchoMax / medida);
+}
+
+/**
  * Estampa el sello en UNA página. Devuelve `false` —sin lanzar— cuando la
  * página es demasiado pequeña para admitirlo.
  *
@@ -90,10 +113,8 @@ function estamparEnPagina(
   if (!selloEsLegible(rect)) return false;
 
   const padding = 6;
-  const anchoContenido = rect.ancho - padding * 2;
-  const altoLogo = 26;
-  const anchoLogo = 26;
-  const gapLogoTexto = 6;
+  const ladoEscudo = 24;
+  const gapLogoTexto = 5;
 
   pagina.drawRectangle({
     x: rect.x,
@@ -110,26 +131,49 @@ function estamparEnPagina(
   const cursorTopY = rect.y + rect.alto - padding;
 
   if (logoImage) {
-    pagina.drawImage(logoImage, { x: cursorX, y: cursorTopY - altoLogo, width: anchoLogo, height: altoLogo });
-    cursorX += anchoLogo + gapLogoTexto;
+    // Sin deformar: el cuadro es fijo, la imagen se encaja y se centra en él.
+    const encajado = encajarEnCaja(
+      { ancho: logoImage.width, alto: logoImage.height },
+      { ancho: ladoEscudo, alto: ladoEscudo },
+      { ampliar: true },
+    );
+    pagina.drawImage(logoImage, {
+      x: cursorX + (ladoEscudo - encajado.ancho) / 2,
+      y: cursorTopY - ladoEscudo + (ladoEscudo - encajado.alto) / 2,
+      width: encajado.ancho,
+      height: encajado.alto,
+    });
+    cursorX += ladoEscudo + gapLogoTexto;
   }
 
-  const textoAncho = rect.ancho - (cursorX - rect.x) - padding;
+  /* Cada línea se MIDE y se encoge hasta caber en una sola: `maxWidth` de
+     pdf-lib parte en dos la línea que no cabe y la segunda mitad aterriza
+     sobre la fila de abajo (la muestra del 1-sep salió con «ÚNICA» pisando
+     la fecha). Encoger décimas de punto es invisible; dos líneas montadas
+     son ilegibles. */
+  const textoAncho = rect.x + rect.ancho - padding - cursorX;
+  const linea = (
+    texto: string, y: number, tamanoBase: number,
+    font: FuentesSello[keyof FuentesSello], color: ReturnType<typeof rgb>,
+  ) => {
+    pagina.drawText(texto, {
+      x: cursorX, y, size: tamanoQueCabe(font, texto, tamanoBase, textoAncho), font, color,
+    });
+  };
 
-  pagina.drawText('RECIBIDO POR VENTANILLA ÚNICA', {
-    x: cursorX, y: cursorTopY - 8, size: 6.5, font: fuentes.bold, color: COLOR_VERDE_INST, maxWidth: textoAncho,
-  });
-  pagina.drawText(datos.radicadoId, {
-    x: cursorX, y: cursorTopY - 20, size: 8.5, font: fuentes.mono, color: COLOR_TEXTO_OSCURO, maxWidth: textoAncho,
-  });
-  pagina.drawText(datos.fechaHoraLegible, {
-    x: cursorX, y: cursorTopY - 32, size: 6.5, font: fuentes.regular, color: COLOR_TEXTO_GRIS, maxWidth: textoAncho,
-  });
-  pagina.drawText('Alcaldía Municipal de Simacota', {
-    x: rect.x + padding, y: rect.y + padding, size: 5.5, font: fuentes.regular, color: COLOR_TEXTO_GRIS, maxWidth: anchoContenido,
+  linea('RECIBIDO POR VENTANILLA ÚNICA', cursorTopY - 8, 6.5, fuentes.bold, COLOR_VERDE_INST);
+  linea(datos.radicadoId, cursorTopY - 20, 8.5, fuentes.mono, COLOR_TEXTO_OSCURO);
+  linea(datos.fechaHoraLegible, cursorTopY - 32, 6.5, fuentes.regular, COLOR_TEXTO_GRIS);
+
+  const pie = 'Alcaldía Municipal de Simacota';
+  pagina.drawText(pie, {
+    x: rect.x + padding,
+    y: rect.y + padding,
+    size: tamanoQueCabe(fuentes.regular, pie, 5.5, rect.ancho - padding * 2),
+    font: fuentes.regular,
+    color: COLOR_TEXTO_GRIS,
   });
 
-  void SELLO_MARGEN_PT;
   return true;
 }
 

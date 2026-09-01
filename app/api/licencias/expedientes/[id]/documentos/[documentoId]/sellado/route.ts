@@ -50,9 +50,9 @@ import {
   requireActiveInternalUser,
 } from '@/lib/server/internal-auth';
 import type { ExpedienteLicenciaDoc } from '@/lib/server/expedientes-licencias';
-import { sellarTodasLasPaginas, SelloPDFError } from '@/lib/sello/generar-sello-pdf';
+import { sellarTodasLasPaginas, SelloPDFError, VERSION_RENDER_SELLO } from '@/lib/sello/generar-sello-pdf';
 import { formatFechaHoraColombia } from '@/lib/fecha-colombia';
-import { cargarLogo } from '@/lib/sello/cargar-logo';
+import { cargarEscudo } from '@/lib/sello/cargar-logo';
 import { logError } from '@/lib/logger';
 
 export const runtime = 'nodejs';
@@ -137,8 +137,13 @@ export async function GET(
     const bucket = getFirebaseAdminStorage().bucket(bucketName);
 
     /* La ruta lleva el HASH de la versión: contenido distinto ⇒ copia distinta.
-       Es imposible servir un sello viejo sobre un documento que cambió. */
-    const pathSellado = `${PREFIJO_SELLADOS}/${id}/${documentoId}/${documento.hashSha256}.pdf`;
+       Es imposible servir un sello viejo sobre un documento que cambió.
+       Y lleva la VERSIÓN DEL DIBUJO: sin ella, una mejora del sello nunca
+       llegaba a las copias ya materializadas (cacheaban su propia degradación,
+       la misma familia que el paquete arregló el 1-sep). Las copias con clave
+       vieja quedan huérfanas en `sellados/` — prefijo regenerable y sin
+       respaldo, no es fuga. */
+    const pathSellado = `${PREFIJO_SELLADOS}/${id}/${documentoId}/v${VERSION_RENDER_SELLO}-${documento.hashSha256}.pdf`;
     const archivoSellado = bucket.file(pathSellado);
 
     const [yaExistia] = await archivoSellado.exists();
@@ -166,7 +171,7 @@ export async function GET(
           ),
           /* El escudo faltaba aquí también — la ruta hermana de ventanilla sí
              lo pasaba y esta no (cazado por el propietario el 1-sep). */
-          logoPng: await cargarLogo(),
+          logoPng: await cargarEscudo(),
         });
         paginasEstampadas = resultado.paginasEstampadas;
         paginasSinSello = resultado.paginasSinSello;

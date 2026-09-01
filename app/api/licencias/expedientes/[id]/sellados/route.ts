@@ -43,7 +43,8 @@ import {
   type DocumentoParaPaquete,
 } from '@/lib/sello/paquete-sellado';
 import { formatFechaHoraColombia } from '@/lib/fecha-colombia';
-import { cargarLogo } from '@/lib/sello/cargar-logo';
+import { cargarEscudo, cargarLogo } from '@/lib/sello/cargar-logo';
+import { VERSION_RENDER_SELLO } from '@/lib/sello/generar-sello-pdf';
 import { logError } from '@/lib/logger';
 
 export const runtime = 'nodejs';
@@ -114,8 +115,9 @@ export async function GET(
     /* La versión del RENDER entra a la clave: una mejora visual (el escudo de
        la carátula, p. ej.) debe regenerar el paquete aunque la composición de
        documentos no cambie — sin esto, el arreglo del 1-sep habría seguido
-       sirviendo la carátula vieja para siempre. */
-    const VERSION_RENDER = '4';
+       sirviendo la carátula vieja para siempre. Es la constante COMPARTIDA del
+       dibujo del sello: se sube allá y todas las rutas regeneran a la vez. */
+    const VERSION_RENDER = VERSION_RENDER_SELLO;
     /* La ESQUINA de la marca la elige quien descarga (selector de 4 chips, el
        patrón del «Sello de recibido» de ventanilla). Entra a la clave: cada
        esquina es una copia derivada distinta. */
@@ -192,9 +194,10 @@ export async function GET(
         sello: {
           radicadoId: numero,
           fechaHoraLegible: formatFechaHoraColombia(expediente.fechaRadicacionDebidaForma ?? act.fecha),
-          logoPng: await cargarLogo(),
+          logoPng: await cargarEscudo(),
           esquina,
         },
+        logoPortadaPng: await cargarLogo(),
       });
 
       await archivoPaquete.save(Buffer.from(resultado.bytes), {

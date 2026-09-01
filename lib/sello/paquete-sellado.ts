@@ -169,7 +169,10 @@ async function paginaDesdeImagen(bytes: Uint8Array, mimeType: string): Promise<U
 export async function construirPaqueteSellado(entrada: {
   constancia: DatosConstanciaPaquete;
   documentos: DocumentoParaPaquete[];
+  /** `logoPng` es el ESCUDO cuadrado del sello estampado. */
   sello: { radicadoId: string; fechaHoraLegible: string; logoPng?: Uint8Array | null; esquina?: EsquinaSello };
+  /** El lockup horizontal para el membrete de la carátula. Si no llega, se usa el del sello. */
+  logoPortadaPng?: Uint8Array | null;
 }): Promise<ResultadoPaqueteSellado> {
   const incluidos: ResultadoPaqueteSellado['incluidos'] = [];
   const aparte: ResultadoPaqueteSellado['aparte'] = [];
@@ -245,9 +248,10 @@ export async function construirPaqueteSellado(entrada: {
   };
 
   // Membrete
-  if (entrada.sello.logoPng && entrada.sello.logoPng.byteLength > 0) {
+  const logoMembrete = entrada.logoPortadaPng ?? entrada.sello.logoPng;
+  if (logoMembrete && logoMembrete.byteLength > 0) {
     try {
-      const escudo = await paquete.embedPng(entrada.sello.logoPng);
+      const escudo = await paquete.embedPng(logoMembrete);
       const altoEscudo = 56;
       const anchoEscudo = (escudo.width / escudo.height) * altoEscudo;
       portada.drawImage(escudo, { x: (CARTA.ancho - anchoEscudo) / 2, y: y - altoEscudo, width: anchoEscudo, height: altoEscudo });

@@ -119,3 +119,29 @@ export const SELLO_MIN_ALTO_PT = 52;
 export function selloEsLegible(rect: RectanguloSello): boolean {
   return rect.ancho >= SELLO_MIN_ANCHO_PT && rect.alto >= SELLO_MIN_ALTO_PT;
 }
+
+/**
+ * Encaja una imagen dentro de una caja SIN deformarla.
+ *
+ * Existe por la muestra del 1-sep-2026: el sello dibujaba el lockup
+ * institucional (4:1 de proporción) en un cuadro fijo de 26×26 y el resultado
+ * era una mancha ilegible. La «simplificación» que produce ese defecto —
+ * `width: caja.ancho, height: caja.alto` — es exactamente lo que alguien
+ * vuelve a escribir si esta función desaparece.
+ *
+ * `ampliar: false` (el default) nunca escala por encima del tamaño natural —
+ * es lo que quiere una foto del ciudadano vuelta página. El sello sí amplía:
+ * su escudo fuente es más grande que el cuadro y reducir es lo normal.
+ */
+export function encajarEnCaja(
+  imagen: DimensionesPagina,
+  caja: DimensionesPagina,
+  opciones: { ampliar?: boolean } = {},
+): DimensionesPagina {
+  const escala = Math.min(
+    caja.ancho / imagen.ancho,
+    caja.alto / imagen.alto,
+    opciones.ampliar ? Number.POSITIVE_INFINITY : 1,
+  );
+  return { ancho: imagen.ancho * escala, alto: imagen.alto * escala };
+}
