@@ -295,7 +295,7 @@ describe('ciudadanoOficioDesdeRadicado — los cuatro marcadores, cada uno en so
       ciudadano: ciudadanoOficioDesdeRadicado(radicado(sobre)),
       dependencia: 'Secretaría de Gobierno',
       funcionario: { nombre: 'Funcionaria Prueba', rol: 'FUNCIONARIO' },
-      cuerpo: 'Respuesta de prueba.',
+      cuerpoRespuesta: 'Respuesta de prueba.',
     });
   }
 
