@@ -43,6 +43,7 @@ import {
   type DocumentoParaPaquete,
 } from '@/lib/sello/paquete-sellado';
 import { formatFechaHoraColombia } from '@/lib/fecha-colombia';
+import { cargarLogo } from '@/lib/sello/cargar-logo';
 import { logError } from '@/lib/logger';
 
 export const runtime = 'nodejs';
@@ -110,7 +111,13 @@ export async function GET(
 
     /* La clave de la copia = hash de la COMPOSICIÓN: número, fecha jurídica y
        (id, hash de la versión vigente) de cada documento, ordenados. */
+    /* La versión del RENDER entra a la clave: una mejora visual (el escudo de
+       la carátula, p. ej.) debe regenerar el paquete aunque la composición de
+       documentos no cambie — sin esto, el arreglo del 1-sep habría seguido
+       sirviendo la carátula vieja para siempre. */
+    const VERSION_RENDER = '2';
     const huella = createHash('sha256');
+    huella.update(VERSION_RENDER);
     huella.update(numero);
     huella.update(act.fecha ?? '');
     for (const d of [...documentosDocs].sort((a, b) => a.id.localeCompare(b.id))) {
@@ -121,20 +128,47 @@ export async function GET(
 
     const [yaExistia] = await archivoPaquete.exists();
     if (!yaExistia) {
-      const paraPaquete: DocumentoParaPaquete[] = await Promise.all(
-        documentosDocs.map(async (d): Promise<DocumentoParaPaquete> => {
-          const nombre = d.nombre ?? d.id;
-          const path = d.versionVigente?.storagePath;
-          if (!path) return { documentoId: d.id, nombre, mimeType: d.versionVigente?.mimeType ?? null, bytes: null };
+      /* DESCARGAS EN SERIE Y CON REINTENTO — lección del 1-sep-2026: 18
+         descargas en paralelo sin reintento fallaron 7 por transitorios, el
+         paquete salió degradado («sin archivo legible» para archivos SANOS) y
+         encima QUEDÓ CACHEADO como si fuera la verdad. Un transitorio no es
+         un hecho del expediente: se reintenta, y si persiste, se responde
+         error — jamás se materializa un paquete a medias. `SIN_ARCHIVO` queda
+         reservado para lo que de verdad no tiene binario (sin storagePath). */
+      const fallidas: string[] = [];
+      const paraPaquete: DocumentoParaPaquete[] = [];
+      for (const d of documentosDocs) {
+        const nombre = d.nombre ?? d.id;
+        const path = d.versionVigente?.storagePath;
+        if (!path) {
+          paraPaquete.push({ documentoId: d.id, nombre, mimeType: d.versionVigente?.mimeType ?? null, bytes: null });
+          continue;
+        }
+        let bytes: Uint8Array | null = null;
+        for (let intento = 1; intento <= 3 && !bytes; intento++) {
           try {
-            const [bytes] = await bucket.file(path).download();
-            return { documentoId: d.id, nombre, mimeType: d.versionVigente?.mimeType ?? null, bytes: new Uint8Array(bytes) };
+            const [buf] = await bucket.file(path).download();
+            bytes = new Uint8Array(buf);
           } catch (error) {
-            logError({ radicadoId: id, modulo: 'sellados-paquete/descarga-original', error });
-            return { documentoId: d.id, nombre, mimeType: d.versionVigente?.mimeType ?? null, bytes: null };
+            if (intento === 3) {
+              logError({ radicadoId: id, modulo: 'sellados-paquete/descarga-original', error });
+              fallidas.push(nombre);
+            }
           }
-        }),
-      );
+        }
+        if (bytes) paraPaquete.push({ documentoId: d.id, nombre, mimeType: d.versionVigente?.mimeType ?? null, bytes });
+      }
+      if (fallidas.length > 0) {
+        return NextResponse.json(
+          {
+            error:
+              `No fue posible leer ${fallidas.length} documento(s) del expediente (${fallidas.slice(0, 3).join('; ')}`
+              + `${fallidas.length > 3 ? '…' : ''}). Es un fallo de lectura, no del expediente: intente de nuevo en un momento.`,
+            motivo: 'DESCARGA_FALLIDA',
+          },
+          { status: 503 },
+        );
+      }
 
       const resultado = await construirPaqueteSellado({
         constancia: {
@@ -151,6 +185,7 @@ export async function GET(
         sello: {
           radicadoId: numero,
           fechaHoraLegible: formatFechaHoraColombia(expediente.fechaRadicacionDebidaForma ?? act.fecha),
+          logoPng: await cargarLogo(),
         },
       });
 

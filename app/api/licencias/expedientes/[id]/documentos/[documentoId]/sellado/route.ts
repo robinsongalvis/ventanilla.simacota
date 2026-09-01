@@ -52,6 +52,7 @@ import {
 import type { ExpedienteLicenciaDoc } from '@/lib/server/expedientes-licencias';
 import { sellarTodasLasPaginas, SelloPDFError } from '@/lib/sello/generar-sello-pdf';
 import { formatFechaHoraColombia } from '@/lib/fecha-colombia';
+import { cargarLogo } from '@/lib/sello/cargar-logo';
 import { logError } from '@/lib/logger';
 
 export const runtime = 'nodejs';
@@ -163,6 +164,9 @@ export async function GET(
           fechaHoraLegible: formatFechaHoraColombia(
             expediente.fechaRadicacionDebidaForma ?? expediente.creadoEn,
           ),
+          /* El escudo faltaba aquí también — la ruta hermana de ventanilla sí
+             lo pasaba y esta no (cazado por el propietario el 1-sep). */
+          logoPng: await cargarLogo(),
         });
         paginasEstampadas = resultado.paginasEstampadas;
         paginasSinSello = resultado.paginasSinSello;
