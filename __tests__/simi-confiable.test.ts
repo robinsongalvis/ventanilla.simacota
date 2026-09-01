@@ -337,12 +337,15 @@ describe('construirContextoSimi — privacidad', () => {
         + 'del predicado son excluyentes: si la de identificado se escribió, el anonimato no se evaluó.',
       ).not.toContain(MARCA_IDENTIFICADO);
 
+      /* REESCRITA el 1-sep-2026 (ADR-0039 §3): el issue #300 CERRÓ lo que esta
+         nota advertía. QUÉ SE RETIRA: la salvedad «NO certifica que el canal
+         quede oculto» — la línea del canal ya es condicional a la reserva.
+         QUÉ SOBREVIVE: la discriminación de rama, intacta. QUIÉN CERTIFICA
+         AHORA la ocultación: el describe «issue #300» de este archivo. */
       expect(
         ctx.bloqueTexto,
         `Con «${caso.marcador}» el bloque emitió «${MARCA_CANAL_CORREO}». Ese renglón sólo existe en la `
-        + 'rama de ciudadano identificado: su presencia confirma que el predicado no reconoció el marcador. '
-        + 'Discrimina la rama; NO certifica que el canal quede oculto — la línea «- Canal de respuesta del '
-        + 'ciudadano: …» (contexto-radicado.ts:171) se emite siempre, también con reserva.',
+        + 'rama de ciudadano identificado: su presencia confirma que el predicado no reconoció el marcador.',
       ).not.toContain(MARCA_CANAL_CORREO);
 
       /* La línea 174 del builder repite la MISMA subexpresión mutable
@@ -520,7 +523,8 @@ describe('construirContextoSimi — privacidad', () => {
 
      ALCANCE (ADR-0033 §4.6-bis). MIRA el `bloqueTexto` (lo único que llega al
      modelo). NO mira la heurística local de competencia (usa el texto y debe:
-     no sale de la entidad), ni `meta`, ni el canal de respuesta (issue #300).
+     no sale de la entidad), ni `meta`. El canal de respuesta, antes excluido
+     aquí, quedó CERRADO por el issue #300: lo vigila su propio describe abajo.
   ══════════════════════════════════════════════════════════════ */
 
   describe('ADR-0040 — el texto libre no viaja bajo reserva', () => {
@@ -561,6 +565,66 @@ describe('construirContextoSimi — privacidad', () => {
 
       expect(ctx.bloqueTexto).toContain(ASUNTO);
       expect(ctx.bloqueTexto).not.toContain('OMITIDOS por reserva de identidad');
+    });
+  });
+
+  /* ══════════════════════════════════════════════════════════════
+     Issue #300 (decisión del propietario, 1-sep-2026) — bajo reserva, el CANAL
+     tampoco se declara al modelo.
+
+     El defecto B del barrido (#291): «- Canal de respuesta del ciudadano:
+     CORREO» se emitía SIEMPRE, antes de la bifurcación de reserva. Y era el
+     caso vivo: la radicación solo anula contacto cuando `esAnonimo`, y
+     RESERVADA lo deja en false. Decisión: solo en el prompt — la radicación
+     no se toca (la reserva protege frente a terceros, no frente a la
+     entidad), `meta.canalRespuesta` intacto porque no viaja al modelo.
+
+     ALCANCE (ADR-0033 §4.6-bis). MIRA el `bloqueTexto`: que bajo cada marcador
+     EN SOLITARIO ni la etiqueta del canal ni su valor («CORREO», el del
+     fixture) aparezcan, y que la omisión quede DECLARADA; y la dirección
+     inversa (identificado conserva su canal). NO mira `meta` (UI y auditoría,
+     no prompt) ni la radicación (fuera del alcance decidido).
+  ══════════════════════════════════════════════════════════════ */
+  describe('issue #300 — el canal de respuesta no se declara bajo reserva', () => {
+    const MARCADORES = [
+      ['esAnonimo = true', { esAnonimo: true, tipoPresentacion: 'IDENTIFICADA' as const, identidadReservada: false }],
+      ['identidadReservada = true', { esAnonimo: false, tipoPresentacion: 'IDENTIFICADA' as const, identidadReservada: true }],
+      ['tipoPresentacion = ANONIMA', { esAnonimo: false, tipoPresentacion: 'ANONIMA' as const, identidadReservada: false }],
+      ['tipoPresentacion = RESERVADA', { esAnonimo: false, tipoPresentacion: 'RESERVADA' as const, identidadReservada: false }],
+    ] as const;
+
+    it.each(MARCADORES)('con %s EN SOLITARIO, el canal no llega al bloque — y la omisión queda declarada', (_m, sobre) => {
+      const ctx = construirContextoSimi({
+        radicado: radicadoBase({ ...sobre }),
+        trazabilidad: [],
+        usuario: usuarioBase,
+      });
+
+      expect(
+        ctx.bloqueTexto,
+        `El renglón del canal viajó al modelo con «${_m}» en solitario. Es metadato de contacto `
+        + 'de un solicitante cuya identidad la ley protege (issue #300).',
+      ).not.toContain('Canal de respuesta del ciudadano');
+      expect(
+        ctx.bloqueTexto,
+        `El VALOR del canal («CORREO», el del fixture) apareció en el bloque con «${_m}» en solitario — `
+        + 'da igual bajo qué etiqueta: el dato salió.',
+      ).not.toContain('CORREO');
+      /* Declarada, no callada — el mismo porqué del ADR-0040. */
+      expect(ctx.bloqueTexto).toContain('Canal de respuesta: OMITIDO');
+    });
+
+    it('identificado sin marcadores: el canal SÍ se declara, con su valor', () => {
+      /* La otra dirección — sin ella, «omitir siempre» pasaría las de arriba
+         y SIMI perdería el canal para todo el mundo. */
+      const ctx = construirContextoSimi({
+        radicado: radicadoBase({ esAnonimo: false, tipoPresentacion: 'IDENTIFICADA', identidadReservada: false }),
+        trazabilidad: [],
+        usuario: usuarioBase,
+      });
+
+      expect(ctx.bloqueTexto).toContain('- Canal de respuesta del ciudadano: CORREO');
+      expect(ctx.bloqueTexto).not.toContain('Canal de respuesta: OMITIDO');
     });
   });
 
