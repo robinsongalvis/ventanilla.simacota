@@ -11,9 +11,11 @@ import {
  * Versión del DIBUJO del sello. Las rutas que materializan copias derivadas la
  * incluyen en su clave: subirla invalida todo render viejo de golpe. Historia:
  * v4 = esquina elegible + logo compartido; v5 = escudo cuadrado sin deformar y
- * líneas medidas que no se pisan (la muestra del 1-sep las mostró chocando).
+ * líneas medidas que no se pisan (la muestra del 1-sep las mostró chocando);
+ * v6 = folio «Página N de M» en el sellado multipágina (decisión del
+ * propietario, 1-sep) — ventanilla primera-página queda igual.
  */
-export const VERSION_RENDER_SELLO = '5';
+export const VERSION_RENDER_SELLO = '6';
 
 /**
  * Sprint Ventanilla Operativa 3 — sellado digital de PDF.
@@ -28,6 +30,10 @@ export const VERSION_RENDER_SELLO = '5';
  *   - Número de radicado (monospace, destacado).
  *   - Fecha y hora en formato humano (zona América/Bogotá).
  *   - "Alcaldía Municipal de Simacota"
+ *   - «Página N de M» SOLO en el sellado multipágina (decisión del
+ *     propietario, 1-sep-2026): en el papel de licencias se nota si a la
+ *     copia le falta una hoja. El sello de primera página (ventanilla)
+ *     conserva el contenido congelado original, sin folio.
  *
  * Estilo: fondo blanco semi-transparente (85% opacidad) con borde fino
  * verde institucional para dar contraste sin ser agresivo.
@@ -73,6 +79,42 @@ interface FuentesSello {
   mono: Awaited<ReturnType<PDFDocument['embedFont']>>;
 }
 
+/** Folio del sello: «Página n de de» — solo existe en el sellado multipágina. */
+export interface FolioSello {
+  n: number;
+  de: number;
+}
+
+export interface FilaSello {
+  texto: string;
+  /** Distancia de la BASE de la fila al borde superior interno del sello (pt). */
+  dy: number;
+  tamano: number;
+  fuente: keyof FuentesSello;
+  color: 'verde' | 'oscuro' | 'gris';
+}
+
+/**
+ * LA FUENTE ÚNICA de las filas del sello — la misma de la que se dibuja
+ * (patrón de `lineasConstanciaPaquete`: pdf-lib no lee texto, así que el
+ * custodio asevera sobre esta función y el dibujo la consume tal cual).
+ *
+ * El folio «Página N de M» lo pidió el propietario (1-sep-2026) para el
+ * papel de licencias: si a la copia impresa le falta una hoja, se nota.
+ * Solo aparece cuando el llamador sella MULTIPÁGINA — el sello de ventanilla
+ * (primera página, contenido congelado del sprint Op 3) queda EXACTO.
+ */
+export function filasSello(datos: DatosSello, folio?: FolioSello): FilaSello[] {
+  return [
+    { texto: 'RECIBIDO POR VENTANILLA ÚNICA', dy: 8, tamano: 6.5, fuente: 'bold', color: 'verde' },
+    { texto: datos.radicadoId, dy: 20, tamano: 8.5, fuente: 'mono', color: 'oscuro' },
+    { texto: datos.fechaHoraLegible, dy: 32, tamano: 6.5, fuente: 'regular', color: 'gris' },
+    ...(folio
+      ? [{ texto: `Página ${folio.n} de ${folio.de}`, dy: 41, tamano: 6, fuente: 'regular' as const, color: 'gris' as const }]
+      : []),
+  ];
+}
+
 /**
  * El tamaño con el que `texto` cabe en UNA línea de `anchoMax` puntos.
  * Devuelve el tamaño base si ya cabe; si no, lo reduce en proporción exacta.
@@ -102,6 +144,7 @@ function estamparEnPagina(
   datos: DatosSello,
   fuentes: FuentesSello,
   logoImage: Awaited<ReturnType<PDFDocument['embedPng']>> | null,
+  folio?: FolioSello,
 ): boolean {
   const { width: ancho, height: alto } = pagina.getSize();
   const rect = calcularRectanguloSelloEnEsquina({ ancho, alto }, datos.esquina ?? 'SUP_IZQ');
@@ -152,18 +195,18 @@ function estamparEnPagina(
      la fecha). Encoger décimas de punto es invisible; dos líneas montadas
      son ilegibles. */
   const textoAncho = rect.x + rect.ancho - padding - cursorX;
-  const linea = (
-    texto: string, y: number, tamanoBase: number,
-    font: FuentesSello[keyof FuentesSello], color: ReturnType<typeof rgb>,
-  ) => {
-    pagina.drawText(texto, {
-      x: cursorX, y, size: tamanoQueCabe(font, texto, tamanoBase, textoAncho), font, color,
-    });
-  };
+  const COLORES = { verde: COLOR_VERDE_INST, oscuro: COLOR_TEXTO_OSCURO, gris: COLOR_TEXTO_GRIS } as const;
 
-  linea('RECIBIDO POR VENTANILLA ÚNICA', cursorTopY - 8, 6.5, fuentes.bold, COLOR_VERDE_INST);
-  linea(datos.radicadoId, cursorTopY - 20, 8.5, fuentes.mono, COLOR_TEXTO_OSCURO);
-  linea(datos.fechaHoraLegible, cursorTopY - 32, 6.5, fuentes.regular, COLOR_TEXTO_GRIS);
+  for (const fila of filasSello(datos, folio)) {
+    const font = fuentes[fila.fuente];
+    pagina.drawText(fila.texto, {
+      x: cursorX,
+      y: cursorTopY - fila.dy,
+      size: tamanoQueCabe(font, fila.texto, fila.tamano, textoAncho),
+      font,
+      color: COLORES[fila.color],
+    });
+  }
 
   const pie = 'Alcaldía Municipal de Simacota';
   pagina.drawText(pie, {
@@ -267,8 +310,8 @@ export async function sellarTodasLasPaginas(
   let estampadas = 0;
 
   for (let i = 0; i < paginas.length; i += 1) {
-    if (estamparEnPagina(paginas[i], datos, fuentes, logoImage)) estampadas += 1;
-    // Número de página HUMANO (base 1): lo va a leer una persona en pantalla.
+    // El folio va por página: «Página 3 de 28». Base 1 — lo lee una persona.
+    if (estamparEnPagina(paginas[i], datos, fuentes, logoImage, { n: i + 1, de: paginas.length })) estampadas += 1;
     else paginasSinSello.push(i + 1);
   }
 
