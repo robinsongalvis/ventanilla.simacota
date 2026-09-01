@@ -50,6 +50,7 @@ if (!password) {
 const FUNCIONARIOS = [
   { email: 'recepcionista.lab@simacota.gov.co',  nombre: 'Recepcionista Lab',   rol: 'RECEPCIONISTA',    tenantId: 'VENTANILLA_UNICA' },
   { email: 'funcionario.lab@simacota.gov.co',    nombre: 'Funcionario Lab',     rol: 'FUNCIONARIO',      tenantId: 'SEC_GOBIERNO', cargo: 'Profesional Universitario' },
+  { email: 'planeacion.lab@simacota.gov.co',   nombre: 'Funcionaria de Planeación Lab', rol: 'FUNCIONARIO', tenantId: 'SEC_PLANEACION', cargo: 'Profesional Universitario — Secretaría de Planeación' },
   { email: 'jefe.lab@simacota.gov.co',           nombre: 'Jefe Dependencia Lab',rol: 'JEFE_DEPENDENCIA', tenantId: 'SEC_GOBIERNO' },
   { email: 'controlinterno.lab@simacota.gov.co', nombre: 'Control Interno Lab', rol: 'CONTROL_INTERNO',  tenantId: 'VENTANILLA_UNICA' },
   { email: 'admin.lab@simacota.gov.co',          nombre: 'Admin Lab',           rol: 'ADMIN',            tenantId: 'VENTANILLA_UNICA' },

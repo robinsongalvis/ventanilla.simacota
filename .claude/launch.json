@@ -31,6 +31,19 @@
       "autoPort": true
     },
     {
+      "name": "stage-celular",
+      "runtimeExecutable": "node",
+      "runtimeArgs": [
+        "scripts/laboratorio/dev-stage.mjs",
+        "-H",
+        "0.0.0.0",
+        "-p",
+        "3200"
+      ],
+      "port": 3200,
+      "autoPort": false
+    },
+    {
       "name": "rediseno-3100",
       "runtimeExecutable": "npx",
       "runtimeArgs": [
