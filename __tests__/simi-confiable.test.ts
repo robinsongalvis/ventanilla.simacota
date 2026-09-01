@@ -221,9 +221,10 @@ describe('construirContextoSimi — privacidad', () => {
        (b) la línea «- Es anónimo:» (173), y la «- Identidad reservada:» (174)
            en las filas `esAnonimo` y `ANONIMA`: hoy emiten «No» aunque el
            bloque declare reservado. Incoherencia reportada, no congelada aquí.
-       (c) el TEXTO LIBRE del ciudadano (asunto y descripción): viaja al modelo
-           igual con la reserva activa — ver la nota del suelo H-11 al final del
-           bucle. Hueco de producción, reportado, fuera del alcance de la tabla.
+       (c) el TEXTO LIBRE del ciudadano: era el hueco A del barrido (viajaba al
+           modelo igual con la reserva activa). CERRADO por el ADR-0040 el
+           1-sep-2026 — lo vigila el bloque «el texto libre no viaja bajo
+           reserva», más abajo. Sigue fuera del alcance de ESTA tabla.
        (d) las otras copias del predicado: lib/reportes-mipg/sanitizar.ts:29
            (tabla propia en __tests__/reportes-mipg.test.ts),
            lib/busqueda/filtros-radicado.ts:83, y
@@ -503,6 +504,67 @@ describe('construirContextoSimi — privacidad', () => {
     // El intento del ciudadano queda con `<<` / `>>` (2 angulares, no 3).
     expect(ctx.bloqueTexto).toContain('<<FIN_TEXTO_CIUDADANO>>');
   });
+
+  /* ══════════════════════════════════════════════════════════════
+     EL TEXTO LIBRE NO VIAJA BAJO RESERVA — custodio del ADR-0040 (1-sep-2026).
+
+     El defecto A del barrido: con reserva activa, asunto y descripción viajaban
+     a Gemini pasados por un sanitizador que DECLARA no detectar nombres ni
+     direcciones. La decisión del propietario fue la omisión TOTAL y declarada —
+     la «sanitización reforzada» se descartó por escrito: prometería una
+     detección que no existe.
+
+     Cada marcador de reserva se prueba EN SOLITARIO, con los otros apagados —
+     la lección de este mismo archivo: combinados, basta uno reconocido para que
+     todo salga bien y el hueco no se note.
+
+     ALCANCE (ADR-0033 §4.6-bis). MIRA el `bloqueTexto` (lo único que llega al
+     modelo). NO mira la heurística local de competencia (usa el texto y debe:
+     no sale de la entidad), ni `meta`, ni el canal de respuesta (issue #300).
+  ══════════════════════════════════════════════════════════════ */
+
+  describe('ADR-0040 — el texto libre no viaja bajo reserva', () => {
+    const ASUNTO = 'Queja por ruido vecinos'; // el del fixture radicadoBase, textual
+
+    const MARCADORES = [
+      ['esAnonimo = true', { esAnonimo: true, tipoPresentacion: 'IDENTIFICADA' as const, identidadReservada: false }],
+      ['identidadReservada = true', { esAnonimo: false, tipoPresentacion: 'IDENTIFICADA' as const, identidadReservada: true }],
+      ['tipoPresentacion = ANONIMA', { esAnonimo: false, tipoPresentacion: 'ANONIMA' as const, identidadReservada: false }],
+      ['tipoPresentacion = RESERVADA', { esAnonimo: false, tipoPresentacion: 'RESERVADA' as const, identidadReservada: false }],
+    ] as const;
+
+    it.each(MARCADORES)('con %s EN SOLITARIO, ni el asunto ni la descripción llegan al bloque — y la omisión queda declarada', (_m, sobre) => {
+      const ctx = construirContextoSimi({
+        radicado: radicadoBase({ ...sobre }),
+        trazabilidad: [],
+        usuario: usuarioBase,
+      });
+
+      expect(
+        ctx.bloqueTexto,
+        `El texto libre del ciudadano viajó al modelo con «${_m}» en solitario. `
+        + 'Es dato que puede identificar a una persona con reserva (Ley 1581/2012 art. 4 lit. f).',
+      ).not.toContain(ASUNTO);
+      /* La omisión se DECLARA, no se calla: sin esta línea, el modelo podría
+         pedir el contenido o inventarlo. */
+      expect(ctx.bloqueTexto).toContain('OMITIDOS por reserva de identidad');
+    });
+
+    it('identificado sin marcadores: el texto libre SÍ viaja, y la declaración de omisión NO está', () => {
+      /* La otra dirección — sin ella, «omitir siempre» pasaría las de arriba y
+         SIMI quedaría ciego para todo el mundo. */
+      const ctx = construirContextoSimi({
+        radicado: radicadoBase({ esAnonimo: false, tipoPresentacion: 'IDENTIFICADA', identidadReservada: false }),
+        trazabilidad: [],
+        usuario: usuarioBase,
+      });
+
+      expect(ctx.bloqueTexto).toContain(ASUNTO);
+      expect(ctx.bloqueTexto).not.toContain('OMITIDOS por reserva de identidad');
+    });
+  });
+
+
 });
 
 describe('SIMI_PROMPT_MAESTRO — anti-inyección (H-16)', () => {
