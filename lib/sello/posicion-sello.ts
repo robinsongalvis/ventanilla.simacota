@@ -1,9 +1,13 @@
 /**
  * Sprint Ventanilla Operativa 3 — cálculo de coordenadas del sello.
  *
- * Se ubica el sello en la ESQUINA SUPERIOR IZQUIERDA (decisión de UX
- * congelada). La izquierda evita tapar el N° de oficio o fecha del
- * remitente, que suelen estar en la esquina superior derecha.
+ * HISTORIA DE LA DECISIÓN: nació congelada en la ESQUINA SUPERIOR
+ * IZQUIERDA (evita tapar el N° de oficio del remitente, que suele ir a la
+ * derecha). El 1-sep-2026 el propietario la DESCONGELÓ para las superficies
+ * con selector: el paquete sellado deja elegir la esquina, con el mismo
+ * patrón de 4 chips del «Sello de recibido» de ventanilla. El default y
+ * todos los llamadores sin selector siguen en SUP_IZQ — nada cambió para
+ * ellos, y sus custodios lo siguen exigiendo.
  *
  * Margen interior: 12 pt desde el borde superior y desde el borde
  * izquierdo. Tamaño: 150×70 pt (~5.3×2.5 cm). Estos valores se
@@ -40,19 +44,32 @@ export const SELLO_MARGEN_PT = 12;
  * hacia arriba, por lo que la coordenada `y` del sello es
  * `alto - margen - selloAlto`.
  */
-export function calcularRectanguloSello(pagina: DimensionesPagina): RectanguloSello {
-  // Reducir sello si la página es muy pequeña. En un carta portrait
-  // (612×792), el sello ocupa 24% del ancho — bien.
+/** Las cuatro esquinas elegibles — mismos valores que el selector de ventanilla. */
+export type EsquinaSello = 'SUP_IZQ' | 'SUP_DER' | 'INF_IZQ' | 'INF_DER';
+
+export function calcularRectanguloSelloEnEsquina(
+  pagina: DimensionesPagina,
+  esquina: EsquinaSello,
+): RectanguloSello {
   const anchoDisponible = pagina.ancho - 2 * SELLO_MARGEN_PT;
   const altoDisponible  = pagina.alto  - 2 * SELLO_MARGEN_PT;
-
   const ancho = Math.min(SELLO_ANCHO_PT, Math.max(0, anchoDisponible));
   const alto  = Math.min(SELLO_ALTO_PT,  Math.max(0, altoDisponible));
 
-  const x = SELLO_MARGEN_PT;
-  const y = pagina.alto - SELLO_MARGEN_PT - alto;
+  const x = esquina === 'SUP_IZQ' || esquina === 'INF_IZQ'
+    ? SELLO_MARGEN_PT
+    : pagina.ancho - SELLO_MARGEN_PT - ancho;
+  const y = esquina === 'SUP_IZQ' || esquina === 'SUP_DER'
+    ? pagina.alto - SELLO_MARGEN_PT - alto
+    : SELLO_MARGEN_PT;
 
   return { x, y, ancho, alto };
+}
+
+export function calcularRectanguloSello(pagina: DimensionesPagina): RectanguloSello {
+  // La forma congelada original: SUP_IZQ. Delegar (y no duplicar) mantiene a
+  // sus custodios vigilando también la función nueva.
+  return calcularRectanguloSelloEnEsquina(pagina, 'SUP_IZQ');
 }
 
 /**
@@ -101,4 +118,30 @@ export const SELLO_MIN_ALTO_PT = 52;
  */
 export function selloEsLegible(rect: RectanguloSello): boolean {
   return rect.ancho >= SELLO_MIN_ANCHO_PT && rect.alto >= SELLO_MIN_ALTO_PT;
+}
+
+/**
+ * Encaja una imagen dentro de una caja SIN deformarla.
+ *
+ * Existe por la muestra del 1-sep-2026: el sello dibujaba el lockup
+ * institucional (4:1 de proporción) en un cuadro fijo de 26×26 y el resultado
+ * era una mancha ilegible. La «simplificación» que produce ese defecto —
+ * `width: caja.ancho, height: caja.alto` — es exactamente lo que alguien
+ * vuelve a escribir si esta función desaparece.
+ *
+ * `ampliar: false` (el default) nunca escala por encima del tamaño natural —
+ * es lo que quiere una foto del ciudadano vuelta página. El sello sí amplía:
+ * su escudo fuente es más grande que el cuadro y reducir es lo normal.
+ */
+export function encajarEnCaja(
+  imagen: DimensionesPagina,
+  caja: DimensionesPagina,
+  opciones: { ampliar?: boolean } = {},
+): DimensionesPagina {
+  const escala = Math.min(
+    caja.ancho / imagen.ancho,
+    caja.alto / imagen.alto,
+    opciones.ampliar ? Number.POSITIVE_INFINITY : 1,
+  );
+  return { ancho: imagen.ancho * escala, alto: imagen.alto * escala };
 }

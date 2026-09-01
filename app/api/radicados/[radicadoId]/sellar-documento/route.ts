@@ -1,7 +1,5 @@
 import { NextResponse } from 'next/server';
 import { createHash } from 'node:crypto';
-import { readFile } from 'node:fs/promises';
-import { join } from 'node:path';
 import {
   InternalAuthError,
   requireActiveInternalUser,
@@ -15,6 +13,7 @@ import { getFirebaseAdminDb, getFirebaseAdminStorage } from '@/lib/firebase-admi
 import { verificarMagicBytes } from '@/lib/seguridad/magic-bytes';
 import { sellarPrimeraPagina, SelloPDFError } from '@/lib/sello/generar-sello-pdf';
 import { formatFechaHoraColombia } from '@/lib/fecha-colombia';
+import { cargarEscudo } from '@/lib/sello/cargar-logo';
 import { logError } from '@/lib/logger';
 import { removeUndefinedDeep } from '@/lib/firestore/removeUndefined';
 import type { SelloDocumento } from '@/src/types/ventanilla';
@@ -44,7 +43,6 @@ interface Payload {
 }
 
 const ROLES_AUTORIZADOS = new Set(['ADMIN', 'RECEPCIONISTA', 'FUNCIONARIO', 'JEFE_DEPENDENCIA']);
-const LOGO_PROJECT_PATH = 'public/brand/logo-alcaldia-simacota.png';
 
 function jsonError(error: unknown): NextResponse {
   if (error instanceof InternalAuthError || error instanceof RadicadoActionError) {
@@ -71,16 +69,6 @@ function sha256Hex(bytes: Uint8Array | Buffer): string {
   return createHash('sha256').update(buf).digest('hex');
 }
 
-async function cargarLogo(): Promise<Uint8Array | null> {
-  try {
-    const buf = await readFile(join(process.cwd(), LOGO_PROJECT_PATH));
-    return new Uint8Array(buf);
-  } catch {
-    // Si el logo no está accesible en el entorno, el sello igual se
-    // genera sin logo — el generar-sello-pdf.ts lo tolera.
-    return null;
-  }
-}
 
 export async function POST(
   request: Request,
@@ -157,7 +145,8 @@ export async function POST(
     }
 
     const hashOriginal = sha256Hex(bytesOriginal);
-    const logoPng = await cargarLogo();
+    // El escudo cuadrado: el lockup completo no cabe en el cuadro del sello.
+    const logoPng = await cargarEscudo();
     const ahora = new Date();
 
     // Sellar (puede lanzar SelloPDFError → jsonError lo mapea).
