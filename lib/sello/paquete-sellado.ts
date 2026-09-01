@@ -76,42 +76,79 @@ export class PaqueteSelladoError extends Error {
 const MIMES_IMAGEN = new Set(['image/png', 'image/jpeg']);
 
 /**
- * Las líneas de la primera hoja, como función PURA — la página se dibuja a
- * partir de esto y el custodio las asevera a partir de esto: una sola fuente.
- * El texto refleja la constancia de radicación existente (misma fuente
- * jurídica: la actuación de radicación) más las dos listas propias del paquete.
+ * El CONTENIDO de la primera hoja, estructurado y PURO — la página se dibuja a
+ * partir de esto y el custodio asevera a partir de esto: una sola fuente.
+ * La forma imita al comprobante de radicación de ventanilla (pedido del
+ * propietario, 1-sep-2026): membrete, caja del número, campos, secciones.
  */
+export function contenidoConstanciaPaquete(
+  datos: DatosConstanciaPaquete,
+  incluidos: ResultadoPaqueteSellado['incluidos'],
+  aparte: ResultadoPaqueteSellado['aparte'],
+): {
+  entidad: string;
+  subtitulo: string;
+  titulo: string;
+  numeroEtiqueta: string;
+  numero: string;
+  campos: [string, string][];
+  solicitante: [string, string][];
+  incluidosTitulo: string;
+  incluidosLineas: string[];
+  aparteTitulo: string | null;
+  aparteLineas: string[];
+  notaFinal: string;
+} {
+  const motivoDe = (m: MotivoAparte) =>
+    m === 'FORMATO_NO_EMPAQUETABLE' ? 'formato sin sello equivalente'
+    : m === 'SIN_ARCHIVO' ? 'sin archivo legible'
+    : 'no fue posible sellarlo';
+  return {
+    entidad: 'ALCALDÍA MUNICIPAL DE SIMACOTA',
+    subtitulo: 'Ventanilla Única Digital · Secretaría de Planeación',
+    titulo: 'CONSTANCIA DE RADICACIÓN — PAQUETE DE COPIAS SELLADAS',
+    numeroEtiqueta: 'N.° DE RADICADO',
+    numero: datos.numeroRadicado,
+    campos: [
+      ['Trámite:', datos.descripcionTramite],
+      ['Radicado en debida forma:', datos.desdeCuandoCorreElPlazo.slice(0, 10)],
+      ['Requisitos verificados:', String(datos.requisitosVerificados)],
+      ['Funcionario:', datos.funcionarioNombre],
+      ['Copia sellada expedida:', datos.expedidaEnLegible],
+    ],
+    solicitante: [
+      ['Nombre:', datos.solicitanteNombre],
+      ['Documento:', datos.solicitanteDocumento],
+    ],
+    incluidosTitulo: `DOCUMENTOS INCLUIDOS (${incluidos.length}) — CADA PÁGINA CON SU SELLO`,
+    incluidosLineas: incluidos.map((d, i) => `${i + 1}. ${d.nombre} — ${d.paginas} pág.`),
+    aparteTitulo: aparte.length > 0 ? 'NO INCLUIDOS — SE DESCARGAN INDIVIDUALMENTE' : null,
+    aparteLineas: aparte.map((d) => `· ${d.nombre} (${motivoDe(d.motivo)})`),
+    notaFinal: 'Copia derivada del expediente digital. El original es el expediente; esta copia se regenera al pedirla.',
+  };
+}
+
+/** Compatibilidad para el custodio: las líneas planas SON el contenido estructurado, aplanado. */
 export function lineasConstanciaPaquete(
   datos: DatosConstanciaPaquete,
   incluidos: ResultadoPaqueteSellado['incluidos'],
   aparte: ResultadoPaqueteSellado['aparte'],
 ): { titulo: string; lineas: string[] } {
-  const lineas = [
-    'Alcaldía Municipal de Simacota · Secretaría de Planeación',
-    '',
-    `Radicado: ${datos.numeroRadicado}`,
-    `Solicitante: ${datos.solicitanteNombre} — ${datos.solicitanteDocumento}`,
-    `Trámite: ${datos.descripcionTramite}`,
-    `Radicado en legal y debida forma el: ${datos.desdeCuandoCorreElPlazo.slice(0, 10)}`,
-    `Requisitos verificados: ${datos.requisitosVerificados}`,
-    `Funcionario: ${datos.funcionarioNombre}`,
-    `Copia sellada expedida: ${datos.expedidaEnLegible}`,
-    '',
-    `Documentos incluidos en este paquete (${incluidos.length}), cada página con su sello:`,
-    ...incluidos.map((d, i) => `  ${i + 1}. ${d.nombre} — ${d.paginas} pág.`),
-  ];
-  if (aparte.length > 0) {
-    lineas.push('', 'No incluidos — se descargan individualmente:');
-    for (const d of aparte) {
-      const motivo =
-        d.motivo === 'FORMATO_NO_EMPAQUETABLE' ? 'formato sin sello equivalente'
-        : d.motivo === 'SIN_ARCHIVO' ? 'sin archivo legible'
-        : 'no fue posible sellarlo';
-      lineas.push(`  · ${d.nombre} (${motivo})`);
-    }
-  }
-  lineas.push('', 'Copia derivada del expediente digital. El original es el expediente; esta copia se regenera al pedirla.');
-  return { titulo: 'CONSTANCIA DE RADICACIÓN — PAQUETE DE COPIAS SELLADAS', lineas };
+  const c = contenidoConstanciaPaquete(datos, incluidos, aparte);
+  return {
+    titulo: c.titulo,
+    lineas: [
+      c.entidad,
+      c.subtitulo,
+      `${c.numeroEtiqueta} ${c.numero}`,
+      ...c.campos.map(([e, v]) => `${e} ${v}`),
+      ...c.solicitante.map(([e, v]) => `${e} ${v}`),
+      c.incluidosTitulo,
+      ...c.incluidosLineas,
+      ...(c.aparteTitulo ? [c.aparteTitulo, ...c.aparteLineas] : []),
+      c.notaFinal,
+    ],
+  };
 }
 
 /** Una imagen se vuelve UNA página carta, centrada y contenida, lista para el sello. */
@@ -170,34 +207,101 @@ export async function construirPaqueteSellado(entrada: {
     );
   }
 
-  // ── la primera hoja, a partir de las MISMAS listas que se devuelven ──────
+  // ── la primera hoja: el lenguaje visual del comprobante de ventanilla ────
   const paquete = await PDFDocument.create();
-  const fuente = await paquete.embedFont(StandardFonts.Helvetica);
-  const fuenteNegrita = await paquete.embedFont(StandardFonts.HelveticaBold);
-  const portada = paquete.addPage([CARTA.ancho, CARTA.alto]);
-  const { titulo, lineas } = lineasConstanciaPaquete(entrada.constancia, incluidos, aparte);
+  const helv = await paquete.embedFont(StandardFonts.Helvetica);
+  const helvB = await paquete.embedFont(StandardFonts.HelveticaBold);
+  const mono = await paquete.embedFont(StandardFonts.Courier);
+  const monoB = await paquete.embedFont(StandardFonts.CourierBold);
 
-  /* El ESCUDO encabeza la carátula — el propietario cazó la hoja «en blanco,
-     muy fea» del primer render: un papel institucional sin escudo no se ve
-     institucional. Mismo PNG que estampan los sellos de página. */
+  const VERDE = rgb(0.078, 0.325, 0.176);   // #14532D
+  const VERDE_TINTE = rgb(0.925, 0.957, 0.925);
+  const GRIS = rgb(0.4, 0.44, 0.41);
+  const TINTA = rgb(0.13, 0.17, 0.14);
+
+  const c = contenidoConstanciaPaquete(entrada.constancia, incluidos, aparte);
+  let portada = paquete.addPage([CARTA.ancho, CARTA.alto]);
   let y = CARTA.alto - MARGEN;
+
+  const centrado = (texto: string, size: number, font = helv, color = TINTA) => {
+    const ancho = font.widthOfTextAtSize(texto, size);
+    portada.drawText(texto, { x: (CARTA.ancho - ancho) / 2, y, size, font, color });
+    y -= size + 6;
+  };
+  const punteada = () => {
+    for (let x = MARGEN; x < CARTA.ancho - MARGEN; x += 9) {
+      portada.drawLine({ start: { x, y }, end: { x: x + 4, y }, thickness: 0.7, color: GRIS });
+    }
+    y -= 16;
+  };
+  /* Salto de página para las listas largas: truncar en silencio afirmaría un
+     contenido menor que el real. */
+  const asegurarEspacio = (necesario: number) => {
+    if (y - necesario < MARGEN) {
+      portada = paquete.addPage([CARTA.ancho, CARTA.alto]);
+      y = CARTA.alto - MARGEN;
+    }
+  };
+
+  // Membrete
   if (entrada.sello.logoPng && entrada.sello.logoPng.byteLength > 0) {
     try {
       const escudo = await paquete.embedPng(entrada.sello.logoPng);
-      const altoEscudo = 64;
+      const altoEscudo = 56;
       const anchoEscudo = (escudo.width / escudo.height) * altoEscudo;
       portada.drawImage(escudo, { x: (CARTA.ancho - anchoEscudo) / 2, y: y - altoEscudo, width: anchoEscudo, height: altoEscudo });
-      y -= altoEscudo + 18;
-    } catch { /* PNG corrupto: la carátula sale sin escudo, como el sello lo tolera */ }
+      y -= altoEscudo + 14;
+    } catch { /* PNG corrupto: membrete sin escudo, como el sello lo tolera */ }
   }
-  portada.drawText(titulo, { x: MARGEN, y: y - 14, size: 12, font: fuenteNegrita, color: rgb(0.07, 0.15, 0.1) });
-  portada.drawLine({ start: { x: MARGEN, y: y - 24 }, end: { x: CARTA.ancho - MARGEN, y: y - 24 }, thickness: 1.2, color: rgb(0.08, 0.27, 0.18) });
-  y = y - 48;
-  for (const linea of lineas) {
-    portada.drawText(linea.slice(0, 110), { x: MARGEN, y, size: 10, font: fuente, color: rgb(0.13, 0.17, 0.14) });
+  centrado(c.entidad, 13, helvB, VERDE);
+  centrado(c.subtitulo, 9, helv, GRIS);
+  y -= 8;
+  centrado(c.titulo, 11, monoB, TINTA);
+  y -= 4;
+  punteada();
+
+  // La caja del número, como en el comprobante
+  const altoCaja = 52;
+  portada.drawRectangle({ x: MARGEN, y: y - altoCaja, width: CARTA.ancho - MARGEN * 2, height: altoCaja, color: VERDE_TINTE, borderColor: VERDE, borderWidth: 1 });
+  const et = c.numeroEtiqueta;
+  const etAncho = helv.widthOfTextAtSize(et, 8);
+  portada.drawText(et, { x: (CARTA.ancho - etAncho) / 2, y: y - 16, size: 8, font: helv, color: GRIS });
+  const numAncho = monoB.widthOfTextAtSize(c.numero, 17);
+  portada.drawText(c.numero, { x: (CARTA.ancho - numAncho) / 2, y: y - 38, size: 17, font: monoB, color: VERDE });
+  y -= altoCaja + 18;
+
+  // Campos etiqueta/valor (etiqueta gris, valor en mono — el estilo del comprobante)
+  const fila = (etiqueta: string, valor: string) => {
+    asegurarEspacio(16);
+    portada.drawText(etiqueta, { x: MARGEN, y, size: 9, font: helv, color: GRIS });
+    portada.drawText(valor.slice(0, 62), { x: MARGEN + 170, y, size: 10, font: mono, color: TINTA });
+    y -= 16;
+  };
+  for (const [e, v] of c.campos) fila(e, v);
+  y -= 4; punteada();
+
+  portada.drawText('DATOS DEL SOLICITANTE', { x: MARGEN, y, size: 9, font: helvB, color: GRIS });
+  y -= 16;
+  for (const [e, v] of c.solicitante) fila(e, v);
+  y -= 4; punteada();
+
+  const seccionLista = (titulo: string, lineas: string[]) => {
+    asegurarEspacio(30);
+    portada.drawText(titulo, { x: MARGEN, y, size: 9, font: helvB, color: VERDE });
     y -= 15;
-    if (y < MARGEN) break; // una constancia no debería desbordar; si pasa, se trunca visiblemente al pie
-  }
+    for (const linea of lineas) {
+      asegurarEspacio(13);
+      portada.drawText(linea.slice(0, 92), { x: MARGEN + 8, y, size: 9, font: mono, color: TINTA });
+      y -= 13;
+    }
+    y -= 8;
+  };
+  seccionLista(c.incluidosTitulo, c.incluidosLineas);
+  if (c.aparteTitulo) seccionLista(c.aparteTitulo, c.aparteLineas);
+
+  asegurarEspacio(24);
+  punteada();
+  portada.drawText(c.notaFinal.slice(0, 110), { x: MARGEN, y, size: 8, font: helv, color: GRIS });
 
   for (const bytes of cuerposSellados) {
     const cuerpo = await PDFDocument.load(bytes);

@@ -115,7 +115,7 @@ export async function GET(
        la carátula, p. ej.) debe regenerar el paquete aunque la composición de
        documentos no cambie — sin esto, el arreglo del 1-sep habría seguido
        sirviendo la carátula vieja para siempre. */
-    const VERSION_RENDER = '2';
+    const VERSION_RENDER = '3';
     const huella = createHash('sha256');
     huella.update(VERSION_RENDER);
     huella.update(numero);
