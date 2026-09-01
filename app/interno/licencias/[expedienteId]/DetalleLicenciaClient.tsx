@@ -358,6 +358,11 @@ export function DetalleLicenciaClient({ expedienteId, onVolver }: DetalleLicenci
      papel «provisional», que sería certificar algo que no consta. */
   const accionesDePapel = [
     { etiqueta: 'Imprimir constancia de radicación', href: `/api/licencias/expedientes/${encodeURIComponent(expedienteId)}/constancia` },
+    /* La fila del sello enlazó AQUÍ desde su primer día — y la ruta no
+       existió hasta el 1-sep-2026, cuando el propietario definió el paquete
+       (un solo PDF: constancia de primera hoja + documentos sellados). El
+       custodio `acciones-papel-alcanzables.test.ts` exige que este href tenga
+       su route.ts en disco. */
     { etiqueta: 'Descargar documentos con sello', href: `/api/licencias/expedientes/${encodeURIComponent(expedienteId)}/sellados` },
     ...(puedeExpedirEjecutoria(expediente.estadoJuridico)
       ? [{ etiqueta: 'Constancia de ejecutoria', href: `/api/licencias/expedientes/${encodeURIComponent(expedienteId)}/ejecutoria` }]
