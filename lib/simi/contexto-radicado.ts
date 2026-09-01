@@ -183,7 +183,16 @@ export function construirContextoSimi(params: {
     `- Fecha de radicación: ${r.control.fechaRadicado}`,
     `- Fecha límite: ${r.termino.fechaVencimiento}`,
     `- Días restantes (hábiles): ${dias} (${estadoTermino})`,
-    `- Canal de respuesta del ciudadano: ${r.canalRespuesta ?? 'No registrado'}`,
+    /* Issue #300 (decisión del propietario, 1-sep-2026): bajo reserva, el
+       canal tampoco se declara — decirle «CORREO» al modelo es metadato de
+       contacto de un solicitante cuya identidad la ley protege. Solo en el
+       prompt: la radicación no se toca (RESERVADA conserva sus datos para la
+       entidad — la reserva protege frente a terceros, no frente a ella), y
+       `meta.canalRespuesta` sigue intacto porque no viaja al modelo (alimenta
+       UI y auditoría). Mismo patrón del ADR-0040: omisión total y declarada. */
+    ...(ocultarIdentidad
+      ? ['- Canal de respuesta: OMITIDO por reserva de identidad del solicitante — no lo pidas ni lo infieras.']
+      : [`- Canal de respuesta del ciudadano: ${r.canalRespuesta ?? 'No registrado'}`]),
     `- Dependencia actual: ${dependencia}`,
     `- Es anónimo: ${r.esAnonimo === true ? 'Sí' : 'No'}`,
     `- Identidad reservada: ${r.identidadReservada === true || r.tipoPresentacion === 'RESERVADA' ? 'Sí' : 'No'}`,
