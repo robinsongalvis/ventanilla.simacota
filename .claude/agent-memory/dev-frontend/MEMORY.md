@@ -9,3 +9,5 @@
 - [Bloque C — Libro Consecutivo](project_bloque_c_libro_consecutivo.md) — reemplaza el Excel; lógica pura en presentacion-libro-consecutivo.ts; 11-ago: buscador rápido (coincideBusquedaLibro) compartido con la Bandeja; `predio` SÍ existe ya en tipos.ts
 - [Testing sin fake timers](feedback_testing_libro_consecutivo_sin_fake_timers.md) — vi.useFakeTimers()+waitFor() se cuelgan; leer el valor real del control, seleccionar el año del fixture, o pasar `hoy` explícito a la función pura en vez de fijar el reloj
 - [RTL getByText y elementos anidados](feedback_rtl_gettext_elementos_anidados.md) — getByText solo une nodos de texto DIRECTOS; un `<strong>` interpolado "esconde" el número del matcher del contenedor
+- [Rediseño modales Licencias](project_rediseno_modales_licencias.md) — PR #303; base corregida a `main` tras hallar #293 ya fusionada; tokens en licencias-tema.css; ADR-0039 nuevo (mutación realista + grep de consultas RTL)
+- [Preview en otro worktree](feedback_preview_worktree_distinto.md) — el Browser pane puede levantar `next dev` en el worktree del coordinador, no en el mío; verificar `lsof -p <pid> | grep cwd` antes de depurar 404/rutas
