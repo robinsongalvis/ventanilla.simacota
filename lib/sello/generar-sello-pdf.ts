@@ -1,6 +1,7 @@
 import { PDFDocument, StandardFonts, rgb } from 'pdf-lib';
 import {
-  calcularRectanguloSello,
+  calcularRectanguloSelloEnEsquina,
+  type EsquinaSello,
   selloCabeEnPagina,
   selloEsLegible,
   SELLO_MARGEN_PT,
@@ -29,6 +30,8 @@ export interface DatosSello {
   fechaHoraLegible: string;
   /** PNG del logo. Opcional — si no llega, se omite y se ajusta el layout. */
   logoPng?:         Uint8Array | null;
+  /** Esquina de la marca (selector del paquete, 1-sep-2026). Default SUP_IZQ — la decisión original. */
+  esquina?:         EsquinaSello;
 }
 
 export interface ResultadoSellado {
@@ -78,7 +81,7 @@ function estamparEnPagina(
   logoImage: Awaited<ReturnType<PDFDocument['embedPng']>> | null,
 ): boolean {
   const { width: ancho, height: alto } = pagina.getSize();
-  const rect = calcularRectanguloSello({ ancho, alto });
+  const rect = calcularRectanguloSelloEnEsquina({ ancho, alto }, datos.esquina ?? 'SUP_IZQ');
   /* Dos comprobaciones, y la segunda es la que de verdad ocurre: el sello se
      ENCOGE para caber, así que «no cabe» casi nunca pasa — lo que pasa es que
      cabe ilegible. Estampar un sello que nadie puede leer y contarlo como

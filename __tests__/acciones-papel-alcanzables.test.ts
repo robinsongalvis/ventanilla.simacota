@@ -46,7 +46,8 @@ function hrefsDeAccionesDePapel(): string[] {
 
 /** `/api/licencias/expedientes/${…}/constancia` → app/api/licencias/expedientes/[id]/constancia/route.ts */
 function rutaEnDisco(href: string): string {
-  const conDinamicos = href.replace(/\$\{[^}]+\}/g, '[id]');
+  const sinQuery = href.split('?')[0]; // ?esquina=… no es parte de la ruta en disco
+  const conDinamicos = sinQuery.replace(/\$\{[^}]+\}/g, '[id]');
   return join(RAIZ, 'app', ...conDinamicos.split('/').filter(Boolean), 'route.ts');
 }
 

@@ -22,8 +22,13 @@ export interface PanelQueSigueProps {
   /** Paso del camino en el que está, para encabezar el panel. */
   pasoActual?: { numero: number; titulo: string } | null;
   onAccion: (tipo: TipoActuacionPermitida) => void;
-  /** Acciones de papel: no cambian el expediente, solo lo imprimen o descargan. */
-  papel?: { etiqueta: string; href: string }[];
+  /** Acciones de papel: no cambian el expediente, solo lo imprimen o descargan.
+   *  Una fila puede ofrecer VARIANTES (p. ej. la esquina de la marca del
+   *  paquete sellado): chips-enlace en lugar del «Abrir →» único. */
+  papel?: (
+    | { etiqueta: string; href: string }
+    | { etiqueta: string; opciones: { etiqueta: string; href: string }[] }
+  )[];
 }
 
 export function PanelQueSigue({ queSigue, pasoActual, onAccion, papel = [] }: PanelQueSigueProps) {
@@ -131,17 +136,38 @@ export function PanelQueSigue({ queSigue, pasoActual, onAccion, papel = [] }: Pa
       {papel.length > 0 && (
         <div className="px-4 pb-3 flex flex-col divide-y" style={{ borderColor: 'var(--color-border)' }}>
           {papel.map((p) => (
-            <a
-              key={p.href}
-              href={p.href}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="flex items-center justify-between py-2.5 text-sm focus-visible:outline-none focus-visible:ring-2 rounded"
-              style={{ color: 'var(--text-primary)' }}
-            >
-              <span>{p.etiqueta}</span>
-              <span className="text-xs font-bold" style={{ color: '#14532D' }}>Abrir →</span>
-            </a>
+            'opciones' in p ? (
+              <div key={p.etiqueta} className="flex flex-wrap items-center justify-between gap-2 py-2.5 text-sm" style={{ color: 'var(--text-primary)' }}>
+                <span>{p.etiqueta}</span>
+                <span className="flex gap-1.5">
+                  {p.opciones.map((o) => (
+                    <a
+                      key={o.href}
+                      href={o.href}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="text-xs font-bold px-2 py-1 rounded-lg focus-visible:outline-none focus-visible:ring-2"
+                      style={{ border: '1px solid var(--color-border)', color: '#14532D' }}
+                      title={`${p.etiqueta} — marca en ${o.etiqueta}`}
+                    >
+                      {o.etiqueta}
+                    </a>
+                  ))}
+                </span>
+              </div>
+            ) : (
+              <a
+                key={p.href}
+                href={p.href}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="flex items-center justify-between py-2.5 text-sm focus-visible:outline-none focus-visible:ring-2 rounded"
+                style={{ color: 'var(--text-primary)' }}
+              >
+                <span>{p.etiqueta}</span>
+                <span className="text-xs font-bold" style={{ color: '#14532D' }}>Abrir →</span>
+              </a>
+            )
           ))}
         </div>
       )}

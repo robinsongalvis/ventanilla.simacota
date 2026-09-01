@@ -1,9 +1,13 @@
 /**
  * Sprint Ventanilla Operativa 3 — cálculo de coordenadas del sello.
  *
- * Se ubica el sello en la ESQUINA SUPERIOR IZQUIERDA (decisión de UX
- * congelada). La izquierda evita tapar el N° de oficio o fecha del
- * remitente, que suelen estar en la esquina superior derecha.
+ * HISTORIA DE LA DECISIÓN: nació congelada en la ESQUINA SUPERIOR
+ * IZQUIERDA (evita tapar el N° de oficio del remitente, que suele ir a la
+ * derecha). El 1-sep-2026 el propietario la DESCONGELÓ para las superficies
+ * con selector: el paquete sellado deja elegir la esquina, con el mismo
+ * patrón de 4 chips del «Sello de recibido» de ventanilla. El default y
+ * todos los llamadores sin selector siguen en SUP_IZQ — nada cambió para
+ * ellos, y sus custodios lo siguen exigiendo.
  *
  * Margen interior: 12 pt desde el borde superior y desde el borde
  * izquierdo. Tamaño: 150×70 pt (~5.3×2.5 cm). Estos valores se
@@ -40,19 +44,32 @@ export const SELLO_MARGEN_PT = 12;
  * hacia arriba, por lo que la coordenada `y` del sello es
  * `alto - margen - selloAlto`.
  */
-export function calcularRectanguloSello(pagina: DimensionesPagina): RectanguloSello {
-  // Reducir sello si la página es muy pequeña. En un carta portrait
-  // (612×792), el sello ocupa 24% del ancho — bien.
+/** Las cuatro esquinas elegibles — mismos valores que el selector de ventanilla. */
+export type EsquinaSello = 'SUP_IZQ' | 'SUP_DER' | 'INF_IZQ' | 'INF_DER';
+
+export function calcularRectanguloSelloEnEsquina(
+  pagina: DimensionesPagina,
+  esquina: EsquinaSello,
+): RectanguloSello {
   const anchoDisponible = pagina.ancho - 2 * SELLO_MARGEN_PT;
   const altoDisponible  = pagina.alto  - 2 * SELLO_MARGEN_PT;
-
   const ancho = Math.min(SELLO_ANCHO_PT, Math.max(0, anchoDisponible));
   const alto  = Math.min(SELLO_ALTO_PT,  Math.max(0, altoDisponible));
 
-  const x = SELLO_MARGEN_PT;
-  const y = pagina.alto - SELLO_MARGEN_PT - alto;
+  const x = esquina === 'SUP_IZQ' || esquina === 'INF_IZQ'
+    ? SELLO_MARGEN_PT
+    : pagina.ancho - SELLO_MARGEN_PT - ancho;
+  const y = esquina === 'SUP_IZQ' || esquina === 'SUP_DER'
+    ? pagina.alto - SELLO_MARGEN_PT - alto
+    : SELLO_MARGEN_PT;
 
   return { x, y, ancho, alto };
+}
+
+export function calcularRectanguloSello(pagina: DimensionesPagina): RectanguloSello {
+  // La forma congelada original: SUP_IZQ. Delegar (y no duplicar) mantiene a
+  // sus custodios vigilando también la función nueva.
+  return calcularRectanguloSelloEnEsquina(pagina, 'SUP_IZQ');
 }
 
 /**

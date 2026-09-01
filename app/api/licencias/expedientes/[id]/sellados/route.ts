@@ -53,7 +53,7 @@ const URL_EXPIRA_MS = 10 * 60 * 1000;
 const PREFIJO_PAQUETES = 'sellados/expedientes';
 
 export async function GET(
-  _request: Request,
+  request: Request,
   { params }: { params: Promise<{ id: string }> },
 ): Promise<NextResponse> {
   const { id } = await params;
@@ -115,9 +115,16 @@ export async function GET(
        la carátula, p. ej.) debe regenerar el paquete aunque la composición de
        documentos no cambie — sin esto, el arreglo del 1-sep habría seguido
        sirviendo la carátula vieja para siempre. */
-    const VERSION_RENDER = '3';
+    const VERSION_RENDER = '4';
+    /* La ESQUINA de la marca la elige quien descarga (selector de 4 chips, el
+       patrón del «Sello de recibido» de ventanilla). Entra a la clave: cada
+       esquina es una copia derivada distinta. */
+    const ESQUINAS_VALIDAS = new Set(['SUP_IZQ', 'SUP_DER', 'INF_IZQ', 'INF_DER']);
+    const esquinaCruda = new URL(request.url).searchParams.get('esquina') ?? 'SUP_IZQ';
+    const esquina = (ESQUINAS_VALIDAS.has(esquinaCruda) ? esquinaCruda : 'SUP_IZQ') as import('@/lib/sello/posicion-sello').EsquinaSello;
     const huella = createHash('sha256');
     huella.update(VERSION_RENDER);
+    huella.update(esquina);
     huella.update(numero);
     huella.update(act.fecha ?? '');
     for (const d of [...documentosDocs].sort((a, b) => a.id.localeCompare(b.id))) {
@@ -186,6 +193,7 @@ export async function GET(
           radicadoId: numero,
           fechaHoraLegible: formatFechaHoraColombia(expediente.fechaRadicacionDebidaForma ?? act.fecha),
           logoPng: await cargarLogo(),
+          esquina,
         },
       });
 
