@@ -2,7 +2,10 @@ import { describe, expect, it } from 'vitest';
 import {
   aRadicadoParaDescarga,
   autorizarDescargaArchivo,
+  autorizarDescargaDocumentoExpediente,
+  autorizarDescargaSalida,
   parsearPathArchivo,
+  parsearPathDocumentoExpediente,
   type RadicadoParaDescarga,
   type UsuarioParaDescarga,
 } from '@/lib/seguridad/autorizar-descarga-archivo';
@@ -32,7 +35,11 @@ describe('parsearPathArchivo', () => {
     });
   });
 
-  it('rechaza paths peligrosos o mal formados', () => {
+  /* OJO CON EL ALCANCE (ADR-0033 §4.6-bis): el único `..` de esta lista
+     ('radicados/../etc/passwd') lo tumba la FORMA —4 segmentos, y PATH_REGEX
+     exige exactamente 3—, NO la guarda de `..`. La travesía que SÍ depende de
+     esa guarda se vigila en el bloque «travesía de directorios» de más abajo. */
+  it('rechaza paths mal FORMADOS: nulo, vacío, barra inicial, doble barra, prefijo ajeno, segmento de más, carácter de control', () => {
     expect(parsearPathArchivo(null)).toBeNull();
     expect(parsearPathArchivo('')).toBeNull();
     expect(parsearPathArchivo('   ')).toBeNull();
@@ -42,6 +49,186 @@ describe('parsearPathArchivo', () => {
     expect(parsearPathArchivo('otros/x/y.pdf')).toBeNull();             // prefijo no permitido
     expect(parsearPathArchivo('radicados/x/y/z.pdf')).toBeNull();        // segmento extra
     expect(parsearPathArchivo('radicados/x/archivo\x00.pdf')).toBeNull(); // control char
+  });
+});
+
+/* ══════════════════════════════════════════════════════════════
+   TRAVESÍA DE DIRECTORIOS — el detector que faltaba
+
+   ALCANCE DECLARADO (ADR-0033 §4.6-bis). Este bloque MIRA UNA SOLA COSA:
+   que sigan en su sitio las dos guardas `path.includes('..')` — la de
+   `parsearPathArchivo` y la de su gemela `parsearPathDocumentoExpediente`.
+   NO mira roles, ni pertenencia, ni el endpoint, ni la firma de URLs, ni
+   la validación de hash: de eso responden los bloques de abajo y
+   `__tests__/autorizar-descarga-salida.test.ts`.
+
+   POR QUÉ HIZO FALTA. Los TRES únicos `..` que había en toda la suite
+   ('radicados/../etc/passwd', 'radicados/x/../../etc/passwd',
+   'salidas/../etc/passwd') traen 4 o 6 segmentos y los tumba el REGEX, que
+   exige EXACTAMENTE 3 — nunca la guarda. Borrar la línea
+   `if (path.includes('..')) return null;` dejaba VERDE la suite entera: la
+   travesía de 3 segmentos no la ejercitaba nadie. Comprobado por mutación.
+
+   POR QUÉ EL REGEX NO BASTA. `..` es un segmento perfectamente legal para
+   él: el punto vive DENTRO de la clase del alfabeto (`[A-Za-z0-9._-]`), así
+   que 'radicados/../archivo.pdf' le encaja entero. Lo que el regex sí
+   rechaza es la FORMA (prefijo ajeno, segmentos de más o de menos) y los
+   caracteres fuera del alfabeto (`%2f`, controles).
+
+   POR QUÉ LOS FIXTURES ENVENENAN LA LISTA DE PERTENENCIA. Para que el
+   anti-IDOR no amortigüe la mutación: `aRadicadoParaDescarga` copia tal cual
+   lo que esté escrito en `archivos[].path`, y en expedientes ni siquiera hay
+   lista (se autoriza por TENANT). Con el path envenenado dentro, la guarda
+   es lo único que queda en pie y el rojo dice «descarga concedida» en vez
+   del tibio «404 en vez de 400».
+
+   QUÉ NO ASEVERA. No asevera `includes` como implementación: si alguien lo
+   sustituye por un análisis por segmentos —más fino y también correcto—,
+   este bloque debe seguir verde, y lo estará. Tampoco asevera las otras tres
+   comprobaciones de los parsers (`startsWith('/')`, `includes('//')`,
+   caracteres de control): son REDUNDANTES con los dos regex, verificado
+   ejecutándolos, así que borrarlas no cambia comportamiento y una prueba
+   suya sería vacua.
+══════════════════════════════════════════════════════════════ */
+describe('travesía de directorios — la guarda de `..` que el regex NO cubre', () => {
+  /* Paths de 3 segmentos que PATH_REGEX ACEPTA y que solo la guarda rechaza.
+     El último (`..` como NOMBRE) es el que caza una guarda debilitada a
+     `includes('../')` o `startsWith('..')`. */
+  it.each([
+    'radicados/../archivo.pdf',
+    'respuestas/../archivo.pdf',
+    'salidas/../oficio_firmado.pdf',
+    `radicados/${RADICADO_ID}/..`,
+  ] as const)('parsearPathArchivo devuelve null para «%s»', (path) => {
+    expect(
+      parsearPathArchivo(path),
+      `TRAVESÍA DE DIRECTORIOS ABIERTA con «${path}». Este path tiene los 3 segmentos que exige `
+      + 'PATH_REGEX y solo caracteres de su alfabeto (el punto vive DENTRO de la clase '
+      + '[A-Za-z0-9._-]), así que EL REGEX LO ACEPTA. La única barrera es la línea '
+      + "includes('..') de parsearPathArchivo, en lib/seguridad/autorizar-descarga-archivo.ts. "
+      + 'Si la borraste creyéndola redundante: no lo es. Vuelve a ponerla.',
+    ).toBeNull();
+  });
+
+  it('control de representatividad: PATH_REGEX sigue aceptando 3 segmentos CON puntos', () => {
+    /* Este control NO es una segunda barrera de seguridad: es la declaración de
+       QUÉ hace representativo al fixture de arriba. Si alguien ensancha o
+       endurece el alfabeto de PATH_REGEX, los `..` de la prueba anterior
+       podrían empezar a caer por la FORMA y quedarse verdes vigilando nada.
+       Cubre el endurecimiento AMPLIO (sacar el punto del alfabeto); un
+       endurecimiento quirúrgico anti-`..` no lo cazaría — pero ése deja la
+       protección en pie, así que el silencio ahí no abre ningún hueco. */
+    const mensaje = 'el fixture de travesía dejó de ser representativo: un path de 3 segmentos '
+      + 'con puntos ya no se acepta, así que los «..» de la prueba anterior podrían estar '
+      + 'cayendo por la FORMA y no por la guarda. Revisa PATH_REGEX antes de dar por buena '
+      + 'esta vigilancia.';
+    expect(parsearPathArchivo('radicados/a.b/archivo.pdf'), mensaje)
+      .toMatchObject({ prefijo: 'radicados', radicadoId: 'a.b' });
+    expect(parsearPathArchivo(`radicados/${RADICADO_ID}/.pdf`), mensaje)
+      .toMatchObject({ prefijo: 'radicados', nombre: '.pdf' });
+  });
+
+  it('parsearPathDocumentoExpediente devuelve null cuando el NOMBRE de archivo es «..»', () => {
+    expect(
+      parsearPathDocumentoExpediente('expedientes/exp-0001/doc-0001/v0001/..'),
+      'TRAVESÍA DE DIRECTORIOS ABIERTA en documentos de expediente: '
+      + 'PATH_REGEX_DOCUMENTO_EXPEDIENTE acepta «..» como nombre de archivo, porque su último '
+      + 'segmento admite el punto ([A-Za-z0-9._- ]). En expedienteId/documentoId no cabe (su '
+      + "alfabeto, [A-Za-z0-9-], no tiene punto), pero en el nombre sí: la guarda includes('..') "
+      + 'de parsearPathDocumentoExpediente es gemela de la de parsearPathArchivo y tan poco '
+      + 'redundante como ella. Vuelve a ponerla.',
+    ).toBeNull();
+  });
+
+  it('control de representatividad (gemela): el último segmento sigue admitiendo puntos', () => {
+    expect(
+      parsearPathDocumentoExpediente('expedientes/exp-0001/doc-0001/v0001/informe.final.pdf'),
+      'el fixture de travesía de expedientes dejó de ser representativo: si el último segmento '
+      + 'ya no admite puntos, el «..» de la prueba anterior podría estar cayendo por la FORMA y '
+      + 'no por la guarda. Revisa PATH_REGEX_DOCUMENTO_EXPEDIENTE en '
+      + 'lib/server/expedientes-documentos-tipos.ts antes de dar por buena esta vigilancia.',
+    ).toMatchObject({
+      expedienteId: 'exp-0001',
+      documentoId:  'doc-0001',
+      idVersion:    'v0001',
+      nombre:       'informe.final.pdf',
+    });
+  });
+
+  it('autorizarDescargaArchivo muere en el PARSEO aunque el path envenenado esté registrado como adjunto', () => {
+    const ENVENENADO = 'radicados/../archivo.pdf';
+    const decision = autorizarDescargaArchivo({
+      path: ENVENENADO,
+      usuario: user('ADMIN'),
+      /* A propósito DENTRO de la lista: si ese path llegó a escribirse en
+         `archivos[].path`, `aRadicadoParaDescarga` lo copia tal cual y
+         `pertenece()` dice que sí. La pertenencia no puede salvar esto. */
+      radicado: { ...RADICADO_BASE, adjuntosPaths: [ENVENENADO] },
+    });
+    expect(
+      decision.ok,
+      `DESCARGA DE TRAVESÍA CONCEDIDA: con «${ENVENENADO}» registrado como adjunto, la guarda `
+      + "includes('..') era la única barrera. Sin ella este path sale AUTORIZADO y "
+      + '/api/interno/archivo le firma una URL de Storage con ese nombre de objeto — que los '
+      + 'consumidores que SÍ resuelven rutas (respaldo/restauración de adjuntos, mirrors '
+      + 'locales) interpretan como salida del directorio.',
+    ).toBe(false);
+    if (!decision.ok) {
+      expect(
+        decision.motivo,
+        'la travesía se rechazó por el motivo equivocado: tiene que morir en el PARSEO '
+        + '(PATH_INVALIDO, 400). Si llega hasta la pertenencia o el rol, el parser ya la dio '
+        + 'por buena y la guarda no está haciendo su trabajo.',
+      ).toBe('PATH_INVALIDO');
+      expect(decision.status).toBe(400);
+    }
+  });
+
+  it('autorizarDescargaSalida muere en el PARSEO aunque el path envenenado sea el archivoPath de la salida', () => {
+    const ENVENENADO = 'salidas/../oficio_firmado.pdf';
+    const decision = autorizarDescargaSalida({
+      path: ENVENENADO,
+      usuario: user('ADMIN'),
+      salida: { dependenciaOrigen: 'SEC_GOBIERNO', archivoPath: ENVENENADO },
+    });
+    expect(
+      decision.ok,
+      `DESCARGA DE TRAVESÍA CONCEDIDA por la puerta de salidas con «${ENVENENADO}» como `
+      + "archivoPath de la salida. Esta puerta comparte parsearPathArchivo, así que borrar su "
+      + "guarda includes('..') abre también el oficio 2-SAL, no solo los adjuntos del radicado.",
+    ).toBe(false);
+    if (!decision.ok) {
+      expect(
+        decision.motivo,
+        'la travesía se rechazó por el motivo equivocado: tiene que morir en el PARSEO '
+        + '(PATH_INVALIDO, 400), no en la pertenencia ni en el rol.',
+      ).toBe('PATH_INVALIDO');
+      expect(decision.status).toBe(400);
+    }
+  });
+
+  it('autorizarDescargaDocumentoExpediente muere en el PARSEO — ahí no hay lista de pertenencia que amortigüe', () => {
+    const ENVENENADO = 'expedientes/exp-0001/doc-0001/v0001/..';
+    const decision = autorizarDescargaDocumentoExpediente({
+      path: ENVENENADO,
+      usuario: user('ADMIN'),
+      expediente: { tenantId: 'SEC_GOBIERNO' },
+    });
+    expect(
+      decision.ok,
+      `DESCARGA DE TRAVESÍA CONCEDIDA en expedientes con «${ENVENENADO}»: esta puerta autoriza `
+      + "por TENANT, sin lista de paths que amortigüe. Sin la guarda includes('..') de "
+      + 'parsearPathDocumentoExpediente el path sale AUTORIZADO y el endpoint baja de Storage '
+      + 'los bytes del objeto que se llame así.',
+    ).toBe(false);
+    if (!decision.ok) {
+      expect(
+        decision.motivo,
+        'la travesía se rechazó por el motivo equivocado: tiene que morir en el PARSEO '
+        + '(PATH_INVALIDO, 400), antes de tocar el expediente o el rol.',
+      ).toBe('PATH_INVALIDO');
+      expect(decision.status).toBe(400);
+    }
   });
 });
 
@@ -161,7 +348,11 @@ describe('autorizarDescargaArchivo — errores de autenticación y datos', () =>
   });
 
   /* 10 */
-  it('path con ../ se rechaza con 400 (sin filtrar detalle)', () => {
+  /* ALCANCE (ADR-0033 §4.6-bis): a este path lo tumba la FORMA —6 segmentos, y
+     PATH_REGEX exige 3—, NO la guarda de `..`. Lo que esta prueba vigila de
+     verdad es que el MENSAJE de un 400 no filtre el path. La guarda de `..` la
+     vigila el bloque «travesía de directorios». */
+  it('path de 6 segmentos con ../ se rechaza con 400 por FORMA, y el mensaje no filtra el detalle', () => {
     const decision = autorizarDescargaArchivo({
       path: 'radicados/x/../../etc/passwd',
       usuario: user('ADMIN'),

@@ -38,7 +38,13 @@ describe('parsearPathArchivo — prefijo salidas', () => {
   });
 
   /* 2 */
-  it('sigue rechazando paths peligrosos con el prefijo nuevo', () => {
+  /* ALCANCE (ADR-0033 §4.6-bis): los cuatro paths de abajo caen por la FORMA
+     (segmentos de más, barra inicial, doble barra). En particular
+     'salidas/../etc/passwd' tiene 4 segmentos y lo tumba el REGEX, no la guarda
+     de `..`. La travesía de 3 segmentos que SÍ depende de esa guarda
+     ('salidas/../oficio_firmado.pdf') se vigila en
+     __tests__/autorizar-descarga-archivo.test.ts, bloque «travesía de directorios». */
+  it('sigue rechazando paths mal FORMADOS con el prefijo nuevo (la guarda de `..` se vigila aparte)', () => {
     expect(parsearPathArchivo('salidas/../etc/passwd')).toBeNull();
     expect(parsearPathArchivo('salidas//doble/barra.pdf')).toBeNull();
     expect(parsearPathArchivo(`/salidas/${SALIDA_ID}/x.pdf`)).toBeNull();

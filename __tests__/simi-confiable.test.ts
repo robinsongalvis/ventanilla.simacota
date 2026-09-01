@@ -175,32 +175,215 @@ describe('construirContextoSimi — privacidad', () => {
     expect(ctx.bloqueTexto).not.toContain('@example.com');
   });
 
-  it('oculta el nombre del solicitante cuando esAnonimo es true', () => {
-    const ctx = construirContextoSimi({
-      radicado: radicadoBase({ esAnonimo: true }),
-      trazabilidad: [],
-      usuario: usuarioBase,
-    });
-    expect(ctx.bloqueTexto).not.toContain('Juan García');
-    expect(ctx.bloqueTexto).toContain('ANÓNIMO');
-  });
+  /* ────────────────────────────────────────────────────────────────
+     El predicado de anonimato — lo que de verdad protege
 
-  it('oculta el nombre cuando tipoPresentacion es RESERVADA', () => {
-    const ctx = construirContextoSimi({
-      radicado: radicadoBase({ tipoPresentacion: 'RESERVADA' }),
-      trazabilidad: [],
-      usuario: usuarioBase,
-    });
-    expect(ctx.bloqueTexto).not.toContain('Juan García');
-  });
+     `construirContextoSimi` no lee NUNCA `solicitante.nombreCompleto`: el
+     nombre no se escribe en el bloque en NINGÚN escenario (eso lo asevera la
+     prueba H-11 de más arriba). Por eso las tres pruebas que vivían aquí
+     —cada una con un único `expect(bloqueTexto).not.toContain('Juan García')`—
+     eran aserciones incondicionalmente verdaderas: pasaban igual con el
+     predicado entero que con el predicado roto. Medido: borrando
+     `|| r.tipoPresentacion === 'RESERVADA'` del predicado pasaba la suite
+     ENTERA.
 
-  it('oculta el nombre cuando identidadReservada es true', () => {
-    const ctx = construirContextoSimi({
-      radicado: radicadoBase({ identidadReservada: true }),
-      trazabilidad: [],
-      usuario: usuarioBase,
+     Lo que SÍ cambia cuando `debeOcultarIdentidad` reconoce un marcador de
+     reserva es la línea «- Solicitante: …» del bloque que viaja a Gemini, y
+     con ella el renglón del canal de correo:
+
+       reconoce    → «ANÓNIMO / RESERVADO — no menciones identidad…»
+                     y NO se declara canal de correo.
+       no reconoce → «persona ciudadana identificada…» + «- Canal de
+                     respuesta: correo electrónico registrado.»
+
+     Eso es lo que se asevera, en las dos direcciones.
+
+     El criterio canónico del repositorio es `identidadProtegida`
+     (lib/seguridad/identidad-protegida.ts, ADR-0006), y su prueba
+     __tests__/identidad-protegida.test.ts:54-58 ya aísla los marcadores igual
+     que esta tabla: el patrón no es nuevo — es el que estas copias del
+     predicado no reutilizaron.
+
+     ─── Alcance declarado (ADR-0033 §4.6-bis) ───
+     VIGILAN, dentro de `bloqueTexto` (lo único que llega al modelo:
+     app/api/simi/radicado/route.ts:213):
+       · la línea «- Solicitante:» — rama de reserva presente, rama de
+         identificado ausente e instrucción operativa al modelo intacta;
+       · la ausencia del renglón «- Canal de respuesta: correo electrónico
+         registrado.»;
+       · la línea «- Identidad reservada:» (contexto-radicado.ts:174), sólo en
+         las dos filas que esa línea reconoce.
+     NO VIGILAN, y por qué:
+       (a) `meta.esAnonimo` / `meta.esReservado` (líneas 275-276): se recalculan
+           aparte y no alimentan el prompt — sólo avisos de UI y el documento de
+           `simi_auditoria`. Un auditor que filtre por `meta.esReservado` NO
+           verá los ANONIMA.
+       (b) la línea «- Es anónimo:» (173), y la «- Identidad reservada:» (174)
+           en las filas `esAnonimo` y `ANONIMA`: hoy emiten «No» aunque el
+           bloque declare reservado. Incoherencia reportada, no congelada aquí.
+       (c) el TEXTO LIBRE del ciudadano (asunto y descripción): viaja al modelo
+           igual con la reserva activa — ver la nota del suelo H-11 al final del
+           bucle. Hueco de producción, reportado, fuera del alcance de la tabla.
+       (d) las otras copias del predicado: lib/reportes-mipg/sanitizar.ts:29
+           (tabla propia en __tests__/reportes-mipg.test.ts),
+           lib/busqueda/filtros-radicado.ts:83, y
+           lib/respuesta-oficial/oficio-institucional.ts:78 —esta última
+           reconoce sólo DOS de los cuatro marcadores y no tiene cobertura.
+       (e) la HERENCIA: la reserva no se propaga por ningún vínculo padre-hijo
+           (`radicadoEntradaId` de las salidas, `radicadoOrigen` de los
+           expedientes de licencias). Queda fuera porque `construirContextoSimi`
+           sólo recibe un `VentanillaRadicado`; si algún día recibe un derivado,
+           esta tabla no lo cubre.
+  ──────────────────────────────────────────────────────────────── */
+
+  /** Marca exclusiva de la rama de reserva en la línea «- Solicitante:». */
+  const MARCA_RESERVADO    = 'ANÓNIMO / RESERVADO';
+  /** Instrucción operativa que acompaña al rótulo. El rótulo etiqueta; esta
+   *  frase es la que restringe la salida del modelo. */
+  const MARCA_INSTRUCCION  = 'no menciones identidad';
+  /** Marca exclusiva de la rama de ciudadano identificado. */
+  const MARCA_IDENTIFICADO = 'persona ciudadana identificada';
+  /** Renglón que sólo existe en la rama de identificado. */
+  const MARCA_CANAL_CORREO = 'correo electrónico registrado';
+
+  /** Extrae la línea «- Solicitante:» del bloque exigiendo que haya UNA sola.
+   *  El texto escrito por el ciudadano se inserta ANTES (builder, líneas
+   *  159-166) y `prepararContenidoNoConfiable` no toca los guiones iniciales:
+   *  una descripción con un renglón «- Solicitante: …» —el escenario de
+   *  inyección que ya prueba H-16— taparía la línea real y estas pruebas
+   *  dejarían de vigilar sin avisar. */
+  function lineaSolicitante(bloqueTexto: string): string {
+    const halladas = bloqueTexto.split('\n').filter((l) => l.startsWith('- Solicitante:'));
+    expect(
+      halladas,
+      `Se esperaba EXACTAMENTE una línea «- Solicitante:» en el bloque y se hallaron ${halladas.length}. `
+      + 'Con 0, el builder dejó de emitirla y estas pruebas no vigilan nada; con más de 1, el renglón real '
+      + 'quedó tapado por texto del ciudadano (inyección tipo H-16) y se estaría aseverando sobre el otro.',
+    ).toHaveLength(1);
+    return halladas[0] ?? '';
+  }
+
+  /* Los CUATRO marcadores que obligan a ocultar la identidad, cada uno EN
+     SOLITARIO y con los otros tres explícitamente apagados. Combinarlos
+     (p. ej. RESERVADA junto a `identidadReservada`) es justo lo que deja pasar
+     la mutación: basta con que UNO siga reconocido para que el bloque salga
+     bien y la prueba no note nada.
+
+     Hoy ninguna ruta de escritura produce estos estados en solitario: la
+     radicación deriva `esAnonimo` e `identidadReservada` desde
+     `tipoPresentacion` (app/api/radicacion/route.ts:323-324,
+     lib/recepcion/construir-radicado.ts:198-199). Se prueban aislados A
+     PROPÓSITO: cada cláusula es una redundancia defensiva para históricos y
+     migraciones que escriban `tipoPresentacion` sin derivar los booleanos. NO
+     borrar estas filas alegando que el estado «no se da».
+
+     Los cuatro agotan el dominio: `tipoPresentacion` sólo admite
+     IDENTIFICADA | ANONIMA | RESERVADA (src/types/ventanilla.ts:317, alias
+     `TipoPresentacionPqrsd` en src/types/radicado.ts:19) y no hay otra bandera
+     de reserva en `VentanillaRadicado`. */
+  const MARCADORES_DE_RESERVA = [
+    {
+      marcador: 'esAnonimo = true',
+      // contexto-radicado.ts:174 sólo mira `identidadReservada` y RESERVADA.
+      emiteIdentidadReservadaSi: false,
+      radicado: { esAnonimo: true,  tipoPresentacion: 'IDENTIFICADA', identidadReservada: false },
+    },
+    {
+      marcador: 'tipoPresentacion = ANONIMA',
+      emiteIdentidadReservadaSi: false,
+      radicado: { esAnonimo: false, tipoPresentacion: 'ANONIMA',      identidadReservada: false },
+    },
+    {
+      marcador: 'tipoPresentacion = RESERVADA',
+      emiteIdentidadReservadaSi: true,
+      radicado: { esAnonimo: false, tipoPresentacion: 'RESERVADA',    identidadReservada: false },
+    },
+    {
+      marcador: 'identidadReservada = true',
+      emiteIdentidadReservadaSi: true,
+      radicado: { esAnonimo: false, tipoPresentacion: 'IDENTIFICADA', identidadReservada: true  },
+    },
+  ] as const;
+
+  for (const caso of MARCADORES_DE_RESERVA) {
+    it(`«${caso.marcador}» por sí solo declara al solicitante RESERVADO en el bloque que va a la IA`, () => {
+      const ctx = construirContextoSimi({
+        radicado: radicadoBase({ ...caso.radicado }),
+        trazabilidad: [],
+        usuario: usuarioBase,
+      });
+      const linea = lineaSolicitante(ctx.bloqueTexto);
+
+      expect(
+        linea,
+        'FUGA DE RESERVA DE IDENTIDAD (Ley 1581/2012 art. 4 lit. f — acceso y circulación restringida). '
+        + `Con «${caso.marcador}» como único marcador, el bloque que se envía a Gemini presenta al `
+        + 'solicitante como IDENTIFICADO. '
+        + `Línea emitida: «${linea}». `
+        + 'Causa: debeOcultarIdentidad() en lib/simi/contexto-radicado.ts dejó de reconocer ese marcador.',
+      ).toContain(MARCA_RESERVADO);
+
+      expect(
+        linea,
+        `Con «${caso.marcador}» se conserva el rótulo «${MARCA_RESERVADO}» pero se perdió la instrucción `
+        + `operativa «${MARCA_INSTRUCCION}». El rótulo sólo etiqueta; la instrucción es lo que restringe `
+        + `la salida del modelo. Línea emitida: «${linea}».`,
+      ).toContain(MARCA_INSTRUCCION);
+
+      expect(
+        linea,
+        `Con «${caso.marcador}» el bloque hacia la IA todavía dice «${MARCA_IDENTIFICADO}». Las dos ramas `
+        + 'del predicado son excluyentes: si la de identificado se escribió, el anonimato no se evaluó.',
+      ).not.toContain(MARCA_IDENTIFICADO);
+
+      expect(
+        ctx.bloqueTexto,
+        `Con «${caso.marcador}» el bloque emitió «${MARCA_CANAL_CORREO}». Ese renglón sólo existe en la `
+        + 'rama de ciudadano identificado: su presencia confirma que el predicado no reconoció el marcador. '
+        + 'Discrimina la rama; NO certifica que el canal quede oculto — la línea «- Canal de respuesta del '
+        + 'ciudadano: …» (contexto-radicado.ts:171) se emite siempre, también con reserva.',
+      ).not.toContain(MARCA_CANAL_CORREO);
+
+      /* La línea 174 del builder repite la MISMA subexpresión mutable
+         (`r.identidadReservada === true || r.tipoPresentacion === 'RESERVADA'`)
+         y se rompe por separado de la del predicado. Se asevera SÓLO en las dos
+         filas que esa línea reconoce; `esAnonimo` y `ANONIMA` quedan fuera a
+         propósito, porque hoy la 174 emite «No» para ellas — incoherencia
+         reportada, no congelada aquí. */
+      if (caso.emiteIdentidadReservadaSi) {
+        expect(
+          ctx.bloqueTexto,
+          `Con «${caso.marcador}» el bloque que va a Gemini afirma «- Identidad reservada: No» sobre un `
+          + 'radicado con identidad amparada. Es la misma subexpresión del predicado, repetida en '
+          + 'lib/simi/contexto-radicado.ts:174, y se rompe por separado de la de la línea 106.',
+        ).toContain('- Identidad reservada: Sí');
+      }
+
+      /* Suelo ya garantizado por la prueba H-11: `construirContextoSimi` no lee
+         nunca `solicitante.nombreCompleto`, y `solicitante.email` sólo aparece
+         como la frase «correo electrónico registrado», jamás crudo. OJO — eso
+         vigila los CAMPOS, no el dato: si el ciudadano escribe su nombre, su
+         dirección o la matrícula de su predio dentro del asunto o de la
+         descripción, ese texto SÍ viaja al modelo con la reserva activa
+         (`sanitizarPiiTextoSimi` sólo borra correo, móvil y documento con
+         prefijo, y declara que no detecta nombres ni direcciones). Hueco de
+         producción, fuera del alcance de estas pruebas, anotado en riesgos. */
+      expect(ctx.bloqueTexto).not.toContain('Juan García');
+      expect(ctx.bloqueTexto).not.toContain('juan@example.com');
     });
-    expect(ctx.bloqueTexto).not.toContain('Juan García');
+  }
+
+  it('la otra dirección: sin marcador de reserva el bloque NO declara al solicitante reservado', () => {
+    const ctx = construirContextoSimi({ radicado: radicadoBase(), trazabilidad: [], usuario: usuarioBase });
+    const linea = lineaSolicitante(ctx.bloqueTexto);
+
+    expect(
+      linea,
+      'Un radicado IDENTIFICADA, sin ninguno de los cuatro marcadores, quedó marcado como reservado. '
+      + 'Un predicado que oculta SIEMPRE pondría verdes las cuatro pruebas de arriba sin proteger nada: '
+      + `esta es la dirección contraria que lo impide. Línea emitida: «${linea}».`,
+    ).not.toContain(MARCA_RESERVADO);
+    expect(linea).toContain(MARCA_IDENTIFICADO);
   });
 
   it('incluye evaluacionCompetencia en meta con nivelConfianza válido', () => {
