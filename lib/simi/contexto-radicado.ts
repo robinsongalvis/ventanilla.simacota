@@ -156,14 +156,29 @@ export function construirContextoSimi(params: {
     ...(heredadoSistema || requiereValidacion
       ? ['- ADVERTENCIA: Este tipo fue heredado del sistema actual y requiere validación jurídica/institucional antes de usarse como criterio definitivo.']
       : []),
-    `- Asunto (contenido escrito por el ciudadano):`,
-    MARK_OPEN_CIUDADANO,
-    prepararContenidoNoConfiable(r.detalle.asunto),
-    MARK_CLOSE_CIUDADANO,
-    `- Descripción (contenido escrito por el ciudadano):`,
-    MARK_OPEN_CIUDADANO,
-    prepararContenidoNoConfiable(r.detalle.descripcion),
-    MARK_CLOSE_CIUDADANO,
+    /* ADR-0040: bajo reserva de identidad, el TEXTO LIBRE no viaja al modelo.
+       El sanitizador declara que no detecta nombres ni direcciones — un
+       «Yo, Juan García, de la matrícula 300-12345…» escrito por un solicitante
+       reservado llegaba íntegro a un tercero. La omisión es total y declarada:
+       una sanitización «reforzada» prometería una detección que no existe.
+       La heurística local de competencia (arriba) sí sigue usando el texto:
+       es código propio, no sale de la entidad. */
+    ...(ocultarIdentidad
+      ? [
+          '- Asunto y descripción: OMITIDOS por reserva de identidad del solicitante '
+          + '(Ley 1581/2012 art. 4 lit. f) — el texto libre puede identificarlo. '
+          + 'No pidas ese contenido ni intentes inferirlo.',
+        ]
+      : [
+          `- Asunto (contenido escrito por el ciudadano):`,
+          MARK_OPEN_CIUDADANO,
+          prepararContenidoNoConfiable(r.detalle.asunto),
+          MARK_CLOSE_CIUDADANO,
+          `- Descripción (contenido escrito por el ciudadano):`,
+          MARK_OPEN_CIUDADANO,
+          prepararContenidoNoConfiable(r.detalle.descripcion),
+          MARK_CLOSE_CIUDADANO,
+        ]),
     `- Estado actual: ${r.estadoActual}`,
     `- Fecha de radicación: ${r.control.fechaRadicado}`,
     `- Fecha límite: ${r.termino.fechaVencimiento}`,
