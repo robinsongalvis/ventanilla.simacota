@@ -28,23 +28,25 @@ Estado del código hoy (verificado 1-sep-2026):
   (líneas 538 y 1108): sin debida forma (422), sin sello ni paquete
   (409 `SIN_NUMERO_LEGAL`), invisible para el vigía del término.
 - Desde el 26-ago el acto de radicar **RECIBE** el número de ventanilla
-  (`serieId: 'radicados'`) — ya no emite la serie `expedientes`. Abrir la serie
-  68745 hoy protege contra duplicados futuros; el número oficial del expediente
-  vivo es el `1-110-…`.
+  (`serieId: 'radicados'`) — dejó de emitir la serie `expedientes`. Con la
+  decisión A1 (1-sep) la emisión **vuelve**: en la debida forma el expediente
+  recibirá también su `68745-…`, y la apertura de esa serie pasa de protección
+  a corazón funcional del arranque.
 - La serie `radicados` **no tiene candado técnico** (`exigeAperturaExplicita`
   solo existe para `expedientes`): si alguien radica antes de la apertura, el
   sistema emite el 28 sin quejarse. De ahí la Regla operativa n.º 1 (§B).
 
 ## A. ANTES del día (D-3 a D-1) — sin esto, el día no arranca
 
-- [ ] **A1 [P] Decisión de producto pendiente** (no está escrita en ningún doc):
-  cuando la creación deje de forzar `DEMO + esPrueba`, ¿qué escribe en
-  `numeroExpediente`? El tipo permite nacer **sin número**
-  (`lib/motor-expedientes/tipos.ts:462`, campo opcional).
-  **Recomendación [C]:** nacer sin número y recibir el `1-110-…` en la debida
-  forma, como ya ocurre; el camino demo se conserva solo tras un selector
-  explícito **de servidor** (hoy el body «NO puede pedir otra cosa» y así debe
-  seguir). Decidido esto, [C] prepara el PR.
+- [x] **A1 [P] DECIDIDA (1-sep-2026):** el expediente nace **sin número**
+  (`lib/motor-expedientes/tipos.ts:462`, campo opcional) y en la radicación en
+  debida forma recibe DOS cosas: el vínculo a su radicado `1-110-…` de entrada
+  (que sigue siendo el ancla del término, ADR-0034 intacto) y su número propio
+  **`68745-0-AA-CCCC`** de la serie `expedientes` — serie ÚNICA para todas las
+  modalidades, continuando el libro del ingeniero. El camino demo se conserva
+  solo tras un selector explícito **de servidor** (el body «NO puede pedir
+  otra cosa» y así sigue). El ADR y el análisis de impacto (nivel 3) van ANTES
+  del PR de A2.
 - [ ] **A2 [C] El PR del candado, listo y verde ANTES del día.** Contenido:
   constante → `true`; los dos planes de creación dejan de forzar
   (`planCrearExpedienteDemo` :538 y `planCrearExpedienteDesdeRadicado` :1108)
@@ -137,6 +139,8 @@ Estado del código hoy (verificado 1-sep-2026):
   La guarda 4 exige que `--ultimo` coincida con el máximo del libro: **si no
   coincide, PARE** — se re-extrae el Excel, no se adivina. Abrir esta serie
   **no** habilita la emisión: el candado sigue siendo un acto aparte (B4).
+  Con la decisión A1, este paso es el corazón del arranque: el número
+  confirmado es el punto exacto donde el sistema toma el relevo del libro.
 
 - [ ] **B4 [P] Merge y deploy del PR del candado** (el de A2, ya verde).
   [C] observa el deploy y confirma que el build sirvió la versión nueva.
