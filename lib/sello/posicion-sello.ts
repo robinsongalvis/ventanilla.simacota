@@ -100,15 +100,17 @@ export function selloCabeEnPagina(
  * decir que se puso es afirmar algo que el papel no sostiene.
  *
  * Las cotas salen del contenido, no de un número redondo:
- *  · ALTO 52 pt — las cuatro líneas del sello se dibujan hasta 32 pt por debajo
- *    del borde superior interno, más el padding de 6 arriba y la línea de pie a
- *    6 del borde inferior: por debajo de 52 las líneas se pisan.
+ *  · ALTO 62 pt — las filas del sello (`filasSello`) llegan hasta 41 pt por
+ *    debajo del borde superior interno (la última es el folio «Página N de M»,
+ *    1-sep-2026), más el padding de 6 arriba, ~2 de descenso tipográfico y la
+ *    línea de pie (5,5 pt a 6 del borde inferior): por debajo de 62 el folio
+ *    pisa el pie.
  *  · ANCHO 120 pt — el número de radicado va en Courier 8,5 (avance 0,6 em =
  *    5,1 pt por carácter). Un `1-110-202608-00000123` son 21 caracteres ≈ 107 pt,
  *    más 12 de padding. Por debajo de eso, el dato que importa sale cortado.
  */
 export const SELLO_MIN_ANCHO_PT = 120;
-export const SELLO_MIN_ALTO_PT = 52;
+export const SELLO_MIN_ALTO_PT = 62;
 
 /**
  * ¿El sello dibujado en este rectángulo se puede LEER?

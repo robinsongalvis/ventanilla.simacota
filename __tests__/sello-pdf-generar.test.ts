@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { PDFDocument, StandardFonts } from 'pdf-lib';
-import { sellarPrimeraPagina, SelloPDFError, tamanoQueCabe } from '@/lib/sello/generar-sello-pdf';
+import { filasSello, sellarPrimeraPagina, SelloPDFError, tamanoQueCabe } from '@/lib/sello/generar-sello-pdf';
 
 /* ══════════════════════════════════════════════════════════════
    Sprint Ventanilla Operativa 3 — generación real del sello.
@@ -106,5 +106,58 @@ describe('tamanoQueCabe — el ajuste que evita la línea partida', () => {
     const size = tamanoQueCabe(reg, largo, 6.5, 109);
     expect(size).toBeLessThan(6.5);
     expect(reg.widthOfTextAtSize(largo, size)).toBeLessThanOrEqual(109 + 1e-9);
+  });
+});
+
+/* ══════════════════════════════════════════════════════════════
+   filasSello — el folio del propietario, y las filas que no se pisan
+   (1-sep-2026).
+
+   «Página N de M» lo decidió el propietario para el papel de licencias: si a
+   la copia impresa le falta una hoja, se nota. La restricción que lo
+   acompaña: SOLO en el sellado multipágina — el sello de ventanilla (primera
+   página, contenido congelado del sprint Op 3) queda EXACTO.
+
+   ALCANCE DECLARADO (ADR-0033 §4.6-bis). Esto MIRA:
+     · la fuente ÚNICA de filas (`filasSello`, la misma que el dibujo
+       consume — patrón de `lineasConstanciaPaquete`): folio presente con
+       folio, ausente sin folio, y las tres filas congeladas intactas;
+     · que el calendario vertical no pise filas: dy estrictamente creciente y
+       separación ≥ el tamaño de la fila que baja (la lección de «ÚNICA»
+       pisando la fecha).
+   Esto NO mira: que la N de cada página del BINARIO sea la correcta —
+   pdf-lib no lee texto; ese cableado es el bucle de `sellarTodasLasPaginas`
+   (una línea, visible en el diff) y no tiene prueba de binario posible aquí.
+══════════════════════════════════════════════════════════════ */
+describe('filasSello — folio y calendario vertical', () => {
+  const DATOS = { radicadoId: '1-110-202609-00000002', fechaHoraLegible: '1 de septiembre de 2026, 8:00 a. m.' };
+
+  it('con folio, la última fila es «Página 3 de 28» — y es la única que folia', () => {
+    const filas = filasSello(DATOS, { n: 3, de: 28 });
+    expect(filas.at(-1)?.texto).toBe('Página 3 de 28');
+    expect(filas.filter((f) => f.texto.includes('Página'))).toHaveLength(1);
+  });
+
+  it('SIN folio, el contenido es EXACTO al congelado de ventanilla: tres filas, ninguna folia', () => {
+    const filas = filasSello(DATOS);
+    expect(filas.map((f) => f.texto)).toEqual([
+      'RECIBIDO POR VENTANILLA ÚNICA',
+      DATOS.radicadoId,
+      DATOS.fechaHoraLegible,
+    ]);
+  });
+
+  it.each([
+    ['con folio', { n: 1, de: 4 }],
+    ['sin folio', undefined],
+  ] as const)('%s: ninguna fila pisa a la siguiente (dy creciente, separación ≥ tamaño)', (_v, folio) => {
+    const filas = filasSello(DATOS, folio);
+    for (let i = 1; i < filas.length; i += 1) {
+      expect(
+        filas[i].dy - filas[i - 1].dy,
+        `la fila «${filas[i].texto}» queda a ${filas[i].dy - filas[i - 1].dy} pt de «${filas[i - 1].texto}» `
+        + 'y su tamaño no cabe en ese hueco — dos filas montadas son ilegibles',
+      ).toBeGreaterThanOrEqual(filas[i].tamano);
+    }
   });
 });
