@@ -181,7 +181,7 @@ export function VistaVentanilla({
             value={consulta}
             onChange={(e) => setConsulta(e.target.value)}
             onKeyDown={(e) => { if (e.key === 'Enter') abrirCoincidenciaExacta(); }}
-            placeholder="Radicado, cédula o nombre del ciudadano…"
+            placeholder="Radicado, expediente, cédula o nombre…"
             aria-label="Buscar radicado por número, cédula o nombre"
             className="flex-1 min-w-0 text-sm bg-transparent outline-none placeholder:text-slate-400"
             style={{ color: '#12261A' }}

@@ -34,7 +34,7 @@ import {
   numeroDocumentoVisible,
 } from '@/lib/seguridad/identidad-protegida';
 import { puedeVerReportes } from '@/lib/permisos/acceso-reportes';
-import { coincideIdentidadFiltroRapido } from '@/lib/busqueda/coincidencia-filtro-rapido';
+import { coincideTextoRadicado, normalizarTextoBusqueda } from '@/lib/busqueda/coincidencia-texto-radicado';
 import { agruparDestinosPorDependencia, areasParaDependencia, getNombreArea } from '@/lib/catalogos/areas';
 import { RegistroExpresModal } from '@/app/interno/dashboard/components/RegistroExpresModal';
 import { RegistrarSalidaModal, type EntradaAmarre } from '@/app/interno/dashboard/components/salidas/RegistrarSalidaModal';
@@ -207,18 +207,21 @@ function aplicarFiltroMIPG(
   else if (filtro === 'RESUELTOS_FUERA_TERMINO') lista = lista.filter((r) => r.cumplioTermino === false);
 
   if (busqueda.trim()) {
-    const q = busqueda.toLowerCase().trim();
-    // Nombre/documento pasan por la guarda anti-inferencia (ADR-0012, R9):
-    // un radicado con identidad reservada no debe coincidir por esos
-    // campos, solo por radicadoId. Asunto, oficina y funcionario no son
-    // identidad del solicitante y siguen coincidiendo directamente.
-    lista = lista.filter(
-      (r) =>
-        coincideIdentidadFiltroRapido(r, q) ||
-        r.detalle.asunto.toLowerCase().includes(q) ||
-        NOMBRES_TENANT[r.clasificacion.oficinaDestino].toLowerCase().includes(q) ||
-        (r.clasificacion.funcionarioResponsableNombre ?? '').toLowerCase().includes(q),
-    );
+    /* EL PREDICADO ÚNICO del sistema (ADR-0041 §3.7, 1-sep-2026). Antes esta
+       página traía su propia lista de campos en línea, en paralelo a la del
+       mostrador: dos criterios donde debía haber uno, cada uno con su copia de
+       la guarda anti-inferencia (ADR-0012, R9). Al ir a añadir el número del
+       expediente —que el propietario pidió poder buscar— quedó claro que el
+       sitio debía ser UNO.
+
+       Qué gana el Tablero: el número del expediente vinculado, el correo del
+       solicitante (detrás de la guarda de identidad, como los demás datos
+       personales) y el nombre del tipo de trámite. Qué conserva: exactamente
+       la misma protección — un radicado con identidad reservada sigue sin
+       coincidir por nombre ni documento. */
+    const q = normalizarTextoBusqueda(busqueda);
+    lista = lista.filter((r) =>
+      coincideTextoRadicado(r, q, { nombreDependencia: NOMBRES_TENANT[r.clasificacion.oficinaDestino] }));
   }
 
   return [...lista].sort((a, b) => {
@@ -1249,7 +1252,7 @@ function TablaRadicados({
             type="search"
             value={busqueda}
             onChange={(e) => onBusquedaChange(e.target.value)}
-            placeholder="Buscar por radicado, nombre o documento…"
+            placeholder="Buscar por radicado, expediente, nombre, documento, asunto o dependencia…"
             className="micro-input w-full rounded-lg pl-9 pr-3 py-2 text-sm outline-none"
             style={{
               background: '#F8FAF7',

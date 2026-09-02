@@ -1090,6 +1090,13 @@ export function planCrearExpedienteDesdeRadicado(
     tramiteId: DEFINICION_LICENCIA_CONSTRUCCION_PARCIAL.id,
     estado: 'EN_REVISION',
     estadoJuridico: 'PRESENTADA',
+    /* EN CLARO, A PROPÓSITO (ADR-0042, 1-sep-2026). Aquí NO se consulta
+       `identidadProtegida`, y no es un olvido: la licencia urbanística exige
+       acreditar la titularidad del predio y el acto que la concede identifica
+       al titular — la reserva de identidad no aplica en Planeación. La
+       excepción está medida: la proyección hacia ventanilla no expone estos
+       campos, así que la identidad no cruza a otra dependencia. El resto del
+       sistema sigue enmascarando igual (ADR-0006). */
     solicitanteNombre: radicado.solicitante.nombreCompleto,
     solicitanteDocumento: radicado.solicitante.numeroDocumento,
     contexto: input.contexto ?? {},
