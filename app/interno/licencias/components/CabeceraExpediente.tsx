@@ -4,6 +4,7 @@ import type { ExpedienteLicenciaDoc } from '@/lib/server/expedientes-licencias';
 import { ChipEstadoJuridico } from './ChipEstadoJuridico';
 import { describirTramiteDesdeSubtipos } from '@/lib/motor-expedientes/describir-tramite';
 import { formatFechaColombia } from '@/lib/fecha-colombia';
+import { rotuloDeSerie } from '@/lib/motor-expedientes/numeros-del-expediente';
 
 /* ══════════════════════════════════════════════════════════════
    CABECERA DEL EXPEDIENTE.
@@ -45,7 +46,12 @@ export function CabeceraExpediente({ expediente, desdeCuandoCorreElPlazo }: Cabe
         <div className="mt-1.5 flex flex-wrap items-center gap-x-3 gap-y-1.5 text-sm">
           {expediente.numeroExpediente?.numero && (
             <span style={{ color: 'var(--text-secondary)' }}>
-              Radicado{' '}
+              {/* El rótulo sale de la SERIE, no está cableado (ADR-0041): un
+                  expediente viejo cuyo número es un 1-110 dirá «Radicado» para
+                  siempre, y uno nuevo con su 68745 dirá «Expediente», en la
+                  misma pantalla y sin reescribir un solo dato. Hoy, con todo
+                  en la serie `radicados`, dice exactamente lo de antes. */}
+              {rotuloDeSerie(expediente.numeroExpediente.serieId)}{' '}
               <strong className="font-mono" style={{ color: 'var(--text-primary)' }}>
                 {expediente.numeroExpediente.numero}
               </strong>

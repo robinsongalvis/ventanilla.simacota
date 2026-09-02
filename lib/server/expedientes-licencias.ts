@@ -2,6 +2,7 @@ import type { TenantId } from '@/src/types/radicado';
 import { calcularCompletitudExpediente, type CompletitudExpediente } from '@/lib/server/completitud-expediente';
 import type { Expediente, Actuacion, ContextoEvaluacionRequisito, DefinicionTramite, NumeroExpedienteAsignado } from '@/lib/motor-expedientes/tipos';
 import { CATALOGO_FIGURAS_NORMATIVAS } from '@/lib/motor-expedientes/catalogo-subtipos-normativo';
+import { esNumeroLegal } from '@/lib/motor-expedientes/numeros-del-expediente';
 import type { ComunicacionesFallidas } from '@/lib/server/comunicacion-fallida';
 import {
   procedeDesistimientoTacito,
@@ -1169,26 +1170,35 @@ export interface GateComunicacionExpediente {
 export function debeEnviarComunicacionExpediente(
   tramiteId: string,
   radicado: RadicadoParaComunicacion | null | undefined,
-  numeroExpediente?: string,
+  numeroExpediente?: { numero: string; serieId: string } | null,
   /** Captura propia del expediente — solo manda cuando NO hay radicado vinculado. */
   contactoDelExpediente?: ContactoCapturado | null,
 ): GateComunicacionExpediente {
-  // NUNCA se comunica al ciudadano un número de DEMOSTRACIÓN.
+  // NUNCA se le entrega al ciudadano un número con el que nadie podrá
+  // encontrarlo.
   //
   // El corte sigue vigente aunque el correo haya dejado de ser una constancia:
   // desde el 26-ago-2026 se envía un ACUSE DE RECIBO
   // (`lib/email/templates/acuse-recibo-expediente-licencia.ts`), que no
   // certifica ningún hecho jurídico — pero sí le da al ciudadano un número
-  // con el que volver al mostrador. Con el candado R10 cerrado ese número es
-  // `DEMO-{AA}-{8hex}`, que no existe en ninguna serie: la persona vendría a
-  // preguntar por un expediente que nadie puede encontrar.
+  // con el que volver al mostrador.
+  //
+  // ANTES cortaba por el PREFIJO `DEMO-`, y eso tenía un agujero que el
+  // ADR-0041 destapó: en su paso 3 el expediente pasa a NACER SIN NÚMERO, y un
+  // número ausente no empieza por `DEMO-` — el corte dejaba de disparar justo
+  // cuando más falta hacía, y el llamador (que asumía el número presente)
+  // enviaba un correo real diciendo «Expediente undefined». Ahora la pregunta
+  // es la correcta y cubre los dos casos: ¿este número es de una serie legal?
+  // Ausente, `demo` y `e2e-stage` responden que no.
   //
   // Se corta AQUÍ y no en la plantilla a propósito: la decisión de comunicar
   // es del dominio, no de la maqueta del correo.
-  if (numeroExpediente?.startsWith('DEMO-')) {
+  if (!esNumeroLegal(numeroExpediente)) {
     return {
       debeEnviar: false,
-      motivo: 'El expediente tiene un número de DEMOSTRACIÓN (candado R10): no se le entrega al ciudadano un número que no pertenece a la serie legal y con el que nadie podría encontrar su expediente.',
+      motivo: numeroExpediente?.numero
+        ? 'El expediente tiene un número de DEMOSTRACIÓN (candado R10): no se le entrega al ciudadano un número que no pertenece a la serie legal y con el que nadie podría encontrar su expediente.'
+        : 'El expediente todavía no tiene número de una serie legal: no se le entrega al ciudadano un correo que no puede nombrar su trámite.',
     };
   }
   if (!DEFINICIONES_HABILITADAS_COMUNICACION_EXPEDIENTE.has(tramiteId)) {

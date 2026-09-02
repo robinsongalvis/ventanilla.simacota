@@ -29,6 +29,7 @@ import { describirTramiteDesdeSubtipos } from '@/lib/motor-expedientes/describir
 import { buildConstanciaRadicacionLicenciaHtml } from '@/lib/constancias/constancia-radicacion-licencia';
 import { logError } from '@/lib/logger';
 import type { TenantId } from '@/src/types/radicado';
+import { numeroDeEntrada } from '@/lib/motor-expedientes/numeros-del-expediente';
 
 export const runtime = 'nodejs';
 
@@ -72,7 +73,11 @@ export async function GET(_req: Request, ctx: { params: Promise<{ id: string }> 
     const act = actSnap.data() as ActuacionLicenciaDoc;
 
     const html = buildConstanciaRadicacionLicenciaHtml({
-      numeroRadicado: exp.numeroExpediente?.numero ?? '',
+      /* El papel se titula «constancia de radicación» y su campo se llama
+         `numeroRadicado`: le corresponde el número de ENTRADA, no el del
+         expediente. Hoy dan el mismo valor → no cambia una sola letra
+         (ADR-0041 paso 1). */
+      numeroRadicado: numeroDeEntrada(exp) ?? exp.numeroExpediente?.numero ?? '',
       solicitanteNombre: exp.solicitanteNombre,
       solicitanteDocumento: exp.solicitanteDocumento,
       tipoDocumento: 'CC',

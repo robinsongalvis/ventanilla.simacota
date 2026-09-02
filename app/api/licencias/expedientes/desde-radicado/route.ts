@@ -147,10 +147,15 @@ export async function POST(request: Request): Promise<NextResponse> {
        El acuse afirma únicamente hechos verificables hoy: qué se recibió,
        qué falta, y que el plazo legal todavía no corre. */
     let constanciaEnviada = false;
-    const gate = debeEnviarComunicacionExpediente(plan.expediente.tramiteId, radicado, plan.expediente.numeroExpediente?.numero);
+    const gate = debeEnviarComunicacionExpediente(plan.expediente.tramiteId, radicado, plan.expediente.numeroExpediente);
     if (gate.debeEnviar) {
       const email = radicado.solicitante.email!;
-      const numero = plan.expediente.numeroExpediente!.numero;
+      /* Sin aserción: el gate de arriba ya garantizó que hay número de una
+         serie legal (`esNumeroLegal`). La aserción `!` afirmaba lo mismo con
+         una promesa del programador en vez de con el flujo — y cuando el
+         ADR-0041 haga nacer el expediente SIN número, esa promesa habría
+         producido un correo real diciendo «Expediente undefined». */
+      const numero = plan.expediente.numeroExpediente?.numero ?? '';
       try {
         const docs = resumenDocumentosAcuse(
           plan.expediente.aportes ?? [],
