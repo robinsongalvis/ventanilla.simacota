@@ -179,7 +179,7 @@ export async function POST(request: Request, context: RouteContext): Promise<Nex
       const gateHito = debeEnviarComunicacionExpediente(
         expediente.tramiteId,
         rad,
-        expediente.numeroExpediente?.numero,
+        expediente.numeroExpediente,
       );
       if (gateHito.debeEnviar && rad?.solicitante.email) {
         try {
@@ -213,7 +213,7 @@ export async function POST(request: Request, context: RouteContext): Promise<Nex
     if (body?.tipo === 'acta-observaciones' && expediente.radicadoId) {
       const radicadoSnap = await db.doc(`ventanilla_radicados/${expediente.radicadoId}`).get();
       const radicado = radicadoSnap.exists ? (radicadoSnap.data() as VentanillaRadicado) : null;
-      const gate = debeEnviarComunicacionExpediente(expediente.tramiteId, radicado, expediente.numeroExpediente?.numero);
+      const gate = debeEnviarComunicacionExpediente(expediente.tramiteId, radicado, expediente.numeroExpediente);
       if (gate.debeEnviar && radicado) {
         const email = radicado.solicitante.email!;
         const numero = expediente.numeroExpediente?.numero ?? id;

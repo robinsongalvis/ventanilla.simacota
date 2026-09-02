@@ -44,6 +44,7 @@ import {
 } from '@/lib/sello/paquete-sellado';
 import { formatFechaHoraColombia } from '@/lib/fecha-colombia';
 import { cargarEscudo, cargarLogo } from '@/lib/sello/cargar-logo';
+import { numeroDeEntrada } from '@/lib/motor-expedientes/numeros-del-expediente';
 import { VERSION_RENDER_SELLO } from '@/lib/sello/generar-sello-pdf';
 import { logError } from '@/lib/logger';
 
@@ -124,10 +125,19 @@ export async function GET(
     const ESQUINAS_VALIDAS = new Set(['SUP_IZQ', 'SUP_DER', 'INF_IZQ', 'INF_DER']);
     const esquinaCruda = new URL(request.url).searchParams.get('esquina') ?? 'SUP_IZQ';
     const esquina = (ESQUINAS_VALIDAS.has(esquinaCruda) ? esquinaCruda : 'SUP_IZQ') as import('@/lib/sello/posicion-sello').EsquinaSello;
+    /* EL NÚMERO ESTAMPADO ENTRA A LA CLAVE (ADR-0041 paso 1). Antes bastaba
+       con `numero` porque era también el que se estampaba. Ahora se estampa el
+       de ENTRADA, y ese SÍ puede cambiar después de materializado el paquete:
+       un expediente huérfano al que se le vincula su radicado más tarde
+       (`planVincularRadicado`) pasa de estampar un valor a estampar otro. Sin
+       esto, se le seguiría sirviendo el paquete viejo para siempre — la misma
+       familia de «cachear su propia degradación» que ya nos costó una vez. */
+    const numeroEntrada = numeroDeEntrada(expediente) ?? numero;
     const huella = createHash('sha256');
     huella.update(VERSION_RENDER);
     huella.update(esquina);
     huella.update(numero);
+    huella.update(numeroEntrada);
     huella.update(act.fecha ?? '');
     for (const d of [...documentosDocs].sort((a, b) => a.id.localeCompare(b.id))) {
       huella.update(`${d.id}:${d.versionVigente?.hashSha256 ?? 'sin-version'};`);
@@ -179,9 +189,15 @@ export async function GET(
         );
       }
 
+      /* Se estampa el número de ENTRADA, no el del expediente: el sello dice
+         «RECIBIDO POR VENTANILLA ÚNICA». Hoy dan el mismo valor (el pivote del
+         26-ago dejó el 1-110 en `numeroExpediente`), así que no cambia un solo
+         papel; el día que el expediente lleve su 68745, este sitio ya pide el
+         correcto. La caída cubre al histórico sin vínculo — su etiquetado
+         llega en el paso 2, cuando el papel muestre los DOS números. */
       const resultado = await construirPaqueteSellado({
         constancia: {
-          numeroRadicado: numero,
+          numeroRadicado: numeroEntrada,
           solicitanteNombre: expediente.solicitanteNombre,
           solicitanteDocumento: expediente.solicitanteDocumento,
           descripcionTramite: describirTramiteDesdeSubtipos(expediente.subtipos, expediente.modalidadesConstruccion),
@@ -192,7 +208,7 @@ export async function GET(
         },
         documentos: paraPaquete,
         sello: {
-          radicadoId: numero,
+          radicadoId: numeroEntrada,
           fechaHoraLegible: formatFechaHoraColombia(expediente.fechaRadicacionDebidaForma ?? act.fecha),
           logoPng: await cargarEscudo(),
           esquina,

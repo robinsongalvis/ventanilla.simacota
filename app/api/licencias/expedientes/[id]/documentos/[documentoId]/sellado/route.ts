@@ -41,6 +41,7 @@
  * motivo escrito, para que la pantalla pueda explicarlo en vez de ofrecer un
  * botón que aparece y desaparece sin razón visible.
  */
+import { createHash } from 'node:crypto';
 import { NextResponse } from 'next/server';
 import type { TenantId } from '@/src/types/radicado';
 import { getFirebaseAdminDb, getFirebaseAdminStorage } from '@/lib/firebase-admin';
@@ -53,6 +54,7 @@ import type { ExpedienteLicenciaDoc } from '@/lib/server/expedientes-licencias';
 import { sellarTodasLasPaginas, SelloPDFError, VERSION_RENDER_SELLO } from '@/lib/sello/generar-sello-pdf';
 import { formatFechaHoraColombia } from '@/lib/fecha-colombia';
 import { cargarEscudo } from '@/lib/sello/cargar-logo';
+import { numeroDeEntrada } from '@/lib/motor-expedientes/numeros-del-expediente';
 import { logError } from '@/lib/logger';
 
 export const runtime = 'nodejs';
@@ -143,7 +145,13 @@ export async function GET(
        la misma familia que el paquete arregló el 1-sep). Las copias con clave
        vieja quedan huérfanas en `sellados/` — prefijo regenerable y sin
        respaldo, no es fuga. */
-    const pathSellado = `${PREFIJO_SELLADOS}/${id}/${documentoId}/v${VERSION_RENDER_SELLO}-${documento.hashSha256}.pdf`;
+    /* Y lleva el NÚMERO ESTAMPADO (ADR-0041 paso 1): el de entrada puede
+       cambiar después de materializada la copia —un expediente huérfano al que
+       se le vincula su radicado más tarde—, y sin esto se serviría el sello
+       viejo. El hash lo acorta sin perder la distinción. */
+    const numeroEntrada = numeroDeEntrada(expediente) ?? numero;
+    const huellaNumero = createHash('sha256').update(numeroEntrada).digest('hex').slice(0, 12);
+    const pathSellado = `${PREFIJO_SELLADOS}/${id}/${documentoId}/v${VERSION_RENDER_SELLO}-${huellaNumero}-${documento.hashSha256}.pdf`;
     const archivoSellado = bucket.file(pathSellado);
 
     const [yaExistia] = await archivoSellado.exists();
@@ -165,7 +173,8 @@ export async function GET(
 
       try {
         const resultado = await sellarTodasLasPaginas(new Uint8Array(bytesOriginal), {
-          radicadoId: numero,
+          // El número de ENTRADA: el sello dice «recibido por ventanilla».
+          radicadoId: numeroEntrada,
           fechaHoraLegible: formatFechaHoraColombia(
             expediente.fechaRadicacionDebidaForma ?? expediente.creadoEn,
           ),

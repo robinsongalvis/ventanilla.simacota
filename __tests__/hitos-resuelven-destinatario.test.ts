@@ -19,7 +19,9 @@ import { debeEnviarComunicacionExpediente } from '@/lib/server/expedientes-licen
  */
 
 const TRAMITE = 'licencia-construccion-obra-nueva';
-const NUM = '1-110-202608-00000040';
+/* Objeto, no string, desde el ADR-0041: el gate ya no pregunta «¿empieza por
+   DEMO-?» sino «¿es de una serie legal?», y eso lo dice el `serieId`. */
+const NUM = { numero: '1-110-202608-00000040', serieId: 'radicados' };
 
 describe('con radicado vinculado, manda el radicado', () => {
   it('con correo válido, se envía', () => {
@@ -69,7 +71,7 @@ describe('los cortes anteriores a la precedencia siguen mandando', () => {
     const g = debeEnviarComunicacionExpediente(
       TRAMITE,
       { solicitante: { email: 'ciudadano@ejemplo.com' } } as never,
-      'DEMO-26-130e665c',
+      { numero: 'DEMO-26-130e665c', serieId: 'demo' },
     );
     expect(g.debeEnviar).toBe(false);
     expect(g.motivo).toMatch(/DEMOSTRACIÓN/);

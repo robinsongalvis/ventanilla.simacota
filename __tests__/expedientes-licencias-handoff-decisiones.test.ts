@@ -118,36 +118,45 @@ describe('planCrearExpedienteDesdeRadicado — proyección MÍNIMA D2 (sin copia
 describe('debeEnviarComunicacionExpediente — gates (A5, dictamen 8-ago)', () => {
   const tramiteHabilitado = DEFINICION_LICENCIA_CONSTRUCCION_PARCIAL.id;
   const radicadoConEmail = { esAnonimo: false, tipoPresentacion: 'IDENTIFICADA' as const, solicitante: { email: 'juan@example.com' } };
+  /* NÚMERO LEGAL EN EL FIXTURE, desde el ADR-0041 (1-sep-2026).
+
+     Estas pruebas miran el DESTINATARIO, no el número, y por eso lo omitían.
+     Con el corte nuevo —sin número de serie legal no se comunica— omitirlo las
+     dejaba pasando por el motivo EQUIVOCADO: las que esperan `false` seguirían
+     verdes sin llegar nunca a la condición que nombran. Se les da número para
+     que cada una vuelva a probar lo suyo. */
+  const NUMERO_LEGAL = { numero: '68745-0-26-0020', serieId: 'expedientes' };
 
   it('Definición habilitada + email válido + sin marca de no-aporte → debeEnviar:true', () => {
-    expect(debeEnviarComunicacionExpediente(tramiteHabilitado, radicadoConEmail)).toEqual({ debeEnviar: true });
+    expect(debeEnviarComunicacionExpediente(tramiteHabilitado, radicadoConEmail, NUMERO_LEGAL)).toEqual({ debeEnviar: true });
   });
 
   it('Definición NO habilitada (v1: fuera de licencia) → debeEnviar:false', () => {
-    const resultado = debeEnviarComunicacionExpediente('otra-definicion', radicadoConEmail);
+    const resultado = debeEnviarComunicacionExpediente('otra-definicion', radicadoConEmail, NUMERO_LEGAL);
     expect(resultado.debeEnviar).toBe(false);
+    expect(resultado.motivo).toMatch(/no está habilitada/i);
   });
 
   it('sin radicado vinculado (creación sin handoff, sin email disponible) → debeEnviar:false', () => {
-    const resultado = debeEnviarComunicacionExpediente(tramiteHabilitado, null);
+    const resultado = debeEnviarComunicacionExpediente(tramiteHabilitado, null, NUMERO_LEGAL);
     expect(resultado.debeEnviar).toBe(false);
   });
 
   it('marca datosNoAportados.correo → debeEnviar:false', () => {
     const resultado = debeEnviarComunicacionExpediente(tramiteHabilitado, {
       ...radicadoConEmail, solicitante: { ...radicadoConEmail.solicitante, datosNoAportados: { correo: true } },
-    });
+    }, NUMERO_LEGAL);
     expect(resultado.debeEnviar).toBe(false);
   });
 
   it('presentación ANÓNIMA → debeEnviar:false (aunque haya email)', () => {
-    const resultado = debeEnviarComunicacionExpediente(tramiteHabilitado, { ...radicadoConEmail, esAnonimo: true });
+    const resultado = debeEnviarComunicacionExpediente(tramiteHabilitado, { ...radicadoConEmail, esAnonimo: true }, NUMERO_LEGAL);
     expect(resultado.debeEnviar).toBe(false);
   });
 
   it('sin email o email inválido → debeEnviar:false', () => {
-    expect(debeEnviarComunicacionExpediente(tramiteHabilitado, { ...radicadoConEmail, solicitante: { email: null } }).debeEnviar).toBe(false);
-    expect(debeEnviarComunicacionExpediente(tramiteHabilitado, { ...radicadoConEmail, solicitante: { email: 'no-es-email' } }).debeEnviar).toBe(false);
+    expect(debeEnviarComunicacionExpediente(tramiteHabilitado, { ...radicadoConEmail, solicitante: { email: null } }, NUMERO_LEGAL).debeEnviar).toBe(false);
+    expect(debeEnviarComunicacionExpediente(tramiteHabilitado, { ...radicadoConEmail, solicitante: { email: 'no-es-email' } }, NUMERO_LEGAL).debeEnviar).toBe(false);
   });
 });
 
@@ -176,7 +185,7 @@ describe('constancia al ciudadano — NUNCA con un número de demostración', ()
     const gate = debeEnviarComunicacionExpediente(
       'licencia-construccion-obra-nueva',
       radicadoConCorreo,
-      'DEMO-26-a1b2c3d4',
+      { numero: 'DEMO-26-a1b2c3d4', serieId: 'demo' },
     );
     expect(gate.debeEnviar).toBe(false);
     expect(gate.motivo).toMatch(/DEMOSTRACIÓN/i);
@@ -186,20 +195,52 @@ describe('constancia al ciudadano — NUNCA con un número de demostración', ()
     // Un trámite no habilitado y un número demo darían ambos `false`; lo que
     // se fija aquí es CUÁL manda, para que el día que se habiliten más
     // trámites el demo siga cortando primero.
-    const gate = debeEnviarComunicacionExpediente('tramite-cualquiera', radicadoConCorreo, 'DEMO-26-ffffffff');
+    const gate = debeEnviarComunicacionExpediente('tramite-cualquiera', radicadoConCorreo, { numero: 'DEMO-26-ffffffff', serieId: 'demo' });
     expect(gate.motivo).toMatch(/DEMOSTRACIÓN/i);
   });
 
-  it('sin número (llamador antiguo) el comportamiento no cambia', () => {
-    const conNumero = debeEnviarComunicacionExpediente('licencia-construccion-obra-nueva', radicadoConCorreo, '68745-0-26-0020');
+  /* REESCRITA el 1-sep-2026 por el ADR-0041 (conforme al ADR-0039 §3).
+
+     QUÉ SE RETIRA: la equivalencia «sin número == con número legal», escrita
+     cuando el parámetro nació opcional para no romper llamadores antiguos.
+
+     CON QUÉ FUNDAMENTO: el ADR-0041 hace que el expediente NAZCA SIN NÚMERO.
+     Con esa equivalencia, un expediente recién creado —sin número todavía—
+     habría pasado el gate, y el llamador, que asume el número presente, habría
+     enviado un correo real diciendo «Expediente undefined» a un ciudadano
+     real. La ausencia no es un llamador descuidado: es el estado normal de un
+     expediente antes de su radicación en debida forma.
+
+     QUÉ SOBREVIVE: que el gate esté DEFINIDO para el caso ausente (no explota,
+     no decide al azar) y que un número legal sí pase. Lo que cambia es la
+     dirección de la respuesta para el ausente, y esa dirección es ahora la
+     misma que para un número de demostración: no se comunica un trámite que
+     todavía no se puede nombrar. */
+  it('SIN número no se envía: no se le manda al ciudadano un correo que no puede nombrar su trámite', () => {
     const sinNumero = debeEnviarComunicacionExpediente('licencia-construccion-obra-nueva', radicadoConCorreo);
-    expect(sinNumero.debeEnviar).toBe(conNumero.debeEnviar);
+    expect(sinNumero.debeEnviar).toBe(false);
+    expect(sinNumero.motivo).toMatch(/todavía no tiene número/i);
   });
 
   it('con un número LEGAL sí se envía', () => {
     expect(
-      debeEnviarComunicacionExpediente('licencia-construccion-obra-nueva', radicadoConCorreo, '68745-0-26-0020').debeEnviar,
+      debeEnviarComunicacionExpediente(
+        'licencia-construccion-obra-nueva',
+        radicadoConCorreo,
+        { numero: '68745-0-26-0020', serieId: 'expedientes' },
+      ).debeEnviar,
     ).toBe(true);
+  });
+
+  it('el número del ENSAYO (e2e-stage) tampoco viaja al ciudadano', () => {
+    /* La otra serie no legal, que el corte por prefijo «DEMO-» nunca vio:
+       el ensayo de stage siembra números con esta serie. */
+    const gate = debeEnviarComunicacionExpediente(
+      'licencia-construccion-obra-nueva',
+      radicadoConCorreo,
+      { numero: '68745-0-26-0001', serieId: 'e2e-stage' },
+    );
+    expect(gate.debeEnviar).toBe(false);
   });
 });
 
