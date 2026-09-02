@@ -28,6 +28,8 @@ export interface RadicadoParaFiltroRapido extends RadicadoConReserva {
     nombreCompleto: string;
     numeroDocumento: string;
   };
+  /** Espejo del expediente vinculado — el `68745-…` (ADR-0041). */
+  vinculoExpediente?: { numeroExpediente?: string | null } | null;
 }
 
 /**
@@ -48,6 +50,14 @@ export function coincideIdentidadFiltroRapido(
   qNormalizado: string,
 ): boolean {
   if (r.radicadoId.toLowerCase().includes(qNormalizado)) return true;
+  /* Y el número del EXPEDIENTE vinculado (ADR-0041 §3.7): el ciudadano llega
+     al mostrador leyendo el `68745-…` que le imprimimos en su constancia, y
+     quien atiende tiene que encontrarlo con eso. Va aquí arriba, junto al
+     radicado, porque es de la misma categoría —un número del trámite— y NO es
+     dato de identidad: la guarda de abajo no le aplica, igual que no le aplica
+     al radicado. */
+  const numeroExpediente = r.vinculoExpediente?.numeroExpediente;
+  if (numeroExpediente && numeroExpediente.toLowerCase().includes(qNormalizado)) return true;
   if (identidadProtegida(r)) return false;
   return (
     r.solicitante.nombreCompleto.toLowerCase().includes(qNormalizado)

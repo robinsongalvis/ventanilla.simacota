@@ -14,6 +14,9 @@
 import type { VentanillaRadicado } from '@/src/types/ventanilla';
 import type { TenantId } from '@/src/types/radicado';
 import { getTipoSolicitudById } from '@/lib/catalogos/tipos-solicitud';
+import { coincideTextoRadicado, normalizarTextoBusqueda } from '@/lib/busqueda/coincidencia-texto-radicado';
+import { NOMBRES_TENANT } from '@/src/types/reglas-negocio';
+import { identidadProtegida } from '@/lib/seguridad/identidad-protegida';
 
 /* ──────────────────────────────────────────────
    Modelo de filtros
@@ -65,13 +68,9 @@ export interface ResultadoBusqueda<T = VentanillaRadicado> {
    Helpers internos
 ────────────────────────────────────────────── */
 
-function norm(value: unknown): string {
-  if (value === null || value === undefined) return '';
-  return String(value)
-    .toLowerCase()
-    .normalize('NFD')
-    .replace(/[̀-ͯ]/g, '');
-}
+/* Una sola normalización para todo el sistema (ADR-0041 §3.7): este `norm`
+   traía su propia copia, sin recorte de espacios. */
+const norm = normalizarTextoBusqueda;
 
 function fechaAMs(value: unknown): number {
   if (typeof value !== 'string' && !(value instanceof Date)) return 0;
@@ -80,11 +79,12 @@ function fechaAMs(value: unknown): number {
   return Number.isNaN(t) ? 0 : t;
 }
 
+/* DELEGA en el criterio canónico del ADR-0006 (1-sep-2026). Reimplementaba sus
+   cuatro marcadores en paralelo: coincidían hoy, y ese es exactamente el modo
+   en que estas copias pasan desapercibidas hasta que una se queda atrás — le
+   pasó al oficio que solo reconocía dos de los cuatro (issue #301). */
 function ocultarIdentidad(r: VentanillaRadicado): boolean {
-  return r.esAnonimo === true
-    || r.tipoPresentacion === 'ANONIMA'
-    || r.tipoPresentacion === 'RESERVADA'
-    || r.identidadReservada === true;
+  return identidadProtegida(r);
 }
 
 /**
@@ -152,25 +152,23 @@ export function aplicarAlcanceRol(
    Aplicar filtros uno por uno
 ────────────────────────────────────────────── */
 
+/**
+ * DELEGA en el predicado ÚNICO del sistema (ADR-0041 §3.7, 1-sep-2026).
+ *
+ * Antes tenía su propia lista de campos y su propia copia de la guarda de
+ * identidad, en paralelo a la del Tablero — dos criterios donde debía haber
+ * uno. Lo que gana aquí: el número del expediente vinculado y el nombre humano
+ * de la dependencia. Lo que conserva: el nombre del tipo de solicitud
+ * resuelto por el catálogo, que este módulo sí puede consultar y el predicado
+ * compartido no (no debe importar catálogos de servidor).
+ */
 function matchTextoLibre(r: VentanillaRadicado, qNorm: string): boolean {
-  if (!qNorm) return true;
-  const oculto = ocultarIdentidad(r);
   const tipo = getTipoSolicitudById(r.termino?.tipoSolicitudId);
-  const campos = [
-    r.radicadoId,
-    r.detalle?.asunto,
-    tipo?.nombre ?? r.termino?.tipoSolicitudNombre,
-    r.clasificacion?.oficinaDestino,
-    r.clasificacion?.funcionarioResponsableNombre,
-    !oculto && r.solicitante?.nombreCompleto,
-    !oculto && r.solicitante?.numeroDocumento,
-    !oculto && r.solicitante?.email,
-  ];
-  for (const c of campos) {
-    if (!c) continue;
-    if (norm(c).includes(qNorm)) return true;
-  }
-  return false;
+  return coincideTextoRadicado(
+    { ...r, termino: { ...r.termino, tipoSolicitudNombre: tipo?.nombre ?? r.termino?.tipoSolicitudNombre } },
+    qNorm,
+    { nombreDependencia: NOMBRES_TENANT[r.clasificacion?.oficinaDestino as TenantId] },
+  );
 }
 
 function pasaFiltros(r: VentanillaRadicado, filtros: FiltrosBusqueda): boolean {
