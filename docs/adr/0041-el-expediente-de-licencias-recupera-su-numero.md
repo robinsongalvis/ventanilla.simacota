@@ -107,6 +107,50 @@ resto de validación de configuración. Su JSDoc ya prescribe este patrón; lo q
 faltaba era una ruta que emitiera. Ninguna emisión ocurre con el candado
 cerrado, y abrirlo sigue siendo cambiar una constante, nunca reescribir lógica.
 
+### 3.7 Se encuentra por CUALQUIERA de los dos números
+
+*(Añadida el 1-sep tras una pregunta del propietario que el análisis de impacto
+no cubrió: «¿qué pasa cuando un funcionario busca con el 1-110 pero es 68745, y
+al revés?». Los cuatro mapas no miraron la búsqueda. La revisión posterior
+encontró una mitad resuelta y una mitad rota.)*
+
+> **Regla: quien tenga uno de los dos números encuentra el trámite. Siempre, en
+> toda superficie de búsqueda.** Tener dos números no puede convertirse en tener
+> que adivinar cuál sirve.
+
+**Lo que YA cumple** — el Libro consecutivo (la superficie de búsqueda del
+funcionario) busca sobre un `haystack` que **ya incluye `numeroExpediente` y
+`radicadoId`** juntos, con fragmentos independientes y sin acentos. Es decir: el
+funcionario ya encuentra por cualquiera de los dos, y seguirá haciéndolo tras el
+cambio. Falta una línea: añadir al `haystack` el campo espejo de §3.1, para que
+también encuentre los expedientes **sin vínculo digital**.
+
+**Lo que está ROTO para el ciudadano** — la consulta pública resuelve
+**únicamente** por el radicado: `ventanilla_radicados/{numeroRadicado}`. Un
+ciudadano que teclee su `68745` recibe la misma negativa que un número
+inexistente. Y es peor que hoy, porque **ese número va a estar impreso en su
+constancia y en su sello**: le entregamos un número que nuestra propia consulta
+no reconoce.
+
+**Decisión:** la consulta pública acepta los dos formatos. Si lo tecleado tiene
+forma de número de expediente, se resuelve el expediente, se toma su radicado
+de entrada, y **se continúa por el camino de siempre**.
+
+Con dos condiciones que no se negocian:
+
+1. **La autorización no se toca.** Cambia por dónde se ENCUENTRA el trámite, no
+   quién puede verlo: el dato de verificación se sigue exigiendo igual, y la
+   respuesta denegada sigue siendo indistinguible entre «no existe» y «no
+   autorizado» — hoy esa indistinguibilidad es lo que impide enumerar radicados,
+   y una ruta nueva que respondiera distinto sería un canal de fuga.
+2. **El registro de fallos y la auditoría cubren el camino nuevo** desde el
+   primer día, no como añadido posterior.
+
+**Regla de secuencia:** el ciudadano empieza a VER el `68745` en el paso 2 del
+orden (§6). La búsqueda debe aceptarlo **en ese mismo paso o antes** — nunca
+después. Entregar un número que la consulta rechaza es exactamente el defecto
+de «pintado y nunca construido» que este proyecto ya pagó una vez.
+
 ## 4. Cómo se rotula — por `serieId`, nunca por posición
 
 El significado de un número **lo declara su `serieId`, documento por
@@ -163,7 +207,7 @@ dos veces. Con esta decisión tiene contenido propio, y vuelve con su custodio.
 |---|---|---|
 | **0** | Este ADR aprobado + **inventario de producción** (solo lectura) | Nada se codifica antes |
 | **1** | Saneos compatibles: gate de comunicaciones por «sin número» en vez de «DEMO-», sello lee `radicadoId`, rótulos por `serieId`, custodios de wording que faltan | Cierra los riesgos 2 y 3 **sin** cambiar comportamiento observable (no-op verificable) |
-| **2** | Los dos números en papel y correo (aún sin emisión) | Compatible: mientras el campo cargue el 1-110, la segunda fila coincide o se omite |
+| **2** | Los dos números en papel y correo (aún sin emisión) **+ la búsqueda por ambos (§3.7)** | Compatible: mientras el campo cargue el 1-110, la segunda fila coincide o se omite. La búsqueda va aquí y no después: es el paso donde el ciudadano empieza a ver el 68745 |
 | **3** | El expediente nace **sin** número | Seguro: los lectores ya toleran la ausencia; el acuse quedó protegido en el paso 1 |
 | **4** | Cableado de la emisión, **con el candado cerrado** | Rama inalcanzable en producción; se prueba por inyección, como ya hace su test |
 | **5** | Operación: limpiar stage → importar históricos si faltan → confirmar el libro con el ingeniero → **abrir la serie** | Protocolo autorización → ejecución. Precondición del abridor |
@@ -181,9 +225,9 @@ su reserva presente en `unicidad_expedientes`.
 - **El ADR-0034 en su fondo.** Todo sigue entrando por ventanilla; el 1-110
   sigue siendo la entrada y el ancla. Lo que se amplía es la proyección: se
   regulariza el quinto campo y ventanilla verá **los dos números etiquetados**.
-- **La búsqueda del ciudadano**, que sigue siendo por radicado — por eso el
-  reparo del ADR-0034 §7 se sostiene: el ciudadano consulta con el número que
-  le entregó la ventanilla, y ahora además **ve** el número de su expediente.
+- **Quién puede ver un trámite.** La búsqueda se amplía a los dos números
+  (§3.7), pero la autorización es exactamente la misma: el dato de verificación
+  se sigue exigiendo y la negativa sigue siendo indistinguible.
 - **Ningún documento existente.** No se renumera nada.
 
 ## 8. Deudas que este ADR deja declaradas
@@ -206,3 +250,9 @@ código. Hechos verificados de nuevo a mano antes de escribir: `radicadoId` port
 el 1-110, el gate DEMO y su aserción non-null, la obligatoriedad de
 `vinculoExpediente.numeroExpediente`, y la ausencia total de `serieId` en el
 Libro.
+
+**§3.7 no salió de ese análisis: salió de una pregunta del propietario.** Los
+cinco agentes recorrieron emisión, campos, papeles, libro, ventanilla y término,
+y **ninguno miró la búsqueda** — el trabajo automático cubrió lo que se le pidió
+y no lo que faltaba pedir. Queda anotado como lección del método: un análisis de
+impacto debe incluir siempre «¿cómo se ENCUENTRA esto después?».
