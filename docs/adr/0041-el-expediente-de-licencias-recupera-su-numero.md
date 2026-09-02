@@ -125,7 +125,8 @@ Inventario de las cuatro superficies, verificado en código:
 | **Libro consecutivo** | Funcionario de Planeación | ✅ Ya busca por ambos |
 | **Bandeja de licencias** | Funcionario de Planeación | ✅ Ya busca por ambos (misma función) |
 | **Consulta pública** | El ciudadano | ❌ Solo el `1-110` |
-| **Búsqueda de ventanilla** | Quien atiende el mostrador | ❌ Solo el `1-110` |
+| **Búsqueda avanzada de ventanilla** | Quien atiende el mostrador | ❌ Solo el `1-110` |
+| **Tablero de la Secretaría** | La Secretaría, a diario | ❌ Solo el `1-110` |
 
 **Lo que YA cumple** — el Libro busca sobre un `haystack` que **ya incluye
 `numeroExpediente` y `radicadoId`** juntos, con fragmentos independientes y sin
@@ -153,10 +154,36 @@ ventanilla: ver el estado y responderle al ciudadano. El número del expediente
 no es dato de identidad, así que entra al texto libre sin tocar la regla de
 identidad reservada.
 
-**Decisión:** las cuatro superficies encuentran por los dos números. La consulta
-pública acepta ambos formatos resolviendo al radicado de entrada y siguiendo por
-el camino de siempre; la búsqueda de ventanilla suma el número del expediente
-vinculado a su texto libre; el Libro y la bandeja suman el campo espejo.
+**Y el Tablero de la Secretaría igual** — su filtro rápido recorre radicado,
+asunto, dependencia y responsable (con la guarda anti-inferencia de identidad
+para nombre y documento), y tampoco el número del expediente. Es la pantalla que
+la Secretaría mira todos los días.
+
+### El hallazgo de fondo: el criterio de búsqueda vive DUPLICADO
+
+Al recorrer las cinco superficies apareció algo que ninguna de ellas revela por
+separado: **hay dos implementaciones paralelas de «¿este radicado coincide con
+este texto?»** — `matchTextoLibre` (`lib/busqueda/filtros-radicado.ts`, que usa
+la búsqueda avanzada y el servidor) y el filtro en línea del Tablero
+(`app/interno/dashboard/page.tsx`), que se apoya en
+`coincideIdentidadFiltroRapido` mientras la otra reimplementa esa misma guarda
+por su cuenta.
+
+Es la familia que este proyecto ya conoce: **el criterio que vive en más de un
+sitio se olvida en uno de ellos** — la misma lección que dejó el olvido de
+Control Interno con los datos de prueba, y que se resolvió poniendo el criterio
+en una sola función.
+
+**Decisión:** el número del expediente no se parchea tres veces. Se **unifica el
+predicado de coincidencia por texto en una sola función compartida** —con su
+guarda de identidad única— y el `68745` se añade **una vez, ahí**. Las
+superficies pasan a consumirla. Si en el futuro aparece un tercer dato buscable,
+entra en un solo sitio y llega a todas.
+
+Resumen de la decisión, para las cinco superficies: la consulta pública acepta
+ambos formatos resolviendo al radicado de entrada y siguiendo por el camino de
+siempre; ventanilla y el Tablero pasan al predicado unificado que ya incluye el
+número del expediente; el Libro y la bandeja suman el campo espejo de §3.1.
 
 Con dos condiciones que no se negocian:
 
@@ -273,13 +300,15 @@ el 1-110, el gate DEMO y su aserción non-null, la obligatoriedad de
 `vinculoExpediente.numeroExpediente`, y la ausencia total de `serieId` en el
 Libro.
 
-**§3.7 no salió de ese análisis: salió de dos preguntas del propietario.** Los
+**§3.7 no salió de ese análisis: salió de tres preguntas del propietario.** Los
 cinco agentes recorrieron emisión, campos, papeles, libro, ventanilla y término,
 y **ninguno miró la búsqueda** — el trabajo automático cubrió lo que se le pidió
 y no lo que faltaba pedir. La primera pregunta («¿y si buscan con el otro
-número?») destapó la consulta pública; la segunda, que nombró dos superficies
-concretas, destapó el mostrador de ventanilla — el hueco más grave de los dos,
-porque contradice la función que el ADR-0034 le asignó.
+número?») destapó la consulta pública; la segunda nombró dos superficies y
+destapó el mostrador de ventanilla, que contradice la función que el ADR-0034 le
+asignó; la tercera nombró el Tablero de la Secretaría — y al ir a verificarlo
+apareció el hallazgo de fondo, que ninguna superficie mostraba por separado: el
+predicado de búsqueda está duplicado, con dos guardas de identidad paralelas.
 
 Lección del método, anotada para el próximo análisis de nivel 3: **«¿cómo se
 ENCUENTRA esto después, y desde qué mostrador?» va en la lista de preguntas
