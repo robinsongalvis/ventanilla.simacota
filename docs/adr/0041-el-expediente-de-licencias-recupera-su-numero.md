@@ -118,12 +118,22 @@ encontró una mitad resuelta y una mitad rota.)*
 > toda superficie de búsqueda.** Tener dos números no puede convertirse en tener
 > que adivinar cuál sirve.
 
-**Lo que YA cumple** — el Libro consecutivo (la superficie de búsqueda del
-funcionario) busca sobre un `haystack` que **ya incluye `numeroExpediente` y
-`radicadoId`** juntos, con fragmentos independientes y sin acentos. Es decir: el
-funcionario ya encuentra por cualquiera de los dos, y seguirá haciéndolo tras el
-cambio. Falta una línea: añadir al `haystack` el campo espejo de §3.1, para que
-también encuentre los expedientes **sin vínculo digital**.
+Inventario de las cuatro superficies, verificado en código:
+
+| Superficie | Quién la usa | Estado |
+|---|---|---|
+| **Libro consecutivo** | Funcionario de Planeación | ✅ Ya busca por ambos |
+| **Bandeja de licencias** | Funcionario de Planeación | ✅ Ya busca por ambos (misma función) |
+| **Consulta pública** | El ciudadano | ❌ Solo el `1-110` |
+| **Búsqueda de ventanilla** | Quien atiende el mostrador | ❌ Solo el `1-110` |
+
+**Lo que YA cumple** — el Libro busca sobre un `haystack` que **ya incluye
+`numeroExpediente` y `radicadoId`** juntos, con fragmentos independientes y sin
+acentos; y la bandeja llama a **esa misma función** (su propio marcador de
+posición ya promete «Buscar por expediente, radicado, nombre, documento,
+matrícula, tipo o estado»). El funcionario de Planeación ya encuentra por
+cualquiera de los dos y seguirá haciéndolo. Falta una línea: añadir al
+`haystack` el campo espejo de §3.1, para los expedientes **sin vínculo digital**.
 
 **Lo que está ROTO para el ciudadano** — la consulta pública resuelve
 **únicamente** por el radicado: `ventanilla_radicados/{numeroRadicado}`. Un
@@ -132,9 +142,21 @@ inexistente. Y es peor que hoy, porque **ese número va a estar impreso en su
 constancia y en su sello**: le entregamos un número que nuestra propia consulta
 no reconoce.
 
-**Decisión:** la consulta pública acepta los dos formatos. Si lo tecleado tiene
-forma de número de expediente, se resuelve el expediente, se toma su radicado
-de entrada, y **se continúa por el camino de siempre**.
+**Lo que está ROTO en el mostrador, y contradice al ADR-0034** — el texto libre
+de la búsqueda de ventanilla (`matchTextoLibre`) recorre radicado, asunto, tipo,
+dependencia, responsable y —si la identidad no está protegida— nombre, documento
+y correo. **No recorre el número del expediente vinculado.** Es decir: cuando el
+ciudadano llame o se pare en el mostrador diciendo «mi licencia es la
+68745-0-26-0021» —el número que le imprimimos nosotros—, **quien atiende no lo
+encuentra**. Y esa es justamente la función que el ADR-0034 le asignó a
+ventanilla: ver el estado y responderle al ciudadano. El número del expediente
+no es dato de identidad, así que entra al texto libre sin tocar la regla de
+identidad reservada.
+
+**Decisión:** las cuatro superficies encuentran por los dos números. La consulta
+pública acepta ambos formatos resolviendo al radicado de entrada y siguiendo por
+el camino de siempre; la búsqueda de ventanilla suma el número del expediente
+vinculado a su texto libre; el Libro y la bandeja suman el campo espejo.
 
 Con dos condiciones que no se negocian:
 
@@ -251,8 +273,14 @@ el 1-110, el gate DEMO y su aserción non-null, la obligatoriedad de
 `vinculoExpediente.numeroExpediente`, y la ausencia total de `serieId` en el
 Libro.
 
-**§3.7 no salió de ese análisis: salió de una pregunta del propietario.** Los
+**§3.7 no salió de ese análisis: salió de dos preguntas del propietario.** Los
 cinco agentes recorrieron emisión, campos, papeles, libro, ventanilla y término,
 y **ninguno miró la búsqueda** — el trabajo automático cubrió lo que se le pidió
-y no lo que faltaba pedir. Queda anotado como lección del método: un análisis de
-impacto debe incluir siempre «¿cómo se ENCUENTRA esto después?».
+y no lo que faltaba pedir. La primera pregunta («¿y si buscan con el otro
+número?») destapó la consulta pública; la segunda, que nombró dos superficies
+concretas, destapó el mostrador de ventanilla — el hueco más grave de los dos,
+porque contradice la función que el ADR-0034 le asignó.
+
+Lección del método, anotada para el próximo análisis de nivel 3: **«¿cómo se
+ENCUENTRA esto después, y desde qué mostrador?» va en la lista de preguntas
+desde el principio**, junto a «¿qué se rompe?» y «¿qué papel lo muestra?».
