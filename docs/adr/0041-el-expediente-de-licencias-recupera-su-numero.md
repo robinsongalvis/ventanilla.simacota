@@ -1,6 +1,6 @@
 # ADR-0041 — El expediente de licencias recupera su número: dos series, dos significados
 
-- **Estado:** PROPUESTO — pendiente de aprobación del propietario.
+- **Estado:** ACEPTADO — aprobado por el propietario el 1-sep-2026.
 - **Fecha:** 1-sep-2026.
 - **Decide:** el propietario (decisión de numeración legal — triaje nivel 3).
 - **Deroga:** el pivote del 26-ago-2026 («el número no se emite, se recibe»),
