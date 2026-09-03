@@ -100,17 +100,18 @@ export function selloCabeEnPagina(
  * decir que se puso es afirmar algo que el papel no sostiene.
  *
  * Las cotas salen del contenido, no de un número redondo:
- *  · ALTO 62 pt — las filas del sello (`filasSello`) llegan hasta 41 pt por
- *    debajo del borde superior interno (la última es el folio «Página N de M»,
- *    1-sep-2026), más el padding de 6 arriba, ~2 de descenso tipográfico y la
- *    línea de pie (5,5 pt a 6 del borde inferior): por debajo de 62 el folio
+ *  · ALTO 68 pt — en su caso MÁXIMO (cinco filas: con «Exp.» del ADR-0041 y
+ *    con folio) las filas llegan a 46 pt por debajo del borde superior
+ *    interno, más el padding de 6 arriba, ~2 de descenso tipográfico y la
+ *    línea de pie (5,5 pt a 6 del borde inferior) = 65,5. Se redondea a 68
+ *    para que el redondeo tipográfico no coma el margen: por debajo, el folio
  *    pisa el pie.
  *  · ANCHO 120 pt — el número de radicado va en Courier 8,5 (avance 0,6 em =
  *    5,1 pt por carácter). Un `1-110-202608-00000123` son 21 caracteres ≈ 107 pt,
  *    más 12 de padding. Por debajo de eso, el dato que importa sale cortado.
  */
 export const SELLO_MIN_ANCHO_PT = 120;
-export const SELLO_MIN_ALTO_PT = 62;
+export const SELLO_MIN_ALTO_PT = 68;
 
 /**
  * ¿El sello dibujado en este rectángulo se puede LEER?

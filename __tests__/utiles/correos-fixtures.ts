@@ -92,7 +92,7 @@ export const CORREOS: { nombre: string; html: () => string }[] = [
       documentosEntregados: ['Certificado de Tradición y Libertad'],
       documentosFaltantes: [{ nombre: 'Paz y salvo municipal', motivo: 'SIN_APORTE' }],
       requisitosAplicables: 19,
-      radicadoVentanillaId: '1-110-202608-00000042',
+      numeroRadicado: '1-110-202608-00000042',
     }),
   },
   {

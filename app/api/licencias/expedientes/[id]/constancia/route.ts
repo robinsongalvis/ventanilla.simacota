@@ -78,6 +78,11 @@ export async function GET(_req: Request, ctx: { params: Promise<{ id: string }> 
          expediente. Hoy dan el mismo valor → no cambia una sola letra
          (ADR-0041 paso 1). */
       numeroRadicado: numeroDeEntrada(exp) ?? exp.numeroExpediente?.numero ?? '',
+      /* El segundo número solo si es DISTINTO del de entrada: hoy coinciden
+         y el papel no repite el mismo dato bajo dos rótulos (ADR-0041). */
+      numeroExpediente: exp.numeroExpediente?.numero !== numeroDeEntrada(exp)
+        ? exp.numeroExpediente?.numero ?? null
+        : null,
       solicitanteNombre: exp.solicitanteNombre,
       solicitanteDocumento: exp.solicitanteDocumento,
       tipoDocumento: 'CC',
