@@ -6,6 +6,7 @@ import {
 } from '@/lib/email/templates/acuse-recibo-expediente-licencia';
 import { contenidoConstanciaPaquete } from '@/lib/sello/paquete-sellado';
 import { filasSello } from '@/lib/sello/generar-sello-pdf';
+import { enMayusculaInicial } from '@/lib/motor-expedientes/describir-tramite';
 
 /* ══════════════════════════════════════════════════════════════
    LOS PAPELES MUESTRAN LOS DOS NÚMEROS, ETIQUETADOS — custodio del paso 2
@@ -163,5 +164,92 @@ describe('el acuse por correo', () => {
     expect(html).toContain(EXPEDIENTE);
     // El titular no cambia: el asunto sigue nombrando el radicado.
     expect(buildAcuseReciboExpedienteSubject(ENTRADA)).not.toContain(EXPEDIENTE);
+  });
+});
+
+/* ══════════════════════════════════════════════════════════════
+   EL NOMBRE DE LA FIGURA, SEGÚN DÓNDE VAYA — custodio del 3-sep-2026.
+
+   Lo vio el propietario en el papel del ensayo: la carátula decía «Trámite:
+   licencia de urbanización», con minúscula inicial. El mismo texto se usa en
+   DOS posiciones gramaticales distintas y solo una de ellas la quiere:
+
+     · DENTRO DE FRASE — «su solicitud de licencia de urbanización y…» →
+       minúscula, y así debe seguir;
+     · TRAS UNA ETIQUETA — «Trámite: …» → mayúscula inicial.
+
+   `describirTramiteDesdeSubtipos` devuelve minúscula a propósito (su uso
+   principal es el primero), así que la mayúscula la pone quien la necesita.
+
+   Y SOLO LA PRIMERA LETRA: mayusculizar cada palabra produce «Licencia De
+   Urbanización» — el defecto hermano que este mismo día se corrigió en la
+   cabecera de la pantalla.
+
+   ALCANCE (ADR-0033 §4.6-bis). MIRA los tres papeles donde el nombre va tras
+   etiqueta, y que las frases NO se toquen. NO mira la pantalla (su custodio
+   está en `numeros-del-expediente`).
+══════════════════════════════════════════════════════════════ */
+describe('el nombre de la figura empieza en mayúscula cuando va tras una etiqueta', () => {
+  const TRAMITE = 'licencia de urbanización';
+
+  it('la función mayusculiza SOLO la primera letra, nunca cada palabra', () => {
+    expect(enMayusculaInicial(TRAMITE)).toBe('Licencia de urbanización');
+    expect(
+      enMayusculaInicial(TRAMITE),
+      'está mayusculizando palabras interiores — en español el «de» no lleva mayúscula',
+    ).not.toMatch(/\bDe\b/);
+  });
+
+  it('un texto vacío no explota ni inventa nada', () => {
+    expect(enMayusculaInicial('')).toBe('');
+  });
+
+  it('la carátula del paquete lo imprime con mayúscula', () => {
+    const c = contenidoConstanciaPaquete({
+      numeroRadicado: ENTRADA,
+      solicitanteNombre: 'Andrés Pérez',
+      solicitanteDocumento: 'CC 123446432',
+      descripcionTramite: TRAMITE,
+      desdeCuandoCorreElPlazo: '2026-09-01T13:00:00.000Z',
+      requisitosVerificados: 18,
+      funcionarioNombre: 'Funcionaria de Planeación',
+      expedidaEnLegible: '1 de septiembre de 2026, 12:00 p. m.',
+    }, [], []);
+    const fila = c.campos.find(([e]) => e.startsWith('Trámite'));
+    expect(fila?.[1]).toBe('Licencia de urbanización');
+  });
+
+  it('la constancia lo imprime con mayúscula en el campo, y en minúscula DENTRO de la frase', () => {
+    const html = buildConstanciaRadicacionLicenciaHtml({
+      numeroRadicado: ENTRADA,
+      solicitanteNombre: 'Andrés Pérez',
+      solicitanteDocumento: '123446432',
+      tipoDocumento: 'CC',
+      descripcionTramite: TRAMITE,
+      desdeCuandoCorreElPlazo: '2026-09-01T13:00:00.000Z',
+      venceEl: '2026-11-05T13:00:00.000Z',
+      requisitosVerificados: 18,
+      funcionarioNombre: 'Funcionaria de Planeación',
+      expedidaEn: '2026-09-01T17:00:00.000Z',
+    });
+    expect(html).toContain('<td>Trámite</td><td>Licencia de urbanización</td>');
+    /* La frase NO se toca: ahí la minúscula es lo correcto. */
+    expect(html, 'la frase quedó con mayúscula en mitad de una oración').toContain(`<strong>${TRAMITE}</strong> presentada por`);
+  });
+
+  it('el acuse por correo, igual: mayúscula en el campo, minúscula en la frase', () => {
+    const html = buildAcuseReciboExpedienteHtml({
+      numeroRadicado: ENTRADA,
+      solicitanteNombre: 'Andrés Pérez',
+      solicitanteDocumento: '123446432',
+      tipoDocumento: 'CC',
+      descripcionTramite: TRAMITE,
+      fechaRecepcion: '2026-09-01T13:00:00.000Z',
+      documentosEntregados: ['Cédula'],
+      documentosFaltantes: [],
+      requisitosAplicables: 18,
+    });
+    expect(html).toContain('Licencia de urbanización');
+    expect(html, 'la frase quedó con mayúscula en mitad de una oración').toContain(`${TRAMITE} bajo el radicado`);
   });
 });

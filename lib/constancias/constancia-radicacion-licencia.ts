@@ -1,5 +1,6 @@
 import { INSTITUCION } from '@/lib/institucion';
 import { formatFechaLargaColombia } from '@/lib/fecha-colombia';
+import { enMayusculaInicial } from '@/lib/motor-expedientes/describir-tramite';
 
 /* ══════════════════════════════════════════════════════════════
    LA CONSTANCIA QUE EL CIUDADANO SE LLEVA EN LA MANO.
@@ -173,7 +174,7 @@ ${p.numeroExpediente ? `  <div class="numero">
   <table>
     <tr><td>Solicitante</td><td>${escapeHtml(p.solicitanteNombre)}</td></tr>
     <tr><td>Documento</td><td>${escapeHtml(p.tipoDocumento)} ${escapeHtml(p.solicitanteDocumento)}</td></tr>
-    <tr><td>Trámite</td><td>${escapeHtml(p.descripcionTramite)}</td></tr>
+    <tr><td>Trámite</td><td>${escapeHtml(enMayusculaInicial(p.descripcionTramite))}</td></tr>
     <tr><td>Requisitos verificados</td><td>${p.requisitosVerificados}</td></tr>
     <tr><td>Declarada por</td><td>${escapeHtml(p.funcionarioNombre)}</td></tr>
     <tr><td>Fecha de expedición</td><td>${escapeHtml(expedida)}</td></tr>

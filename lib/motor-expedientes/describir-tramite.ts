@@ -48,6 +48,29 @@ import { describirModalidades, FIGURA_CON_MODALIDAD } from './modalidad-construc
  */
 export const DESCRIPCION_TRAMITE_SIN_FIGURA = 'trámite ante la Secretaría de Planeación';
 
+/**
+ * EL MISMO NOMBRE, EMPEZANDO EN MAYÚSCULA — para cuando NO va dentro de una
+ * frase (3-sep-2026).
+ *
+ * `describirTramiteDesdeSubtipos` devuelve el nombre en minúscula A PROPÓSITO,
+ * porque su uso principal es dentro de oraciones: «recibió su solicitud de
+ * licencia de urbanización y abrió…». Pero el mismo texto se imprime también
+ * como VALOR DE UN CAMPO —«Trámite: …»— en la carátula del paquete, en la
+ * constancia y en el acuse por correo, y ahí la minúscula inicial se lee como
+ * un descuido. El propietario lo vio en el papel del ensayo.
+ *
+ * Solo la PRIMERA letra: mayusculizar cada palabra produce «Licencia De
+ * Urbanización», y en español el «de» no la lleva — el defecto hermano que
+ * este mismo día se corrigió en la cabecera de la pantalla.
+ *
+ * No usa CSS porque estos destinos no lo tienen: un PDF dibujado con pdf-lib y
+ * un correo HTML, donde `first-letter` no es fiable.
+ */
+export function enMayusculaInicial(texto: string): string {
+  if (!texto) return texto;
+  return texto.charAt(0).toLocaleUpperCase('es-CO') + texto.slice(1);
+}
+
 /** Índice código → nombre, construido UNA vez desde el catálogo normativo. */
 const NOMBRE_POR_CODIGO = new Map(
   CATALOGO_FIGURAS_NORMATIVAS.map((f) => [f.codigo, f.nombre.toLowerCase()]),

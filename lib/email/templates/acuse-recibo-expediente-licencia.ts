@@ -1,5 +1,6 @@
 import { INSTITUCION } from '@/lib/institucion';
 import { formatFechaLargaColombia } from '@/lib/fecha-colombia';
+import { enMayusculaInicial } from '@/lib/motor-expedientes/describir-tramite';
 
 /* ══════════════════════════════════════════════════════════════
    TEMPLATE: Acuse de recibo de solicitud de licencia.
@@ -141,7 +142,7 @@ export function buildAcuseReciboExpedienteHtml(p: TemplateAcuseReciboExpedienteP
       ${filaDato('Radicado de entrada:', p.numeroRadicado)}
       ${p.numeroExpediente ? filaDato('Expediente (Planeación):', p.numeroExpediente) : ''}
       ${filaDato('Solicitante:', `${p.solicitanteNombre} — ${p.tipoDocumento} ${p.solicitanteDocumento}`)}
-      ${filaDato('Trámite:', p.descripcionTramite)}
+      ${filaDato('Trámite:', enMayusculaInicial(p.descripcionTramite))}
       ${filaDato('Fecha de recepción:', fechaFmt)}
     </table>
   </td></tr>

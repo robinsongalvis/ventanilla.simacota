@@ -1,6 +1,7 @@
 import { PDFDocument, StandardFonts, rgb } from 'pdf-lib';
 import { sellarTodasLasPaginas, SelloPDFError } from '@/lib/sello/generar-sello-pdf';
 import type { EsquinaSello } from '@/lib/sello/posicion-sello';
+import { enMayusculaInicial } from '@/lib/motor-expedientes/describir-tramite';
 
 /* ══════════════════════════════════════════════════════════════
    EL PAQUETE SELLADO — un solo PDF con la constancia de primera hoja y
@@ -134,7 +135,7 @@ export function contenidoConstanciaPaquete(
       ? 'Para consultar en línea use el RADICADO DE ENTRADA.'
       : null,
     campos: [
-      ['Trámite:', datos.descripcionTramite],
+      ['Trámite:', enMayusculaInicial(datos.descripcionTramite)],
       ['Radicado en debida forma:', datos.desdeCuandoCorreElPlazo.slice(0, 10)],
       ['Requisitos verificados:', String(datos.requisitosVerificados)],
       ['Funcionario:', datos.funcionarioNombre],
