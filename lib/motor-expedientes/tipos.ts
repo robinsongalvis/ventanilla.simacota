@@ -460,6 +460,19 @@ export interface Expediente {
   actualizadoEn: string;
   /** Número de expediente emitido — ausente hasta que se emite (PASO 4/5). */
   numeroExpediente?: NumeroExpedienteAsignado;
+  /**
+   * EL NÚMERO DE ENTRADA (`1-110-…`), espejado en el raíz (ADR-0041 §3.1).
+   *
+   * `radicadoId` ya lo porta cuando hay vínculo digital —el documento vive en
+   * `ventanilla_radicados/{radicadoId}`—, pero es una llave foránea y es nula
+   * en el expediente sin vínculo, que obtiene su número por TRANSCRIPCIÓN del
+   * libro. Este espejo da a los papeles y a las pantallas UN solo sitio del
+   * que leer, sin ramificar en «¿hay vínculo?».
+   *
+   * Contra la divergencia: cuando hay vínculo, el acto de radicar EXIGE que lo
+   * transcrito coincida con `radicadoId`. No pueden decir cosas distintas.
+   */
+  numeroRadicadoEntrada?: string | null;
   /** Códigos de `SubtipoTramite` declarados por la Definición que aplican a este caso concreto. */
   subtipos?: string[];
   /** REAL si el expediente nació en la plataforma; RECONSTRUIDO si viene de migración (D6, Fase 5). Mismo tipo que `Actuacion.origen`. */

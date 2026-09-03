@@ -409,6 +409,42 @@ function formatearNumeroExpedienteDemo(fecha: Date): string {
  * ni `unicidad_expedientes/*` — el plan que devuelve solo referencia
  * `expedientes/{id}` y su subcolección `actuaciones`.
  */
+/**
+ * QUÉ IDENTIDAD RECIBE UN EXPEDIENTE AL NACER (ADR-0041 paso 3).
+ *
+ * Con el candado CERRADO —la situación de hoy— nace de DEMOSTRACIÓN: número
+ * `DEMO-{AA}-{8hex}` en la serie `demo` y `esPrueba: true`. Esa dupla no es
+ * decorativa: es la HUELLA con la que el guion de limpieza distingue lo
+ * borrable (`esPrueba && serieId === 'demo'`), y la que hace fail-closed a los
+ * gates de sello. Por eso el ADR-0041 §3.4 la conserva.
+ *
+ * Con el candado ABIERTO nace SIN NÚMERO. No es un vacío: el número del
+ * expediente se emite en la radicación en debida forma —el acto que el libro
+ * del ingeniero numera—, y ponerle uno antes sería gastar serie por un
+ * expediente que quizá nunca se radique.
+ *
+ * POR QUÉ AQUÍ Y NO EN LA ACTIVACIÓN: el ADR ponía este cambio en el paso de
+ * activación, junto al de la constante. Se adelanta a propósito — el día del
+ * arranque es el peor día para estrenar código. Así la activación queda en
+ * cambiar UNA constante, y esta rama se prueba hoy por inyección.
+ */
+export function identidadAlNacer(
+  ahora: Date,
+  habilitado: boolean = EMISION_REAL_EXPEDIENTES_HABILITADA,
+): Pick<ExpedienteLicenciaDoc, 'numeroExpediente' | 'esPrueba'> {
+  if (habilitado) return {};
+  return {
+    numeroExpediente: {
+      numero: formatearNumeroExpedienteDemo(ahora),
+      // 'demo' NO es un `SerieConsecutivo` real (`lib/server/consecutivo-legal.ts`)
+      // — marca explícita de que este número no salió de la serie legal.
+      serieId: 'demo',
+      año: ahora.getFullYear(),
+    },
+    esPrueba: true,
+  };
+}
+
 export function planCrearExpedienteDemo(
   input: CrearExpedienteInput,
   tenantId: TenantId,
@@ -529,14 +565,7 @@ export function planCrearExpedienteDemo(
       capturadoEn: nowIso,
     },
     origen: 'REAL',
-    numeroExpediente: {
-      numero: formatearNumeroExpedienteDemo(ahora),
-      // 'demo' NO es un `SerieConsecutivo` real (`lib/server/consecutivo-legal.ts`)
-      // — marca explícita de que este número no salió de la serie legal.
-      serieId: 'demo',
-      año: ahora.getFullYear(),
-    },
-    esPrueba: true,
+    ...identidadAlNacer(ahora),
     // Espejo denormalizado (R11, ver JSDoc del campo) — nace ya poblado
     // porque el expediente nace CON su actuación de radicación en la MISMA
     // escritura (`app/api/licencias/expedientes/route.ts`, un solo batch).
@@ -1112,8 +1141,7 @@ export function planCrearExpedienteDesdeRadicado(
       ? { modalidadesConstruccion: [...input.modalidadesConstruccion] }
       : {}),
     origen: 'REAL',
-    numeroExpediente: { numero, serieId: 'demo', año: ahora.getFullYear() },
-    esPrueba: true,
+    ...identidadAlNacer(ahora),
     // Espejo denormalizado (R11, ver JSDoc del campo) — mismo criterio que
     // `planCrearExpedienteDemo`: nace ya poblado porque el expediente nace
     // CON su actuación de radicación en la MISMA transacción.
@@ -1783,6 +1811,8 @@ export interface PlanRadicarEnDebidaForma {
        El campo real es `año`, y un expediente con `anio` habría quedado sin
        número visible para todo lo que lo lee. */
     numeroExpediente: NumeroExpedienteAsignado;
+    /** El `1-110-…` de entrada, espejado (ADR-0041 §3.1). */
+    numeroRadicadoEntrada: string;
     /**
      * La fecha JURÍDICA de la radicación, denormalizada en el raíz por el
      * mismo motivo que `fechaAlertaConservadora`: quien lista no paga la
@@ -1827,6 +1857,13 @@ export function planRadicarEnDebidaForma(entrada: {
    * Una licencia no recibe un número propio — recibe el que ya tiene.
    */
   numeroOficial: string;
+  /**
+   * El número de la serie `expedientes` YA EMITIDO por el caller dentro de su
+   * transacción (ADR-0041 paso 4). `null` mientras el candado esté cerrado.
+   * Se recibe emitido y no se emite aquí a propósito: esta función es PURA y
+   * la emisión es una escritura transaccional — el mismo reparto de siempre.
+   */
+  numeroEmitido?: { numero: string; año: number } | null;
   /** Año de la serie a la que se imputa, tomado del propio número transcrito. */
   anioSerie: number;
   actuacionesPrevias: ActuacionLicenciaDoc[];
@@ -1835,7 +1872,7 @@ export function planRadicarEnDebidaForma(entrada: {
   definicionId?: string;
   observacion?: string;
 }): PlanRadicarEnDebidaForma {
-  const { expedienteId, tenantId, evaluacion, numeroOficial, anioSerie,
+  const { expedienteId, tenantId, evaluacion, numeroOficial, anioSerie, numeroEmitido = null,
           actuacionesPrevias, actor, ahora, definicionId, observacion } = entrada;
 
   const actuacionId = idActuacionRadicacion(expedienteId);
@@ -1907,11 +1944,22 @@ export function planRadicarEnDebidaForma(entrada: {
     actuacionId,
     parcheExpediente: {
       estadoJuridico: 'RADICADA_EN_DEBIDA_FORMA',
-      /* La serie es `radicados`, la de ventanilla: es de donde sale el número.
-         Decirlo aquí importa — el Libro y la auditoría clasifican por `serieId`,
-         y afirmar `expedientes` haría creer que consumió un consecutivo de una
-         serie que este acto ya no toca. */
-      numeroExpediente: { numero: numeroOficial, serieId: 'radicados', año: anioSerie },
+      /* LOS DOS NÚMEROS, cada uno en su sitio (ADR-0041).
+
+         Cuando el candado de emisión está ABIERTO, el acto emite el número de
+         la serie `expedientes` —el `68745-…` que continúa el libro del
+         ingeniero— y ESE pasa a ser el número del expediente. El `1-110-…`
+         transcrito no se pierde ni se degrada: queda en su espejo propio, que
+         es de donde lo leen los papeles.
+
+         Con el candado CERRADO —hoy— no hay número que emitir y el expediente
+         conserva el `1-110-…` con `serieId: 'radicados'`, exactamente como
+         desde el pivote del 26-ago. El espejo se escribe igual: cuesta un
+         campo y evita que el día del arranque haya expedientes con y sin él. */
+      numeroExpediente: numeroEmitido
+        ? { numero: numeroEmitido.numero, serieId: 'expedientes', año: numeroEmitido.año }
+        : { numero: numeroOficial, serieId: 'radicados', año: anioSerie },
+      numeroRadicadoEntrada: numeroOficial,
       fechaRadicacionDebidaForma: evaluacion.anclaIso,
       fechaAlertaConservadora,
       completitud: evaluacion.completitud,

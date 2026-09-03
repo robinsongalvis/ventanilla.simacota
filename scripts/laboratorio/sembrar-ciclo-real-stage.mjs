@@ -132,6 +132,12 @@ await db.doc(`expedientes/${EXP_ID}`).set({
   creadoEn: dias(-3),
   actualizadoEn: dias(-1),
   numeroExpediente: { numero: NUMERO, serieId: 'expedientes', año: 2026, colision: false },
+  /* EL ESPEJO DEL NÚMERO DE ENTRADA (ADR-0041 §3.1). Con él, el ensayo enseña
+     lo que el arranque va a producir de verdad: el expediente con SUS DOS
+     números, y los papeles mostrándolos etiquetados. Sin él, la carátula y el
+     sello caerían al camino de un solo número y el ensayo no probaría nada
+     de lo nuevo. */
+  numeroRadicadoEntrada: RADICADO_ORIGEN,
   subtipos: ['CONSTRUCCION'],
   origen: 'REAL',
   esPrueba: false,

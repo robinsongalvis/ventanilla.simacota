@@ -53,6 +53,7 @@ import {
   planRadicarEnDebidaForma,
   esErrorExpediente,
   esRadicacionYaOcurrida,
+  evaluarCandadoEmisionReal,
   idActuacionRadicacion,
   type ActuacionLicenciaDoc,
   type DocumentoParaAncla,
@@ -61,6 +62,9 @@ import {
 import { logError } from '@/lib/logger';
 import { registrarEventoNegocio } from '@/lib/observabilidad/eventos-negocio';
 import type { TenantId } from '@/src/types/radicado';
+import { emitirNumeroExpedienteReal } from '@/lib/server/emitir-numero-expediente';
+import { SerieNoAbiertaError } from '@/lib/server/consecutivo-legal';
+import { codigosNumeroExpediente } from '@/src/types/reglas-negocio';
 
 export const runtime = 'nodejs';
 
@@ -165,6 +169,21 @@ export async function POST(req: Request, ctx: { params: Promise<{ id: string }> 
        local: el contador se indexa por año civil de Bogotá, y un reintento
        debe usar el mismo año y el mismo `AA` que el primer intento. */
     const fechaEmision = atLocalNoon(new Date());
+
+    /* EL CANDADO R10, aquí y no dentro de la transacción (ADR-0041 paso 4).
+       Es validación de CONFIGURACIÓN, no lectura transaccional: fallar rápido
+       sin gastar un round-trip. Hoy está cerrado, así que `emitir` es false y
+       este acto se comporta EXACTAMENTE como desde el pivote del 26-ago — el
+       expediente conserva su `1-110-…`. Abrirlo es cambiar UNA constante.
+
+       Nótese que el candado NO bloquea el acto: bloquea la EMISIÓN. Radicar en
+       debida forma tiene que seguir siendo posible con el candado puesto, o el
+       término de 45 días no arrancaría para nadie. */
+    const candado = evaluarCandadoEmisionReal();
+    const emitir = !esErrorExpediente(candado);
+    /* Los códigos DANE/curaduría, resueltos ANTES de abrir la transacción: es
+       fail-closed de configuración y el emisor lo exige así. */
+    const codigos = emitir ? codigosNumeroExpediente(TENANT_LICENCIAS) : null;
     const db = getFirebaseAdminDb();
     const expedienteRef = db.doc(`expedientes/${id}`);
     const actor = { uid: usuario.uid, nombre: usuario.nombre, rol: usuario.rol };
@@ -248,8 +267,24 @@ export async function POST(req: Request, ctx: { params: Promise<{ id: string }> 
         return { yaEstaba: true, numeroExpediente: evaluacion.numeroExpediente, anclaIso: evaluacion.anclaIso };
       }
 
+      /* LA EMISIÓN, en su hueco reservado: después de TODAS las lecturas y de
+         todos los guards puros, antes de la primera escritura. La cabecera de
+         esta ruta lo dejó dicho desde el primer día — «la emisión del
+         consecutivo es la ÚLTIMA lectura y su confirmación la PRIMERA
+         escritura». Va DENTRO de la misma transacción: si algo falla después,
+         el número no queda consumido. */
+      const numeroEmitido = emitir && codigos
+        ? await (async () => {
+            const r = await emitirNumeroExpedienteReal({
+              tx, db, fecha: fechaEmision, tenantId: TENANT_LICENCIAS, codigos, expedienteId: id,
+            });
+            return { numero: r.numeroExpediente, año: fechaEmision.getFullYear() };
+          })()
+        : null;
+
       const plan = planRadicarEnDebidaForma({
         expedienteId: id,
+        numeroEmitido,
         tenantId: exp.tenantId,
         evaluacion,
         numeroOficial: numero.canonico,
@@ -378,6 +413,23 @@ export async function POST(req: Request, ctx: { params: Promise<{ id: string }> 
   } catch (error) {
     if (error instanceof InternalAuthError) {
       return NextResponse.json({ error: error.message }, { status: error.status });
+    }
+    /* LA SERIE SIN ABRIR, dicha y no escondida en un 500 (ADR-0041 §5).
+       Si la emisión falla, el ACTO no ocurre — y sin acto el término de 45
+       días hábiles no arranca. Un 500 opaco dejaría a alguien creyendo que
+       radicó, con el reloj parado y nadie mirando. */
+    if (error instanceof SerieNoAbiertaError) {
+      logError({ radicadoId: id, modulo: 'licencias/radicar/serie-sin-abrir', error });
+      return NextResponse.json(
+        {
+          error:
+            'La serie legal de expedientes no está abierta para este año, así que no se puede '
+            + 'emitir el número. La radicación NO quedó registrada y el término no ha empezado a '
+            + 'correr. Avise a la administración: hay que abrir el contador antes de continuar.',
+          motivo: 'SERIE_NO_ABIERTA',
+        },
+        { status: 409 },
+      );
     }
     logError({ radicadoId: id, modulo: 'licencias/radicar', error });
     /* Si tras los reintentos sigue colisionando, no es un fallo del sistema
