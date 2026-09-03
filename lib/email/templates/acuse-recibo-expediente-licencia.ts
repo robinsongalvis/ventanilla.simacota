@@ -40,7 +40,20 @@ import { formatFechaLargaColombia } from '@/lib/fecha-colombia';
 ══════════════════════════════════════════════════════════════ */
 
 export interface TemplateAcuseReciboExpedienteParams {
-  numeroExpediente: string;
+  /**
+   * EL PROTAGONISTA: el radicado de ENTRADA (`1-110-…`).
+   *
+   * Lo era de hecho y no de nombre. Este correo sale al CREAR el expediente, y
+   * desde el ADR-0041 en ese momento el expediente todavía NO tiene número
+   * propio — el `68745-…` se emite después, en la radicación en debida forma.
+   * Protagonizar un número inexistente producía «Expediente undefined»; y
+   * antes del ADR producía un `DEMO-…` con el que nadie podía encontrar nada.
+   * El de entrada existe desde el primer segundo y es el que sirve para
+   * consultar en línea.
+   */
+  numeroRadicado: string;
+  /** El `68745-…`, cuando ya exista. Se muestra como dato, no como titular. */
+  numeroExpediente?: string | null;
   solicitanteNombre: string;
   solicitanteDocumento: string;
   tipoDocumento: string;
@@ -55,7 +68,6 @@ export interface TemplateAcuseReciboExpedienteParams {
   /** Cuántos requisitos aplican de verdad a este caso. */
   requisitosAplicables: number;
   /** Radicado de ventanilla asociado, si lo hay. */
-  radicadoVentanillaId?: string | null;
 }
 
 function escapeHtml(str: string): string {
@@ -67,8 +79,8 @@ function escapeHtml(str: string): string {
     .replace(/'/g, '&#039;');
 }
 
-export function buildAcuseReciboExpedienteSubject(numeroExpediente: string): string {
-  return `Acuse de recibo de su solicitud · Expediente ${numeroExpediente} · Alcaldía Municipal de Simacota`;
+export function buildAcuseReciboExpedienteSubject(numeroRadicado: string): string {
+  return `Acuse de recibo de su solicitud · Radicado ${numeroRadicado} · Alcaldía Municipal de Simacota`;
 }
 
 function filaDato(etiqueta: string, valor: string): string {
@@ -96,7 +108,7 @@ export function buildAcuseReciboExpedienteHtml(p: TemplateAcuseReciboExpedienteP
   return `<!DOCTYPE html>
 <html lang="es">
 <head><meta charset="UTF-8"/><meta name="viewport" content="width=device-width,initial-scale=1.0"/>
-<title>${escapeHtml(buildAcuseReciboExpedienteSubject(p.numeroExpediente))}</title></head>
+<title>${escapeHtml(buildAcuseReciboExpedienteSubject(p.numeroRadicado))}</title></head>
 <body style="margin:0;padding:0;background:#f4f5f7;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;">
 <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:#f4f5f7;padding:32px 16px;">
 <tr><td align="center">
@@ -115,8 +127,8 @@ export function buildAcuseReciboExpedienteHtml(p: TemplateAcuseReciboExpedienteP
     </p>
     <p style="margin:0;font-size:15px;line-height:1.6;color:#1F2933;">
       La Alcaldía Municipal de Simacota <strong>recibió su solicitud</strong> de
-      ${escapeHtml(p.descripcionTramite)} y abrió el expediente
-      <strong>${escapeHtml(p.numeroExpediente)}</strong>. ${
+      ${escapeHtml(p.descripcionTramite)} bajo el radicado
+      <strong>${escapeHtml(p.numeroRadicado)}</strong>. ${
         entregados > 0
           ? 'Este mensaje deja constancia de qué documentos quedaron en poder de la administración y cuáles faltan.'
           : 'Este mensaje le indica qué documentos debe entregar para que su solicitud quede completa.'
@@ -126,11 +138,11 @@ export function buildAcuseReciboExpedienteHtml(p: TemplateAcuseReciboExpedienteP
 
   <tr><td style="padding:12px 24px;">
     <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="font-size:13px;color:#1F2933;">
-      ${filaDato('Expediente:', p.numeroExpediente)}
+      ${filaDato('Radicado de entrada:', p.numeroRadicado)}
+      ${p.numeroExpediente ? filaDato('Expediente (Planeación):', p.numeroExpediente) : ''}
       ${filaDato('Solicitante:', `${p.solicitanteNombre} — ${p.tipoDocumento} ${p.solicitanteDocumento}`)}
       ${filaDato('Trámite:', p.descripcionTramite)}
       ${filaDato('Fecha de recepción:', fechaFmt)}
-      ${p.radicadoVentanillaId ? filaDato('Radicado de ventanilla asociado:', p.radicadoVentanillaId) : ''}
     </table>
   </td></tr>
 
@@ -206,9 +218,9 @@ export function buildAcuseReciboExpedienteHtml(p: TemplateAcuseReciboExpedienteP
 
   <tr><td style="padding:12px 24px 20px 24px;">
     <p style="margin:0;font-size:12px;line-height:1.5;color:#667085;">
-      Para cualquier consulta sobre este expediente puede comunicarse con la Secretaría de
-      Planeación o acercarse a la ventanilla única indicando el número
-      <strong>${escapeHtml(p.numeroExpediente)}</strong>.
+      Para cualquier consulta sobre su solicitud puede comunicarse con la Secretaría de
+      Planeación o acercarse a la ventanilla única indicando el radicado
+      <strong>${escapeHtml(p.numeroRadicado)}</strong>.
     </p>
   </td></tr>
 

@@ -26,7 +26,7 @@ const BASE = {
   descripcionTramite: 'licencia de construcción — obra nueva',
   fechaRecepcion: '2026-08-26T12:00:00.000Z',
   requisitosAplicables: 19,
-  radicadoVentanillaId: '1-110-202608-00000042',
+  numeroRadicado: '1-110-202608-00000042',
 };
 
 const INCOMPLETO = {

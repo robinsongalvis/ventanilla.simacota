@@ -80,9 +80,13 @@ export function EstadoTramiteLicencia({ radicadoId }: EstadoTramiteLicenciaProps
         <h3 id="estado-tramite-licencia" className={etiqueta} style={{ color: '#667085' }}>
           Estado del trámite de licencia
         </h3>
+        {/* Rotulado (ADR-0041): en el mostrador este número aparece junto al
+            radicado que la funcionaria ya tiene en pantalla. Sin rótulo, tiene
+            que adivinar cuál le está leyendo al ciudadano. */}
         {p.numeroExpediente && (
-          <span className="font-mono text-xs" style={{ color: 'var(--text-secondary)' }}>
-            {p.numeroExpediente}
+          <span className="text-xs" style={{ color: 'var(--text-secondary)' }}>
+            Expediente{' '}
+            <span className="font-mono">{p.numeroExpediente}</span>
           </span>
         )}
       </div>

@@ -163,9 +163,13 @@ export async function POST(request: Request): Promise<NextResponse> {
         );
         await enviarEmail({
           to: email,
-          subject: buildAcuseReciboExpedienteSubject(numero),
+          /* EL RADICADO DE ENTRADA es el titular (ADR-0041): este correo sale
+             al CREAR, y en ese momento el expediente todavía no tiene número
+             propio. `radicadoId` es el `1-110-…` del vínculo. */
+          subject: buildAcuseReciboExpedienteSubject(radicadoId),
           html: buildAcuseReciboExpedienteHtml({
-            numeroExpediente: numero,
+            numeroRadicado: radicadoId,
+            numeroExpediente: plan.expediente.numeroExpediente?.numero ?? null,
             solicitanteNombre: plan.expediente.solicitanteNombre,
             solicitanteDocumento: plan.expediente.solicitanteDocumento,
             tipoDocumento: radicado.solicitante.tipoDocumento,
@@ -179,7 +183,6 @@ export async function POST(request: Request): Promise<NextResponse> {
             documentosEntregados: docs.entregados,
             documentosFaltantes: docs.faltantes,
             requisitosAplicables: docs.aplicables,
-            radicadoVentanillaId: radicadoId,
           }),
         });
         constanciaEnviada = true;

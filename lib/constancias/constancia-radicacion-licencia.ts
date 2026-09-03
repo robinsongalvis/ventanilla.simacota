@@ -37,8 +37,13 @@ import { formatFechaLargaColombia } from '@/lib/fecha-colombia';
 ══════════════════════════════════════════════════════════════ */
 
 export interface ConstanciaRadicacionLicenciaParams {
-  /** El número del libro de ventanilla, en forma canónica. El que vale. */
+  /** El número del libro de ventanilla, en forma canónica: el de ENTRADA. */
   numeroRadicado: string;
+  /**
+   * El `68745-…` del expediente en Planeación (ADR-0041). Opcional: antes de
+   * que exista, el papel muestra un solo número — no inventa el otro.
+   */
+  numeroExpediente?: string | null;
   solicitanteNombre: string;
   solicitanteDocumento: string;
   tipoDocumento: string;
@@ -108,6 +113,13 @@ export function buildConstanciaRadicacionLicenciaHtml(p: ConstanciaRadicacionLic
     text-align:center;
   }
   .numero .rotulo{color:var(--verde)}
+  /* Dos cajas seguidas (ADR-0041): se juntan para que se lean como un par,
+     no como dos secciones sueltas. */
+  .numero + .numero{margin-top:-.6rem}
+  .nota-consulta{
+    font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;
+    font-size:.72rem;color:var(--suave);text-align:center;margin:-.6rem 0 1.2rem;
+  }
   .numero strong{
     display:block;margin-top:.3rem;font-family:ui-monospace,SFMono-Regular,Menlo,monospace;
     font-size:1.5rem;letter-spacing:.02em;font-variant-numeric:tabular-nums;
@@ -149,9 +161,14 @@ export function buildConstanciaRadicacionLicenciaHtml(p: ConstanciaRadicacionLic
   </p>
 
   <div class="numero">
-    <p class="rotulo">Número de radicado</p>
+    <p class="rotulo">Número de radicado${p.numeroExpediente ? ' de entrada (Ventanilla)' : ''}</p>
     <strong>${escapeHtml(p.numeroRadicado)}</strong>
   </div>
+${p.numeroExpediente ? `  <div class="numero">
+    <p class="rotulo">Número de expediente (Planeación)</p>
+    <strong>${escapeHtml(p.numeroExpediente)}</strong>
+  </div>
+  <p class="nota-consulta">Para consultar en línea use el número de radicado de entrada.</p>` : ''}
 
   <table>
     <tr><td>Solicitante</td><td>${escapeHtml(p.solicitanteNombre)}</td></tr>

@@ -247,8 +247,15 @@ function ConsultaInterna() {
                 <p className="mb-3 text-[10px] font-bold uppercase tracking-widest text-slate-500">
                   Su licencia urbanística
                 </p>
+                {/* CON SU RÓTULO (ADR-0041): el ciudadano ya consultó con su
+                    radicado y aquí ve un SEGUNDO número. Sin decir cuál es,
+                    dos números en la misma pantalla solo generan la llamada
+                    al mostrador que este bloque existe para evitar. */}
                 {licencia.numeroExpediente && (
-                  <p className="mb-2 font-mono text-xs text-slate-600">{licencia.numeroExpediente}</p>
+                  <p className="mb-2 text-xs text-slate-600">
+                    <span className="text-slate-500">Expediente en Planeación: </span>
+                    <span className="font-mono">{licencia.numeroExpediente}</span>
+                  </p>
                 )}
                 <h2 className="text-base font-black text-slate-900">{licencia.estado.titulo}</h2>
                 <p className="mt-1 text-sm leading-relaxed text-slate-700">{licencia.estado.explicacion}</p>
