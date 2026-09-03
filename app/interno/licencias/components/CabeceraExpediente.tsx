@@ -57,7 +57,20 @@ export function CabeceraExpediente({ expediente, desdeCuandoCorreElPlazo }: Cabe
               </strong>
             </span>
           )}
-          <span className="capitalize" style={{ color: 'var(--text-secondary)' }}>{tramite}</span>
+          {/* `first-letter:uppercase`, NO `capitalize` (3-sep-2026, cazado por
+              el propietario en el ensayo). `capitalize` mayusculiza CADA
+              palabra y la cabecera decía «Licencia De Urbanización» — en
+              español el «de» no lleva mayúscula, y el nombre de una figura
+              jurídica no es un título que se maquille. En un trámite
+              combinado era peor: «… Licencia De Construcción Y Aprobación
+              De Planos».
+
+              Quitarla del todo tampoco servía: `describirTramiteDesdeSubtipos`
+              devuelve el nombre en MINÚSCULA a propósito, porque su uso
+              principal es dentro de frases («recibió su solicitud de licencia
+              de urbanización y…»). Aquí es una etiqueta suelta y necesita
+              arrancar en mayúscula — pero solo la primera letra. */}
+          <span className="first-letter:uppercase" style={{ color: 'var(--text-secondary)' }}>{tramite}</span>
           <ChipEstadoJuridico estado={expediente.estadoJuridico} />
         </div>
       </div>

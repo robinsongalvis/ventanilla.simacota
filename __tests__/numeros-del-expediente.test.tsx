@@ -155,6 +155,33 @@ describe('rotuloDeSerie — el rótulo sale de la serie, en la cabecera REAL', (
     expect(rotuloJuntoAlNumero('68745-0-26-0021')).toBe('Expediente 68745-0-26-0021');
   });
 
+  it('el nombre de la figura se imprime TAL COMO lo escribe el catálogo', () => {
+    /* Cazado por el propietario en el ensayo del 3-sep: una regla de estilo
+       (`capitalize`) ponía mayúscula a cada palabra y la cabecera decía
+       «Licencia De Urbanización». En español el «de» no la lleva, y el nombre
+       de una figura jurídica no es un título que se maquille: el catálogo
+       normativo es la fuente y la pantalla lo respeta. */
+    const { container } = render(
+      <CabeceraExpediente
+        expediente={expedienteCon({ numero: '68745-0-26-0021', serieId: 'expedientes' })}
+        desdeCuandoCorreElPlazo={null}
+      />,
+    );
+    /* El TEXTO viaja en minúscula a propósito (`describirTramiteDesdeSubtipos`
+       existe sobre todo para frases: «su solicitud de licencia de
+       urbanización y…»). Lo que se asevera aquí es que la cabecera NO lo
+       mayusculiza palabra por palabra — la mayúscula inicial la pone el
+       estilo `first-letter`, que el DOM no aplica en jsdom. */
+    const texto = container.textContent ?? '';
+    expect(texto.toLowerCase()).toContain('licencia de construcción');
+    expect(
+      texto,
+      'una regla de estilo está mayusculizando cada palabra del nombre de la figura — en español el «de» no lleva mayúscula',
+    ).not.toMatch(/\bDe\b/);
+    const span = [...container.querySelectorAll('span')].find((s) => s.textContent === texto.match(/licencia[^P]*/i)?.[0]?.trim());
+    expect(span?.className ?? '', 'la cabecera volvió a `capitalize`').not.toContain('capitalize');
+  });
+
   it('una serie desconocida se rotula neutro — no se le inventa identidad', () => {
     expect(rotuloDeSerie('serie-que-nadie-ha-escrito')).toBe('Número');
     expect(rotuloDeSerie(undefined)).toBe('Número');
