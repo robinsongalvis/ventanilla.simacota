@@ -35,7 +35,14 @@ const CARTA = { ancho: 612, alto: 792 } as const;
 const MARGEN = 54;
 
 export interface DatosConstanciaPaquete {
+  /** El `1-110-…` de ventanilla: la constancia de que la solicitud entró. */
   numeroRadicado: string;
+  /**
+   * El `68745-…` del expediente en Planeación (ADR-0041). Opcional: mientras
+   * los dos números sean el mismo objeto —o antes de la debida forma— no hay
+   * segundo número que mostrar, y la carátula no debe inventarlo.
+   */
+  numeroExpediente?: string | null;
   solicitanteNombre: string;
   solicitanteDocumento: string;
   descripcionTramite: string;
@@ -90,8 +97,10 @@ export function contenidoConstanciaPaquete(
   entidad: string;
   subtitulo: string;
   titulo: string;
-  numeroEtiqueta: string;
-  numero: string;
+  /** Los números del trámite, cada uno con su etiqueta. Uno o dos. */
+  numeros: { etiqueta: string; valor: string }[];
+  /** Cuál sirve para consultar en línea — null si solo hay uno y es obvio. */
+  notaConsulta: string | null;
   campos: [string, string][];
   solicitante: [string, string][];
   incluidosTitulo: string;
@@ -108,8 +117,22 @@ export function contenidoConstanciaPaquete(
     entidad: 'ALCALDÍA MUNICIPAL DE SIMACOTA',
     subtitulo: 'Ventanilla Única Digital · Secretaría de Planeación',
     titulo: 'CONSTANCIA DE RADICACIÓN — PAQUETE DE COPIAS SELLADAS',
-    numeroEtiqueta: 'N.° DE RADICADO',
-    numero: datos.numeroRadicado,
+    /* DOS NÚMEROS, CADA UNO CON SU ETIQUETA (ADR-0041). Sin etiqueta, dos
+       números juntos obligan al ciudadano a adivinar cuál es cuál — y a la
+       funcionaria a explicárselo cada vez. Cuando solo hay uno, la carátula no
+       inventa el otro ni deja un hueco. */
+    numeros: [
+      { etiqueta: 'RADICADO DE ENTRADA (Ventanilla)', valor: datos.numeroRadicado },
+      ...(datos.numeroExpediente
+        ? [{ etiqueta: 'EXPEDIENTE (Planeación)', valor: datos.numeroExpediente }]
+        : []),
+    ],
+    /* La frase que evita el viaje de vuelta al mostrador: con dos números
+       impresos, el ciudadano teclea el que tenga más a mano y la consulta en
+       línea hoy solo resuelve por el de entrada (issue #321). */
+    notaConsulta: datos.numeroExpediente
+      ? 'Para consultar en línea use el RADICADO DE ENTRADA.'
+      : null,
     campos: [
       ['Trámite:', datos.descripcionTramite],
       ['Radicado en debida forma:', datos.desdeCuandoCorreElPlazo.slice(0, 10)],
@@ -141,7 +164,8 @@ export function lineasConstanciaPaquete(
     lineas: [
       c.entidad,
       c.subtitulo,
-      `${c.numeroEtiqueta} ${c.numero}`,
+      ...c.numeros.map((n) => `${n.etiqueta} ${n.valor}`),
+      ...(c.notaConsulta ? [c.notaConsulta] : []),
       ...c.campos.map(([e, v]) => `${e} ${v}`),
       ...c.solicitante.map(([e, v]) => `${e} ${v}`),
       c.incluidosTitulo,
@@ -170,7 +194,7 @@ export async function construirPaqueteSellado(entrada: {
   constancia: DatosConstanciaPaquete;
   documentos: DocumentoParaPaquete[];
   /** `logoPng` es el ESCUDO cuadrado del sello estampado. */
-  sello: { radicadoId: string; fechaHoraLegible: string; logoPng?: Uint8Array | null; esquina?: EsquinaSello };
+  sello: { radicadoId: string; numeroExpediente?: string | null; fechaHoraLegible: string; logoPng?: Uint8Array | null; esquina?: EsquinaSello };
   /** El lockup horizontal para el membrete de la carátula. Si no llega, se usa el del sello. */
   logoPortadaPng?: Uint8Array | null;
 }): Promise<ResultadoPaqueteSellado> {
@@ -265,15 +289,43 @@ export async function construirPaqueteSellado(entrada: {
   y -= 4;
   punteada();
 
-  // La caja del número, como en el comprobante
+  /* LA CAJA DE LOS NÚMEROS, en el lenguaje del comprobante de ventanilla. Con
+     dos, se parte en columnas iguales separadas por un filete: uno al lado del
+     otro, mismo peso visual, cada uno bajo su etiqueta. El tamaño se MIDE para
+     que quepa —los dos números tienen largos distintos— en vez de fijarlo y
+     esperar que no se pisen. */
+  const anchoCaja = CARTA.ancho - MARGEN * 2;
   const altoCaja = 52;
-  portada.drawRectangle({ x: MARGEN, y: y - altoCaja, width: CARTA.ancho - MARGEN * 2, height: altoCaja, color: VERDE_TINTE, borderColor: VERDE, borderWidth: 1 });
-  const et = c.numeroEtiqueta;
-  const etAncho = helv.widthOfTextAtSize(et, 8);
-  portada.drawText(et, { x: (CARTA.ancho - etAncho) / 2, y: y - 16, size: 8, font: helv, color: GRIS });
-  const numAncho = monoB.widthOfTextAtSize(c.numero, 17);
-  portada.drawText(c.numero, { x: (CARTA.ancho - numAncho) / 2, y: y - 38, size: 17, font: monoB, color: VERDE });
-  y -= altoCaja + 18;
+  portada.drawRectangle({ x: MARGEN, y: y - altoCaja, width: anchoCaja, height: altoCaja, color: VERDE_TINTE, borderColor: VERDE, borderWidth: 1 });
+
+  const columnas = c.numeros.length;
+  const anchoColumna = anchoCaja / columnas;
+  c.numeros.forEach((num, i) => {
+    const centroX = MARGEN + anchoColumna * i + anchoColumna / 2;
+    const disponible = anchoColumna - 16;
+
+    const tamEtiqueta = Math.min(8, (8 * disponible) / Math.max(helv.widthOfTextAtSize(num.etiqueta, 8), 1));
+    const etAncho = helv.widthOfTextAtSize(num.etiqueta, tamEtiqueta);
+    portada.drawText(num.etiqueta, { x: centroX - etAncho / 2, y: y - 16, size: tamEtiqueta, font: helv, color: GRIS });
+
+    const tamNumero = Math.min(17, (17 * disponible) / Math.max(monoB.widthOfTextAtSize(num.valor, 17), 1));
+    const numAncho = monoB.widthOfTextAtSize(num.valor, tamNumero);
+    portada.drawText(num.valor, { x: centroX - numAncho / 2, y: y - 38, size: tamNumero, font: monoB, color: VERDE });
+
+    // Filete entre columnas — separa sin encerrar.
+    if (i > 0) {
+      const xFilete = MARGEN + anchoColumna * i;
+      portada.drawLine({ start: { x: xFilete, y: y - 10 }, end: { x: xFilete, y: y - altoCaja + 8 }, thickness: 0.6, color: VERDE });
+    }
+  });
+  y -= altoCaja + 16;
+
+  if (c.notaConsulta) {
+    const anchoNota = helv.widthOfTextAtSize(c.notaConsulta, 8);
+    portada.drawText(c.notaConsulta, { x: (CARTA.ancho - anchoNota) / 2, y, size: 8, font: helv, color: GRIS });
+    y -= 16;
+  }
+  y -= 8;
 
   // Campos etiqueta/valor (etiqueta gris, valor en mono — el estilo del comprobante)
   const fila = (etiqueta: string, valor: string) => {

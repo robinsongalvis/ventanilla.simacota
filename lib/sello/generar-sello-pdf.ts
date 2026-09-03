@@ -13,9 +13,10 @@ import {
  * v4 = esquina elegible + logo compartido; v5 = escudo cuadrado sin deformar y
  * líneas medidas que no se pisan (la muestra del 1-sep las mostró chocando);
  * v6 = folio «Página N de M» en el sellado multipágina (decisión del
- * propietario, 1-sep) — ventanilla primera-página queda igual.
+ * propietario, 1-sep) — ventanilla primera-página queda igual; v7 = la línea
+ * «Exp.» del ADR-0041, cuando el expediente lleva número propio.
  */
-export const VERSION_RENDER_SELLO = '6';
+export const VERSION_RENDER_SELLO = '7';
 
 /**
  * Sprint Ventanilla Operativa 3 — sellado digital de PDF.
@@ -40,7 +41,14 @@ export const VERSION_RENDER_SELLO = '6';
  */
 
 export interface DatosSello {
+  /** El número de ENTRADA — el que el rótulo del sello promete. */
   radicadoId:       string;
+  /**
+   * El `68745-…` del expediente (ADR-0041). Opcional: la PR #315 descartó esta
+   * línea con razón —entonces los dos números eran el mismo objeto y habría
+   * impreso el mismo dato dos veces—; vuelve ahora que tiene contenido propio.
+   */
+  numeroExpediente?: string | null;
   fechaHoraLegible: string;
   /** PNG del logo. Opcional — si no llega, se omite y se ajusta el layout. */
   logoPng?:         Uint8Array | null;
@@ -105,12 +113,21 @@ export interface FilaSello {
  * (primera página, contenido congelado del sprint Op 3) queda EXACTO.
  */
 export function filasSello(datos: DatosSello, folio?: FolioSello): FilaSello[] {
+  const conExpediente = Boolean(datos.numeroExpediente);
   return [
+    /* EL CALENDARIO VERTICAL, medido para el caso MÁXIMO (cinco filas: con
+       expediente y con folio). Cada `dy` deja por debajo al menos el tamaño de
+       la fila que baja, y la última cabe sobre el pie sin rozarlo — la cuenta
+       está en `SELLO_MIN_ALTO_PT`. Cuando faltan filas, las de abajo suben:
+       el sello de ventanilla (tres filas) conserva EXACTAMENTE su forma. */
     { texto: 'RECIBIDO POR VENTANILLA ÚNICA', dy: 8, tamano: 6.5, fuente: 'bold', color: 'verde' },
-    { texto: datos.radicadoId, dy: 20, tamano: 8.5, fuente: 'mono', color: 'oscuro' },
-    { texto: datos.fechaHoraLegible, dy: 32, tamano: 6.5, fuente: 'regular', color: 'gris' },
+    { texto: datos.radicadoId, dy: conExpediente ? 19 : 20, tamano: 8.5, fuente: 'mono', color: 'oscuro' },
+    ...(conExpediente
+      ? [{ texto: `Exp. ${datos.numeroExpediente}`, dy: 29, tamano: 6.5, fuente: 'mono' as const, color: 'oscuro' as const }]
+      : []),
+    { texto: datos.fechaHoraLegible, dy: conExpediente ? 38 : 32, tamano: 6.5, fuente: 'regular', color: 'gris' },
     ...(folio
-      ? [{ texto: `Página ${folio.n} de ${folio.de}`, dy: 41, tamano: 6, fuente: 'regular' as const, color: 'gris' as const }]
+      ? [{ texto: `Página ${folio.n} de ${folio.de}`, dy: conExpediente ? 46 : 41, tamano: 6, fuente: 'regular' as const, color: 'gris' as const }]
       : []),
   ];
 }

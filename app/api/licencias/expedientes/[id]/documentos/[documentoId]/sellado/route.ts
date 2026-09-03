@@ -175,6 +175,9 @@ export async function GET(
         const resultado = await sellarTodasLasPaginas(new Uint8Array(bytesOriginal), {
           // El número de ENTRADA: el sello dice «recibido por ventanilla».
           radicadoId: numeroEntrada,
+          /* La línea «Exp.» solo cuando es un número DISTINTO del de entrada:
+             hoy coinciden y el sello no repite el mismo dato dos veces. */
+          numeroExpediente: numero !== numeroEntrada ? numero : null,
           fechaHoraLegible: formatFechaHoraColombia(
             expediente.fechaRadicacionDebidaForma ?? expediente.creadoEn,
           ),
