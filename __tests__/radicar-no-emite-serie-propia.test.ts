@@ -2,21 +2,35 @@ import { describe, it, expect } from 'vitest';
 import { readFileSync } from 'node:fs';
 
 /**
- * EL ACTO DE RADICAR NO EMITE: RECIBE.
+ * EL ACTO DE RADICAR EMITE OTRA VEZ — Y BAJO CANDADO.
  *
- * Hasta el 26-ago-2026 esta ruta emitía un consecutivo de la serie
- * `expedientes` y el candado R10 la custodiaba. Por decisión del propietario, el
- * número oficial es el del LIBRO DE VENTANILLA, transcrito por el operario: en
- * la Administración Municipal todo entra por ventanilla, y ese número es el
- * único que vale.
+ * REESCRITA el 2-sep-2026 por el ADR-0041 (conforme al ADR-0039 §3).
  *
- * Al quitar la emisión, el candado R10 dejó de aplicar a esta ruta — y quitar
- * una comprobación sin dejar nada en su lugar es exactamente cómo se pierden.
- * Esta prueba es lo que queda en su lugar: asevera, sobre el código real, que
- * la ruta NO PUEDE alcanzar la serie de expedientes ni su contador.
+ * QUÉ SE RETIRA: la prohibición de emitir. Esta prueba nació el 26-ago, cuando
+ * el propietario decidió que el número oficial fuera el del libro de ventanilla
+ * transcrito; al quitarse la emisión, el candado R10 dejó de aplicar a esta
+ * ruta, y la prueba se puso en su lugar para que la ausencia no se perdiera.
  *
- * El candado sigue vigente donde importa: `expedientes-licencias-rutas-ejecucion`
- * lo asevera sobre la ruta de creación, que sí podría emitir.
+ * CON QUÉ FUNDAMENTO SE RETIRA: el ADR-0041, aprobado por el propietario el
+ * 1-sep, devuelve a las licencias su número propio de la serie `expedientes`
+ * —el `68745-…` que continúa el libro del ingeniero de Planeación— emitido en
+ * este mismo acto. La premisa de la prueba («la ruta NO PUEDE alcanzar la
+ * serie») es exactamente lo que la decisión revierte.
+ *
+ * QUÉ SOBREVIVE, Y ES LA MITAD QUE IMPORTA: que la emisión no pueda ocurrir
+ * sin candado, que el número no se pueda inventar en el servidor y que la
+ * fecha no se pueda inventar en el cuerpo. Nada de eso lo tocó el ADR.
+ *
+ * QUÉ VIGILA AHORA, ADEMÁS: que la emisión esté DENTRO de la transacción y
+ * ANTES de la primera escritura. Fuera de ella, un fallo posterior dejaría un
+ * número consumido para siempre por un acto que no ocurrió — y en una serie
+ * legal eso no se arregla, se anula con acta.
+ *
+ * LÍMITE DECLARADO (la lección del barrido del 30-ago): las aserciones de
+ * ORDEN se hacen sobre el texto del fuente, y el texto no es el mecanismo. Lo
+ * que SÍ se ejecuta —que con candado cerrado no se escribe un número de la
+ * serie `expedientes`— vive en `emision-bajo-candado.test.ts`, sobre las
+ * funciones puras.
  */
 const RUTA = 'app/api/licencias/expedientes/[id]/radicar/route.ts';
 const TEXTO = readFileSync(RUTA, 'utf8');
@@ -34,18 +48,26 @@ const FUENTE = TEXTO
   .replace(/\/\*[\s\S]*?\*\//g, '')
   .replace(/^\s*\/\/.*$/gm, '');
 
-describe('la ruta del acto no puede consumir la serie de expedientes', () => {
-  it.each([
-    ['el emisor de números de expediente', 'emitirNumeroExpedienteReal'],
-    ['el helper de consecutivos legales', 'leerConsecutivosLegales'],
-    ['la confirmación de consecutivos', 'confirmarConsecutivosLegales'],
-  ])('no importa ni invoca %s', (_que, simbolo) => {
-    expect(FUENTE).not.toContain(simbolo);
+describe('la ruta del acto emite bajo candado, y dentro de la transacción', () => {
+  it('la emisión pasa por el candado R10 — no hay camino que lo esquive', () => {
+    /* El invariante que sobrevive a la reescritura: emitir sin preguntar al
+       candado es lo que R10 existe para impedir. */
+    expect(FUENTE).toContain('evaluarCandadoEmisionReal');
+    const iCandado = FUENTE.indexOf('evaluarCandadoEmisionReal');
+    const iEmision = FUENTE.indexOf('emitirNumeroExpedienteReal(');
+    expect(iEmision, 'la ruta dejó de emitir — si fue a propósito, esta prueba se reescribe con su fundamento').toBeGreaterThan(-1);
+    expect(iCandado, 'el candado debe consultarse ANTES de emitir').toBeLessThan(iEmision);
   });
 
-  it('no nombra el contador de expedientes ni su colección de unicidad', () => {
-    expect(FUENTE).not.toMatch(/counters\/expedientes/);
-    expect(FUENTE).not.toMatch(/unicidad_expedientes/);
+  it('emite DENTRO de la transacción y ANTES de la primera escritura', () => {
+    /* Fuera de la transacción, un fallo posterior dejaría el número consumido
+       por un acto que no ocurrió. En una serie legal eso no se corrige: se
+       anula con acta. */
+    const iTx = FUENTE.indexOf('runTransaction');
+    const iEmision = FUENTE.indexOf('emitirNumeroExpedienteReal(');
+    const iPrimeraEscritura = FUENTE.indexOf('tx.create(');
+    expect(iEmision, 'la emisión quedó FUERA de la transacción').toBeGreaterThan(iTx);
+    expect(iEmision, 'la emisión quedó DESPUÉS de la primera escritura').toBeLessThan(iPrimeraEscritura);
   });
 
   it('sí reserva el número en la serie de VENTANILLA, que es de donde sale', () => {

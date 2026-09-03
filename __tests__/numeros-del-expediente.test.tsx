@@ -38,6 +38,16 @@ import type { ExpedienteLicenciaDoc } from '@/lib/server/expedientes-licencias';
 ══════════════════════════════════════════════════════════════ */
 
 describe('numeroDeEntrada — el número que el ciudadano tiene en la mano', () => {
+  it('manda el ESPEJO — lo escribe el acto de radicar, y existe también sin vínculo', () => {
+    /* Paso 4 del ADR-0041: el expediente sin vínculo digital obtiene su 1-110
+       por transcripción del libro, y sin el espejo no tendría dónde vivir. */
+    expect(numeroDeEntrada({
+      numeroRadicadoEntrada: '1-110-202609-00000041',
+      radicadoId: null,
+      numeroExpediente: { numero: '68745-0-26-0021', serieId: 'expedientes' },
+    })).toBe('1-110-202609-00000041');
+  });
+
   it('con vínculo, manda el vínculo: ese id ES el 1-110', () => {
     expect(numeroDeEntrada({
       radicadoId: '1-110-202609-00000041',

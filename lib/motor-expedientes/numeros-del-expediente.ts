@@ -35,6 +35,8 @@ export interface NumerosDelExpediente {
    * nació sin vínculo; en legados puede traer formas `1-WEB-`/`EXT-…`.
    */
   radicadoId?: string | null;
+  /** El espejo del `1-110-…` escrito por el acto de radicar (ADR-0041 §3.1). */
+  numeroRadicadoEntrada?: string | null;
 }
 
 /**
@@ -45,13 +47,15 @@ export interface NumerosDelExpediente {
  * radicados sin vínculo digital — sin ella, esos perderían su número al
  * cambiar los llamadores, que es justo lo que el paso 1 debe evitar.
  *
- * PASO 4 DEL ADR-0041: cuando exista el campo espejo `numeroRadicadoEntrada`,
- * la precedencia pasa a ser `numeroRadicadoEntrada ?? radicadoId` y la caída
- * a `numeroExpediente` DESAPARECE — para entonces ese campo cargará el 68745 y
- * devolverlo aquí sería exactamente la mentira que este módulo evita. Es un
- * solo sitio que cambiar, y por eso este módulo existe.
+ * PRECEDENCIA (paso 4, 2-sep-2026): manda el ESPEJO, que el acto de radicar
+ * escribe y que existe también para el expediente sin vínculo digital; luego
+ * el vínculo. La caída a `numeroExpediente` sobrevive SOLO para los
+ * expedientes radicados ANTES de que el espejo existiera —cuyo campo carga un
+ * 1-110 de la serie `radicados`— y por eso comprueba la serie: el día que ahí
+ * viva un 68745, devolverlo sería la mentira que este módulo evita.
  */
 export function numeroDeEntrada(exp: NumerosDelExpediente): string | null {
+  if (exp.numeroRadicadoEntrada) return exp.numeroRadicadoEntrada;
   if (exp.radicadoId) return exp.radicadoId;
   const propio = exp.numeroExpediente;
   if (propio && esSerieDeEntrada(propio.serieId)) return propio.numero;
