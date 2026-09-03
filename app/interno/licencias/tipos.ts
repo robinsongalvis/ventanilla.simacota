@@ -62,6 +62,17 @@ export interface EventoTimelineItem {
   /** En lenguaje de persona: «Se abrió el expediente», no `apertura-expediente`. */
   titulo: string;
   meta: string;
+  /**
+   * ISO del INSTANTE del hecho — la clave con la que se ordena el historial.
+   *
+   * Existe porque ordenar por `meta` era ordenar por una fecha YA FORMATEADA
+   * (`dd/mm/yyyy`): con día de precisión, dos hechos del mismo día quedaban en
+   * el orden en que se armó la lista, y entre meses distintos el orden salía
+   * al revés —«01/09» va antes que «29/08» como texto, y después como
+   * calendario—. Ausente en la proyección de vencimiento, que no es un hecho
+   * ocurrido y se añade al final a propósito.
+   */
+  ocurrioEn?: string;
   /** Fecha y hora en que ocurrió, ya formateadas para leer. */
   cuando?: string;
   /** Quién lo hizo. Capturado en servidor, nunca lo que mande el cliente. */

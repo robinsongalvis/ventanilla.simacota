@@ -88,3 +88,68 @@ describe('el vencimiento no se disfraza de hecho', () => {
     expect(items.some((i) => i.tipo === 'VENCIMIENTO_CALCULADO')).toBe(false);
   });
 });
+
+/* ══════════════════════════════════════════════════════════════
+   EL HISTORIAL VA EN ORDEN — custodio del 3-sep-2026.
+
+   Lo cazó el propietario mirando un expediente en el ensayo: «La documentación
+   quedó completa · 8:29 a. m.» aparecía DESPUÉS de «Radicada en legal y debida
+   forma · 12:00 p. m.». El comentario del código prometía justo lo contrario
+   —«se inserta en su sitio cronológico, no al final: el historial cuenta una
+   historia y el orden es parte de lo que cuenta»— y el mecanismo no lo cumplía.
+
+   LA CAUSA: se ordenaba por `meta`, que es una fecha YA FORMATEADA
+   (`dd/mm/yyyy`). Con día de precisión, dos hechos del mismo día quedaban en
+   el orden en que se armó la lista; y entre meses distintos el orden salía
+   INVERTIDO, porque «01/09» va antes que «29/08» como texto y después como
+   calendario.
+
+   ALCANCE DECLARADO (ADR-0033 §4.6-bis). Esto MIRA: que los hechos salgan en
+   orden cronológico real, dentro del mismo día y a través de meses, con la
+   completitud en su sitio. NO mira: los títulos ni el lenguaje (arriba), ni la
+   maquetación.
+══════════════════════════════════════════════════════════════ */
+describe('el historial va en orden cronológico', () => {
+  it('dentro del MISMO día, la completitud cae en su sitio y no al final', () => {
+    const items = construirTimelineDesdeActuaciones(
+      [
+        base({ id: 'a1', tipo: 'apertura-expediente', fecha: '2026-09-01T13:25:00.000Z' }),
+        base({ id: 'a2', tipo: 'radicacion-debida-forma', fecha: '2026-09-01T17:00:00.000Z' }),
+      ],
+      'REAL',
+      null,
+      '2026-09-01T13:29:00.000Z',
+    );
+    const orden = items.filter((i) => i.tipo !== 'VENCIMIENTO_CALCULADO').map((i) => i.tipo);
+    expect(
+      orden.indexOf('COMPLETITUD'),
+      'la completitud (8:29) quedó fuera de su sitio entre la apertura (8:25) y la radicación (12:00)',
+    ).toBe(1);
+  });
+
+  it('a través de MESES, el orden es el del calendario y no el del texto', () => {
+    /* El caso que el formato dd/mm/yyyy invertía: «01/09» pesa menos que
+       «29/08» como cadena, y más como fecha. */
+    const items = construirTimelineDesdeActuaciones(
+      [base({ id: 'a1', tipo: 'radicacion-debida-forma', fecha: '2026-09-01T14:00:00.000Z' })],
+      'REAL',
+      null,
+      '2026-08-29T14:00:00.000Z',
+    );
+    const orden = items.filter((i) => i.tipo !== 'VENCIMIENTO_CALCULADO').map((i) => i.tipo);
+    expect(
+      orden[0],
+      'un hecho de agosto quedó DESPUÉS de uno de septiembre — se está ordenando por el texto de la fecha',
+    ).toBe('COMPLETITUD');
+  });
+
+  it('la proyección de vencimiento se queda al final: no es un hecho ocurrido', () => {
+    const items = construirTimelineDesdeActuaciones(
+      [base({ id: 'a1', tipo: 'radicacion-debida-forma', fecha: '2026-09-01T14:00:00.000Z' })],
+      'REAL',
+      new Date('2026-11-05T14:00:00.000Z'),
+      '2026-08-29T14:00:00.000Z',
+    );
+    expect(items.at(-1)?.tipo).toBe('VENCIMIENTO_CALCULADO');
+  });
+});

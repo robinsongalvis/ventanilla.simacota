@@ -103,6 +103,7 @@ export function construirTimelineDesdeActuaciones(
       /* La jerga entera, tal cual la escribió el servidor. Plegada. */
       detalleTecnico: a.detalle || undefined,
       meta: formatFechaColombia(a.fecha),
+      ocurrioEn: a.fecha,
     }));
 
   /* LA COMPLETITUD, que no es actuación pero sí es hecho. Se inserta en su sitio
@@ -115,8 +116,16 @@ export function construirTimelineDesdeActuaciones(
       cuando: formatFechaHoraColombia(completoDesde),
       resumen: 'Desde este día se ancla el plazo para resolver.',
       meta: formatFechaColombia(completoDesde),
+      ocurrioEn: completoDesde,
     });
-    items.sort((a, b) => (a.meta < b.meta ? -1 : a.meta > b.meta ? 1 : 0));
+    /* POR EL INSTANTE, no por la fecha formateada (3-sep-2026, cazado por el
+       propietario en el ensayo). El orden anterior comparaba `meta`, que es un
+       `dd/mm/yyyy` ya escrito para leer, y fallaba de dos maneras: con día de
+       precisión, la completitud caía al FINAL entre hechos del mismo día —que
+       es justo lo que el comentario de arriba promete que no pasa—; y entre
+       meses distintos el orden salía invertido, porque «01/09» va antes que
+       «29/08» como texto y después como calendario. */
+    items.sort((a, b) => (a.ocurrioEn ?? '').localeCompare(b.ocurrioEn ?? ''));
   }
 
   if (origenExpediente !== 'RECONSTRUIDO' && vigente) {
