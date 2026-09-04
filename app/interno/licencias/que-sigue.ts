@@ -76,7 +76,9 @@ const DESTINOS_CON_RUTA_PROPIA = new Set<string>(['RADICADA_EN_DEBIDA_FORMA']);
 /** Actuaciones que solo tienen sentido si ya hubo acta de observaciones. */
 const EXIGEN_ACTA_PREVIA = new Set<TipoActuacionPermitida>(['desistimiento-tacito', 'respuesta-subsanacion']);
 
-const ACCIONES_POR_DESTINO: Readonly<Record<string, AccionQueSigue[]>> = {
+/* EXPORTADO para que el custodio de alcanzabilidad contraste lo que la
+   pantalla OFRECE contra lo que el servidor ADMITE (issue #328). */
+export const ACCIONES_POR_DESTINO: Readonly<Record<string, AccionQueSigue[]>> = {
   EN_REVISION: [{
     tipo: 'inicio-revision',
     etiqueta: 'Iniciar revisión',
