@@ -642,6 +642,14 @@ export const DETALLE_ACTUACION_MIN = 15;
 export interface RegistrarActuacionInput {
   tipo: string;
   detalle: string;
+  /**
+   * ISO — el día en que el acta se comunicó al ciudadano, tal como la
+   * funcionaria lo declara (issue #327). El formulario lo pedía desde el
+   * principio y el servidor lo tiraba: solo lo usaba para imprimir una fecha
+   * en el correo. Ahora se PERSISTE, porque de él cuelgan los 30 días hábiles
+   * del ciudadano y la posibilidad de archivar por desistimiento.
+   */
+  fechaComunicacion?: string;
   /* Evidencia ESTRUCTURADA de los actos de cierre. No va en el detalle libre
      porque la constancia de ejecutoria tiene que poder volver a imprimirla y
      un dato dentro de una frase no se puede verificar. */
@@ -665,7 +673,10 @@ export interface PlanRegistrarActuacion {
  * se VALIDA contra ese mapa vía `puedeTransicionar` — nunca se asume válida
  * solo por estar aquí declarada.
  */
-const ESTADO_DESTINO_POR_TIPO_ACTUACION: Readonly<Record<TipoActuacionPermitida, EstadoJuridicoLicencia>> = {
+/* EXPORTADO para que su custodio (`cadena-de-cierre-alcanzable`) lo lea de
+   la fuente en vez de copiar la lista — copiarla sería reintroducir el
+   defecto del #328 dentro de la prueba que existe para impedirlo. */
+export const ESTADO_DESTINO_POR_TIPO_ACTUACION: Readonly<Record<TipoActuacionPermitida, EstadoJuridicoLicencia>> = {
   /* LA SALIDA DEL CALLEJÓN. Desde `RADICADA_EN_DEBIDA_FORMA` el mapa de
      transiciones solo permite `EN_REVISION` y `DESISTIDA`, y hasta el
      26-ago-2026 NINGUNA ruta escribía `EN_REVISION`. Consecuencia: el acta de
@@ -699,11 +710,29 @@ const ESTADO_DESTINO_POR_TIPO_ACTUACION: Readonly<Record<TipoActuacionPermitida,
   'firmeza': 'EN_FIRME',
 };
 
+/**
+ * ¿ES UN TIPO DE ACTUACIÓN QUE EL SISTEMA ADMITE?
+ *
+ * DERIVA DEL MAPA, no de una lista escrita a mano (3-sep-2026, issue #328).
+ *
+ * EL DEFECTO QUE LO OBLIGA: había DOS listas. `ESTADO_DESTINO_POR_TIPO_ACTUACION`
+ * declaraba los diez tipos con su estado destino; esta función enumeraba cuatro.
+ * Las seis que faltaban —conceder, negar, desistir por expreso o tácito,
+ * notificar y declarar en firme— quedaban RECHAZADAS: un expediente llegaba a
+ * `EN_VIABILIDAD` y ahí se quedaba para siempre, sin poder resolverse ni
+ * archivarse, y la constancia de ejecutoria nunca podía expedirse.
+ *
+ * Lo agravaban tres cosas: la pantalla OFRECÍA esas acciones como principales;
+ * el mensaje de error las ENUMERABA como admitidas (porque salía del mapa, no
+ * de aquí); y todas sus validaciones —evidencia de resolución, de notificación,
+ * de firmeza, y el guard del desistimiento tácito— estaban escritas DETRÁS de
+ * esta puerta, así que nunca habían corrido.
+ *
+ * Derivar del mapa hace imposible que las dos vuelvan a separarse: añadir un
+ * tipo al mapa lo habilita, y quitarlo lo deshabilita. Una sola verdad.
+ */
 function esTipoActuacionPermitida(tipo: string): tipo is TipoActuacionPermitida {
-  return tipo === 'inicio-revision'
-    || tipo === 'acta-observaciones'
-    || tipo === 'respuesta-subsanacion'
-    || tipo === 'acto-viabilidad';
+  return Object.prototype.hasOwnProperty.call(ESTADO_DESTINO_POR_TIPO_ACTUACION, tipo);
 }
 
 /**
@@ -819,9 +848,12 @@ export function planRegistrarActuacion(
        entre que el cron mira y el funcionario pulsa puede haber entrado la
        respuesta del ciudadano, y archivar sobre la foto de ayer cerraría una
        solicitud que hoy está viva. */
-    const acta = actuacionesExistentes.find((a) => a.tipo === 'acta-observaciones');
+    /* Del resolutor ÚNICO (issue #327). Antes leía `acta.fechaComunicacion`
+       directamente — un campo que nunca se persistía, así que este guard
+       SIEMPRE bloqueaba y el archivo por desistimiento era inalcanzable. */
+    const comunicada = fechaComunicacionDelActa(actuacionesExistentes);
     const err = procedeDesistimientoTacito({
-      fechaComunicacionActa: acta?.fechaComunicacion,
+      fechaComunicacionActa: comunicada?.fecha,
       huboRespuestaSubsanacion: actuacionesExistentes.some((a) => a.tipo === 'respuesta-subsanacion'),
       ahora,
     });
@@ -848,6 +880,10 @@ export function planRegistrarActuacion(
     fecha: ahora.toISOString(),
     origen: 'REAL',
     detalle: detalleLimpio,
+    /* SE PERSISTE (issue #327). Solo cuando viene: la ausencia se guarda como
+       ausencia — sin comunicación declarada no corre plazo contra el
+       ciudadano, y una fecha inventada aquí sería una que nadie declaró. */
+    ...(input.fechaComunicacion ? { fechaComunicacion: input.fechaComunicacion } : {}),
     ...(evidenciaCierre ? { evidenciaCierre } : {}),
   };
 
@@ -1356,6 +1392,51 @@ function esComunicacionDelActa(a: Pick<ActuacionLicenciaDoc, 'tipoComunicacion' 
 }
 
 /**
+ * ¿CUÁNDO SE COMUNICÓ EL ACTA AL CIUDADANO? — UNA sola respuesta (3-sep-2026).
+ *
+ * Es el hecho del que cuelga TODO lo demás: desde ahí corren los 30 días
+ * hábiles del ciudadano, y desde ahí se cuenta si procede archivar por
+ * desistimiento tácito.
+ *
+ * ── EL DEFECTO QUE LA OBLIGA (issue #327) ─────────────────────────────────
+ *
+ * El hecho se calculaba en DOS sitios y solo uno funcionaba: la pantalla lo
+ * tomaba de la actuación `comunicacion-enviada`, y el guard de archivo leía
+ * `acta.fechaComunicacion` — un campo que el formulario pedía, la funcionaria
+ * escribía y NADIE PERSISTÍA. Resultado: el archivo por desistimiento era
+ * inalcanzable, y no fallaba al registrar el acta sino meses después, cuando
+ * ya no había forma de aportar el dato.
+ *
+ * ── LA PRECEDENCIA, Y POR QUÉ ─────────────────────────────────────────────
+ *
+ * 1. Manda lo que la funcionaria DECLARÓ en el acta. La comunicación puede
+ *    haber sido personal, por edicto o por correo físico — canales que el
+ *    sistema no ve, y que la norma admite igual.
+ * 2. Si no declaró nada, vale el correo que el sistema SÍ envió: su actuación
+ *    `comunicacion-enviada` es evidencia de una comunicación real.
+ * 3. Si no hay ninguna de las dos, NO HAY HECHO. Y eso se dice, no se
+ *    inventa una fecha: sin comunicación probada no corre plazo contra el
+ *    ciudadano.
+ */
+export function fechaComunicacionDelActa(
+  actuaciones: Pick<ActuacionLicenciaDoc, 'tipo' | 'fecha' | 'fechaComunicacion' | 'tipoComunicacion' | 'detalle'>[],
+): { fecha: string; base: 'DECLARADA_EN_EL_ACTA' | 'CORREO_ENVIADO' } | null {
+  const ordenadas = [...actuaciones].sort((a, b) => new Date(a.fecha).getTime() - new Date(b.fecha).getTime());
+  const acta = [...ordenadas].reverse().find((a) => a.tipo === 'acta-observaciones');
+  if (!acta) return null;
+
+  if (acta.fechaComunicacion) {
+    return { fecha: acta.fechaComunicacion, base: 'DECLARADA_EN_EL_ACTA' };
+  }
+
+  const actaTime = new Date(acta.fecha).getTime();
+  const correo = ordenadas.find((a) => (
+    a.tipo === 'comunicacion-enviada' && new Date(a.fecha).getTime() >= actaTime && esComunicacionDelActa(a)
+  ));
+  return correo ? { fecha: correo.fecha, base: 'CORREO_ENVIADO' } : null;
+}
+
+/**
  * Evalúa si un expediente tiene un plazo de subsanación (desistimiento
  * tácito, art. 2.2.6.1.2.2.4) EN CURSO o VENCIDO, a partir de su
  * trazabilidad de actuaciones — PURA, sin I/O, sin escribir nada.
@@ -1391,12 +1472,13 @@ export function evaluarPlazoSubsanacion(
   const yaRespondio = ordenadas.some((a) => a.tipo === 'respuesta-subsanacion' && new Date(a.fecha).getTime() >= actaTime);
   if (yaRespondio) return { resultado: 'NO_APLICA' };
 
-  const comunicacion = ordenadas.find((a) => (
-    a.tipo === 'comunicacion-enviada' && new Date(a.fecha).getTime() >= actaTime && esComunicacionDelActa(a)
-  ));
-  if (!comunicacion) return { resultado: 'NO_APLICA' };
+  /* Del resolutor ÚNICO — la misma respuesta que usa el guard de archivo.
+     Antes esta función tenía su propia búsqueda y el guard la suya, y las dos
+     daban resultados distintos (issue #327). */
+  const comunicada = fechaComunicacionDelActa(ordenadas);
+  if (!comunicada) return { resultado: 'NO_APLICA' };
 
-  const fechaVencimientoPlazo = calcularFechaLimiteRespuestaActa(comunicacion.fecha);
+  const fechaVencimientoPlazo = calcularFechaLimiteRespuestaActa(comunicada.fecha);
   const diasHabilesRestantes = diasRestantesHabiles(fechaVencimientoPlazo, hoy);
   const resultado: ResultadoPlazoSubsanacion = diasHabilesRestantes < 0 ? 'POR_ARCHIVAR' : 'EN_PLAZO';
 
