@@ -36,6 +36,7 @@
  * las proyecciones crecen hasta dejar de ser proyecciones.
  */
 import type { ExpedienteLicenciaDoc } from './expedientes-licencias';
+import type { EstadoJuridicoLicencia } from '@/lib/motor-expedientes/estados-licencia';
 /* Las etiquetas legibles YA existen en el mapa de estilos del módulo de
    licencias, y son las que la funcionaria de Planeación ya ve. Se reutilizan en
    vez de escribir once labels paralelas: dos fuentes para el mismo texto
@@ -56,8 +57,15 @@ export const PLAZO_SIN_EMPEZAR = 'El plazo aún no ha empezado a correr.';
 
 export interface ProyeccionVentanilla {
   numeroExpediente: string | null;
-  /** Código del estado jurídico — para la interfaz, no para leérselo a nadie. */
-  estadoJuridico: string;
+  /**
+   * Código del estado jurídico — para la interfaz, no para leérselo a nadie.
+   *
+   * Va TIPADO, no como `string` suelto: el mostrador lo usa para leer el reloj
+   * con `leerElTermino`, la misma función que la tarjeta de Planeación. Con un
+   * `string` cualquiera, un estado mal escrito no lo vería el compilador y el
+   * mostrador clasificaría mal un plazo (ADR-0034).
+   */
+  estadoJuridico: EstadoJuridicoLicencia;
   /** El estado en palabras que el ciudadano entiende. */
   estadoLegible: string;
   /** ISO, o `null` si el plazo no ha empezado. */

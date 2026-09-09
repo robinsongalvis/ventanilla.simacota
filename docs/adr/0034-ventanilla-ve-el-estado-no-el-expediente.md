@@ -107,3 +107,70 @@ sin ellos.
   proyección se lee desde el detalle del radicado ya vinculado. Que el
   expediente figure en el listado es una decisión distinta, con efectos sobre
   los indicadores de cumplimiento.
+
+---
+
+## 8. Adenda — 9-sep-2026: el reloj se lee igual en las dos pantallas
+
+**Quién decide:** el propietario. Sus palabras: *«la idea es que concuerde uno
+con el otro independientemente»*.
+
+### 8.1 El defecto que la obliga
+
+La proyección se construyó entera el 26-ago —ruta de servidor, nueve casos de
+aislamiento por tenant, componente y prueba de render en verde— y **nadie llegó
+a verla nunca**. El bloque colgaba de `PanelGestionRadicado`, el panel de
+detalle anterior, que el «Sprint Panel claro» dejó sin un solo llamador. La
+prueba que lo cubría **renderizaba el panel muerto**: verde sobre algo que
+ningún usuario podía abrir.
+
+Es la familia que este proyecto ya conoce —verde por ausencia— en una superficie
+nueva: no un criterio olvidado en un sitio, sino una pantalla entera desconectada
+de su ruta.
+
+### 8.2 Qué se decide
+
+Ventanilla muestra, además de las fechas, **cuántos días hábiles faltan y en qué
+día del plazo va** (*«Quedan 39 días hábiles · día 6 de 45»*), y **la situación
+del reloj**: corriendo, detenido, ya decidido o sin empezar.
+
+**No es una ampliación de la proyección.** No entra ni un campo nuevo: los dos
+números se derivan de `estadoJuridico` y de las dos fechas que el §2 ya
+autorizó. La regla de ampliación del §3 protege contra *añadir datos*, no contra
+*presentar mejor* los que ya están concedidos.
+
+### 8.3 La garantía, y por qué es estructural
+
+Las dos pantallas llaman a `leerElTermino`
+(`lib/motor-expedientes/lectura-del-termino.ts`), que a su vez consume el mismo
+`clasificarFrenteAlTermino` que usa el cron. Una sola aritmética. El motivo es
+el del §6 llevado a su conclusión: si el mostrador restara por su cuenta, dos
+funcionarias podrían darle al mismo ciudadano dos plazos distintos, y se
+llevaría el que le tocara en suerte.
+
+El caso más caro que esto corrige no es un día de diferencia: es que un
+expediente **con acta de observaciones** —término suspendido por el
+D.1077/2015 art. 2.2.6.1.2.2.4— salía en Planeación como *«reloj detenido»* y en
+el mostrador como *«vence el …»*. El mostrador anunciaba un vencimiento que la
+norma había parado.
+
+### 8.4 Lo que NO se comparte, y es deliberado
+
+**Las palabras.** Planeación le dice a su técnico qué hacer —*«o sale la
+resolución, o sale el acta»*— y le nombra el riesgo de silencio administrativo
+positivo. Eso es deliberación interna y criterio jurídico en formación: sigue
+fuera del mostrador por el §3. Ventanilla dice **hechos** —cuántos días, hasta
+cuándo, si el reloj está parado—, que es lo que la funcionaria puede leerle al
+ciudadano. Lo que no puede divergir es el **número**.
+
+### 8.5 Custodia
+
+`__tests__/ventanilla-y-planeacion-concuerdan.test.tsx` monta **las dos**
+pantallas sobre un mismo expediente y compara. Y comprueba que el bloque siga
+**alcanzable desde la ruta**, calculando el cierre de imports desde
+`app/interno/dashboard/page.tsx` — porque lo que falló en agosto no fue que el
+componente no pintara, sino que nadie podía llegar a él, y eso es una propiedad
+del grafo, no del render.
+
+`PanelGestionRadicado` y su prueba se retiran: eran el código muerto donde se
+perdió la pantalla.

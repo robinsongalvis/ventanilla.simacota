@@ -77,6 +77,11 @@ import { CentroControlInterno }              from '@/app/interno/dashboard/compo
 import { InstitucionalHeader }               from '@/app/components/institucional/InstitucionalHeader';
 import { SelloRadicado }                     from '@/app/components/institucional/SelloRadicado';
 import { ResumenEjecutivoRadicado }          from '@/app/interno/dashboard/components/ResumenEjecutivoRadicado';
+/* ADR-0034 — ventanilla ve el ESTADO del trámite de licencia. Vivía colgado de
+   `PanelGestionRadicado`, el panel de detalle ANTERIOR, que el Sprint Panel
+   claro dejó sin un solo llamador: la proyección se construyó, se probó y se
+   aseguró, y nadie llegó nunca a verla. Cuelga del panel que sí se pinta. */
+import { EstadoTramiteLicencia }             from '@/app/interno/dashboard/components/pqrs/EstadoTramiteLicencia';
 import { BarraKpisOperativos }               from '@/app/interno/dashboard/components/BarraKpisOperativos';
 import { calcularKpisOperativos }            from '@/lib/kpis-operativos/calcular-kpis-operativos';
 import {
@@ -2259,6 +2264,12 @@ function PanelDerecho({
               radicado={radicado}
               ultimoEvento={ultimoEvento}
             />
+
+            {/* El bloque se pinta SOLO si el radicado está vinculado a un
+                expediente de licencia; para todo lo demás no existe. Va aquí
+                arriba a propósito: es lo que la funcionaria necesita cuando el
+                ciudadano ya está parado frente a ella preguntando. */}
+            <EstadoTramiteLicencia radicadoId={radicado.radicadoId} />
 
             <SelloRadicado
               variant="compact"
