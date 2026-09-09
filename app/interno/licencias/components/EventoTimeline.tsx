@@ -13,6 +13,9 @@ const COLOR_POR_TIPO: Record<EventoTimelineItem['tipo'], string> = {
   // una comunicación enviada es informativa, deliberadamente NO el verde de
   // éxito (Bloque A·A4/A5): no es un logro del trámite, es un aviso.
   COMUNICACION: 'var(--color-info)',
+  // Un papel que entra o cambia. Violeta: ni el verde de un logro del trámite
+  // ni el azul de la subsanación — es un hecho de archivo, no de decisión.
+  DOCUMENTO: '#7C3AED',
   // Punteado y GRIS, no rojo: ver abajo.
   VENCIMIENTO_CALCULADO: '#94A3B8',
 };

@@ -193,13 +193,19 @@ function fakeDb(datos: Record<string, Record<string, unknown>> = {}): { db: Fire
   return { db, tx, creados };
 }
 
+/* Expediente que TODAVÍA NO está radicado en debida forma: es el estado en que
+   ocurren estas subidas de intake, y en el que —a propósito— el movimiento
+   documental no deja línea en el historial. Los casos con ancla viven en
+   `historial-de-documentos.test.ts`. */
+const EXP_SIN_ANCLA = { id: 'exp-1', tenantId: 'SEC_PLANEACION', aportes: [], anclaDebidaForma: null };
+
 describe('planSubirDocumento — documento NUEVO (v0001)', () => {
   it('sin requisitoId: crea documento lógico nuevo con versión v0001', async () => {
     const { db, tx, creados } = fakeDb();
     const archivo = validarYPrepararArchivoDocumento({ buffer: PDF_BUFFER, mimeTypeDeclarado: 'application/pdf', nombreOriginal: 'anexo.pdf' });
     if (esErrorExpediente(archivo)) throw new Error('setup inválido');
 
-    const resultado = await planSubirDocumento(tx, db, 'exp-1', 'SEC_PLANEACION', [], { archivo }, ACTOR, AHORA);
+    const resultado = await planSubirDocumento(tx, db, EXP_SIN_ANCLA, { archivo }, ACTOR, AHORA);
 
     expect(resultado.documentoNuevo).toBe(true);
     expect(resultado.numeroVersion).toBe(1);
@@ -214,7 +220,7 @@ describe('planSubirDocumento — documento NUEVO (v0001)', () => {
     if (esErrorExpediente(archivo)) throw new Error('setup inválido');
 
     const resultado = await planSubirDocumento(
-      tx, db, 'exp-1', 'SEC_PLANEACION', [], { archivo, requisitoId: 'certificado-tradicion-libertad' }, ACTOR, AHORA,
+      tx, db, EXP_SIN_ANCLA, { archivo, requisitoId: 'certificado-tradicion-libertad' }, ACTOR, AHORA,
     );
 
     expect(resultado.aportesActualizados).toEqual([
@@ -236,7 +242,7 @@ describe('planSubirDocumento — SEGUNDA versión (v0002) sobre un documento exi
 
     const aportesActuales = [{ requisitoId: 'certificado-tradicion-libertad', estado: 'APORTADO' as const, documentoIds: ['doc-1'] }];
     const resultado = await planSubirDocumento(
-      tx, db, 'exp-1', 'SEC_PLANEACION', aportesActuales, { archivo, requisitoId: 'certificado-tradicion-libertad' }, ACTOR, AHORA,
+      tx, db, { ...EXP_SIN_ANCLA, aportes: aportesActuales }, { archivo, requisitoId: 'certificado-tradicion-libertad' }, ACTOR, AHORA,
     );
 
     expect(resultado.documentoNuevo).toBe(false);

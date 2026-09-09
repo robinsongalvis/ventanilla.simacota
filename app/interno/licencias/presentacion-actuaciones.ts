@@ -8,6 +8,11 @@
  */
 
 import type { Actuacion, OrigenActuacion } from '@/lib/motor-expedientes/tipos';
+/* Type-only: se borra al compilar, así que NO arrastra `firebase-admin` al
+   navegador. Mismo camino que ya usa `DetalleLicenciaClient.tsx`. Se importa el
+   tipo en vez de redeclararlo aquí: dos definiciones del mismo dato acaban
+   divergiendo, y esta lleva un hash que tiene que ser el mismo. */
+import type { EvidenciaDocumento } from '@/lib/server/expedientes-licencias';
 import { formatFechaColombia } from '@/lib/fecha-colombia';
 import { PREFIJO_AVISO_ACTA_COMUNICACION } from '@/lib/motor-expedientes/comunicaciones-licencia';
 import type { EventoTimelineItem } from './tipos';
@@ -28,6 +33,12 @@ export const TITULO_ACTUACION: Record<string, string> = {
   'acta-observaciones': 'Acta de observaciones',
   'respuesta-subsanacion': 'Respuesta de subsanación',
   'modificacion-solicitud': 'Modificación de la solicitud',
+  /* EL CAMBIO DE UN PAPEL ES UN HECHO (9-sep-2026). Hasta hoy subir o
+     reemplazar un documento no dejaba ni una línea aquí: el propietario lo
+     probó y no encontró nada. Se distinguen los dos verbos porque no dicen lo
+     mismo — aportar añade, reemplazar SUSTITUYE lo que ya se estaba evaluando. */
+  'documento-aportado': 'Se aportó un documento',
+  'documento-reemplazado': 'Se reemplazó un documento',
 };
 
 export const TIPO_TIMELINE: Record<string, EventoTimelineItem['tipo']> = {
@@ -39,6 +50,8 @@ export const TIPO_TIMELINE: Record<string, EventoTimelineItem['tipo']> = {
   'respuesta-subsanacion': 'SUBSANACION',
   'modificacion-solicitud': 'SUBSANACION',
   'comunicacion-enviada': 'COMUNICACION',
+  'documento-aportado': 'DOCUMENTO',
+  'documento-reemplazado': 'DOCUMENTO',
 };
 
 /**
@@ -146,6 +159,18 @@ export function construirTimelineDesdeActuaciones(
 /** Lo que importa del hecho, compuesto de CAMPOS estructurados. */
 function resumenDe(a: Actuacion): string | undefined {
   if (a.tipo === 'apertura-expediente') return undefined;
+
+  /* DE `evidenciaDocumento`, NO DE `detalle`. El detalle trae la misma
+     información en prosa para el auditor, pero componer el resumen partiéndolo
+     sería frágil: el día que alguien cambie una coma, el resumen miente. Ese es
+     el motivo por el que la evidencia viaja estructurada. */
+  const evidencia = (a as { evidenciaDocumento?: EvidenciaDocumento }).evidenciaDocumento;
+  if (evidencia) {
+    return evidencia.numeroVersion > 1
+      ? `«${evidencia.nombre}» — ahora en la versión ${evidencia.numeroVersion}. La versión anterior se conserva.`
+      : `«${evidencia.nombre}».`;
+  }
+
   return undefined;
 }
 

@@ -57,8 +57,16 @@ export interface FilaLicencia {
 
 /** Evento mostrado en `EventoTimeline` (Pantalla 02, panel historial). */
 export interface EventoTimelineItem {
-  /** `COMUNICACION` (Bloque A·A4/A5): constancia o aviso de acta enviados al ciudadano — tono INFORMATIVO, nunca el verde de éxito de `RADICACION`. */
-  tipo: 'RADICACION' | 'ACTA' | 'SUBSANACION' | 'VENCIMIENTO_CALCULADO' | 'COMUNICACION' | 'APERTURA' | 'COMPLETITUD';
+  /**
+   * `COMUNICACION` (Bloque A·A4/A5): constancia o aviso de acta enviados al
+   * ciudadano — tono INFORMATIVO, nunca el verde de éxito de `RADICACION`.
+   *
+   * `DOCUMENTO` (9-sep-2026): un papel entró o se reemplazó. Tono propio y no
+   * `SUBSANACION`, que era donde caía por defecto: una subsanación responde a
+   * un acta y mueve el reloj; cambiar un documento no hace ninguna de las dos
+   * cosas, y pintarlos igual haría creer que sí.
+   */
+  tipo: 'RADICACION' | 'ACTA' | 'SUBSANACION' | 'VENCIMIENTO_CALCULADO' | 'COMUNICACION' | 'APERTURA' | 'COMPLETITUD' | 'DOCUMENTO';
   /** En lenguaje de persona: «Se abrió el expediente», no `apertura-expediente`. */
   titulo: string;
   meta: string;

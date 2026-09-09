@@ -1,4 +1,4 @@
-import { createHash } from 'node:crypto';
+import { createHash, randomUUID } from 'node:crypto';
 import type { DocumentReference, Firestore, Transaction } from 'firebase-admin/firestore';
 import { verificarMagicBytes, tiposPermitidosMagicBytes } from '@/lib/seguridad/magic-bytes';
 import { sanitizeFilename } from '@/lib/server/radicados-security';
@@ -12,7 +12,11 @@ import {
 } from '@/lib/server/expedientes-documentos-tipos';
 import { requisitoAplica } from '@/lib/motor-expedientes/completitud';
 import type { AporteRequisito, ContextoEvaluacionRequisito, DefinicionTramite } from '@/lib/motor-expedientes/tipos';
-import type { ErrorExpediente, ActorExpediente } from '@/lib/server/expedientes-licencias';
+import type {
+  ErrorExpediente,
+  ActorExpediente,
+  ActuacionLicenciaDoc,
+} from '@/lib/server/expedientes-licencias';
 
 /* ══════════════════════════════════════════════════════════════
    Lógica de DECISIÓN de documentos de expediente (D7) — Bloque A·A2.
@@ -172,6 +176,130 @@ export interface PlanSubirDocumento {
   numeroVersion: number;
   /** Aportes resultantes del expediente, listos para `tx.update` — solo se incluye si `requisitoId` estaba presente. */
   aportesActualizados?: AporteRequisito[];
+  /**
+   * La actuación escrita en el historial, si correspondía escribirla (solo
+   * desde la radicación en debida forma). Se devuelve para que el caller pueda
+   * responderla y para que las pruebas la vean sin espiar la transacción.
+   */
+  actuacion?: ActuacionLicenciaDoc;
+}
+
+/* ══════════════════════════════════════════════════════════════════════════
+   EL MOVIMIENTO DE UN DOCUMENTO ES UN HECHO DEL EXPEDIENTE
+
+   ── EL DEFECTO QUE ESTO CIERRA ────────────────────────────────────────────
+
+   Hasta el 9-sep-2026 subir, reemplazar o actualizar un documento NO dejaba
+   rastro alguno en el historial: la ruta de documentos no escribía ni una
+   actuación. Lo probó el propietario y no encontró nada.
+
+   Las VERSIONES sí se guardaban —`documentos/{id}/versiones/vNNNN`, ninguna se
+   borra jamás—, así que la evidencia nunca se perdió. Lo que faltaba era el
+   HECHO: cuándo cambió, quién lo cambió y a qué versión. Sin eso, un
+   expediente no puede responder la pregunta que un juez hace primero cuando
+   una licencia se demanda: «¿cuál plano evaluó la Secretaría?».
+
+   ── DESDE CUÁNDO SE REGISTRA, Y POR QUÉ NO ANTES ──────────────────────────
+
+   Desde la RADICACIÓN EN DEBIDA FORMA. Antes de ese hito el ciudadano todavía
+   está armando su solicitud: registrar los dieciocho documentos del intake
+   como dieciocho hechos ahogaría los cinco o seis que de verdad cuentan. Desde
+   la debida forma el contenido documental está fijado y cualquier cambio
+   importa — que es exactamente lo que el propietario pidió ver.
+
+   Las versiones anteriores a ese hito siguen guardándose igual: lo que no se
+   escribe es la línea del historial, no el archivo.
+
+   ── ESTO NO MUEVE EL RELOJ, Y ES DELIBERADO ───────────────────────────────
+
+   Ninguno de los dos slugs está en `SLUG_A_TIPO_EVENTO`
+   (`lib/motor-expedientes/termino.ts`), así que `derivarEventosTermino` los
+   ignora por construcción. No es un olvido: la norma no suspende el término
+   porque se cambie un papel, y el propio `MODIFICACION_SOLICITUD` está
+   declarado inerte por el mismo motivo. Cambiar un documento deja huella
+   archivística; no detiene un plazo.
+
+   ── ALCANCE DECLARADO (ADR-0033 §4.6-bis) ─────────────────────────────────
+
+   Esto MIRA: los documentos que ENTRAN (aporte nuevo y reemplazo por versión
+   nueva), desde la debida forma en adelante.
+   Esto NO MIRA: el intake previo a la debida forma; el retiro de un documento
+   —hoy no existe ninguna ruta que borre, así que no hay hecho que registrar—;
+   ni los cambios de `contexto` o del checklist, que no son documentos.
+══════════════════════════════════════════════════════════════════════════ */
+
+/** Primer aporte de un documento lógico. */
+export const SLUG_DOCUMENTO_APORTADO = 'documento-aportado';
+/** Versión nueva sobre un documento que ya existía — el CAMBIO. */
+export const SLUG_DOCUMENTO_REEMPLAZADO = 'documento-reemplazado';
+
+/**
+ * La actuación que deja constancia del movimiento. PURA: se puede probar sin
+ * Firestore, y el caller decide si la escribe.
+ *
+ * `detalle` es prosa para el auditor; todo lo verificable viaja en
+ * `evidenciaDocumento`. El resumen que lee la funcionaria se compone de esos
+ * campos, nunca partiendo esta frase.
+ */
+export function construirActuacionMovimientoDocumento(
+  expedienteId: string,
+  tenantId: string,
+  evidencia: { documentoId: string; nombre: string; numeroVersion: number; requisitoId?: string; hashSha256: string },
+  actor: ActorExpediente,
+  ahora: Date,
+): ActuacionLicenciaDoc {
+  const esReemplazo = evidencia.numeroVersion > 1;
+  return {
+    id: randomUUID(),
+    expedienteId,
+    tenantId,
+    tipo: esReemplazo ? SLUG_DOCUMENTO_REEMPLAZADO : SLUG_DOCUMENTO_APORTADO,
+    etapa: 'documentacion',
+    actorUid: actor.uid,
+    actorNombre: actor.nombre,
+    actorRol: actor.rol,
+    fecha: ahora.toISOString(),
+    origen: 'REAL',
+    evidenciaDocumento: {
+      documentoId: evidencia.documentoId,
+      nombre: evidencia.nombre,
+      numeroVersion: evidencia.numeroVersion,
+      ...(evidencia.requisitoId ? { requisitoId: evidencia.requisitoId } : {}),
+      hashSha256: evidencia.hashSha256,
+    },
+    detalle: esReemplazo
+      ? `Se reemplazó el documento "${evidencia.nombre}" con una versión nueva (v${evidencia.numeroVersion}). La versión anterior se conserva.`
+      : `Se aportó el documento "${evidencia.nombre}".`,
+  };
+}
+
+/**
+ * ¿Este movimiento deja constancia en el historial? Solo desde la radicación
+ * en debida forma — ver el bloque de arriba.
+ *
+ * Función propia y no un `if` en línea porque es la REGLA, y una regla que
+ * vive dentro de otra función no se puede probar ni encontrar.
+ */
+export function registraMovimientoEnHistorial(anclaDebidaForma: string | null | undefined): boolean {
+  return Boolean(anclaDebidaForma);
+}
+
+/**
+ * Lo que la subida necesita saber del expediente.
+ *
+ * Va como OBJETO y no como tres parámetros sueltos por una razón concreta: al
+ * añadir `anclaDebidaForma` la función habría llegado a nueve posicionales, y
+ * —más importante— siendo un campo del objeto, el compilador OBLIGA a cada
+ * llamador nuevo a decidir si este expediente ya está radicado. Un opcional
+ * habría dejado que un llamador futuro se olvidara y perdiera el rastro sin
+ * que nada avisara: la misma familia de defecto que este cambio viene a cerrar.
+ */
+export interface ExpedienteParaSubida {
+  id: string;
+  tenantId: string;
+  aportes: AporteRequisito[];
+  /** ISO de la radicación en debida forma, o `null` si todavía no ocurrió. */
+  anclaDebidaForma: string | null;
 }
 
 /**
@@ -204,13 +332,12 @@ export interface PlanSubirDocumento {
 export async function planSubirDocumento(
   tx: Transaction,
   db: Firestore,
-  expedienteId: string,
-  tenantId: string,
-  aportesActuales: AporteRequisito[],
+  expediente: ExpedienteParaSubida,
   input: SubirDocumentoInput,
   actor: ActorExpediente,
   ahora: Date,
 ): Promise<PlanSubirDocumento> {
+  const { id: expedienteId, tenantId, aportes: aportesActuales } = expediente;
   const documentosCol = () => db.collection(`expedientes/${expedienteId}/${SUBCOLECCION_DOCUMENTOS}`);
   const nowIso = ahora.toISOString();
 
@@ -295,5 +422,28 @@ export async function planSubirDocumento(
       : [...aportesActuales, { requisitoId: input.requisitoId, estado: 'APORTADO' as const, documentoIds: [documentoId] }];
   }
 
-  return { storagePathFinal, documentoNuevo, documentoId, numeroVersion, aportesActualizados };
+  /* EL HECHO, EN LA MISMA TRANSACCIÓN QUE LA VERSIÓN. No después: si se
+     escribiera fuera, un fallo entre las dos dejaría una versión sin historial
+     —o un historial que anuncia una versión que no existe—, y el expediente
+     mentiría sobre su propio contenido en el momento exacto en que más
+     importa. */
+  let actuacion: ActuacionLicenciaDoc | undefined;
+  if (registraMovimientoEnHistorial(expediente.anclaDebidaForma)) {
+    actuacion = construirActuacionMovimientoDocumento(
+      expedienteId,
+      tenantId,
+      {
+        documentoId,
+        nombre: nombreDocumento,
+        numeroVersion,
+        ...(requisitoIdDocumento ? { requisitoId: requisitoIdDocumento } : {}),
+        hashSha256: input.archivo.hashSha256,
+      },
+      actor,
+      ahora,
+    );
+    tx.create(db.collection(`expedientes/${expedienteId}/actuaciones`).doc(actuacion.id), actuacion);
+  }
+
+  return { storagePathFinal, documentoNuevo, documentoId, numeroVersion, aportesActualizados, actuacion };
 }
