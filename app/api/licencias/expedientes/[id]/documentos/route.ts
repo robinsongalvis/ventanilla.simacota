@@ -137,9 +137,15 @@ export async function POST(request: Request, context: RouteContext): Promise<Nex
       return planSubirDocumento(
         tx,
         db,
-        id,
-        expediente.tenantId,
-        expediente.aportes ?? [],
+        {
+          id,
+          tenantId: expediente.tenantId,
+          aportes: expediente.aportes ?? [],
+          /* Desde este hito —y solo desde él— cada movimiento documental deja
+             constancia en el historial. Antes, el ciudadano todavía está
+             armando su solicitud. */
+          anclaDebidaForma: expediente.fechaRadicacionDebidaForma ?? null,
+        },
         { archivo: archivoValidado, requisitoId, nombre },
         { uid: usuario.uid, nombre: usuario.nombre, rol: usuario.rol },
         ahora,

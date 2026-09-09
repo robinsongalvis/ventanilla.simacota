@@ -261,6 +261,11 @@ export interface ActuacionLicenciaDoc extends Actuacion {
   /** ISO — día en que el acta se COMUNICÓ al ciudadano; de ahí corre el plazo de subsanación. */
   fechaComunicacion?: string;
   /**
+   * Presente SOLO en las actuaciones de movimiento documental
+   * (`documento-aportado` / `documento-reemplazado`). Ver `EvidenciaDocumento`.
+   */
+  evidenciaDocumento?: EvidenciaDocumento;
+  /**
    * Presente SOLO en actuaciones `tipo: 'comunicacion-enviada'` — el tipo
    * ESTRUCTURADO de la comunicación (p. ej. "Aviso de acta de observaciones
    * y correcciones", "Acuse de recibo de solicitud").
@@ -610,6 +615,34 @@ export type TipoActuacionPermitida =
   | 'desistimiento-tacito'
   | 'notificacion'
   | 'firmeza';
+
+/**
+ * QUÉ DOCUMENTO SE MOVIÓ — evidencia estructurada de un aporte o un reemplazo
+ * después de la radicación en debida forma.
+ *
+ * ── POR QUÉ ESTÁ AQUÍ Y NO DENTRO DE UNA FRASE ───────────────────────────
+ *
+ * Misma doctrina que `EvidenciaCierre`: un dato dentro de `detalle` no se
+ * puede verificar. Y aquí hay uno que es la razón de ser de todo esto — el
+ * `hashSha256`. Cuando dentro de dos años alguien demande la licencia y
+ * pregunte «¿cuál plano evaluó la Secretaría?», la respuesta no puede ser una
+ * frase: tiene que ser una huella que se contraste contra el archivo.
+ *
+ * El `numeroVersion` es lo que distingue el aporte del REEMPLAZO. La versión
+ * anterior nunca se borra —vive en `documentos/{id}/versiones/vNNNN`—, así que
+ * este rastro no guarda el documento: guarda CUÁNDO cambió y a cuál.
+ */
+export interface EvidenciaDocumento {
+  documentoId: string;
+  /** Nombre legible del documento lógico, tal como lo ve la funcionaria. */
+  nombre: string;
+  /** 1 en el primer aporte; 2, 3… en cada reemplazo. */
+  numeroVersion: number;
+  /** Requisito del checklist al que responde, si responde a alguno. */
+  requisitoId?: string;
+  /** La huella de los bytes — lo que permite probar QUÉ archivo se evaluó. */
+  hashSha256: string;
+}
 
 /** Los tres bloques de evidencia de cierre; cada actuación llena el suyo. */
 export interface EvidenciaCierre {
