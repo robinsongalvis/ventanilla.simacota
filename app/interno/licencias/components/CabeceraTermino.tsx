@@ -1,13 +1,15 @@
 'use client';
 
 import {
-  clasificarFrenteAlTermino,
   COLOR_NIVEL_TERMINO,
-  PLAZO_DECISION_LICENCIA_DIAS_HABILES,
   type NivelTermino,
 } from '@/lib/motor-expedientes/semaforo-termino';
+/* LOS NÚMEROS NO SE CALCULAN AQUÍ. Desde el 9-sep-2026 los comparte
+   `leerElTermino` con la proyección de ventanilla (ADR-0034): si esta tarjeta
+   volviera a hacer su propia aritmética, el mostrador y Planeación podrían
+   decirle al mismo ciudadano dos plazos distintos. */
+import { leerElTermino } from '@/lib/motor-expedientes/lectura-del-termino';
 import type { EstadoJuridicoLicencia } from '@/lib/motor-expedientes/estados-licencia';
-import { diasRestantesHabiles } from '@/lib/tiempos-radicado';
 import { formatFechaColombia } from '@/lib/fecha-colombia';
 
 /* ══════════════════════════════════════════════════════════════
@@ -77,13 +79,7 @@ const MENSAJE: Record<'EN_TERMINO' | NivelTermino, { texto: string; estado: stri
 const VERDE_EN_TERMINO = '#116932';
 
 export function CabeceraTermino({ venceIso, desdeIso, estadoJuridico, expedienteId }: CabeceraTerminoProps) {
-  const fila = clasificarFrenteAlTermino(
-    /* `creadoEn` solo lo usa la rama SIN_ANCLAR, inalcanzable aquí porque
-       `venceIso` existe; se pasa el vencimiento como relleno para no fingir un
-       ancla que puede no haber. */
-    { id: expedienteId, estadoJuridico, creadoEn: desdeIso ?? venceIso, fechaAlertaConservadora: venceIso },
-    new Date(),
-  );
+  const lectura = leerElTermino({ expedienteId, estadoJuridico, venceIso, desdeIso });
 
   /* ── EL RELOJ DETENIDO SE VE. ─────────────────────────────────────────
      Antes, con el término suspendido, esta tarjeta DESAPARECÍA. Y desaparecer
@@ -99,7 +95,7 @@ export function CabeceraTermino({ venceIso, desdeIso, estadoJuridico, expediente
      quedaban al congelarse depende de la serie de eventos, y el servidor
      todavía no manda ese dato. Inventarlo aquí sería peor que no darlo. Se
      dice lo que se sabe con certeza: que está detenido y por qué. */
-  if (fila.situacion === 'SUSPENDIDO') {
+  if (lectura.situacion === 'SUSPENDIDO') {
     return (
       <div
         className="rounded-xl overflow-hidden"
@@ -141,16 +137,11 @@ export function CabeceraTermino({ venceIso, desdeIso, estadoJuridico, expediente
 
   /* Sin ancla o ya resuelto: el panel de abajo lo dice con sus palabras;
      inventarles un anillo afirmaría un reloj que no existe. */
-  if (fila.situacion !== 'CORRIENDO') return null;
+  if (lectura.situacion !== 'CORRIENDO') return null;
 
-  const restantes = fila.diasHabilesRestantes ?? diasRestantesHabiles(venceIso);
-  const nivel = fila.nivel ?? 'EN_TERMINO';
+  const { diasHabilesRestantes: restantes, nivel, vencido, diaTranscurrido: transcurridos, porcentaje } = lectura;
   const m = MENSAJE[nivel];
   const acento = nivel === 'EN_TERMINO' ? VERDE_EN_TERMINO : COLOR_NIVEL_TERMINO[nivel];
-  const vencido = nivel === 'VENCIDO';
-
-  const transcurridos = Math.max(0, PLAZO_DECISION_LICENCIA_DIAS_HABILES - Math.max(0, restantes));
-  const porcentaje = Math.min(100, Math.round((transcurridos / PLAZO_DECISION_LICENCIA_DIAS_HABILES) * 100));
 
   const R = 30;
   const circunferencia = 2 * Math.PI * R;
@@ -193,7 +184,7 @@ export function CabeceraTermino({ venceIso, desdeIso, estadoJuridico, expediente
               {desdeIso
                 ? `${vencido ? 'Corría' : 'Corre'} desde el ${formatFechaColombia(desdeIso)}`
                 : 'Sin ancla registrada'}
-              {!vencido && ` · día ${transcurridos} de ${PLAZO_DECISION_LICENCIA_DIAS_HABILES}`}
+              {!vencido && ` · día ${transcurridos} de ${lectura.totalDias}`}
             </p>
           </div>
         </div>

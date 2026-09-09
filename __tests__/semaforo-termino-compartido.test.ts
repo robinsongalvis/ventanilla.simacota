@@ -85,9 +85,26 @@ describe('nadie reimplementa el criterio', () => {
   const soloCodigo = (t: string) => t.replace(/\/\*[\s\S]*?\*\//g, '').replace(/^\s*\/\/.*$/gm, '');
   const TARJETA = soloCodigo(readFileSync('app/interno/licencias/components/CabeceraTermino.tsx', 'utf8'));
   const CRON = soloCodigo(readFileSync('app/api/cron/vencimientos-licencias/route.ts', 'utf8'));
+  const LECTURA = soloCodigo(readFileSync('lib/motor-expedientes/lectura-del-termino.ts', 'utf8'));
 
-  it('la pantalla LLAMA a la función compartida', () => {
-    expect(TARJETA).toMatch(/clasificarFrenteAlTermino\(/);
+  it('la pantalla LLAMA a la lectura compartida, y esa llama al clasificador', () => {
+    /* Desde el 9-sep-2026 la tarjeta ya no clasifica de primera mano: consume
+       `leerElTermino`, que es también lo que consume el mostrador (ADR-0034).
+       La cadena se custodia entera — si la tarjeta volviera a clasificar por su
+       cuenta, podría acabar mostrando un número distinto del que ve ventanilla
+       sobre el mismo expediente. */
+    expect(TARJETA).toMatch(/leerElTermino\(/);
+    expect(LECTURA).toMatch(/clasificarFrenteAlTermino\(/);
+  });
+
+  it('y la pantalla NO rehace la aritmética de los días', () => {
+    /* El defecto que esto previene: «39 días hábiles · día 6 de 45» en
+       Planeación y «38 días» en el mostrador, del MISMO expediente, delante del
+       ciudadano. Los dos números salen de una sola resta o no salen. */
+    expect(TARJETA, 'la tarjeta volvió a restar los días por su cuenta')
+      .not.toMatch(/PLAZO_DECISION_LICENCIA_DIAS_HABILES\s*-/);
+    expect(TARJETA, 'la tarjeta volvió a contar días hábiles por su cuenta')
+      .not.toMatch(/diasRestantesHabiles\(/);
   });
 
   it('y NO declara umbrales propios', () => {
