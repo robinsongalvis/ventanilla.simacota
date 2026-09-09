@@ -134,6 +134,12 @@ export async function POST(request: Request, context: RouteContext): Promise<Nex
       {
         tipo: body?.tipo ?? '',
         detalle: body?.detalle ?? '',
+        /* EL ESLABÓN QUE FALTABA (issue #327). Este campo llegaba en el body,
+           se usaba para imprimir una fecha en el correo, y nunca se pasaba al
+           plan — así que nunca se guardaba. La funcionaria lo escribía y el
+           sistema lo botaba; meses después, al ir a archivar por
+           desistimiento, no constaba. */
+        fechaComunicacion: body?.fechaComunicacion,
         /* La evidencia de cierre viaja TAL CUAL: el planificador la valida y
            rechaza con el motivo. La ruta no la interpreta ni la completa. */
         resolucion: body?.resolucion,
