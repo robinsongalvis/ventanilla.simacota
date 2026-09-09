@@ -54,20 +54,39 @@ describe('el plazo todavía no corre', () => {
 });
 
 describe('el plazo corre', () => {
+  /* Las fechas van en DD/MM/AAAA, el MISMO formato de la tarjeta de Planeación
+     (`formatFechaColombia`). No es cosmética: el 9-sep-2026 el propietario pidió
+     que las dos pantallas concuerden, y comparar «24/10/2026» con «24 de octubre
+     de 2026» obliga a la funcionaria a traducir mentalmente delante del
+     ciudadano. */
+  const corriendo = () => ({
+    tieneExpediente: true,
+    proyeccion: proyeccion({
+      estadoJuridico: 'RADICADA_EN_DEBIDA_FORMA',
+      estadoLegible: 'Radicada en debida forma',
+      fechaRadicacionDebidaForma: '2026-08-20T12:00:00Z',
+      venceEl: '2026-10-24T12:00:00Z',
+      avisoPlazo: null,
+    }),
+  });
+
   it('da las dos fechas: desde cuándo y hasta cuándo', async () => {
-    responder({
-      tieneExpediente: true,
-      proyeccion: proyeccion({
-        estadoLegible: 'Radicada en debida forma',
-        fechaRadicacionDebidaForma: '2026-08-20T12:00:00Z',
-        venceEl: '2026-10-24T12:00:00Z',
-        avisoPlazo: null,
-      }),
-    });
+    responder(corriendo());
     render(<EstadoTramiteLicencia radicadoId="rad-1" />);
-    await waitFor(() => expect(document.body.textContent).toMatch(/20 de agosto de 2026/));
-    expect(document.body.textContent).toMatch(/24 de octubre de 2026/);
+    await waitFor(() => expect(document.body.textContent).toMatch(/20\/08\/2026/));
+    expect(document.body.textContent).toMatch(/24\/10\/2026/);
     expect(document.body.textContent).toMatch(/Radicada en debida forma/);
+  });
+
+  it('y dice cuántos días faltan — la pregunta que el ciudadano hace de verdad', async () => {
+    /* Hasta el 9-sep-2026 este bloque daba las fechas y nada más, mientras
+       Planeación mostraba la cuenta atrás. La funcionaria del mostrador tenía
+       que restar días hábiles de cabeza, con festivos incluidos. */
+    responder(corriendo());
+    render(<EstadoTramiteLicencia radicadoId="rad-1" />);
+    await waitFor(() =>
+      expect(document.body.textContent).toMatch(/Quedan \d+ días hábiles · día \d+ de 45/),
+    );
   });
 });
 
