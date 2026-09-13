@@ -41,6 +41,7 @@ const VENCE = '2026-11-03T12:00:00.000Z';
 const termino = (over: Partial<TerminoUI> = {}): TerminoUI => ({
   fechaAlertaConservadora: VENCE,
   fundamento: FUNDAMENTO_SUSPENSION_REANUDACION,
+  relojDetenido: null,
   ...over,
 });
 

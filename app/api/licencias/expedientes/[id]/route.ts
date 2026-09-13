@@ -142,6 +142,10 @@ export async function GET(request: Request, context: RouteContext): Promise<Next
     const terminoDual = {
       fechaAlertaConservadora: vencimientoTermino.vencimiento?.toISOString() ?? null,
       fundamento: vencimientoTermino.fundamento,
+      /* EL RELOJ DETENIDO, CON SUS NÚMEROS. Los calculaba el motor y los tiraba;
+         ahora llegan a la pantalla, que hasta hoy decía «detenido» sin poder
+         decir desde cuándo ni cuánto quedaba. */
+      relojDetenido: vencimientoTermino.relojDetenido,
     };
 
     const plazoSubsanacion = evaluarPlazoSubsanacion(actuacionesLicencia, new Date());

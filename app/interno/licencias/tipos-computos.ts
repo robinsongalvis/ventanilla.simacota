@@ -21,8 +21,9 @@
 
 import type { EvaluacionPlazoSubsanacion, BorradorActoDesistimiento } from '@/lib/server/expedientes-licencias';
 import type { ErrorVigencia, ReglaVigencia } from '@/lib/motor-expedientes/vigencias';
+import type { RelojDetenido } from '@/lib/motor-expedientes/termino';
 
-export type { EvaluacionPlazoSubsanacion, BorradorActoDesistimiento };
+export type { EvaluacionPlazoSubsanacion, BorradorActoDesistimiento, RelojDetenido };
 
 /** `VencimientoDual` (`lib/motor-expedientes/termino.ts`) tras `NextResponse.json`. */
 /**
@@ -39,6 +40,14 @@ export interface TerminoUI {
   fechaAlertaConservadora: string | null;
   /** El artículo que sostiene el cómputo, para citarlo en vez de explicar dudas. */
   fundamento: string;
+  /**
+   * El reloj detenido, con sus números — `null` si está corriendo.
+   *
+   * `RelojDetenido` ya declara su fecha como `desdeIso: string`, así que cruza
+   * `NextResponse.json` sin cambiar de forma y se reutiliza tal cual, sin
+   * redeclarar (mismo criterio que `EvaluacionPlazoSubsanacion`).
+   */
+  relojDetenido: RelojDetenido | null;
 }
 
 /** @deprecated Nombre anterior. Se conserva para no romper llamadores externos. */
