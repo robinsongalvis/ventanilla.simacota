@@ -45,6 +45,12 @@ import { calcularVencimientoTermino, derivarEventosTermino } from '@/lib/motor-e
    para que la pantalla también pueda usarla sin arrastrar servidor. Quien ya la
    importaba desde aquí sigue funcionando. */
 import { PLAZO_DECISION_LICENCIA_DIAS_HABILES } from '@/lib/motor-expedientes/semaforo-termino';
+import {
+  calcularPlazoSubsanacion,
+  prorrogaLlegaATiempo,
+  SLUG_PRORROGA_SUBSANACION,
+  type ProrrogaDescartada,
+} from '@/lib/motor-expedientes/plazo-subsanacion';
 import { resolverDestinatario, type ContactoCapturado } from '@/lib/motor-expedientes/destinatario-expediente';
 export { PLAZO_DECISION_LICENCIA_DIAS_HABILES };
 
@@ -265,6 +271,8 @@ export interface ActuacionLicenciaDoc extends Actuacion {
    * (`documento-aportado` / `documento-reemplazado`). Ver `EvidenciaDocumento`.
    */
   evidenciaDocumento?: EvidenciaDocumento;
+  /** Presente SOLO en `prorroga-subsanacion`. Ver `EvidenciaProrrogaSubsanacion`. */
+  evidenciaProrroga?: EvidenciaProrrogaSubsanacion;
   /**
    * Presente SOLO en actuaciones `tipo: 'comunicacion-enviada'` — el tipo
    * ESTRUCTURADO de la comunicación (p. ej. "Aviso de acta de observaciones
@@ -644,6 +652,28 @@ export interface EvidenciaDocumento {
   hashSha256: string;
 }
 
+/**
+ * LA PRÓRROGA DEL PLAZO DE SUBSANACIÓN — evidencia de un hecho del CIUDADANO.
+ *
+ * El art. 2.2.6.1.2.2.4 la concede «a solicitud de parte», así que lo que el
+ * expediente tiene que poder probar no es que la Secretaría la otorgó, sino que
+ * ÉL la pidió, y cuándo. De ahí que la fecha que manda sea `solicitadaEl` y no
+ * el día en que la funcionaria la registró: entre una y otra pueden pasar días,
+ * y la que decide si llegó a tiempo es la primera.
+ *
+ * Va estructurada y no dentro de una frase por lo de siempre: este dato mueve
+ * un plazo legal de 30 a 45 días hábiles, y un dato que mueve plazos tiene que
+ * poder verificarse sin leer prosa.
+ */
+export interface EvidenciaProrrogaSubsanacion {
+  /** ISO — día en que el ciudadano solicitó la ampliación. */
+  solicitadaEl: string;
+  /** Cómo llegó la solicitud: «Escrito radicado», «Correo electrónico», «Personalmente»… */
+  medio: string;
+  /** Número de radicado u oficio de la solicitud, si lo tiene. */
+  referencia?: string;
+}
+
 /** Los tres bloques de evidencia de cierre; cada actuación llena el suyo. */
 export interface EvidenciaCierre {
   resolucion?: EvidenciaResolucion;
@@ -885,10 +915,20 @@ export function planRegistrarActuacion(
        directamente — un campo que nunca se persistía, así que este guard
        SIEMPRE bloqueaba y el archivo por desistimiento era inalcanzable. */
     const comunicada = fechaComunicacionDelActa(actuacionesExistentes);
+    /* LA PRÓRROGA ENTRA AL GUARD. Sin esta línea, la maquinaria de los quince
+       días seguía siendo lo que era hasta hoy: una función pura, probada en las
+       dos direcciones, y sin un solo llamador que le pasara el dato. Archivar
+       con la prórroga corriendo declararía un incumplimiento que no ocurrió. */
+    const ordenadasParaPlazo = [...actuacionesExistentes]
+      .sort((a, b) => new Date(a.fecha).getTime() - new Date(b.fecha).getTime());
+    const actaVigente = [...ordenadasParaPlazo].reverse().find((a) => a.tipo === 'acta-observaciones');
     const err = procedeDesistimientoTacito({
       fechaComunicacionActa: comunicada?.fecha,
       huboRespuestaSubsanacion: actuacionesExistentes.some((a) => a.tipo === 'respuesta-subsanacion'),
       ahora,
+      prorroga: actaVigente
+        ? prorrogaDeLasActuaciones(ordenadasParaPlazo, new Date(actaVigente.fecha).getTime())
+        : null,
     });
     if (err) return { status: 409, mensaje: err.mensaje };
   }
@@ -1399,6 +1439,15 @@ export interface EvaluacionPlazoSubsanacion {
   fechaVencimientoPlazo?: string;
   /** Puede ser negativo (plazo ya vencido) — presente solo si `resultado !== 'NO_APLICA'`. */
   diasHabilesRestantes?: number;
+  /** 30, o 45 cuando consta una prórroga pedida a tiempo. */
+  diasHabilesPlazo?: number;
+  conProrroga?: boolean;
+  /**
+   * Se registró una prórroga y NO se aplicó, con su motivo. No se calla: una
+   * prórroga descartada en silencio haría creer a la funcionaria que el
+   * ciudadano tiene quince días que no tiene.
+   */
+  prorrogaDescartada?: ProrrogaDescartada;
 }
 
 /**
@@ -1511,11 +1560,161 @@ export function evaluarPlazoSubsanacion(
   const comunicada = fechaComunicacionDelActa(ordenadas);
   if (!comunicada) return { resultado: 'NO_APLICA' };
 
-  const fechaVencimientoPlazo = calcularFechaLimiteRespuestaActa(comunicada.fecha);
-  const diasHabilesRestantes = diasRestantesHabiles(fechaVencimientoPlazo, hoy);
-  const resultado: ResultadoPlazoSubsanacion = diasHabilesRestantes < 0 ? 'POR_ARCHIVAR' : 'EN_PLAZO';
+  /* EL MISMO CÁLCULO QUE USA EL GUARD DE ARCHIVO. Antes esta función contaba
+     siempre 30 días y `procedeDesistimientoTacito` contaba 30 o 45 — dos
+     reglas para un solo plazo legal. Ahora las dos preguntan aquí. */
+  const plazo = calcularPlazoSubsanacion(
+    { comunicadaEl: comunicada.fecha, prorroga: prorrogaDeLasActuaciones(ordenadas, actaTime) },
+    hoy,
+  );
+  if (!plazo) return { resultado: 'NO_APLICA' };
 
-  return { resultado, fechaVencimientoPlazo, diasHabilesRestantes };
+  return {
+    resultado: plazo.vencido ? 'POR_ARCHIVAR' : 'EN_PLAZO',
+    fechaVencimientoPlazo: plazo.venceEl,
+    diasHabilesRestantes: plazo.diasHabilesRestantes,
+    diasHabilesPlazo: plazo.diasHabiles,
+    conProrroga: plazo.conProrroga,
+    ...(plazo.prorrogaDescartada ? { prorrogaDescartada: plazo.prorrogaDescartada } : {}),
+  };
+}
+
+/**
+ * La prórroga que consta para ESTA acta — la última registrada después de ella.
+ *
+ * Se ata al acta y no se toma «la que haya»: un expediente puede tener un acta
+ * previa de otro ciclo, y una prórroga de entonces no amplía el plazo de ahora.
+ * Misma cautela que ya aplica `esComunicacionDelActa` con las comunicaciones.
+ */
+export function prorrogaDeLasActuaciones(
+  actuacionesOrdenadas: Pick<ActuacionLicenciaDoc, 'tipo' | 'fecha' | 'evidenciaProrroga'>[],
+  actaTime: number,
+): { solicitadaEl: string } | null {
+  const prorroga = [...actuacionesOrdenadas]
+    .reverse()
+    .find((a) => a.tipo === SLUG_PRORROGA_SUBSANACION
+      && new Date(a.fecha).getTime() >= actaTime
+      && Boolean(a.evidenciaProrroga?.solicitadaEl));
+  return prorroga ? { solicitadaEl: prorroga.evidenciaProrroga!.solicitadaEl } : null;
+}
+
+/* ══════════════════════════════════════════════════════════════════════════
+   REGISTRAR LA PRÓRROGA DEL PLAZO DE SUBSANACIÓN
+
+   D.1077/2015 art. 2.2.6.1.2.2.4: «Este plazo podrá ser ampliado, a solicitud
+   de parte, hasta por un término adicional de quince (15) días hábiles».
+
+   ── POR QUÉ HACÍA FALTA UNA RUTA PROPIA ───────────────────────────────────
+
+   La prórroga NO mueve el estado jurídico: el expediente sigue
+   `CON_ACTA_DE_OBSERVACIONES` antes y después. Meterla en
+   `ESTADO_DESTINO_POR_TIPO_ACTUACION` —el mapa que decide qué actuaciones
+   admite el sistema y a qué estado llevan— habría obligado a inventarle un
+   destino que no tiene. Se registra por su propia ruta, como los movimientos
+   documentales.
+
+   ── LO QUE SE VALIDA, Y POR QUÉ CADA COSA ─────────────────────────────────
+
+   Que el plazo EXISTA (acta comunicada y sin responder): ampliar un plazo que
+   no corre, o uno que ya se cumplió con la respuesta, es ampliar nada.
+   Que la solicitud llegue A TIEMPO: pedirla después del vencimiento no revive
+   un término extinguido — para entonces lo que procede es el desistimiento.
+   Que sea ÚNICA: la norma concede «un término adicional», en singular.
+
+   La validación de oportunidad usa `prorrogaLlegaATiempo`, la MISMA frontera
+   que `calcularPlazoSubsanacion` aplica al contar. Si fueran dos comparaciones
+   distintas, esta ruta podría aceptar una prórroga que el cómputo después
+   descarta, y el expediente diría una cosa y el reloj otra.
+══════════════════════════════════════════════════════════════════════════ */
+
+export interface RegistrarProrrogaInput {
+  /** ISO — día en que el CIUDADANO solicitó la ampliación. */
+  solicitadaEl: string;
+  /** Cómo llegó: «Escrito radicado», «Correo electrónico», «Personalmente»… */
+  medio: string;
+  /** Radicado u oficio de la solicitud, si lo tiene. */
+  referencia?: string;
+}
+
+export function planRegistrarProrrogaSubsanacion(
+  expediente: Pick<ExpedienteLicenciaDoc, 'id' | 'tenantId' | 'estadoJuridico'>,
+  actuaciones: ActuacionLicenciaDoc[],
+  input: RegistrarProrrogaInput,
+  actor: ActorExpediente,
+  ahora: Date,
+): ErrorExpediente | { actuacion: ActuacionLicenciaDoc } {
+  if (expediente.estadoJuridico !== 'CON_ACTA_DE_OBSERVACIONES') {
+    return {
+      status: 409,
+      mensaje: 'La prórroga solo procede mientras corre el plazo de subsanación: este expediente no tiene un acta de observaciones pendiente de respuesta.',
+    };
+  }
+
+  const ordenadas = [...actuaciones].sort((a, b) => new Date(a.fecha).getTime() - new Date(b.fecha).getTime());
+  const acta = [...ordenadas].reverse().find((a) => a.tipo === 'acta-observaciones');
+  if (!acta) {
+    return { status: 409, mensaje: 'No hay acta de observaciones registrada: no hay plazo de subsanación que ampliar.' };
+  }
+  const actaTime = new Date(acta.fecha).getTime();
+
+  if (ordenadas.some((a) => a.tipo === 'respuesta-subsanacion' && new Date(a.fecha).getTime() >= actaTime)) {
+    return { status: 409, mensaje: 'El ciudadano ya respondió el acta: no hay plazo que ampliar.' };
+  }
+
+  const comunicada = fechaComunicacionDelActa(ordenadas);
+  if (!comunicada) {
+    return {
+      status: 409,
+      mensaje: 'No consta la fecha en que el acta se comunicó al ciudadano, así que no se puede saber si la prórroga llega a tiempo. Registre la comunicación primero.',
+    };
+  }
+
+  if (prorrogaDeLasActuaciones(ordenadas, actaTime)) {
+    return { status: 409, mensaje: 'Ya consta una prórroga para esta acta. La norma concede un único término adicional.' };
+  }
+
+  const solicitada = new Date(input.solicitadaEl);
+  if (!input.solicitadaEl || Number.isNaN(solicitada.getTime())) {
+    return { status: 400, mensaje: 'Indique la fecha en que el ciudadano solicitó la prórroga.' };
+  }
+  if (solicitada.getTime() > ahora.getTime()) {
+    return { status: 400, mensaje: 'La fecha de la solicitud no puede estar en el futuro.' };
+  }
+  if (solicitada.getTime() < new Date(comunicada.fecha).getTime()) {
+    return { status: 400, mensaje: 'La solicitud no puede ser anterior a la comunicación del acta.' };
+  }
+  const medio = input.medio?.trim();
+  if (!medio) {
+    return { status: 400, mensaje: 'Indique por qué medio llegó la solicitud de prórroga.' };
+  }
+
+  if (!prorrogaLlegaATiempo(comunicada.fecha, solicitada)) {
+    return {
+      status: 409,
+      mensaje: 'La solicitud de prórroga llegó después de vencido el plazo de 30 días hábiles: no amplía un término ya extinguido (D.1077/2015 art. 2.2.6.1.2.2.4).',
+    };
+  }
+
+  const referencia = input.referencia?.trim();
+  return {
+    actuacion: {
+      id: crypto.randomUUID(),
+      expedienteId: expediente.id,
+      tenantId: expediente.tenantId,
+      tipo: SLUG_PRORROGA_SUBSANACION,
+      etapa: 'subsanacion',
+      actorUid: actor.uid,
+      actorNombre: actor.nombre,
+      actorRol: actor.rol,
+      fecha: ahora.toISOString(),
+      origen: 'REAL',
+      evidenciaProrroga: { solicitadaEl: solicitada.toISOString(), medio, ...(referencia ? { referencia } : {}) },
+      detalle:
+        `Prórroga del plazo de subsanación: 15 días hábiles adicionales (D.1077/2015 art. 2.2.6.1.2.2.4). `
+        + `Solicitada por el ciudadano el ${solicitada.toISOString().slice(0, 10)} por ${medio}`
+        + (referencia ? ` (${referencia}).` : '.'),
+    },
+  };
 }
 
 /**

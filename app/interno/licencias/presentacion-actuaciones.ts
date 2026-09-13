@@ -12,7 +12,8 @@ import type { Actuacion, OrigenActuacion } from '@/lib/motor-expedientes/tipos';
    navegador. Mismo camino que ya usa `DetalleLicenciaClient.tsx`. Se importa el
    tipo en vez de redeclararlo aquí: dos definiciones del mismo dato acaban
    divergiendo, y esta lleva un hash que tiene que ser el mismo. */
-import type { EvidenciaDocumento } from '@/lib/server/expedientes-licencias';
+import type { EvidenciaDocumento, EvidenciaProrrogaSubsanacion } from '@/lib/server/expedientes-licencias';
+import { SLUG_PRORROGA_SUBSANACION } from '@/lib/motor-expedientes/plazo-subsanacion';
 import { formatFechaColombia } from '@/lib/fecha-colombia';
 import { PREFIJO_AVISO_ACTA_COMUNICACION } from '@/lib/motor-expedientes/comunicaciones-licencia';
 import type { EventoTimelineItem } from './tipos';
@@ -39,6 +40,9 @@ export const TITULO_ACTUACION: Record<string, string> = {
      mismo — aportar añade, reemplazar SUSTITUYE lo que ya se estaba evaluando. */
   'documento-aportado': 'Se aportó un documento',
   'documento-reemplazado': 'Se reemplazó un documento',
+  /* No dice «se concedió»: la norma la concede a solicitud de parte, y lo que
+     el expediente prueba es que el ciudadano la PIDIÓ y cuándo. */
+  [SLUG_PRORROGA_SUBSANACION]: 'Prórroga del plazo de subsanación',
 };
 
 export const TIPO_TIMELINE: Record<string, EventoTimelineItem['tipo']> = {
@@ -52,6 +56,10 @@ export const TIPO_TIMELINE: Record<string, EventoTimelineItem['tipo']> = {
   'comunicacion-enviada': 'COMUNICACION',
   'documento-aportado': 'DOCUMENTO',
   'documento-reemplazado': 'DOCUMENTO',
+  /* Tono de ACTA: la prórroga pertenece al ciclo del acta de observaciones —
+     es su plazo el que se amplía—, y verlas del mismo color cuenta la historia
+     que de verdad ocurrió. */
+  [SLUG_PRORROGA_SUBSANACION]: 'ACTA',
 };
 
 /**
@@ -169,6 +177,13 @@ function resumenDe(a: Actuacion): string | undefined {
     return evidencia.numeroVersion > 1
       ? `«${evidencia.nombre}» — ahora en la versión ${evidencia.numeroVersion}. La versión anterior se conserva.`
       : `«${evidencia.nombre}».`;
+  }
+
+  const prorroga = (a as { evidenciaProrroga?: EvidenciaProrrogaSubsanacion }).evidenciaProrroga;
+  if (prorroga) {
+    return `El ciudadano la solicitó el ${formatFechaColombia(prorroga.solicitadaEl)} por ${prorroga.medio}`
+      + (prorroga.referencia ? ` (${prorroga.referencia}).` : '.')
+      + ' El plazo pasa de 30 a 45 días hábiles.';
   }
 
   return undefined;

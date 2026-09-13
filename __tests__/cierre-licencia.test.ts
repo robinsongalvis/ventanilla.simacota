@@ -176,7 +176,7 @@ describe('la prórroga de 15 días hábiles (ADR-0038 §2.3)', () => {
   it('CON prórroga concedida, a los 30 NO procede — y el motivo la nombra', () => {
     const e = procedeDesistimientoTacito({
       fechaComunicacionActa: COMUNICADA, huboRespuestaSubsanacion: false, ahora: alDia(30),
-      prorrogaConcedida: true,
+      prorroga: { solicitadaEl: COMUNICADA },
     });
     expect(e).not.toBeNull();
     expect(e!.mensaje).toMatch(/45/);
@@ -187,7 +187,7 @@ describe('la prórroga de 15 días hábiles (ADR-0038 §2.3)', () => {
   it('con prórroga, a los 45 sí procede', () => {
     expect(procedeDesistimientoTacito({
       fechaComunicacionActa: COMUNICADA, huboRespuestaSubsanacion: false, ahora: alDia(45),
-      prorrogaConcedida: true,
+      prorroga: { solicitadaEl: COMUNICADA },
     })).toBeNull();
   });
 
@@ -199,7 +199,7 @@ describe('la prórroga de 15 días hábiles (ADR-0038 §2.3)', () => {
     })).toBeNull();
     expect(procedeDesistimientoTacito({
       fechaComunicacionActa: COMUNICADA, huboRespuestaSubsanacion: false, ahora: alDia(31),
-      prorrogaConcedida: false,
+      prorroga: null,
     })).toBeNull();
   });
 });
