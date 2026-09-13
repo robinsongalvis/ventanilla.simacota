@@ -122,20 +122,75 @@ function esEventoQueReinicia(tipo: TipoEventoTermino): boolean {
  * SUSPENSION_REANUDACION), se procesan en orden cronológico: cada
  * suspensión/reanudación es independiente de la anterior.
  */
-export function calcularVencimiento(eventos: EventoTermino[], politica: PoliticaTermino): Date | null {
+/**
+ * EL RELOJ DETENIDO, CON SUS NÚMEROS.
+ *
+ * ── POR QUÉ EXISTE ────────────────────────────────────────────────────────
+ *
+ * `calcularVencimiento` ya congelaba los días que quedaban al llegar el acta
+ * —`diasRestantesGuardados`, unas líneas más abajo— y acto seguido los TIRABA:
+ * la función devolvía solo una fecha. Por eso la tarjeta de Planeación decía
+ * «Reloj detenido» sin un solo número, y su propio comentario lo reconocía:
+ * «cuántos días quedaban al congelarse depende de la serie de eventos, y el
+ * servidor todavía no manda ese dato».
+ *
+ * El dato existía. Lo que faltaba era devolverlo.
+ *
+ * Lo pidió el propietario: que se vea el tiempo que lleva parado y cuánto le
+ * queda cuando arranque de nuevo.
+ *
+ * ── LO QUE NO DICE, Y HAY QUE SABERLO ─────────────────────────────────────
+ *
+ * Solo el ACTA DE OBSERVACIONES congela días aquí. El acto de viabilidad —la
+ * otra causa de suspensión que reconoce la norma— sigue INERTE en este cómputo
+ * (⚖️ hueco 1, DF-7 del ADR-0029: a la espera del concepto escrito de
+ * Jurídica). Para un expediente en `EN_VIABILIDAD` esta función devuelve
+ * `null`: el reloj se ve detenido en pantalla, pero aquí no hay días
+ * acreditados que devolver. No se inventan — y la pantalla lo dice con
+ * palabras en vez de callarlo.
+ */
+export interface RelojDetenido {
+  /** ISO del día en que el reloj se detuvo — el acta que lo paró. */
+  desdeIso: string;
+  /**
+   * Días hábiles que le quedaban al término en ese momento. Son los que se
+   * restauran al reanudar: el tiempo gastado ANTES del acta no se recupera.
+   */
+  diasHabilesGuardados: number;
+}
+
+export interface ProyeccionComputo {
+  vencimiento: Date | null;
+  /** Presente solo si la serie de eventos TERMINA con el reloj parado. */
+  relojDetenido: RelojDetenido | null;
+}
+
+/**
+ * Una sola pasada produce las dos respuestas. Separarlas en dos funciones
+ * habría dejado dos recorridos del mismo calendario que pueden divergir — el
+ * defecto que este módulo lleva evitando desde que el criterio subió del cron.
+ */
+export function proyectarComputo(eventos: EventoTermino[], politica: PoliticaTermino): ProyeccionComputo {
   const ordenados = [...eventos].sort((a, b) => a.fecha.getTime() - b.fecha.getTime());
   const radicacion = ordenados.find((e) => e.tipo === 'RADICACION_DEBIDA_FORMA');
-  if (!radicacion) return null;
+  if (!radicacion) return { vencimiento: null, relojDetenido: null };
 
   if (politica.efectoSubsanacion === 'REINICIO_A_CERO') {
     const reinicios = ordenados.filter((e) => esEventoQueReinicia(e.tipo));
     const ancla = reinicios.length > 0 ? reinicios[reinicios.length - 1]! : radicacion;
-    return sumarDiasHabiles(ancla.fecha, politica.plazoDias);
+    /* Bajo reinicio no hay reloj detenido que describir: el plazo vuelve a
+       empezar entero, no se guarda nada. */
+    return { vencimiento: sumarDiasHabiles(ancla.fecha, politica.plazoDias), relojDetenido: null };
   }
 
   // SUSPENSION_REANUDACION
   let vencimiento = sumarDiasHabiles(radicacion.fecha, politica.plazoDias);
-  let diasRestantesGuardados: number | null = null;
+  /* UNA sola variable para el reloj parado — antes eran dos (los días guardados
+     y el día en que se paró) que había que acordarse de limpiar juntas. El
+     banco de mutaciones lo demostró: quitar una de las dos limpiezas no ponía
+     roja ni una prueba, porque la otra ya bastaba. Dos estados que siempre
+     valen lo mismo son un estado con una copia que puede quedarse atrás. */
+  let relojDetenido: RelojDetenido | null = null;
 
   for (const evento of ordenados) {
     // Switch EXHAUSTIVO (ver `esEventoQueReinicia` arriba para el mismo
@@ -146,15 +201,18 @@ export function calcularVencimiento(eventos: EventoTermino[], politica: Politica
       case 'RADICACION_DEBIDA_FORMA':
         break; // ya se usó como ancla arriba
       case 'ACTA_OBSERVACIONES':
-        if (diasRestantesGuardados === null) {
+        if (relojDetenido === null) {
           // Congela los días hábiles que quedaban ENTRE el acta y el vencimiento vigente.
-          diasRestantesGuardados = diasRestantesHabiles(vencimiento, evento.fecha);
+          relojDetenido = {
+            desdeIso: evento.fecha.toISOString(),
+            diasHabilesGuardados: diasRestantesHabiles(vencimiento, evento.fecha),
+          };
         }
         break;
       case 'RESPUESTA_SUBSANACION':
-        if (diasRestantesGuardados !== null) {
-          vencimiento = sumarDiasHabiles(evento.fecha, diasRestantesGuardados);
-          diasRestantesGuardados = null;
+        if (relojDetenido !== null) {
+          vencimiento = sumarDiasHabiles(evento.fecha, relojDetenido.diasHabilesGuardados);
+          relojDetenido = null;
         }
         break;
       case 'MODIFICACION_SOLICITUD':
@@ -178,7 +236,19 @@ export function calcularVencimiento(eventos: EventoTermino[], politica: Politica
     }
   }
 
-  return vencimiento;
+  /* SIGUE DETENIDO si al acabar la serie nadie reanudó: es el estado de HOY, no
+     un hecho histórico. Un acta seguida de su respuesta deja esto en `null`
+     aunque el acta exista. */
+  return { vencimiento, relojDetenido };
+}
+
+/**
+ * La fecha de vencimiento, a secas. Envoltorio de `proyectarComputo` para los
+ * llamadores que solo necesitan eso — y para no cambiarle la firma a lo que ya
+ * existía.
+ */
+export function calcularVencimiento(eventos: EventoTermino[], politica: PoliticaTermino): Date | null {
+  return proyectarComputo(eventos, politica).vencimiento;
 }
 
 /* ──────────────────────────────────────────────
@@ -188,6 +258,16 @@ export function calcularVencimiento(eventos: EventoTermino[], politica: Politica
 export interface VencimientoTermino {
   /** La fecha en que vence el término. `null` sin radicación en debida forma. */
   vencimiento: Date | null;
+  /**
+   * El reloj parado con sus números, o `null` si está corriendo.
+   *
+   * NO SE LLAMA `suspension`, y el nombre está elegido: ese campo YA EXISTIÓ en
+   * este mismo contrato con otro significado —una de las dos hipótesis de
+   * vencimiento del «hueco 1»— y el ADR-0038 lo retiró. Reusar la palabra
+   * habría hecho que una prueba que custodia esa retirada empezara a hablar de
+   * otra cosa sin que nadie se enterara. Ver `RelojDetenido`.
+   */
+  relojDetenido: RelojDetenido | null;
   /**
    * El artículo que sostiene el cómputo. Se devuelve para que la pantalla lo
    * CITE en vez de explicar una incertidumbre que ya no existe.
@@ -229,13 +309,15 @@ export function calcularVencimientoTermino(
   eventos: EventoTermino[],
   plazoDias: number,
 ): VencimientoTermino {
+  const proyeccion = proyectarComputo(eventos, {
+    plazoDias,
+    computo: 'HABILES',
+    anclaje: 'RADICACION_EN_DEBIDA_FORMA',
+    efectoSubsanacion: 'SUSPENSION_REANUDACION',
+  });
   return {
-    vencimiento: calcularVencimiento(eventos, {
-      plazoDias,
-      computo: 'HABILES',
-      anclaje: 'RADICACION_EN_DEBIDA_FORMA',
-      efectoSubsanacion: 'SUSPENSION_REANUDACION',
-    }),
+    vencimiento: proyeccion.vencimiento,
+    relojDetenido: proyeccion.relojDetenido,
     fundamento: FUNDAMENTO_SUSPENSION_REANUDACION,
   };
 }

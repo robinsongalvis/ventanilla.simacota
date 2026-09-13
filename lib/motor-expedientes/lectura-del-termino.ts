@@ -41,6 +41,8 @@ import {
   type NivelTermino,
 } from './semaforo-termino';
 import type { EstadoJuridicoLicencia } from './estados-licencia';
+import type { RelojDetenido } from './termino';
+import { diasHabilesTranscurridos } from '@/lib/tiempos-radicado';
 
 /** Lo mínimo para leer el reloj. Los dos ISO son los que ya viajan a ambas pantallas. */
 export interface EntradaLecturaTermino {
@@ -50,6 +52,12 @@ export interface EntradaLecturaTermino {
   venceIso: string | null;
   /** ISO del ancla — desde cuándo corre. Opcional: los expedientes anteriores al acto de radicar no la tienen. */
   desdeIso?: string | null;
+  /**
+   * El reloj detenido con sus números, tal como lo devuelve el servidor
+   * (`proyectarComputo`). Opcional: una pantalla que no lo reciba sigue
+   * diciendo que está detenido, solo que sin la cuenta — nunca la inventa.
+   */
+  relojDetenido?: RelojDetenido | null;
 }
 
 export interface TerminoCorriendo {
@@ -72,6 +80,12 @@ export interface TerminoSuspendido {
   situacion: 'SUSPENDIDO';
   /** El artículo que detiene el reloj, para poder citarlo tal cual. */
   fundamento: string;
+  /** ISO del día en que se detuvo. Ausente si el servidor no acreditó la parada. */
+  detenidoDesdeIso?: string;
+  /** Días hábiles que le quedaban al término al detenerse — los que se restauran al reanudar. */
+  diasHabilesGuardados?: number;
+  /** Días hábiles que lleva parado, contados hasta `ahora`. */
+  diasHabilesDetenido?: number;
 }
 
 export interface TerminoSinAnclar { situacion: 'SIN_ANCLAR' }
@@ -106,7 +120,22 @@ export function leerElTermino(
   );
 
   if (fila.situacion === 'SUSPENDIDO') {
-    return { situacion: 'SUSPENDIDO', fundamento: fila.fundamentoSuspension ?? '' };
+    /* LOS NÚMEROS SOLO SI EL SERVIDOR LOS ACREDITÓ. Para un expediente
+       `EN_VIABILIDAD` no los hay —ese acto sigue inerte en el cómputo, ⚖️ hueco
+       1 del ADR-0029— y la pantalla tiene que poder decir «detenido, y los días
+       no se están acreditando» en vez de estampar un cero que sería mentira. */
+    const s = entrada.relojDetenido;
+    return {
+      situacion: 'SUSPENDIDO',
+      fundamento: fila.fundamentoSuspension ?? '',
+      ...(s
+        ? {
+          detenidoDesdeIso: s.desdeIso,
+          diasHabilesGuardados: s.diasHabilesGuardados,
+          diasHabilesDetenido: diasHabilesTranscurridos(s.desdeIso, ahora),
+        }
+        : {}),
+    };
   }
   if (fila.situacion === 'RESUELTO') return { situacion: 'RESUELTO' };
   if (fila.situacion === 'SIN_ANCLAR') return { situacion: 'SIN_ANCLAR' };

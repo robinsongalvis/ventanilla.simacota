@@ -516,11 +516,16 @@ export function DetalleLicenciaClient({ expedienteId, onVolver }: DetalleLicenci
               estadoJuridico={expediente.estadoJuridico}
               desdeIso={anclaDelTermino}
               venceIso={computos.terminoDual.fechaAlertaConservadora}
+              /* Los números del reloj parado y el plazo que corre contra el
+                 ciudadano: los dos salen del servidor, y los dos se leen en la
+                 misma tarjeta que el término. */
+              relojDetenido={computos.terminoDual.relojDetenido}
+              plazoCiudadano={computos.plazoSubsanacion}
             />
           )}
 
           <PanelTerminoDual
-            terminoDual={computos?.terminoDual ?? { fechaAlertaConservadora: null, fundamento: '' }}
+            terminoDual={computos?.terminoDual ?? { fechaAlertaConservadora: null, fundamento: '', relojDetenido: null }}
             origen={expediente.origen}
             estadoJuridico={expediente.estadoJuridico}
             fechaRadicacion={fechaRadicacion}
