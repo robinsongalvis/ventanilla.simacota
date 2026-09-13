@@ -40,12 +40,21 @@
  * puede verificar ni volver a imprimir.
  */
 import { sumarDiasHabiles, diasHabilesTranscurridos } from '@/lib/tiempos-radicado';
+import {
+  calcularPlazoSubsanacion,
+  DIAS_HABILES_SUBSANACION_BASE,
+  DIAS_HABILES_PRORROGA_SUBSANACION,
+} from './plazo-subsanacion';
 
 /** CPACA (Ley 1437/2011) art. 76 — recursos dentro de los 10 días hábiles siguientes a la notificación. */
 export const DIAS_HABILES_RECURSOS = 10;
 
-/** D.1077/2015 art. 2.2.6.1.2.3.4 — el requerimiento debe atenderse en 30 días hábiles. */
-export const DIAS_HABILES_SUBSANACION_TACITO = 30;
+/**
+ * D.1077/2015 art. 2.2.6.1.2.3.4 — el requerimiento debe atenderse en 30 días
+ * hábiles. Vive en `./plazo-subsanacion.ts`, donde vive el cálculo; aquí solo
+ * se reexporta con su nombre de siempre para no romper llamadores.
+ */
+export const DIAS_HABILES_SUBSANACION_TACITO = DIAS_HABILES_SUBSANACION_BASE;
 
 /**
  * La PRÓRROGA del ciudadano — D.1077/2015 art. 2.2.6.1.2.2.4:
@@ -61,7 +70,7 @@ export const DIAS_HABILES_SUBSANACION_TACITO = 30;
  * «A SOLICITUD DE PARTE»: no se concede sola. Por eso el cómputo la aplica solo
  * cuando consta que se concedió — la ausencia del dato NO es una prórroga.
  */
-export const DIAS_HABILES_PRORROGA_SUBSANACION = 15;
+export { DIAS_HABILES_PRORROGA_SUBSANACION } from './plazo-subsanacion';
 
 /**
  * El plazo del ciudadano para aportar los comprobantes de pago cuando el
@@ -230,10 +239,14 @@ export function procedeDesistimientoTacito(entrada: {
   huboRespuestaSubsanacion: boolean;
   ahora: Date;
   /**
-   * ¿Consta que se concedió la prórroga de 15 días hábiles? Solo con este dato
-   * se amplía el plazo: «a solicitud de parte» significa que no se presume.
+   * La prórroga de 15 días hábiles, si consta — con la fecha en que el
+   * CIUDADANO la solicitó.
+   *
+   * ERA UN `boolean`, y no bastaba: un «sí» no puede decir si se pidió a
+   * tiempo, y una prórroga solicitada después de vencido el plazo no revive un
+   * término extinguido. El dato entra con su fecha y el cálculo decide.
    */
-  prorrogaConcedida?: boolean;
+  prorroga?: { solicitadaEl: string } | null;
 }): ErrorCierre | null {
   if (entrada.huboRespuestaSubsanacion) {
     return {
@@ -254,21 +267,39 @@ export function procedeDesistimientoTacito(entrada: {
         'que hayan transcurrido los 30 días hábiles. Registre la comunicación antes de archivar.',
     };
   }
+  /* EL MISMO CÁLCULO QUE VE LA PANTALLA. Antes este guard tenía su propia
+     aritmética y `evaluarPlazoSubsanacion` la suya —una con prórroga y otra
+     sin ella—, y cablear los quince días en un solo lado habría hecho que la
+     pantalla pidiera archivar quince días hábiles antes de que el servidor lo
+     permitiera. */
+  const plazo = calcularPlazoSubsanacion(
+    { comunicadaEl: entrada.fechaComunicacionActa, prorroga: entrada.prorroga ?? null },
+    entrada.ahora,
+  );
+  if (!plazo) {
+    return { campo: 'fechaComunicacion', mensaje: 'No se pudo calcular el plazo de subsanación con los datos registrados.' };
+  }
+  /* LA FRONTERA NO SE MUEVE EN ESTE CAMBIO. El guard sigue preguntando «¿han
+     transcurrido N días hábiles?» —su regla de siempre— y lo único que toma del
+     cálculo compartido es la N (30 o 45). Lo que se unifica aquí es el NÚMERO,
+     que es donde estaba la divergencia de quince días.
+
+     QUEDA UNA DIFERENCIA DE UN DÍA, y se declara en vez de taparla: en el día N
+     exacto este guard deja archivar (`transcurridos >= N`) mientras la pantalla
+     todavía dice «en plazo» (`diasHabilesRestantes === 0`). Unificarla obliga a
+     decidir si el día N el ciudadano aún tiene su día — una frontera legal, no
+     un defecto de cableado. Se sube al propietario aparte; moverla aquí sería
+     cambiar cuándo se puede archivar una solicitud, escondido en un PR que dice
+     que no toca el cómputo. */
   const transcurridos = diasHabilesTranscurridos(entrada.fechaComunicacionActa, entrada.ahora);
-  /* CON PRÓRROGA CONCEDIDA, el plazo del ciudadano son 45, no 30. Archivar a los
-     30 con la prórroga corriendo sería declarar un incumplimiento que no
-     ocurrió. */
-  const plazo = entrada.prorrogaConcedida === true
-    ? DIAS_HABILES_SUBSANACION_TACITO + DIAS_HABILES_PRORROGA_SUBSANACION
-    : DIAS_HABILES_SUBSANACION_TACITO;
-  if (transcurridos < plazo) {
+  if (transcurridos < plazo.diasHabiles) {
     return {
       campo: 'plazo',
       mensaje:
         `Han transcurrido ${transcurridos} días hábiles desde la comunicación del acta; el ` +
-        `desistimiento tácito procede a los ${plazo}` +
-        (entrada.prorrogaConcedida === true
-          ? ` (30 + ${DIAS_HABILES_PRORROGA_SUBSANACION} de prórroga concedida, D.1077/2015 art. 2.2.6.1.2.2.4)`
+        `desistimiento tácito procede a los ${plazo.diasHabiles}` +
+        (plazo.conProrroga
+          ? ` (${DIAS_HABILES_SUBSANACION_BASE} + ${DIAS_HABILES_PRORROGA_SUBSANACION} de prórroga concedida, D.1077/2015 art. 2.2.6.1.2.2.4)`
           : ' (D.1077/2015 art. 2.2.6.1.2.3.4)') + '.',
     };
   }

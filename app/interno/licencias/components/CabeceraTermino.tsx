@@ -192,7 +192,20 @@ export function CabeceraTermino({
                 Le quedan {plazoCiudadano.diasHabilesRestantes} días hábiles
                 {plazoCiudadano.fechaVencimientoPlazo && (
                   <> — vence el {formatFechaColombia(plazoCiudadano.fechaVencimientoPlazo)}</>
-                )}.
+                )}
+                {/* DE DÓNDE SALE EL PLAZO. Con prórroga son 45 y no 30, y quien
+                    mira tiene que poder ver por qué cambió el número — si no,
+                    parece que el sistema se equivocó. */}
+                {plazoCiudadano.conProrroga && <> (30 + 15 de prórroga concedida)</>}.
+              </p>
+            )}
+            {plazoCiudadano?.prorrogaDescartada === 'SOLICITADA_FUERA_DE_PLAZO' && (
+              /* UNA PRÓRROGA DESCARTADA EN SILENCIO ES PEOR QUE NINGUNA: la
+                 funcionaria creería que el ciudadano tiene quince días que no
+                 tiene, y dejaría correr un archivo que ya procede. */
+              <p role="alert" style={{ fontWeight: 700, color: '#B54708' }}>
+                ⚠ Consta una prórroga solicitada DESPUÉS de vencido el plazo: no lo amplía.
+                El término sigue siendo de 30 días hábiles.
               </p>
             )}
             {plazoCiudadano?.resultado === 'POR_ARCHIVAR' && (

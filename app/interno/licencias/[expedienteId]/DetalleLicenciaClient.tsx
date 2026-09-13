@@ -49,6 +49,7 @@ import { PanelVigenciaActo } from '../components/PanelVigenciaActo';
 import { PanelDesistimientoSemicontrolado } from '../components/PanelDesistimientoSemicontrolado';
 import { BotonAccionPlaceholder } from '../components/BotonAccionPlaceholder';
 import { RegistrarActuacionModal } from '../components/RegistrarActuacionModal';
+import { RegistrarProrrogaModal } from '../components/RegistrarProrrogaModal';
 import { ChecklistRequisitos } from '../components/ChecklistRequisitos';
 import type { DestinatarioResuelto } from '@/lib/motor-expedientes/destinatario-expediente';
 import { PanelQueSigue } from '../components/PanelQueSigue';
@@ -101,6 +102,8 @@ export function DetalleLicenciaClient({ expedienteId, onVolver }: DetalleLicenci
   const [definicionId, setDefinicionId] = useState<string | null>(null);
   const [radicadoVinculado, setRadicadoVinculado] = useState<{ id: string; fecha: string } | null>(null);
   const [vinculando, setVinculando] = useState(false);
+  // Prórroga del plazo de subsanación (D.1077/2015 art. 2.2.6.1.2.2.4).
+  const [registrandoProrroga, setRegistrandoProrroga] = useState(false);
   const [modalActuacion, setModalActuacion] = useState<TipoActuacionPermitida | null>(null);
   const [modalRadicar, setModalRadicar] = useState(false);
   const [pestana, setPestana] = useState<PestanaExpediente>('documentos');
@@ -524,6 +527,23 @@ export function DetalleLicenciaClient({ expedienteId, onVolver }: DetalleLicenci
             />
           )}
 
+          {/* LA PRÓRROGA, DONDE SE MIRA EL RELOJ. Mientras el plazo del
+              ciudadano corre, es la única acción que puede moverlo — y hasta hoy
+              el cómputo sabía aplicarla pero nadie tenía por dónde registrarla:
+              la función existía, probada, sin un solo llamador. */}
+          {expediente.estadoJuridico === 'CON_ACTA_DE_OBSERVACIONES'
+            && computos?.plazoSubsanacion.resultado === 'EN_PLAZO'
+            && !computos.plazoSubsanacion.conProrroga && (
+            <button
+              type="button"
+              onClick={() => setRegistrandoProrroga(true)}
+              className="text-xs font-bold px-3 py-2 rounded-lg transition-all active:scale-95 w-full"
+              style={{ border: '1px solid var(--color-border)', color: 'var(--text-secondary)', background: 'var(--bg-surface)' }}
+            >
+              Registrar prórroga de 15 días hábiles
+            </button>
+          )}
+
           <PanelTerminoDual
             terminoDual={computos?.terminoDual ?? { fechaAlertaConservadora: null, fundamento: '', relojDetenido: null }}
             origen={expediente.origen}
@@ -673,6 +693,17 @@ export function DetalleLicenciaClient({ expedienteId, onVolver }: DetalleLicenci
             {borradorActoDesistimiento.cuerpo}
           </div>
         </div>
+      )}
+
+      {registrandoProrroga && (
+        <RegistrarProrrogaModal
+          expedienteId={expedienteId}
+          onCerrar={() => setRegistrandoProrroga(false)}
+          onRegistrada={() => {
+            setRegistrandoProrroga(false);
+            void cargar({ silencioso: true });
+          }}
+        />
       )}
 
       {/* Reparación del expediente huérfano — ver `VincularRadicadoModal`. */}
