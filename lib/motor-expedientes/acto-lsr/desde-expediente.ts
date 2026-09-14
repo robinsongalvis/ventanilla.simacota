@@ -147,6 +147,7 @@ export const CAMPOS_SIN_ORIGEN: readonly CamposQueElExpedienteNoTiene[] = [
   { campo: 'Cédula catastral', dondeDeberiaCapturarse: 'Datos del predio' },
   { campo: 'Estrato', dondeDeberiaCapturarse: 'Datos del predio' },
   { campo: 'Titulares adicionales', dondeDeberiaCapturarse: 'Intake — hoy el expediente guarda UN solicitante y el acto admite varios' },
+  { campo: 'Zona de UAF del predio y su fuente', dondeDeberiaCapturarse: 'Hechos del caso — determinación técnica por la altura del predio, no por la vereda' },
   { campo: 'Escritura pública (número, fecha, notaría, círculo)', dondeDeberiaCapturarse: 'Hechos del caso' },
   { campo: 'Profesional responsable (nombre, clase, matrícula)', dondeDeberiaCapturarse: 'Hechos del caso' },
   { campo: 'Lotes resultantes (número, propietario, área)', dondeDeberiaCapturarse: 'Pantalla propia de la subdivisión' },

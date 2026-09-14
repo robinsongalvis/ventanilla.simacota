@@ -32,7 +32,7 @@ import {
 } from './estructura-f-pgj-002';
 import { CAMPOS_OBLIGATORIOS_ACTO, type DatosActoLsr } from './datos-acto-lsr';
 import {
-  MESES_VIGENCIA_LSR, SMDLV_POR_LOTE_LSR, smdlvDeLaLicencia, uafDeLaVereda,
+  MESES_VIGENCIA_LSR, SMDLV_POR_LOTE_LSR, smdlvDeLaLicencia, uafDeterminada,
   vencimientoDeLaLicencia, type RangoUaf,
 } from './reglas-acto-lsr';
 import { decisionesQueFaltan, type ParametrosDelActo } from './decisiones-pendientes';
@@ -94,14 +94,14 @@ export function generarActoLsr(datos: DatosActoLsr, parametros: ParametrosDelAct
   }
 
   /* ── 3. La UAF: regla de negocio, no dato ─────────────────────────────── */
-  const uaf = uafDeLaVereda(datos.vereda);
-  if (datos.vereda && !uaf) {
+  const uaf = uafDeterminada(datos.determinacionUaf);
+  if (datos.determinacionUaf && !uaf) {
     hallazgos.push({
       nivel: 'BLOQUEANTE',
-      queFalta: `Zona de Unidad Agrícola Familiar de la vereda «${datos.vereda}»`,
+      queFalta: 'La fuente de la determinación de la Unidad Agrícola Familiar',
       porQue:
-        'La Resolución INCORA 041/1996 pone a Simacota en dos zonas según la altura, y de cuál aplique depende que la '
-        + 'subdivisión sea válida o nula. El reparto de veredas por zona lo tiene Planeación; no se deduce del nombre.',
+        'Se declaró la zona pero no de dónde salió la altura del predio. De esta zona depende que la subdivisión sea válida '
+        + 'o nula (Ley 160 art. 44), y un acto que la afirma sin respaldo no puede defender su propia motivación.',
     });
   }
 
@@ -127,7 +127,7 @@ export function generarActoLsr(datos: DatosActoLsr, parametros: ParametrosDelAct
   bloques.push({ clase: 'PARRAFO', texto: CITAS_UAF.articulo44 });
   bloques.push({ clase: 'PARRAFO', texto: CITAS_UAF.fuenteRangos });
   if (uaf) bloques.push({ clase: 'PARRAFO', texto: `${uaf.descripcion} Unidad agrícola familiar: de ${uaf.desdeHas} a ${uaf.hastaHas} hectáreas.` });
-  else bloques.push(HUECO('La zona de UAF aplicable al predio', 'Planeación — reparto de veredas por zona'));
+  else bloques.push(HUECO('La determinación de la zona de UAF del predio, con su fuente', 'Determinación técnica del expediente'));
 
   bloques.push({ clase: 'TITULO', texto: 'RESUELVE' });
 

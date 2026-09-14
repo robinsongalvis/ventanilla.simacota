@@ -7,7 +7,7 @@ import {
   DECISIONES_PENDIENTES, SIN_DECIDIR, decisionesQueFaltan, type ParametrosDelActo,
 } from '@/lib/motor-expedientes/acto-lsr/decisiones-pendientes';
 import {
-  RANGOS_UAF, ZONA_UAF_POR_VEREDA, smdlvDeLaLicencia, uafDeLaVereda,
+  RANGOS_UAF, smdlvDeLaLicencia, uafDeterminada,
   vencimientoDeLaLicencia, requiereExcepcionUaf, MESES_VIGENCIA_LSR,
 } from '@/lib/motor-expedientes/acto-lsr/reglas-acto-lsr';
 import {
@@ -40,6 +40,7 @@ import { ARTICULOS_FIJOS, ENCABEZADO_F_PGJ_002 } from '@/lib/motor-expedientes/a
 function datosCompletos(): DatosActoLsr {
   const d = datosVacios();
   d.nombrePredio = 'EL MIRADOR';
+  d.determinacionUaf = { zona: 'MAGDALENA_MEDIO', fuente: 'Levantamiento topográfico del expediente' };
   d.vereda = 'Vereda de prueba';
   d.matriculaInmobiliaria = '321-99999';
   d.areaTotalTexto = '6 has 3100 M2';
@@ -125,39 +126,30 @@ describe('no se expide un acto incompleto', () => {
 
   it('con todo completo y todo decidido, SÍ se puede expedir', () => {
     /* La prueba en positivo: si nunca pudiera expedirse, las negativas de
-       arriba pasarían por el motivo equivocado. Hace falta cargar la zona UAF,
-       que es la única regla que el repositorio no puede rellenar solo. */
-    const conZona = { ...ZONA_UAF_POR_VEREDA, 'vereda de prueba': 'MAGDALENA_MEDIO' as const };
-    const datos = datosCompletos();
-    const acto = generarActoLsrConZonas(datos, TODO_DECIDIDO, conZona);
+       arriba pasarían por el motivo equivocado. */
+    const acto = generarActoLsr(datosCompletos(), TODO_DECIDIDO);
     expect(acto.hallazgos.filter((h) => h.nivel === 'BLOQUEANTE').map((h) => h.queFalta)).toEqual([]);
     expect(acto.puedeExpedirse).toBe(true);
   });
 
-  it('sin zona de UAF cargada, se niega — y explica por qué no la deduce', () => {
-    const acto = generarActoLsr(datosCompletos(), TODO_DECIDIDO);
-    const uaf = bloqueantes(acto).find((h) => h.queFalta.includes('Unidad Agrícola Familiar'));
-    expect(uaf, 'generó sin saber qué UAF aplica').toBeDefined();
-    expect(uaf!.porQue).toMatch(/no se deduce del nombre/);
+  it('sin la determinación de UAF, se niega', () => {
+    const datos = datosCompletos();
+    datos.determinacionUaf = null;
+    const acto = generarActoLsr(datos, TODO_DECIDIDO);
+    expect(bloqueantes(acto).map((h) => h.queFalta)).toContain('Zona de Unidad Agrícola Familiar del predio');
+  });
+
+  it('con la zona declarada PERO sin fuente, también se niega', () => {
+    /* De esta zona depende que la subdivisión sea válida o nula. Afirmarla sin
+       decir de dónde salió deja un acto que no puede defender su motivación. */
+    const datos = datosCompletos();
+    datos.determinacionUaf = { zona: 'GUANENTA', fuente: '   ' };
+    const acto = generarActoLsr(datos, TODO_DECIDIDO);
+    const uaf = bloqueantes(acto).find((h) => h.queFalta.includes('fuente'));
+    expect(uaf, 'aceptó una zona sin respaldo').toBeDefined();
+    expect(acto.calculado.uaf).toBeNull();
   });
 });
-
-/* El reparto de veredas por zona es un dato de Planeación; para probar el
-   camino completo se inyecta uno de mentira sin tocar el módulo real. */
-function generarActoLsrConZonas(
-  datos: DatosActoLsr,
-  parametros: ParametrosDelActo,
-  zonas: Record<string, 'MAGDALENA_MEDIO' | 'GUANENTA'>,
-): ActoLsrGenerado {
-  const original = { ...ZONA_UAF_POR_VEREDA };
-  Object.assign(ZONA_UAF_POR_VEREDA as Record<string, string>, zonas);
-  try {
-    return generarActoLsr(datos, parametros);
-  } finally {
-    for (const k of Object.keys(zonas)) delete (ZONA_UAF_POR_VEREDA as Record<string, string>)[k];
-    Object.assign(ZONA_UAF_POR_VEREDA as Record<string, string>, original);
-  }
-}
 
 describe('las reglas de negocio, contrastadas contra el acto real', () => {
   it('las expensas salen de la cantidad de lotes, no de un número escrito a mano', () => {
@@ -181,12 +173,16 @@ describe('las reglas de negocio, contrastadas contra el acto real', () => {
     expect(RANGOS_UAF.GUANENTA.hastaHas).toBe(10);
   });
 
-  it('el reparto de veredas por zona está VACÍO a propósito', () => {
-    /* Si alguien lo rellena «por parecido de nombre», este custodio se pone
-       rojo y obliga a decir de dónde salió el dato. En el acto real, un predio
-       en una vereda llamada «Alta» va por Magdalena Medio. */
-    expect(Object.keys(ZONA_UAF_POR_VEREDA)).toEqual([]);
-    expect(uafDeLaVereda('Vizcaína Alta')).toBeNull();
+  it('la zona NO se deduce de la vereda: se determina para el predio, con fuente', () => {
+    /* El error que este custodio cierra (14-sep-2026): la primera versión traía
+       un mapa vereda → zona. El texto que la resolución cita dice «LAS ÁREAS con
+       altura inferior a 1.000 m.s.n.m.» — la frontera es una curva de nivel y
+       puede partir una vereda en dos. En el acto real, un predio de una vereda
+       llamada «Alta» va por Magdalena Medio: no es que el nombre engañe, es que
+       la vereda no era la unidad. */
+    expect(uafDeterminada(null)).toBeNull();
+    expect(uafDeterminada({ zona: 'GUANENTA', fuente: '' }), 'aceptó una zona sin fuente').toBeNull();
+    expect(uafDeterminada({ zona: 'GUANENTA', fuente: 'Levantamiento topográfico' })).toBe(RANGOS_UAF.GUANENTA);
   });
 
   it('por debajo del mínimo de la UAF hace falta la excepción del art. 45 literal C', () => {

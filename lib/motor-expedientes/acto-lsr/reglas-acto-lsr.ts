@@ -57,33 +57,50 @@ export const RANGOS_UAF: Readonly<Record<ZonaUaf, RangoUaf>> = {
 };
 
 /**
- * QUÉ VEREDA CAE EN QUÉ ZONA — **vacío a propósito**.
+ * LA ZONA NO SE DEDUCE: SE DETERMINA, Y PARA ESTE PREDIO.
  *
- * El acto real distingue «las áreas con altura inferior a 1.000 m.s.n.m.» de
- * «Alto Simacota», y esa frontera es geográfica: quién está a cada lado lo sabe
- * Planeación, no este archivo. El catálogo de 48 veredas existe en el módulo de
- * Agricultura, pero NO trae altura ni zona.
+ * ── EL ERROR QUE ESTO CORRIGE (14-sep-2026) ───────────────────────────────
  *
- * Rellenarlo por parecido de nombre —«Vizcaína Alta» suena a alto, luego
- * Guanentá— sería inventar el dato que decide si una subdivisión es nula. En el
- * acto real, ese predio va por MAGDALENA MEDIO pese a llamarse «Alta».
+ * La primera versión de este módulo traía un mapa `ZONA_UAF_POR_VEREDA`, y con
+ * él una pregunta para Planeación: «¿qué veredas están bajo los 1.000 m.s.n.m.?».
+ * El propietario la rechazó, y al releer el texto que la propia resolución cita
+ * quedó claro por qué:
  *
- * Mientras esté vacío, `uafDeLaVereda` devuelve `null` y el generador se
- * detiene con un motivo legible. Es lo correcto: es mejor no emitir que emitir
- * con la UAF equivocada.
+ *   «Bolívar, Simacota, Río negro y Landázuri: LAS ÁREAS con altura inferior a
+ *    1.000 m.s.n.m.»
+ *
+ * **Áreas**, no veredas. La frontera es una curva de nivel, y una misma vereda
+ * puede quedar partida por ella. No existe una tabla municipal que reparta
+ * veredas por zona porque la unidad no es la vereda: es el predio, con su
+ * altura, y eso sale del levantamiento topográfico o del mapa del EOT — no de
+ * una decisión administrativa que alguien pueda dictar en una reunión.
+ *
+ * El ejemplo que el propio módulo citaba lo estaba diciendo: el predio de una
+ * vereda llamada «Alta» va por Magdalena Medio. No es que el nombre engañe; es
+ * que la vereda no era la unidad.
+ *
+ * ── POR QUÉ LA FUENTE ES OBLIGATORIA ──────────────────────────────────────
+ *
+ * De esta zona depende que la subdivisión sea válida o nula (art. 44 de la Ley
+ * 160: «so pena de nulidad absoluta»). Un expediente que afirme la zona sin
+ * decir de dónde la sacó no puede defender su propia motivación. Por eso
+ * `fuente` no es opcional: el dato viaja con su respaldo o no viaja.
  */
-export const ZONA_UAF_POR_VEREDA: Readonly<Record<string, ZonaUaf>> = {};
-
-/** La UAF de una vereda, o `null` si el reparto no está cargado para ella. */
-export function uafDeLaVereda(vereda: string | null | undefined): RangoUaf | null {
-  if (!vereda) return null;
-  const zona = ZONA_UAF_POR_VEREDA[normalizarVereda(vereda)];
-  return zona ? RANGOS_UAF[zona] : null;
+export interface DeterminacionUaf {
+  zona: ZonaUaf;
+  /**
+   * De dónde salió la altura del predio: «Levantamiento topográfico del
+   * 12-ago-2026», «Cartografía del EOT», «Concepto técnico N.º …». Texto libre
+   * mientras Planeación no normalice de dónde debe salir — normalizarlo antes
+   * sería fijar una fuente que nadie ha declarado.
+   */
+  fuente: string;
 }
 
-/** Minúsculas y sin tildes — «Vizcaína Alta», «VIZCAINA ALTA» y «vizcaina alta» son la misma. */
-export function normalizarVereda(v: string): string {
-  return v.toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '').replace(/\s+/g, ' ').trim();
+/** El rango que aplica a este predio, o `null` si no se ha determinado. */
+export function uafDeterminada(determinacion: DeterminacionUaf | null | undefined): RangoUaf | null {
+  if (!determinacion || !determinacion.fuente?.trim()) return null;
+  return RANGOS_UAF[determinacion.zona] ?? null;
 }
 
 /* ── LAS EXPENSAS ─────────────────────────────────────────────────────────

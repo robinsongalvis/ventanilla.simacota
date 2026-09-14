@@ -23,6 +23,8 @@
  * rellenar, y es justo lo contrario.
  */
 
+import type { DeterminacionUaf } from './reglas-acto-lsr';
+
 /** Un titular de la licencia. Son VARIOS: el acto real tiene tres. */
 export interface TitularActo {
   nombre: string;
@@ -89,6 +91,12 @@ export interface FechasDelActo {
 }
 
 export interface DatosActoLsr {
+  /**
+   * La zona de Unidad Agrícola Familiar DETERMINADA para este predio, con su
+   * fuente. No se deduce de la vereda: la frontera de los 1.000 m.s.n.m. es una
+   * curva de nivel y puede partir una vereda en dos (ver `DeterminacionUaf`).
+   */
+  determinacionUaf: DeterminacionUaf | null;
   /** Nombre del predio, p. ej. «CAMPO ALEGRE». */
   nombrePredio: string | null;
   vereda: string | null;
@@ -127,12 +135,14 @@ export const CAMPOS_OBLIGATORIOS_ACTO: readonly { campo: keyof DatosActoLsr | 'l
   { campo: 'escritura', comoSeLlama: 'Escritura pública', porQue: 'El artículo primero la cita con su número, notaría y círculo.' },
   { campo: 'lotes', comoSeLlama: 'Lotes resultantes', porQue: 'Sin ellos no hay subdivisión que aprobar ni cuadro de áreas que imprimir.' },
   { campo: 'referenciaPagoExpensas', comoSeLlama: 'Referencia de pago de expensas', porQue: 'El artículo de tarifas la cita; sin ella no consta que se pagó.' },
+  { campo: 'determinacionUaf', comoSeLlama: 'Zona de Unidad Agrícola Familiar del predio', porQue: 'De ella depende si la subdivisión es válida o nula (Ley 160 art. 44). Se determina por la altura del predio, con su fuente.' },
   { campo: 'firmantes', comoSeLlama: 'Firmantes', porQue: 'Un acto administrativo sin firmante identificado no es un acto administrativo.' },
 ];
 
 /** Un juego de datos vacío — el punto de partida honesto, sin campos inventados. */
 export function datosVacios(): DatosActoLsr {
   return {
+    determinacionUaf: null,
     nombrePredio: null, vereda: null, direccion: null, matriculaInmobiliaria: null,
     cedulaCatastral: null, areaTotalTexto: null, estrato: null,
     titulares: [], profesional: null, escritura: null, lotes: [],
