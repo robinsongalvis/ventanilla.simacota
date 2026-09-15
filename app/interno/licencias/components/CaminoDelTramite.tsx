@@ -22,7 +22,7 @@ export function CaminoDelTramite({
   return (
     <section
       aria-label="Camino del trámite"
-      className="rounded-xl p-4"
+      className="microtarjeta rounded-xl p-4"
       style={{ background: 'var(--bg-surface)', border: '1px solid var(--color-border)' }}
     >
       <p className="text-[10px] font-bold uppercase tracking-widest mb-3" style={{ color: '#667085' }}>

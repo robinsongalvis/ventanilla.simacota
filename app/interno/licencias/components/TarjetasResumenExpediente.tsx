@@ -94,7 +94,7 @@ function Tarjeta({
   icono: ReactNode; tinte: string; trazo: string; label: string; children: ReactNode;
 }) {
   return (
-    <div className="flex items-start gap-3 rounded-xl p-3" style={{ background: 'var(--bg-surface)', border: '1px solid var(--color-border)' }}>
+    <div className="microtarjeta flex items-start gap-3 rounded-xl p-3" style={{ background: 'var(--bg-surface)', border: '1px solid var(--color-border)' }}>
       <span aria-hidden className="mt-0.5 flex h-9 w-9 shrink-0 items-center justify-center rounded-full" style={{ background: tinte, color: trazo }}>
         {icono}
       </span>
