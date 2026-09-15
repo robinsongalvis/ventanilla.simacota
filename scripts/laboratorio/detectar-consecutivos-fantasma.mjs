@@ -41,6 +41,12 @@ export const ALCANCE_DETECTOR = {
   excluidos: {
     expedientes:
       'La serie no tiene colección de documentos cuyo id lleve el consecutivo, así que no hay serie de ids que barrer por continuidad. Su unicidad la garantiza la reserva `unicidad_expedientes` y su coherencia con la apertura la vigila el cron de auditoría de los lunes.',
+    'actos-lsr': 'El acto todavía no se emite: no hay documentos cuyo id lleve el consecutivo.',
+    'actos-lc': 'El acto todavía no se emite: no hay documentos cuyo id lleve el consecutivo.',
+    'actos-lsu': 'El acto todavía no se emite: no hay documentos cuyo id lleve el consecutivo.',
+    'actos-ph': 'El acto todavía no se emite: no hay documentos cuyo id lleve el consecutivo.',
+    'actos-lr': 'El acto todavía no se emite: no hay documentos cuyo id lleve el consecutivo.',
+    'actos-lu': 'El acto todavía no se emite: no hay documentos cuyo id lleve el consecutivo.',
   },
 };
 

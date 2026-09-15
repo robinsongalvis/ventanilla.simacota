@@ -34,7 +34,24 @@ import type { OrigenActuacion } from '@/lib/motor-expedientes/tipos';
  *     origen `RECONSTRUIDO` abortan toda la confirmación (ver su JSDoc).
  */
 
-export type SerieConsecutivo = 'radicados' | 'salidas' | 'planillas' | 'expedientes';
+/**
+ * Las series legales del municipio.
+ *
+ * ── POR QUÉ HAY UNA POR MODALIDAD DE ACTO (14-sep-2026) ───────────────────
+ *
+ * Planeación decidió que la resolución se numera con **una serie por
+ * modalidad, reiniciando cada año** (`LSR No. 001-2025`). Eso no es una
+ * etiqueta sobre un consecutivo común: son consecutivos distintos, y meterlos
+ * en uno solo haría que LSR y LC se pisaran los números.
+ *
+ * `actos-la` NO existe: la ampliación comparte el consecutivo de construcción
+ * mientras no se aclare su descripción (ver `acto-lsr/serie-acto-lsr.ts`).
+ * `actos-lu` sí existe aunque nunca se haya usado — abrirla el día que se use
+ * es un acto explícito, y una serie que no existe no se puede abrir.
+ */
+export type SerieConsecutivo =
+  | 'radicados' | 'salidas' | 'planillas' | 'expedientes'
+  | 'actos-lsr' | 'actos-lc' | 'actos-lsu' | 'actos-ph' | 'actos-lr' | 'actos-lu';
 
 /**
  * EL DOMINIO, EN CÓDIGO Y NO EN UN COMENTARIO.
@@ -47,6 +64,7 @@ export type SerieConsecutivo = 'radicados' | 'salidas' | 'planillas' | 'expedien
  */
 export const SERIES_CONSECUTIVO = [
   'radicados', 'salidas', 'planillas', 'expedientes',
+  'actos-lsr', 'actos-lc', 'actos-lsu', 'actos-ph', 'actos-lr', 'actos-lu',
 ] as const satisfies readonly SerieConsecutivo[];
 
 /**
