@@ -94,19 +94,55 @@ apertura: {
 }
 ```
 
-**2 · Ejecutar**, primero en seco y después de verdad:
+**2 · El dry-run, que ahora es PRECONDICIÓN y no modo por defecto** (15-sep-2026):
 
 ```bash
 export FIREBASE_SERVICE_ACCOUNT="$(grep '^FIREBASE_SERVICE_ACCOUNT=' .env.produccion | cut -d= -f2-)"
 node -e "console.log(JSON.parse(process.env.FIREBASE_SERVICE_ACCOUNT).project_id)"   # debe decir ventanilla-unica-f31b1
-node scripts/operacion/abrir-series.mjs --proyecto ventanilla-unica-f31b1            # DRY-RUN
-CONFIRMO_APERTURA=SI node scripts/operacion/abrir-series.mjs --proyecto ventanilla-unica-f31b1
+node scripts/operacion/abrir-series.mjs --proyecto ventanilla-unica-f31b1
 ```
 
-**Antes de ejecutar el segundo**, contraste contra el libro lo que imprima el
-dry-run: tiene que decir `EL PRIMER NÚMERO SERÁ: 26` para expedientes y `14`
-para actos-lsr. Si el libro avanzó desde la confirmación, **pare y vuelva a
-fijar el punto** — el script no puede saberlo por su cuenta.
+**Criterio de OK — las cuatro cosas, todas:**
+
+| | Debe decir |
+|---|---|
+| 1 | `EXPEDIENTES` · `► EL PRIMER NÚMERO SERÁ: 26` |
+| 2 | `ACTOS-LSR` · `► EL PRIMER NÚMERO SERÁ: 14` |
+| 3 | Ninguna otra serie con `Se abrirá dejándolo en` |
+| 4 | Esos dos números coinciden con el libro **consultado en ese momento** |
+
+Si cualquiera de las cuatro falla, **NO ejecute**: vuelva a fijar el punto de
+apertura con los números del libro de hoy y repita el dry-run.
+
+La cuarta es la única que ningún código puede comprobar — el libro de papel
+avanza sin que el sistema se entere. Por eso el dry-run imprime los números en
+grande y por eso hay que mirarlos contra el libro, no contra este documento.
+
+**3 · Ejecutar, declarando los números**
+
+El propio dry-run imprime el comando ya armado. Es este:
+
+```bash
+CONFIRMO_APERTURA=SI node scripts/operacion/abrir-series.mjs \
+  --proyecto ventanilla-unica-f31b1 \
+  --esperado expedientes=26 --esperado actos-lsr=14
+```
+
+`--esperado` es **obligatorio**: sin él el script aborta con código 5 sin
+escribir nada. No es una formalidad — es lo que impide que la ejecución se salte
+la comprobación. Si entre el dry-run y la ejecución el punto de apertura cambia,
+los números no coinciden y aborta igual.
+
+**Debe imprimir**, antes de escribir:
+
+```
+✔ Comprobación: los primeros números coinciden con lo declarado en el acta.
+   ABIERTA  expedientes: <n> → primer número 26
+   ABIERTA  actos-lsr: <n> → primer número 14
+```
+
+Si en vez de eso sale `⛔`, **nada se escribió** (todo-o-nada) y el mensaje dice
+qué no cuadró.
 
 > Aviso de la carga de credenciales: `source .env` **no sirve** — el shell se
 > come las comillas del JSON. Use el `export` de arriba, tal cual. En el ensayo
