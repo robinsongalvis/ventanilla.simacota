@@ -612,10 +612,17 @@ export function DetalleLicenciaClient({ expedienteId, onVolver }: DetalleLicenci
           className="flex-1 min-w-0 rounded-xl p-4"
           style={{ background: 'var(--bg-surface)', border: '1px solid var(--color-border)', boxShadow: 'var(--shadow-soft)' }}
         >
-          <p className="text-[10.5px] font-bold uppercase tracking-widest mb-3" style={{ color: 'var(--text-secondary)' }}>
+          <p className="text-[10.5px] font-bold uppercase tracking-widest" style={{ color: 'var(--text-secondary)' }}>
             Historial del expediente
           </p>
-          <EventoTimeline eventos={timeline} />
+          <p className="text-xs mb-3 mt-0.5" style={{ color: 'var(--text-secondary)' }}>
+            Registro de las actuaciones y el estado actual del expediente.
+          </p>
+          <EventoTimeline
+            eventos={timeline}
+            contexto={{ estado: expediente.estadoJuridico, documentacionCompleta: expediente.completitud?.completo === true }}
+            leyenda
+          />
 
           {/* ── RESUMEN DE DOCUMENTOS ────────────────────────────────────
               Junto al historial y NO en la columna de acciones: quien mira lo
