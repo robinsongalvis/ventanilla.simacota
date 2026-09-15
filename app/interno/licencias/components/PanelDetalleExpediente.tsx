@@ -360,7 +360,11 @@ export function PanelDetalleExpediente({ expedienteId, onCerrar, textoColision =
               {computos?.vigencia !== undefined && <PanelVigenciaActo vigencia={computos.vigencia} />}
 
               <Seccion titulo="Historial del expediente">
-                <EventoTimeline eventos={timeline} />
+                <EventoTimeline
+                  eventos={timeline}
+                  contexto={{ estado: expediente.estadoJuridico, documentacionCompleta: expediente.completitud?.completo === true }}
+                  leyenda
+                />
               </Seccion>
 
               <Seccion titulo="Documentos">
