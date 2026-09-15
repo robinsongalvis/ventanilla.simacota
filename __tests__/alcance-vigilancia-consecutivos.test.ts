@@ -65,7 +65,11 @@ describe('el mecanismo caza de verdad el defecto que lo motivó', () => {
       cubiertos: ['radicados', 'salidas', 'planillas'],
       excluidos: {},
     } as const;
-    expect(elementosNoDeclarados(SERIES_CONSECUTIVO, comoEstabaAntes)).toEqual(['expedientes']);
+    /* Se comprueba que SEÑALA la serie olvidada, no que sea la única: el
+       dominio crece —el 14-sep-2026 entraron las seis series de actos— y una
+       aserción sobre la lista entera convertiría cada serie nueva en una
+       prueba roja que no dice nada del mecanismo. */
+    expect(elementosNoDeclarados(SERIES_CONSECUTIVO, comoEstabaAntes)).toContain('expedientes');
   });
 
   it('declarar la exclusión con el nombre mal escrito tampoco pasa', () => {
@@ -75,7 +79,9 @@ describe('el mecanismo caza de verdad el defecto que lo motivó', () => {
       cubiertos: ['radicados', 'salidas', 'planillas'],
       excluidos: { expediente: 'falta la s' },
     } as never;
-    expect(elementosNoDeclarados(SERIES_CONSECUTIVO, conErrata)).toEqual(['expedientes']);
+    expect(elementosNoDeclarados(SERIES_CONSECUTIVO, conErrata)).toContain('expedientes');
+    /* El fantasma sí es exacto: es lo que sobra en la declaración, y no
+       depende de cuántas series tenga el dominio. */
     expect(elementosFantasma(SERIES_CONSECUTIVO, conErrata)).toEqual(['expediente']);
   });
 });

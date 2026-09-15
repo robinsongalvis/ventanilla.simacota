@@ -45,6 +45,18 @@ export const ALCANCE_BARRIDA_CONTINUIDAD: AlcanceVigilancia<SerieConsecutivo> = 
   excluidos: {
     expedientes:
       'No tiene colección de documentos asignada mientras Fase 1 no la defina, así que no hay serie de ids que barrer por continuidad. NO queda sin vigilancia: se audita en su propia rama (estado del contador y coherencia con su apertura) más abajo en este mismo cron.',
+    /* Las seis series de ACTOS (14-sep-2026). Ningún documento lleva todavía
+       el número de la resolución en su id —la emisión no está construida— así
+       que no hay serie de ids que barrer. Se excluyen de la BARRIDA, no de la
+       vigilancia: su contador y su coherencia con la apertura se auditan en la
+       misma rama que `expedientes`. El día que el acto se emita y su número
+       viva en un documento, estas líneas se mueven a `cubiertos`. */
+    'actos-lsr': 'El acto todavía no se emite: no hay documentos cuyo id lleve el consecutivo. Se audita con `expedientes`, por contador y apertura.',
+    'actos-lc': 'El acto todavía no se emite: no hay documentos cuyo id lleve el consecutivo. Se audita con `expedientes`, por contador y apertura.',
+    'actos-lsu': 'El acto todavía no se emite: no hay documentos cuyo id lleve el consecutivo. Se audita con `expedientes`, por contador y apertura.',
+    'actos-ph': 'El acto todavía no se emite: no hay documentos cuyo id lleve el consecutivo. Se audita con `expedientes`, por contador y apertura.',
+    'actos-lr': 'El acto todavía no se emite: no hay documentos cuyo id lleve el consecutivo. Se audita con `expedientes`, por contador y apertura.',
+    'actos-lu': 'El acto todavía no se emite: no hay documentos cuyo id lleve el consecutivo. Se audita con `expedientes`, por contador y apertura.',
   },
 };
 // Techo del plan (Vercel Hobby/Pro: 300s en funciones cron) — mismo estándar

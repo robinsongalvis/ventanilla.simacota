@@ -46,6 +46,18 @@ export const SERIE_DE_LA_MODALIDAD: Readonly<Record<ModalidadActo, ModalidadActo
 };
 
 /**
+ * El CONTADOR del que sale el número de cada modalidad.
+ *
+ * Deriva de `SERIE_DE_LA_MODALIDAD`, no se escribe aparte: si LA dejara de
+ * compartir con LC, cambiar el mapa de arriba basta y esto lo sigue. Dos listas
+ * paralelas sobre lo mismo es exactamente lo que produjo la divergencia de
+ * quince días en el plazo de subsanación.
+ */
+export function contadorDeLaModalidad(modalidad: ModalidadActo): string {
+  return `actos-${SERIE_DE_LA_MODALIDAD[modalidad].toLowerCase()}`;
+}
+
+/**
  * El número, escrito. `LSR No. 001-2025`.
  *
  * El consecutivo va a TRES dígitos porque así lo lleva el libro (`001`, `013`)

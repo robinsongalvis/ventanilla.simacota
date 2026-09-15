@@ -1,12 +1,13 @@
 import { describe, expect, it } from 'vitest';
 import {
-  SERIE_DE_LA_MODALIDAD, ULTIMO_CONFIRMADO_2026, ULTIMO_RADICADO_2026,
+  SERIE_DE_LA_MODALIDAD, ULTIMO_CONFIRMADO_2026, ULTIMO_RADICADO_2026, contadorDeLaModalidad,
   formatearNumeroActo, leerNumeroActo, siguienteConsecutivo, type ModalidadActo,
 } from '@/lib/motor-expedientes/acto-lsr/serie-acto-lsr';
 import {
   PARAMETROS_DECIDIDOS, PROCEDENCIA, TEXTO_RECURSOS_RESOLUCION_LSR,
 } from '@/lib/motor-expedientes/acto-lsr/decisiones-tomadas';
 import { decisionesQueFaltan } from '@/lib/motor-expedientes/acto-lsr/decisiones-pendientes';
+import { SERIES_CONSECUTIVO } from '@/lib/server/consecutivo-legal';
 import { generarActoLsr, renderTextoActo } from '@/lib/motor-expedientes/acto-lsr/generar-acto-lsr';
 import { datosVacios } from '@/lib/motor-expedientes/acto-lsr/datos-acto-lsr';
 
@@ -88,6 +89,23 @@ describe('LA no abre contador propio — el error recuperable', () => {
     expect(ULTIMO_CONFIRMADO_2026.LA).toBeUndefined();
     /* LU tampoco: el ingeniero respondió «no tiene». Abriría en 001 al usarse. */
     expect(ULTIMO_CONFIRMADO_2026.LU).toBeUndefined();
+  });
+
+  it('el contador de LA es el de LC — derivado, no escrito aparte', () => {
+    /* Si se escribiera en dos sitios, aclarar lo de LA obligaría a acordarse de
+       los dos. Aquí solo hay un mapa. */
+    expect(contadorDeLaModalidad('LA')).toBe('actos-lc');
+    expect(contadorDeLaModalidad('LC')).toBe('actos-lc');
+    expect(contadorDeLaModalidad('LSR')).toBe('actos-lsr');
+  });
+
+  it('cada contador existe en el dominio de series', () => {
+    /* Un contador con nombre inventado no se puede abrir: `abrir-series` solo
+       recorre `SERIES_CONSECUTIVO`, y la serie se quedaría muda. */
+    for (const m of ['LSR', 'LC', 'LSU', 'PH', 'LR', 'LA', 'LU'] as ModalidadActo[]) {
+      expect(SERIES_CONSECUTIVO as readonly string[], `${m} apunta a un contador que no existe`)
+        .toContain(contadorDeLaModalidad(m));
+    }
   });
 
   it('el radicado de entrada abre en 0026', () => {

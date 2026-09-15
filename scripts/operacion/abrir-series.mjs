@@ -28,7 +28,14 @@
 import { getFirestore } from 'firebase-admin/firestore';
 import { cert, getApps, initializeApp } from 'firebase-admin/app';
 
-const SERIES = ['radicados', 'salidas', 'planillas', 'expedientes'];
+/* MISMA lista que `SERIES_CONSECUTIVO` (`lib/server/consecutivo-legal.ts`).
+   `abrir-series-coherente.test.ts` enfrenta las dos: si una gana una serie y la
+   otra no, la prueba lo dice. Las de actos entraron el 14-sep-2026, cuando
+   Planeación fijó una serie por modalidad. */
+const SERIES = [
+  'radicados', 'salidas', 'planillas', 'expedientes',
+  'actos-lsr', 'actos-lc', 'actos-lsu', 'actos-ph', 'actos-lr', 'actos-lu',
+];
 
 /* Réplica de `decidirApertura` (lib/server/apertura-series.ts). Este script es
    un `.mjs` y no puede importar TypeScript. La copia NO queda a la buena fe:
