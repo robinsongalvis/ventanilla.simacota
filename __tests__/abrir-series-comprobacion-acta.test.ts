@@ -1,5 +1,4 @@
 import { describe, expect, it } from 'vitest';
-// @ts-expect-error — script de operación en .mjs, sin tipos
 import { verificarEsperados } from '@/scripts/operacion/abrir-series.mjs';
 
 /* ══════════════════════════════════════════════════════════════
