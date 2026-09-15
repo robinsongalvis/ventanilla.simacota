@@ -132,7 +132,7 @@ function FilaEvento({
       {/* CONTENIDO — para el evento ACTUAL, en una tarjeta tenue con borde
           lateral; para los demás, alineado a la derecha del punto. */}
       <div
-        className={evento.esActual ? 'ml-6 rounded-lg px-3 py-2' : 'pl-6'}
+        className={evento.esActual ? 'microtarjeta ml-6 rounded-lg px-3 py-2' : 'pl-6'}
         style={
           evento.esActual
             ? { background: FONDO_EVENTO_ACTUAL, border: `1px solid ${def.chipFondo}`, borderLeft: `3px solid ${def.color}` }
@@ -176,7 +176,7 @@ function FilaEvento({
               onClick={() => setTecnicoAbierto((v) => !v)}
               aria-expanded={tecnicoAbierto}
               aria-controls={idTecnico}
-              className="mt-1.5 inline-flex items-center gap-1 text-[11px] font-bold focus-visible:outline-none focus-visible:ring-2 rounded"
+              className="mt-1.5 inline-flex items-center gap-1 text-[11px] font-bold transition-colors hover:underline focus-visible:outline-none focus-visible:ring-2 rounded"
               style={{ color: '#667085' }}
             >
               <span aria-hidden>ⓘ</span>

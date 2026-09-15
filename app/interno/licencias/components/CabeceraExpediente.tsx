@@ -148,11 +148,11 @@ function TarjetaEstado({
   const estilo = { background: fondo, border: `1px solid ${dot}22` } as const;
   const clase = 'rounded-xl px-4 py-3 lg:w-64 lg:shrink-0 text-left';
   return onVer ? (
-    <button type="button" onClick={onVer} className={`${clase} transition-shadow hover:shadow-sm focus-visible:outline-none focus-visible:ring-2`} style={estilo}>
+    <button type="button" onClick={onVer} className={`microtarjeta-clic ${clase}`} style={estilo}>
       {contenido}
     </button>
   ) : (
-    <div className={clase} style={estilo}>{contenido}</div>
+    <div className={`microtarjeta ${clase}`} style={estilo}>{contenido}</div>
   );
 }
 

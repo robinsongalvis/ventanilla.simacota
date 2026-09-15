@@ -45,7 +45,7 @@ export function PestanasExpediente({ activa, onCambiar, documentos, hechos }: Pe
             type="button"
             aria-selected={esActiva}
             onClick={() => onCambiar(p.id)}
-            className="inline-flex items-center gap-2 px-3 py-2.5 text-sm transition-colors focus-visible:outline-none focus-visible:ring-2"
+            className="inline-flex items-center gap-2 rounded-t-lg px-3 py-2.5 text-sm transition-colors duration-150 hover:bg-black/[0.03] active:bg-black/[0.05] focus-visible:outline-none focus-visible:ring-2"
             style={{
               color: esActiva ? '#14532D' : 'var(--text-secondary)',
               fontWeight: esActiva ? 800 : 600,
