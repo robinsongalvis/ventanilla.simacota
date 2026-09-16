@@ -1,6 +1,6 @@
 'use client';
 
-import { useMemo } from 'react';
+import { useMemo, type ReactNode } from 'react';
 import type { AporteRequisito, ContextoEvaluacionRequisito, DefinicionTramite } from '@/lib/motor-expedientes/tipos';
 import type { DocumentoExpedienteDoc } from '@/lib/server/expedientes-documentos-tipos';
 import { evaluarCompletitud } from '@/lib/motor-expedientes/completitud';
@@ -88,6 +88,23 @@ export function ChecklistRequisitos({
   const aplicables = Math.max(0, totalNoOpcionales - noResueltos);
   const aportados = Math.max(0, aplicables - resultado.faltantes.length);
 
+  /* Resumen por ESTADO — un solo eje, mutuamente excluyente. Todos salen de las
+     MISMAS listas del evaluador; ningún número se inventa ni se recalcula.
+
+     Deliberadamente NO se muestra «Condicionales» aquí: es un eje de TIPO, no de
+     estado, y un condicional que aplica y está pendiente contaría a la vez en
+     «Pendientes» y en «Condicionales» (se solaparían). «Condicionales» queda
+     para el filtro de la Fase 2, no para el resumen.
+
+     · «Requieren corrección» = DUPLICADO (`aportesDuplicados`): más de un aporte
+       para el mismo requisito. NO es una revisión humana —ese flujo no existe—,
+       es la única inconsistencia de datos que la tabla marca hoy.
+     · «Sin definir» = INDETERMINADO (`indeterminados`): condicional cuya
+       condición aún no se puede evaluar porque falta un hecho del caso. */
+  const pendientes = resultado.faltantes.length;
+  const requiereCorreccion = resultado.aportesDuplicados.length;
+  const sinDefinir = resultado.indeterminados.length;
+
   const otrosDocumentos = documentos.filter((d) => !d.requisitoId);
 
   return (
@@ -146,6 +163,15 @@ export function ChecklistRequisitos({
         {soloLectura && motivoSoloLectura && (
           <p className="text-xs w-full" style={{ color: 'var(--text-secondary)' }}>{motivoSoloLectura}</p>
         )}
+      </div>
+
+      {/* RESUMEN POR ESTADO — de un vistazo, con los mismos números del
+          evaluador. Presentación pura: no reevalúa nada. */}
+      <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
+        <TileEstado valor={aportados} label="Aportados" color="#16A34A" fondo="#E7F5EC" icono={<IconoCheck />} />
+        <TileEstado valor={pendientes} label="Pendientes" color="#D97706" fondo="#FDF1DC" icono={<IconoReloj />} />
+        <TileEstado valor={requiereCorreccion} label="Requieren corrección" color="#DC2626" fondo="#FCEAEA" icono={<IconoEquis />} />
+        <TileEstado valor={sinDefinir} label="Sin definir" color="#2563EB" fondo="#E9F0FC" icono={<IconoInterrogante />} />
       </div>
 
       {definicion.clavesContexto && definicion.clavesContexto.length > 0 && (
@@ -222,5 +248,58 @@ export function ChecklistRequisitos({
         onDocumentoSubido={onDocumentoSubido}
       />
     </div>
+  );
+}
+
+/** Una tarjeta del resumen por estado: icono en círculo de color + número + etiqueta. */
+function TileEstado({
+  valor, label, color, fondo, icono,
+}: {
+  valor: number; label: string; color: string; fondo: string; icono: ReactNode;
+}) {
+  return (
+    <div className="flex items-center gap-2.5 rounded-xl px-3 py-2.5" style={{ background: 'var(--bg-surface)', border: '1px solid var(--color-border)' }}>
+      <span aria-hidden className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full" style={{ background: fondo, color }}>
+        {icono}
+      </span>
+      <span className="min-w-0">
+        <span className="block font-headline text-lg font-black leading-none tabular-nums" style={{ color: 'var(--text-primary)' }}>{valor}</span>
+        <span className="mt-0.5 block text-xs leading-tight" style={{ color: 'var(--text-secondary)' }}>{label}</span>
+      </span>
+    </div>
+  );
+}
+
+function IconoCheck() {
+  return (
+    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" aria-hidden>
+      <circle cx="12" cy="12" r="9" stroke="currentColor" strokeWidth="1.7" />
+      <path d="M8.3 12.2l2.4 2.4 5-5.2" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
+    </svg>
+  );
+}
+function IconoReloj() {
+  return (
+    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" aria-hidden>
+      <circle cx="12" cy="12" r="9" stroke="currentColor" strokeWidth="1.7" />
+      <path d="M12 7.5V12l3 2" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
+    </svg>
+  );
+}
+function IconoEquis() {
+  return (
+    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" aria-hidden>
+      <circle cx="12" cy="12" r="9" stroke="currentColor" strokeWidth="1.7" />
+      <path d="M9 9l6 6M15 9l-6 6" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" />
+    </svg>
+  );
+}
+function IconoInterrogante() {
+  return (
+    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" aria-hidden>
+      <circle cx="12" cy="12" r="9" stroke="currentColor" strokeWidth="1.7" />
+      <path d="M9.6 9.4a2.4 2.4 0 0 1 4.2 1.5c0 1.6-2.4 1.8-2.4 3.1" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" />
+      <circle cx="11.4" cy="16.4" r="0.95" fill="currentColor" />
+    </svg>
   );
 }

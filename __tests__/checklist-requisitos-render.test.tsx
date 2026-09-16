@@ -273,6 +273,10 @@ describe('Bloque A·A3 — ChecklistRequisitos reacciona EN VIVO a "Hechos del c
     expect(barraDespues.getAttribute('aria-valuenow')).toBe('0');
     expect(barraDespues.getAttribute('aria-valuemax')).toBe('3');
     expect(screen.getByText(/^Faltan · 3$/)).toBeTruthy();
-    expect(screen.queryByText(/^Sin definir/)).toBeNull();
+    /* Se apunta al ENCABEZADO del grupo («Sin definir — dependen de Hechos del
+       caso · N»), no a un «Sin definir» cualquiera: el resumen por estado tiene
+       una tarjeta «Sin definir» siempre visible (que ahora marca 0), y es
+       correcta — lo que esta prueba custodia es que el GRUPO desaparezca. */
+    expect(screen.queryByText(/^Sin definir — dependen/)).toBeNull();
   });
 });
