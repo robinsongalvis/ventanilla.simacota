@@ -22,16 +22,15 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import { RadicarDebidaFormaModal, type VistaPreviaDebidaForma } from '../components/RadicarDebidaFormaModal';
 import { accionesDeCierreDisponibles, puedeExpedirEjecutoria } from '../acciones-de-cierre';
 import { CabeceraExpediente } from '../components/CabeceraExpediente';
+import { TarjetasResumenExpediente } from '../components/TarjetasResumenExpediente';
 import { CaminoDelTramite } from '../components/CaminoDelTramite';
 import { CabeceraTermino } from '../components/CabeceraTermino';
 import { PestanasExpediente, type PestanaExpediente } from '../components/PestanasExpediente';
 import type { TipoActuacionPermitida } from '@/lib/server/expedientes-licencias';
-import type { ReactNode } from 'react';
 import Link from 'next/link';
 import { useAuth } from '@/lib/hooks/useAuth';
 import type { ActuacionLicenciaDoc, ExpedienteLicenciaDoc } from '@/lib/server/expedientes-licencias';
 import { puedeTransicionar, type EstadoJuridicoLicencia } from '@/lib/motor-expedientes/estados-licencia';
-import { formatFechaColombia } from '@/lib/fecha-colombia';
 import type { ContextoEvaluacionRequisito, DefinicionTramite } from '@/lib/motor-expedientes/tipos';
 import type { DocumentoExpedienteDoc } from '@/lib/server/expedientes-documentos-tipos';
 import { DEFINICION_LICENCIA_CONSTRUCCION_PARCIAL } from '@/lib/motor-expedientes/definiciones/licencia-construccion-parcial';
@@ -41,7 +40,6 @@ import { ESTILOS_ESTADO_JURIDICO } from '../estilos-estado-juridico';
 import type { ComputosExpedienteUI, BorradorActoDesistimiento } from '../tipos-computos';
 import { ChipEstadoJuridico } from '../components/ChipEstadoJuridico';
 import { ChipPrueba } from '../components/ChipPrueba';
-import { NumeroLegal } from '../components/NumeroLegal';
 import { EventoTimeline } from '../components/EventoTimeline';
 import { PanelTerminoDual } from '../components/PanelTerminoDual';
 import { VincularRadicadoModal } from '../components/VincularRadicadoModal';
@@ -443,6 +441,8 @@ export function DetalleLicenciaClient({ expedienteId, onVolver }: DetalleLicenci
         <CabeceraExpediente
           expediente={expediente}
           desdeCuandoCorreElPlazo={anclaDelTermino ?? null}
+          terminoDual={computos?.terminoDual}
+          onVerEstado={() => setPestana('historial')}
         />
         {expediente.esPrueba && (
           <div className="flex flex-wrap items-center gap-2">
@@ -457,40 +457,16 @@ export function DetalleLicenciaClient({ expedienteId, onVolver }: DetalleLicenci
           documentos={conteoDocumentos}
           hechos={conteoHechos}
         />
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-4 pt-3" style={{ borderTop: '1px solid var(--color-border)' }}>
-          <Metadato label="Solicitante">
-            {expediente.solicitanteNombre}
-            <span style={{ color: 'var(--text-secondary)' }}> · {expediente.solicitanteDocumento}</span>
-          </Metadato>
-          <Metadato label="Radicado de origen (Ventanilla)" truncar={false}>
-            {expediente.radicadoId ? (
-              <span className="flex flex-col gap-0.5">
-                <NumeroLegal value={expediente.radicadoId} variant="radicado" size="sm" />
-                <span className="text-xs" style={{ color: 'var(--text-secondary)' }}>
-                  {radicadoVinculado?.fecha
-                    ? `Vinculado el ${formatFechaColombia(radicadoVinculado.fecha)}`
-                    : 'Fecha de vinculación no disponible'}
-                </span>
-              </span>
-            ) : (
-              // El expediente nació sin radicado («Radicar solicitud»).
-              // Antes esto era un callejón sin salida permanente; ahora se
-              // puede reparar desde aquí mismo.
-              <span className="flex flex-col items-start gap-1">
-                <span>Sin vincular aún</span>
-                <button
-                  type="button"
-                  onClick={() => setVinculando(true)}
-                  className="text-xs font-bold underline focus-visible:outline-none focus-visible:ring-2 rounded"
-                  style={{ color: 'var(--color-primary)' }}
-                >
-                  Vincular radicado de Ventanilla
-                </button>
-              </span>
-            )}
-          </Metadato>
-          <Metadato label="Origen">{expediente.origen ?? 'REAL'}</Metadato>
-          <Metadato label="Creado">{formatFechaColombia(expediente.creadoEn)}</Metadato>
+        <div className="pt-3" style={{ borderTop: '1px solid var(--color-border)' }}>
+          <TarjetasResumenExpediente
+            solicitanteNombre={expediente.solicitanteNombre}
+            solicitanteDocumento={expediente.solicitanteDocumento}
+            radicadoId={expediente.radicadoId}
+            radicadoVinculadoFecha={radicadoVinculado?.fecha ?? null}
+            origen={expediente.origen}
+            creadoEn={expediente.creadoEn}
+            onVincular={() => setVinculando(true)}
+          />
         </div>
       </div>
 
@@ -612,10 +588,17 @@ export function DetalleLicenciaClient({ expedienteId, onVolver }: DetalleLicenci
           className="flex-1 min-w-0 rounded-xl p-4"
           style={{ background: 'var(--bg-surface)', border: '1px solid var(--color-border)', boxShadow: 'var(--shadow-soft)' }}
         >
-          <p className="text-[10.5px] font-bold uppercase tracking-widest mb-3" style={{ color: 'var(--text-secondary)' }}>
+          <p className="text-[10.5px] font-bold uppercase tracking-widest" style={{ color: 'var(--text-secondary)' }}>
             Historial del expediente
           </p>
-          <EventoTimeline eventos={timeline} />
+          <p className="text-xs mb-3 mt-0.5" style={{ color: 'var(--text-secondary)' }}>
+            Registro de las actuaciones y el estado actual del expediente.
+          </p>
+          <EventoTimeline
+            eventos={timeline}
+            contexto={{ estado: expediente.estadoJuridico, documentacionCompleta: expediente.completitud?.completo === true }}
+            leyenda
+          />
 
           {/* ── RESUMEN DE DOCUMENTOS ────────────────────────────────────
               Junto al historial y NO en la columna de acciones: quien mira lo
@@ -745,24 +728,3 @@ function VolverBandeja({ onVolver }: { onVolver?: () => void }) {
   );
 }
 
-function Metadato({
-  label,
-  children,
-  truncar = true,
-}: {
-  label: string;
-  children: ReactNode;
-  /** `false` cuando el contenido necesita más de una línea (p. ej. radicado + fecha de vinculación) — el resto de metadatos sigue truncando a una línea. */
-  truncar?: boolean;
-}) {
-  return (
-    <div className="min-w-0">
-      <p className="text-[10px] font-bold uppercase tracking-widest" style={{ color: 'var(--text-secondary)' }}>
-        {label}
-      </p>
-      <div className={`text-sm mt-0.5 ${truncar ? 'truncate' : ''}`} style={{ color: 'var(--text-primary)' }}>
-        {children}
-      </div>
-    </div>
-  );
-}

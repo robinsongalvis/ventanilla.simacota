@@ -2,6 +2,7 @@ import { afterEach, describe, expect, it } from 'vitest';
 import { cleanup, render, screen } from '@testing-library/react';
 import { EventoTimeline } from '@/app/interno/licencias/components/EventoTimeline';
 import { construirTimelineDesdeActuaciones, tituloComunicacionEnviada } from '@/app/interno/licencias/presentacion-actuaciones';
+import { ESTADOS_VISUALES } from '@/app/interno/licencias/estado-visual-evento';
 import type { Actuacion } from '@/lib/motor-expedientes/tipos';
 
 afterEach(() => {
@@ -12,8 +13,9 @@ afterEach(() => {
    Bloque A·A4/A5 — la actuación `comunicacion-enviada` (constancia de
    handoff o aviso de acta, `construirActuacionComunicacionEnviada`,
    `lib/server/expedientes-licencias.ts`) debe verse en el timeline con
-   etiqueta PROPIA (no el `tipo` crudo) y tono INFORMATIVO — nunca el verde
-   de éxito de `RADICACION`.
+   etiqueta PROPIA (no el `tipo` crudo). El COLOR ya no depende de la especie:
+   desde el cambio de UI/UX (15-sep-2026) sale del ESTADO VISUAL — un hecho ya
+   ocurrido es `completed` (`app/interno/licencias/estado-visual-evento.ts`).
 
    El servidor NO tiene un campo `metadata.tipo` (ni `Actuacion` ni
    `ActuacionLicenciaDoc` lo declaran) — constancia y aviso de acta
@@ -22,6 +24,12 @@ afterEach(() => {
    `construirActuacionComunicacionEnviada` para las dos llamadas que hoy
    existen (`desde-radicado/route.ts` y `[id]/actuaciones/route.ts`).
 ══════════════════════════════════════════════════════════════ */
+
+/** jsdom devuelve `style.background` normalizado a `rgb(...)`; comparamos ahí. */
+function hexARgb(hex: string): string {
+  const n = hex.replace('#', '');
+  return `rgb(${parseInt(n.slice(0, 2), 16)}, ${parseInt(n.slice(2, 4), 16)}, ${parseInt(n.slice(4, 6), 16)})`;
+}
 
 function actuacionComunicacion(overrides: Partial<Actuacion> = {}): Actuacion {
   return {
@@ -57,8 +65,8 @@ describe('tituloComunicacionEnviada — distingue constancia de aviso de acta po
   });
 });
 
-describe('EventoTimeline — comunicacion-enviada con etiqueta y tono propios', () => {
-  it('renderiza "Constancia enviada al ciudadano" y "Aviso de acta enviado" en tono info (nunca el verde de RADICACION)', () => {
+describe('EventoTimeline — comunicacion-enviada con etiqueta propia y color por estado', () => {
+  it('renderiza "Constancia enviada al ciudadano" y "Aviso de acta enviado" con título propio y color de estado (completed)', () => {
     const actuaciones: Actuacion[] = [
       actuacionComunicacion({ id: 'act-1', fecha: '2026-08-08T10:00:00.000Z' }),
       actuacionComunicacion({
@@ -83,16 +91,17 @@ describe('EventoTimeline — comunicacion-enviada con etiqueta y tono propios', 
     const filas = container.querySelectorAll('li');
     expect(filas.length).toBe(2);
     filas.forEach((fila) => {
-      /* SE LOCALIZA POR SU ATRIBUTO, no por su posición. La heurística anterior
-         —«el último span[aria-hidden] de la fila»— se rompió el 30-ago-2026 al
-         añadir el icono del detalle técnico, que va después del punto: la prueba
-         empezó a medir el color del icono. El orden del DOM no es un contrato;
-         `data-punto-timeline` sí. */
+      /* SE LOCALIZA POR SU ATRIBUTO, no por su posición. `data-punto-timeline`
+         es un contrato estable; el orden del DOM no. */
       const punto = fila.querySelector('[data-punto-timeline]') as HTMLElement;
-      expect(punto.style.background).toBe('var(--color-info)');
-      // Nunca el verde institucional de éxito/RADICACION ni el ámbar de ACTA.
-      expect(punto.style.background).not.toBe('#14532D');
-      expect(punto.style.background).not.toBe('#D97706');
+      /* NUEVA SEMÁNTICA (UI/UX 15-sep-2026): el color del punto ya NO sale del
+         `tipo` de la actuación, sino de su ESTADO VISUAL, deliberadamente
+         INDEPENDIENTE del tipo (`estado-visual-evento.ts`). Una comunicación
+         enviada es un hecho ya ocurrido → `completed` (verde), como cualquier
+         otro hecho cumplido. Que la especie ya NO decida el color es justo el
+         objetivo del cambio; la distinción «comunicación» vive ahora en su
+         título, no en su color. */
+      expect(punto.style.background).toBe(hexARgb(ESTADOS_VISUALES.completed.color));
     });
   });
 });

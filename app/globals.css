@@ -302,6 +302,107 @@ body {
   border-radius: inherit;
 }
 
+/* ── Microinteracciones sobrias de tarjeta (paneles administrativos) ──
+   Una leve elevación que comunica «disponible para interactuar», no una
+   animación. SOLO sombra y desplazamiento: no tocan color, borde, radio ni
+   layout, así que se combinan con los estilos en línea de cada tarjeta sin
+   alterarlos. `.microtarjeta` es para tarjetas informativas (más sutil);
+   `.microtarjeta-clic`, para las que tienen una acción al hacer clic (un
+   punto más perceptible). Sobrio y serio, nada de rebotes ni escalados. */
+.microtarjeta,
+.microtarjeta-clic {
+  transition: box-shadow 180ms ease, transform 180ms ease;
+}
+.microtarjeta:hover {
+  box-shadow: 0 4px 14px rgba(20, 83, 45, 0.07);
+  transform: translateY(-1px);
+}
+.microtarjeta-clic {
+  cursor: pointer;
+}
+.microtarjeta-clic:hover {
+  box-shadow: 0 8px 22px rgba(20, 83, 45, 0.11);
+  transform: translateY(-2px);
+}
+.microtarjeta-clic:active {
+  transform: translateY(0);
+  box-shadow: 0 2px 6px rgba(20, 83, 45, 0.08);
+  transition-duration: 90ms;
+}
+.microtarjeta-clic:focus-visible {
+  outline: 2px solid var(--color-info);
+  outline-offset: 2px;
+}
+/* Respeta prefers-reduced-motion: se conserva la sombra (afordancia),
+   se elimina el desplazamiento. */
+@media (prefers-reduced-motion: reduce) {
+  .microtarjeta,
+  .microtarjeta-clic {
+    transition: box-shadow 130ms ease !important;
+  }
+  .microtarjeta:hover,
+  .microtarjeta-clic:hover,
+  .microtarjeta-clic:active {
+    transform: none !important;
+  }
+}
+
+/* ── Segmented control sobrio (Hechos del caso) ──
+   Los estados (seleccionado / no seleccionado) viven aquí, dirigidos por
+   `aria-pressed`, para poder dar micro-hover sin pelear con estilos en línea.
+   El verde queda de ACENTO (opción elegida); las demás, neutras. */
+.seg-opt {
+  cursor: pointer;
+  transition:
+    background-color 160ms ease,
+    border-color 160ms ease,
+    box-shadow 160ms ease,
+    transform 160ms ease,
+    color 160ms ease;
+}
+.seg-opt[aria-pressed='false'] {
+  background: var(--bg-surface);
+  color: var(--text-primary);
+  border: 1px solid var(--color-border);
+  font-weight: 600;
+}
+.seg-opt[aria-pressed='false']:hover:not(:disabled) {
+  background: #f1f4f2;
+  border-color: var(--color-border-strong);
+  box-shadow: 0 2px 6px rgba(20, 83, 45, 0.06);
+  transform: translateY(-1px);
+}
+.seg-opt[aria-pressed='true'] {
+  background: #14532d;
+  color: #fff;
+  border: 1px solid #14532d;
+  font-weight: 800;
+  box-shadow: 0 1px 3px rgba(20, 83, 45, 0.22);
+}
+.seg-opt[aria-pressed='true']:hover:not(:disabled) {
+  box-shadow: 0 3px 9px rgba(20, 83, 45, 0.24);
+  transform: translateY(-1px);
+}
+.seg-opt:active:not(:disabled) {
+  transform: translateY(0);
+}
+.seg-opt:disabled {
+  cursor: default;
+}
+.seg-opt:focus-visible {
+  outline: 2px solid var(--color-info);
+  outline-offset: 2px;
+}
+@media (prefers-reduced-motion: reduce) {
+  .seg-opt {
+    transition: background-color 120ms ease, border-color 120ms ease, box-shadow 120ms ease;
+  }
+  .seg-opt:hover:not(:disabled),
+  .seg-opt:active:not(:disabled) {
+    transform: none;
+  }
+}
+
 /* ── Sprint UI Premium — utilidades para hover gradiente Digital ── */
 
 /* Botón primario premium (Radicar mi Solicitud) */

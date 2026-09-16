@@ -106,7 +106,7 @@ export function ChecklistRequisitos({
         </p>
 
         <div
-          className="flex-1 min-w-[120px] h-2 rounded-full overflow-hidden"
+          className="flex-1 min-w-[120px] h-1.5 rounded-full overflow-hidden"
           role="progressbar"
           aria-valuenow={aportados}
           aria-valuemin={0}
