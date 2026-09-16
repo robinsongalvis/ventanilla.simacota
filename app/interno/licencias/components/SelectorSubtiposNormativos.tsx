@@ -75,7 +75,7 @@ function TarjetaFigura({
   return (
     <label
       className={
-        'flex items-start gap-2 cursor-pointer transition-colors '
+        'tl-card flex items-start gap-2 cursor-pointer '
         + 'hover:border-[var(--verde-institucional)] '
         + 'has-[:focus-visible]:outline has-[:focus-visible]:outline-2 '
         + 'has-[:focus-visible]:outline-offset-2 has-[:focus-visible]:outline-[var(--verde-institucional)] '

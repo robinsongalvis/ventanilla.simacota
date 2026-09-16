@@ -66,6 +66,8 @@ export function RadicarSolicitudModal({ onCerrar, onCreado }: RadicarSolicitudMo
   const [guardando, setGuardando] = useState(false);
   const [errorServidor, setErrorServidor] = useState<string | null>(null);
   const [creado, setCreado] = useState<ExpedienteLicenciaDoc | null>(null);
+  /* 14.11 — el header gana una sombra sutil solo cuando el cuerpo se desplaza. */
+  const [scrolled, setScrolled] = useState(false);
 
   useEffect(() => {
     function onKeyDown(e: KeyboardEvent) {
@@ -146,10 +148,10 @@ export function RadicarSolicitudModal({ onCerrar, onCreado }: RadicarSolicitudMo
       aria-modal="true"
       aria-label="Recibir solicitud de licencia"
     >
-      <button type="button" aria-label="Cerrar" onClick={onCerrar} className="absolute inset-0 bg-black/55" />
+      <button type="button" aria-label="Cerrar" onClick={onCerrar} className="tl-overlay absolute inset-0 bg-black/55" />
 
       <div
-        className="relative w-full max-w-2xl shadow-2xl overflow-hidden flex flex-col"
+        className="tl-modal relative w-full max-w-2xl overflow-hidden flex flex-col"
         style={{
           background: 'var(--superficie)',
           border: '1px solid var(--borde)',
@@ -157,7 +159,7 @@ export function RadicarSolicitudModal({ onCerrar, onCreado }: RadicarSolicitudMo
           maxHeight: 'calc(100dvh - 24px)',
         }}
       >
-        <header className="px-5 py-4" style={{ borderBottom: '1px solid var(--borde)' }}>
+        <header className={`tl-header px-5 py-4 ${scrolled ? 'tl-header--scrolled' : ''}`} style={{ borderBottom: '1px solid var(--borde)' }}>
           <p
             className="text-[11px] font-semibold uppercase"
             style={{ color: 'var(--dorado)', letterSpacing: '0.08em' }}
@@ -184,7 +186,7 @@ export function RadicarSolicitudModal({ onCerrar, onCreado }: RadicarSolicitudMo
         </header>
 
         {creado ? (
-          <div className="flex flex-col items-center gap-4 px-6 py-10 text-center">
+          <div className="tl-success-in flex flex-col items-center gap-4 px-6 py-10 text-center">
             <p className="text-xs font-bold uppercase tracking-widest" style={{ color: 'var(--color-success-text)' }}>
               Expediente creado
             </p>
@@ -198,7 +200,7 @@ export function RadicarSolicitudModal({ onCerrar, onCreado }: RadicarSolicitudMo
               <button
                 type="button"
                 onClick={onCerrar}
-                className="px-4 py-2.5 rounded-xl text-sm font-bold"
+                className="tl-btn tl-btn-secondary px-4 py-2.5 rounded-xl text-sm font-bold"
                 style={{ border: '1px solid #D9E2D9', color: '#475569' }}
               >
                 Volver a la bandeja
@@ -206,7 +208,7 @@ export function RadicarSolicitudModal({ onCerrar, onCreado }: RadicarSolicitudMo
               <button
                 type="button"
                 onClick={() => router.push(`/interno/licencias/${creado.id}`)}
-                className="px-5 py-2.5 rounded-xl text-sm font-bold text-white"
+                className="tl-btn tl-btn-primary px-5 py-2.5 rounded-xl text-sm font-bold text-white"
                 style={{ background: '#14532D' }}
               >
                 Ver expediente →
@@ -214,7 +216,11 @@ export function RadicarSolicitudModal({ onCerrar, onCreado }: RadicarSolicitudMo
             </div>
           </div>
         ) : (
-          <form onSubmit={(e) => { void handleSubmit(e); }} className="flex-1 min-h-0 overflow-y-auto px-5 py-4 space-y-4">
+          <form
+            onSubmit={(e) => { void handleSubmit(e); }}
+            onScroll={(e) => setScrolled(e.currentTarget.scrollTop > 4)}
+            className="flex-1 min-h-0 overflow-y-auto px-5 py-4 space-y-4"
+          >
             <div className="grid gap-3 grid-cols-1 md:grid-cols-2">
               <label>
                 <span className={labelCls} style={labelStyle}>Nombre del solicitante</span>
@@ -331,20 +337,20 @@ export function RadicarSolicitudModal({ onCerrar, onCreado }: RadicarSolicitudMo
             />
 
             {errorServidor && (
-              <p role="alert" className="rounded-lg px-3 py-2 text-xs"
+              <p role="alert" className="tl-error-in rounded-lg px-3 py-2 text-xs"
                  style={{ background: '#FEF2F2', border: '1px solid #FECACA', color: '#991B1B' }}>
                 {errorServidor}
               </p>
             )}
 
             <footer
-              className="flex items-center justify-end gap-2 mt-1 pt-3"
-              style={{ borderTop: '1px solid var(--borde)' }}
+              className="tl-footer flex items-center justify-end gap-2 -mx-5 px-5 pt-3 pb-1 mt-1"
+              style={{ borderTop: '1px solid var(--borde)', background: 'var(--superficie)' }}
             >
               <button
                 type="button"
                 onClick={onCerrar}
-                className="text-sm font-medium focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--verde-institucional)]"
+                className="tl-btn tl-btn-secondary text-sm font-medium focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--verde-institucional)]"
                 style={{
                   padding: '12px 22px',
                   borderRadius: 'var(--radio-control)',
@@ -358,10 +364,15 @@ export function RadicarSolicitudModal({ onCerrar, onCreado }: RadicarSolicitudMo
               <button
                 type="submit"
                 disabled={guardando}
-                className="text-sm font-semibold text-white disabled:opacity-60 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--verde-institucional)]"
+                className="tl-btn tl-btn-primary text-sm font-semibold text-white disabled:opacity-60 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--verde-institucional)]"
                 style={{ padding: '12px 22px', borderRadius: 'var(--radio-control)', background: 'var(--verde-institucional)' }}
               >
-                {guardando ? 'Recibiendo…' : 'Recibir solicitud'}
+                {guardando ? (
+                  <span className="inline-flex items-center gap-2">
+                    <span className="tl-spinner" aria-hidden />
+                    Recibiendo…
+                  </span>
+                ) : 'Recibir solicitud'}
               </button>
             </footer>
           </form>
