@@ -88,14 +88,22 @@ export function ChecklistRequisitos({
   const aplicables = Math.max(0, totalNoOpcionales - noResueltos);
   const aportados = Math.max(0, aplicables - resultado.faltantes.length);
 
-  /* Resumen por estado — TODOS salen de las mismas listas del evaluador, ningún
-     número se inventa. «Requiere corrección» no es un estado nuevo: es
-     `DUPLICADO`, que el propio `RequisitoItem` describe como «requiere
-     corrección manual». «Condicionales» cuenta los requisitos de tipo
-     CONDICIONAL (apliquen o no), que es la cifra que la funcionaria reconoce. */
+  /* Resumen por ESTADO — un solo eje, mutuamente excluyente. Todos salen de las
+     MISMAS listas del evaluador; ningún número se inventa ni se recalcula.
+
+     Deliberadamente NO se muestra «Condicionales» aquí: es un eje de TIPO, no de
+     estado, y un condicional que aplica y está pendiente contaría a la vez en
+     «Pendientes» y en «Condicionales» (se solaparían). «Condicionales» queda
+     para el filtro de la Fase 2, no para el resumen.
+
+     · «Requieren corrección» = DUPLICADO (`aportesDuplicados`): más de un aporte
+       para el mismo requisito. NO es una revisión humana —ese flujo no existe—,
+       es la única inconsistencia de datos que la tabla marca hoy.
+     · «Sin definir» = INDETERMINADO (`indeterminados`): condicional cuya
+       condición aún no se puede evaluar porque falta un hecho del caso. */
   const pendientes = resultado.faltantes.length;
   const requiereCorreccion = resultado.aportesDuplicados.length;
-  const condicionales = definicion.requisitos.filter((r) => r.tipo === 'CONDICIONAL').length;
+  const sinDefinir = resultado.indeterminados.length;
 
   const otrosDocumentos = documentos.filter((d) => !d.requisitoId);
 
@@ -162,8 +170,8 @@ export function ChecklistRequisitos({
       <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
         <TileEstado valor={aportados} label="Aportados" color="#16A34A" fondo="#E7F5EC" icono={<IconoCheck />} />
         <TileEstado valor={pendientes} label="Pendientes" color="#D97706" fondo="#FDF1DC" icono={<IconoReloj />} />
-        <TileEstado valor={requiereCorreccion} label="Requiere corrección" color="#DC2626" fondo="#FCEAEA" icono={<IconoEquis />} />
-        <TileEstado valor={condicionales} label="Condicionales" color="#7C3AED" fondo="#F1E9FE" icono={<IconoDocumento />} />
+        <TileEstado valor={requiereCorreccion} label="Requieren corrección" color="#DC2626" fondo="#FCEAEA" icono={<IconoEquis />} />
+        <TileEstado valor={sinDefinir} label="Sin definir" color="#2563EB" fondo="#E9F0FC" icono={<IconoInterrogante />} />
       </div>
 
       {definicion.clavesContexto && definicion.clavesContexto.length > 0 && (
@@ -286,11 +294,12 @@ function IconoEquis() {
     </svg>
   );
 }
-function IconoDocumento() {
+function IconoInterrogante() {
   return (
     <svg width="18" height="18" viewBox="0 0 24 24" fill="none" aria-hidden>
-      <path d="M7 3.75h6.5L18.25 8.5V19A1.25 1.25 0 0 1 17 20.25H7A1.25 1.25 0 0 1 5.75 19V5A1.25 1.25 0 0 1 7 3.75Z" stroke="currentColor" strokeWidth="1.6" />
-      <path d="M13 4v5h5M8.5 13h7M8.5 16h4" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" />
+      <circle cx="12" cy="12" r="9" stroke="currentColor" strokeWidth="1.7" />
+      <path d="M9.6 9.4a2.4 2.4 0 0 1 4.2 1.5c0 1.6-2.4 1.8-2.4 3.1" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" />
+      <circle cx="11.4" cy="16.4" r="0.95" fill="currentColor" />
     </svg>
   );
 }
