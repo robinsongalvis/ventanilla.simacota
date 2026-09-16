@@ -1,6 +1,6 @@
 'use client';
 
-import { useMemo } from 'react';
+import { useMemo, type ReactNode } from 'react';
 import type { AporteRequisito, ContextoEvaluacionRequisito, DefinicionTramite } from '@/lib/motor-expedientes/tipos';
 import type { DocumentoExpedienteDoc } from '@/lib/server/expedientes-documentos-tipos';
 import { evaluarCompletitud } from '@/lib/motor-expedientes/completitud';
@@ -88,6 +88,15 @@ export function ChecklistRequisitos({
   const aplicables = Math.max(0, totalNoOpcionales - noResueltos);
   const aportados = Math.max(0, aplicables - resultado.faltantes.length);
 
+  /* Resumen por estado — TODOS salen de las mismas listas del evaluador, ningún
+     número se inventa. «Requiere corrección» no es un estado nuevo: es
+     `DUPLICADO`, que el propio `RequisitoItem` describe como «requiere
+     corrección manual». «Condicionales» cuenta los requisitos de tipo
+     CONDICIONAL (apliquen o no), que es la cifra que la funcionaria reconoce. */
+  const pendientes = resultado.faltantes.length;
+  const requiereCorreccion = resultado.aportesDuplicados.length;
+  const condicionales = definicion.requisitos.filter((r) => r.tipo === 'CONDICIONAL').length;
+
   const otrosDocumentos = documentos.filter((d) => !d.requisitoId);
 
   return (
@@ -146,6 +155,15 @@ export function ChecklistRequisitos({
         {soloLectura && motivoSoloLectura && (
           <p className="text-xs w-full" style={{ color: 'var(--text-secondary)' }}>{motivoSoloLectura}</p>
         )}
+      </div>
+
+      {/* RESUMEN POR ESTADO — de un vistazo, con los mismos números del
+          evaluador. Presentación pura: no reevalúa nada. */}
+      <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
+        <TileEstado valor={aportados} label="Aportados" color="#16A34A" fondo="#E7F5EC" icono={<IconoCheck />} />
+        <TileEstado valor={pendientes} label="Pendientes" color="#D97706" fondo="#FDF1DC" icono={<IconoReloj />} />
+        <TileEstado valor={requiereCorreccion} label="Requiere corrección" color="#DC2626" fondo="#FCEAEA" icono={<IconoEquis />} />
+        <TileEstado valor={condicionales} label="Condicionales" color="#7C3AED" fondo="#F1E9FE" icono={<IconoDocumento />} />
       </div>
 
       {definicion.clavesContexto && definicion.clavesContexto.length > 0 && (
@@ -222,5 +240,57 @@ export function ChecklistRequisitos({
         onDocumentoSubido={onDocumentoSubido}
       />
     </div>
+  );
+}
+
+/** Una tarjeta del resumen por estado: icono en círculo de color + número + etiqueta. */
+function TileEstado({
+  valor, label, color, fondo, icono,
+}: {
+  valor: number; label: string; color: string; fondo: string; icono: ReactNode;
+}) {
+  return (
+    <div className="flex items-center gap-2.5 rounded-xl px-3 py-2.5" style={{ background: 'var(--bg-surface)', border: '1px solid var(--color-border)' }}>
+      <span aria-hidden className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full" style={{ background: fondo, color }}>
+        {icono}
+      </span>
+      <span className="min-w-0">
+        <span className="block font-headline text-lg font-black leading-none tabular-nums" style={{ color: 'var(--text-primary)' }}>{valor}</span>
+        <span className="mt-0.5 block text-xs leading-tight" style={{ color: 'var(--text-secondary)' }}>{label}</span>
+      </span>
+    </div>
+  );
+}
+
+function IconoCheck() {
+  return (
+    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" aria-hidden>
+      <circle cx="12" cy="12" r="9" stroke="currentColor" strokeWidth="1.7" />
+      <path d="M8.3 12.2l2.4 2.4 5-5.2" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
+    </svg>
+  );
+}
+function IconoReloj() {
+  return (
+    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" aria-hidden>
+      <circle cx="12" cy="12" r="9" stroke="currentColor" strokeWidth="1.7" />
+      <path d="M12 7.5V12l3 2" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
+    </svg>
+  );
+}
+function IconoEquis() {
+  return (
+    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" aria-hidden>
+      <circle cx="12" cy="12" r="9" stroke="currentColor" strokeWidth="1.7" />
+      <path d="M9 9l6 6M15 9l-6 6" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" />
+    </svg>
+  );
+}
+function IconoDocumento() {
+  return (
+    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" aria-hidden>
+      <path d="M7 3.75h6.5L18.25 8.5V19A1.25 1.25 0 0 1 17 20.25H7A1.25 1.25 0 0 1 5.75 19V5A1.25 1.25 0 0 1 7 3.75Z" stroke="currentColor" strokeWidth="1.6" />
+      <path d="M13 4v5h5M8.5 13h7M8.5 16h4" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" />
+    </svg>
   );
 }
