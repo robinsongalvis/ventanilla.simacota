@@ -124,7 +124,7 @@ export function CabeceraTermino({
     const acreditada = lectura.diasHabilesDetenido !== undefined;
     return (
       <div
-        className="rounded-xl overflow-hidden"
+        className="microtarjeta rounded-xl overflow-hidden"
         style={{ background: 'var(--bg-surface)', border: '1px solid var(--color-border)', borderTop: '3px solid #64748B' }}
       >
         <div className="p-4 flex flex-col gap-3">

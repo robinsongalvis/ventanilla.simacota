@@ -209,10 +209,10 @@ export function PanelHechosCaso({ expedienteId, clavesContexto, contexto, soloLe
             cuántas; al terminar, CONFIRMA que el checklist quedó exacto — que
             es el hecho que la funcionaria necesita para seguir. */}
         <span
-          className="text-xs font-bold px-3 py-2 rounded-lg"
+          className="text-xs font-bold px-3 py-1.5 rounded-lg"
           style={
             sinDefinir === 0
-              ? { background: '#116932', color: '#fff' }
+              ? { background: '#116932', color: '#fff', boxShadow: '0 1px 3px rgba(20,83,45,0.25)' }
               : { background: 'var(--bg-surface)', color: '#9A6206', border: '1px solid var(--color-border)' }
           }
         >
@@ -306,21 +306,18 @@ function FilaHecho({
 
   return (
     <li
-      className={`px-5 ${definido ? 'py-3' : 'py-4'} flex flex-wrap items-start justify-between gap-x-6 gap-y-3`}
+      className="px-5 py-4 flex flex-wrap items-start justify-between gap-x-8 gap-y-3"
       style={{
         borderTop: indice === 1 ? undefined : '1px solid var(--color-border)',
-        /* El verde recorre la fila entera y se apaga hacia la derecha, para
-           que la respondida se distinga de un vistazo sin gritar. */
-        background: definido
-          ? 'linear-gradient(90deg, rgba(20,83,45,0.07) 0%, rgba(20,83,45,0.03) 60%, transparent 100%)'
-          : undefined,
+        /* Fondo NEUTRO: la fila respondida se distingue por su check y su chip,
+           no por un lavado verde que dominaba la pantalla. */
       }}
     >
       <div className="min-w-0 flex-1">
         <div className="flex items-start gap-2.5">
           <span
             aria-hidden
-            className="mt-0.5 shrink-0 flex h-6 w-6 items-center justify-center rounded-full text-[11px] font-black"
+            className="mt-0.5 shrink-0 flex h-5 w-5 items-center justify-center rounded-full text-[10px] font-black"
             style={
               definido
                 ? { background: '#14532D', color: '#fff' }
@@ -344,12 +341,13 @@ function FilaHecho({
                 aplicada sin tener que recordar qué eligió. */}
             {definido && opcionDeValor(valorActual) && (
               <span
-                className="inline-block mt-1.5 text-xs font-bold px-2.5 py-1 rounded-full"
-                style={{ background: '#E7F6EC', color: '#116932' }}
+                className="inline-flex items-center mt-1.5 text-xs font-semibold px-2.5 py-1 rounded-md"
+                style={{ background: '#F1F5F3', color: '#116932' }}
               >
                 {/* El chip tiene TEXTO PROPIO, no la etiqueta más la
                     consecuencia pegadas: al decidir se puede ser más explícito
-                    que en un botón, porque ya no compite por espacio. */}
+                    que en un botón, porque ya no compite por espacio. Fondo
+                    NEUTRO y solo el punto en verde: información, no botón. */}
                 <span aria-hidden className="inline-block h-1.5 w-1.5 rounded-full mr-1.5" style={{ background: 'currentColor' }} />
                 {opcionDeValor(valorActual)!.resumen ?? opcionDeValor(valorActual)!.etiqueta}
               </span>
@@ -362,7 +360,7 @@ function FilaHecho({
                   onClick={() => setAyudaAbierta((v) => !v)}
                   aria-expanded={ayudaAbierta}
                   aria-controls={idAyuda}
-                  className="mt-1.5 inline-flex items-center gap-1.5 text-xs font-bold focus-visible:outline-none focus-visible:ring-2 rounded"
+                  className="mt-1.5 inline-flex items-center gap-1.5 text-xs font-bold transition-colors hover:underline focus-visible:outline-none focus-visible:ring-2 rounded"
                   style={{ color: '#14532D' }}
                 >
                   <span aria-hidden>ⓘ</span>
@@ -376,7 +374,7 @@ function FilaHecho({
                   id={idAyuda}
                   hidden={!ayudaAbierta}
                   className="text-xs leading-relaxed mt-2 px-3 py-2 rounded-lg"
-                  style={{ background: 'rgba(20,83,45,0.05)', borderLeft: '3px solid #14532D', color: 'var(--text-secondary)' }}
+                  style={{ background: 'var(--bg-surface-2)', borderLeft: '3px solid #14532D', color: 'var(--text-secondary)' }}
                 >
                   {clave.ayuda}
                 </p>
@@ -397,7 +395,7 @@ function FilaHecho({
            LO RESPONDIDO SE COMPACTA. El grupo se estrecha cuando el hecho ya
            está decidido: sin las consecuencias debajo de cada opción no
            necesita el ancho que exigía para caberlas. */
-        className={`flex gap-1 p-1 rounded-xl shrink-0 w-full ${definido ? 'sm:w-[220px]' : 'sm:w-[360px]'}`}
+        className={`flex items-stretch gap-1 p-1 rounded-xl shrink-0 w-full ${definido ? 'sm:w-[230px]' : 'sm:w-[360px]'}`}
         style={{ background: 'var(--bg-surface-2)' }}
       >
         {opciones.map((o) => {
@@ -409,12 +407,7 @@ function FilaHecho({
               disabled={soloLectura || guardando}
               aria-pressed={elegida}
               onClick={() => onElegir(o.valor)}
-              className={`flex-1 basis-0 ${definido ? 'px-3 py-1.5 text-[13px]' : 'px-4 py-2.5 text-sm'} text-center rounded-lg transition-colors disabled:opacity-60 focus-visible:outline-none focus-visible:ring-2`}
-              style={
-                elegida
-                  ? { background: '#14532D', color: '#fff', fontWeight: 800 }
-                  : { background: 'transparent', color: 'var(--text-primary)', fontWeight: 700 }
-              }
+              className={`seg-opt flex-1 basis-0 flex flex-col items-center justify-center min-h-[46px] leading-tight ${definido ? 'px-2.5 py-1.5 text-[12.5px]' : 'px-3 py-2 text-sm'} text-center rounded-lg disabled:opacity-60 focus-visible:outline-none`}
             >
               <span className="block">{o.etiqueta}</span>
               {/* LA CONSECUENCIA ES AYUDA PARA DECIDIR, y una vez decidido deja

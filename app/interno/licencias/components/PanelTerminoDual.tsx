@@ -92,8 +92,8 @@ export function PanelTerminoDual({ terminoDual, origen, fechaRadicacion, estadoJ
 
   return (
     <div
-      className="rounded-xl p-4 flex flex-col gap-3"
-      style={{ background: 'var(--bg-surface)', border: '1px solid var(--color-border)', boxShadow: 'var(--shadow-soft)' }}
+      className="microtarjeta rounded-xl p-4 flex flex-col gap-3"
+      style={{ background: 'var(--bg-surface)', border: '1px solid var(--color-border)' }}
     >
       {/* EL CÓMPUTO, PLEGADO. Deja de ser el encabezado y pasa a ser la letra
           menuda que se abre cuando se necesita. No se pierde una palabra: el
@@ -104,7 +104,7 @@ export function PanelTerminoDual({ terminoDual, origen, fechaRadicacion, estadoJ
         onClick={() => setDetalleAbierto((v) => !v)}
         aria-expanded={detalleAbierto}
         aria-controls="detalle-computo"
-        className="inline-flex items-center gap-1.5 text-xs font-bold self-start focus-visible:outline-none focus-visible:ring-2 rounded"
+        className="inline-flex items-center gap-1.5 text-xs font-bold self-start transition-colors hover:underline focus-visible:outline-none focus-visible:ring-2 rounded"
         style={{ color: '#14532D' }}
       >
         <span aria-hidden>ⓘ</span>
