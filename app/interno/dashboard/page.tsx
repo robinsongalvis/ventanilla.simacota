@@ -4866,27 +4866,24 @@ function DashboardInterior({ usuario, cerrarSesion }: { usuario: UsuarioAutentic
               onLimpiarTodo={limpiarTodosLosFiltros}
             />
 
-            {/* Banner de prioridad — reemplaza la bandeja operativa +
-                siguiente atención sugerida. Versión compacta que muestra
-                solo lo crítico: el caso más urgente que necesita acción. */}
+            {/* Banner de prioridad — el caso más urgente que necesita acción.
+                Rediseño §5: aparece SOLO ante una situación real (un caso
+                vencido o por vencer en ≤ 2 días). En calma NO se muestra —
+                nada de alerta permanente ni tarjeta vacía; el "qué sigue"
+                sin urgencia vive en «Mi jornada» (Fase 4). */}
             {(() => {
               const resumen = calcularResumenBandeja(todosLosRadicados);
               const siguiente = resumen.siguiente;
               const dias = siguiente ? calcDiasRestantes(siguiente) : null;
-              const nivelBanner = dias !== null && dias < 0
-                ? 'critico'
-                : dias !== null && dias <= 2
-                  ? 'alerta'
-                  : 'normal';
-              const msgBanner = dias !== null && dias < 0
+              // Sin caso vencido ni por vencer (≤ 2 días hábiles), no hay alerta.
+              // El early-return estrecha `dias` a number ≤ 2 en lo que sigue.
+              if (dias === null || dias > 2) return null;
+              const nivelBanner = dias < 0 ? 'critico' : 'alerta';
+              const msgBanner = dias < 0
                 ? `Atender de inmediato: vencido hace ${Math.abs(dias)} día${Math.abs(dias) !== 1 ? 's' : ''}`
-                : dias !== null && dias === 0
+                : dias === 0
                   ? 'Atender hoy: vence durante la jornada actual'
-                  : dias !== null && dias <= 2
-                    ? `Atender pronto: vence en ${dias} día${dias !== 1 ? 's' : ''}`
-                    : siguiente
-                      ? 'Caso activo con término vigente'
-                      : 'No hay casos activos en esta bandeja';
+                  : `Atender pronto: vence en ${dias} día${dias !== 1 ? 's' : ''}`;
               return (
                 <div className="px-3 sm:px-4 py-2 shrink-0 bg-white" style={{ borderBottom: '1px solid #E5E7EB' }}>
                   <PriorityBanner
