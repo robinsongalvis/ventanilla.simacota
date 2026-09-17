@@ -82,7 +82,7 @@ import { ResumenEjecutivoRadicado }          from '@/app/interno/dashboard/compo
    claro dejó sin un solo llamador: la proyección se construyó, se probó y se
    aseguró, y nadie llegó nunca a verla. Cuelga del panel que sí se pinta. */
 import { EstadoTramiteLicencia }             from '@/app/interno/dashboard/components/pqrs/EstadoTramiteLicencia';
-import { BarraKpisOperativos }               from '@/app/interno/dashboard/components/BarraKpisOperativos';
+import { FiltrosRapidos, PanelFiltrosAvanzados, ChipFiltro, type FiltroChipConfig } from '@/app/interno/dashboard/components/filtros/FiltrosTablero';
 import { calcularKpisOperativos }            from '@/lib/kpis-operativos/calcular-kpis-operativos';
 import {
   filtrarPorKpiOperativo,
@@ -4497,10 +4497,6 @@ function DashboardInterior({ usuario, cerrarSesion }: { usuario: UsuarioAutentic
     () => tarjetasMipg.reduce((s, t) => s + t.valor, 0),
     [tarjetasMipg],
   );
-  const tarjetasMipgCompactas = useMemo(
-    () => tarjetasMipg.filter((t) => !(FILTROS_GRANDES as string[]).includes(t.filtro)),
-    [tarjetasMipg],
-  );
 
   // Sprint 1.5 — toggle secundario "Datos incompletos" en la bandeja.
   // Estado local del componente (no va al store global porque es un
@@ -4617,6 +4613,67 @@ function DashboardInterior({ usuario, cerrarSesion }: { usuario: UsuarioAutentic
     dispatch({ type: 'SET_BUSQUEDA', busqueda: '' });
     setMenuMovilAbierto(false);
   }
+
+  // ══ Fase 3 — filtros del listado EN VIVO (reorganización VISUAL) ══════════
+  // Reutiliza los MISMOS setters de siempre (dispatch MIPG, setFiltroOperativo,
+  // setSoloMios, setSoloDatosIncompletos, tenant). CERO lógica de filtrado
+  // nueva; la «Búsqueda avanzada» histórica queda intacta y aparte.
+  const [filtrosAvanzadosAbierto, setFiltrosAvanzadosAbierto] = useState(false);
+  const setMipgFiltro = (f: FiltroMIPG) =>
+    dispatch({ type: 'SET_FILTRO_MIPG', filtro: filtroMIPG === f ? 'TODOS' : f });
+  const toggleOperativoFiltro = (f: Exclude<FiltroKpiOperativo, 'NINGUNO'>) =>
+    setFiltroOperativo(filtroOperativo === f ? 'NINGUNO' : f);
+  const desh = (valor: number, activo: boolean) => valor === 0 && !activo;
+
+  // Contador para el badge de «Filtros avanzados» (excluye la búsqueda, que
+  // tiene su propio campo). Son las dimensiones de `estadoFiltros` sin BÚSQUEDA.
+  const nFiltrosVivos =
+    (filtroMIPG !== 'TODOS' ? 1 : 0) +
+    (filtroOperativo !== 'NINGUNO' ? 1 : 0) +
+    (soloMios ? 1 : 0) +
+    (soloDatosIncompletos ? 1 : 0) +
+    (tenantFiltro !== 'TODOS' ? 1 : 0);
+
+  const filtrosRapidos: FiltroChipConfig[] = [
+    { id: 'q-todos', label: 'Todos', valor: todosLosRadicados.length, tono: 'neutral',
+      activo: filtroMIPG === 'TODOS' && filtroOperativo === 'NINGUNO',
+      onClick: () => { dispatch({ type: 'SET_FILTRO_MIPG', filtro: 'TODOS' }); setFiltroOperativo('NINGUNO'); } },
+    { id: 'q-por-vencer', label: 'Por vencer', valor: metricas.porVencer, tono: 'ambar',
+      activo: filtroMIPG === 'POR_VENCER', onClick: () => setMipgFiltro('POR_VENCER'), deshabilitado: desh(metricas.porVencer, filtroMIPG === 'POR_VENCER') },
+    { id: 'q-en-termino', label: 'En término', valor: metricas.enTermino, tono: 'verde',
+      activo: filtroMIPG === 'EN_TERMINO', onClick: () => setMipgFiltro('EN_TERMINO'), deshabilitado: desh(metricas.enTermino, filtroMIPG === 'EN_TERMINO') },
+    { id: 'q-sin-asignar', label: 'Sin asignar', valor: kpisOperativos.sinAsignar, tono: 'ambar',
+      activo: filtroOperativo === 'SIN_ASIGNAR', onClick: () => toggleOperativoFiltro('SIN_ASIGNAR'), deshabilitado: desh(kpisOperativos.sinAsignar, filtroOperativo === 'SIN_ASIGNAR') },
+    { id: 'q-vencidos', label: 'Vencidos', valor: metricas.vencidas, tono: 'rojo',
+      activo: filtroMIPG === 'VENCIDAS', onClick: () => setMipgFiltro('VENCIDAS'), deshabilitado: desh(metricas.vencidas, filtroMIPG === 'VENCIDAS') },
+    { id: 'q-resueltos-hoy', label: 'Resueltos hoy', valor: kpisOperativos.resueltosHoy, tono: 'verde',
+      activo: filtroOperativo === 'RESUELTOS_HOY', onClick: () => toggleOperativoFiltro('RESUELTOS_HOY'), deshabilitado: desh(kpisOperativos.resueltosHoy, filtroOperativo === 'RESUELTOS_HOY') },
+  ];
+
+  // «Filtros avanzados» — TODOS los filtros del vivo que existen hoy, por
+  // categoría. Ninguno nuevo: el resto de MIPG + operativos + identidad +
+  // dependencia que antes vivían en la banda permanente «Estado operativo».
+  const chipsEstadoAvanzado: FiltroChipConfig[] = [
+    { id: 'a-radicadas', label: 'Radicadas', valor: metricas.radicadas, tono: 'neutral', activo: filtroMIPG === 'RADICADAS', onClick: () => setMipgFiltro('RADICADAS'), deshabilitado: desh(metricas.radicadas, filtroMIPG === 'RADICADAS') },
+    { id: 'a-por-vencer', label: 'Por vencer', valor: metricas.porVencer, tono: 'ambar', activo: filtroMIPG === 'POR_VENCER', onClick: () => setMipgFiltro('POR_VENCER'), deshabilitado: desh(metricas.porVencer, filtroMIPG === 'POR_VENCER') },
+    { id: 'a-en-termino', label: 'En término', valor: metricas.enTermino, tono: 'verde', activo: filtroMIPG === 'EN_TERMINO', onClick: () => setMipgFiltro('EN_TERMINO'), deshabilitado: desh(metricas.enTermino, filtroMIPG === 'EN_TERMINO') },
+    { id: 'a-vencidos', label: 'Vencidos', valor: metricas.vencidas, tono: 'rojo', activo: filtroMIPG === 'VENCIDAS', onClick: () => setMipgFiltro('VENCIDAS'), deshabilitado: desh(metricas.vencidas, filtroMIPG === 'VENCIDAS') },
+    { id: 'a-asignadas', label: 'Asignadas', valor: metricas.asignadas, tono: 'azul', activo: filtroMIPG === 'ASIGNADAS', onClick: () => setMipgFiltro('ASIGNADAS'), deshabilitado: desh(metricas.asignadas, filtroMIPG === 'ASIGNADAS') },
+    { id: 'a-devueltas', label: 'Devueltas / Prórroga', valor: metricas.devueltasProrroga, tono: 'ambar', activo: filtroMIPG === 'DEVUELTAS_PRORROGA', onClick: () => setMipgFiltro('DEVUELTAS_PRORROGA'), deshabilitado: desh(metricas.devueltasProrroga, filtroMIPG === 'DEVUELTAS_PRORROGA') },
+    { id: 'a-fuera-termino', label: 'Resueltos fuera de término', valor: metricas.resueltosFueraTermino, tono: 'rojo', activo: filtroMIPG === 'RESUELTOS_FUERA_TERMINO', onClick: () => setMipgFiltro('RESUELTOS_FUERA_TERMINO'), deshabilitado: desh(metricas.resueltosFueraTermino, filtroMIPG === 'RESUELTOS_FUERA_TERMINO') },
+    { id: 'a-hoy', label: 'Hoy', valor: kpisOperativos.hoy, tono: 'neutral', activo: filtroOperativo === 'HOY', onClick: () => toggleOperativoFiltro('HOY'), deshabilitado: desh(kpisOperativos.hoy, filtroOperativo === 'HOY') },
+    { id: 'a-sin-asignar', label: 'Sin asignar', valor: kpisOperativos.sinAsignar, tono: 'ambar', activo: filtroOperativo === 'SIN_ASIGNAR', onClick: () => toggleOperativoFiltro('SIN_ASIGNAR'), deshabilitado: desh(kpisOperativos.sinAsignar, filtroOperativo === 'SIN_ASIGNAR') },
+    { id: 'a-sin-sellar', label: 'Sin sellar', valor: kpisOperativos.sinSellar, tono: 'ambar', activo: filtroOperativo === 'SIN_SELLAR', onClick: () => toggleOperativoFiltro('SIN_SELLAR'), deshabilitado: desh(kpisOperativos.sinSellar, filtroOperativo === 'SIN_SELLAR') },
+    { id: 'a-correo-fallido', label: 'Correo fallido', valor: kpisOperativos.correoFallido, tono: 'rojo', activo: filtroOperativo === 'CORREO_FALLIDO', onClick: () => toggleOperativoFiltro('CORREO_FALLIDO'), deshabilitado: desh(kpisOperativos.correoFallido, filtroOperativo === 'CORREO_FALLIDO') },
+    { id: 'a-resueltos-hoy', label: 'Resueltos hoy', valor: kpisOperativos.resueltosHoy, tono: 'verde', activo: filtroOperativo === 'RESUELTOS_HOY', onClick: () => toggleOperativoFiltro('RESUELTOS_HOY'), deshabilitado: desh(kpisOperativos.resueltosHoy, filtroOperativo === 'RESUELTOS_HOY') },
+  ];
+  const chipsPrioridad: FiltroChipConfig[] = [
+    { id: 'a-prioridad', label: 'Prioridad MIPG', valor: metricas.prioridadMIPG, tono: 'rojo', activo: filtroMIPG === 'PRIORIDAD_MIPG', onClick: () => setMipgFiltro('PRIORIDAD_MIPG'), deshabilitado: desh(metricas.prioridadMIPG, filtroMIPG === 'PRIORIDAD_MIPG') },
+  ];
+  const chipsIdentidad: FiltroChipConfig[] = [
+    { id: 'a-solo-mios', label: 'Solo los míos', valor: misActivos, tono: 'verde', activo: soloMios, onClick: () => setSoloMios((v) => !v) },
+    { id: 'a-datos-incompletos', label: 'Datos incompletos', tono: 'ambar', activo: soloDatosIncompletos, onClick: () => setSoloDatosIncompletos((v) => !v) },
+  ];
 
   return (
     <div className="flex h-[100dvh] overflow-hidden" style={{ background: '#F8FAF7' }}>
@@ -4823,40 +4880,54 @@ function DashboardInterior({ usuario, cerrarSesion }: { usuario: UsuarioAutentic
               metricas={metricas}
               filtroActivo={filtroMIPG}
               onFiltroChange={(f) => dispatch({ type: 'SET_FILTRO_MIPG', filtro: f })}
-              veTodosTenants={veTodosTenants}
+              /* El selector de dependencia y «Datos incompletos» se movieron a
+                 «Filtros avanzados» (Fase 3) — ya no compiten en la fila de
+                 métricas. veTodosTenants=false oculta aquí ese selector. */
+              veTodosTenants={false}
               tenantFiltro={tenantFiltro}
               onTenantChange={(t) => dispatch({ type: 'SET_TENANT_FILTRO', tenant: t })}
               modoCompacto={indicadoresCompactos}
               onToggleCompacto={toggleIndicadoresModo}
-              soloDatosIncompletos={soloDatosIncompletos}
-              onToggleDatosIncompletos={() => setSoloDatosIncompletos((v) => !v)}
             />
 
-            {/* Panel Op Fase 2 — banda única "Estado operativo": KPIs
-                MIPG compactos + KPIs operativos del día en una sola
-                franja (sprint tablero-jerarquia). En modo compacto los
-                MIPG ya están en la fila de TarjetasMIPG — no se duplican. */}
-            <BarraKpisOperativos
-              kpis={kpisOperativos}
-              filtroActivo={filtroOperativo}
-              onChange={setFiltroOperativo}
-              chipsExtra={!indicadoresCompactos && tarjetasMipgCompactas.length > 0 ? (
-                <>
-                  {tarjetasMipgCompactas.map((t) => (
-                    <ChipMipgCompacto
-                      key={t.filtro}
-                      item={t}
-                      activo={filtroMIPG === t.filtro}
-                      compacto
-                      onClick={() => dispatch({ type: 'SET_FILTRO_MIPG', filtro: t.filtro })}
-                    />
-                  ))}
-                  <span className="w-px self-stretch shrink-0" style={{ background: '#D9E2D9' }} aria-hidden="true" />
-                </>
-              ) : undefined}
-              misAsignados={misActivos}
-              soloMios={soloMios}
-              onToggleSoloMios={() => setSoloMios((v) => !v)}
+            {/* Rediseño §4 — filtros rápidos (frecuentes, visibles) + panel
+                «Filtros avanzados» colapsable con el RESTO agrupado por
+                categoría. Reorganización visual de los MISMOS filtros: se
+                acabó la banda permanente «Estado operativo». La «Búsqueda
+                avanzada» histórica es otra cosa y sigue en su botón. */}
+            <FiltrosRapidos
+              items={filtrosRapidos}
+              filtrosActivos={nFiltrosVivos}
+              avanzadosAbierto={filtrosAvanzadosAbierto}
+              onToggleAvanzados={() => setFiltrosAvanzadosAbierto((v) => !v)}
+              idPanel="panel-filtros-avanzados"
+            />
+            <PanelFiltrosAvanzados
+              abierto={filtrosAvanzadosAbierto}
+              idPanel="panel-filtros-avanzados"
+              hayFiltros={nFiltrosVivos > 0}
+              onLimpiar={limpiarTodosLosFiltros}
+              grupos={[
+                { titulo: 'Estado operativo', contenido: chipsEstadoAvanzado.map((c) => <ChipFiltro key={c.id} {...c} />) },
+                { titulo: 'Prioridad', contenido: chipsPrioridad.map((c) => <ChipFiltro key={c.id} {...c} />) },
+                { titulo: 'Identidad y gestión', contenido: chipsIdentidad.map((c) => <ChipFiltro key={c.id} {...c} />) },
+                ...(veTodosTenants ? [{
+                  titulo: 'Dependencia',
+                  contenido: (
+                    <select
+                      value={tenantFiltro}
+                      onChange={(e) => dispatch({ type: 'SET_TENANT_FILTRO', tenant: e.target.value as TenantId | 'TODOS' })}
+                      className="select-internal text-xs"
+                      aria-label="Filtrar por dependencia"
+                    >
+                      <option value="TODOS">Todas las dependencias</option>
+                      {(Object.keys(DIRECTORIO_TENANTS) as TenantId[]).map((id) => (
+                        <option key={id} value={id}>{NOMBRES_TENANT[id]}</option>
+                      ))}
+                    </select>
+                  ),
+                }] : []),
+              ]}
             />
 
             {/* Panel Op Nivel 3A — barra de filtros activos (solo si hay). */}
