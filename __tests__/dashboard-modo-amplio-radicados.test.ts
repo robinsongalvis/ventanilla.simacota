@@ -27,7 +27,9 @@ describe('Dashboard — vista amplia de radicados', () => {
 
   it('mantiene barras compactas y la tabla visible con más espacio', () => {
     expect(dashboard).toContain('<PriorityBanner');
-    expect(dashboard).toContain('<BarraKpisOperativos');
+    // La banda «Estado operativo» se retiró en la Fase 3 del rediseño
+    // (reemplazada por FiltrosRapidos/PanelFiltrosAvanzados); ya no se
+    // afirma su presencia aquí.
     expect(dashboard).toContain('<TarjetasMIPG');
     expect(dashboard).toContain('<TablaRadicados');
   });

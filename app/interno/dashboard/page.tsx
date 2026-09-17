@@ -1130,7 +1130,6 @@ function TarjetasMIPG({
   // Sprint tablero-jerarquia — los 4 KPIs restantes (Prioridad MIPG,
   // En término, Devueltas/Prórroga, Fuera de término) ya NO se
   // renderizan aquí: se fusionaron en la banda "Estado operativo"
-  // (ver <BarraKpisOperativos chipsExtra=…> en el render principal)
   // para cumplir la regla de banda única de estado.
   const porFiltro = new Map(tarjetas.map((t) => [t.filtro, t]));
 
@@ -4491,7 +4490,7 @@ function DashboardInterior({ usuario, cerrarSesion }: { usuario: UsuarioAutentic
   // siempre) pasa a un chip junto al título del Tablero. También
   // reutilizamos los 4 KPIs "compactos" (Prioridad/En término/
   // Devueltas-Prórroga/Fuera de término) para fusionarlos con la banda
-  // "Estado operativo" — ver <BarraKpisOperativos chipsExtra=…> abajo.
+  // "Estado operativo".
   const tarjetasMipg = useMemo(() => construirTarjetasMIPG(metricas), [metricas]);
   const totalKpisMipg = useMemo(
     () => tarjetasMipg.reduce((s, t) => s + t.valor, 0),
