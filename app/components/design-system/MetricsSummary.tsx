@@ -4,7 +4,7 @@
    Design System — MetricsSummary
 
    Barra compacta de métricas que reemplaza las 4 TarjetasMIPGGrande
-   y la BarraKpisOperativos en una sola línea visual.
+   en una sola línea visual.
 
    Diseño:
    - Fila horizontal con métricas clave en texto compacto
