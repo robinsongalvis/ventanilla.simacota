@@ -10,6 +10,15 @@ afterEach(() => {
   vi.restoreAllMocks();
 });
 
+/* El resumen ya no tiene encabezados de grupo «Faltan · N» (Fase 2: la vista se
+   agrupa por CATEGORÍA). El mismo número —cuántos hay en cada estado— vive ahora
+   en el contador del FILTRO correspondiente; se lee de ahí, que sigue saliendo
+   de las listas reales del evaluador. */
+function contadorFiltro(nombre: RegExp, valor: string) {
+  const btn = screen.getByRole('tab', { name: nombre });
+  expect(within(btn).getByText(valor), `el filtro ${nombre} debe contar ${valor}`).toBeTruthy();
+}
+
 /* ══════════════════════════════════════════════════════════════
    Bloque A·A3 — Checklist de requisitos (detalle del expediente).
 
@@ -101,7 +110,7 @@ describe('Bloque A·A3 — ChecklistRequisitos deriva estados del evaluador real
     expect(screen.getByText('Certificado de tradición')).toBeTruthy();
     expect(screen.getByText('Aportado')).toBeTruthy();
     expect(screen.getByText('v1')).toBeTruthy();
-    expect(screen.getByText('Reemplazar (nueva versión)')).toBeTruthy();
+    expect(screen.getByText('Reemplazar')).toBeTruthy();
     const enlaceDescarga = screen.getByText('Descargar') as HTMLAnchorElement;
     expect(enlaceDescarga.getAttribute('href')).toBe(
       `/api/interno/archivo?path=${encodeURIComponent('expedientes/exp-1/doc-1/v0001/certificado.pdf')}`,
@@ -158,7 +167,7 @@ describe('Bloque A·A3 — ChecklistRequisitos deriva estados del evaluador real
     expect(barra.getAttribute('aria-valuemax')).toBe('2');
     /* Y el grupo «Faltan» cuenta el que falta: la información no desapareció,
        cambió de sitio. */
-    expect(screen.getByText(/^Faltan · 1$/)).toBeTruthy();
+    contadorFiltro(/Pendientes/, '1');
     expect(screen.getByText('Incompleto')).toBeTruthy();
   });
 
@@ -189,7 +198,7 @@ describe('Bloque A·A3 — ChecklistRequisitos deriva estados del evaluador real
 
     // Ningún control de carga, en ningún requisito ni en "Otros documentos".
     expect(screen.queryByText('Subir documento')).toBeNull();
-    expect(screen.queryByText('Reemplazar (nueva versión)')).toBeNull();
+    expect(screen.queryByText('Reemplazar')).toBeNull();
     expect(screen.queryByText('Adjuntar documento')).toBeNull();
 
     /* El panel «Hechos del caso» se sigue viendo, pero no se puede tocar.
@@ -250,8 +259,8 @@ describe('Bloque A·A3 — ChecklistRequisitos reacciona EN VIVO a "Hechos del c
     /* «Faltan» cuenta los PENDIENTES (2). El condicional indeterminado va en su
        propio grupo: no se sabe si se exige —el evaluador lo descuenta de
        aplicables— y su acción es responder, no subir. */
-    expect(screen.getByText(/^Faltan · 2$/)).toBeTruthy();
-    expect(screen.getByText(/^Sin definir — dependen de Hechos del caso · 1$/)).toBeTruthy();
+    contadorFiltro(/Pendientes/, '2');
+    contadorFiltro(/Sin definir/, '1');
 
     // El funcionario marca "hay apoderado":
     fireEvent.click(screen.getByRole('button', { name: /^Sí$/ }));
@@ -272,7 +281,7 @@ describe('Bloque A·A3 — ChecklistRequisitos reacciona EN VIVO a "Hechos del c
     const barraDespues = screen.getByRole('progressbar', { name: /documentos aportados/i });
     expect(barraDespues.getAttribute('aria-valuenow')).toBe('0');
     expect(barraDespues.getAttribute('aria-valuemax')).toBe('3');
-    expect(screen.getByText(/^Faltan · 3$/)).toBeTruthy();
+    contadorFiltro(/Pendientes/, '3');
     /* Se apunta al ENCABEZADO del grupo («Sin definir — dependen de Hechos del
        caso · N»), no a un «Sin definir» cualquiera: el resumen por estado tiene
        una tarjeta «Sin definir» siempre visible (que ahora marca 0), y es

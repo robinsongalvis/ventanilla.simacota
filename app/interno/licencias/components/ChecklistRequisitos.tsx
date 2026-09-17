@@ -1,30 +1,35 @@
 'use client';
 
-import { useMemo, type ReactNode } from 'react';
+import { useMemo, useState } from 'react';
 import type { AporteRequisito, ContextoEvaluacionRequisito, DefinicionTramite } from '@/lib/motor-expedientes/tipos';
 import type { DocumentoExpedienteDoc } from '@/lib/server/expedientes-documentos-tipos';
 import { evaluarCompletitud } from '@/lib/motor-expedientes/completitud';
 import type { EstadoVisualRequisito } from '../estilos-estado-requisito';
+import { CATEGORIAS_DOCUMENTOS, categoriaDeRequisito } from '../categorias-documentos';
 import { PanelHechosCaso } from './PanelHechosCaso';
 import { RequisitoItem } from './RequisitoItem';
 import { OtrosDocumentos } from './OtrosDocumentos';
+import { DocumentSummary } from './DocumentSummary';
+import { DocumentFilters, type ConteosFiltro, type FiltroDoc } from './DocumentFilters';
+import { DocumentCategory } from './DocumentCategory';
 
 /* ══════════════════════════════════════════════════════════════
-   Sección "Checklist de requisitos" — Bloque A·A3 (ADR-0026 D4/D7,
-   ADR-0029). Orquesta el evaluador REAL (`evaluarCompletitud`,
-   `lib/motor-expedientes/completitud.ts`) contra los `documentos` y
-   `aportes` del expediente + el `contexto` vivo del caso — nunca
-   reimplementa la evaluación de condiciones ni el cálculo de completitud,
+   Vista «Documentos del trámite» — Bloque A·A3 (ADR-0026 D4/D7, ADR-0029).
+   Orquesta el evaluador REAL (`evaluarCompletitud`) contra `documentos`,
+   `aportes` y el `contexto` vivo del caso — nunca reimplementa la evaluación,
    solo la traduce a estado visual por requisito.
 
-   Componente CONTROLADO: no duplica `contexto`/`aportes`/`documentos` en
-   estado local — recibe todo por props y reporta los dos únicos cambios
-   posibles (contexto actualizado, documento subido) al padre
-   (`DetalleLicenciaClient`), que es quien posee el expediente. Así el
-   toggle de un hecho del caso reevalúa el checklist en el MISMO render en
-   cuanto el padre re-renderiza con el `contexto` nuevo — sin duplicar la
-   fuente de verdad.
+   FASE 2 (rediseño): resumen por estado → filtros + buscador → categorías
+   colapsables (01–06) → filas compactas. Las categorías son una capa de
+   PRESENTACIÓN (`../categorias-documentos.ts`): NO cambian el resultado del
+   evaluador. El filtro, la búsqueda y el expandido son estado LOCAL de UI —
+   la fuente de verdad sigue siendo el expediente, propiedad del padre.
 ══════════════════════════════════════════════════════════════ */
+
+/** Minúsculas y sin tildes, para que la búsqueda no dependa de acentos. */
+function normalizar(s: string): string {
+  return s.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+}
 
 export interface ChecklistRequisitosProps {
   expedienteId: string;
@@ -51,128 +56,117 @@ export function ChecklistRequisitos({
   onDocumentoSubido,
 }: ChecklistRequisitosProps) {
   const resultado = useMemo(() => evaluarCompletitud(definicion, aportes, contexto), [definicion, aportes, contexto]);
-
   const documentoPorId = useMemo(() => new Map(documentos.map((d) => [d.id, d] as const)), [documentos]);
   const aportePorRequisito = useMemo(() => new Map(aportes.map((a) => [a.requisitoId, a] as const)), [aportes]);
 
   /**
-   * Traduce el `ResultadoCompletitud` (ya calculado por el evaluador real)
-   * a UN estado visual por requisito. Cada requisito de la Definición cae
-   * en EXACTAMENTE una de las 4 listas del resultado (duplicado > indeterminado
-   * > no-aplica > faltante — mutuamente excluyentes por construcción de
-   * `evaluarCompletitud`) o en ninguna, que son los dos casos que el
-   * evaluador no reporta por diseño (ver su JSDoc): un OPCIONAL sin aporte
-   * (nunca bloquea, nunca se lista) o un requisito ya APORTADO con éxito
-   * (tampoco se lista: solo se reportan "problemas" + no-aplicables). Para
-   * esos dos, se lee directamente `aporte.estado` — un campo de dato, no
-   * una reevaluación de la lógica de condiciones/Kleene del evaluador.
+   * Traduce el `ResultadoCompletitud` (ya calculado por el evaluador real) a UN
+   * estado visual por requisito. Idéntico a la versión anterior — NO cambia la
+   * lógica. Ver JSDoc histórico en el evaluador para el orden de exclusión.
    */
-  function estadoDe(requisitoId: string): EstadoVisualRequisito {
-    if (resultado.aportesDuplicados.some((d) => d.requisitoId === requisitoId)) return 'DUPLICADO';
-    if (resultado.indeterminados.some((i) => i.requisitoId === requisitoId)) return 'INDETERMINADO';
-    if (resultado.noAplicables.includes(requisitoId)) return 'NO_APLICA';
-    if (resultado.faltantes.some((f) => f.requisitoId === requisitoId)) return 'PENDIENTE';
-    const aporte = aportePorRequisito.get(requisitoId);
-    const aportado = aporte?.estado === 'APORTADO' && aporte.documentoIds.length > 0;
-    return aportado ? 'APORTADO' : 'NO_APLICA'; // opcional sin aportar: informativo, nunca bloquea.
-  }
+  const estadoDe = useMemo(() => {
+    return (requisitoId: string): EstadoVisualRequisito => {
+      if (resultado.aportesDuplicados.some((d) => d.requisitoId === requisitoId)) return 'DUPLICADO';
+      if (resultado.indeterminados.some((i) => i.requisitoId === requisitoId)) return 'INDETERMINADO';
+      if (resultado.noAplicables.includes(requisitoId)) return 'NO_APLICA';
+      if (resultado.faltantes.some((f) => f.requisitoId === requisitoId)) return 'PENDIENTE';
+      const aporte = aportePorRequisito.get(requisitoId);
+      const aportado = aporte?.estado === 'APORTADO' && aporte.documentoIds.length > 0;
+      return aportado ? 'APORTADO' : 'NO_APLICA';
+    };
+  }, [resultado, aportePorRequisito]);
 
-  // "Aplicables" = obligatorios + condicionales que SÍ aplican (se excluyen
-  // opcionales, no-aplicables, indeterminados y duplicados — de estos dos
-  // últimos el evaluador ni siquiera llegó a decidir su aplicación, ver
-  // `completitud.ts`). Identidad exacta con las 4 listas de `resultado`
-  // (demostrada en el JSDoc de `estadoDe`): ningún número se inventa fuera
-  // de `resultado.*.length` + un conteo estático sobre `definicion.requisitos`.
+  // ── Contadores del resumen — IDÉNTICOS (D-1). Un solo eje de ESTADO. ─────
   const totalNoOpcionales = definicion.requisitos.filter((r) => r.tipo !== 'OPCIONAL').length;
   const noResueltos = resultado.noAplicables.length + resultado.indeterminados.length + resultado.aportesDuplicados.length;
   const aplicables = Math.max(0, totalNoOpcionales - noResueltos);
   const aportados = Math.max(0, aplicables - resultado.faltantes.length);
-
-  /* Resumen por ESTADO — un solo eje, mutuamente excluyente. Todos salen de las
-     MISMAS listas del evaluador; ningún número se inventa ni se recalcula.
-
-     Deliberadamente NO se muestra «Condicionales» aquí: es un eje de TIPO, no de
-     estado, y un condicional que aplica y está pendiente contaría a la vez en
-     «Pendientes» y en «Condicionales» (se solaparían). «Condicionales» queda
-     para el filtro de la Fase 2, no para el resumen.
-
-     · «Requieren corrección» = DUPLICADO (`aportesDuplicados`): más de un aporte
-       para el mismo requisito. NO es una revisión humana —ese flujo no existe—,
-       es la única inconsistencia de datos que la tabla marca hoy.
-     · «Sin definir» = INDETERMINADO (`indeterminados`): condicional cuya
-       condición aún no se puede evaluar porque falta un hecho del caso. */
   const pendientes = resultado.faltantes.length;
   const requiereCorreccion = resultado.aportesDuplicados.length;
   const sinDefinir = resultado.indeterminados.length;
+
+  // ── Cada requisito con su estado y su categoría (presentación) ───────────
+  const listaVista = useMemo(
+    () => definicion.requisitos.map((r) => ({ requisito: r, estado: estadoDe(r.id), categoria: categoriaDeRequisito(r.id) })),
+    [definicion, estadoDe],
+  );
+
+  // ── Conteos por filtro (sobre requisitos REALES) ─────────────────────────
+  const conteos: ConteosFiltro = useMemo(() => {
+    const c: ConteosFiltro = { TODOS: 0, APORTADO: 0, PENDIENTE: 0, CONDICIONAL: 0, DUPLICADO: 0, INDETERMINADO: 0 };
+    for (const { requisito, estado } of listaVista) {
+      c.TODOS++;
+      if (estado === 'APORTADO') c.APORTADO++;
+      if (estado === 'PENDIENTE') c.PENDIENTE++;
+      if (estado === 'DUPLICADO') c.DUPLICADO++;
+      if (estado === 'INDETERMINADO') c.INDETERMINADO++;
+      if (requisito.tipo === 'CONDICIONAL') c.CONDICIONAL++;
+    }
+    return c;
+  }, [listaVista]);
+
+  // ── Avance por categoría (global, no del subconjunto filtrado) ───────────
+  const statsCategoria = useMemo(() => {
+    const m = new Map<string, { aportados: number; exigibles: number }>();
+    for (const { estado, categoria } of listaVista) {
+      const s = m.get(categoria) ?? { aportados: 0, exigibles: 0 };
+      if (estado !== 'NO_APLICA') s.exigibles++;
+      if (estado === 'APORTADO') s.aportados++;
+      m.set(categoria, s);
+    }
+    return m;
+  }, [listaVista]);
+
+  const [filtro, setFiltro] = useState<FiltroDoc>('TODOS');
+  const [busqueda, setBusqueda] = useState('');
+  // Por defecto se expanden las categorías INCOMPLETAS (donde aún falta trabajo).
+  const [expandidas, setExpandidas] = useState<Set<string>>(() => {
+    const set = new Set<string>();
+    for (const cat of CATEGORIAS_DOCUMENTOS) {
+      const s = statsCategoria.get(cat.numero);
+      if (s && s.exigibles > 0 && s.aportados < s.exigibles) set.add(cat.numero);
+    }
+    return set;
+  });
+
+  const filtroActivo = filtro !== 'TODOS' || busqueda.trim() !== '';
+  const q = normalizar(busqueda.trim());
+
+  function coincideFiltro(estado: EstadoVisualRequisito, tipo: string): boolean {
+    switch (filtro) {
+      case 'TODOS': return true;
+      case 'CONDICIONAL': return tipo === 'CONDICIONAL';
+      default: return estado === filtro;
+    }
+  }
+  function coincideBusqueda(nombre: string, descripcion?: string): boolean {
+    if (q === '') return true;
+    return normalizar(`${nombre} ${descripcion ?? ''}`).includes(q);
+  }
+  function alternarCategoria(numero: string) {
+    setExpandidas((prev) => {
+      const n = new Set(prev);
+      if (n.has(numero)) n.delete(numero); else n.add(numero);
+      return n;
+    });
+  }
 
   const otrosDocumentos = documentos.filter((d) => !d.requisitoId);
 
   return (
     <div className="flex flex-col gap-3">
-      {/* BARRA DE PROGRESO. Sustituye a la tarjeta de resumen: el mismo dato
-          —«aportados de aplicables»— pero visible de un vistazo y sin ocupar
-          una tarjeta entera. Los números NO cambian: salen de las mismas
-          listas del evaluador. */}
-      <div
-        className="rounded-xl px-4 py-3 flex flex-wrap items-center gap-x-4 gap-y-2"
-        style={{ background: 'var(--bg-surface)', border: '1px solid var(--color-border)' }}
-      >
-        <p className="text-sm shrink-0" style={{ color: 'var(--text-primary)' }}>
-          <strong>{aportados} de {aplicables}</strong>{' '}
-          <span style={{ color: 'var(--text-secondary)' }}>documentos aportados</span>
-        </p>
+      <DocumentSummary
+        aportados={aportados}
+        aplicables={aplicables}
+        pendientes={pendientes}
+        requiereCorreccion={requiereCorreccion}
+        sinDefinir={sinDefinir}
+        completo={resultado.completo}
+      />
 
-        <div
-          className="flex-1 min-w-[120px] h-1.5 rounded-full overflow-hidden"
-          role="progressbar"
-          aria-valuenow={aportados}
-          aria-valuemin={0}
-          aria-valuemax={aplicables}
-          aria-label="Documentos aportados"
-          style={{ background: 'var(--bg-surface-2)' }}
-        >
-          <div
-            className="h-full rounded-full"
-            style={{
-              width: aplicables > 0 ? `${Math.round((aportados / aplicables) * 100)}%` : '0%',
-              background: resultado.completo ? '#14532D' : '#4E9A5F',
-            }}
-          />
-        </div>
-
-        <span className="text-sm font-bold shrink-0" style={{ color: resultado.completo ? '#116932' : '#4E9A5F' }}>
-          {aplicables > 0 ? Math.round((aportados / aplicables) * 100) : 0}%
-        </span>
-
-        {/* El chip vuelve: lo quité al reemplazar la tarjeta de resumen y una
-            prueba lo cazó. Dice de un vistazo si el checklist está completo,
-            que es lo que decide si se puede radicar. */}
-        <span
-          className="text-[11px] font-bold uppercase tracking-wider px-2.5 py-1 rounded-full shrink-0"
-          style={resultado.completo ? { background: '#E7F6EC', color: '#116932' } : { background: '#FAEEDA', color: '#7A4F0A' }}
-        >
-          {resultado.completo ? 'Completo' : 'Incompleto'}
-        </span>
-
-        {resultado.aportesDuplicados.length > 0 && (
-          <span className="text-xs w-full" style={{ color: '#9A6206' }}>
-            {resultado.aportesDuplicados.length} con aportes duplicados
-          </span>
-        )}
-
-        {soloLectura && motivoSoloLectura && (
-          <p className="text-xs w-full" style={{ color: 'var(--text-secondary)' }}>{motivoSoloLectura}</p>
-        )}
-      </div>
-
-      {/* RESUMEN POR ESTADO — de un vistazo, con los mismos números del
-          evaluador. Presentación pura: no reevalúa nada. */}
-      <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
-        <TileEstado valor={aportados} label="Aportados" color="#16A34A" fondo="#E7F5EC" icono={<IconoCheck />} />
-        <TileEstado valor={pendientes} label="Pendientes" color="#D97706" fondo="#FDF1DC" icono={<IconoReloj />} />
-        <TileEstado valor={requiereCorreccion} label="Requieren corrección" color="#DC2626" fondo="#FCEAEA" icono={<IconoEquis />} />
-        <TileEstado valor={sinDefinir} label="Sin definir" color="#2563EB" fondo="#E9F0FC" icono={<IconoInterrogante />} />
-      </div>
+      {soloLectura && motivoSoloLectura && (
+        <p className="text-xs px-1" style={{ color: 'var(--text-secondary)' }}>{motivoSoloLectura}</p>
+      )}
 
       {definicion.clavesContexto && definicion.clavesContexto.length > 0 && (
         <PanelHechosCaso
@@ -184,41 +178,34 @@ export function ChecklistRequisitos({
         />
       )}
 
-      {/* AGRUPADO: lo que FALTA arriba, lo APORTADO abajo. Antes era una lista
-          plana donde un requisito pendiente y uno ya entregado se veían igual,
-          y la funcionaria tenía que leerlos todos para saber qué le queda.
+      <DocumentFilters activo={filtro} onCambiar={setFiltro} conteos={conteos} busqueda={busqueda} onBuscar={setBusqueda} />
 
-          Los NO APLICABLES van al final, atenuados, PERO SE LISTAN: la
-          funcionaria tiene derecho a saber qué no se le exige y por qué, y
-          esconderlos convertiría una decisión del sistema en algo invisible.
-          (Los escondí en la primera versión de este rediseño; una prueba que ya
-          existía lo cazó, y tenía razón.) */}
-      {([
-        { clave: 'faltan', titulo: 'Faltan', estados: ['PENDIENTE'] as const },
-        /* SIN DEFINIR va aparte de FALTAN, y no es un detalle de maquetación:
-           un indeterminado NO se sabe todavía si se exige —por eso el evaluador
-           lo descuenta de «aplicables»—, así que meterlo en «Faltan» haría que
-           el encabezado contara 3 mientras la barra dice «0 de 2». Y la acción
-           es otra: uno se sube, el otro se responde en Hechos del caso. */
-        { clave: 'sin-definir', titulo: 'Sin definir — dependen de Hechos del caso', estados: ['INDETERMINADO'] as const },
-        { clave: 'aportados', titulo: 'Aportados', estados: ['APORTADO'] as const },
-        { clave: 'no-aplican', titulo: 'No se exigen en este caso', estados: ['NO_APLICA'] as const },
-      ] as const).map((grupo) => {
-        const requisitos = definicion.requisitos.filter((r) =>
-          (grupo.estados as readonly string[]).includes(estadoDe(r.id)),
-        );
-        if (requisitos.length === 0) return null;
-        return (
-          <div key={grupo.clave} className="flex flex-col gap-1.5">
-            <p className="text-[10px] font-bold uppercase tracking-widest px-1" style={{ color: '#667085' }}>
-              {`${grupo.titulo} · ${requisitos.length}`}
-            </p>
-            <div
-              className="rounded-xl overflow-hidden"
-              style={{ background: 'var(--bg-surface)', border: '1px solid var(--color-border)' }}
+      {/* CATEGORÍAS 01–06 — capa de presentación; el evaluador no las mira. */}
+      <div className="flex flex-col gap-2.5">
+        {CATEGORIAS_DOCUMENTOS.map((cat) => {
+          const items = listaVista.filter((v) => v.categoria === cat.numero);
+          if (items.length === 0) return null;
+          const filtrados = items.filter(
+            (v) => coincideFiltro(v.estado, v.requisito.tipo) && coincideBusqueda(v.requisito.nombre, v.requisito.descripcion),
+          );
+          // Con filtro/búsqueda activos, una categoría sin coincidencias se oculta.
+          if (filtroActivo && filtrados.length === 0) return null;
+          const mostrar = filtroActivo ? filtrados : items;
+          const st = statsCategoria.get(cat.numero) ?? { aportados: 0, exigibles: 0 };
+          return (
+            <DocumentCategory
+              key={cat.numero}
+              numero={cat.numero}
+              titulo={cat.titulo}
+              descripcion={cat.descripcion}
+              aportados={st.aportados}
+              total={st.exigibles}
+              expandido={filtroActivo || expandidas.has(cat.numero)}
+              onToggle={() => alternarCategoria(cat.numero)}
+              idContenido={`categoria-${cat.numero}`}
             >
-              <ul className="flex flex-col">
-                {requisitos.map((requisito) => {
+              <ul className="flex flex-col divide-y" style={{ borderColor: 'var(--color-border)' }}>
+                {mostrar.map(({ requisito, estado }) => {
                   const aporte = aportePorRequisito.get(requisito.id);
                   const documentoId = aporte?.documentoIds?.[0];
                   const indeterminado = resultado.indeterminados.find((i) => i.requisitoId === requisito.id);
@@ -227,7 +214,7 @@ export function ChecklistRequisitos({
                       key={requisito.id}
                       expedienteId={expedienteId}
                       requisito={requisito}
-                      estado={estadoDe(requisito.id)}
+                      estado={estado}
                       documento={documentoId ? documentoPorId.get(documentoId) : undefined}
                       clavesFaltantesIndeterminado={indeterminado?.clavesFaltantes}
                       soloLectura={soloLectura}
@@ -236,10 +223,10 @@ export function ChecklistRequisitos({
                   );
                 })}
               </ul>
-            </div>
-          </div>
-        );
-      })}
+            </DocumentCategory>
+          );
+        })}
+      </div>
 
       <OtrosDocumentos
         expedienteId={expedienteId}
@@ -247,59 +234,14 @@ export function ChecklistRequisitos({
         soloLectura={soloLectura}
         onDocumentoSubido={onDocumentoSubido}
       />
-    </div>
-  );
-}
 
-/** Una tarjeta del resumen por estado: icono en círculo de color + número + etiqueta. */
-function TileEstado({
-  valor, label, color, fondo, icono,
-}: {
-  valor: number; label: string; color: string; fondo: string; icono: ReactNode;
-}) {
-  return (
-    <div className="flex items-center gap-2.5 rounded-xl px-3 py-2.5" style={{ background: 'var(--bg-surface)', border: '1px solid var(--color-border)' }}>
-      <span aria-hidden className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full" style={{ background: fondo, color }}>
-        {icono}
-      </span>
-      <span className="min-w-0">
-        <span className="block font-headline text-lg font-black leading-none tabular-nums" style={{ color: 'var(--text-primary)' }}>{valor}</span>
-        <span className="mt-0.5 block text-xs leading-tight" style={{ color: 'var(--text-secondary)' }}>{label}</span>
-      </span>
+      {/* AYUDA — secundaria, no compite con los documentos. */}
+      <p className="mt-1 flex items-center gap-1.5 px-1 text-xs" style={{ color: 'var(--text-secondary)' }}>
+        <span aria-hidden>
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none"><circle cx="12" cy="12" r="9" stroke="currentColor" strokeWidth="1.6" /><path d="M9.6 9.4a2.4 2.4 0 0 1 4.2 1.5c0 1.6-2.4 1.8-2.4 3.1" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" /><circle cx="11.4" cy="16.4" r="0.9" fill="currentColor" /></svg>
+        </span>
+        ¿Necesitas ayuda? Consulta la guía del trámite o comunícate con Planeación.
+      </p>
     </div>
-  );
-}
-
-function IconoCheck() {
-  return (
-    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" aria-hidden>
-      <circle cx="12" cy="12" r="9" stroke="currentColor" strokeWidth="1.7" />
-      <path d="M8.3 12.2l2.4 2.4 5-5.2" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
-    </svg>
-  );
-}
-function IconoReloj() {
-  return (
-    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" aria-hidden>
-      <circle cx="12" cy="12" r="9" stroke="currentColor" strokeWidth="1.7" />
-      <path d="M12 7.5V12l3 2" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
-    </svg>
-  );
-}
-function IconoEquis() {
-  return (
-    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" aria-hidden>
-      <circle cx="12" cy="12" r="9" stroke="currentColor" strokeWidth="1.7" />
-      <path d="M9 9l6 6M15 9l-6 6" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" />
-    </svg>
-  );
-}
-function IconoInterrogante() {
-  return (
-    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" aria-hidden>
-      <circle cx="12" cy="12" r="9" stroke="currentColor" strokeWidth="1.7" />
-      <path d="M9.6 9.4a2.4 2.4 0 0 1 4.2 1.5c0 1.6-2.4 1.8-2.4 3.1" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" />
-      <circle cx="11.4" cy="16.4" r="0.95" fill="currentColor" />
-    </svg>
   );
 }
