@@ -91,7 +91,7 @@ import {
 import { puedeVerTodosLosTenants } from '@/lib/permisos/alcance-tenants';
 import { BarraFiltrosActivos } from '@/app/interno/dashboard/components/BarraFiltrosActivos';
 import type { EstadoFiltros, DimensionFiltro } from '@/lib/filtros-activos/resumir-filtros-activos';
-import { MetricsSummary } from '@/app/components/design-system/MetricsSummary';
+import { MetricsCards } from '@/app/components/design-system/MetricsCards';
 import { PriorityBanner } from '@/app/components/design-system/PriorityBanner';
 import {
   type FiltroGrande,
@@ -920,6 +920,45 @@ interface TarjetaMIPGItem {
 /** Panel Op Nivel 3B — los 4 KPIs accionables van como tarjetas grandes. */
 const FILTROS_GRANDES: FiltroGrande[] = ['VENCIDAS', 'POR_VENCER', 'RADICADAS', 'ASIGNADAS'];
 
+/** Rediseño Sala de operaciones (Fase 1) — sublínea de cada tarjeta grande.
+ *  Describe el estado REAL que cuenta la métrica (ver `calcularMetricas`),
+ *  no cambia el dato ni el filtro. */
+const SUBLABEL_METRICA: Record<FiltroGrande, string> = {
+  VENCIDAS:   'Requieren atención',
+  POR_VENCER: 'Vencen en ≤ 2 días',
+  RADICADAS:  'En espera de gestión',
+  ASIGNADAS:  'En trámite',
+};
+
+/** Icono (glifo BLANCO sobre chip de color pleno) por tarjeta grande. */
+const ICONO_METRICA: Record<FiltroGrande, React.ReactNode> = {
+  VENCIDAS: (
+    <svg className="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      <path d="M12 5.5l7.6 13.1a1 1 0 0 1-.87 1.5H5.27a1 1 0 0 1-.87-1.5L12 5.5z" />
+      <path d="M12 10.6v3.4" />
+      <circle cx="12" cy="16.9" r="0.5" fill="currentColor" stroke="none" />
+    </svg>
+  ),
+  POR_VENCER: (
+    <svg className="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      <circle cx="12" cy="12" r="8" />
+      <path d="M12 7.6V12l3 1.9" />
+    </svg>
+  ),
+  RADICADAS: (
+    <svg className="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      <path d="M5 6.5h14l1.8 6.5H16l-1.4 2.3H9.4L8 13H3.2L5 6.5z" />
+      <path d="M3.2 13v4.3a1 1 0 0 0 1 1h15.6a1 1 0 0 0 1-1V13" />
+    </svg>
+  ),
+  ASIGNADAS: (
+    <svg className="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      <circle cx="12" cy="8.4" r="3.2" />
+      <path d="M5.6 19a6.4 6.4 0 0 1 12.8 0" />
+    </svg>
+  ),
+};
+
 /** Paleta operativa institucional: fondos claros + números y labels en
  *  tonos de alto contraste (-700/-800). Cada KPI se identifica por el
  *  riel izquierdo de 4px, no por el fondo (que se reserva para
@@ -1177,7 +1216,7 @@ function TarjetasMIPG({
   // la saturación visual y deja más espacio para la tabla principal.
   // El detalle del radicado crítico se accede desde la tabla directamente.
   return (
-    <MetricsSummary
+    <MetricsCards
       titulo="Métricas"
       criticas={FILTROS_GRANDES.map((filtro) => {
         const t = porFiltro.get(filtro);
@@ -1187,10 +1226,12 @@ function TarjetasMIPG({
           valor: t.valor,
           color: t.rielColor,
           colorTexto: t.textoColor,
+          sublabel: SUBLABEL_METRICA[filtro],
+          icono: ICONO_METRICA[filtro],
           activo: filtroActivo === filtro,
           onClick: () => onFiltroChange(filtro),
         };
-      }).filter(Boolean) as { label: string; valor: number; color: string; colorTexto: string; activo: boolean; onClick: () => void }[]}
+      }).filter(Boolean) as { label: string; valor: number; color: string; colorTexto: string; sublabel: string; icono: React.ReactNode; activo: boolean; onClick: () => void }[]}
       secundarias={tarjetas
         .filter((t) => !FILTROS_GRANDES.includes(t.filtro as FiltroGrande))
         .map((t) => ({
@@ -4715,40 +4756,46 @@ function DashboardInterior({ usuario, cerrarSesion }: { usuario: UsuarioAutentic
           />
         ) : (
           <>
-            {/* Rediseño 3B.2 — encabezado de sala de operaciones (solo
-                desktop; el móvil ya tiene su propio header). */}
+            {/* Rediseño Sala de operaciones (Fase 1) — encabezado (solo
+                desktop; el móvil ya tiene su propio header). El TÍTULO es el
+                nombre de la dependencia, dinámico (multi-secretaría): sale de
+                `usuario.tenantId`, o del filtro de dependencia si el rol ve
+                todas. NO está fijo a Planeación. */}
             {vistaActual === 'TABLERO' && (
-              <div className="hidden md:flex items-center justify-between gap-3 px-4 pt-2 pb-1 bg-white shrink-0">
-                <div className="flex items-center gap-2.5 min-w-0">
-                  <div>
-                    <div className="flex items-center gap-2">
-                      <span className="text-[10px] font-bold uppercase tracking-[0.12em]" style={{ color: '#5F8A6E' }}>
-                        Sala de operaciones
-                      </span>
-                      <span className="w-1.5 h-1.5 rounded-full" style={{ background: '#3B9E5F' }} />
-                      <span className="text-[10px]" style={{ color: '#7A8B7F' }}>tiempo real</span>
-                    </div>
-                    <p className="text-lg font-black leading-tight mt-0.5" style={{ color: '#12261A' }}>
-                      Tablero · {veTodosTenants
+              <div className="hidden md:block px-4 pt-3 pb-2 bg-white shrink-0">
+                <div className="flex items-center gap-2 mb-1">
+                  <span className="text-[10px] font-bold uppercase tracking-[0.14em]" style={{ color: '#5F8A6E' }}>
+                    Sala de operaciones
+                  </span>
+                  <span className="inline-flex items-center gap-1">
+                    <span className="w-1.5 h-1.5 rounded-full motion-safe:animate-pulse" style={{ background: '#3B9E5F' }} aria-hidden="true" />
+                    <span className="text-[10px] font-semibold" style={{ color: '#3B9E5F' }}>En tiempo real</span>
+                  </span>
+                </div>
+                <div className="flex items-end justify-between gap-3">
+                  <div className="min-w-0">
+                    <h1 className="text-2xl lg:text-[28px] font-black leading-tight tracking-tight truncate" style={{ color: '#12261A' }}>
+                      {veTodosTenants
                         ? (tenantFiltro === 'TODOS' ? 'Vista municipal' : (NOMBRES_TENANT[tenantFiltro] ?? 'Vista municipal'))
                         : NOMBRES_TENANT[usuario.tenantId]}
+                    </h1>
+                    <p className="text-[13px] mt-0.5" style={{ color: '#6B7A70' }}>
+                      Gestión de radicados, trámites y solicitudes
                     </p>
                   </div>
-                  {/* Sprint tablero-jerarquia — reemplaza la card vertical
-                      "Todos" que antes competía visualmente con las 4
-                      tarjetas de severidad; mismo total, mismo filtro de
-                      reinicio, ahora como chip discreto junto al título. */}
+                  {/* Chip "N activos" — reinicia el filtro MIPG a TODOS
+                      (mismo comportamiento de siempre). */}
                   <button
                     type="button"
                     onClick={() => dispatch({ type: 'SET_FILTRO_MIPG', filtro: 'TODOS' })}
                     aria-pressed={filtroMIPG === 'TODOS'}
                     aria-label={`Ver todos los radicados activos del panorama MIPG (${totalKpisMipg})`}
-                    className="shrink-0 inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-[11px] font-bold focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-700/30"
+                    className="shrink-0 inline-flex items-center gap-1.5 rounded-full px-3 py-1.5 text-xs font-bold micro-card focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-700/30"
                     style={filtroMIPG === 'TODOS'
-                      ? { background: '#EEF4EE', color: '#14532D', border: '1px solid #14532D' }
-                      : { background: '#F8FAF7', color: '#14532D', border: '1px solid #D9E2D9' }}
+                      ? { background: '#E8F3EC', color: '#17643A', border: '1px solid #17643A' }
+                      : { background: '#F8FAF7', color: '#17643A', border: '1px solid #D9E2D9' }}
                   >
-                    <span className="tabular-nums">{totalKpisMipg}</span> activos
+                    <span className="tabular-nums text-sm font-black">{totalKpisMipg}</span> activos
                   </button>
                 </div>
               </div>

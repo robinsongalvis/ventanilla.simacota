@@ -8,6 +8,8 @@
 export { StatusBadge, BadgeEstadoRadicado, BadgePrioridad, BadgeUrgencia, BadgeRol } from './StatusBadge';
 export { MetricCard } from './MetricCard';
 export { MetricsSummary } from './MetricsSummary';
+export { MetricsCards } from './MetricsCards';
+export type { MetricaCard } from './MetricsCards';
 export { SectionHeader } from './SectionHeader';
 export { CollapsibleSection } from './CollapsibleSection';
 export { EmptyState } from './EmptyState';
