@@ -25,11 +25,12 @@ describe('Dashboard — vista amplia de radicados', () => {
     expect(dashboard).toContain('indicadoresCompactos');
   });
 
-  it('mantiene barras compactas y la tabla visible con más espacio', () => {
+  it('mantiene la alerta y una representación adaptativa de los radicados', () => {
     expect(dashboard).toContain('<PriorityBanner');
-    expect(dashboard).toContain('<BarraKpisOperativos');
     expect(dashboard).toContain('<TarjetasMIPG');
     expect(dashboard).toContain('<TablaRadicados');
+    expect(dashboard).toContain('hidden xl:block');
+    expect(dashboard).toContain('xl:hidden');
   });
 
   it('conserva la preferencia de ambos paneles tras recargar', () => {
@@ -61,10 +62,10 @@ describe('Dashboard — vista amplia de radicados', () => {
     expect(dashboard).toContain('<TarjetasMIPG');
   });
 
-  it('evita desbordamiento horizontal en las barras móviles', () => {
-    expect(dashboard).toContain('overflow-hidden');
-    expect(dashboard).toContain('overflow-x-auto');
+  it('evita forzar la tabla del tablero a un ancho mínimo horizontal', () => {
+    expect(dashboard).toContain('table-fixed');
+    expect(dashboard).not.toContain('md:min-w-[920px]');
     expect(dashboard).toContain('min-w-0');
-    expect(dashboard).toContain('shrink-0');
+    expect(dashboard).toContain('break-words');
   });
 });

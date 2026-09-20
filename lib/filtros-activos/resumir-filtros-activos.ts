@@ -48,6 +48,7 @@ const LABEL_MIPG: Record<Exclude<FiltroMIPG, 'TODOS'>, string> = {
   ASIGNADAS:              'Asignadas',
   EN_TERMINO:             'En término',
   POR_VENCER:             'Por vencer',
+  POR_VENCER_HOY:         'Por vencer hoy',
   VENCIDAS:               'Vencidas',
   CORREOS_FALLIDOS:       'Correos fallidos',
   DEVUELTAS_PRORROGA:     'Devueltas / Prórroga',

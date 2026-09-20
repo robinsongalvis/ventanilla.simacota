@@ -22,6 +22,7 @@ export type FiltroMIPG =
   | 'ASIGNADAS'
   | 'EN_TERMINO'
   | 'POR_VENCER'
+  | 'POR_VENCER_HOY'
   | 'VENCIDAS'
   | 'CORREOS_FALLIDOS'
   | 'DEVUELTAS_PRORROGA'

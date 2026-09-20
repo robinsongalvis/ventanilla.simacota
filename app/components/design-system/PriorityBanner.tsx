@@ -17,6 +17,7 @@
 ══════════════════════════════════════════════════════════════ */
 
 import type { ReactNode } from 'react';
+import { AlertTriangle } from 'lucide-react';
 
 interface PriorityBannerProps {
   /** Mensaje de urgencia. */
@@ -25,6 +26,8 @@ interface PriorityBannerProps {
   radicadoId?: string;
   /** Asunto del radicado. */
   asunto?: string;
+  /** Descripción breve de la atención requerida. */
+  descripcion?: string;
   /** Responsable. */
   responsable?: string;
   /** Botón de acción principal. */
@@ -49,6 +52,7 @@ export function PriorityBanner({
   mensaje,
   radicadoId,
   asunto,
+  descripcion,
   responsable,
   accion,
   nivel,
@@ -82,7 +86,7 @@ export function PriorityBanner({
 
   return (
     <div
-      className="flex items-center gap-3 px-3 sm:px-4 py-2.5 rounded-xl bg-white"
+      className="flex items-center gap-3 px-3 sm:px-4 py-2 rounded-xl bg-white transition-shadow duration-200 hover:shadow-sm"
       style={{
         border: `1px solid ${colores.border}33`,
         borderLeft: `4px solid ${colores.border}`,
@@ -94,9 +98,7 @@ export function PriorityBanner({
         className="shrink-0 w-8 h-8 rounded-lg flex items-center justify-center"
         style={{ background: colores.bg }}
       >
-        <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke={colores.icon} strokeWidth={2}>
-          <path strokeLinecap="round" strokeLinejoin="round" d="M12 9v3.75m-9.303 3.376c-.866 1.5.217 3.374 1.948 3.374h14.71c1.73 0 2.813-1.874 1.948-3.374L13.949 3.378c-.866-1.5-3.032-1.5-3.898 0L2.697 16.126zM12 15.75h.007v.008H12v-.008z" />
-        </svg>
+        <AlertTriangle size={17} strokeWidth={1.9} color={colores.icon} aria-hidden="true" />
       </div>
 
       {/* Contenido */}
@@ -104,6 +106,11 @@ export function PriorityBanner({
         <p className="text-[10px] font-bold uppercase tracking-wider" style={{ color: colores.text }}>
           {mensaje}
         </p>
+        {descripcion && (
+          <p className="mt-0.5 break-words text-xs font-semibold" style={{ color: '#1F2933' }}>
+            {descripcion}
+          </p>
+        )}
         {radicadoId && (
           <div className="flex items-center gap-2 mt-0.5">
             <span className="font-mono text-xs font-bold" style={{ color: '#14532D' }}>{radicadoId}</span>

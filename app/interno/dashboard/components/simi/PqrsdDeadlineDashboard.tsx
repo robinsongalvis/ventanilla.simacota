@@ -15,11 +15,11 @@ function KpiCard({
   label, valor, color, bg, border,
 }: { label: string; valor: number | string; color: string; bg: string; border: string }) {
   return (
-    <div className="rounded-xl p-3 flex flex-col gap-1" style={{ background: bg, border: `1px solid ${border}` }}>
+    <div className="min-w-0 rounded-xl p-3 flex flex-col gap-1" style={{ background: bg, border: `1px solid ${border}` }}>
       <p className="text-2xl font-black tabular-nums" style={{ color, fontFamily: 'var(--font-manrope)' }}>
         {valor}
       </p>
-      <p className="text-[10px] font-bold uppercase tracking-widest" style={{ color: '#94A3B8' }}>
+      <p className="break-words text-[10px] font-bold uppercase tracking-widest" style={{ color: '#94A3B8' }}>
         {label}
       </p>
     </div>
@@ -39,7 +39,7 @@ export function PqrsdDeadlineDashboard({
   return (
     <div className="space-y-4">
       {/* KPIs principales */}
-      <div className={`grid gap-3 ${compact ? 'grid-cols-3' : 'grid-cols-2 sm:grid-cols-3 lg:grid-cols-4'}`}>
+      <div className={`grid min-w-0 gap-3 ${compact ? 'grid-cols-1 min-[440px]:grid-cols-2 xl:grid-cols-3' : 'grid-cols-1 min-[440px]:grid-cols-2 sm:grid-cols-3 lg:grid-cols-4'}`}>
         <KpiCard
           label="Total radicados"
           valor={data.totalRadicados}
