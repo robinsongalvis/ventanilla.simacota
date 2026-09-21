@@ -28,7 +28,7 @@ import { GuardModuloPlaneacion } from './components/GuardModuloPlaneacion';
 export default function LicenciasLayout({ children }: { children: ReactNode }) {
   return (
     <GuardModuloPlaneacion>
-      <div className="h-screen flex overflow-hidden print:h-auto print:overflow-visible print:block" style={{ background: 'var(--bg-base)' }}>
+      <div className="h-screen flex overflow-hidden overflow-x-visible print:h-auto print:overflow-visible print:block" style={{ background: 'var(--bg-base)' }}>
         <LicenciasSidebar />
         {/* `min-h-0` NO es decorativo: sin él, un hijo flex con `flex-1` no
             puede contraerse por debajo de su contenido (su `min-height`
@@ -42,9 +42,9 @@ export default function LicenciasLayout({ children }: { children: ReactNode }) {
             patrón que el resto del proyecto ya aplica (ver los
             contenedores equivalentes de `app/interno/dashboard/page.tsx`);
             este layout era el único que lo omitía. */}
-        <div className="flex-1 flex flex-col min-w-0 min-h-0 overflow-hidden print:overflow-visible print:block">
+        <div className="flex-1 flex flex-col min-w-0 min-h-0 overflow-hidden overflow-x-visible print:overflow-visible print:block">
           <LicenciasTopBarMovil titulo="Licencias" />
-          <main className="flex-1 overflow-y-auto print:overflow-visible">{children}</main>
+          <main className="min-w-0 flex-1 overflow-y-auto print:overflow-visible">{children}</main>
         </div>
       </div>
     </GuardModuloPlaneacion>

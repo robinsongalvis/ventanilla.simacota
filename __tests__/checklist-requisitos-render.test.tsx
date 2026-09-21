@@ -21,6 +21,15 @@ afterEach(() => {
    MECANISMO genérico del checklist (deriva estados, cuenta el resumen,
    reacciona a cambios de contexto), no el contenido de esa Definición
    concreta (eso lo cubre `definicion-licencia-construccion-parcial.test.ts`).
+
+   REDISEÑO documentación (sep-2026): la vista pasó a resumen + filtros +
+   secciones colapsables por categoría, con filas compactas (acción principal
+   «Ver» / «+ Adjuntar documento» y lo secundario —descargar/reemplazar— en un
+   menú de tres puntos). Los requisitos sintéticos no están mapeados a ninguna
+   categoría, así que caen todos en «Documentos adicionales» (fallback), que es
+   la sección que se abre por defecto. Lo que estas pruebas custodian —los
+   ESTADOS y los NÚMEROS salen del evaluador real— es idéntico; cambia el sitio
+   donde se leen, no la exigencia.
 ══════════════════════════════════════════════════════════════ */
 
 const DEFINICION_TEST: DefinicionTramite = {
@@ -50,6 +59,8 @@ const DEFINICION_TEST: DefinicionTramite = {
   ],
 };
 
+const RUTA_DOC = 'expedientes/exp-1/doc-1/v0001/certificado.pdf';
+
 function documentoFixture(overrides: Partial<DocumentoExpedienteDoc> = {}): DocumentoExpedienteDoc {
   return {
     id: 'doc-1',
@@ -59,7 +70,7 @@ function documentoFixture(overrides: Partial<DocumentoExpedienteDoc> = {}): Docu
     creadoEn: '2026-08-01T10:00:00.000Z',
     versionVigente: {
       numeroVersion: 1,
-      storagePath: 'expedientes/exp-1/doc-1/v0001/certificado.pdf',
+      storagePath: RUTA_DOC,
       hashSha256: 'a'.repeat(64),
       tamanioBytes: 1024,
       mimeType: 'application/pdf',
@@ -70,6 +81,14 @@ function documentoFixture(overrides: Partial<DocumentoExpedienteDoc> = {}): Docu
     totalVersiones: 1,
     ...overrides,
   };
+}
+
+/** La fila (`<li>`) de un requisito por su nombre. El nombre puede aparecer
+ *  además en el resumen (lista de pendientes), así que se acota a la fila. */
+function filaDe(nombre: string): HTMLElement {
+  const li = screen.getAllByText(nombre).map((el) => el.closest('li')).find((x): x is HTMLLIElement => x !== null);
+  if (!li) throw new Error(`No se encontró la fila del requisito "${nombre}"`);
+  return li;
 }
 
 describe('Bloque A·A3 — ChecklistRequisitos deriva estados del evaluador real', () => {
@@ -92,32 +111,33 @@ describe('Bloque A·A3 — ChecklistRequisitos deriva estados del evaluador real
       />,
     );
 
-    // OBLIGATORIO sin aporte → PENDIENTE, con control de carga.
-    expect(screen.getByText('Cédula del solicitante')).toBeTruthy();
-    expect(screen.getByText('Pendiente')).toBeTruthy();
-    expect(screen.getByText('Subir documento')).toBeTruthy();
+    // OBLIGATORIO sin aporte → PENDIENTE, con la acción principal «+ Adjuntar documento».
+    const filaPendiente = filaDe('Cédula del solicitante');
+    expect(within(filaPendiente).getByText('Pendiente')).toBeTruthy();
+    expect(within(filaPendiente).getByText('+ Adjuntar documento')).toBeTruthy();
 
-    // OBLIGATORIO con aporte real → APORTADO, con el documento y su versión.
-    expect(screen.getByText('Certificado de tradición')).toBeTruthy();
-    expect(screen.getByText('Aportado')).toBeTruthy();
-    expect(screen.getByText('v1')).toBeTruthy();
-    expect(screen.getByText('Reemplazar (nueva versión)')).toBeTruthy();
-    const enlaceDescarga = screen.getByText('Descargar') as HTMLAnchorElement;
-    expect(enlaceDescarga.getAttribute('href')).toBe(
-      `/api/interno/archivo?path=${encodeURIComponent('expedientes/exp-1/doc-1/v0001/certificado.pdf')}`,
-    );
+    // OBLIGATORIO con aporte real → APORTADO, con el documento, su versión y la acción «Ver».
+    const filaAportada = filaDe('Certificado de tradición');
+    expect(within(filaAportada).getByText('Aportado')).toBeTruthy();
+    expect(within(filaAportada).getByText(/^v1 ·/)).toBeTruthy();
+    const enlaceVer = within(filaAportada).getByText('Ver') as HTMLAnchorElement;
+    expect(enlaceVer.getAttribute('href')).toBe(`/api/interno/archivo?path=${encodeURIComponent(RUTA_DOC)}`);
+
+    // Lo secundario (descargar, reemplazar) vive en el menú de tres puntos.
+    fireEvent.click(within(filaAportada).getByRole('button', { name: 'Más acciones' }));
+    const enlaceDescarga = within(filaAportada).getByText('Descargar') as HTMLAnchorElement;
+    expect(enlaceDescarga.getAttribute('href')).toBe(`/api/interno/archivo?path=${encodeURIComponent(RUTA_DOC)}`);
+    expect(within(filaAportada).getByText('Reemplazar (nueva versión)')).toBeTruthy();
 
     // CONDICIONAL cuya condición NO se cumple (esApoderado=false) → NO_APLICA, con el motivo legible.
     expect(screen.getByText('Poder del apoderado')).toBeTruthy();
-    expect(screen.getByText('No aplica a este caso: esApoderado = sí.')).toBeTruthy();
+    expect(screen.getByText('No se exige en este caso (esApoderado = sí).')).toBeTruthy();
 
     // OPCIONAL sin aportar → mismo trío visual que "no aplica" pero rotulado "Opcional" (nunca bloquea).
     expect(screen.getByText('Fotos del predio')).toBeTruthy();
-    expect(screen.getByText('Opcional — no bloquea la completitud del checklist.')).toBeTruthy();
-    // "No aplica" (badge de ESTADO) solo debe aparecer para el condicional —
-    // el opcional comparte el mismo trío de color pero el badge de estado se
-    // rotula "Opcional" (ver estilos-estado-requisito.ts), que además coincide
-    // con el badge de TIPO del propio requisito opcional: dos badges, mismo texto.
+    // "No aplica" (badge de ESTADO) solo para el condicional; el opcional
+    // comparte el trío de color pero su badge de estado se rotula "Opcional",
+    // que además coincide con su badge de TIPO: dos badges, mismo texto.
     expect(screen.getAllByText('No aplica').length).toBe(1);
     expect(screen.getAllByText('Opcional').length).toBe(2);
   });
@@ -142,24 +162,18 @@ describe('Bloque A·A3 — ChecklistRequisitos deriva estados del evaluador real
     );
 
     // 3 no-opcionales (2 obligatorios + 1 condicional) − 1 no-aplicable = 2 aplicables; de esos, 1 ya aportado.
-    /* REDISEÑO 28-ago: el resumen pasó de una frase larga a una barra de
-       progreso —«1 de 2 documentos aportados»— y lo que antes iba en el
-       sufijo («faltan 1», «N sin definir») ahora vive en los encabezados de
-       grupo («Faltan · N») y en el contador de la pestaña de Hechos.
-
-       Se actualiza la FRASE, no la exigencia: sigue aseverándose el número
-       exacto que sale de las listas reales del evaluador, que es lo que esta
+    /* Se leen por `aria`, no casando cadenas: los números viven en la barra de
+       progreso, que los expone semánticamente. Sigue aseverándose el número
+       EXACTO que sale de las listas reales del evaluador — que es lo que esta
        prueba existe para custodiar. */
-    /* Se leen por `aria` y no casando cadenas: los números viven en la barra de
-       progreso, que los expone semánticamente. Un `textContent` se rompería con
-       cualquier cambio de maquetación sin que nada hubiera cambiado de verdad. */
     const barra = screen.getByRole('progressbar', { name: /documentos aportados/i });
     expect(barra.getAttribute('aria-valuenow')).toBe('1');
     expect(barra.getAttribute('aria-valuemax')).toBe('2');
-    /* Y el grupo «Faltan» cuenta el que falta: la información no desapareció,
-       cambió de sitio. */
-    expect(screen.getByText(/^Faltan · 1$/)).toBeTruthy();
-    expect(screen.getByText('Incompleto')).toBeTruthy();
+    // El resumen anuncia lo que falta, y el filtro «Pendientes» cuenta ese 1:
+    // la información no desapareció, cambió de sitio.
+    expect(screen.getByText(/^1 documento por completar$/)).toBeTruthy();
+    const chipPendientes = screen.getByRole('button', { name: /^Pendientes/ });
+    expect(within(chipPendientes).getByText('1')).toBeTruthy();
   });
 
   it('modo solo-lectura (RECONSTRUIDO/cerrado): sin controles de carga ni edición de hechos del caso', () => {
@@ -182,20 +196,20 @@ describe('Bloque A·A3 — ChecklistRequisitos deriva estados del evaluador real
       />,
     );
 
-    // El documento aportado se sigue viendo (solo-lectura ≠ ocultar información).
-    expect(screen.getByText('v1')).toBeTruthy();
-    expect(screen.getByText('Descargar')).toBeTruthy();
+    // El documento aportado se sigue viendo (solo-lectura ≠ ocultar información): versión + acción «Ver».
+    const filaAportada = filaDe('Certificado de tradición');
+    expect(within(filaAportada).getByText(/^v1 ·/)).toBeTruthy();
+    expect(within(filaAportada).getByText('Ver')).toBeTruthy();
     expect(screen.getByText(/Expediente histórico migrado/)).toBeTruthy();
 
     // Ningún control de carga, en ningún requisito ni en "Otros documentos".
-    expect(screen.queryByText('Subir documento')).toBeNull();
+    expect(screen.queryByText('+ Adjuntar documento')).toBeNull();
     expect(screen.queryByText('Reemplazar (nueva versión)')).toBeNull();
     expect(screen.queryByText('Adjuntar documento')).toBeNull();
 
-    /* El panel «Hechos del caso» se sigue viendo, pero no se puede tocar.
-       REDISEÑO 28-ago: los dropdowns pasaron a botones segmentados; lo que se
-       custodia —que en solo-lectura NO se pueda cambiar un hecho— es idéntico,
-       solo cambia el control en el que se comprueba. */
+    /* El panel «Hechos del caso» se sigue viendo, pero no se puede tocar: lo que
+       se custodia —que en solo-lectura NO se pueda cambiar un hecho— es que los
+       botones segmentados están deshabilitados. */
     for (const opcion of ['Sí', 'No']) {
       expect(
         (screen.getByRole('button', { name: new RegExp(`^${opcion}$`) }) as HTMLButtonElement).disabled,
@@ -239,19 +253,18 @@ describe('Bloque A·A3 — ChecklistRequisitos reacciona EN VIVO a "Hechos del c
 
     render(<Harness aportes={[]} documentos={[]} contextoInicial={{}} />);
 
-    const filaCondicional = () => screen.getByText('Poder del apoderado').closest('li') as HTMLElement;
+    const filaCondicional = () => filaDe('Poder del apoderado');
 
     // Antes: sin `esApoderado` en el contexto, el condicional es INDETERMINADO (fail-closed, NO "no aplica").
     expect(within(filaCondicional()).getByText('Falta definir')).toBeTruthy();
-    expect(within(filaCondicional()).queryByText('Subir documento')).toBeNull();
+    expect(within(filaCondicional()).queryByText('+ Adjuntar documento')).toBeNull();
     const barraAntes = screen.getByRole('progressbar', { name: /documentos aportados/i });
     expect(barraAntes.getAttribute('aria-valuenow')).toBe('0');
+    // El indeterminado se descuenta del denominador (no se sabe si se exige):
+    // 2 pendientes conocidos, el condicional aparte como «Falta definir».
     expect(barraAntes.getAttribute('aria-valuemax')).toBe('2');
-    /* «Faltan» cuenta los PENDIENTES (2). El condicional indeterminado va en su
-       propio grupo: no se sabe si se exige —el evaluador lo descuenta de
-       aplicables— y su acción es responder, no subir. */
-    expect(screen.getByText(/^Faltan · 2$/)).toBeTruthy();
-    expect(screen.getByText(/^Sin definir — dependen de Hechos del caso · 1$/)).toBeTruthy();
+    expect(screen.getAllByText('Pendiente').length).toBe(2);
+    expect(screen.getByText('Falta definir')).toBeTruthy();
 
     // El funcionario marca "hay apoderado":
     fireEvent.click(screen.getByRole('button', { name: /^Sí$/ }));
@@ -263,16 +276,16 @@ describe('Bloque A·A3 — ChecklistRequisitos reacciona EN VIVO a "Hechos del c
 
     // Después: el condicional pasa a APLICA (PENDIENTE, con su propio control de carga) — el requisito "aparece" como exigible.
     await waitFor(() => expect(within(filaCondicional()).getByText('Pendiente')).toBeTruthy());
-    expect(within(filaCondicional()).getByText('Subir documento')).toBeTruthy();
+    expect(within(filaCondicional()).getByText('+ Adjuntar documento')).toBeTruthy();
     expect(within(filaCondicional()).queryByText('Falta definir')).toBeNull();
 
     /* Al definir el hecho, el condicional deja de ser indeterminado y pasa a
-       EXIGIRSE: el denominador sube de 2 a 3 y el grupo «Sin definir»
-       desaparece. Eso es lo que esta prueba custodia. */
+       EXIGIRSE: el denominador sube de 2 a 3 y ya no queda nada «por definir».
+       Eso es lo que esta prueba custodia. */
     const barraDespues = screen.getByRole('progressbar', { name: /documentos aportados/i });
     expect(barraDespues.getAttribute('aria-valuenow')).toBe('0');
     expect(barraDespues.getAttribute('aria-valuemax')).toBe('3');
-    expect(screen.getByText(/^Faltan · 3$/)).toBeTruthy();
-    expect(screen.queryByText(/^Sin definir/)).toBeNull();
+    expect(screen.getAllByText('Pendiente').length).toBe(3);
+    expect(screen.queryByText('Falta definir')).toBeNull();
   });
 });

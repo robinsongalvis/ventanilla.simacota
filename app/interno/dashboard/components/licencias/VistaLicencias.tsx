@@ -64,10 +64,10 @@ export function VistaLicencias() {
   }
 
   return (
-    <div className="flex flex-col gap-3 h-full">
+    <div className="flex h-full w-full min-w-0 flex-col gap-3">
       <div className="shrink-0 px-4 md:px-6 pt-4 print:hidden">
         <div
-          className="flex gap-1 p-1 rounded-full w-fit"
+          className="flex max-w-full flex-wrap gap-1 rounded-full p-1"
           style={{ background: '#EEF4EE' }}
           role="tablist"
           aria-label="Sección de Licencias"
