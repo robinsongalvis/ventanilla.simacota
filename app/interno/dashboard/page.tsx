@@ -4,6 +4,7 @@ export const dynamic = 'force-dynamic';
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
+import Link from 'next/link';
 import {
   AlertTriangle,
   ArrowRight,
@@ -1285,6 +1286,43 @@ function AccionesRadicado({
   );
 }
 
+/**
+ * Señal de que este radicado YA dio origen a un expediente de licencias
+ * (handoff radicado⇄expediente, Bloque A·A4 / ADR-0026).
+ *
+ * POR QUÉ EXISTE: el mismo caso vive legítimamente en las DOS bandejas —la
+ * ventanilla vigila el término de respuesta al ciudadano y Licencias el ciclo
+ * jurídico (D.1077/2015)—, pero el tablero no mostraba ese vínculo por ningún
+ * lado. La funcionaria veía un radicado «sin clasificar» sin forma de saber
+ * que ya estaba siendo gestionado como expediente, ni por dónde llegar a él:
+ * el dato existía en `vinculoExpediente` y no se usaba en toda la pantalla.
+ *
+ * Es SOLO presentación: no reevalúa nada, no decide nada y no altera el
+ * handoff. Ausente el vínculo, no pinta nada (un radicado sin expediente es
+ * el caso normal, no una anomalía que haya que señalar).
+ */
+function ChipExpedienteVinculado({ vinculo }: { vinculo: VentanillaRadicado['vinculoExpediente'] }) {
+  if (!vinculo) return null;
+  return (
+    <Link
+      href={`/interno/licencias/${vinculo.expedienteId}`}
+      /* La fila/tarjeta entera selecciona el radicado al hacer clic; este
+         enlace navega a OTRA pantalla, así que detiene la propagación para
+         que no ocurran las dos cosas a la vez. */
+      onClick={(e) => e.stopPropagation()}
+      className="mt-1 inline-flex max-w-full items-center gap-1 rounded px-1.5 py-[1px] text-[9px] font-semibold uppercase tracking-wide transition-colors hover:brightness-95 focus-visible:outline-none focus-visible:ring-2"
+      style={{ background: '#EEF4EE', color: '#14532D', border: '1px solid #14532D' }}
+      title={`Expediente de licencias vinculado: ${vinculo.numeroExpediente} — abrir`}
+    >
+      <svg width="9" height="9" viewBox="0 0 24 24" fill="none" aria-hidden>
+        <path d="M4 10.5 12 4l8 6.5M6 9.5V19h12V9.5" stroke="currentColor" strokeWidth="2.2" strokeLinejoin="round" />
+      </svg>
+      <span className="break-all">{vinculo.numeroExpediente}</span>
+      <span aria-hidden>→</span>
+    </Link>
+  );
+}
+
 function TablaRadicados({
   radicados,
   cargando,
@@ -1397,6 +1435,7 @@ function TablaRadicados({
                 <div className="min-w-0">
                   <p className="break-all font-mono text-[13px] font-extrabold tracking-tight" style={{ color: '#14532D' }}>{r.radicadoId}</p>
                   <p className="mt-0.5 text-[10px]" style={{ color: '#94A3B8' }}>{fmtFecha(r.control.fechaRadicado)}</p>
+                  <ChipExpedienteVinculado vinculo={r.vinculoExpediente} />
                 </div>
                 <span className={`inline-flex max-w-full items-center rounded-full border px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide ${estadoVisual.clase}`}>
                   {estadoVisual.etiqueta}
@@ -1502,6 +1541,7 @@ function TablaRadicados({
                       <span className="break-all font-mono text-[12px] font-extrabold tracking-tight" style={{ color: '#14532D' }}>{r.radicadoId}</span>
                     </div>
                     <p className="text-[10px] mt-0.5" style={{ color: '#94A3B8' }}>{fmtFecha(r.control.fechaRadicado)}</p>
+                    <ChipExpedienteVinculado vinculo={r.vinculoExpediente} />
                   </td>
                   <td className="min-w-0 break-words px-2 py-2 align-top">
                     <p className="break-words font-medium" style={{ color: '#1F2933' }}>{nombreSolicitanteVisible(r, r.solicitante.nombreCompleto)}</p>
