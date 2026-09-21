@@ -27,7 +27,13 @@ const GLOBALS = readFileSync(join(process.cwd(), 'app/globals.css'), 'utf8');
 
 describe('panel interno — el body no debe desplazarse donde hay scroll propio', () => {
   it('la clase existe en globals.css y oculta el desbordamiento', () => {
-    expect(GLOBALS).toMatch(/body\.sin-scroll-de-pagina\s*\{[^}]*overflow:\s*hidden/);
+    /* Se asevera el EJE VERTICAL bloqueado, que es lo que evita el defecto —
+       no la sintaxis exacta. Valen `overflow: hidden` y `overflow-y: hidden`:
+       ambas impiden que el `<body>` se desplace en vertical. El eje horizontal
+       se dejó deliberadamente libre (ver el comentario de la regla en
+       `globals.css`) para que una regresión de ancho sea detectable en lugar
+       de quedar recortada en silencio. */
+    expect(GLOBALS).toMatch(/body\.sin-scroll-de-pagina\s*\{[^}]*overflow(-y)?:\s*hidden/);
   });
 
   it('el layout la aplica y la retira al salir de la ruta (no la deja pegada)', () => {

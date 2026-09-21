@@ -11,7 +11,7 @@ const TITULO_SOLO_LECTURA = 'Tu rol no permite realizar acciones sobre radicados
  * jefe.lab está fijado a su propia dependencia (FUNCIONARIO/JEFE_DEPENDENCIA
  * no ven todos los tenants — lib/permisos/alcance-tenants.ts) y ese tenant
  * no está documentado en el encargo. En vez de asumirlo, el test lo
- * descubre leyendo el encabezado "Tablero · {dependencia}" (visible solo
+ * descubre leyendo el encabezado "Bandeja de trámites · {dependencia}" (visible solo
  * para roles sin alcance municipal, page.tsx ~4810) y luego usa ADMIN
  * —que sí puede elegir cualquier "Dependencia destino" al radicar— para
  * crear un radicado dirigido exactamente a esa dependencia.
@@ -21,10 +21,27 @@ test('jefe en modo solo lectura: abre el radicado y no puede actuar', async ({ b
   const jefePage = await jefeCtx.newPage();
   await login(jefePage, USUARIOS_LAB.jefe);
 
-  const encabezadoTablero = jefePage.getByText(/^Tablero · /);
+  const encabezadoTablero = jefePage.getByText(/^Bandeja de trámites · /);
+  await expect(encabezadoTablero).toBeVisible({ timeout: 15_000 });
+  await expect(jefePage.getByRole('button', { name: /^Vencidos:/ })).toBeVisible({ timeout: 15_000 });
+
+  // Chromium usa zoom 100% por defecto. Validamos la bandeja en los anchos
+  // de aceptación antes de continuar con el flujo funcional del jefe.
+  for (const ancho of [1366, 1024, 390, 375, 360, 320]) {
+    await jefePage.setViewportSize({ width: ancho, height: 768 });
+    const medidas = await jefePage.evaluate(() => ({
+      viewport: window.innerWidth,
+      documento: document.documentElement.scrollWidth,
+      cuerpo: document.body.scrollWidth,
+    }));
+    expect(medidas.documento).toBeLessThanOrEqual(medidas.viewport);
+    expect(medidas.cuerpo).toBeLessThanOrEqual(medidas.viewport);
+  }
+  await jefePage.setViewportSize({ width: 1366, height: 768 });
+
   await expect(encabezadoTablero).toBeVisible({ timeout: 15_000 });
   const texto = (await encabezadoTablero.textContent()) ?? '';
-  const dependenciaJefe = texto.replace(/^Tablero\s*·\s*/, '').trim();
+  const dependenciaJefe = texto.replace(/^Bandeja de trámites\s*·\s*/, '').trim();
   expect(dependenciaJefe.length).toBeGreaterThan(0);
   expect(dependenciaJefe).not.toBe('Vista municipal');
 

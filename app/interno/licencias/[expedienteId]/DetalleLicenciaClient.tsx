@@ -291,7 +291,7 @@ export function DetalleLicenciaClient({ expedienteId, onVolver }: DetalleLicenci
 
   if (estadoCarga === 'cargando' || cargandoAuth) {
     return (
-      <div className="p-4 md:p-6 max-w-[1400px] mx-auto">
+      <div className="mx-auto w-full min-w-0 max-w-[1400px] p-4 md:p-6">
         <p className="text-sm" style={{ color: 'var(--text-secondary)' }}>Cargando expediente…</p>
       </div>
     );
@@ -299,7 +299,7 @@ export function DetalleLicenciaClient({ expedienteId, onVolver }: DetalleLicenci
 
   if (estadoCarga === 'no-encontrado') {
     return (
-      <div className="p-4 md:p-6 max-w-[720px] mx-auto flex flex-col items-start gap-3">
+      <div className="mx-auto flex w-full min-w-0 max-w-[720px] flex-col items-start gap-3 p-4 md:p-6">
         <VolverBandeja onVolver={onVolver} />
         <div className="rounded-xl p-5 w-full" style={{ background: 'var(--bg-surface)', border: '1px solid var(--color-border)', boxShadow: 'var(--shadow-soft)' }}>
           <h1 className="font-headline text-xl" style={{ color: 'var(--text-primary)' }}>Expediente no encontrado</h1>
@@ -313,7 +313,7 @@ export function DetalleLicenciaClient({ expedienteId, onVolver }: DetalleLicenci
 
   if (estadoCarga === 'error' || !expediente) {
     return (
-      <div className="p-4 md:p-6 max-w-[720px] mx-auto flex flex-col items-start gap-3">
+      <div className="mx-auto flex w-full min-w-0 max-w-[720px] flex-col items-start gap-3 p-4 md:p-6">
         <VolverBandeja onVolver={onVolver} />
         <p role="alert" className="rounded-lg px-3 py-2 text-sm w-full" style={{ background: '#FEF2F2', border: '1px solid #FECACA', color: '#991B1B' }}>
           {errorMsg ?? 'No fue posible cargar el expediente.'}
@@ -397,7 +397,7 @@ export function DetalleLicenciaClient({ expedienteId, onVolver }: DetalleLicenci
         : undefined;
 
   return (
-    <div className="p-4 md:p-6 flex flex-col gap-5 max-w-[1400px] mx-auto">
+    <div className="mx-auto flex w-full min-w-0 max-w-[1400px] flex-col gap-5 p-4 md:p-6">
       {/* Todo el "chrome" de pantalla vive dentro de este contenedor
           `print:hidden` — al imprimir (botón "Imprimir" del proyecto de
           acto de desistimiento, más abajo) solo debe salir la vista limpia
@@ -727,4 +727,3 @@ function VolverBandeja({ onVolver }: { onVolver?: () => void }) {
     </Link>
   );
 }
-

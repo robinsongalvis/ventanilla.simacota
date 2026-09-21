@@ -4,6 +4,22 @@ export const dynamic = 'force-dynamic';
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
+import {
+  AlertTriangle,
+  ArrowRight,
+  CheckCircle2,
+  CircleX,
+  Clock3,
+  Eye,
+  FileText,
+  MoreVertical,
+  Plus,
+  Search,
+  SlidersHorizontal,
+  UserRoundX,
+  UsersRound,
+  type LucideIcon,
+} from 'lucide-react';
 import { collection, getDocs, limit, orderBy, query } from 'firebase/firestore';
 import { signInWithEmailAndPassword }     from 'firebase/auth';
 import { getFirebaseAuth, getDb }         from '@/lib/firebase';
@@ -82,7 +98,6 @@ import { ResumenEjecutivoRadicado }          from '@/app/interno/dashboard/compo
    claro dejó sin un solo llamador: la proyección se construyó, se probó y se
    aseguró, y nadie llegó nunca a verla. Cuelga del panel que sí se pinta. */
 import { EstadoTramiteLicencia }             from '@/app/interno/dashboard/components/pqrs/EstadoTramiteLicencia';
-import { BarraKpisOperativos }               from '@/app/interno/dashboard/components/BarraKpisOperativos';
 import { calcularKpisOperativos }            from '@/lib/kpis-operativos/calcular-kpis-operativos';
 import {
   filtrarPorKpiOperativo,
@@ -91,11 +106,7 @@ import {
 import { puedeVerTodosLosTenants } from '@/lib/permisos/alcance-tenants';
 import { BarraFiltrosActivos } from '@/app/interno/dashboard/components/BarraFiltrosActivos';
 import type { EstadoFiltros, DimensionFiltro } from '@/lib/filtros-activos/resumir-filtros-activos';
-import { MetricsSummary } from '@/app/components/design-system/MetricsSummary';
 import { PriorityBanner } from '@/app/components/design-system/PriorityBanner';
-import {
-  type FiltroGrande,
-} from '@/lib/kpis-mipg/radicado-mas-critico';
 import { useFuncionariosTenant }              from '@/lib/hooks/useFuncionariosTenant';
 import type { FuncionarioTenant }             from '@/lib/hooks/useFuncionariosTenant';
 import type { ResponsableFuncionario }        from '@/lib/actions/asignarRadicado';
@@ -206,6 +217,7 @@ function aplicarFiltroMIPG(
   else if (filtro === 'ASIGNADAS')               lista = lista.filter((r) => ['ASIGNADO', 'EN_REVISION', 'EN_PROCESO'].includes(r.estadoActual));
   else if (filtro === 'EN_TERMINO')              lista = lista.filter((r) => estaActivo(r) && calcDiasRestantes(r) > 2);
   else if (filtro === 'POR_VENCER')              lista = lista.filter((r) => { const d = calcDiasRestantes(r); return estaActivo(r) && d >= 0 && d <= 2; });
+  else if (filtro === 'POR_VENCER_HOY')          lista = lista.filter((r) => estaActivo(r) && calcDiasRestantes(r) === 0);
   else if (filtro === 'VENCIDAS')                lista = lista.filter((r) => estaActivo(r) && calcDiasRestantes(r) < 0);
   else if (filtro === 'CORREOS_FALLIDOS')        lista = lista.filter((r) => r.alertaNotificacionFallida === true);
   else if (filtro === 'DEVUELTAS_PRORROGA')      lista = lista.filter((r) => ['DEVUELTO', 'PRORROGA'].includes(r.estadoActual));
@@ -852,6 +864,7 @@ function MobileTopBar({
         : vistaActual === 'LICENCIAS'
           ? 'Licencias'
           : 'Panel interno');
+  const etiquetaVista = vistaActual === 'TABLERO' ? 'Bandeja de trámites' : vista;
   const rolCompacto: Record<string, string> = {
     ADMIN: 'Admin',
     RECEPCIONISTA: 'Recepción',
@@ -861,8 +874,8 @@ function MobileTopBar({
   };
 
   return (
-    <header className="md:hidden shrink-0 bg-white px-3 py-2.5" style={{ borderBottom: '1px solid #D9E2D9' }}>
-      <div className="flex items-center gap-2.5">
+    <header className="md:hidden w-full min-w-0 shrink-0 bg-white px-3 py-2.5" style={{ borderBottom: '1px solid #D9E2D9' }}>
+      <div className="flex min-w-0 items-center gap-2.5">
         <button
           type="button"
           onClick={onAbrirMenu}
@@ -879,10 +892,10 @@ function MobileTopBar({
             Alcaldía de Simacota
           </p>
           <p className="truncate text-sm font-black leading-tight" style={{ color: '#1F2933' }}>
-            {vista}
+            {etiquetaVista}
           </p>
         </div>
-        <span className="shrink-0 rounded-full px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider border"
+        <span className="hidden shrink-0 rounded-full border px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider min-[360px]:inline"
               style={{ background: '#EEF4EE', color: '#14532D', borderColor: '#D9E2D9' }}>
           {rolCompacto[usuario.rol] ?? 'Func.'}
         </span>
@@ -916,9 +929,6 @@ interface TarjetaMIPGItem {
   textoColor: string;
   icono?:    React.ReactNode;
 }
-
-/** Panel Op Nivel 3B — los 4 KPIs accionables van como tarjetas grandes. */
-const FILTROS_GRANDES: FiltroGrande[] = ['VENCIDAS', 'POR_VENCER', 'RADICADAS', 'ASIGNADAS'];
 
 /** Paleta operativa institucional: fondos claros + números y labels en
  *  tonos de alto contraste (-700/-800). Cada KPI se identifica por el
@@ -993,61 +1003,59 @@ function construirTarjetasMIPG(metricas: MetricasMIPGData): TarjetaMIPGItem[] {
   ];
 }
 
-/** Texto oscuro AA-safe para el estado atenuado (valor === 0): tras el
- *  opacity 0.55 del contenedor sigue cumpliendo ≥ 4.5:1 sobre fondo
- *  claro (mismo criterio que TarjetaMIPGGrande). Solo el cromado
- *  (riel/borde) pierde color; el texto nunca depende de la opacidad
- *  para su legibilidad. */
-const TEXTO_ATENUADO = '#0F172A';
-const RIEL_ATENUADO  = '#CBD5D1';
-
-/** Chip MIPG compacto — reutilizado por TarjetasMIPG (fila compacta y
- *  modo "minimizar paneles") y por la banda "Estado operativo"
- *  fusionada. Jerarquía por severidad: valor 0 se atenúa pero sigue
- *  visible y clicable. */
-function ChipMipgCompacto({
-  item,
+function TarjetaResumenTablero({
+  etiqueta,
+  valor,
+  descripcion,
+  tono,
+  Icono,
   activo,
-  compacto,
   onClick,
 }: {
-  item: TarjetaMIPGItem;
+  etiqueta: string;
+  valor: number;
+  descripcion: string;
+  tono: 'rojo' | 'ambar' | 'azul' | 'verde' | 'gris';
+  Icono: LucideIcon;
   activo: boolean;
-  compacto: boolean;
   onClick: () => void;
 }) {
-  const atenuada = item.valor === 0;
-  const cls = compacto
-    ? { card: 'px-2.5 py-1', num: 'text-base', label: 'text-[9px] mt-0' }
-    : { card: 'px-4 py-3',   num: 'text-2xl',  label: 'text-[10px] mt-0.5' };
+  const tonos = {
+    rojo: { fondo: '#FEF2F2', borde: '#FECACA', texto: '#B91C1C' },
+    ambar: { fondo: '#FFFBEB', borde: '#FDE68A', texto: '#B45309' },
+    azul: { fondo: '#EFF6FF', borde: '#BFDBFE', texto: '#1D4ED8' },
+    verde: { fondo: '#F0FDF4', borde: '#BBF7D0', texto: '#166534' },
+    gris: { fondo: '#F8FAFC', borde: '#E2E8F0', texto: '#334155' },
+  } as const;
+  const tonoActual = tonos[tono];
+
   return (
     <button
       type="button"
       onClick={onClick}
       aria-pressed={activo}
-      aria-label={`Filtrar bandeja por ${item.label} (${item.valor})`}
-      className={`micro-card shrink-0 flex flex-col items-start ${cls.card} rounded-xl cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-700/30`}
+      aria-label={`${etiqueta}: ${valor}`}
+      className="tablero-interactivo min-w-0 rounded-xl border px-2.5 py-2 text-left transition-[transform,box-shadow,border-color,background-color] duration-200 ease-out hover:-translate-y-0.5 hover:shadow-md active:translate-y-0 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-700/30"
       style={{
-        background: activo ? '#EEF4EE' : '#F8FAF7',
-        border: `1px solid ${activo ? '#14532D' : '#D9E2D9'}`,
-        borderLeftColor: atenuada ? RIEL_ATENUADO : item.rielColor,
-        borderLeftWidth: 4,
-        opacity: atenuada ? 0.55 : 1,
+        background: activo ? '#FFFFFF' : tonoActual.fondo,
+        borderColor: activo ? tonoActual.texto : tonoActual.borde,
+        boxShadow: activo ? `0 0 0 2px ${tonoActual.texto}22` : undefined,
       }}
     >
-      <span
-        className={`${cls.num} font-black leading-none tabular-nums flex items-center gap-1`}
-        style={{ color: atenuada ? TEXTO_ATENUADO : item.textoColor }}
-      >
-        {item.icono && <span className="mt-0.5">{item.icono}</span>}
-        {item.valor}
-      </span>
-      <span
-        className={`${cls.label} font-bold uppercase tracking-widest`}
-        style={{ color: atenuada ? TEXTO_ATENUADO : item.textoColor }}
-      >
-        {item.label}
-      </span>
+      <div className="flex min-w-0 items-start gap-1.5">
+        <span
+          aria-hidden="true"
+          className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg text-sm font-black"
+          style={{ background: '#FFFFFFAA', color: tonoActual.texto }}
+        >
+          <Icono size={16} strokeWidth={1.9} />
+        </span>
+        <div className="min-w-0">
+          <p className="text-xl font-black leading-none tabular-nums" style={{ color: tonoActual.texto }}>{valor}</p>
+          <p className="mt-0.5 break-words text-[11px] font-bold leading-tight" style={{ color: tonoActual.texto }}>{etiqueta}</p>
+          <p className="mt-px break-words text-[9px] leading-tight" style={{ color: '#667085' }}>{descripcion}</p>
+        </div>
+      </div>
     </button>
   );
 }
@@ -1056,6 +1064,13 @@ function TarjetasMIPG({
   metricas,
   filtroActivo,
   onFiltroChange,
+  kpisOperativos,
+  filtroOperativo,
+  onFiltroOperativoChange,
+  porVencerHoy,
+  misAsignados,
+  soloMios,
+  onToggleSoloMios,
   veTodosTenants,
   tenantFiltro,
   onTenantChange,
@@ -1067,6 +1082,13 @@ function TarjetasMIPG({
   metricas:       MetricasMIPGData;
   filtroActivo:   FiltroMIPG;
   onFiltroChange: (f: FiltroMIPG) => void;
+  kpisOperativos: ReturnType<typeof calcularKpisOperativos>;
+  filtroOperativo: FiltroKpiOperativo;
+  onFiltroOperativoChange: (f: FiltroKpiOperativo) => void;
+  porVencerHoy: number;
+  misAsignados: number;
+  soloMios: boolean;
+  onToggleSoloMios: () => void;
   /** Panel Op Nivel 1 — gatea el selector de dependencia. ADMIN,
    *  CONTROL_INTERNO y RECEPCIONISTA lo ven; los demás no. */
   veTodosTenants: boolean;
@@ -1078,21 +1100,6 @@ function TarjetasMIPG({
   onToggleDatosIncompletos?: () => void;
 }) {
   const tarjetas: TarjetaMIPGItem[] = construirTarjetasMIPG(metricas);
-
-  // Sprint UI Bandeja Operativa — variante compacta:
-  // - py reducido (py-1.5 vs py-3).
-  // - Tarjetas px-3 py-1.5 con número text-base en lugar de 2xl.
-  // - Mantiene riel izquierdo y selección por color.
-  const cls = modoCompacto
-    ? { wrap: 'px-3 sm:px-4 py-1.5', card: 'px-2.5 py-1', num: 'text-base', label: 'text-[9px] mt-0' }
-    : { wrap: 'px-3 sm:px-4 py-2',    card: 'px-4 py-3',    num: 'text-2xl', label: 'text-[10px] mt-0.5' };
-
-  // Panel Op Nivel 3B — mapa por filtro para ubicar las 4 grandes.
-  // Sprint tablero-jerarquia — los 4 KPIs restantes (Prioridad MIPG,
-  // En término, Devueltas/Prórroga, Fuera de término) ya NO se
-  // renderizan aquí: se fusionaron en la banda "Estado operativo"
-  // (ver <BarraKpisOperativos chipsExtra=…> en el render principal)
-  // para cumplir la regla de banda única de estado.
   const porFiltro = new Map(tarjetas.map((t) => [t.filtro, t]));
 
   const controlesTop = (
@@ -1101,7 +1108,7 @@ function TarjetasMIPG({
         <button
           type="button"
           onClick={onToggleCompacto}
-          className="shrink-0 text-[10px] font-bold uppercase tracking-widest px-3 py-2 rounded-lg border focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-700/30"
+          className="tablero-interactivo shrink-0 rounded-lg border px-2.5 py-1.5 text-[10px] font-bold uppercase tracking-widest transition-[transform,box-shadow,background-color] duration-200 ease-out hover:-translate-y-px hover:shadow-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-700/30"
           style={{
             background: modoCompacto ? '#14532D' : 'white',
             color: modoCompacto ? 'white' : '#14532D',
@@ -1117,7 +1124,7 @@ function TarjetasMIPG({
         <button
           type="button"
           onClick={onToggleDatosIncompletos}
-          className="shrink-0 text-[10px] font-bold uppercase tracking-widest px-3 py-2 rounded-lg border focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-500/30"
+          className="tablero-interactivo shrink-0 rounded-lg border px-2.5 py-1.5 text-[10px] font-bold uppercase tracking-widest transition-[transform,box-shadow,background-color] duration-200 ease-out hover:-translate-y-px hover:shadow-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-500/30"
           style={{
             background: soloDatosIncompletos ? '#FBBF24' : 'white',
             color:      soloDatosIncompletos ? '#78350F' : '#B45309',
@@ -1129,6 +1136,17 @@ function TarjetasMIPG({
           {soloDatosIncompletos ? '✓ Datos incompletos' : 'Datos incompletos'}
         </button>
       )}
+      <button
+        type="button"
+        onClick={onToggleSoloMios}
+        aria-pressed={soloMios}
+        className="tablero-interactivo shrink-0 rounded-lg border px-2.5 py-1.5 text-[10px] font-bold uppercase tracking-widest transition-[transform,box-shadow,background-color] duration-200 ease-out hover:-translate-y-px hover:shadow-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-700/30"
+        style={soloMios
+          ? { background: '#14532D', color: '#FFFFFF', borderColor: '#14532D' }
+          : { background: '#FFFFFF', color: '#14532D', borderColor: '#97C459' }}
+      >
+        {misAsignados} solo los míos
+      </button>
       {veTodosTenants && (
         <div className="shrink-0 flex items-center ml-auto">
           <select
@@ -1147,62 +1165,54 @@ function TarjetasMIPG({
     </>
   );
 
-  const tarjetaPequena = (t: TarjetaMIPGItem) => (
-    <ChipMipgCompacto
-      key={t.filtro}
-      item={t}
-      activo={filtroActivo === t.filtro}
-      compacto={modoCompacto}
-      onClick={() => onFiltroChange(t.filtro)}
-    />
-  );
+  const principal = (filtro: FiltroMIPG) => porFiltro.get(filtro)!;
+  const enTermino = principal('EN_TERMINO');
 
-  // Modo compacto: una sola fila con todas las tarjetas pequeñas
-  // (comportamiento previo intacto para dar altura a la lista; la
-  // card vertical "Todos" se retiró — su total vive ahora en el chip
-  // "N activos" junto al título del Tablero, siempre visible).
-  if (modoCompacto) {
-    return (
-      <div className={`${cls.wrap} shrink-0 bg-white`} style={{ borderBottom: '1px solid #D9E2D9' }}>
-        <div className="flex gap-2 overflow-x-auto pb-0.5 items-center">
-          {controlesTop}
-          {tarjetas.map(tarjetaPequena)}
-        </div>
-      </div>
-    );
-  }
-
-  // Modo expandido (default): barra compacta de métricas (design system).
-  // Reemplaza las 4 tarjetas grandes por una fila horizontal que reduce
-  // la saturación visual y deja más espacio para la tabla principal.
-  // El detalle del radicado crítico se accede desde la tabla directamente.
   return (
-    <MetricsSummary
-      titulo="Métricas"
-      criticas={FILTROS_GRANDES.map((filtro) => {
-        const t = porFiltro.get(filtro);
-        if (!t) return null;
-        return {
-          label: t.label,
-          valor: t.valor,
-          color: t.rielColor,
-          colorTexto: t.textoColor,
-          activo: filtroActivo === filtro,
-          onClick: () => onFiltroChange(filtro),
-        };
-      }).filter(Boolean) as { label: string; valor: number; color: string; colorTexto: string; activo: boolean; onClick: () => void }[]}
-      secundarias={tarjetas
-        .filter((t) => !FILTROS_GRANDES.includes(t.filtro as FiltroGrande))
-        .map((t) => ({
-          label: t.label,
-          valor: t.valor,
-          color: t.rielColor,
-          colorTexto: t.textoColor,
-          activo: filtroActivo === t.filtro,
-          onClick: () => onFiltroChange(t.filtro),
-        }))}
-      acciones={controlesTop}
-    />
+    <section className="shrink-0 bg-[#F8FAF7] px-3 py-2 sm:px-4 lg:px-6" aria-label="Resumen operativo de trámites">
+      <div className="mb-2 flex min-w-0 flex-wrap items-center justify-between gap-1.5">
+        <div className="min-w-0">
+          <h2 className="text-sm font-black" style={{ color: '#12261A' }}>Resumen de trámites</h2>
+          <p className="text-[10px]" style={{ color: '#667085' }}>Indicadores actualizados en tiempo real</p>
+        </div>
+        <div className="flex min-w-0 flex-wrap items-center gap-1.5">{controlesTop}</div>
+      </div>
+
+      {!modoCompacto && (
+        <>
+          <div className="grid min-w-0 grid-cols-1 gap-1.5 min-[440px]:grid-cols-2 xl:grid-cols-4">
+            {([
+              ['VENCIDAS', 'Vencidos', 'Requieren atención', 'rojo', AlertTriangle],
+              ['POR_VENCER', 'Por vencer', 'Próximos a vencer', 'ambar', Clock3],
+              ['RADICADAS', 'Radicados', 'Pendientes de gestión', 'gris', FileText],
+              ['ASIGNADAS', 'Asignados', 'En gestión', 'azul', UsersRound],
+            ] as const).map(([filtro, etiqueta, descripcion, tono, Icono]) => (
+              <TarjetaResumenTablero
+                key={filtro}
+                etiqueta={etiqueta}
+                valor={principal(filtro).valor}
+                descripcion={descripcion}
+                tono={tono}
+                Icono={Icono}
+                activo={filtroActivo === filtro}
+                onClick={() => onFiltroChange(filtro)}
+              />
+            ))}
+          </div>
+
+          <div className="mt-2.5 flex min-w-0 items-center gap-2">
+            <h2 className="text-sm font-black" style={{ color: '#12261A' }}>Seguimiento</h2>
+            <span className="h-px min-w-0 flex-1" style={{ background: '#D9E2D9' }} />
+          </div>
+          <div className="mt-1.5 grid min-w-0 grid-cols-1 gap-1.5 min-[440px]:grid-cols-2 xl:grid-cols-4">
+            <TarjetaResumenTablero etiqueta="En término" valor={enTermino.valor} descripcion="Dentro del plazo" tono="verde" Icono={CheckCircle2} activo={filtroActivo === 'EN_TERMINO'} onClick={() => onFiltroChange('EN_TERMINO')} />
+            <TarjetaResumenTablero etiqueta="Sin asignar" valor={kpisOperativos.sinAsignar} descripcion="Pendientes de asignación" tono="ambar" Icono={UserRoundX} activo={filtroOperativo === 'SIN_ASIGNAR'} onClick={() => onFiltroOperativoChange(filtroOperativo === 'SIN_ASIGNAR' ? 'NINGUNO' : 'SIN_ASIGNAR')} />
+            <TarjetaResumenTablero etiqueta="Por vencer hoy" valor={porVencerHoy} descripcion="Vencen durante el día" tono="gris" Icono={Clock3} activo={filtroActivo === 'POR_VENCER_HOY'} onClick={() => onFiltroChange(filtroActivo === 'POR_VENCER_HOY' ? 'TODOS' : 'POR_VENCER_HOY')} />
+            <TarjetaResumenTablero etiqueta="Con errores" valor={kpisOperativos.correoFallido} descripcion="Notificaciones fallidas" tono="rojo" Icono={CircleX} activo={filtroActivo === 'CORREOS_FALLIDOS'} onClick={() => onFiltroChange(filtroActivo === 'CORREOS_FALLIDOS' ? 'TODOS' : 'CORREOS_FALLIDOS')} />
+          </div>
+        </>
+      )}
+    </section>
   );
 }
 
@@ -1213,12 +1223,65 @@ function TarjetasMIPG({
 function SkeletonFila() {
   return (
     <tr className="animate-pulse border-b border-white/[0.05]">
-      {Array.from({ length: 7 }).map((_, i) => (
-        <td key={i} className="px-4 py-3">
+      {Array.from({ length: 8 }).map((_, i) => (
+        <td key={i} className="px-2 py-2">
           <div className="h-3 rounded bg-slate-800/80" style={{ width: `${40 + (i % 3) * 25}%` }} />
         </td>
       ))}
     </tr>
+  );
+}
+
+function EstadoVisualRadicado(radicado: VentanillaRadicado) {
+  const semaforo = calcularSemaforo(radicado);
+  if (semaforo.estado === 'VENCIDO') {
+    return { etiqueta: 'Vencido', clase: BADGE_ESTADO.VENCIDO, semaforo };
+  }
+  return {
+    etiqueta: LABELS_ESTADO[radicado.estadoActual] ?? radicado.estadoActual,
+    clase: BADGE_ESTADO[radicado.estadoActual] ?? 'bg-gray-100 text-gray-600 border-gray-200',
+    semaforo,
+  };
+}
+
+function AccionesRadicado({
+  radicado,
+  onSeleccionar,
+}: {
+  radicado: VentanillaRadicado;
+  onSeleccionar: (radicado: VentanillaRadicado) => void;
+}) {
+  return (
+    <div className="flex shrink-0 items-center justify-end gap-1" onClick={(event) => event.stopPropagation()}>
+      <button
+        type="button"
+        onClick={() => onSeleccionar(radicado)}
+        className="tablero-interactivo group inline-flex items-center gap-1 rounded-lg border px-2 py-1.5 text-[11px] font-bold transition-[transform,box-shadow,background-color] duration-200 ease-out hover:-translate-y-px hover:bg-[#EEF4EE] hover:shadow-sm active:translate-y-0 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-700/30"
+        style={{ color: '#14532D', borderColor: '#B7D8C0', background: '#FFFFFF' }}
+      >
+        <Eye className="tablero-icono-movil transition-transform duration-150 group-hover:translate-x-px" size={15} strokeWidth={1.9} aria-hidden="true" />
+        Ver
+      </button>
+      <details className="relative">
+        <summary
+          aria-label={`Más acciones para ${radicado.radicadoId}`}
+          className="tablero-interactivo flex h-8 w-8 cursor-pointer list-none items-center justify-center rounded-lg border text-sm font-black transition-[transform,box-shadow,background-color] duration-200 ease-out hover:-translate-y-px hover:bg-[#F8FAF7] hover:shadow-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-700/30"
+          style={{ color: '#667085', borderColor: '#D9E2D9', background: '#FFFFFF' }}
+        >
+          <MoreVertical size={17} strokeWidth={1.9} aria-hidden="true" />
+        </summary>
+        <div className="absolute right-0 z-30 mt-1 w-40 rounded-lg border p-1 shadow-lg" style={{ background: '#FFFFFF', borderColor: '#D9E2D9' }}>
+          <button
+            type="button"
+            onClick={() => onSeleccionar(radicado)}
+            className="w-full rounded-md px-2 py-1.5 text-left text-xs font-semibold transition-colors duration-150 hover:bg-[#EEF4EE]"
+            style={{ color: '#14532D' }}
+          >
+            Abrir detalle
+          </button>
+        </div>
+      </details>
+    </div>
   );
 }
 
@@ -1233,6 +1296,7 @@ function TablaRadicados({
   onNuevoRadicado,
   puedeRadicar,
   onAbrirBusquedaAvanzada,
+  forzarTarjetas,
 }: {
   radicados:              VentanillaRadicado[];
   cargando:               boolean;
@@ -1244,15 +1308,15 @@ function TablaRadicados({
   onNuevoRadicado:        () => void;
   puedeRadicar:           boolean;
   onAbrirBusquedaAvanzada?: () => void;
+  /** Mantiene legibles los datos cuando el panel de detalle reduce el área central. */
+  forzarTarjetas:         boolean;
 }) {
   return (
     <div className="flex-1 flex flex-col overflow-hidden min-h-0">
       {/* Toolbar */}
       <div className="flex flex-wrap items-center gap-2 sm:gap-3 px-3 sm:px-4 py-2 sm:py-2.5 shrink-0 bg-white" style={{ borderBottom: '1px solid #D9E2D9' }}>
-        <div className="relative min-w-0 flex-1 max-w-sm sm:min-w-[220px]">
-          <svg className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5" style={{ color: '#94A3B8' }} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-            <path strokeLinecap="round" strokeLinejoin="round" d="M21 21l-5.197-5.197m0 0A7.5 7.5 0 105.196 5.196a7.5 7.5 0 0010.607 10.607z" />
-          </svg>
+        <div className="relative min-w-0 flex-[1_1_15rem] max-w-xl">
+          <Search className="absolute left-3 top-1/2 h-3.5 w-3.5 -translate-y-1/2" style={{ color: '#94A3B8' }} strokeWidth={1.9} aria-hidden="true" />
           <input
             type="search"
             value={busqueda}
@@ -1271,13 +1335,11 @@ function TablaRadicados({
           <button
             onClick={onAbrirBusquedaAvanzada}
             type="button"
-            className="shrink-0 flex items-center gap-1.5 px-3 py-2 rounded-lg text-xs font-bold focus-visible:outline-none border"
+            className="group shrink-0 flex items-center gap-1.5 rounded-lg border px-3 py-2 text-xs font-bold transition-[transform,box-shadow,background-color] duration-200 ease-out hover:-translate-y-px hover:bg-[#EEF4EE] hover:shadow-sm focus-visible:outline-none"
             style={{ background: 'white', color: '#14532D', borderColor: '#14532D' }}
             title="Búsqueda histórica avanzada (Sprint 2)"
           >
-            <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-              <path strokeLinecap="round" strokeLinejoin="round" d="M3 4a1 1 0 011-1h16a1 1 0 011 1v2a1 1 0 01-.293.707L14 13.414V19a1 1 0 01-.553.894l-4 2A1 1 0 018 21v-7.586L3.293 6.707A1 1 0 013 6V4z" />
-            </svg>
+            <SlidersHorizontal className="tablero-icono-movil transition-transform duration-150 group-hover:rotate-[-8deg]" size={15} strokeWidth={1.9} aria-hidden="true" />
             Filtros avanzados
           </button>
         )}
@@ -1287,9 +1349,7 @@ function TablaRadicados({
             className="micro-btn-primary shrink-0 flex items-center gap-1.5 px-3 py-2 rounded-lg text-white text-xs font-bold focus-visible:outline-none"
             style={{ background: '#14532D' }}
           >
-            <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
-              <path strokeLinecap="round" strokeLinejoin="round" d="M12 4v16m8-8H4" />
-            </svg>
+            <Plus size={15} strokeWidth={2} aria-hidden="true" />
             Nuevo
           </button>
         )}
@@ -1303,80 +1363,86 @@ function TablaRadicados({
         </div>
       )}
 
-      {/* Tarjetas — móvil (< sm) */}
-      <div className="sm:hidden flex-1 overflow-y-auto bg-white" style={{ borderTop: '1px solid #EEF4EE' }}>
+      {/* Tarjetas — tablet y móvil. Evitan comprimir ocho columnas en anchos no disponibles. */}
+      <div className={`${forzarTarjetas ? '' : 'xl:hidden'} flex-1 min-h-0 overflow-y-auto bg-[#F8FAF7] p-3 sm:p-4`} style={{ borderTop: '1px solid #EEF4EE' }}>
         {cargando && !error && (
           Array.from({ length: 5 }).map((_, i) => (
-            <div key={i} className="px-4 py-3 animate-pulse space-y-2" style={{ borderBottom: '1px solid #EEF4EE' }}>
+            <div key={i} className="mb-2 rounded-xl bg-white px-4 py-3 animate-pulse space-y-2" style={{ border: '1px solid #D9E2D9' }}>
               <div className="h-3 rounded w-2/3" style={{ background: '#EEF4EE' }} />
               <div className="h-2.5 rounded w-1/2" style={{ background: '#F8FAF7' }} />
             </div>
           ))
         )}
         {!cargando && !error && radicados.length === 0 && (
-          <div className="px-4 py-16 text-center">
+          <div className="rounded-xl bg-white px-4 py-16 text-center" style={{ border: '1px solid #D9E2D9' }}>
             <p className="font-medium mb-1" style={{ color: '#667085' }}>Sin radicados</p>
             <p className="text-xs" style={{ color: '#94A3B8' }}>No hay resultados para los filtros aplicados.</p>
           </div>
         )}
         {!cargando && radicados.map((r) => {
-          const esRojo = r.prioridad === 'ROJO';
           const seleccionado = radicadoSeleccionadoId === r.radicadoId;
-          const semaforoData = calcularSemaforo(r);
+          const estadoVisual = EstadoVisualRadicado(r);
           return (
-            <button
+            <article
               key={r.radicadoId}
-              type="button"
-              onClick={() => onSeleccionar(r)}
-              className="micro-row w-full text-left px-4 py-3"
+              className="micro-row tablero-interactivo mb-2 min-w-0 rounded-xl bg-white p-3 text-left transition-[transform,box-shadow,background-color] duration-200 ease-out hover:-translate-y-px hover:shadow-sm sm:p-4"
               aria-current={seleccionado ? 'true' : undefined}
               style={{
-                borderBottom: '1px solid #EEF4EE',
+                border: '1px solid #D9E2D9',
                 borderLeft: seleccionado ? '4px solid #14532D' : '4px solid transparent',
                 background: seleccionado ? '#EEF4EE' : undefined,
               }}
             >
-              <div className="flex items-start justify-between gap-2 mb-1.5">
-                {/* Requisito legal — el radicado nunca se trunca; solo
-                    el badge de estado es shrink-0 para dejarle espacio. */}
-                <div className="flex items-center gap-1.5 min-w-0">
-                  {esRojo && <span className="shrink-0 w-1.5 h-1.5 rounded-full bg-red-500 animate-pulse mt-0.5" />}
-                  <span className="font-mono text-[13px] font-extrabold tracking-tight break-words" style={{ color: '#14532D' }}>{r.radicadoId}</span>
+              <div className="flex min-w-0 flex-wrap items-start justify-between gap-2">
+                <div className="min-w-0">
+                  <p className="break-all font-mono text-[13px] font-extrabold tracking-tight" style={{ color: '#14532D' }}>{r.radicadoId}</p>
+                  <p className="mt-0.5 text-[10px]" style={{ color: '#94A3B8' }}>{fmtFecha(r.control.fechaRadicado)}</p>
                 </div>
-                <span className={`shrink-0 inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wide border ${
-                  BADGE_ESTADO[r.estadoActual] ?? 'bg-gray-100 text-gray-600 border-gray-200'
-                }`}>
-                  {LABELS_ESTADO[r.estadoActual] ?? r.estadoActual}
+                <span className={`inline-flex max-w-full items-center rounded-full border px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide ${estadoVisual.clase}`}>
+                  {estadoVisual.etiqueta}
                 </span>
               </div>
-              <p className="text-sm font-medium truncate" style={{ color: '#1F2933' }}>{nombreSolicitanteVisible(r, r.solicitante.nombreCompleto)}</p>
-              <div className="mt-1 flex flex-wrap gap-x-3 gap-y-0.5">
-                <span className="text-[10px]" style={{ color: '#667085' }}>{r.termino.tipoSolicitudNombre}</span>
-                <span className="text-[10px] truncate" style={{ color: '#94A3B8' }}>{NOMBRES_TENANT[r.clasificacion.oficinaDestino]}</span>
+              <p className="mt-3 break-words text-sm font-bold" style={{ color: '#1F2933' }}>{nombreSolicitanteVisible(r, r.solicitante.nombreCompleto)}</p>
+              <p className="mt-1 break-words text-xs" style={{ color: '#667085' }}>{r.termino.tipoSolicitudNombre}</p>
+              <p className="mt-1 break-words text-[11px]" style={{ color: '#94A3B8' }}>{NOMBRES_TENANT[r.clasificacion.oficinaDestino]}</p>
+              <div className="mt-3 grid min-w-0 grid-cols-1 gap-2 min-[440px]:grid-cols-2">
+                <div className="min-w-0">
+                  <p className="text-[9px] font-bold uppercase tracking-wider" style={{ color: '#94A3B8' }}>Vencimiento</p>
+                  <p className="break-words text-xs" style={{ color: '#667085' }}>{fmtFecha(r.termino.fechaVencimiento)}</p>
+                </div>
+                <div className="min-w-0">
+                  <p className="text-[9px] font-bold uppercase tracking-wider" style={{ color: '#94A3B8' }}>Tiempo</p>
+                  <p className={`break-words text-xs font-bold ${estadoVisual.semaforo.textoClass}`}>{estadoVisual.semaforo.label}</p>
+                </div>
               </div>
-              <div className="mt-1 flex items-center gap-3">
-                <span className="text-[10px]" style={{ color: '#94A3B8' }}>Vence {fmtFecha(r.termino.fechaVencimiento)}</span>
-                <span className={`text-[11px] font-semibold tabular-nums ${semaforoData.textoClass}`}>{semaforoData.label}</span>
+              <div className="mt-3 border-t pt-3" style={{ borderColor: '#EEF4EE' }}>
+                <AccionesRadicado radicado={r} onSeleccionar={onSeleccionar} />
               </div>
-            </button>
+            </article>
           );
         })}
       </div>
 
-      {/* Tabla — sm+ : ancho mínimo en escritorio para preservar legibilidad de columnas */}
-      {/* Sprint UI Bandeja:
-          - `min-h-0` para que el flex-1 no quede infinito.
-          - El thead sticky con `background-clip: padding-box` y background
-            aplicado al `th` (no al `tr`) para evitar bordes desplazados.
-          - Sombra sutil bajo el thead para indicar scroll. */}
-      <div className="hidden sm:block flex-1 min-h-0 overflow-y-auto overflow-x-auto bg-white">
-        <table className="w-full text-sm md:min-w-[920px]">
+      {/* Tabla — solo en escritorio amplio. Su ancho siempre es el del contenedor,
+          no una medida mínima que pueda desbordar el cuerpo central. */}
+      <div className={`${forzarTarjetas ? 'hidden' : 'hidden xl:block'} flex-1 min-h-0 overflow-y-auto bg-white`}>
+        <table className="w-full table-fixed text-sm">
+          <colgroup>
+            <col className="w-[17%]" />
+            <col className="w-[12%]" />
+            <col className="w-[16%]" />
+            <col className="w-[17%]" />
+            <col className="w-[9%]" />
+            <col className="w-[9%]" />
+            <col className="w-[12%]" />
+            <col className="w-[8%]" />
+          </colgroup>
           <thead className="sticky top-0 z-20">
             <tr style={{ borderBottom: '1px solid #D9E2D9' }}>
-              {['Radicado', 'Solicitante', 'Tipo Trámite', 'Dependencia', 'Estado', 'Vencimiento', 'Días'].map((h) => (
+              {['Radicado', 'Solicitante', 'Tipo de trámite', 'Dependencia', 'Estado', 'Vencimiento', 'Tiempo', 'Acciones'].map((h) => (
                 <th
                   key={h}
-                  className="px-4 py-2.5 text-left text-[10px] font-bold uppercase tracking-widest whitespace-nowrap"
+                  className="whitespace-nowrap px-2 py-2 text-left text-[9px] font-bold uppercase tracking-wider leading-tight"
                   style={{
                     color: '#14532D',
                     background: '#EEF4EE',
@@ -1396,7 +1462,7 @@ function TablaRadicados({
 
             {!cargando && !error && radicados.length === 0 && (
               <tr>
-                <td colSpan={7} className="px-4 py-16 text-center">
+                <td colSpan={8} className="px-4 py-16 text-center">
                   <p className="font-medium mb-1" style={{ color: '#667085' }}>Sin radicados</p>
                   <p className="text-xs" style={{ color: '#94A3B8' }}>No hay resultados para los filtros aplicados.</p>
                 </td>
@@ -1404,9 +1470,9 @@ function TablaRadicados({
             )}
 
             {!cargando && radicados.map((r) => {
-              const esRojo   = r.prioridad === 'ROJO';
               const seleccionado = radicadoSeleccionadoId === r.radicadoId;
-              const semaforoData = calcularSemaforo(r);
+              const estadoVisual = EstadoVisualRadicado(r);
+              const semaforoData = estadoVisual.semaforo;
               const diasColor = semaforoData.textoClass;
               // Rediseño 3B.2 — riel de color por estado del término,
               // siempre visible. La selección lo intensifica a verde.
@@ -1422,7 +1488,7 @@ function TablaRadicados({
                 <tr
                   key={r.radicadoId}
                   onClick={() => onSeleccionar(r)}
-                  className={`micro-row cursor-pointer ${seleccionado ? 'is-selected' : ''}`}
+                  className={`micro-row cursor-pointer transition-colors duration-200 hover:bg-[#F8FAF7] ${seleccionado ? 'is-selected' : ''}`}
                   aria-selected={seleccionado}
                   style={{
                     borderBottom: '1px solid #EEF4EE',
@@ -1431,16 +1497,15 @@ function TablaRadicados({
                     boxShadow: seleccionado ? 'inset 0 0 0 1px rgba(20,83,45,0.08)' : undefined,
                   }}
                 >
-                  <td className="px-4 py-3 whitespace-nowrap">
-                    <div className="flex items-center gap-2">
-                      {esRojo && <span className="shrink-0 w-1.5 h-1.5 rounded-full bg-red-500 animate-pulse" />}
-                      <span className="font-mono text-[13px] font-extrabold tracking-tight" style={{ color: '#14532D' }}>{r.radicadoId}</span>
+                  <td className="min-w-0 break-words px-2 py-2 align-top">
+                    <div className="min-w-0">
+                      <span className="break-all font-mono text-[12px] font-extrabold tracking-tight" style={{ color: '#14532D' }}>{r.radicadoId}</span>
                     </div>
                     <p className="text-[10px] mt-0.5" style={{ color: '#94A3B8' }}>{fmtFecha(r.control.fechaRadicado)}</p>
                   </td>
-                  <td className="px-4 py-3 max-w-[180px]">
-                    <p className="font-medium truncate" style={{ color: '#1F2933' }}>{nombreSolicitanteVisible(r, r.solicitante.nombreCompleto)}</p>
-                    <p className="text-[10px] font-mono" style={{ color: '#94A3B8' }}>
+                  <td className="min-w-0 break-words px-2 py-2 align-top">
+                    <p className="break-words font-medium" style={{ color: '#1F2933' }}>{nombreSolicitanteVisible(r, r.solicitante.nombreCompleto)}</p>
+                    <p className="break-all text-[10px] font-mono" style={{ color: '#94A3B8' }}>
                       {documentoSolicitanteVisible(r, r.solicitante.tipoDocumento, r.solicitante.numeroDocumento)}
                     </p>
                     {/* Sprint Ventanilla Operativa 1 — chip de tipo de entrada / origen */}
@@ -1463,25 +1528,26 @@ function TablaRadicados({
                       )}
                     </div>
                   </td>
-                  <td className="px-4 py-3 whitespace-nowrap">
-                    <p className="text-xs" style={{ color: '#667085' }}>{r.termino.tipoSolicitudNombre}</p>
+                  <td className="min-w-0 break-words px-2 py-2 align-top">
+                    <p className="break-words text-xs" style={{ color: '#667085' }}>{r.termino.tipoSolicitudNombre}</p>
                     <p className="text-[10px]" style={{ color: '#94A3B8' }}>{r.termino.diasRespuesta}d {r.termino.unidad.toLowerCase()}</p>
                   </td>
-                  <td className="px-4 py-3 max-w-[150px]">
-                    <p className="text-xs truncate" style={{ color: '#667085' }}>{NOMBRES_TENANT[r.clasificacion.oficinaDestino]}</p>
+                  <td className="min-w-0 break-words px-2 py-2 align-top">
+                    <p className="break-words text-xs" style={{ color: '#667085' }}>{NOMBRES_TENANT[r.clasificacion.oficinaDestino]}</p>
                   </td>
-                  <td className="px-4 py-3 whitespace-nowrap">
-                    <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wide border ${
-                      BADGE_ESTADO[r.estadoActual] ?? 'bg-gray-100 text-gray-600 border-gray-200'
-                    }`}>
-                      {LABELS_ESTADO[r.estadoActual] ?? r.estadoActual}
+                  <td className="min-w-0 break-words px-2 py-2 align-top">
+                    <span className={`inline-flex max-w-full items-center rounded-full border px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide ${estadoVisual.clase}`}>
+                      {estadoVisual.etiqueta}
                     </span>
                   </td>
-                  <td className="px-4 py-3 whitespace-nowrap">
+                  <td className="min-w-0 break-words px-2 py-2 align-top">
                     <p className="text-xs" style={{ color: '#667085' }}>{fmtFecha(r.termino.fechaVencimiento)}</p>
                   </td>
-                  <td className="px-4 py-3 whitespace-nowrap">
-                    <span className={`text-sm font-semibold tabular-nums ${diasColor}`}>{semaforoData.label}</span>
+                  <td className="min-w-0 break-words px-2 py-2 align-top">
+                    <span className={`whitespace-nowrap text-sm font-semibold tabular-nums ${diasColor}`}>{semaforoData.label}</span>
+                  </td>
+                  <td className="min-w-0 px-2 py-2 align-top">
+                    <AccionesRadicado radicado={r} onSeleccionar={onSeleccionar} />
                   </td>
                 </tr>
               );
@@ -2181,10 +2247,10 @@ function PanelDerecho({
         </div>
       )}
 
-      {/* Tabs — scroll horizontal interno cuando no caben */}
+      {/* Tabs — se envuelven en pantallas estrechas para conservar cada acción visible. */}
       <div
-        className="flex shrink-0 overflow-x-auto overflow-y-hidden bg-white gap-1 px-2 py-1.5"
-        style={{ borderBottom: '1px solid #D9E2D9', scrollbarWidth: 'thin' }}
+        className="flex min-w-0 shrink-0 flex-wrap gap-1 bg-white px-2 py-1.5"
+        style={{ borderBottom: '1px solid #D9E2D9' }}
         role="tablist"
       >
         {TABS_PANEL.map((t) => {
@@ -2194,7 +2260,7 @@ function PanelDerecho({
               role="tab"
               aria-selected={activo}
               onClick={() => cambiarTab(t.id)}
-              className="shrink-0 px-3 py-1.5 rounded-lg text-[11px] font-bold uppercase tracking-wider whitespace-nowrap focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-700/30 transition-all duration-150"
+              className="px-3 py-1.5 rounded-lg text-[11px] font-bold uppercase tracking-wider focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-700/30 transition-all duration-150"
               style={activo
                 ? {
                     color: '#FFFFFF',
@@ -3325,7 +3391,7 @@ function DrawerNuevoRadicado({
         className="relative w-full bg-white flex flex-col shadow-2xl rounded-2xl overflow-hidden animate-modal-panel"
         style={{
           border: '1px solid #D9E2D9',
-          maxWidth: 'min(1120px, calc(100vw - 24px))',
+          maxWidth: 'min(1120px, calc(100% - 24px))',
           maxHeight: 'calc(100dvh - 24px)',
         }}
       >
@@ -4456,11 +4522,6 @@ function DashboardInterior({ usuario, cerrarSesion }: { usuario: UsuarioAutentic
     () => tarjetasMipg.reduce((s, t) => s + t.valor, 0),
     [tarjetasMipg],
   );
-  const tarjetasMipgCompactas = useMemo(
-    () => tarjetasMipg.filter((t) => !(FILTROS_GRANDES as string[]).includes(t.filtro)),
-    [tarjetasMipg],
-  );
-
   // Sprint 1.5 — toggle secundario "Datos incompletos" en la bandeja.
   // Estado local del componente (no va al store global porque es un
   // filtro efímero que no debe persistir entre sesiones).
@@ -4470,6 +4531,10 @@ function DashboardInterior({ usuario, cerrarSesion }: { usuario: UsuarioAutentic
   // Ambos son efímeros: no persisten entre sesiones. Solo un filtro
   // operativo activo a la vez, combinable con el filtro MIPG.
   const kpisOperativos = useMemo(() => calcularKpisOperativos(todosLosRadicados), [todosLosRadicados]);
+  const porVencerHoy = useMemo(
+    () => todosLosRadicados.filter((radicado) => estaActivo(radicado) && calcDiasRestantes(radicado) === 0).length,
+    [todosLosRadicados],
+  );
   const [filtroOperativo, setFiltroOperativo] = useState<FiltroKpiOperativo>('NINGUNO');
 
   // Sprint Cola personal — "Solo los míos": filtro de identidad efímero,
@@ -4578,7 +4643,7 @@ function DashboardInterior({ usuario, cerrarSesion }: { usuario: UsuarioAutentic
   }
 
   return (
-    <div className="flex h-[100dvh] overflow-hidden" style={{ background: '#F8FAF7' }}>
+    <div className="flex h-[100dvh] overflow-hidden overflow-x-visible" style={{ background: '#F8FAF7' }}>
       {/* ── COLUMNA 1: Sidebar de navegación ── */}
       <SidebarNav
         className="hidden md:flex"
@@ -4602,7 +4667,7 @@ function DashboardInterior({ usuario, cerrarSesion }: { usuario: UsuarioAutentic
             Sprint UI Bandeja: añadimos `min-h-0` para que los hijos con
             `flex-1` puedan ceder altura al scroll interno sin crecer
             indefinidamente y romper el layout. */}
-      <div className="flex-1 flex flex-col overflow-hidden min-w-0 min-h-0">
+      <div className="flex-1 flex flex-col overflow-hidden overflow-x-visible min-w-0 min-h-0">
         <MobileTopBar
           usuario={usuario}
           vistaActual={vistaActual}
@@ -4715,12 +4780,12 @@ function DashboardInterior({ usuario, cerrarSesion }: { usuario: UsuarioAutentic
           />
         ) : (
           <>
-            {/* Rediseño 3B.2 — encabezado de sala de operaciones (solo
-                desktop; el móvil ya tiene su propio header). */}
+            {/* Encabezado de la bandeja: la dependencia es siempre la del
+                alcance ya autorizado por el store, no un dato duplicado. */}
             {vistaActual === 'TABLERO' && (
-              <div className="hidden md:flex items-center justify-between gap-3 px-4 pt-2 pb-1 bg-white shrink-0">
-                <div className="flex items-center gap-2.5 min-w-0">
-                  <div>
+              <div className="hidden md:flex min-w-0 items-center justify-between gap-3 bg-white px-4 pb-3 pt-4 lg:px-6 shrink-0">
+                <div className="flex min-w-0 items-center gap-2.5">
+                  <div className="min-w-0">
                     <div className="flex items-center gap-2">
                       <span className="text-[10px] font-bold uppercase tracking-[0.12em]" style={{ color: '#5F8A6E' }}>
                         Sala de operaciones
@@ -4728,8 +4793,8 @@ function DashboardInterior({ usuario, cerrarSesion }: { usuario: UsuarioAutentic
                       <span className="w-1.5 h-1.5 rounded-full" style={{ background: '#3B9E5F' }} />
                       <span className="text-[10px]" style={{ color: '#7A8B7F' }}>tiempo real</span>
                     </div>
-                    <p className="text-lg font-black leading-tight mt-0.5" style={{ color: '#12261A' }}>
-                      Tablero · {veTodosTenants
+                    <p className="mt-0.5 break-words text-xl font-black leading-tight" style={{ color: '#12261A' }}>
+                      Bandeja de trámites · {veTodosTenants
                         ? (tenantFiltro === 'TODOS' ? 'Vista municipal' : (NOMBRES_TENANT[tenantFiltro] ?? 'Vista municipal'))
                         : NOMBRES_TENANT[usuario.tenantId]}
                     </p>
@@ -4776,6 +4841,13 @@ function DashboardInterior({ usuario, cerrarSesion }: { usuario: UsuarioAutentic
               metricas={metricas}
               filtroActivo={filtroMIPG}
               onFiltroChange={(f) => dispatch({ type: 'SET_FILTRO_MIPG', filtro: f })}
+              kpisOperativos={kpisOperativos}
+              filtroOperativo={filtroOperativo}
+              onFiltroOperativoChange={setFiltroOperativo}
+              porVencerHoy={porVencerHoy}
+              misAsignados={misActivos}
+              soloMios={soloMios}
+              onToggleSoloMios={() => setSoloMios((v) => !v)}
               veTodosTenants={veTodosTenants}
               tenantFiltro={tenantFiltro}
               onTenantChange={(t) => dispatch({ type: 'SET_TENANT_FILTRO', tenant: t })}
@@ -4783,33 +4855,6 @@ function DashboardInterior({ usuario, cerrarSesion }: { usuario: UsuarioAutentic
               onToggleCompacto={toggleIndicadoresModo}
               soloDatosIncompletos={soloDatosIncompletos}
               onToggleDatosIncompletos={() => setSoloDatosIncompletos((v) => !v)}
-            />
-
-            {/* Panel Op Fase 2 — banda única "Estado operativo": KPIs
-                MIPG compactos + KPIs operativos del día en una sola
-                franja (sprint tablero-jerarquia). En modo compacto los
-                MIPG ya están en la fila de TarjetasMIPG — no se duplican. */}
-            <BarraKpisOperativos
-              kpis={kpisOperativos}
-              filtroActivo={filtroOperativo}
-              onChange={setFiltroOperativo}
-              chipsExtra={!indicadoresCompactos && tarjetasMipgCompactas.length > 0 ? (
-                <>
-                  {tarjetasMipgCompactas.map((t) => (
-                    <ChipMipgCompacto
-                      key={t.filtro}
-                      item={t}
-                      activo={filtroMIPG === t.filtro}
-                      compacto
-                      onClick={() => dispatch({ type: 'SET_FILTRO_MIPG', filtro: t.filtro })}
-                    />
-                  ))}
-                  <span className="w-px self-stretch shrink-0" style={{ background: '#D9E2D9' }} aria-hidden="true" />
-                </>
-              ) : undefined}
-              misAsignados={misActivos}
-              soloMios={soloMios}
-              onToggleSoloMios={() => setSoloMios((v) => !v)}
             />
 
             {/* Panel Op Nivel 3A — barra de filtros activos (solo si hay). */}
@@ -4826,39 +4871,41 @@ function DashboardInterior({ usuario, cerrarSesion }: { usuario: UsuarioAutentic
               const resumen = calcularResumenBandeja(todosLosRadicados);
               const siguiente = resumen.siguiente;
               const dias = siguiente ? calcDiasRestantes(siguiente) : null;
+              const requiereAtencion = Boolean(
+                siguiente && (dias !== null && dias <= 2
+                  || siguiente.prioridad === 'ROJO'
+                  || !siguiente.clasificacion.funcionarioResponsableUid),
+              );
+              if (!requiereAtencion) return null;
               const nivelBanner = dias !== null && dias < 0
                 ? 'critico'
                 : dias !== null && dias <= 2
                   ? 'alerta'
                   : 'normal';
-              const msgBanner = dias !== null && dias < 0
-                ? `Atender de inmediato: vencido hace ${Math.abs(dias)} día${Math.abs(dias) !== 1 ? 's' : ''}`
+              const descripcionBanner = dias !== null && dias < 0
+                ? `Trámite vencido hace ${Math.abs(dias)} día${Math.abs(dias) !== 1 ? 's' : ''}`
                 : dias !== null && dias === 0
-                  ? 'Atender hoy: vence durante la jornada actual'
+                  ? 'Trámite vence hoy'
                   : dias !== null && dias <= 2
-                    ? `Atender pronto: vence en ${dias} día${dias !== 1 ? 's' : ''}`
+                    ? `Trámite vence en ${dias} día${dias !== 1 ? 's' : ''}`
                     : siguiente
-                      ? 'Caso activo con término vigente'
-                      : 'No hay casos activos en esta bandeja';
+                      ? 'Trámite requiere atención'
+                      : '';
               return (
                 <div className="px-3 sm:px-4 py-2 shrink-0 bg-white" style={{ borderBottom: '1px solid #E5E7EB' }}>
                   <PriorityBanner
                     nivel={nivelBanner}
-                    mensaje={msgBanner}
-                    radicadoId={siguiente?.radicadoId}
-                    asunto={siguiente?.detalle.asunto}
-                    responsable={siguiente?.clasificacion.funcionarioResponsableNombre ?? undefined}
+                    mensaje="Atención requerida"
+                    descripcion={descripcionBanner}
                     accion={siguiente ? (
                       <button
                         type="button"
                         onClick={() => dispatch({ type: 'SELECCIONAR_RADICADO', radicado: siguiente })}
-                        className="shrink-0 inline-flex items-center gap-1 rounded-lg px-3 py-1.5 text-xs font-bold transition-transform active:scale-95"
+                        className="tablero-interactivo group shrink-0 inline-flex items-center gap-1 rounded-lg px-3 py-1.5 text-xs font-bold transition-[transform,box-shadow,background-color] duration-200 ease-out hover:-translate-y-px hover:shadow-md active:translate-y-0 active:scale-95"
                         style={{ background: '#D4A017', color: '#3D2C00' }}
                       >
                         Atender
-                        <svg className="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2.5}>
-                          <path strokeLinecap="round" strokeLinejoin="round" d="M5 12h14M13 6l6 6-6 6" />
-                        </svg>
+                        <ArrowRight className="tablero-icono-movil transition-transform duration-150 group-hover:translate-x-0.5" size={15} strokeWidth={2} aria-hidden="true" />
                       </button>
                     ) : undefined}
                   />
@@ -4880,6 +4927,7 @@ function DashboardInterior({ usuario, cerrarSesion }: { usuario: UsuarioAutentic
               }}
               puedeRadicar={tienePermisoRadicar}
               onAbrirBusquedaAvanzada={() => setBusquedaAvanzadaAbierta(true)}
+              forzarTarjetas={panelDerechoAbierto}
             />
           </>
         )}

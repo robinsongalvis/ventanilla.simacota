@@ -135,7 +135,7 @@ export function PanelHechosCaso({ expedienteId, clavesContexto, contexto, soloLe
   return (
     <section
       aria-label="Hechos del caso"
-      className="rounded-xl overflow-hidden"
+      className="w-full min-w-0 overflow-hidden rounded-xl"
       style={{ background: 'var(--bg-surface)', border: '1px solid var(--color-border)', boxShadow: 'var(--shadow-soft)' }}
     >
       {/* CABECERA con progreso. Sustituye al banner ámbar de advertencia: decir
@@ -143,14 +143,14 @@ export function PanelHechosCaso({ expedienteId, clavesContexto, contexto, soloLe
           anunciando el avance. */}
       <div className="px-5 py-4 flex flex-wrap items-start justify-between gap-3"
            style={{ borderBottom: '1px solid var(--color-border)' }}>
-        <div className="min-w-0">
+        <div className="min-w-0 flex-1">
           <p className="text-[10px] font-bold uppercase tracking-widest" style={{ color: '#667085' }}>
             Hechos del caso
           </p>
-          <p className="font-headline text-lg font-black mt-0.5" style={{ color: 'var(--text-primary)' }}>
+          <p className="mt-0.5 break-words font-headline text-lg font-black" style={{ color: 'var(--text-primary)', overflowWrap: 'anywhere' }}>
             {`${clavesLegibles.length} respuestas ajustan el checklist a este caso`}
           </p>
-          <p className="text-sm mt-0.5" style={{ color: 'var(--text-secondary)' }}>
+          <p className="mt-0.5 break-words text-sm" style={{ color: 'var(--text-secondary)', overflowWrap: 'anywhere' }}>
             Nada se exige de más ni de menos: cada respuesta activa o retira requisitos al instante.
           </p>
         </div>
@@ -395,7 +395,7 @@ function FilaHecho({
            LO RESPONDIDO SE COMPACTA. El grupo se estrecha cuando el hecho ya
            está decidido: sin las consecuencias debajo de cada opción no
            necesita el ancho que exigía para caberlas. */
-        className={`flex items-stretch gap-1 p-1 rounded-xl shrink-0 w-full ${definido ? 'sm:w-[230px]' : 'sm:w-[360px]'}`}
+        className={`flex min-w-0 items-stretch gap-1 rounded-xl p-1 shrink-0 w-full ${definido ? 'sm:w-[230px]' : 'sm:w-[360px]'}`}
         style={{ background: 'var(--bg-surface-2)' }}
       >
         {opciones.map((o) => {
@@ -407,7 +407,7 @@ function FilaHecho({
               disabled={soloLectura || guardando}
               aria-pressed={elegida}
               onClick={() => onElegir(o.valor)}
-              className={`seg-opt flex-1 basis-0 flex flex-col items-center justify-center min-h-[46px] leading-tight ${definido ? 'px-2.5 py-1.5 text-[12.5px]' : 'px-3 py-2 text-sm'} text-center rounded-lg disabled:opacity-60 focus-visible:outline-none`}
+            className={`seg-opt min-w-0 flex-1 basis-0 break-words flex flex-col items-center justify-center min-h-[46px] leading-tight ${definido ? 'px-2.5 py-1.5 text-[12.5px]' : 'px-3 py-2 text-sm'} text-center rounded-lg disabled:opacity-60 focus-visible:outline-none`}
             >
               <span className="block">{o.etiqueta}</span>
               {/* LA CONSECUENCIA ES AYUDA PARA DECIDIR, y una vez decidido deja

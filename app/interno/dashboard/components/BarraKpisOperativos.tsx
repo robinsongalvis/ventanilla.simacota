@@ -80,7 +80,7 @@ export function BarraKpisOperativos({
       style={{ borderBottom: '1px solid #D9E2D9' }}
       aria-label="Estado operativo del día"
     >
-      <div className="flex items-center gap-2 overflow-x-auto pb-0.5">
+      <div className="flex min-w-0 flex-wrap items-center gap-2">
         <span
           className="shrink-0 text-[9px] font-bold uppercase tracking-widest"
           style={{ color: '#667085' }}
@@ -104,7 +104,7 @@ export function BarraKpisOperativos({
               type="button"
               onClick={() => handleClick(p.id)}
               disabled={deshabilitada}
-              className="shrink-0 flex items-center gap-1.5 px-2.5 py-1 rounded-full border text-[10px] font-semibold uppercase tracking-wide transition-all disabled:cursor-not-allowed"
+            className="flex min-w-0 items-center gap-1.5 px-2.5 py-1 rounded-full border text-[10px] font-semibold uppercase tracking-wide transition-all disabled:cursor-not-allowed"
               style={{
                 background:  activo ? t.bgActivo : t.bg,
                 color:       activo ? t.textActivo : t.text,
@@ -127,7 +127,7 @@ export function BarraKpisOperativos({
           <button
             type="button"
             onClick={onToggleSoloMios}
-            className="shrink-0 ml-auto flex items-center gap-1.5 px-2.5 py-1 rounded-full border text-[10px] font-semibold uppercase tracking-wide transition-all"
+            className="flex min-w-0 items-center gap-1.5 px-2.5 py-1 rounded-full border text-[10px] font-semibold uppercase tracking-wide transition-all sm:ml-auto"
             style={soloMios
               ? { background: '#14532D', color: '#FFFFFF', borderColor: '#14532D' }
               : { background: 'white', color: '#14532D', borderColor: '#97C459' }}

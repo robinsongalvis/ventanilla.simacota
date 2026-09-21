@@ -21,7 +21,7 @@ export function OtrosDocumentos({ expedienteId, documentos, soloLectura, onDocum
 
   return (
     <div
-      className="rounded-xl p-4"
+      className="w-full min-w-0 rounded-xl p-4"
       style={{ background: 'var(--bg-surface)', border: '1px solid var(--color-border)', boxShadow: 'var(--shadow-soft)' }}
     >
       <p className="text-[10.5px] font-bold uppercase tracking-widest mb-3" style={{ color: 'var(--text-secondary)' }}>
@@ -33,8 +33,8 @@ export function OtrosDocumentos({ expedienteId, documentos, soloLectura, onDocum
       ) : (
         <ul className="flex flex-col gap-2 mb-3">
           {documentos.map((doc) => (
-            <li key={doc.id} className="flex flex-wrap items-center gap-x-2 gap-y-1 text-xs" style={{ color: 'var(--text-secondary)' }}>
-              <span className="truncate max-w-full" style={{ color: 'var(--text-primary)' }}>{doc.nombre}</span>
+            <li key={doc.id} className="flex min-w-0 flex-col gap-x-2 gap-y-1 text-xs sm:flex-row sm:flex-wrap sm:items-center" style={{ color: 'var(--text-secondary)' }}>
+              <span className="min-w-0 break-words" style={{ color: 'var(--text-primary)', overflowWrap: 'anywhere' }}>{doc.nombre}</span>
               <span className="shrink-0 font-mono">v{doc.versionVigente.numeroVersion}</span>
               <a
                 href={`/api/interno/archivo?path=${encodeURIComponent(doc.versionVigente.storagePath)}`}

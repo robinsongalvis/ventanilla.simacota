@@ -54,7 +54,7 @@ export function CabeceraExpediente({
   const descripcionEstado = pasoActual ? capitalizar(pasoActual.subtexto('ACTUAL')) : undefined;
 
   return (
-    <div className="relative overflow-hidden">
+    <div className="relative min-w-0 overflow-hidden">
       <PaisajeDecorativo />
 
       <header className="relative flex flex-col gap-4 lg:flex-row lg:items-stretch lg:gap-5">
@@ -71,7 +71,7 @@ export function CabeceraExpediente({
             <p className="text-[10px] font-bold uppercase tracking-widest" style={{ color: 'var(--text-secondary)' }}>
               Solicitante
             </p>
-            <h1 className="font-headline text-2xl font-black leading-tight" style={{ color: 'var(--text-primary)' }}>
+            <h1 className="break-words font-headline text-2xl font-black leading-tight" style={{ color: 'var(--text-primary)', overflowWrap: 'anywhere' }}>
               {expediente.solicitanteNombre}
               {expediente.solicitanteDocumento && (
                 <span className="font-normal" style={{ color: 'var(--text-secondary)' }}>
@@ -93,9 +93,9 @@ export function CabeceraExpediente({
               <span className="first-letter:uppercase" style={{ color: 'var(--text-secondary)' }}>{tramite}</span>
             </div>
 
-            <p className="mt-1.5 flex items-center gap-1.5 text-xs" style={{ color: 'var(--text-secondary)' }}>
-              <IconoInstitucion />
-              Alcaldía de Simacota{dependencia && <> · {dependencia}</>}
+            <p className="mt-1.5 flex min-w-0 items-start gap-1.5 text-xs" style={{ color: 'var(--text-secondary)' }}>
+              <span className="shrink-0"><IconoInstitucion /></span>
+              <span className="break-words" style={{ overflowWrap: 'anywhere' }}>Alcaldía de Simacota{dependencia && <> · {dependencia}</>}</span>
             </p>
           </div>
         </div>
