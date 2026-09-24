@@ -48,7 +48,7 @@ jobs:
           cache: 'npm'
 
       - name: Install Dependencies
-        run: npm install
+        run: npm ci
 
       - name: Lint Check (Linter Gate)
         id: lint
@@ -131,17 +131,17 @@ jobs:
           java-version: '21'
 
       - name: Install Dependencies
-        run: npm install
+        run: npm ci
 
       - name: Emulador + reglas + sonda canario
         id: sonda
         if: ${{ !cancelled() }}
-        run: npx firebase-tools emulators:exec --only firestore --project demo-ventanilla-lab "node scripts/laboratorio/probar-emulador.mjs"
+        run: npx --yes firebase-tools@15.19.0 emulators:exec --only firestore --project demo-ventanilla-lab "node scripts/laboratorio/probar-emulador.mjs"
 
       - name: Matriz de aislamiento por tenant (ADR-0007)
         id: matriz
         if: ${{ !cancelled() }}
-        run: npx firebase-tools emulators:exec --only firestore --project demo-ventanilla-lab "npm run test:rules"
+        run: npx --yes firebase-tools@15.19.0 emulators:exec --only firestore --project demo-ventanilla-lab "npm run test:rules"
 
   informe-despliegue:
     name: Compuerta de despliegue — Informe de gobernanza (ADR-0013, 2D)
