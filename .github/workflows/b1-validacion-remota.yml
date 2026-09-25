@@ -330,24 +330,195 @@ jobs:
           cat > playwright.b1-preview.config.ts <<'EOF'
           import baseConfig from './playwright.config';
 
-          const oidcToken = process.env.VERCEL_TRUSTED_OIDC_TOKEN;
-          if (!oidcToken) throw new Error('Falta el JWT OIDC efímero para acceder al Preview protegido.');
-
           export default {
             ...baseConfig,
             use: {
               ...baseConfig.use,
               baseURL: process.env.B1_PREVIEW_URL,
-              extraHTTPHeaders: {
-                ...baseConfig.use?.extraHTTPHeaders,
-                'x-vercel-trusted-oidc-idp-token': oidcToken,
-              },
+              serviceWorkers: 'block',
             },
           };
           EOF
+          cat > e2e/b1-oidc-fixtures.ts <<'EOF'
+          import type {
+            APIRequestContext,
+            APIResponse,
+            Browser,
+            BrowserContext,
+            BrowserContextOptions,
+            Route,
+          } from '@playwright/test';
+          import { test as base, expect } from './fixtures';
 
-      - name: Obtener JWT OIDC nuevo para Playwright
-        id: oidc-e2e
+          const NOMBRE_HEADER_OIDC = 'x-vercel-trusted-oidc-idp-token';
+          const ORIGEN_PREVIEW_AUTORIZADO = 'https://ventanilla-simacota-6qaz5ct8o-robinsongalvis-projects.vercel.app';
+          const preview = new URL(process.env.B1_PREVIEW_URL ?? '');
+          const oidcToken = (() => {
+            const token = process.env.VERCEL_TRUSTED_OIDC_TOKEN;
+            if (!token) throw new Error('Falta el JWT OIDC efímero para acceder al Preview protegido.');
+            return token;
+          })();
+          if (
+            preview.origin !== ORIGEN_PREVIEW_AUTORIZADO ||
+            preview.href !== `${ORIGEN_PREVIEW_AUTORIZADO}/`
+          ) {
+            throw new Error('GUARDA: el origen E2E no es el Preview exacto autorizado.');
+          }
+
+          function sinOidc(headers: Record<string, string>): Record<string, string> {
+            return Object.fromEntries(
+              Object.entries(headers).filter(([nombre]) => nombre.toLowerCase() !== NOMBRE_HEADER_OIDC),
+            );
+          }
+
+          function conteniaOidc(headers: Record<string, string>): boolean {
+            return Object.keys(headers).some((nombre) => nombre.toLowerCase() === NOMBRE_HEADER_OIDC);
+          }
+
+          function validarLocation(response: APIResponse, origen: URL): void {
+            const location = response.headers().location;
+            if (!location) return;
+            const destino = new URL(location, origen);
+            if (destino.origin !== preview.origin) {
+              throw new Error(`GUARDA OIDC: redirect fuera del Preview bloqueado (${destino.origin}).`);
+            }
+          }
+
+          async function enrutarConOidcSeguro(route: Route): Promise<void> {
+            const request = route.request();
+            const url = new URL(request.url());
+            const headersOriginales = request.headers();
+
+            if (url.origin !== preview.origin) {
+              if (conteniaOidc(headersOriginales)) {
+                await route.abort('blockedbyclient');
+                throw new Error(`GUARDA OIDC: JWT detectado en origin externo ${url.origin}.`);
+              }
+              await route.continue();
+              return;
+            }
+
+            const response = await route.fetch({
+              headers: {
+                ...sinOidc(headersOriginales),
+                [NOMBRE_HEADER_OIDC]: oidcToken,
+              },
+              maxRedirects: 0,
+            });
+
+            try {
+              validarLocation(response, url);
+              await route.fulfill({ response });
+            } catch (error) {
+              await response.dispose();
+              await route.abort('blockedbyclient');
+              throw error;
+            }
+          }
+
+          async function crearContextoSeguro(
+            browser: Browser,
+            options: BrowserContextOptions = {},
+          ): Promise<BrowserContext> {
+            if (options.extraHTTPHeaders && conteniaOidc(options.extraHTTPHeaders)) {
+              throw new Error('GUARDA OIDC: no se permite configurar el JWT como header global.');
+            }
+            const context = await browser.newContext({ ...options, serviceWorkers: 'block' });
+            await context.route('**/*', enrutarConOidcSeguro);
+            return context;
+          }
+
+          function browserSeguro(browser: Browser): Browser {
+            const protegido = Object.create(browser) as Browser;
+            protegido.newContext = (options?: BrowserContextOptions) => crearContextoSeguro(browser, options);
+            return protegido;
+          }
+
+          async function validarRespuestaApi(response: APIResponse, url: URL): Promise<APIResponse> {
+            try {
+              validarLocation(response, url);
+              return response;
+            } catch (error) {
+              await response.dispose();
+              throw error;
+            }
+          }
+
+          function requestSeguro(request: APIRequestContext): APIRequestContext {
+            const protegido = Object.create(request) as APIRequestContext;
+
+            protegido.get = async (url, options = {}) => {
+              const destino = new URL(String(url), preview);
+              const headers = sinOidc(options.headers ?? {});
+              if (destino.origin !== preview.origin && conteniaOidc(options.headers ?? {})) {
+                throw new Error(`GUARDA OIDC: JWT detectado en request externo ${destino.origin}.`);
+              }
+              const response = await request.get(url, {
+                ...options,
+                headers: destino.origin === preview.origin ? { ...headers, [NOMBRE_HEADER_OIDC]: oidcToken } : headers,
+                maxRedirects: 0,
+              });
+              return validarRespuestaApi(response, destino);
+            };
+
+            protegido.post = async (url, options = {}) => {
+              const destino = new URL(String(url), preview);
+              const headers = sinOidc(options.headers ?? {});
+              if (destino.origin !== preview.origin && conteniaOidc(options.headers ?? {})) {
+                throw new Error(`GUARDA OIDC: JWT detectado en request externo ${destino.origin}.`);
+              }
+              const response = await request.post(url, {
+                ...options,
+                headers: destino.origin === preview.origin ? { ...headers, [NOMBRE_HEADER_OIDC]: oidcToken } : headers,
+                maxRedirects: 0,
+              });
+              return validarRespuestaApi(response, destino);
+            };
+
+            return protegido;
+          }
+
+          export const test = base.extend({
+            browser: [
+              async ({ browser }, use) => {
+                await use(browserSeguro(browser));
+              },
+              { scope: 'worker' },
+            ],
+            request: async ({ request }, use) => {
+              await use(requestSeguro(request));
+            },
+          });
+
+          export { expect };
+          EOF
+          node <<'NODE'
+          const fs = require('node:fs');
+          const cambios = [
+            {
+              archivo: 'e2e/01-ciclo-dorado.spec.ts',
+              original: "import { test, expect } from './fixtures';",
+              seguro: "import { test, expect } from './b1-oidc-fixtures';",
+            },
+            {
+              archivo: 'e2e/06-perimetro-sin-sesion.spec.ts',
+              original: "import { test, expect } from '@playwright/test';",
+              seguro: "import { test, expect } from './b1-oidc-fixtures';",
+            },
+          ];
+          for (const { archivo, original, seguro } of cambios) {
+            const contenido = fs.readFileSync(archivo, 'utf8');
+            if (contenido.split(original).length !== 2) {
+              throw new Error(`No se encontró exactamente un import esperado en ${archivo}.`);
+            }
+            fs.writeFileSync(archivo, contenido.replace(original, seguro));
+          }
+          NODE
+          git diff -- e2e/01-ciclo-dorado.spec.ts e2e/06-perimetro-sin-sesion.spec.ts \
+            | tee .b1-artifacts/harness-oidc-e2e.patch
+
+      - name: Obtener JWT OIDC nuevo para 01-ciclo-dorado
+        id: oidc_e2e_01
         uses: actions/github-script@v7
         with:
           script: |
@@ -363,13 +534,39 @@ jobs:
             core.setSecret(token);
             core.setOutput('token', token);
 
-      - name: E2E crítico contra el preview stage
+      - name: E2E 01 — ciclo dorado contra el preview stage
         env:
           B1_PREVIEW_URL: ${{ env.PREVIEW_URL }}
-          VERCEL_TRUSTED_OIDC_TOKEN: ${{ steps.oidc-e2e.outputs.token }}
+          VERCEL_TRUSTED_OIDC_TOKEN: ${{ steps.oidc_e2e_01.outputs.token }}
         run: |
           set -o pipefail
-          npx playwright test --config=playwright.b1-preview.config.ts e2e/01-ciclo-dorado.spec.ts e2e/06-perimetro-sin-sesion.spec.ts 2>&1 | tee .b1-artifacts/e2e.log
+          : > .b1-artifacts/e2e.log
+          npx playwright test --config=playwright.b1-preview.config.ts e2e/01-ciclo-dorado.spec.ts 2>&1 | tee -a .b1-artifacts/e2e.log
+
+      - name: Obtener JWT OIDC nuevo para 06-perimetro-sin-sesion
+        id: oidc_e2e_06
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const token = await core.getIDToken();
+            const claims = JSON.parse(Buffer.from(token.split('.')[1], 'base64url'));
+            const audiencias = Array.isArray(claims.aud) ? claims.aud : [claims.aud];
+            if (claims.repository !== 'robinsongalvis/ventanilla.simacota') throw new Error('OIDC: repositorio no autorizado.');
+            if (claims.repository_owner !== 'robinsongalvis') throw new Error('OIDC: propietario no autorizado.');
+            if (claims.head_ref !== 'validation/b1-54256f5') throw new Error('OIDC: rama origen no autorizada.');
+            if (claims.base_ref !== 'release/fase5-hardening') throw new Error('OIDC: rama base no autorizada.');
+            if (claims.environment !== 'stage-e2e') throw new Error('OIDC: Environment no autorizado.');
+            if (!audiencias.includes('https://github.com/robinsongalvis')) throw new Error('OIDC: audience no autorizada.');
+            core.setSecret(token);
+            core.setOutput('token', token);
+
+      - name: E2E 06 — perímetro sin sesión contra el preview stage
+        env:
+          B1_PREVIEW_URL: ${{ env.PREVIEW_URL }}
+          VERCEL_TRUSTED_OIDC_TOKEN: ${{ steps.oidc_e2e_06.outputs.token }}
+        run: |
+          set -o pipefail
+          npx playwright test --config=playwright.b1-preview.config.ts e2e/06-perimetro-sin-sesion.spec.ts 2>&1 | tee -a .b1-artifacts/e2e.log
 
       - name: Obtener JWT OIDC nuevo para smoke final
         id: oidc-smoke
@@ -421,4 +618,6 @@ jobs:
 
       - name: Eliminar archivos efímeros y logs del emulador
         if: ${{ always() }}
-        run: rm -f .env.stage playwright.b1-preview.config.ts firebase-debug.log firestore-debug.log
+        run: |
+          git restore -- e2e/01-ciclo-dorado.spec.ts e2e/06-perimetro-sin-sesion.spec.ts
+          rm -f .env.stage playwright.b1-preview.config.ts e2e/b1-oidc-fixtures.ts firebase-debug.log firestore-debug.log
