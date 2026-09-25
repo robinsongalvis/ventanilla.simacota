@@ -1,0 +1,729 @@
+'use client';
+
+/* ══════════════════════════════════════════════════════════════
+   Detalle de Expediente — bloque "Integración UI y demo" (ADR-0029).
+
+   Reemplaza `detalleLicencia()` (fixtures) por el contrato real
+   `GET /api/licencias/expedientes/{id}` (expediente + actuaciones reales,
+   asc por fecha).
+
+   Bloque "Términos y vigencias protectores" (10-ago-2026): el panel de
+   término, la vigencia del acto y el estado de plazo de subsanación YA NO
+   se recalculan en el cliente — consumen `computos`/`borradorActoDesistimiento`
+   tal como los devuelve el servidor (`PanelTerminoDual`, `PanelVigenciaActo`,
+   `PanelDesistimientoSemicontrolado`, ver `../tipos-computos.ts`). Antes de
+   este bloque, esta pantalla reutilizaba `proyectarVencimiento` (client-side,
+   `fixtures.ts`) — se retiró para que el servidor sea la ÚNICA fuente de
+   verdad del cómputo (evita que cliente y servidor diverjan sobre la misma
+   fecha legal).
+══════════════════════════════════════════════════════════════ */
+
+import { useCallback, useEffect, useMemo, useState } from 'react';
+import { RadicarDebidaFormaModal, type VistaPreviaDebidaForma } from '../components/RadicarDebidaFormaModal';
+import { accionesDeCierreDisponibles, puedeExpedirEjecutoria } from '../acciones-de-cierre';
+import { CabeceraExpediente } from '../components/CabeceraExpediente';
+import { TarjetasResumenExpediente } from '../components/TarjetasResumenExpediente';
+import { CaminoDelTramite } from '../components/CaminoDelTramite';
+import { CabeceraTermino } from '../components/CabeceraTermino';
+import { PestanasExpediente, type PestanaExpediente } from '../components/PestanasExpediente';
+import type { TipoActuacionPermitida } from '@/lib/server/expedientes-licencias';
+import Link from 'next/link';
+import { useAuth } from '@/lib/hooks/useAuth';
+import type { ActuacionLicenciaDoc, ExpedienteLicenciaDoc } from '@/lib/server/expedientes-licencias';
+import { puedeTransicionar, type EstadoJuridicoLicencia } from '@/lib/motor-expedientes/estados-licencia';
+import type { ContextoEvaluacionRequisito, DefinicionTramite } from '@/lib/motor-expedientes/tipos';
+import type { DocumentoExpedienteDoc } from '@/lib/server/expedientes-documentos-tipos';
+import { DEFINICION_LICENCIA_CONSTRUCCION_PARCIAL } from '@/lib/motor-expedientes/definiciones/licencia-construccion-parcial';
+import { construirTimelineDesdeActuaciones } from '../presentacion-actuaciones';
+import { nombreSubtipo } from '../presentacion-subtipos';
+import { ESTILOS_ESTADO_JURIDICO } from '../estilos-estado-juridico';
+import type { ComputosExpedienteUI, BorradorActoDesistimiento } from '../tipos-computos';
+import { ChipEstadoJuridico } from '../components/ChipEstadoJuridico';
+import { ChipPrueba } from '../components/ChipPrueba';
+import { EventoTimeline } from '../components/EventoTimeline';
+import { PanelTerminoDual } from '../components/PanelTerminoDual';
+import { VincularRadicadoModal } from '../components/VincularRadicadoModal';
+import { PanelVigenciaActo } from '../components/PanelVigenciaActo';
+import { PanelDesistimientoSemicontrolado } from '../components/PanelDesistimientoSemicontrolado';
+import { BotonAccionPlaceholder } from '../components/BotonAccionPlaceholder';
+import { RegistrarActuacionModal } from '../components/RegistrarActuacionModal';
+import { RegistrarProrrogaModal } from '../components/RegistrarProrrogaModal';
+import { ChecklistRequisitos } from '../components/ChecklistRequisitos';
+import type { DestinatarioResuelto } from '@/lib/motor-expedientes/destinatario-expediente';
+import { PanelQueSigue } from '../components/PanelQueSigue';
+import { derivarQueSigue } from '../que-sigue';
+import { PASOS, situacionDePaso } from '../camino-del-tramite';
+import { ResumenDocumentos } from '../components/ResumenDocumentos';
+
+type EstadoCarga = 'cargando' | 'error' | 'no-encontrado' | 'listo';
+
+/**
+ * Registro de Definiciones de Trámite conocidas por el CLIENTE — Bloque
+ * A·A3. Hoy solo hay una sembrada (`DEFINICION_LICENCIA_CONSTRUCCION_
+ * PARCIAL`, dato puro importable, ver su propio JSDoc); el servidor
+ * (`GET .../[id]`) devuelve `definicionId` como STRING, no el objeto — la
+ * UI resuelve aquí. Cuando exista resolución dinámica de Definiciones por
+ * `tramiteId` (Fase 1, fuera de este bloque), este registro se reemplaza
+ * por esa fuente sin tocar `ChecklistRequisitos` (recibe `DefinicionTramite`
+ * ya resuelta, no un id).
+ */
+const DEFINICIONES_CONOCIDAS: Record<string, DefinicionTramite> = {
+  [DEFINICION_LICENCIA_CONSTRUCCION_PARCIAL.id]: DEFINICION_LICENCIA_CONSTRUCCION_PARCIAL,
+};
+
+/** Los dos tránsitos que esta pantalla puede disparar — mismo mapeo tipo→destino que `ESTADO_DESTINO_POR_TIPO_ACTUACION` en `lib/server/expedientes-licencias.ts` (no exportado; se declara aquí SOLO para decidir si el botón se muestra habilitado, la autoridad final sigue siendo el guard del servidor). */
+const DESTINO_ACTA: EstadoJuridicoLicencia = 'CON_ACTA_DE_OBSERVACIONES';
+const DESTINO_RESPUESTA: EstadoJuridicoLicencia = 'EN_VIABILIDAD';
+
+export interface DetalleLicenciaClientProps {
+  expedienteId: string;
+  /**
+   * Bloque B ("la ventanita") — cuando el Detalle se monta EMBEBIDO dentro
+   * de `VistaLicencias` (`app/interno/dashboard/components/licencias/
+   * VistaLicencias.tsx`), "← Bandeja de Licencias" es un cambio de estado
+   * local del panel (volver a `expedienteSeleccionado = null`), no una
+   * navegación de ruta. Si se recibe, `VolverBandeja` renderiza un botón
+   * que llama esto en vez de `<Link href="/interno/licencias">`. Sin esta
+   * prop (ruta standalone `/interno/licencias/{id}`) el comportamiento es
+   * exactamente el de antes: `<Link>`.
+   */
+  onVolver?: () => void;
+}
+
+export function DetalleLicenciaClient({ expedienteId, onVolver }: DetalleLicenciaClientProps) {
+  const { usuario, cargando: cargandoAuth } = useAuth();
+  const [estadoCarga, setEstadoCarga] = useState<EstadoCarga>('cargando');
+  const [errorMsg, setErrorMsg] = useState<string | null>(null);
+  const [expediente, setExpediente] = useState<ExpedienteLicenciaDoc | null>(null);
+  const [actuaciones, setActuaciones] = useState<ActuacionLicenciaDoc[]>([]);
+  const [documentos, setDocumentos] = useState<DocumentoExpedienteDoc[]>([]);
+  const [definicionId, setDefinicionId] = useState<string | null>(null);
+  const [radicadoVinculado, setRadicadoVinculado] = useState<{ id: string; fecha: string } | null>(null);
+  const [vinculando, setVinculando] = useState(false);
+  // Prórroga del plazo de subsanación (D.1077/2015 art. 2.2.6.1.2.2.4).
+  const [registrandoProrroga, setRegistrandoProrroga] = useState(false);
+  const [modalActuacion, setModalActuacion] = useState<TipoActuacionPermitida | null>(null);
+  const [modalRadicar, setModalRadicar] = useState(false);
+  const [pestana, setPestana] = useState<PestanaExpediente>('documentos');
+
+  /* Los contadores salen del MISMO evaluador que el checklist: no se cuentan
+     aparte, para que la pestaña y el listado no puedan decir cosas distintas. */
+  const conteoDocumentos = useMemo(() => {
+    const completitud = expediente?.completitud;
+    return {
+      aportados: Math.max(0, (completitud?.aplicables ?? 0) - (completitud?.faltantes?.length ?? 0)),
+      aplicables: completitud?.aplicables ?? 0,
+    };
+  }, [expediente]);
+
+  const conteoHechos = useMemo(() => {
+    const claves = DEFINICION_LICENCIA_CONSTRUCCION_PARCIAL.clavesContexto ?? [];
+    const ctx = expediente?.contexto ?? {};
+    return {
+      definidos: claves.filter((c) => ctx[c.nombre] !== undefined).length,
+      total: claves.length,
+    };
+  }, [expediente]);
+  /** Bloque "Términos y vigencias protectores" (10-ago-2026) — `computos`/`borradorActoDesistimiento` YA CALCULADOS por el servidor (`GET .../[id]`), ver `../tipos-computos.ts`. */
+  const [computos, setComputos] = useState<ComputosExpedienteUI | null>(null);
+  /* La vista previa del acto de radicar. La ruta la devolvía desde #248 y nadie
+     la consumía: el acto estaba construido y era inalcanzable desde el
+     mostrador. */
+  const [debidaForma, setDebidaForma] = useState<VistaPreviaDebidaForma | null>(null);
+  const [destinatario, setDestinatario] = useState<DestinatarioResuelto | null>(null);
+  const [borradorActoDesistimiento, setBorradorActoDesistimiento] = useState<BorradorActoDesistimiento | null>(null);
+
+  /**
+   * `opts.silencioso`: recarga tras una subida de documento (checklist) SIN
+   * pasar por `estadoCarga: 'cargando'` — evita que el detalle entero
+   * parpadee a la pantalla de carga cada vez que el funcionario sube un
+   * papel (Bloque A·A3). Si la recarga silenciosa falla, se deja el último
+   * estado bueno en pantalla en vez de reemplazarlo por una pantalla de
+   * error — la subida en sí YA se confirmó con el funcionario (el propio
+   * control de carga mostró su resultado); solo el refresco posterior no
+   * llegó, y el próximo cambio (o recargar la página) lo reintenta.
+   */
+  const cargar = useCallback(async (opts?: { silencioso?: boolean }) => {
+    const silencioso = opts?.silencioso ?? false;
+    if (!silencioso) setEstadoCarga('cargando');
+    try {
+      const res = await fetch(`/api/licencias/expedientes/${encodeURIComponent(expedienteId)}`, { credentials: 'include' });
+      if (res.status === 404) {
+        if (!silencioso) setEstadoCarga('no-encontrado');
+        return;
+      }
+      const body = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        if (!silencioso) {
+          setErrorMsg(body.error ?? 'No fue posible cargar el expediente.');
+          setEstadoCarga('error');
+        }
+        return;
+      }
+      setExpediente(body.expediente as ExpedienteLicenciaDoc);
+      setActuaciones(Array.isArray(body.actuaciones) ? body.actuaciones : []);
+      setDocumentos(Array.isArray(body.documentos) ? body.documentos : []);
+      setDefinicionId(typeof body.definicionId === 'string' ? body.definicionId : null);
+      setRadicadoVinculado(
+        body.radicadoVinculado && typeof body.radicadoVinculado.fecha === 'string'
+          ? { id: String(body.radicadoVinculado.id), fecha: body.radicadoVinculado.fecha }
+          : null,
+      );
+      setComputos(body.computos && typeof body.computos === 'object' ? (body.computos as ComputosExpedienteUI) : null);
+      setDestinatario(
+        body.destinatario && typeof body.destinatario === 'object'
+          ? (body.destinatario as DestinatarioResuelto)
+          : null,
+      );
+      /* VIENE DENTRO DE `computos`, NO EN LA RAÍZ. Esto leía
+         `body.debidaForma`, que el servidor nunca ha mandado ahí: siempre daba
+         `undefined`, el estado quedaba en `null`, y como el botón se pinta
+         detrás de `{debidaForma && …}`, NO EXISTÍA EN LA PANTALLA. Ni
+         habilitado ni deshabilitado con su motivo: ausente.
+
+         Nadie lo vio porque el único expediente que se abría a diario ya estaba
+         radicado, y ahí no hay botón que echar en falta. Lo destapó el primer
+         expediente completo y sin radicar (stage, 29-ago-2026). */
+      const previa = (body.computos as { debidaForma?: unknown } | null)?.debidaForma;
+      setDebidaForma(
+        previa && typeof previa === 'object' ? (previa as VistaPreviaDebidaForma) : null,
+      );
+      setBorradorActoDesistimiento(
+        body.borradorActoDesistimiento && typeof body.borradorActoDesistimiento === 'object'
+          ? (body.borradorActoDesistimiento as BorradorActoDesistimiento)
+          : null,
+      );
+      if (!silencioso) setEstadoCarga('listo');
+    } catch {
+      if (!silencioso) {
+        setErrorMsg('Error de red al cargar el expediente.');
+        setEstadoCarga('error');
+      }
+    }
+  }, [expedienteId]);
+
+  useEffect(() => {
+    if (cargandoAuth || !usuario) return;
+    void cargar();
+  }, [cargandoAuth, usuario, cargar]);
+
+  const yaHuboActa = actuaciones.some((a) => a.tipo === 'acta-observaciones');
+
+  /* Las actuaciones de CIERRE se derivan del mapa de transiciones —la misma
+     función que el servidor consulta— para que la pantalla no pueda ofrecer un
+     botón que el servidor rechaza, ni esconder uno que sí procede. */
+  const accionesDeCierre = useMemo(
+    () => (expediente ? accionesDeCierreDisponibles(expediente.estadoJuridico, { yaHuboActa }) : []),
+    [expediente, yaHuboActa],
+  );
+
+  const esHistorico = expediente?.origen === 'RECONSTRUIDO';
+
+  /** ISO de la primera `radicacion-debida-forma` — solo referencia del ancla para `PanelTerminoDual`, nunca insumo de cómputo (eso ya lo hizo el servidor). */
+  const fechaRadicacion = actuaciones.find((a) => a.tipo === 'radicacion-debida-forma')?.fecha;
+
+  /**
+   * El ancla que muestra la tarjeta, con el campo PERSISTIDO por delante y la
+   * actuación como respaldo.
+   *
+   * EL DEFECTO QUE ESTO ARREGLA (29-ago-2026): la tarjeta se guardaba tras
+   * `expediente.fechaRadicacionDebidaForma`, que es OPCIONAL y solo lo escribe
+   * el acto de radicar (#248). El expediente de demostración nació EN debida
+   * forma el 24/08, antes de que ese acto existiera, así que el campo está
+   * vacío y la tarjeta no se pintaba nunca — mientras el panel de al lado sí
+   * mostraba el ancla, porque la deriva de la actuación. Lo mismo le pasa a
+   * TODO expediente anterior al acto.
+   *
+   * La guarda de la tarjeta ya no depende del ancla: depende del vencimiento,
+   * que es lo único que necesita para clasificar. Sin ancla la tarjeta
+   * simplemente omite la línea «Corre desde el …».
+   */
+  const anclaDelTermino = expediente?.fechaRadicacionDebidaForma ?? fechaRadicacion;
+
+  /**
+   * UNA SOLA CONDICIÓN, DOS USOS. Decide si se pinta la tarjeta Y si el panel
+   * de abajo cede su bloque destacado.
+   *
+   * Escrita dos veces podrían divergir, y la divergencia peligrosa no es la
+   * obvia: si la tarjeta deja de pintarse pero el panel sigue creyendo que
+   * alguien destaca el vencimiento, la pantalla se queda SIN NINGUNA fecha
+   * destacada. Un plazo que no se ve en ninguna parte es peor que verlo dos
+   * veces.
+   */
+  const hayVencimientoProyectado = Boolean(computos?.terminoDual.fechaAlertaConservadora);
+
+  /**
+   * "Vencimiento calculado" del timeline usa `fechaAlertaConservadora`
+   * (`computos.terminoDual`, servidor) — la MISMA fecha que ya destaca
+   * `PanelTerminoDual` con la alerta roja, nunca una recomputada aparte en
+   * el cliente (única fuente de verdad para el término). La dependencia del
+   * `useMemo` es el ISO (primitivo estable), no el `Date` construido abajo
+   * — un `Date` nuevo en cada render invalidaría la memoización.
+   */
+  const fechaAlertaConservadoraIso = computos?.terminoDual.fechaAlertaConservadora ?? null;
+
+  const timeline = useMemo(() => {
+    if (!expediente) return [];
+    const vigenteParaTimeline = fechaAlertaConservadoraIso ? new Date(fechaAlertaConservadoraIso) : null;
+    return construirTimelineDesdeActuaciones(actuaciones, expediente.origen, vigenteParaTimeline, expediente.completitud?.completoDesde ?? null);
+  }, [expediente, actuaciones, fechaAlertaConservadoraIso]);
+
+  function alRegistrarActuacion(actuacion: ActuacionLicenciaDoc, nuevoEstadoJuridico: EstadoJuridicoLicencia) {
+    setActuaciones((prev) => [...prev, actuacion]);
+    setExpediente((prev) => (prev ? { ...prev, estadoJuridico: nuevoEstadoJuridico } : prev));
+    setModalActuacion(null);
+  }
+
+  /**
+   * El PATCH de `.../contexto` ya devuelve el `contexto` MERGEADO
+   * (`planActualizarContexto`, `lib/server/expedientes-licencias.ts`) — se
+   * aplica directo al expediente en memoria, sin recargar todo el detalle
+   * (los `aportes`/`documentos` no cambian al editar un hecho del caso).
+   */
+  function alActualizarContexto(nuevoContexto: ContextoEvaluacionRequisito) {
+    setExpediente((prev) => (prev ? { ...prev, contexto: nuevoContexto } : prev));
+  }
+
+  /** La subida de documento (D7) solo confirma ids/metadatos, no el `DocumentoExpedienteDoc` completo — se recarga en silencio para reflejar la versión/aporte reales que persistió el servidor. */
+  function alSubirDocumento() {
+    void cargar({ silencioso: true });
+  }
+
+  if (estadoCarga === 'cargando' || cargandoAuth) {
+    return (
+      <div className="mx-auto w-full min-w-0 max-w-[1400px] p-4 md:p-6">
+        <p className="text-sm" style={{ color: 'var(--text-secondary)' }}>Cargando expediente…</p>
+      </div>
+    );
+  }
+
+  if (estadoCarga === 'no-encontrado') {
+    return (
+      <div className="mx-auto flex w-full min-w-0 max-w-[720px] flex-col items-start gap-3 p-4 md:p-6">
+        <VolverBandeja onVolver={onVolver} />
+        <div className="rounded-xl p-5 w-full" style={{ background: 'var(--bg-surface)', border: '1px solid var(--color-border)', boxShadow: 'var(--shadow-soft)' }}>
+          <h1 className="font-headline text-xl" style={{ color: 'var(--text-primary)' }}>Expediente no encontrado</h1>
+          <p className="text-sm mt-2" style={{ color: 'var(--text-secondary)' }}>
+            No existe un expediente con este identificador, o fue eliminado.
+          </p>
+        </div>
+      </div>
+    );
+  }
+
+  if (estadoCarga === 'error' || !expediente) {
+    return (
+      <div className="mx-auto flex w-full min-w-0 max-w-[720px] flex-col items-start gap-3 p-4 md:p-6">
+        <VolverBandeja onVolver={onVolver} />
+        <p role="alert" className="rounded-lg px-3 py-2 text-sm w-full" style={{ background: '#FEF2F2', border: '1px solid #FECACA', color: '#991B1B' }}>
+          {errorMsg ?? 'No fue posible cargar el expediente.'}
+        </p>
+      </div>
+    );
+  }
+
+  const numero = expediente.numeroExpediente?.numero ?? expediente.id;
+  const puedeRegistrarActa = puedeTransicionar(expediente.estadoJuridico, DESTINO_ACTA, { yaHuboActa });
+  const puedeRegistrarRespuesta = yaHuboActa && puedeTransicionar(expediente.estadoJuridico, DESTINO_RESPUESTA, { yaHuboActa });
+
+  // Motivo del bloqueo — MISMO patrón que `notaDeshabilitado` de
+  // `BotonAccionPlaceholder` ("Emitir acto final", abajo), pero para
+  // botones de acción REAL: el motivo se deriva del propio estado
+  // jurídico actual (`ESTILOS_ESTADO_JURIDICO[...].label`, la única fuente
+  // de etiquetas legibles del dominio) — nunca se inventa un estado o una
+  // condición que el motor no exprese.
+  const etiquetaEstadoActual = ESTILOS_ESTADO_JURIDICO[expediente.estadoJuridico].label;
+  const notaActaDeshabilitada = puedeRegistrarActa
+    ? undefined
+    : yaHuboActa
+      ? 'El acta procede por una sola vez (D.1077/2015 art. 2.2.6.1.2.2.4) — ya fue registrada en este expediente.'
+      : `El acta solo procede con el expediente en revisión — estado actual: "${etiquetaEstadoActual}".`;
+  const notaRespuestaDeshabilitada = puedeRegistrarRespuesta
+    ? undefined
+    : `La respuesta de subsanación solo procede con el expediente "con acta de observaciones" — estado actual: "${etiquetaEstadoActual}".`;
+
+  /* QUÉ SIGUE — derivado del mapa de transiciones, con los motivos que da el
+     SERVIDOR. La pantalla no decide qué se ofrece ni redacta por qué algo no
+     procede: coloca lo que el dominio ya decidió.
+
+     Va AQUÍ y no arriba porque consume las notas del servidor, que se calculan
+     después de la guarda de `expediente`. `tsc` lo cazó cuando lo puse antes. */
+  const queSigue = derivarQueSigue({
+    estado: expediente.estadoJuridico,
+    yaHuboActa,
+    motivos: { acta: notaActaDeshabilitada, respuesta: notaRespuestaDeshabilitada },
+  });
+
+  /* PAPEL: no cambian el expediente, lo imprimen o lo descargan. La constancia
+     de ejecutoria SOLO con el acto en firme — sin los hechos no se compone un
+     papel «provisional», que sería certificar algo que no consta. */
+  const accionesDePapel = [
+    { etiqueta: 'Imprimir constancia de radicación', href: `/api/licencias/expedientes/${encodeURIComponent(expedienteId)}/constancia` },
+    /* La fila del sello enlazó AQUÍ desde su primer día — y la ruta no
+       existió hasta el 1-sep-2026, cuando el propietario definió el paquete
+       (un solo PDF: constancia de primera hoja + documentos sellados). El
+       custodio `acciones-papel-alcanzables.test.ts` exige que este href tenga
+       su route.ts en disco. */
+    /* La marca de agua la posiciona quien descarga — el patrón de 4 chips del
+       «Sello de recibido» de ventanilla, pedido por el propietario (1-sep). */
+    {
+      etiqueta: 'Descargar documentos con sello',
+      opciones: [
+        { etiqueta: '↖ Sup. izq.', href: `/api/licencias/expedientes/${encodeURIComponent(expedienteId)}/sellados?esquina=SUP_IZQ` },
+        { etiqueta: '↗ Sup. der.', href: `/api/licencias/expedientes/${encodeURIComponent(expedienteId)}/sellados?esquina=SUP_DER` },
+        { etiqueta: '↙ Inf. izq.', href: `/api/licencias/expedientes/${encodeURIComponent(expedienteId)}/sellados?esquina=INF_IZQ` },
+        { etiqueta: '↘ Inf. der.', href: `/api/licencias/expedientes/${encodeURIComponent(expedienteId)}/sellados?esquina=INF_DER` },
+      ],
+    },
+    ...(puedeExpedirEjecutoria(expediente.estadoJuridico)
+      ? [{ etiqueta: 'Constancia de ejecutoria', href: `/api/licencias/expedientes/${encodeURIComponent(expedienteId)}/ejecutoria` }]
+      : []),
+  ];
+
+  /* El paso del camino en que está, para encabezar el panel: la funcionaria ve
+     «paso 3 de 4» y la acción de ese paso en el mismo sitio. */
+  const pasoActualDelCamino = PASOS.find((x) => situacionDePaso(x, expediente.estadoJuridico, expediente.completitud?.completo === true) === 'ACTUAL') ?? null;
+
+  // Checklist (Bloque A·A3) — solo-lectura para histórico migrado (no se
+  // "aporta" a un expediente reconstruido) o expediente ya EN_FIRME (mismo
+  // candado que aplica el propio servidor en `POST .../documentos`, 409).
+  const definicion = definicionId ? DEFINICIONES_CONOCIDAS[definicionId] : undefined;
+  const soloLecturaChecklist = expediente.origen === 'RECONSTRUIDO' || expediente.estadoJuridico === 'EN_FIRME';
+  const motivoSoloLecturaChecklist =
+    expediente.origen === 'RECONSTRUIDO'
+      ? 'Expediente histórico migrado — no admite nuevos aportes.'
+      : expediente.estadoJuridico === 'EN_FIRME'
+        ? 'Expediente en firme — no admite nuevos aportes.'
+        : undefined;
+
+  return (
+    <div className="mx-auto flex w-full min-w-0 max-w-[1400px] flex-col gap-5 p-4 md:p-6">
+      {/* Todo el "chrome" de pantalla vive dentro de este contenedor
+          `print:hidden` — al imprimir (botón "Imprimir" del proyecto de
+          acto de desistimiento, más abajo) solo debe salir la vista limpia
+          del final, nunca la bandeja de botones ni los demás paneles. */}
+      <div className="print:hidden flex flex-col gap-5">
+      <VolverBandeja onVolver={onVolver} />
+
+      {/* ── ¿HAY A QUIÉN AVISARLE? ────────────────────────────────────────
+          Se advierte SOLO cuando no se puede escribir, y con el motivo que
+          resolvió el SERVIDOR — el mismo criterio que decide si sale el correo.
+          Sin esto, un expediente sin destinatario se veía exactamente igual que
+          uno con destinatario, y el silencio no se notaba hasta que hacía falta
+          escribirle. */}
+      {destinatario?.correo === null && (
+        <div
+          role="status"
+          className="rounded-xl px-4 py-3 flex items-start gap-3"
+          style={{ background: '#FDF6E3', border: '1px solid #D4A017' }}
+        >
+          <span aria-hidden className="text-lg leading-none" style={{ color: '#7A4F0A' }}>✉</span>
+          <div className="min-w-0">
+            <p className="text-sm font-bold" style={{ color: '#7A4F0A' }}>
+              {destinatario.origen === 'DECLARADO_SIN_CORREO'
+                ? 'Este ciudadano no recibirá avisos automáticos'
+                : 'Este expediente no tiene a quién avisarle'}
+            </p>
+            <p className="text-xs mt-0.5 leading-relaxed" style={{ color: '#7A4F0A' }}>
+              {destinatario.motivo}
+            </p>
+          </div>
+        </div>
+      )}
+
+      {/* ── Tarjeta encabezado ── */}
+      <div
+        className="rounded-xl p-4 md:p-5 flex flex-col gap-3"
+        style={{ background: 'var(--bg-surface)', border: '1px solid var(--color-border)', boxShadow: 'var(--shadow-soft)' }}
+      >
+        {/* CABECERA — quién, qué radicado, qué trámite, en qué estado, y el
+            PLAZO siempre visible arriba a la derecha. */}
+        <CabeceraExpediente
+          expediente={expediente}
+          desdeCuandoCorreElPlazo={anclaDelTermino ?? null}
+          terminoDual={computos?.terminoDual}
+          onVerEstado={() => setPestana('historial')}
+        />
+        {expediente.esPrueba && (
+          <div className="flex flex-wrap items-center gap-2">
+            <ChipPrueba />
+          </div>
+        )}
+
+        {/* PESTAÑAS con contador: dicen dónde falta trabajo sin abrirlas. */}
+        <PestanasExpediente
+          activa={pestana}
+          onCambiar={setPestana}
+          documentos={conteoDocumentos}
+          hechos={conteoHechos}
+        />
+        <div className="pt-3" style={{ borderTop: '1px solid var(--color-border)' }}>
+          <TarjetasResumenExpediente
+            solicitanteNombre={expediente.solicitanteNombre}
+            solicitanteDocumento={expediente.solicitanteDocumento}
+            radicadoId={expediente.radicadoId}
+            radicadoVinculadoFecha={radicadoVinculado?.fecha ?? null}
+            origen={expediente.origen}
+            creadoEn={expediente.creadoEn}
+            onVincular={() => setVinculando(true)}
+          />
+        </div>
+      </div>
+
+      {/* ── Estado de plazo de subsanación (desistimiento SEMICONTROLADO) ──
+          Se muestra ANTES del resto del detalle cuando es crítico
+          (POR_ARCHIVAR): el funcionario debe verlo de inmediato. Cuando
+          EN_PLAZO, es una línea discreta; cuando NO_APLICA, no renderiza
+          nada (`PanelDesistimientoSemicontrolado`). */}
+      {computos && (
+        <PanelDesistimientoSemicontrolado
+          plazoSubsanacion={computos.plazoSubsanacion}
+          borrador={borradorActoDesistimiento}
+        />
+      )}
+
+      <div className="flex flex-col lg:flex-row gap-5 items-start">
+        {/* ── Panel término (doble fecha) + vigencia + acciones ── */}
+        <div className="w-full lg:w-[430px] shrink-0 flex flex-col gap-3">
+          {/* EL SEMÁFORO, ENCIMA. El módulo anterior estaba en rojo con 41
+              días por delante: un cronómetro que siempre grita acaba ignorado
+              justo el día que grita de verdad. La clasificación sale de la
+              MISMA función que usa el cron. */}
+          {hayVencimientoProyectado && computos?.terminoDual.fechaAlertaConservadora && (
+            <CabeceraTermino
+              expedienteId={expedienteId}
+              estadoJuridico={expediente.estadoJuridico}
+              desdeIso={anclaDelTermino}
+              venceIso={computos.terminoDual.fechaAlertaConservadora}
+              /* Los números del reloj parado y el plazo que corre contra el
+                 ciudadano: los dos salen del servidor, y los dos se leen en la
+                 misma tarjeta que el término. */
+              relojDetenido={computos.terminoDual.relojDetenido}
+              plazoCiudadano={computos.plazoSubsanacion}
+            />
+          )}
+
+          {/* LA PRÓRROGA, DONDE SE MIRA EL RELOJ. Mientras el plazo del
+              ciudadano corre, es la única acción que puede moverlo — y hasta hoy
+              el cómputo sabía aplicarla pero nadie tenía por dónde registrarla:
+              la función existía, probada, sin un solo llamador. */}
+          {expediente.estadoJuridico === 'CON_ACTA_DE_OBSERVACIONES'
+            && computos?.plazoSubsanacion.resultado === 'EN_PLAZO'
+            && !computos.plazoSubsanacion.conProrroga && (
+            <button
+              type="button"
+              onClick={() => setRegistrandoProrroga(true)}
+              className="text-xs font-bold px-3 py-2 rounded-lg transition-all active:scale-95 w-full"
+              style={{ border: '1px solid var(--color-border)', color: 'var(--text-secondary)', background: 'var(--bg-surface)' }}
+            >
+              Registrar prórroga de 15 días hábiles
+            </button>
+          )}
+
+          <PanelTerminoDual
+            terminoDual={computos?.terminoDual ?? { fechaAlertaConservadora: null, fundamento: '', relojDetenido: null }}
+            origen={expediente.origen}
+            estadoJuridico={expediente.estadoJuridico}
+            fechaRadicacion={fechaRadicacion}
+            vencimientoDestacadoArriba={hayVencimientoProyectado}
+          />
+
+          {computos?.vigencia !== undefined && <PanelVigenciaActo vigencia={computos.vigencia} />}
+
+          {/* CAMINO DEL TRÁMITE, encima de las acciones: primero se ve DÓNDE
+              está el expediente y después qué se puede hacer con él. Va FUERA
+              del condicional de histórico: un expediente migrado también tiene
+              un punto en el camino, y ocultárselo no lo hace menos cierto. */}
+          <CaminoDelTramite
+            estado={expediente.estadoJuridico}
+            documentacionCompleta={expediente.completitud?.completo === true}
+          />
+
+          {!esHistorico && (
+            <div className="flex flex-col sm:flex-row gap-2 flex-wrap items-start">
+              {/* EL ACTO DE RADICAR. Va primero porque es el que abre el
+                  expediente al término legal; todo lo demás ocurre después de
+                  él. El motivo por el que no procede sale del SERVIDOR y se
+                  muestra entero: hoy el más frecuente es que el expediente es
+                  de demostración, el candado que protege la serie legal. */}
+              {debidaForma && (
+                <div className="flex flex-col gap-1.5">
+                  <button
+                    type="button"
+                    disabled={!debidaForma.procede}
+                    onClick={() => setModalRadicar(true)}
+                    aria-describedby={!debidaForma.procede ? 'radicar-nota' : undefined}
+                    className="inline-flex items-center gap-2 rounded-[10px] px-4 py-2.5 text-sm font-bold transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-1 disabled:opacity-50 disabled:cursor-not-allowed hover:brightness-95 active:scale-[0.98]"
+                    style={{ background: '#14532D', color: '#fff', boxShadow: '0 2px 8px rgba(20,83,45,0.25)' }}
+                  >
+                    Radicar en legal y debida forma
+                  </button>
+                  {!debidaForma.procede && debidaForma.motivo && (
+                    <p id="radicar-nota" className="text-xs max-w-xs" style={{ color: '#9A6206' }}>
+                      {debidaForma.motivo}
+                    </p>
+                  )}
+                </div>
+              )}
+              {/* ── QUÉ SIGUE ────────────────────────────────────────────
+                  Sustituye la PILA PLANA de botones que había aquí: cierre,
+                  acta, respuesta y desistimiento uno tras otro, todos del mismo
+                  tamaño, con lo destructivo arriba y en verde.
+
+                  El panel no decide nada — `derivarQueSigue` lo hace desde el
+                  mapa de transiciones — y los motivos de lo que no procede son
+                  los que devuelve el servidor, colocados, no redactados. */}
+              <PanelQueSigue
+                queSigue={queSigue}
+                pasoActual={pasoActualDelCamino}
+                onAccion={(tipo) => setModalActuacion(tipo)}
+                papel={accionesDePapel}
+              />
+            </div>
+          )}
+        </div>
+
+        {/* ── Panel historial ── */}
+        <div
+          className="flex-1 min-w-0 rounded-xl p-4"
+          style={{ background: 'var(--bg-surface)', border: '1px solid var(--color-border)', boxShadow: 'var(--shadow-soft)' }}
+        >
+          <p className="text-[10.5px] font-bold uppercase tracking-widest" style={{ color: 'var(--text-secondary)' }}>
+            Historial del expediente
+          </p>
+          <p className="text-xs mb-3 mt-0.5" style={{ color: 'var(--text-secondary)' }}>
+            Registro de las actuaciones y el estado actual del expediente.
+          </p>
+          <EventoTimeline
+            eventos={timeline}
+            contexto={{ estado: expediente.estadoJuridico, documentacionCompleta: expediente.completitud?.completo === true }}
+            leyenda
+          />
+
+          {/* ── RESUMEN DE DOCUMENTOS ────────────────────────────────────
+              Junto al historial y NO en la columna de acciones: quien mira lo
+              que ha pasado suele querer ver también qué hay, sin cambiar de
+              pestaña. Solo lectura y cero lógica — el checklist sigue siendo el
+              único que evalúa. */}
+          <div className="mt-4">
+            <ResumenDocumentos
+              documentos={documentos}
+              aportados={expediente.completitud ? expediente.completitud.aplicables - expediente.completitud.faltantes.length : undefined}
+              aplicables={expediente.completitud?.aplicables}
+            />
+          </div>
+        </div>
+      </div>
+
+      {/* ── Checklist de requisitos ── */}
+      {definicion ? (
+        <ChecklistRequisitos
+          expedienteId={expediente.id}
+          definicion={definicion}
+          contexto={expediente.contexto ?? {}}
+          aportes={expediente.aportes ?? []}
+          documentos={documentos}
+          soloLectura={soloLecturaChecklist}
+          motivoSoloLectura={motivoSoloLecturaChecklist}
+          onContextoActualizado={alActualizarContexto}
+          onDocumentoSubido={alSubirDocumento}
+        />
+      ) : definicionId ? (
+        <div className="rounded-xl p-4" style={{ background: 'var(--bg-surface-2)', border: '1px solid var(--color-border)' }}>
+          <p className="text-sm" style={{ color: 'var(--text-secondary)' }}>
+            Definición de trámite &quot;{definicionId}&quot; no reconocida — no es posible mostrar el checklist.
+          </p>
+        </div>
+      ) : null}
+
+      {modalRadicar && debidaForma && (
+        <RadicarDebidaFormaModal
+          expedienteId={expedienteId}
+          previa={debidaForma}
+          onCerrar={() => setModalRadicar(false)}
+          /* Recarga en silencio: tras el acto el expediente cambia de estado,
+             gana una actuación y estrena número. */
+          onRadicado={() => cargar({ silencioso: true })}
+        />
+      )}
+
+      {modalActuacion && (
+        <RegistrarActuacionModal
+          expedienteId={expediente.id}
+          tipo={modalActuacion}
+          onCerrar={() => setModalActuacion(null)}
+          onRegistrada={alRegistrarActuacion}
+        />
+      )}
+      </div>
+
+      {/* ── Vista SOLO impresión: proyecto de acto de desistimiento ──
+          Sibling del contenedor `print:hidden` de arriba (nunca anidada
+          dentro de él: un ancestro `display:none` oculta cualquier
+          descendiente sin importar su propio `display`). El botón
+          "Imprimir" de `PanelDesistimientoSemicontrolado` dispara
+          `window.print()` sobre ESTA vista limpia — sin sidebar, sin
+          botones, sin el resto de paneles del detalle. */}
+      {borradorActoDesistimiento && (
+        <div className="hidden print:block">
+          <p className="text-xs uppercase tracking-widest font-bold" style={{ color: '#0f172a' }}>
+            Expediente {numero}
+          </p>
+          <h1 className="font-headline text-xl mt-1 mb-4" style={{ color: '#0f172a' }}>
+            {borradorActoDesistimiento.titulo}
+          </h1>
+          <div className="text-sm whitespace-pre-wrap" style={{ color: '#0f172a', lineHeight: 1.6 }}>
+            {borradorActoDesistimiento.cuerpo}
+          </div>
+        </div>
+      )}
+
+      {registrandoProrroga && (
+        <RegistrarProrrogaModal
+          expedienteId={expedienteId}
+          onCerrar={() => setRegistrandoProrroga(false)}
+          onRegistrada={() => {
+            setRegistrandoProrroga(false);
+            void cargar({ silencioso: true });
+          }}
+        />
+      )}
+
+      {/* Reparación del expediente huérfano — ver `VincularRadicadoModal`. */}
+      {vinculando && (
+        <VincularRadicadoModal
+          expedienteId={expedienteId}
+          onCerrar={() => setVinculando(false)}
+          onVinculado={() => {
+            setVinculando(false);
+            void cargar({ silencioso: true });
+          }}
+        />
+      )}
+    </div>
+  );
+}
+
+function VolverBandeja({ onVolver }: { onVolver?: () => void }) {
+  const className = 'inline-flex items-center gap-1.5 text-sm font-medium w-fit rounded focus-visible:outline-none focus-visible:ring-2';
+  const contenido = (
+    <>
+      <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+        <path strokeLinecap="round" strokeLinejoin="round" d="M10.5 19.5L3 12m0 0l7.5-7.5M3 12h18" />
+      </svg>
+      Bandeja de Licencias
+    </>
+  );
+  if (onVolver) {
+    return (
+      <button type="button" onClick={onVolver} className={className} style={{ color: '#14532D' }}>
+        {contenido}
+      </button>
+    );
+  }
+  return (
+    <Link href="/interno/licencias" className={className} style={{ color: '#14532D' }}>
+      {contenido}
+    </Link>
+  );
+}

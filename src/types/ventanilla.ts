@@ -7,15 +7,75 @@ import type {
   ZonaGeografica,
 } from './radicado';
 import type { TipoSolicitudId, UnidadTermino } from '@/lib/tiempos-radicado';
+// type-only import — erased en runtime, seguro desde shared types
+import type { RolInterno } from '@/lib/hooks/useAuth';
 
-export type TipoPersona = 'NATURAL' | 'JURIDICA';
+export type TipoPersona =
+  | 'NATURAL'
+  | 'JURIDICA'
+  | 'ENTIDAD_PUBLICA'
+  | 'COMUNICACION_INSTITUCIONAL'
+  | 'NO_IDENTIFICADO';
+
 export type TipoDocumento = 'CC' | 'CE' | 'NIT' | 'PASAPORTE' | 'OTRO';
-export type MedioRecepcion = 'OFICIO_FISICO' | 'EMAIL' | 'WEB' | 'PRESENCIAL';
+/**
+ * PQRSD verbal (P-GSC-8200-170-014 / Ley 1755 art. 15): la petición
+ * presentada de palabra — en el mostrador o por teléfono — se radica
+ * marcando explícitamente que fue verbal. No genera documento físico,
+ * por lo que NO entra a la planilla de reparto.
+ */
+export type MedioRecepcion =
+  | 'OFICIO_FISICO'
+  | 'EMAIL'
+  | 'WEB'
+  | 'PRESENCIAL'
+  | 'VERBAL_PRESENCIAL'
+  | 'VERBAL_TELEFONICO';
+/** Canal por el que el ciudadano prefiere recibir la respuesta */
+export type CanalRespuesta = 'CORREO' | 'PRESENCIAL' | 'TELEFONO' | 'DIRECCION_FISICA';
+
+/**
+ * Sprint Ventanilla Operativa 1 — clasificación operativa del ingreso.
+ * `origenIngreso` describe POR DÓNDE llegó la solicitud; `tipoEntrada`
+ * describe QUÉ es lo que llegó. Ambos son opcionales para compatibilidad
+ * con radicados históricos.
+ */
+export type OrigenIngreso =
+  | 'PQRSD_WEB_OFICIAL'
+  | 'CORREO_INSTITUCIONAL'
+  | 'VENTANILLA_FISICA'
+  | 'ENTREGA_PRESENCIAL'
+  | 'OFICIO_EXTERNO'
+  | 'COMUNICACION_INSTITUCIONAL'
+  | 'OTRO';
+
+export type TipoEntrada =
+  | 'PQRSD'
+  | 'CORRESPONDENCIA_RECIBIDA'
+  | 'OFICIO_INSTITUCIONAL'
+  | 'SOLICITUD_CIUDADANA'
+  | 'COMUNICACION_ENTIDAD_PUBLICA'
+  | 'COMUNICACION_INTERNA'
+  | 'OTRO';
+
+/**
+ * Registra explícitamente qué datos NO aportó el solicitante. Permite
+ * radicar sin inventar información y deja evidencia auditable de las
+ * decisiones de Ventanilla.
+ */
+export interface DatosNoAportados {
+  documento?: boolean;
+  telefono?: boolean;
+  correo?: boolean;
+  direccion?: boolean;
+}
 
 export interface UbicacionSolicitante {
   pais: string;
   departamento: string;
   municipio: string;
+  /** Barrio opcional para radicación de correspondencia y comunicaciones. */
+  barrio?: string | null;
 }
 
 export interface SolicitanteRadicado {
@@ -26,11 +86,24 @@ export interface SolicitanteRadicado {
   razonSocial?: string | null;
   /** Null cuando el solicitante no proveyó el dato (Firestore no acepta undefined) */
   email?: string | null;
-  /** Null cuando el solicitante no proveyó el dato (Firestore no acepta undefined) */
+  /**
+   * @deprecated Usar `telefonoMovil` / `telefonoFijo` en radicados nuevos.
+   * Se mantiene para compatibilidad con radicados históricos.
+   */
   telefono?: string | null;
+  /** Sprint Ventanilla Operativa 1 — teléfono móvil separado. */
+  telefonoMovil?: string | null;
+  /** Sprint Ventanilla Operativa 1 — teléfono fijo separado. */
+  telefonoFijo?: string | null;
   /** Null cuando el solicitante no proveyó el dato (Firestore no acepta undefined) */
   direccion?: string | null;
   ubicacion: UbicacionSolicitante;
+  /**
+   * Sprint Ventanilla Operativa 1 — registra explícitamente qué datos NO
+   * aportó el solicitante. Ausencia = todos aportados (o histórico previo
+   * al sprint).
+   */
+  datosNoAportados?: DatosNoAportados;
 }
 
 export interface ControlRadicacion {
@@ -40,6 +113,44 @@ export interface ControlRadicacion {
   horaRadicado: string;
   medioRecepcion: MedioRecepcion;
   origen: OrigenRadicado;
+  /** Sprint Ventanilla Operativa 1 — origen operativo ampliado. */
+  origenIngreso?: OrigenIngreso;
+  /** Sprint Ventanilla Operativa 1 — clasificación del tipo de entrada. */
+  tipoEntrada?: TipoEntrada;
+}
+
+/**
+ * BM-B33 — suspensión del término por requerimiento de subsanación
+ * (Ley 1755 Art. 17). Aditiva y auditable: NO reescribe el término original;
+ * el reloj se congela al NOTIFICAR (no al emitir) y se reanuda al subsanar.
+ */
+export interface SuspensionTermino {
+  /** El término está suspendido AHORA (solo tras la notificación). */
+  activa: boolean;
+  /** ISO — emisión interna del requerimiento. */
+  fechaRequerimiento: string;
+  /** ISO — NOTIFICACIÓN al ciudadano = ancla legal de la suspensión. Null hasta notificar. */
+  fechaNotificacion?: string | null;
+  /** ISO — `fechaNotificacion` + 1 mes calendario (C.C. art. 67). */
+  fechaLimiteSubsanacion?: string | null;
+  /** Días hábiles del término que quedaban AL NOTIFICAR (reloj congelado). */
+  diasHabilesRestantes?: number | null;
+  /** Contenido mínimo: qué debe subsanar el ciudadano. */
+  motivo: string;
+  /** Quién emitió el requerimiento (snapshot). */
+  requeridoPor: { uid: string; nombre: string };
+  /** Prórroga del ciudadano (Art. 17): hasta 1 mes más, pedida antes de vencer. */
+  prorroga?: {
+    solicitada: boolean;
+    fechaSolicitud: string;
+    /** `fechaLimiteSubsanacion` + 1 mes calendario. */
+    nuevaFechaLimite: string;
+  } | null;
+  /**
+   * BM-B33 — el cron ya PROPUSO el desistimiento (idempotencia). No implica
+   * decisión: el desistimiento lo confirma un humano por acto motivado.
+   */
+  desistimientoPropuesto?: boolean | null;
 }
 
 export interface TerminoLegal {
@@ -49,18 +160,45 @@ export interface TerminoLegal {
   unidad: UnidadTermino;
   fechaVencimiento: string;
   prorrogasAplicadas: number;
+  /** BM-B33 — presente solo cuando hubo requerimiento de subsanación. */
+  suspension?: SuspensionTermino | null;
+}
+
+/**
+ * Sprint Ventanilla Operativa 3 — copia sellada de un archivo del
+ * radicado. El archivo original NUNCA se modifica; esta estructura
+ * apunta a la copia estampada guardada en `sellados/{radicadoId}/`.
+ */
+export interface SelloDocumento {
+  /** Path en Storage de la copia sellada. */
+  path: string;
+  /** Nombre del archivo sellado (con prefijo/timestamp). */
+  nombre: string;
+  tamanioKB: number;
+  /** Fecha ISO del sellado. */
+  fecha: string;
+  /** UID del funcionario que disparó el sellado. */
+  actorUid: string;
+  /** SHA-256 hex del archivo original (cadena de custodia). */
+  hashOriginal: string;
+  /** SHA-256 hex de la copia sellada (cadena de custodia). */
+  hashSellado: string;
+  paginasEstampadas: number;
 }
 
 export interface ArchivoRadicado {
   nombre: string;
-  url: string;
+  url?: string | null;
   path: string;
   tipo: string;
   tamanioKB: number;
   orden: number;
+  /** Sprint Ventanilla Operativa 3 — copia sellada, si existe. */
+  sellado?: SelloDocumento | null;
 }
 
 export interface TrazabilidadRadicado {
+  eventoId?: string;
   fecha: string;
   accion: AccionAuditoria | 'TRASLADO' | 'PRORROGA';
   actorUid: string;
@@ -89,29 +227,187 @@ export interface FeedbackIA {
   fecha:            string;
 }
 
+export interface RespuestaOficial {
+  /** Ruta en Storage: respuestas/{radicadoId}/{timestamp_filename}. Null cuando la respuesta no incluye PDF firmado. */
+  archivoPath:   string | null;
+  /** Nombre del PDF firmado. Null cuando la respuesta no incluye archivo. */
+  archivoNombre: string | null;
+  nota:          string;
+  fecha:         string;        // ISO
+  actorUid:      string;
+  actorNombre:   string;
+}
+
+/**
+ * MIPG-2 — Snapshot inmutable del responsable funcional asignado.
+ *
+ * Los campos `funcionarioResponsable*` se capturan en el momento exacto de
+ * la asignación y NO se actualizan si el usuario cambia de nombre, cargo o rol.
+ * Esto garantiza la evidencia histórica requerida por MIPG.
+ *
+ * Compatibilidad hacia atrás: radicados anteriores solo tienen `funcionarioResponsableUid`.
+ * El sistema los muestra como "No registrado (ver trazabilidad)".
+ */
+export interface ClasificacionRadicado {
+  oficinaDestino:   TenantId;
+  zonaGeografica:   ZonaGeografica;
+  /**
+   * Fase 2 · Dependencia + Área — nivel 2 del modelo: el área u
+   * oficina que trabaja el caso operativamente (id del catálogo en
+   * lib/catalogos/areas.ts). Opcional: se fija al asignar/trasladar y
+   * se limpia si el radicado cambia de destino sin área nueva.
+   */
+  areaResponsable?: string | null;
+
+  /**
+   * Sprint Serie documental (TRD) — foto de la serie asignada al nacer:
+   * código `D.CS[.SUB]`, nombre y fuente (versión de la TRD usada).
+   * Inmutable: si la TRD cambia, los radicados históricos conservan la
+   * clasificación con la que nacieron.
+   */
+  serieDocumental?: {
+    codigo: string;
+    nombre: string;
+    fuente: string;
+  } | null;
+
+  /** UID técnico de Firebase Auth — referencia permanente */
+  funcionarioResponsableUid?:     string;
+  /** Nombre completo al momento de la asignación */
+  funcionarioResponsableNombre?:  string;
+  /** Email institucional al momento de la asignación */
+  funcionarioResponsableEmail?:   string;
+  /** Rol bajo el que actuó */
+  funcionarioResponsableRol?:     RolInterno;
+  /** Cargo adicional si aplica (campo opcional en el perfil) */
+  funcionarioResponsableCargo?:   string;
+  /** ISO timestamp del momento exacto de la asignación del responsable */
+  fechaAsignacionResponsable?:    string;
+}
+
+/** Constancia de anulación de un número de la serie consecutiva. */
+export interface AnulacionRadicado {
+  /** ISO-8601 del momento de la anulación. */
+  fecha: string;
+  motivo: string;
+  /** Ruta del acta que la autoriza — sin acta no hay anulación. */
+  acta: string;
+}
+
 export interface VentanillaRadicado {
   radicadoId: string;
   estadoActual: EstadoRadicado | 'ASIGNADO' | 'POR_VENCER' | 'VENCIDO' | 'PRORROGA';
+  ultimaActualizacion: string;
   prioridad: Prioridad;
+  /**
+   * MIPG — Requisito 8: evidencia de cumplimiento de término legal.
+   *
+   * Se persiste en Firestore al momento de resolver el radicado:
+   *   true  → respondido dentro del plazo legal (incluyendo prórrogas)
+   *   false → respondido fuera del plazo legal
+   *   null/undefined → radicado aún activo, no resuelto
+   *
+   * Este valor es inmutable una vez escrito; el auditor de Control Interno
+   * puede consultarlo en cualquier momento, incluso años después.
+   */
+  cumplioTermino?: boolean | null;
+  /** PQRSD: solicitud presentada de forma anónima (Ley 1755/2015 art. 14) */
+  esAnonimo?: boolean;
+  /** PQRSD: presentación identificada, anónima o con identidad reservada */
+  tipoPresentacion?: 'IDENTIFICADA' | 'ANONIMA' | 'RESERVADA';
+  /** PQRSD: datos personales protegidos en vistas no autorizadas */
+  identidadReservada?: boolean;
+  /** SHA-256 del código de consulta. El token original solo se entrega al radicar. */
+  consultaTokenHash?: string;
+  /** Canal de respuesta preferido por el ciudadano */
+  canalRespuesta?: CanalRespuesta | null;
   solicitante: SolicitanteRadicado;
   control: ControlRadicacion;
   termino: TerminoLegal;
-  clasificacion: {
-    oficinaDestino: TenantId;
-    funcionarioResponsableUid?: string;
-    zonaGeografica: ZonaGeografica;
-  };
+  clasificacion: ClasificacionRadicado;
   detalle: {
     asunto: string;
     descripcion: string;
     numeroFolios: number;
     /** Null cuando no se especificaron anexos (Firestore no acepta undefined) */
     anexosDescripcion?: string | null;
+    /** Sprint Ventanilla Operativa 1 — número de anexos entregados. */
+    numeroAnexos?: number;
+    /** Sprint Ventanilla Operativa 1 — observaciones sobre los anexos. */
+    observacionesAnexos?: string | null;
   };
   archivos: ArchivoRadicado[];
-  trazabilidad: TrazabilidadRadicado[];
-  analisisIa?: AnalisisIA;
-  feedbackIa?: FeedbackIA;
+  analisisIa?:       AnalisisIA;
+  feedbackIa?:       FeedbackIA;
+  respuestaOficial?: RespuestaOficial | null;
+  /**
+   * Bandera de alerta visual para el dashboard: indica que al menos un correo
+   * institucional asociado a este radicado falló y aún no fue gestionado por
+   * canal alternativo. Se pone en `true` al persistir un evento
+   * `NOTIFICACION_CORREO_FALLIDA` y solo se baja a `false` cuando un
+   * funcionario marca explícitamente la notificación como gestionada.
+   */
+  alertaNotificacionFallida?: boolean;
+  /**
+   * Sprint Cierre del mostrador — true cuando la constancia de radicación
+   * ya fue enviada al correo del solicitante. La escribe el endpoint
+   * enviar-constancia tras el envío exitoso; ausente = no enviada.
+   * Alimenta el pendiente "Constancia sin enviar" del mostrador.
+   */
+  constanciaEnviadaCorreo?: boolean;
+  /**
+   * Sprint Planilla de reparto — constancia de que el documento físico
+   * ya fue entregado en la dependencia destino. La escribe únicamente
+   * el endpoint de entregas (Admin SDK) al registrar la planilla;
+   * ausente/null = el papel sigue en ventanilla. Zanja el "eso nunca
+   * me llegó": queda quién recibió, cuándo y en qué planilla.
+   */
+  entregaFisica?: {
+    planillaId: string;
+    fecha: string;
+    recibidoPor: string;
+  } | null;
+  /**
+   * Bloque A·A4 (D2 ADR-0026) — handoff radicado⇄expediente de licencias.
+   * Presente cuando este radicado dio origen a un expediente del motor
+   * (`POST /api/licencias/expedientes/desde-radicado`). Vínculo ÚNICO: la
+   * ruta rechaza (409) un segundo intento de vincular el mismo radicado —
+   * el chequeo y la escritura ocurren en la MISMA transacción que crea el
+   * expediente. Ausente = radicado sin expediente vinculado.
+   */
+  vinculoExpediente?: {
+    expedienteId: string;
+    /** `NumeroExpedienteAsignado.numero` del expediente al momento de vincular (p. ej. `DEMO-26-a1b2c3d4`). */
+    numeroExpediente: string;
+    /** ISO 8601 — momento de la vinculación (reloj del servidor). */
+    fecha: string;
+  } | null;
+
+  /* ── Marcas de NO-operación-real ──────────────────────────────────────
+     Estos tres campos existían en los datos y en el código desde hace
+     tiempo (seis módulos filtran por ellos) pero NO en el tipo, así que
+     TypeScript no podía ayudar a nadie a recordarlos — y Control Interno,
+     que es el que alimenta el Excel institucional, se olvidó de filtrarlos.
+     Declararlos es lo que convierte «acordarse» en «que el compilador te
+     avise». */
+  /** ¿El acto interno de respuesta ocurrió dentro del plazo? Se guarda aparte
+   *  de `cumplioTermino` porque son cosas distintas: cumplir exige además
+   *  haber NOTIFICADO (Ley 1755). Distinguirlas separa «se respondió tarde»
+   *  de «se respondió a tiempo pero el aviso no salió». */
+  respuestaEnTermino?: boolean;
+  /** ¿Se informó al ciudadano de la prórroga? Mientras sea false, la prórroga
+   *  no le es oponible (Ley 1755 art. 14: debe informarse ANTES del
+   *  vencimiento) y hay que notificarla por otra vía. */
+  prorrogaNotificada?: boolean;
+  /** Registro de prueba: nunca cuenta como operación real. */
+  isTest?: boolean;
+  /** Excluido de métricas e indicadores oficiales. */
+  excludeFromMetrics?: boolean;
+  /** Número anulado con acta: el registro queda, el número se pierde con
+   *  constancia (AGN 060/2001 — un borrado dejaría un hueco indistinguible
+   *  de una pérdida documental). Lo escribe scripts/operacion/limpiar-datos-prueba.mjs. */
+  anulado?: AnulacionRadicado | null;
+
 }
 
 
@@ -119,7 +415,7 @@ export interface UsuarioInterno {
   uid: string;
   email: string;
   nombre: string;
-  rol: 'ADMIN' | 'FUNCIONARIO' | 'RECEPCIONISTA';
+  rol: 'ADMIN' | 'FUNCIONARIO' | 'RECEPCIONISTA' | 'JEFE_DEPENDENCIA' | 'CONTROL_INTERNO';
   tenantId: TenantId;
   activo: boolean;
 }
@@ -139,4 +435,3 @@ export interface AuditoriaOverride {
   accionFuncionario: 'MODIFICADO' | 'ACEPTADO';
   motivoCorreccion: string;
 }
-

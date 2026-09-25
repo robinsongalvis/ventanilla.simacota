@@ -2,7 +2,7 @@
 
 ## Colecciones Firestore
 
-### `radicados/{radicadoId}`
+### `ventanilla_radicados/{radicadoId}`
 
 Documento principal para consulta rapida de dashboard y detalle.
 
@@ -17,9 +17,9 @@ Campos principales:
 - `clasificacion`: oficina destino, funcionario responsable y zona.
 - `detalle`: asunto, descripcion, folios y anexos.
 - `archivos`: metadatos de Firebase Storage.
-- `trazabilidad`: copia corta de los ultimos eventos para pintar timeline rapido.
+- `ultimaActualizacion`: fecha ISO del ultimo evento, usada para analytics sin consultar subcolecciones.
 
-### `radicados/{radicadoId}/trazabilidad/{eventoId}`
+### `ventanilla_radicados/{radicadoId}/trazabilidad/{eventoId}`
 
 Bitacora completa e inmutable. Cada accion operativa debe crear un evento:
 
@@ -51,9 +51,9 @@ Contador transaccional por vigencia para generar consecutivos institucionales.
 
 ## Indices recomendados
 
-- `radicados`: `clasificacion.oficinaDestino ASC`, `control.fechaRadicado DESC`.
-- `radicados`: `estadoActual ASC`, `termino.fechaVencimiento ASC`.
-- `radicados`: `control.medioRecepcion ASC`, `control.fechaRadicado DESC`.
+- `ventanilla_radicados`: `clasificacion.oficinaDestino ASC`, `control.fechaRadicado DESC`.
+- `ventanilla_radicados`: `estadoActual ASC`, `termino.fechaVencimiento ASC`.
+- `ventanilla_radicados`: `control.medioRecepcion ASC`, `control.fechaRadicado DESC`.
 
 ## Storage
 
@@ -64,4 +64,3 @@ radicados/{radicadoId}/{timestamp}_{nombreArchivo}
 ```
 
 El documento guarda solo metadatos y `path`. La descarga se controla con reglas de Storage y/o URLs firmadas segun el rol.
-

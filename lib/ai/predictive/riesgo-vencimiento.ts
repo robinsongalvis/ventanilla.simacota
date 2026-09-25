@@ -26,7 +26,7 @@ function estaResuelto(r: VentanillaRadicado): boolean {
 function diasHabilesTranscurridos(r: VentanillaRadicado): number {
   const inicio = r.control.fechaRadicado;
   const fin = estaResuelto(r)
-    ? (r.trazabilidad.at(-1)?.fecha ?? new Date().toISOString())
+    ? (r.ultimaActualizacion ?? new Date().toISOString())
     : new Date().toISOString();
   return Math.abs(diasRestantesHabiles(fin, inicio));
 }

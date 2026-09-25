@@ -12,6 +12,24 @@ export interface TenantConfig {
   responsable:    string;
   activo:         boolean;
   zonaExclusiva?: ZonaGeografica;
+  /**
+   * Código DANE de la División Político-Administrativa (DIVIPOLA) del
+   * municipio — string, NO number: otros municipios pueden tener ceros a la
+   * izquierda (p. ej. departamentos de un solo dígito), y un `number` los
+   * perdería silenciosamente. Fase 2 (motor de expedientes, licencias):
+   * primer segmento de `numeroExpediente` (`lib/motor-expedientes/numero-
+   * expediente.ts`). Solo poblado para tenants que emiten expedientes con
+   * numeración propia — hoy únicamente `SEC_PLANEACION`.
+   */
+  codigoDane?: string;
+  /**
+   * Código de la Curaduría Urbana (o "0" si el municipio no tiene curador
+   * urbano y la función la ejerce directamente la Secretaría de
+   * Planeación, como Simacota) — string por la misma razón que
+   * `codigoDane` (ceros a la izquierda en otros municipios/curadurías).
+   * Segundo segmento de `numeroExpediente`.
+   */
+  codigoCuraduria?: string;
 }
 
 /* ══════════════════════════════════════════════════════════════
@@ -51,6 +69,10 @@ export const DIRECTORIO_TENANTS: Record<TenantId, TenantConfig> = {
     celularOficial: '3502956396',
     responsable:    '',
     activo:         true,
+    // Fase 2 — módulo de licencias (motor de expedientes). '0' = sin
+    // curador urbano; la función la ejerce Planeación directamente.
+    codigoDane:      '68745',
+    codigoCuraduria: '0',
   },
   SEC_DESARROLLO_SOCIAL: {
     tenantId:       'SEC_DESARROLLO_SOCIAL',
@@ -182,3 +204,34 @@ export const NOMBRES_TENANT = Object.fromEntries(
     ([id, cfg]) => [id, cfg.nombreOficial]
   )
 ) as Record<TenantId, string>;
+
+/** Códigos DANE/curaduría de un tenant, resueltos y garantizados presentes. */
+export interface CodigosNumeroExpediente {
+  codigoDane: string;
+  codigoCuraduria: string;
+}
+
+/**
+ * Resuelve `codigoDane`/`codigoCuraduria` de un tenant para formatear un
+ * `numeroExpediente` (`lib/motor-expedientes/numero-expediente.ts`).
+ *
+ * FAIL-CLOSED a propósito: lanza `Error` (no devuelve `undefined` ni aplica
+ * un default silencioso) si el tenant no existe en `DIRECTORIO_TENANTS` o
+ * si le falta cualquiera de los dos códigos. Debe llamarse ANTES de abrir
+ * la transacción de emisión — un expediente numerado con un código
+ * incorrecto o inventado es un defecto de identidad legal, no un dato que
+ * se pueda "arreglar después"; es preferible que la emisión falle con un
+ * mensaje claro a que emita un número con un código placeholder.
+ */
+export function codigosNumeroExpediente(tenantId: TenantId): CodigosNumeroExpediente {
+  const cfg = DIRECTORIO_TENANTS[tenantId];
+  if (!cfg) {
+    throw new Error(`No existe configuración de dependencia para "${tenantId}": no se puede emitir un número de expediente.`);
+  }
+  if (!cfg.codigoDane || !cfg.codigoCuraduria) {
+    throw new Error(
+      `La dependencia "${cfg.nombreOficial}" (${tenantId}) no tiene código DANE y/o de curaduría configurado en DIRECTORIO_TENANTS: no se puede emitir un número de expediente sin esos datos.`,
+    );
+  }
+  return { codigoDane: cfg.codigoDane, codigoCuraduria: cfg.codigoCuraduria };
+}

@@ -260,9 +260,9 @@ export function ModalRadicado({ radicado, usuario, onCerrar }: Props) {
                         <span className="text-slate-500 text-base">📎</span>
                         <span className="truncate">{arch.nombre}</span>
                       </span>
-                      {arch.url ? (
+                      {arch.path ? (
                         <a
-                          href={arch.url}
+                          href={`/api/interno/archivo?path=${encodeURIComponent(arch.path)}`}
                           target="_blank"
                           rel="noopener noreferrer"
                           className="shrink-0 text-xs text-indigo-400 hover:text-indigo-300 transition-colors underline underline-offset-2"
@@ -270,7 +270,7 @@ export function ModalRadicado({ radicado, usuario, onCerrar }: Props) {
                           Ver
                         </a>
                       ) : (
-                        <span className="shrink-0 text-xs text-slate-600">Sin URL</span>
+                        <span className="shrink-0 text-xs text-slate-600">Sin archivo</span>
                       )}
                     </li>
                   ))}

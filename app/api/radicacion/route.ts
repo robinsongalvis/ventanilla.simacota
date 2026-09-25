@@ -1,0 +1,573 @@
+import { NextResponse } from 'next/server';
+import { checkRateLimit } from '@/lib/ai/rate-limit';
+import { verificarMagicBytes } from '@/lib/seguridad/magic-bytes';
+import { getFirebaseAdminDb, getFirebaseAdminStorage } from '@/lib/firebase-admin';
+import { removeUndefinedDeep } from '@/lib/firestore/removeUndefined';
+import {
+  calcularFechaVencimiento,
+  TIPOS_PQRSD_CIUDADANO,
+  TIPOS_SOLICITUD,
+  type TipoSolicitudId,
+} from '@/lib/tiempos-radicado';
+import { formatearRadicadoInstitucional } from '@/lib/radicado-institucional';
+import { construirVentanillaRadicado } from '@/lib/recepcion/construir-radicado';
+import {
+  confirmarConsecutivosLegales,
+  leerConsecutivosLegales,
+} from '@/lib/server/consecutivo-legal';
+import { randomUUID } from 'node:crypto';
+import { enviarEmail } from '@/lib/email/mailer';
+import {
+  buildConfirmacionRadicacionHtml,
+  buildConfirmacionRadicacionSubject,
+} from '@/lib/email/templates/confirmacion-radicacion';
+import { debeNotificarCiudadano } from '@/lib/email/debe-notificar-ciudadano';
+import { registrarTrazabilidadNotificacion } from '@/lib/trazabilidad/notificacion';
+import { logError } from '@/lib/logger';
+import { registrarEventoNegocio } from '@/lib/observabilidad/eventos-negocio';
+import {
+  generarTokenConsulta,
+  hashTokenConsulta,
+} from '@/lib/seguridad/consulta-publica-radicado';
+import { validarReglasRadicacion } from '@/lib/seguridad/reglas-radicacion';
+import type { Prioridad, TenantId, TipoPresentacionPqrsd, ZonaGeografica } from '@/src/types/radicado';
+import type {
+  AnalisisIA,
+  ArchivoRadicado,
+  CanalRespuesta,
+  MedioRecepcion,
+  TipoDocumento,
+  VentanillaRadicado,
+} from '@/src/types/ventanilla';
+
+
+export const runtime = 'nodejs';
+
+const MAX_FILES = 3;
+const MAX_FILE_SIZE = 5 * 1024 * 1024;
+const ALLOWED_FILE_TYPES = new Set([
+  'application/pdf',
+  'image/jpeg',
+  'image/png',
+  'application/vnd.openxmlformats-officedocument.wordprocessingml.document',   // DOCX
+  'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',         // XLSX
+  'application/vnd.openxmlformats-officedocument.presentationml.presentation', // PPTX
+]);
+const CANALES_RESPUESTA = new Set<CanalRespuesta>([
+  'CORREO',
+  'PRESENCIAL',
+  'TELEFONO',
+  'DIRECCION_FISICA',
+]);
+const TIPOS_PRESENTACION = new Set<TipoPresentacionPqrsd>(['IDENTIFICADA', 'ANONIMA', 'RESERVADA']);
+const MEDIO_RECEPCION: MedioRecepcion = 'WEB';
+const TENANT_RECEPCION: TenantId = 'VENTANILLA_UNICA';
+const ZONA_DEFAULT: ZonaGeografica = 'CASCO_URBANO';
+const RATE_LIMIT = { maxRequests: 8, windowMs: 60_000 };
+
+interface ErrorResponse {
+  exito: false;
+  error: string;
+  errores: string[];
+}
+
+function badRequest(error: string, errores: string[] = [error]): NextResponse<ErrorResponse> {
+  return NextResponse.json({ exito: false, error, errores }, { status: 400 });
+}
+
+function getText(formData: FormData, key: string): string {
+  const value = formData.get(key);
+  return typeof value === 'string' ? value.trim() : '';
+}
+
+function getClientIp(request: Request): string {
+  const forwardedFor = request.headers.get('x-forwarded-for')?.split(',')[0]?.trim();
+  return forwardedFor || request.headers.get('x-real-ip') || 'unknown';
+}
+
+function isTipoSolicitud(value: string): value is TipoSolicitudId {
+  return value in TIPOS_SOLICITUD && TIPOS_PQRSD_CIUDADANO.includes(value as TipoSolicitudId);
+}
+
+function isCanalRespuesta(value: string): value is CanalRespuesta {
+  return CANALES_RESPUESTA.has(value as CanalRespuesta);
+}
+
+function isTipoPresentacion(value: string): value is TipoPresentacionPqrsd {
+  return TIPOS_PRESENTACION.has(value as TipoPresentacionPqrsd);
+}
+
+function sanitizeFilename(filename: string): string {
+  return filename
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .replace(/[^a-zA-Z0-9_.\- ]/g, '_')
+    .replace(/\s+/g, ' ')
+    .trim()
+    .slice(0, 120) || 'archivo';
+}
+
+function validarCampos({
+  nombre,
+  email,
+  telefono,
+  direccion,
+  descripcion,
+  tipoPresentacion,
+  canalRespuesta,
+}: {
+  nombre: string;
+  email: string;
+  telefono: string;
+  direccion: string;
+  descripcion: string;
+  tipoPresentacion: TipoPresentacionPqrsd;
+  canalRespuesta: CanalRespuesta;
+}): string[] {
+  const errores: string[] = [];
+  const esAnonimo = tipoPresentacion === 'ANONIMA';
+
+  if (!esAnonimo && nombre.length < 3) {
+    errores.push('Registra el nombre completo o razón social del solicitante.');
+  }
+
+  if (descripcion.length < 20) {
+    errores.push('Describe la solicitud con al menos 20 caracteres.');
+  }
+
+  if (canalRespuesta === 'CORREO' && !email) {
+    errores.push('El correo electrónico es obligatorio para recibir respuesta por correo.');
+  }
+
+  if (canalRespuesta === 'CORREO' && email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+    errores.push('El correo electrónico no tiene un formato válido.');
+  }
+
+  if (canalRespuesta === 'TELEFONO' && !telefono) {
+    errores.push('El teléfono es obligatorio cuando el canal de respuesta es telefónico.');
+  }
+
+  if (canalRespuesta === 'DIRECCION_FISICA' && !direccion) {
+    errores.push('La dirección física es obligatoria para notificación por correspondencia.');
+  }
+
+  return errores;
+}
+
+function validarArchivos(files: File[]): string[] {
+  const errores: string[] = [];
+
+  if (files.length > MAX_FILES) {
+    errores.push(`Solo se permiten hasta ${MAX_FILES} archivos adjuntos.`);
+  }
+
+  files.forEach((file) => {
+    if (!ALLOWED_FILE_TYPES.has(file.type)) {
+      errores.push(`El archivo ${file.name} debe ser PDF, JPG, PNG, DOCX, XLSX o PPTX.`);
+    }
+
+    if (file.size > MAX_FILE_SIZE) {
+      errores.push(`El archivo ${file.name} supera el tamaño máximo de 5 MB.`);
+    }
+  });
+
+  return errores;
+}
+
+
+function bucketStorage() {
+  const bucketName = process.env.FIREBASE_STORAGE_BUCKET;
+  if (!bucketName) {
+    throw new Error('FIREBASE_STORAGE_BUCKET no configurado.');
+  }
+  return getFirebaseAdminStorage().bucket(bucketName);
+}
+
+/** H3: guarda los bytes en una ruta de Storage (usado para el staging previo
+ *  a la transacción). No calcula el path — el caller decide staging vs final. */
+async function guardarEnStorage(file: File, path: string): Promise<void> {
+  const buffer = Buffer.from(await file.arrayBuffer());
+  await bucketStorage().file(path).save(buffer, {
+    resumable: false,
+    metadata: { contentType: file.type || 'application/octet-stream' },
+  });
+}
+
+/** H3: mueve un objeto de staging a su ruta final tras confirmar la
+ *  transacción. Storage no es transaccional con Firestore (N8): un fallo aquí
+ *  deja el radicado válido y el adjunto pendiente de conciliación. */
+async function moverEnStorage(origen: string, destino: string): Promise<void> {
+  await bucketStorage().file(origen).move(destino);
+}
+
+function parseAnalisisIa(value: string): AnalisisIA | undefined {
+  if (!value) return undefined;
+
+  try {
+    const parsed = JSON.parse(value) as Partial<AnalisisIA>;
+    if (
+      typeof parsed.resumenEjecutivo === 'string'
+      && Array.isArray(parsed.etiquetasSemanticas)
+      && typeof parsed.dependenciaSugerida === 'string'
+      && typeof parsed.confianzaClasificacion === 'number'
+    ) {
+      return {
+        resumenEjecutivo: parsed.resumenEjecutivo,
+        etiquetasSemanticas: parsed.etiquetasSemanticas.filter((item): item is string => typeof item === 'string'),
+        dependenciaSugerida: parsed.dependenciaSugerida as TenantId,
+        confianzaClasificacion: parsed.confianzaClasificacion,
+        fechaAnalisis: typeof parsed.fechaAnalisis === 'string' ? parsed.fechaAnalisis : new Date().toISOString(),
+        promptVersion: typeof parsed.promptVersion === 'string' ? parsed.promptVersion : undefined,
+      };
+    }
+  } catch {
+    return undefined;
+  }
+
+  return undefined;
+}
+
+export async function POST(request: Request) {
+  const inicioOperacion = Date.now();
+  let radicadoIdActual: string | null = null;
+  try {
+    const ip = getClientIp(request);
+    const limited = checkRateLimit(`radicacion:${ip}`, RATE_LIMIT);
+    if (limited) {
+      return NextResponse.json({
+        exito: false,
+        error: 'Has realizado varias solicitudes en poco tiempo. Espera un momento e intenta nuevamente.',
+        errores: ['Has realizado varias solicitudes en poco tiempo. Espera un momento e intenta nuevamente.'],
+      }, {
+        status: 429,
+        headers: {
+          'Retry-After': String(limited.retryAfterSeconds),
+          'X-RateLimit-Limit': String(RATE_LIMIT.maxRequests),
+        },
+      });
+    }
+
+    const formData = await request.formData();
+    const tipoSolicitudIdRaw = getText(formData, 'tipoSolicitudId');
+    const tipoPresentacionRaw = getText(formData, 'tipoPresentacion') || 'IDENTIFICADA';
+    const canalRespuestaRaw = getText(formData, 'canalRespuesta') || 'CORREO';
+
+    if (!isTipoSolicitud(tipoSolicitudIdRaw)) {
+      return badRequest('Tipo de solicitud no válido.');
+    }
+
+    if (!isTipoPresentacion(tipoPresentacionRaw)) {
+      return badRequest('Tipo de presentación no válido.');
+    }
+
+    if (!isCanalRespuesta(canalRespuestaRaw)) {
+      return badRequest('Canal de respuesta no válido.');
+    }
+
+    const nombre = getText(formData, 'nombre');
+    const email = getText(formData, 'email').toLowerCase();
+    const telefono = getText(formData, 'telefono').replace(/\s/g, '');
+    const direccion = getText(formData, 'direccion');
+    const descripcion = getText(formData, 'descripcion');
+    const analisisIa = parseAnalisisIa(getText(formData, 'analisisIa'));
+    const files = formData.getAll('archivos').filter((value): value is File => value instanceof File && value.size > 0);
+
+    // Sprint 1.5 — reglas de negocio delegadas a lib/seguridad/reglas-radicacion.
+    // El flujo público ciudadano normalmente no marca noAportaCorreo, pero
+    // validamos defensivamente por si llega vía integraciones o formularios
+    // internos que reutilicen este endpoint.
+    const noAportaCorreo = getText(formData, 'noAportaCorreo') === 'true';
+    const errorReglas = validarReglasRadicacion({
+      noAportaCorreo,
+      canalRespuesta: canalRespuestaRaw,
+    });
+
+    const errores = [
+      ...validarCampos({
+        nombre,
+        email,
+        telefono,
+        direccion,
+        descripcion,
+        tipoPresentacion: tipoPresentacionRaw,
+        canalRespuesta: canalRespuestaRaw,
+      }),
+      ...(errorReglas ? [errorReglas] : []),
+      ...validarArchivos(files),
+    ];
+
+    if (errores.length > 0) {
+      return badRequest('La solicitud tiene datos pendientes por corregir.', errores);
+    }
+
+    // H-08: verificar firma binaria / estructura del buffer real.
+    // El Content-Type y la extensión son falsificables; PDF/JPG/PNG se validan
+    // por firma, DOCX/XLSX/PPTX por presencia de [Content_Types].xml + carpeta
+    // esperada y ausencia de vbaProject.bin (macro disfrazada).
+    const erroresMagicBytes: string[] = [];
+    for (const file of files) {
+      const buffer = Buffer.from(await file.arrayBuffer());
+      if (!verificarMagicBytes(buffer, file.type)) {
+        erroresMagicBytes.push(
+          `El archivo ${file.name} no tiene una firma válida para su tipo declarado.`,
+        );
+      }
+    }
+    if (erroresMagicBytes.length > 0) {
+      return badRequest('La solicitud tiene datos pendientes por corregir.', erroresMagicBytes);
+    }
+
+    const ahora = new Date();
+    const termino = calcularFechaVencimiento(ahora, tipoSolicitudIdRaw);
+    const tipoSolicitud = TIPOS_SOLICITUD[tipoSolicitudIdRaw];
+    const esAnonimo = tipoPresentacionRaw === 'ANONIMA';
+    const identidadReservada = tipoPresentacionRaw === 'RESERVADA';
+    const solicitanteNombre = esAnonimo ? 'Anónimo / Reservado' : nombre;
+    const consultaToken = !email ? generarTokenConsulta() : undefined;
+    const asunto = `${tipoSolicitud.nombre}: ${descripcion.slice(0, 90)}${descripcion.length > 90 ? '...' : ''}`;
+
+    // H3 (Bloque 2): staging → transacción → finalize.
+    // 1) Subir adjuntos a STAGING antes de consumir el consecutivo: un fallo de
+    //    subida no crea radicado ni gasta número.
+    const db = getFirebaseAdminDb();
+    const requestId = randomUUID();
+    const preparados = files.map((file, index) => ({
+      file,
+      orden: index + 1,
+      filename: `${Date.now()}_${index + 1}_${sanitizeFilename(file.name)}`,
+      tipo: file.type || 'application/octet-stream',
+      tamanioKB: Math.max(1, Math.round(file.size / 1024)),
+    }));
+    await Promise.all(preparados.map((p) =>
+      guardarEnStorage(p.file, `radicados/_pendientes/${requestId}/${p.filename}`),
+    ));
+
+    // 2) Consecutivo + documento en UNA transacción (atómico). Dentro del
+    //    callback SOLO cómputo puro y tx.set; ningún I/O de Storage.
+    const { radicadoId, archivos } = await db.runTransaction(async (tx) => {
+      // Se conserva el ARREGLO devuelto por leer (no se desestructura y descarta):
+      // confirmarConsecutivosLegales exige exactamente esa misma referencia
+      // (guarda por identidad, consecutivo-legal.ts:107). Pasar un arreglo nuevo
+      // hacía fallar la transacción con 500 en toda radicación pública (P0).
+      const pendientesRadicado = await leerConsecutivosLegales(tx, db, ahora, [
+        { serie: 'radicados', formatear: formatearRadicadoInstitucional },
+      ]);
+      const [consecRadicado] = pendientesRadicado;
+      const radicadoId = consecRadicado.documentoId;
+      const consecutivo = consecRadicado.consecutivo;
+      const archivos: ArchivoRadicado[] = preparados.map((p) => ({
+        nombre: p.file.name,
+        url: '',
+        path: `radicados/${radicadoId}/${p.filename}`,
+        tipo: p.tipo,
+        tamanioKB: p.tamanioKB,
+        orden: p.orden,
+      }));
+
+    // C1/M1 (pieza angular) — constructor puro compartido con la superficie
+    // interna (lib/actions/radicarVentanilla.ts). Reutiliza
+    // sugerirSerieDocumental internamente; no toca la numeración (H3).
+    const radicado: VentanillaRadicado = removeUndefinedDeep(construirVentanillaRadicado({
+      radicadoId,
+      consecutivo,
+      ahora,
+      prioridad: tipoSolicitud.prioridadSugerida as Prioridad,
+      cumplioTermino: null,
+      tipoPresentacion: tipoPresentacionRaw,
+      canalRespuesta: canalRespuestaRaw,
+      ...(consultaToken ? { consultaTokenHash: hashTokenConsulta(consultaToken) } : {}),
+      solicitante: {
+        tipoPersona: 'NATURAL',
+        tipoDocumento: 'OTRO' as TipoDocumento,
+        numeroDocumento: '',
+        nombreCompleto: solicitanteNombre,
+        razonSocial: null,
+        email: esAnonimo ? null : email || null,
+        telefono: esAnonimo ? null : telefono || null,
+        direccion: esAnonimo ? null : direccion || null,
+        ubicacion: {
+          pais: 'Colombia',
+          departamento: 'Santander',
+          municipio: 'Simacota',
+        },
+      },
+      control: {
+        medioRecepcion: MEDIO_RECEPCION,
+        origen: 'WEB',
+        horaRadicado: ahora.toLocaleTimeString('es-CO', {
+          hour: '2-digit',
+          minute: '2-digit',
+          second: '2-digit',
+          hour12: false,
+        }),
+      },
+      termino: {
+        tipoSolicitudId: tipoSolicitud.id,
+        tipoSolicitudNombre: tipoSolicitud.nombre,
+        diasRespuesta: termino.diasRespuesta,
+        unidad: termino.unidad,
+        fechaVencimiento: termino.fechaVencimiento,
+      },
+      clasificacionBase: {
+        oficinaDestino: TENANT_RECEPCION,
+        zonaGeografica: ZONA_DEFAULT,
+      },
+      detalle: {
+        asunto,
+        descripcion,
+        numeroFolios: archivos.length,
+        anexosDescripcion: archivos.length > 0 ? `${archivos.length} archivo(s) adjunto(s)` : null,
+      },
+      archivos,
+      analisisIa,
+    }));
+
+      confirmarConsecutivosLegales(tx, ahora, pendientesRadicado);
+      tx.set(db.doc(`ventanilla_radicados/${radicadoId}`), radicado);
+      return { radicadoId, archivos };
+    });
+    radicadoIdActual = radicadoId;
+
+    // 3) Finalize: mover adjuntos de staging a su ruta final (post-commit; el
+    //    radicado ya es válido — un fallo de move NO crea fantasma; N8 lo
+    //    concilia luego, deuda declarada).
+    await Promise.all(preparados.map((p) =>
+      moverEnStorage(
+        `radicados/_pendientes/${requestId}/${p.filename}`,
+        `radicados/${radicadoId}/${p.filename}`,
+      ).catch((error) => logError({ radicadoId, modulo: 'radicacion/finalize-adjunto', error })),
+    ));
+    await db.collection(`ventanilla_radicados/${radicadoId}/trazabilidad`).add(removeUndefinedDeep({
+      eventoId: `ev_${radicadoId}_RADICACION`,
+      fecha: ahora.toISOString(),
+      accion: 'RADICACION',
+      actorUid: 'portal-ciudadano',
+      actorNombre: 'Portal ciudadano',
+      oficinaDestino: TENANT_RECEPCION,
+      nota: `Radicado creado desde el portal ciudadano. Canal de respuesta: ${canalRespuestaRaw}.`,
+      metadata: {
+        tipoSolicitudId: tipoSolicitud.id,
+        tipoPresentacion: tipoPresentacionRaw,
+        esAnonimo,
+        identidadReservada,
+        archivos: archivos.length,
+      },
+    }));
+
+    // Sprint 1.5 — evento operativo cuando el ciudadano marcó noAportaCorreo
+    // en el endpoint público. Hoy solo entra por esa casilla; el shape del
+    // metadata es igual al del flujo interno para uniformidad de reportes.
+    // No se muestra en la línea de tiempo pública.
+    if (noAportaCorreo) {
+      await db.collection(`ventanilla_radicados/${radicadoId}/trazabilidad`).add(removeUndefinedDeep({
+        eventoId: `ev_${radicadoId}_DATOS_NO_APORTADOS`,
+        fecha: ahora.toISOString(),
+        accion: 'DATOS_NO_APORTADOS_MARCADOS',
+        actorUid: 'portal-ciudadano',
+        actorNombre: 'Portal ciudadano',
+        oficinaDestino: TENANT_RECEPCION,
+        nota: 'El solicitante no aportó: correo.',
+        metadata: {
+          documento: false,
+          correo:    true,
+          telefono:  false,
+          direccion: false,
+        },
+      }));
+    }
+
+    // ── Email de confirmación al ciudadano (síncrono, no bloqueante) ──
+    // Se espera al envío SMTP antes de responder para garantizar trazabilidad
+    // real y compatibilidad con Vercel serverless (las promesas pendientes se
+    // matan al retornar la función). El radicado ya quedó persistido — un
+    // fallo SMTP nunca lo revierte; solo se registra en trazabilidad y se
+    // levanta el flag `alertaNotificacionFallida`.
+    let emailEnviado = false;
+    let emailError: string | undefined;
+    const debeEnviar = debeNotificarCiudadano({
+      esAnonimo,
+      tipoPresentacion: tipoPresentacionRaw,
+      solicitante: { email: esAnonimo ? null : email || null },
+    });
+
+    if (debeEnviar) {
+      const destinatario = email;
+      try {
+        await enviarEmail({
+          to:      destinatario,
+          subject: buildConfirmacionRadicacionSubject(radicadoId),
+          html:    buildConfirmacionRadicacionHtml({
+            radicadoId,
+            ciudadanoNombre:  solicitanteNombre,
+            tipoSolicitud:    tipoSolicitud.nombre,
+            fechaRadicado:    ahora.toISOString(),
+            fechaVencimiento: termino.fechaVencimiento,
+            canalRespuesta:   canalRespuestaRaw,
+            descripcionCorta: descripcion.slice(0, 120),
+          }),
+        });
+        emailEnviado = true;
+        await registrarTrazabilidadNotificacion({
+          radicadoId,
+          tipoNotificacion: 'RADICACION',
+          destinatario,
+          estado:           'ENVIADA',
+        });
+      } catch (err) {
+        emailError = err instanceof Error ? err.message : String(err);
+        logError({
+          radicadoId,
+          modulo: 'radicacion/email-confirmacion',
+          error:  err,
+        });
+        await registrarTrazabilidadNotificacion({
+          radicadoId,
+          tipoNotificacion: 'RADICACION',
+          destinatario,
+          estado:           'FALLIDA',
+          error:            emailError,
+        });
+      }
+    }
+
+    registrarEventoNegocio({
+      operacion: 'radicacion',
+      resultado: 'ok',
+      latenciaMs: Date.now() - inicioOperacion,
+      radicadoId,
+      actorRol: 'PORTAL_CIUDADANO',
+      tenant: TENANT_RECEPCION,
+    });
+
+    return NextResponse.json({
+      exito: true,
+      radicadoId,
+      errores: [],
+      archivosSubidos: archivos.length,
+      archivosFallidos: 0,
+      fechaRadicado: ahora.toISOString(),
+      fechaVencimiento: termino.fechaVencimiento,
+      dependenciaReceptora: TENANT_RECEPCION,
+      emailEnviado,
+      ...(consultaToken ? { consultaToken } : {}),
+      ...(emailError ? { emailError } : {}),
+    });
+  } catch (error) {
+    registrarEventoNegocio({
+      operacion: 'radicacion',
+      resultado: 'error',
+      latenciaMs: Date.now() - inicioOperacion,
+      radicadoId: radicadoIdActual,
+      actorRol: 'PORTAL_CIUDADANO',
+      tenant: TENANT_RECEPCION,
+      error,
+    });
+    const message = error instanceof Error ? error.message : 'No fue posible crear el radicado.';
+    console.error('[api/radicacion] Error creando radicado:', message);
+    return NextResponse.json({
+      exito: false,
+      error: 'No fue posible radicar la solicitud. Intenta nuevamente o comunícate con la Alcaldía.',
+      errores: ['No fue posible radicar la solicitud. Intenta nuevamente o comunícate con la Alcaldía.'],
+    }, { status: 500 });
+  }
+}

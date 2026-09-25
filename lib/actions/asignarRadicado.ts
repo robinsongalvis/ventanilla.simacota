@@ -1,94 +1,83 @@
-import { doc, updateDoc, writeBatch, arrayUnion } from 'firebase/firestore';
-import { getDb } from '@/lib/firebase';
-import type { TenantId } from '@/src/types/radicado';
+import type { TenantId }      from '@/src/types/radicado';
+import type { RolInterno }    from '@/lib/hooks/useAuth';
+
+/* ── Tipos públicos ─────────────────────────────────────────── */
 
 export interface ActorAsignacion {
-  uid: string;
+  uid:    string;
   nombre: string;
+  rol?:   RolInterno;
+}
+
+/**
+ * MIPG-2 — Snapshot del responsable funcional al momento de asignación.
+ * Inmutable: si el usuario cambia de nombre/cargo/rol, el radicado histórico
+ * conserva los datos originales.
+ */
+export interface ResponsableFuncionario {
+  uid:    string;
+  nombre: string;
+  email:  string;
+  rol:    RolInterno;
+  cargo?: string;
 }
 
 export interface ResultadoAsignacion {
   asignados: number;
-  fallidos: number;
+  fallidos:  number;
 }
 
 /* ══════════════════════════════════════════════════════════════
-   ASIGNACIÓN INDIVIDUAL
+   ASIGNACIÓN INDIVIDUAL — con snapshot MIPG-2
 ══════════════════════════════════════════════════════════════ */
 
 export async function asignarRadicado(
-  radicadoId: string,
+  radicadoId:    string,
   tenantDestino: TenantId,
-  actor: ActorAsignacion,
-  funcionarioDestinoUid?: string,
+  actor:         ActorAsignacion,
+  /** Snapshot del responsable funcional. Si es null no se asigna responsable. */
+  responsable?:  ResponsableFuncionario | null,
+  /** Tenant de origen (para trazabilidad) */
+  tenantOrigen?: TenantId,
+  /** Fase 2 — área responsable (id del catálogo), opcional. */
+  areaId?:       string | null,
 ): Promise<void> {
-  const db = getDb();
-  const ref = doc(db, 'ventanilla_radicados', radicadoId);
-  const ahora = new Date().toISOString();
-
-  await updateDoc(ref, {
-    'clasificacion.oficinaDestino': tenantDestino,
-    ...(funcionarioDestinoUid
-      ? { 'clasificacion.funcionarioResponsableUid': funcionarioDestinoUid }
-      : {}),
-    estadoActual: 'ASIGNADO',
-    trazabilidad: arrayUnion({
-      fecha: ahora,
-      accion: 'TRASLADO',
-      actorUid: actor.uid,
-      actorNombre: actor.nombre,
-      oficinaDestino: tenantDestino,
-      ...(funcionarioDestinoUid ? { funcionarioDestinoUid } : {}),
-      nota: `Asignado a ${tenantDestino} por ${actor.nombre}`,
-    }),
+  void actor;
+  void tenantOrigen;
+  const response = await fetch(`/api/radicados/${encodeURIComponent(radicadoId)}/asignar`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    credentials: 'include',
+    body: JSON.stringify({ tenantDestino, responsable: responsable ?? null, areaId: areaId ?? null }),
   });
+  const data = await response.json().catch(() => null) as { error?: string } | null;
+  if (!response.ok) {
+    throw new Error(data?.error ?? 'Error al asignar el radicado.');
+  }
 }
 
 /* ══════════════════════════════════════════════════════════════
-   ASIGNACIÓN MASIVA (writeBatch en bloques de 400)
+   ASIGNACIÓN MASIVA — writeBatch en bloques de 400
+   No incluye snapshot de responsable individual (se asigna después
+   por el funcionario o jefe de la dependencia destino).
 ══════════════════════════════════════════════════════════════ */
 
 export async function asignarMasivo(
-  radicadoIds: string[],
+  radicadoIds:   string[],
   tenantDestino: TenantId,
-  actor: ActorAsignacion,
-  onProgress?: (asignados: number, total: number) => void,
+  actor:         ActorAsignacion,
+  onProgress?:   (asignados: number, total: number) => void,
 ): Promise<ResultadoAsignacion> {
-  const db = getDb();
-  const CHUNK = 400;
-  const ahora = new Date().toISOString();
   let asignados = 0;
-  let fallidos = 0;
+  let fallidos  = 0;
 
-  const entrada = {
-    fecha: ahora,
-    accion: 'TRASLADO',
-    actorUid: actor.uid,
-    actorNombre: actor.nombre,
-    oficinaDestino: tenantDestino,
-    nota: `Asignación masiva a ${tenantDestino} por ${actor.nombre}`,
-  };
-
-  for (let i = 0; i < radicadoIds.length; i += CHUNK) {
-    const lote = radicadoIds.slice(i, i + CHUNK);
-    const batch = writeBatch(db);
-
-    for (const id of lote) {
-      const ref = doc(db, 'ventanilla_radicados', id);
-      batch.update(ref, {
-        'clasificacion.oficinaDestino': tenantDestino,
-        estadoActual: 'ASIGNADO',
-        trazabilidad: arrayUnion(entrada),
-      });
-    }
-
+  for (const id of radicadoIds) {
     try {
-      await batch.commit();
-      asignados += lote.length;
+      await asignarRadicado(id, tenantDestino, actor);
+      asignados += 1;
     } catch {
-      fallidos += lote.length;
+      fallidos += 1;
     }
-
     onProgress?.(asignados, radicadoIds.length);
   }
 

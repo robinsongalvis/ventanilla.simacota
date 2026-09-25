@@ -1,14 +1,40 @@
 import { NextResponse } from 'next/server';
-import { doc, updateDoc, setDoc } from 'firebase/firestore';
-import { getDb } from '@/lib/firebase';
+import { getFirebaseAdminDb } from '@/lib/firebase-admin';
+import { checkRateLimit, getClientIp, rateLimitHeaders } from '@/lib/ai/rate-limit';
+import { requireActiveInternalUser } from '@/lib/server/internal-auth';
 
 export async function POST(request: Request) {
+  /* PT-3 (24-ago-2026): esta era la ÚNICA ruta /api/ai que escribía estado
+     de negocio SIN sesión — un anónimo de internet que derivara un
+     radicadoId (formato público) podía sembrar feedbackIa en un radicado
+     real y contaminar ai_feedback/ai_auditoria sin actor atribuible. La
+     sesión va ANTES del rate limit: a un no autenticado no se le regala
+     ni el conteo de la ventana. El actor sale de la sesión, no del body —
+     un evaluador no puede firmar como otro. */
+  let usuario;
+  try {
+    usuario = await requireActiveInternalUser();
+  } catch {
+    return NextResponse.json({ error: 'Sesión requerida.' }, { status: 401 });
+  }
+  const limite = { maxRequests: 30, windowMs: 60_000 };
+  const ip = getClientIp(request);
+  const bloqueado = checkRateLimit(`ai:feedback:${ip}`, limite);
+
+  if (bloqueado) {
+    return NextResponse.json(
+      { error: 'Se recibieron muchas evaluaciones seguidas. Espere un momento e intente nuevamente.' },
+      {
+        status: 429,
+        headers: rateLimitHeaders(limite.maxRequests, bloqueado.retryAfterSeconds),
+      },
+    );
+  }
+
   try {
     const payload = await request.json();
     const {
       radicadoId,
-      usuarioId,
-      actorNombre,
       puntuacion, // 'POSITIVO' | 'CORREGIDO' | 'NEGATIVO'
       motivoCorreccion,
       clasificacionOriginal,
@@ -20,42 +46,41 @@ export async function POST(request: Request) {
       confianzaIA,
     } = payload;
 
-    if (!radicadoId || !usuarioId || !puntuacion) {
+    if (!radicadoId || !puntuacion) {
       return NextResponse.json(
-        { error: 'radicadoId, usuarioId y puntuacion son requeridos.' },
+        { error: 'radicadoId y puntuacion son requeridos.' },
         { status: 400 }
       );
     }
+    // Identidad del evaluador: SIEMPRE de la sesión verificada.
+    const usuarioId = usuario.uid;
+    const actorNombre = usuario.nombre;
 
-    const db = getDb();
+    const db = getFirebaseAdminDb();
     const ahora = new Date().toISOString();
     const feedbackId = `fb_${radicadoId}_${Date.now()}`;
 
-    // 1. Registrar evaluación en la colección 'ai_feedback'
     const feedbackDoc = {
       feedbackId,
       radicadoId,
       usuarioId,
-      actorNombre: actorNombre || 'Funcionario',
+      actorNombre,
       puntuacion,
       motivoCorreccion: motivoCorreccion || null,
       fecha: ahora,
     };
-    await setDoc(doc(db, 'ai_feedback', feedbackId), feedbackDoc);
+    await db.doc(`ai_feedback/${feedbackId}`).set(feedbackDoc);
 
-    // 2. Actualizar el radicado en 'ventanilla_radicados' con la evaluación
-    const radRef = doc(db, 'ventanilla_radicados', radicadoId);
-    await updateDoc(radRef, {
+    await db.doc(`ventanilla_radicados/${radicadoId}`).update({
       feedbackIa: {
         usuarioId,
-        actorNombre: actorNombre || 'Funcionario',
+        actorNombre,
         puntuacion,
         motivoCorreccion: motivoCorreccion || null,
         fecha: ahora,
       },
     });
 
-    // 3. Si hubo corrección, registrar auditoría en la colección 'ai_auditoria'
     if (puntuacion === 'CORREGIDO' || clasificacionOriginal !== clasificacionFinal) {
       const auditoriaId = `aud_${radicadoId}_${Date.now()}`;
       const auditoriaDoc = {
@@ -73,7 +98,7 @@ export async function POST(request: Request) {
         accionFuncionario: puntuacion === 'CORREGIDO' ? 'MODIFICADO' : 'ACEPTADO',
         motivoCorreccion: motivoCorreccion || 'Traslado o re-enrutamiento manual.',
       };
-      await setDoc(doc(db, 'ai_auditoria', auditoriaId), auditoriaDoc);
+      await db.doc(`ai_auditoria/${auditoriaId}`).set(auditoriaDoc);
     }
 
     return NextResponse.json({ exito: true, feedbackId });

@@ -11,21 +11,41 @@ import type { MetadataRoute } from 'next';
  */
 export default function manifest(): MetadataRoute.Manifest {
   return {
-    name: 'Ventanilla Única Digital – Simacota',
+    name: 'Ventanilla Única Digital - Alcaldía de Simacota',
     short_name: 'Ventanilla Simacota',
     description:
-      'Plataforma oficial de radicación ciudadana de la Alcaldía Municipal de Simacota, Santander',
+      'Sistema institucional de radicación, consulta y seguimiento de solicitudes ciudadanas.',
     start_url: '/',
     display: 'standalone',
-    background_color: '#0A0A0B',
-    theme_color: '#6366F1',
+    display_override: ['standalone', 'minimal-ui'],
+    background_color: '#ffffff',
+    theme_color:      '#14532d',
     lang: 'es',
+    scope: '/',
     icons: [
       {
-        src: '/og-image.png',
-        sizes: '1200x630',
+        src: '/icon-192x192.png',
+        sizes: '192x192',
         type: 'image/png',
         purpose: 'any',
+      },
+      {
+        src: '/icon-512x512.png',
+        sizes: '512x512',
+        type: 'image/png',
+        purpose: 'any',
+      },
+      {
+        src: '/maskable-icon-192x192.png',
+        sizes: '192x192',
+        type: 'image/png',
+        purpose: 'maskable',
+      },
+      {
+        src: '/maskable-icon-512x512.png',
+        sizes: '512x512',
+        type: 'image/png',
+        purpose: 'maskable',
       },
     ],
   };

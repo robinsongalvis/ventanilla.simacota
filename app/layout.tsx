@@ -1,33 +1,26 @@
-import type { Metadata } from 'next';
-import { DM_Sans, Manrope } from 'next/font/google';
+import type { Metadata, Viewport } from 'next';
 import './globals.css';
-import { SimiChat } from '@/app/components/ai/SimiChat';
 import { SimiProvider } from '@/lib/store/simiContext';
+import { SimiChatCondicional } from '@/app/components/SimiChatCondicional';
+import { PwaInstallPrompt } from '@/app/components/pwa/PwaInstallPrompt';
 
-// Body + UI text — DM Sans per Obsidian Kinetic spec
-const dmSans = DM_Sans({
-  variable: '--font-dm-sans',
-  subsets: ['latin'],
-  weight: ['400', '700'],
-  display: 'swap',
-});
-
-// Headlines — Manrope 700/800
-const manrope = Manrope({
-  variable: '--font-manrope',
-  subsets: ['latin'],
-  weight: ['700', '800'],
-  display: 'swap',
-});
+/* ── Base URL absoluto.
+      Prioridad: NEXT_PUBLIC_SITE_URL → VERCEL_URL → dominio institucional.
+      Esto es lo que hace que WhatsApp resuelva la imagen OG, porque
+      necesita acceder a https://<host>/og-image.png públicamente. */
+const SITE_URL_RAW =
+  process.env.NEXT_PUBLIC_SITE_URL
+  || (process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : null)
+  || 'https://ventanilla-simacota.vercel.app';
+const SITE_URL = SITE_URL_RAW.startsWith('http') ? SITE_URL_RAW : `https://${SITE_URL_RAW}`;
 
 export const metadata: Metadata = {
-  // ── Base URL — obligatorio para que los OG relativos funcionen ──
-  metadataBase: new URL('https://ventanilla.simacota.gov.co'),
+  metadataBase: new URL(SITE_URL),
 
   // ── Template de título: las rutas hijas heredan automáticamente ──
   title: {
-    default: 'Ventanilla Única Digital – Alcaldía de Simacota',
-    template: '%s | Ventanilla Única · Simacota',
+    default: 'Ventanilla Única Digital | Alcaldía Municipal de Simacota',
+    template: '%s | Alcaldía Municipal de Simacota',
   },
 
   // ── Descripción optimizada para snippet de Google (≤160 chars) ──
@@ -52,6 +45,23 @@ export const metadata: Metadata = {
   authors: [{ name: 'Alcaldía Municipal de Simacota' }],
   creator: 'Alcaldía Municipal de Simacota',
   publisher: 'Alcaldía Municipal de Simacota',
+  manifest: '/manifest.json',
+  icons: {
+    icon: [
+      { url: '/favicon.ico' },
+      { url: '/favicon-16x16.png', sizes: '16x16', type: 'image/png' },
+      { url: '/favicon-32x32.png', sizes: '32x32', type: 'image/png' },
+    ],
+    apple: [
+      { url: '/apple-touch-icon.png', sizes: '180x180', type: 'image/png' },
+    ],
+    shortcut: ['/favicon.ico'],
+  },
+  appleWebApp: {
+    capable: true,
+    title: 'Ventanilla Simacota',
+    statusBarStyle: 'black-translucent',
+  },
 
   // ── Canonical raíz ──────────────────────────────────────────────
   alternates: {
@@ -59,21 +69,24 @@ export const metadata: Metadata = {
   },
 
   // ── OpenGraph: WhatsApp, Facebook, LinkedIn ─────────────────────
+  //   URLs absolutas para que WhatsApp/Telegram/Slack resuelvan la
+  //   imagen previa sin ambigüedad.
   openGraph: {
     type: 'website',
     locale: 'es_CO',
-    url: '/',
+    url: SITE_URL,
     siteName: 'Ventanilla Única Digital – Simacota',
     title: 'Ventanilla Única Digital – Alcaldía de Simacota',
     description:
       'Radica tu solicitud ciudadana en segundos. Plataforma oficial con IA y trazabilidad total. Simacota, Santander, Colombia.',
     images: [
       {
-        url: '/og-image.png',
+        url: `${SITE_URL}/og-image.png`,
         width: 1200,
         height: 630,
         alt: 'Ventanilla Única Digital – Alcaldía de Simacota, Santander',
         type: 'image/png',
+        secureUrl: `${SITE_URL}/og-image.png`,
       },
     ],
   },
@@ -81,10 +94,11 @@ export const metadata: Metadata = {
   // ── Twitter / X Card ────────────────────────────────────────────
   twitter: {
     card: 'summary_large_image',
+    site: '@AlcaldiaSimacota',
     title: 'Ventanilla Única Digital – Alcaldía de Simacota',
     description:
       'Radica tu solicitud ciudadana en segundos. Plataforma oficial con IA y trazabilidad total.',
-    images: ['/og-image.png'],
+    images: [`${SITE_URL}/og-image.png`],
   },
 
   // ── Directivas de indexación ────────────────────────────────────
@@ -100,6 +114,10 @@ export const metadata: Metadata = {
   },
 };
 
+export const viewport: Viewport = {
+  themeColor: '#14532d',
+};
+
 export default function RootLayout({
   children,
 }: Readonly<{
@@ -108,15 +126,15 @@ export default function RootLayout({
   return (
     <html
       lang="es"
-      className={`${dmSans.variable} ${manrope.variable} h-full`}
+      className="h-full"
     >
-      <body className="min-h-full bg-[#0A0A0B] text-slate-100 antialiased">
+      <body className="min-h-full antialiased">
         <SimiProvider>
           {children}
-          <SimiChat />
+          <SimiChatCondicional />
+          <PwaInstallPrompt />
         </SimiProvider>
       </body>
     </html>
   );
 }
-

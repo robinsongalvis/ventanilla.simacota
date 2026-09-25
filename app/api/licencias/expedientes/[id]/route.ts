@@ -1,0 +1,285 @@
+/* ══════════════════════════════════════════════════════════════
+   GET /api/licencias/expedientes/[id]  — detalle: expediente + actuaciones
+   + documentos + definicionId + computos
+
+   Bloque "Integración UI y demo" / Bloque A·A2. Dos `orderBy` de un solo
+   campo sobre subcolecciones de UN padre — orden natural, sin índice
+   compuesto (ningún `where` combinado con el `orderBy`).
+
+   `documentos`: lista de documentos LÓGICOS con su `versionVigente` (1
+   query a `documentos`, NUNCA se toca `versiones` — INV-5 del contrato A1,
+   `lib/server/expedientes-documentos-tipos.ts`).
+
+   NO calcula completitud aquí: `evaluarCompletitud` es pura
+   (`lib/motor-expedientes/completitud.ts`) y la ejecuta la UI con
+   `documentos`/`aportes`/`contexto` + la Definición.
+
+   `computos` (Bloque "Términos y vigencias protectores", 10-ago-2026):
+   `{ terminoDual, vigencia?, plazoSubsanacion }`, TODO calculado EN
+   MEMORIA sobre `actuaciones`/`expediente` YA LEÍDOS arriba — CERO
+   lecturas nuevas a Firestore (R11). `borradorActoDesistimiento` viaja
+   junto (no dentro de `computos`: es un documento generado, no un
+   cómputo) — `null` salvo que `plazoSubsanacion.resultado === 'POR_ARCHIVAR'`.
+══════════════════════════════════════════════════════════════ */
+
+import { NextResponse } from 'next/server';
+import { getFirebaseAdminDb } from '@/lib/firebase-admin';
+import {
+  canOperateTenant,
+  InternalAuthError,
+  requireActiveInternalUser,
+} from '@/lib/server/internal-auth';
+import type { TenantId } from '@/src/types/radicado';
+import { SUBCOLECCION_DOCUMENTOS } from '@/lib/server/expedientes-documentos-tipos';
+import { DEFINICION_LICENCIA_CONSTRUCCION_PARCIAL } from '@/lib/motor-expedientes/definiciones/licencia-construccion-parcial';
+import {
+  evaluarPlazoSubsanacion,
+  evaluarRadicacionEnDebidaForma,
+  esErrorExpediente,
+  esRadicacionYaOcurrida,
+  generarBorradorActoDesistimiento,
+  PLAZO_DECISION_LICENCIA_DIAS_HABILES,
+  type ExpedienteLicenciaDoc,
+  type ActuacionLicenciaDoc,
+  type DocumentoParaAncla,
+} from '@/lib/server/expedientes-licencias';
+import { atLocalNoon, sumarDiasHabiles, diasRestantesHabiles } from '@/lib/tiempos-radicado';
+
+/** Ejecuta un cálculo de PRESENTACIÓN sin dejar que su fallo tumbe la lectura. */
+function intentar<T>(calculo: () => T): T | null {
+  try {
+    return calculo();
+  } catch (error) {
+    logError({ radicadoId: 'n/a', modulo: 'licencias/expedientes/[id]/vista-previa', error });
+    return null;
+  }
+}
+import { calcularVencimientoTermino, derivarEventosTermino } from '@/lib/motor-expedientes/termino';
+import { calcularVencimientoVigencia, esErrorVigencia } from '@/lib/motor-expedientes/vigencias';
+import { logError } from '@/lib/logger';
+import { resolverDestinatario } from '@/lib/motor-expedientes/destinatario-expediente';
+
+export const runtime = 'nodejs';
+
+interface RouteContext {
+  params: Promise<{ id: string }>;
+}
+
+function jsonError(error: unknown) {
+  if (error instanceof InternalAuthError) {
+    return NextResponse.json({ error: error.message }, { status: error.status });
+  }
+  return NextResponse.json({ error: 'No fue posible consultar el expediente.' }, { status: 500 });
+}
+
+export async function GET(request: Request, context: RouteContext): Promise<NextResponse> {
+  try {
+    const usuario = await requireActiveInternalUser();
+    const { id } = await context.params;
+
+    const db = getFirebaseAdminDb();
+    const expedienteRef = db.doc(`expedientes/${id}`);
+    const doc = await expedienteRef.get();
+    if (!doc.exists) {
+      return NextResponse.json({ error: 'Expediente no encontrado.' }, { status: 404 });
+    }
+    const expediente = doc.data() as Record<string, unknown>;
+
+    if (!canOperateTenant(usuario, expediente.tenantId as TenantId)) {
+      return NextResponse.json({ error: 'Tu rol no permite consultar este expediente.' }, { status: 403 });
+    }
+
+    const actuacionesSnap = await expedienteRef.collection('actuaciones').orderBy('fecha', 'asc').get();
+    const actuaciones = actuacionesSnap.docs.map((d) => d.data());
+
+    const documentosSnap = await expedienteRef.collection(SUBCOLECCION_DOCUMENTOS).get();
+    const documentos = documentosSnap.docs.map((d) => d.data());
+
+    // Bloque A·A4 (D2): proyección mínima del radicado de origen, si el
+    // expediente nació por handoff (`radicadoId` poblado). Solo id + fecha
+    // del vínculo — no se trae el radicado completo (N+1 evitado a
+    // propósito: la UI que necesite más detalle del radicado lo pide por
+    // su propia ruta).
+    let radicadoVinculado: { id: string; fecha: string } | null = null;
+    /* Los datos del radicado que hacen falta para saber A QUIÉN se le escribe.
+       Se toman de la MISMA lectura que ya se hacía para el vínculo: cero
+       consultas nuevas (R11). */
+    let contactoDelRadicado: Parameters<typeof resolverDestinatario>[0]['radicado'] = null;
+    const radicadoId = (expediente as { radicadoId?: string | null }).radicadoId;
+    if (radicadoId) {
+      const radicadoSnap = await db.doc(`ventanilla_radicados/${radicadoId}`).get();
+      const datos = radicadoSnap.exists
+        ? (radicadoSnap.data() as {
+            vinculoExpediente?: { fecha: string } | null;
+            esAnonimo?: boolean;
+            tipoPresentacion?: 'IDENTIFICADA' | 'ANONIMA' | 'RESERVADA';
+            solicitante?: { email?: string | null };
+          })
+        : null;
+      if (datos?.vinculoExpediente) {
+        radicadoVinculado = { id: radicadoId, fecha: datos.vinculoExpediente.fecha };
+      }
+      if (datos) {
+        contactoDelRadicado = {
+          esAnonimo: datos.esAnonimo,
+          tipoPresentacion: datos.tipoPresentacion,
+          solicitante: { email: datos.solicitante?.email ?? null },
+        };
+      }
+    }
+
+    // ── computos (Bloque "Términos y vigencias protectores") — TODO en
+    // memoria sobre `actuaciones`/`expediente` ya leídos arriba, CERO
+    // lecturas nuevas a Firestore (R11).
+    const actuacionesLicencia = actuaciones as unknown as ActuacionLicenciaDoc[];
+    const expedienteLicencia = expediente as unknown as ExpedienteLicenciaDoc;
+
+    const eventos = derivarEventosTermino(actuacionesLicencia);
+    /* UNA fecha y su artículo. Se sigue enviando bajo la clave `terminoDual`
+       para no romper a la pantalla en el mismo commit; el nombre del campo
+       persistido tampoco cambia (ver `TerminoUI`). */
+    const vencimientoTermino = calcularVencimientoTermino(eventos, PLAZO_DECISION_LICENCIA_DIAS_HABILES);
+    const terminoDual = {
+      fechaAlertaConservadora: vencimientoTermino.vencimiento?.toISOString() ?? null,
+      fundamento: vencimientoTermino.fundamento,
+      /* EL RELOJ DETENIDO, CON SUS NÚMEROS. Los calculaba el motor y los tiraba;
+         ahora llegan a la pantalla, que hasta hoy decía «detenido» sin poder
+         decir desde cuándo ni cuánto quedaba. */
+      relojDetenido: vencimientoTermino.relojDetenido,
+    };
+
+    const plazoSubsanacion = evaluarPlazoSubsanacion(actuacionesLicencia, new Date());
+    const borradorActoDesistimiento = generarBorradorActoDesistimiento(expedienteLicencia, plazoSubsanacion);
+
+    // `vigencia` es OMITIDA (no un error HTTP) si el expediente aún no
+    // tiene `actoFinal.fechaFirmeza` (no está cerrado) o si
+    // `calcularVencimientoVigencia` no puede resolver la regla (p. ej.
+    // CONSTRUCCION sin `modalidadConstruccion` — dato que HOY ningún
+    // expediente captura, ver JSDoc de `seleccionarReglaVigencia`): en
+    // ambos casos es un hueco honesto, no un fallo del cómputo.
+    let vigencia: ReturnType<typeof calcularVencimientoVigencia> | undefined;
+    const fechaFirmeza = expedienteLicencia.actoFinal?.fechaFirmeza;
+    if (fechaFirmeza) {
+      const resultado = calcularVencimientoVigencia({
+        fechaFirmeza,
+        subtipos: expedienteLicencia.subtipos ?? [],
+      });
+      if (!esErrorVigencia(resultado)) {
+        vigencia = resultado;
+      }
+    }
+
+    /* ── VISTA PREVIA DEL ACTO DE RADICAR ────────────────────────────────
+       Lo que la funcionaria tiene que ver ANTES de pulsar el acto que emite
+       identidad legal y arranca un plazo de 45 días hábiles:
+
+         · si procede, y si no, POR QUÉ — con la lista de lo que falta;
+         · QUÉ DÍA quedará anclado el término, y por qué documento;
+         · si esa fecha es un hecho registrado o una deducción;
+         · y el caso duro: si el término nacerá ya vencido.
+
+       Descubrir cualquiera de esas cosas DESPUÉS de pulsar sería el peor
+       mostrador posible: el número ya estaría emitido y el plazo corriendo.
+
+       Se calcula con la MISMA función pura que ejecuta el POST — no con una
+       réplica «de presentación». Si divergieran, la pantalla prometería una
+       cosa y el acto haría otra, que es exactamente la clase de defecto que
+       este módulo lleva una semana persiguiendo.
+
+       CERO lecturas nuevas: `actuaciones` y `documentos` ya se trajeron
+       arriba para otros fines. */
+    /* Un solo reloj para toda la vista previa: la fecha del ancla, la
+       proyección del vencimiento y el juicio de «nace vencido» tienen que
+       mirar el mismo instante, o pueden contradecirse entre sí. */
+    const ahora = new Date();
+    /* La previa es información, no la razón de esta ruta: si su cálculo falla,
+       el detalle del expediente debe seguir cargando. Se dice que no se pudo
+       evaluar —nunca se afirma que «no procede», que sería una conclusión que
+       nadie sacó— y el POST volverá a evaluarlo con su propia transacción. */
+    const evaluacion = intentar(() => evaluarRadicacionEnDebidaForma({
+      expediente: expediente as unknown as ExpedienteLicenciaDoc,
+      actuacionesPrevias: actuaciones as ActuacionLicenciaDoc[],
+      documentos: (documentos as DocumentoParaAncla[]).filter((d) => d?.creadoEn),
+      tenantEsperado: expediente.tenantId as TenantId,
+      ahora,
+    }));
+
+    const debidaForma = evaluacion === null
+      ? { procede: false, yaRadicada: false, motivo: 'No se pudo evaluar si la radicación procede. Abra el expediente de nuevo; si persiste, avise a soporte.' }
+      : esErrorExpediente(evaluacion)
+      ? { procede: false, motivo: evaluacion.mensaje, yaRadicada: false }
+      : esRadicacionYaOcurrida(evaluacion)
+        ? {
+            procede: false,
+            yaRadicada: true,
+            motivo: 'Este expediente ya está radicado en legal y debida forma.',
+            numeroExpediente: evaluacion.numeroExpediente,
+            desdeCuandoCorreElPlazo: evaluacion.anclaIso,
+          }
+        : {
+            procede: true,
+            yaRadicada: false,
+            /* El día que la funcionaria confirma. Viaja de vuelta en el POST
+               como `anclaEsperada`: si la evidencia cambia entre que mira y
+               pulsa, el acto se rechaza en vez de afirmar una fecha que ella
+               no vio. */
+            anclaPropuesta: evaluacion.anclaDiaCivil,
+            anclaIso: evaluacion.anclaIso,
+            baseDelAncla: evaluacion.baseDelAncla,
+            requisitoQueFijaElAncla: evaluacion.evidencia.requisitoId,
+            documentoQueFijaElAncla: evaluacion.evidencia.documentoId,
+            requisitosAplicables: evaluacion.completitud.aplicables,
+            /* EL PREFIJO SUGERIDO PARA TRANSCRIBIR, calculado AQUÍ y no en el
+               navegador. La funcionaria copia del libro de papel, y averiguar
+               el formato le cuesta más tiempo que escribir el número; pero el
+               año y el mes NO pueden salir del reloj del equipo: un portátil
+               con la fecha corrida propondría un mes que no existe en el libro.
+               El servidor sabe qué día es, en hora de Bogotá.
+
+               ES UNA SUGERENCIA DE FORMATO, NO EL NÚMERO: el consecutivo lo
+               escribe ella, y el mes queda editable porque un radicado puede
+               ser de un mes anterior. */
+            prefijoRadicadoSugerido: `1-110-${new Intl.DateTimeFormat('en-CA', {
+              timeZone: 'America/Bogota', year: 'numeric', month: '2-digit',
+            }).format(ahora).replace('-', '')}-`,
+            /* El caso duro, dicho antes y no después: si el último documento
+               entró hace más de 45 días hábiles, el término nace vencido. El
+               acto procede igual —es un hecho verdadero— pero nadie debería
+               enterarse al pulsar. */
+            venceraEl: sumarDiasHabiles(
+              atLocalNoon(evaluacion.anclaIso),
+              PLAZO_DECISION_LICENCIA_DIAS_HABILES,
+            ).toISOString(),
+            naceVencido:
+              diasRestantesHabiles(
+                sumarDiasHabiles(atLocalNoon(evaluacion.anclaIso), PLAZO_DECISION_LICENCIA_DIAS_HABILES).toISOString(),
+              ) < 0,
+          };
+
+    return NextResponse.json({
+      ok: true,
+      expediente,
+      actuaciones,
+      documentos,
+      /* ── A QUIÉN SE LE ESCRIBE, RESUELTO EN EL SERVIDOR ──────────────
+         Una fuente, dos salidas: el mismo `resolverDestinatario` que decide si
+         sale un correo decide lo que la pantalla advierte. Si la pantalla lo
+         dedujera por su cuenta, tendríamos dos criterios que hoy coinciden y
+         mañana no — el patrón que este proyecto lleva un mes corrigiendo. */
+      destinatario: resolverDestinatario({
+        radicado: contactoDelRadicado,
+        capturaPropia: (expediente as { solicitanteContacto?: Parameters<typeof resolverDestinatario>[0]['capturaPropia'] }).solicitanteContacto,
+      }),
+      radicadoVinculado,
+      // Placeholder: única Definición sembrada hoy (Bloque A·A2). Cuando
+      // exista resolución real por `expediente.tramiteId` (persistencia de
+      // Fase 1), este campo se resuelve dinámicamente en vez de fijo.
+      definicionId: DEFINICION_LICENCIA_CONSTRUCCION_PARCIAL.id,
+      computos: { terminoDual, vigencia, plazoSubsanacion, debidaForma },
+      borradorActoDesistimiento,
+    });
+  } catch (error) {
+    logError({ radicadoId: 'n/a', modulo: 'licencias/expedientes/[id]/GET', error });
+    return jsonError(error);
+  }
+}

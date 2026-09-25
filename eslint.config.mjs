@@ -1,20 +1,32 @@
-import { FlatCompat } from "@eslint/eslintrc";
-import { defineConfig, globalIgnores } from "eslint/config";
-
-const compat = new FlatCompat({
-  baseDirectory: import.meta.dirname,
-});
+import nextVitals from 'eslint-config-next/core-web-vitals';
+import nextTypeScript from 'eslint-config-next/typescript';
+import { defineConfig, globalIgnores } from 'eslint/config';
 
 const eslintConfig = defineConfig([
-  ...compat.extends("next/core-web-vitals", "next/typescript"),
-  // Override default ignores of eslint-config-next.
+  ...nextVitals,
+  ...nextTypeScript,
   globalIgnores([
-    // Default ignores of eslint-config-next:
-    ".next/**",
-    "out/**",
-    "build/**",
-    "next-env.d.ts",
+    '.next/**',
+    'out/**',
+    'build/**',
+    '.claude/**',
+    'next-env.d.ts',
   ]),
+  {
+    rules: {
+      'react-hooks/immutability': 'off',
+      'react-hooks/refs': 'off',
+      'react-hooks/set-state-in-effect': 'off',
+    },
+  },
+  {
+    // Los fixtures de Playwright reciben un parámetro `use` que la regla de
+    // hooks de React confunde con un hook. En `e2e/` no hay React.
+    files: ['e2e/**'],
+    rules: {
+      'react-hooks/rules-of-hooks': 'off',
+    },
+  },
 ]);
 
 export default eslintConfig;

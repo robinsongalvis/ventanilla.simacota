@@ -1,0 +1,187 @@
+{
+  "indexes": [
+    {
+      "collectionGroup": "ventanilla_radicados",
+      "queryScope": "COLLECTION",
+      "fields": [
+        {
+          "fieldPath": "clasificacion.oficinaDestino",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "control.fechaRadicado",
+          "order": "DESCENDING"
+        }
+      ]
+    },
+    {
+      "collectionGroup": "ventanilla_radicados",
+      "queryScope": "COLLECTION",
+      "fields": [
+        {
+          "fieldPath": "estadoActual",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "control.fechaRadicado",
+          "order": "DESCENDING"
+        }
+      ]
+    },
+    {
+      "collectionGroup": "ventanilla_radicados",
+      "queryScope": "COLLECTION",
+      "fields": [
+        {
+          "fieldPath": "termino.tipoSolicitudId",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "control.fechaRadicado",
+          "order": "DESCENDING"
+        }
+      ]
+    },
+    {
+      "collectionGroup": "ventanilla_radicados",
+      "queryScope": "COLLECTION",
+      "fields": [
+        {
+          "fieldPath": "cumplioTermino",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "control.fechaRadicado",
+          "order": "DESCENDING"
+        }
+      ]
+    },
+    {
+      "collectionGroup": "users",
+      "queryScope": "COLLECTION",
+      "fields": [
+        {
+          "fieldPath": "tenantId",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "activo",
+          "order": "ASCENDING"
+        }
+      ]
+    },
+    {
+      "collectionGroup": "seguridad_descargas_auditoria",
+      "queryScope": "COLLECTION",
+      "fields": [
+        {
+          "fieldPath": "radicadoId",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "fecha",
+          "order": "DESCENDING"
+        }
+      ]
+    },
+    {
+      "collectionGroup": "ventanilla_radicados",
+      "queryScope": "COLLECTION",
+      "fields": [
+        {
+          "fieldPath": "control.origen",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "control.fechaRadicado",
+          "order": "DESCENDING"
+        }
+      ]
+    },
+    {
+      "collectionGroup": "ventanilla_radicados",
+      "queryScope": "COLLECTION",
+      "fields": [
+        {
+          "fieldPath": "estadoActual",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "termino.fechaVencimiento",
+          "order": "ASCENDING"
+        }
+      ]
+    },
+    {
+      "collectionGroup": "simi_rag_consultas",
+      "queryScope": "COLLECTION",
+      "fields": [
+        {
+          "fieldPath": "tenantId",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "createdAt",
+          "order": "DESCENDING"
+        }
+      ]
+    },
+    {
+      "collectionGroup": "plantillas_respuesta",
+      "queryScope": "COLLECTION",
+      "fields": [
+        {
+          "fieldPath": "tenantId",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "estado",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "nombre",
+          "order": "ASCENDING"
+        }
+      ]
+    },
+    {
+      "collectionGroup": "expedientes",
+      "queryScope": "COLLECTION",
+      "fields": [
+        {
+          "fieldPath": "tenantId",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "creadoEn",
+          "order": "DESCENDING"
+        }
+      ]
+    },
+    {
+      "collectionGroup": "vigilancia_termino_corridas",
+      "queryScope": "COLLECTION",
+      "fields": [
+        {
+          "fieldPath": "__name__",
+          "order": "DESCENDING"
+        }
+      ]
+    },
+    {
+      "collectionGroup": "radicados",
+      "queryScope": "COLLECTION",
+      "fields": [
+        {
+          "fieldPath": "clasificacionIA.oficinaDestino",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "fechaCreacion",
+          "order": "DESCENDING"
+        }
+      ]
+    }
+  ],
+  "fieldOverrides": []
+}

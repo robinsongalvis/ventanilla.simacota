@@ -1,0 +1,31 @@
+{
+  "_documentacion": {
+    "proposito": "Allowlist GOBERNADA del gate de auditoría (ADR-0028). La consume scripts/ci/audit-gate.mjs. Arranca VACÍA: el Hito 1 (#147) remedió las 5 advisories vigentes; NO se allowlista deuda existente. Solo se añade una entrada cuando una advisory high/critical proviene de una transitiva SIN fix upstream y NO es alcanzable, para romper el hard-deadlock del branch protection sin desactivar el gate.",
+    "invariantes_de_seguridad": [
+      "El gate FALLA ante cualquier advisory high/critical que NO esté aquí por su id EXACTO.",
+      "Cada entrada EXIGE los 7 campos de 'esquema_entrada'. Una entrada mal formada FALLA el gate.",
+      "Una entrada VENCIDA (caducidad < hoy) FALLA el gate: fuerza a revisarla; ninguna excepción queda abierta para siempre.",
+      "Una entrada cubre SOLO el advisory-id que declara. Una advisory NUEVA sobre el mismo paquete NO queda cubierta.",
+      "Toda alta a esta allowlist exige visto bueno del rol de Seguridad (revisión cruzada, principio 5)."
+    ],
+    "esquema_entrada": {
+      "advisory": "string — id de la advisory (GHSA-xxxx-xxxx-xxxx o CVE-AAAA-NNNN). Debe coincidir exactamente con el que reporta 'npm audit --json' (url/source).",
+      "paquete": "string — paquete afectado (documental; la cobertura es por advisory-id, no por paquete).",
+      "justificacion": "string — por qué se excepciona en vez de remediar (p.ej. sin fix upstream para la versión fijada).",
+      "alcanzabilidad": "string — evaluación de si el código del proyecto alcanza la ruta vulnerable; base para aceptar el riesgo temporalmente.",
+      "fechaAlta": "string YYYY-MM-DD — fecha de alta de la excepción.",
+      "caducidad": "string YYYY-MM-DD — fecha de caducidad, MÁXIMO 90 días desde fechaAlta. Al vencer, el gate falla hasta renovar o retirar.",
+      "responsable": "string — persona/rol que asume la excepción."
+    },
+    "ejemplo_entrada": {
+      "advisory": "GHSA-xxxx-xxxx-xxxx",
+      "paquete": "ejemplo-transitiva",
+      "justificacion": "Sin fix upstream para la versión fijada por el lockfile; bump mayor rompe API. Diferido.",
+      "alcanzabilidad": "No alcanzable: la ruta vulnerable (parseo de X) no se ejercita desde el código del proyecto.",
+      "fechaAlta": "2026-08-05",
+      "caducidad": "2026-11-03",
+      "responsable": "seguridad — Nombre Apellido"
+    }
+  },
+  "exceptions": []
+}

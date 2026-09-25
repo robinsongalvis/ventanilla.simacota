@@ -1,0 +1,71 @@
+import { readFileSync } from 'fs';
+import { describe, expect, it } from 'vitest';
+
+const dashboard = readFileSync('app/interno/dashboard/page.tsx', 'utf8');
+const indicadores = readFileSync('lib/hooks/useIndicadoresModo.ts', 'utf8');
+const store = readFileSync('lib/store/ventanillaStore.tsx', 'utf8');
+
+describe('Dashboard — vista amplia de radicados', () => {
+  it('por defecto los paneles aparecen normales', () => {
+    expect(indicadores).toContain('useState(false)');
+    expect(indicadores).toContain("return v === 'compacto' ? 'compacto' : 'normal'");
+  });
+
+  it('ofrece un control general para minimizar o restaurar paneles operativos', () => {
+    expect(dashboard).toContain('Minimizar paneles');
+    expect(dashboard).toContain('Mostrar paneles');
+    expect(dashboard).toContain('Minimizar paneles operativos y ampliar la lista de radicados');
+    expect(dashboard).toContain('Mostrar Bandeja Operativa y Siguiente Atención');
+  });
+
+  it('permite minimizar y mostrar cada tarjeta individualmente', () => {
+    expect(dashboard).toContain('Minimizar paneles');
+    expect(dashboard).toContain('Mostrar paneles');
+    expect(dashboard).toContain('onToggleCompacto={toggleIndicadoresModo}');
+    expect(dashboard).toContain('indicadoresCompactos');
+  });
+
+  it('mantiene la alerta y una representación adaptativa de los radicados', () => {
+    expect(dashboard).toContain('<PriorityBanner');
+    expect(dashboard).toContain('<TarjetasMIPG');
+    expect(dashboard).toContain('<TablaRadicados');
+    expect(dashboard).toContain('hidden xl:block');
+    expect(dashboard).toContain('xl:hidden');
+  });
+
+  it('conserva la preferencia de ambos paneles tras recargar', () => {
+    expect(dashboard).toContain('const indicadoresCompactos = indicadoresModo === \'compacto\';');
+    expect(dashboard).toContain('onToggleCompacto={toggleIndicadoresModo}');
+    expect(indicadores).toContain("dashboardPanelBandejaMinimizada");
+    expect(indicadores).toContain("dashboardPanelSiguienteMinimizada");
+    expect(indicadores).toContain('window.localStorage.setItem(STORAGE_BANDEJA, String(bandeja))');
+    expect(indicadores).toContain('window.localStorage.setItem(STORAGE_SIGUIENTE, String(siguiente))');
+  });
+
+  it('convierte Correos fallidos en un acceso al filtro de radicados afectados', () => {
+    expect(store).toContain("| 'CORREOS_FALLIDOS'");
+    expect(dashboard).toContain("filtro === 'CORREOS_FALLIDOS'");
+    expect(dashboard).toContain('onClick={onVerCorreosFallidos}');
+    expect(dashboard).toContain("dispatch({ type: 'SET_FILTRO_MIPG', filtro: 'CORREOS_FALLIDOS' })");
+    expect(dashboard).toContain("dispatch({ type: 'SET_BUSQUEDA', busqueda: '' })");
+  });
+
+  it('mantiene Ver radicado y la selección existentes', () => {
+    expect(dashboard).toContain('onVerRadicado={(r) => abrirRadicadoPorId(r.radicadoId)}');
+    expect(dashboard).toContain("dispatch({ type: 'SELECCIONAR_RADICADO', radicado })");
+    expect(dashboard).toContain('radicadoSeleccionadoId={radicadoSeleccionado?.radicadoId ?? null}');
+  });
+
+  it('mantiene Semáforo PQRSD y métricas visibles', () => {
+    expect(dashboard).toContain('{esAdmin && (');
+    expect(dashboard).toContain('<PqrsdDeadlineDashboard');
+    expect(dashboard).toContain('<TarjetasMIPG');
+  });
+
+  it('evita forzar la tabla del tablero a un ancho mínimo horizontal', () => {
+    expect(dashboard).toContain('table-fixed');
+    expect(dashboard).not.toContain('md:min-w-[920px]');
+    expect(dashboard).toContain('min-w-0');
+    expect(dashboard).toContain('break-words');
+  });
+});

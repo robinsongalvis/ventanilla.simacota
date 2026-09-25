@@ -1,0 +1,15 @@
+# Artefactos GENERADOS a partir del snapshot (contienen los mismos datos
+# personales que el snapshot origen — ver README.md, nota R8). Reproducibles
+# en cualquier momento con `planificarImportacion`/`generarReporteDryRun`;
+# no aportan nada nuevo que versionar.
+*.generado.json
+*.generado.md
+
+# Versión COMPLETA del snapshot, CON datos personales (nombres de
+# solicitantes, dirección, barrio/vereda, matrícula — Ley 1581/2012). JAMÁS
+# entra a la historia de git, ni siquiera en un repo privado: la historia es
+# permanente aunque el archivo se borre después. Vive SOLO en máquinas
+# autorizadas (la del propietario) como `consecutivo-licencias-snapshot.local.json`.
+# El archivo que SÍ se versiona es el `.sanitizado.json` hermano (sin PII,
+# misma reconciliación 202/0/202/2 — ver README.md).
+*.local.json

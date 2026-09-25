@@ -1,0 +1,372 @@
+'use client';
+
+import { useEffect, useState } from 'react';
+import { useRouter } from 'next/navigation';
+import type { ExpedienteLicenciaDoc } from '@/lib/server/expedientes-licencias';
+import { SelectorSubtiposNormativos } from './SelectorSubtiposNormativos';
+import { SelectorModalidadesConstruccion } from './SelectorModalidadesConstruccion';
+import { exigeModalidadConstruccion } from '@/lib/motor-expedientes/modalidad-construccion';
+import './licencias-tema.css';
+
+/* ══════════════════════════════════════════════════════════════
+   Formulario "Recibir solicitud" — bloque "Integración UI y demo".
+
+   El verbo dice lo que la acción HACE. Hasta el 26-ago-2026 este modal decía
+   «Radicar solicitud»: crea un expediente en PRESENTADA y escribe una actuación
+   `apertura-expediente`, que por el ADR-0033 es un acto ANTERIOR y distinto de
+   la radicación en legal y debida forma. La funcionaria no puede leer en el
+   botón que está haciendo algo que no está haciendo.
+
+   Envía a `POST /api/licencias/expedientes`. El servidor SIEMPRE crea un
+   expediente de PRUEBA (`esPrueba: true`, candado R10) — este formulario
+   no expone ninguna forma de pedir lo contrario, ni finge que el número
+   resultante es un consecutivo legal.
+
+   Mismo patrón visual que el resto de modales del panel (`RegistroExpres
+   Modal`, `app/interno/dashboard/components/`): overlay + card, `role=
+   dialog`, error del servidor mostrado literal en `role=alert`.
+
+   REDISEÑO VISUAL (mockup de Figma aprobado por el propietario, 31-ago-2026).
+   Presentación pura: mismos datos, mismos nombres accesibles, cero cambios
+   de validación. Usa `./licencias-tema.css` (clase `.tema-licencias`,
+   aplicada en el `<div role="dialog">` de más abajo) en vez de hex sueltos.
+   El campo celular deja de vivir dentro de la tarjeta de contacto —pasa a
+   ser un campo suelto con su propio estilo— pero el correo y la declaración
+   "no tiene correo" NO se tocan (el encargo solo hablaba del celular).
+══════════════════════════════════════════════════════════════ */
+
+export interface RadicarSolicitudModalProps {
+  onCerrar: () => void;
+  /** Se invoca en cuanto el servidor confirma la creación — el caller decide si refresca su lista en segundo plano; el modal sigue abierto mostrando la confirmación. */
+  onCreado?: (expediente: ExpedienteLicenciaDoc) => void;
+}
+
+export function RadicarSolicitudModal({ onCerrar, onCreado }: RadicarSolicitudModalProps) {
+  const router = useRouter();
+
+  const [solicitanteNombre, setSolicitanteNombre] = useState('');
+  const [solicitanteDocumento, setSolicitanteDocumento] = useState('');
+  /* ── EL CONTACTO, QUE NO EXISTÍA ──────────────────────────────────────
+     Este formulario no pedía correo ni celular, y un expediente creado por
+     aquí NO tiene radicado del que heredarlos: era un ciudadano al que nunca
+     podríamos escribirle. Todo el sistema de avisos —acuse, aviso de acta,
+     hitos— se construyó sobre un dato que nadie recogía.
+
+     Se recoge aquí porque este es el ÚNICO momento en que se puede: el
+     ciudadano está delante. Después ya no está. */
+  const [correo, setCorreo] = useState('');
+  const [celular, setCelular] = useState('');
+  const [sinCorreo, setSinCorreo] = useState(false);
+  const [subtipos, setSubtipos] = useState<string[]>([]);
+  const [errorSubtipos, setErrorSubtipos] = useState<string | null>(null);
+  const [modalidades, setModalidades] = useState<string[]>([]);
+  const [errorModalidades, setErrorModalidades] = useState<string | null>(null);
+
+
+  const [guardando, setGuardando] = useState(false);
+  const [errorServidor, setErrorServidor] = useState<string | null>(null);
+  const [creado, setCreado] = useState<ExpedienteLicenciaDoc | null>(null);
+
+  useEffect(() => {
+    function onKeyDown(e: KeyboardEvent) {
+      if (e.key === 'Escape') onCerrar();
+    }
+    window.addEventListener('keydown', onKeyDown);
+    return () => window.removeEventListener('keydown', onKeyDown);
+  }, [onCerrar]);
+
+  function alternarSubtipo(codigo: string) {
+    setSubtipos((prev) => (prev.includes(codigo) ? prev.filter((c) => c !== codigo) : [...prev, codigo]));
+  }
+
+  function alternarModalidad(codigo: string) {
+    setModalidades((prev) => (prev.includes(codigo) ? prev.filter((c) => c !== codigo) : [...prev, codigo]));
+  }
+
+
+  async function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
+    e.preventDefault();
+    if (subtipos.length === 0) {
+      setErrorSubtipos('Selecciona al menos un subtipo (figura normativa).');
+      return;
+    }
+    setErrorSubtipos(null);
+
+    /* Si la figura la exige, la modalidad es OBLIGATORIA en la pantalla —aunque
+       el servidor no la exija, porque tiene que poder leer los expedientes
+       viejos que nacieron sin ella. Quien crea uno nuevo, la captura. */
+    if (exigeModalidadConstruccion(subtipos) && modalidades.length === 0) {
+      setErrorModalidades('Indica al menos una modalidad de construcción (art. 2.2.6.1.1.7).');
+      return;
+    }
+    setErrorModalidades(null);
+    setErrorServidor(null);
+    setGuardando(true);
+    try {
+      const res = await fetch('/api/licencias/expedientes', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify({
+          solicitanteNombre,
+          solicitanteDocumento,
+          subtipos,
+          // Solo viaja si la figura la admite: el servidor rechaza una
+          // modalidad descolgada de su figura.
+          ...(exigeModalidadConstruccion(subtipos) ? { modalidadesConstruccion: modalidades } : {}),
+          /* El servidor rechaza el silencio: o correo, o la declaración. Aquí
+             se manda lo que la funcionaria decidió, sin normalizar nada. */
+          contacto: {
+            ...(sinCorreo ? { datosNoAportados: { correo: true } } : { correo: correo.trim() }),
+            ...(celular.trim() ? { celular: celular.trim() } : {}),
+          },
+        }),
+      });
+      const body = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        setErrorServidor(body.error ?? 'No fue posible radicar la solicitud.');
+        return;
+      }
+      setCreado(body.expediente as ExpedienteLicenciaDoc);
+      onCreado?.(body.expediente as ExpedienteLicenciaDoc);
+    } catch {
+      setErrorServidor('Error de red al radicar la solicitud.');
+    } finally {
+      setGuardando(false);
+    }
+  }
+
+  const labelCls = 'mb-1 block text-[10px] font-bold uppercase tracking-widest';
+  const labelStyle = { color: '#667085' };
+
+  return (
+    <div
+      className="fixed inset-0 z-50 flex items-center justify-center px-3 py-3 tema-licencias"
+      role="dialog"
+      aria-modal="true"
+      aria-label="Recibir solicitud de licencia"
+    >
+      <button type="button" aria-label="Cerrar" onClick={onCerrar} className="absolute inset-0 bg-black/55" />
+
+      <div
+        className="relative w-full max-w-2xl shadow-2xl overflow-hidden flex flex-col"
+        style={{
+          background: 'var(--superficie)',
+          border: '1px solid var(--borde)',
+          borderRadius: 'var(--radio-modal)',
+          maxHeight: 'calc(100dvh - 24px)',
+        }}
+      >
+        <header className="px-5 py-4" style={{ borderBottom: '1px solid var(--borde)' }}>
+          <p
+            className="text-[11px] font-semibold uppercase"
+            style={{ color: 'var(--dorado)', letterSpacing: '0.08em' }}
+          >
+            Secretaría de Planeación · Licencias Urbanísticas
+          </p>
+          <h2 className="text-[26px] font-semibold leading-tight" style={{ color: 'var(--verde-institucional)' }}>
+            Recibir solicitud
+          </h2>
+          <div
+            className="mt-3"
+            style={{
+              background: 'var(--ambar-fondo)',
+              border: '1px solid var(--ambar-borde)',
+              borderRadius: '8px',
+              padding: '10px 14px',
+            }}
+          >
+            <p className="text-[12.5px] leading-snug" style={{ color: 'var(--ambar-texto)' }}>
+              <span className="font-semibold">Modo demostración (esPrueba)</span>
+              {' — la emisión con consecutivo legal está bloqueada hasta autorizar la siembra (R10).'}
+            </p>
+          </div>
+        </header>
+
+        {creado ? (
+          <div className="flex flex-col items-center gap-4 px-6 py-10 text-center">
+            <p className="text-xs font-bold uppercase tracking-widest" style={{ color: 'var(--color-success-text)' }}>
+              Expediente creado
+            </p>
+            <p className="text-2xl font-black font-mono" style={{ color: '#12261A' }}>
+              {creado.numeroExpediente?.numero ?? creado.id}
+            </p>
+            <p className="text-xs max-w-sm" style={{ color: '#667085' }}>
+              Número de demostración (esPrueba) — no es un consecutivo legal. Puedes verlo en el detalle o volver a la bandeja.
+            </p>
+            <div className="flex gap-2">
+              <button
+                type="button"
+                onClick={onCerrar}
+                className="px-4 py-2.5 rounded-xl text-sm font-bold"
+                style={{ border: '1px solid #D9E2D9', color: '#475569' }}
+              >
+                Volver a la bandeja
+              </button>
+              <button
+                type="button"
+                onClick={() => router.push(`/interno/licencias/${creado.id}`)}
+                className="px-5 py-2.5 rounded-xl text-sm font-bold text-white"
+                style={{ background: '#14532D' }}
+              >
+                Ver expediente →
+              </button>
+            </div>
+          </div>
+        ) : (
+          <form onSubmit={(e) => { void handleSubmit(e); }} className="flex-1 min-h-0 overflow-y-auto px-5 py-4 space-y-4">
+            <div className="grid gap-3 grid-cols-1 md:grid-cols-2">
+              <label>
+                <span className={labelCls} style={labelStyle}>Nombre del solicitante</span>
+                <input
+                  type="text"
+                  value={solicitanteNombre}
+                  onChange={(e) => setSolicitanteNombre(e.target.value)}
+                  required
+                  className="input-internal"
+                  placeholder="Carlos Alberto Rojas Mantilla"
+                />
+              </label>
+              <label>
+                <span className={labelCls} style={labelStyle}>Documento del solicitante</span>
+                <input
+                  type="text"
+                  value={solicitanteDocumento}
+                  onChange={(e) => setSolicitanteDocumento(e.target.value)}
+                  required
+                  className="input-internal"
+                  placeholder="13456789"
+                />
+              </label>
+            </div>
+
+            {/* ── CÓMO SE LE AVISA AL CIUDADANO ──────────────────────────
+                No es un campo más: de esto depende que reciba el acuse, el
+                aviso del acta y los hitos. Por eso lleva su propio bloque y su
+                propia explicación, en vez de perderse entre nombre y
+                documento. */}
+            <div
+              className="rounded-xl p-4 flex flex-col gap-3"
+              style={{ background: 'var(--bg-surface-2)', border: '1px solid var(--color-border)' }}
+            >
+              <div>
+                <p className="text-sm font-bold" style={{ color: 'var(--text-primary)' }}>
+                  ¿Cómo se le avisa al ciudadano?
+                </p>
+                <p className="text-xs mt-0.5" style={{ color: 'var(--text-secondary)' }}>
+                  Con el correo recibirá el acuse, el aviso si hay observaciones y los avisos del
+                  trámite. Sin él, habrá que citarlo por otro medio.
+                </p>
+              </div>
+
+              <label>
+                <span className={labelCls} style={labelStyle}>Correo electrónico</span>
+                <input
+                  type="email"
+                  value={correo}
+                  onChange={(e) => setCorreo(e.target.value)}
+                  disabled={sinCorreo}
+                  required={!sinCorreo}
+                  className="input-internal"
+                  placeholder="nombre@ejemplo.com"
+                />
+              </label>
+
+              {/* LA AUSENCIA SE DECLARA, NO SE CALLA. Un vacío en silencio y un
+                  «no tiene» son hechos distintos: el primero es un descuido que
+                  hay que corregir, el segundo una constancia del expediente. */}
+              <label className="flex items-start gap-2.5 cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={sinCorreo}
+                  onChange={(e) => { setSinCorreo(e.target.checked); if (e.target.checked) setCorreo(''); }}
+                  className="mt-0.5 h-4 w-4 shrink-0"
+                />
+                <span className="text-sm" style={{ color: 'var(--text-primary)' }}>
+                  El solicitante manifiesta no tener correo electrónico
+                  <span className="block text-xs" style={{ color: 'var(--text-secondary)' }}>
+                    Queda escrito en el expediente. No recibirá avisos automáticos.
+                  </span>
+                </span>
+              </label>
+            </div>
+
+            {/* CELULAR, FUERA DE LA TARJETA DE CONTACTO (sección 2 del rediseño,
+                encargo del propietario 31-ago-2026) — la tarjeta grande de arriba
+                queda solo para correo, que es el canal con avisos activos hoy. */}
+            <label className="block">
+              <span
+                className="mb-1 block text-[11px] font-semibold uppercase"
+                style={{ color: 'var(--texto-suave)', letterSpacing: '0.06em' }}
+              >
+                Celular (opcional)
+              </span>
+              <input
+                type="tel"
+                value={celular}
+                onChange={(e) => setCelular(e.target.value)}
+                className="w-full text-[15px] font-medium outline-none"
+                style={{
+                  height: '48px',
+                  padding: '0 14px',
+                  border: '1.5px solid var(--verde-institucional)',
+                  borderRadius: 'var(--radio-control)',
+                  color: 'var(--texto)',
+                  background: 'var(--superficie)',
+                }}
+                placeholder="300 123 4567"
+              />
+              <span className="block text-xs mt-1" style={{ color: 'var(--texto-suave)' }}>
+                Se guarda desde ya · los avisos por WhatsApp o SMS llegarán cuando se activen.
+              </span>
+            </label>
+
+            <SelectorSubtiposNormativos seleccionados={subtipos} onAlternar={alternarSubtipo} error={errorSubtipos} />
+
+            <SelectorModalidadesConstruccion
+              subtipos={subtipos}
+              seleccionadas={modalidades}
+              onAlternar={alternarModalidad}
+              error={errorModalidades}
+            />
+
+            {errorServidor && (
+              <p role="alert" className="rounded-lg px-3 py-2 text-xs"
+                 style={{ background: '#FEF2F2', border: '1px solid #FECACA', color: '#991B1B' }}>
+                {errorServidor}
+              </p>
+            )}
+
+            <footer
+              className="flex items-center justify-end gap-2 mt-1 pt-3"
+              style={{ borderTop: '1px solid var(--borde)' }}
+            >
+              <button
+                type="button"
+                onClick={onCerrar}
+                className="text-sm font-medium focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--verde-institucional)]"
+                style={{
+                  padding: '12px 22px',
+                  borderRadius: 'var(--radio-control)',
+                  border: '1px solid var(--borde)',
+                  background: 'var(--superficie)',
+                  color: 'var(--texto)',
+                }}
+              >
+                Cancelar
+              </button>
+              <button
+                type="submit"
+                disabled={guardando}
+                className="text-sm font-semibold text-white disabled:opacity-60 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--verde-institucional)]"
+                style={{ padding: '12px 22px', borderRadius: 'var(--radio-control)', background: 'var(--verde-institucional)' }}
+              >
+                {guardando ? 'Recibiendo…' : 'Recibir solicitud'}
+              </button>
+            </footer>
+          </form>
+        )}
+      </div>
+    </div>
+  );
+}

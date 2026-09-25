@@ -7,12 +7,13 @@
  */
 
 /* ══════════════════════════════════════════════════════════════
-   CONTRATO DE EXTRACCIÓN (4 campos del formulario público)
+   CONTRATO DE EXTRACCIÓN (7 campos — Vision AI v2.1)
 ══════════════════════════════════════════════════════════════ */
 
 /**
  * Datos extraídos de un documento por Vision AI.
- * Mapeados 1:1 con los campos del formulario público de radicación.
+ * Los 4 primeros campos mapean 1:1 con el formulario público de radicación.
+ * Los 3 últimos son metadatos de enrutamiento que se muestran en el chat.
  *
  * `null` = campo no encontrado en el documento (no confundir con cadena vacía).
  */
@@ -25,6 +26,12 @@ export interface DatosExtraidos {
   telefono: string | null;
   /** Descripción o asunto de la solicitud inferido del documento */
   descripcion: string | null;
+  /** Tipo de documento detectado (ej. "Carta formal", "Cédula de Ciudadanía") */
+  tipo_documento: string | null;
+  /** Número de cédula, NIT o pasaporte — solo dígitos */
+  documento_identidad: string | null;
+  /** Dependencia sugerida según el contenido del documento */
+  dependencia_sugerida: string | null;
 }
 
 /* ══════════════════════════════════════════════════════════════
@@ -98,12 +105,15 @@ export interface ScanDocFormData {
 ══════════════════════════════════════════════════════════════ */
 
 /**
- * Estructura del JSON que Gemini debe devolver con responseMimeType="application/json".
- * Coincide con DatosExtraidos — es el esquema que se fuerza mediante responseSchema.
+ * Estructura del JSON que Gemini devuelve con responseMimeType="application/json".
+ * Usa los nombres exactos del prompt v2.1 — normalizarExtraccion() los mapea a DatosExtraidos.
  */
 export interface GeminiExtraccionSchema {
-  nombre: string | null;
-  email: string | null;
-  telefono: string | null;
-  descripcion: string | null;
+  tipo_documento_adjunto: string | null;
+  nombre_completo: string | null;
+  documento_identidad: string | null;
+  telefono_contacto: string | null;
+  correo_electronico: string | null;
+  asunto_resumido: string | null;
+  dependencia_sugerida: string | null;
 }

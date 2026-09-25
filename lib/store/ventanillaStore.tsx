@@ -20,21 +20,31 @@ export type FiltroMIPG =
   | 'RADICADAS'
   | 'PRIORIDAD_MIPG'
   | 'ASIGNADAS'
+  | 'EN_TERMINO'
   | 'POR_VENCER'
+  | 'POR_VENCER_HOY'
   | 'VENCIDAS'
-  | 'DEVUELTAS_PRORROGA';
+  | 'CORREOS_FALLIDOS'
+  | 'DEVUELTAS_PRORROGA'
+  | 'RESUELTOS_FUERA_TERMINO';
 
 export type VistaActual =
   | 'TABLERO'
   | 'RADICACION'
   | 'VENTANILLA'
+  | 'SALIDAS'      // Radicación de salida — libro de correspondencia despachada
   | 'BANDEJA'
   | 'DEPENDENCIAS'
+  | 'MI_GESTION'   // Dashboard personal de desempeño del funcionario
   | 'REPORTES'
   | 'ANALYTICS'    // Centro de Inteligencia Operativa — Fase 2
   | 'ALERTAS'      // Panel de Alertas Predictivas — Fase 2
   | 'SUPERVISION_IA' // Panel de Supervisión y Gobernanza de IA — Fase 3.5
-  | 'ANTICIPACION_OPERATIVA'; // Anticipación Operativa y Análisis Predictivo — Fase 4.1
+  | 'ANTICIPACION_OPERATIVA' // Anticipación Operativa y Análisis Predictivo — Fase 4.1
+  | 'ADMINISTRACION'         // Gestión de usuarios internos — Solo ADMIN
+  | 'APROBACIONES'           // Cola de aprobaciones — Jefe + Admin
+  | 'CONTROL_INTERNO'        // Dashboard métricas MIPG — Control Interno
+  | 'LICENCIAS';             // Licencias urbanísticas (Secretaría de Planeación) — Bloque B
 
 
 interface VentanillaState {

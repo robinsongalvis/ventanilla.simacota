@@ -14,6 +14,7 @@ const LABELS_ACCION: Record<string, string> = {
   RESPUESTA_FUNCIONARIO: 'Respuesta del funcionario',
   DEVOLUCION:            'Devolución',
   RECLASIFICACION:       'Reclasificación',
+  TIPO_SOLICITUD_RECLASIFICADO: 'Reclasificación tipo de solicitud',
   NOTIFICACION_WHATSAPP: 'Notificación WhatsApp',
   // Legacy values used in seed data
   EN_REVISION:           'Cambio de estado',
@@ -31,6 +32,7 @@ const COLOR_ACCION: Record<string, { dot: string; ring: string; icon: string }> 
   RESPUESTA_FUNCIONARIO: { dot: 'bg-emerald-500', ring: 'ring-emerald-500/30', icon: '💬' },
   DEVOLUCION:            { dot: 'bg-rose-500',    ring: 'ring-rose-500/30',    icon: '↩️' },
   RECLASIFICACION:       { dot: 'bg-orange-500',  ring: 'ring-orange-500/30',  icon: '🔀' },
+  TIPO_SOLICITUD_RECLASIFICADO: { dot: 'bg-orange-500', ring: 'ring-orange-500/30', icon: '🔀' },
   NOTIFICACION_WHATSAPP: { dot: 'bg-green-500',   ring: 'ring-green-500/30',   icon: '📱' },
   // Legacy fallbacks
   EN_REVISION:           { dot: 'bg-amber-500',   ring: 'ring-amber-500/30',   icon: '🔄' },
@@ -84,7 +86,11 @@ export function TimelineAuditoria({ entradas }: Props) {
       {ordenadas.map((entrada, idx) => {
         const color  = COLOR_ACCION[entrada.accion] ?? COLOR_FALLBACK;
         const label  = LABELS_ACCION[entrada.accion] ?? entrada.accion;
-        const meta   = entrada.metadata as { estadoAnterior?: string; estadoNuevo?: string } | undefined;
+        const meta   = entrada.metadata as {
+          estadoAnterior?: string;
+          estadoNuevo?: string;
+          archivoAdjunto?: null | string | { nombre: string; path: string; tipo?: string };
+        } | undefined;
         const esUltimo = idx === ordenadas.length - 1;
 
         return (
@@ -133,6 +139,33 @@ export function TimelineAuditoria({ entradas }: Props) {
                   {meta.estadoAnterior} → {meta.estadoNuevo}
                 </p>
               )}
+
+              {/* Archivo adjunto del evento (RESPUESTA_FUNCIONARIO). */}
+              {(() => {
+                const adj = meta?.archivoAdjunto;
+                if (!adj) return null;
+                // Backwards-compat: eventos viejos guardaban solo el nombre como string.
+                if (typeof adj === 'string') {
+                  return (
+                    <p className="mt-1 text-xs text-slate-600">
+                      Oficio anexado: <span className="font-mono">{adj}</span>
+                    </p>
+                  );
+                }
+                return (
+                  <p className="mt-1 text-xs text-slate-600 inline-flex items-center gap-2">
+                    Oficio anexado: <span className="font-mono">{adj.nombre}</span>
+                    <a
+                      href={`/api/interno/archivo?path=${encodeURIComponent(adj.path)}`}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="text-indigo-400 hover:text-indigo-300 underline underline-offset-2"
+                    >
+                      Descargar
+                    </a>
+                  </p>
+                );
+              })()}
             </div>
           </li>
         );

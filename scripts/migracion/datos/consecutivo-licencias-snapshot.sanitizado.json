@@ -1,0 +1,1505 @@
+{
+ "_procedencia": {
+  "archivoOrigen": "CONSECUTIVO LICENCIAS Simacota Santander.xlsx (ingeniero de Planeación, compartido 6-ago-2026)",
+  "sha256": "0eaa7d88b2574ca976482393c8f9638ccee2efbb52d52753d3ae9e570c457a35",
+  "extraidoEn": "2026-08-09T01:01:20.011733+00:00",
+  "totalRegistros": 202,
+  "nota": "Snapshot de SOLO LECTURA para la migración Fase 5 (expedientes RECONSTRUIDOS). El Excel sigue VIVO en Planeación: el corte definitivo y congelamiento se hará tras la reunión (doctrina R7 del análisis). La hoja de impuestos 2022 NO se extrae (R8: fuera del alcance de la migración, decide P9).",
+  "sanitizado": {
+   "fecha": "2026-08-09T01:25:56.803104+00:00",
+   "camposRetirados": [
+    "solicitante",
+    "direccion",
+    "barrioVereda",
+    "area",
+    "matricula",
+    "correcciones"
+   ],
+   "nota": "Versión SIN datos personales (Ley 1581/2012): los nombres de solicitantes, direcciones y matrículas NO entran a la historia de git. La versión completa vive SOLO en la máquina del propietario como consecutivo-licencias-snapshot.local.json (gitignored). El sha256 sigue siendo el del xlsx ORIGEN. Esta versión conserva todos los campos que el planificador usa: la reconciliación (202/0/202/2) es idéntica entre ambas versiones."
+  }
+ },
+ "registros": [
+  {
+   "hoja": "2026",
+   "fila": 2,
+   "radicado": "68745-0-26-0001",
+   "fechaSolicitud": "2026-01-06",
+   "tipo": "LC",
+   "estado": "TERMINADA"
+  },
+  {
+   "hoja": "2026",
+   "fila": 3,
+   "radicado": "68745-0-26-0002",
+   "fechaSolicitud": "27/01/20206",
+   "tipo": "LSR",
+   "estado": "REVISADO"
+  },
+  {
+   "hoja": "2026",
+   "fila": 4,
+   "radicado": "68745-0-26-0003",
+   "tipo": "PH",
+   "estado": "TERMINADA"
+  },
+  {
+   "hoja": "2026",
+   "fila": 5,
+   "radicado": "68745-0-26-0004",
+   "fechaSolicitud": "2026-03-27",
+   "tipo": "LSR",
+   "estado": "REVISADO"
+  },
+  {
+   "hoja": "2026",
+   "fila": 6,
+   "radicado": "68745-0-26-0005",
+   "fechaSolicitud": "2026-04-10",
+   "tipo": "LC",
+   "estado": "REVISADO"
+  },
+  {
+   "hoja": "2026",
+   "fila": 7,
+   "radicado": "68745-0-26-0006",
+   "fechaSolicitud": "2026-04-11",
+   "tipo": "PH",
+   "estado": "REVISADO"
+  },
+  {
+   "hoja": "2026",
+   "fila": 8,
+   "radicado": "68745-0-26-0007",
+   "fechaSolicitud": "2026-04-28",
+   "tipo": "LU",
+   "estado": "REVISADO"
+  },
+  {
+   "hoja": "2026",
+   "fila": 9,
+   "radicado": "68745-0-26-0008",
+   "fechaSolicitud": "2026-04-28",
+   "tipo": "LC",
+   "estado": "REVISADO"
+  },
+  {
+   "hoja": "2026",
+   "fila": 10,
+   "radicado": "68745-0-26-0009",
+   "fechaSolicitud": "2026-05-04",
+   "tipo": "LC",
+   "estado": "REVISADO"
+  },
+  {
+   "hoja": "2026",
+   "fila": 11,
+   "radicado": "68745-0-26-0010",
+   "fechaSolicitud": "2026-05-06",
+   "tipo": "LSR",
+   "estado": "REVISADO"
+  },
+  {
+   "hoja": "2026",
+   "fila": 12,
+   "radicado": "68745-0-26-0011",
+   "fechaSolicitud": "2026-05-12",
+   "tipo": "LSR",
+   "estado": "REVISADO"
+  },
+  {
+   "hoja": "2026",
+   "fila": 13,
+   "radicado": "68745-0-26-0012",
+   "fechaSolicitud": "2026-05-27",
+   "tipo": "LSR",
+   "estado": "REVISADO"
+  },
+  {
+   "hoja": "2026",
+   "fila": 14,
+   "radicado": "68745-0-26-0013",
+   "fechaSolicitud": "2026-05-27",
+   "tipo": "LSU",
+   "estado": "REVISADO"
+  },
+  {
+   "hoja": "2026",
+   "fila": 15,
+   "radicado": "68745-0-26-0014",
+   "fechaSolicitud": "2026-05-27",
+   "tipo": "LA",
+   "estado": "REVISADO"
+  },
+  {
+   "hoja": "2026",
+   "fila": 16,
+   "radicado": "68745-0-26-0015",
+   "fechaSolicitud": "2026-05-28",
+   "tipo": "LA",
+   "estado": "REVISADO"
+  },
+  {
+   "hoja": "2026",
+   "fila": 17,
+   "radicado": "68745-0-26-0016",
+   "fechaSolicitud": "2026-05-29",
+   "tipo": "LC",
+   "estado": "REVISADO"
+  },
+  {
+   "hoja": "2026",
+   "fila": 18,
+   "radicado": "68745-0-26-0017",
+   "fechaSolicitud": "2026-06-02",
+   "tipo": "LSR",
+   "estado": "REVISADO"
+  },
+  {
+   "hoja": "2026",
+   "fila": 19,
+   "radicado": "68745-0-26-0018",
+   "fechaSolicitud": "2026-06-12",
+   "tipo": "LSR",
+   "estado": "REVISADO"
+  },
+  {
+   "hoja": "2026",
+   "fila": 20,
+   "radicado": "68745-0-26-0019",
+   "fechaSolicitud": "2026-06-24",
+   "tipo": "LC",
+   "estado": "REVISADO"
+  },
+  {
+   "hoja": "2025",
+   "fila": 2,
+   "radicado": "68745-0-25-0001",
+   "fechaSolicitud": "2025-01-22",
+   "tipo": "LSR",
+   "estado": "terminado"
+  },
+  {
+   "hoja": "2025",
+   "fila": 3,
+   "radicado": "68745-0-25-0002",
+   "fechaSolicitud": "2025-01-22",
+   "tipo": "LSR",
+   "noLicencia": "002-2025",
+   "estado": "terminado"
+  },
+  {
+   "hoja": "2025",
+   "fila": 4,
+   "radicado": "68745-0-25-0003",
+   "fechaSolicitud": "2025-02-17",
+   "tipo": "LSR",
+   "estado": "terminado"
+  },
+  {
+   "hoja": "2025",
+   "fila": 5,
+   "radicado": "68745-0-25-0004",
+   "fechaSolicitud": "2025-03-06",
+   "tipo": "LC",
+   "estado": "terminado"
+  },
+  {
+   "hoja": "2025",
+   "fila": 6,
+   "radicado": "68745-0-25-0005",
+   "fechaSolicitud": "2025-03-07",
+   "tipo": "LC",
+   "estado": "terminado"
+  },
+  {
+   "hoja": "2025",
+   "fila": 7,
+   "radicado": "68745-0-25-0006",
+   "fechaSolicitud": "2025-03-11",
+   "tipo": "LSR",
+   "estado": "terminado"
+  },
+  {
+   "hoja": "2025",
+   "fila": 8,
+   "radicado": "68745-0-25-0007",
+   "fechaSolicitud": "2025-03-11",
+   "tipo": "LSR",
+   "estado": "terminado"
+  },
+  {
+   "hoja": "2025",
+   "fila": 9,
+   "radicado": "68745-0-25-0008",
+   "fechaSolicitud": "2025-03-12",
+   "tipo": "PH",
+   "estado": "terminado"
+  },
+  {
+   "hoja": "2025",
+   "fila": 10,
+   "radicado": "68745-0-25-0009",
+   "fechaSolicitud": "2025-04-07",
+   "tipo": "LSR",
+   "estado": "terminado"
+  },
+  {
+   "hoja": "2025",
+   "fila": 11,
+   "radicado": "68745-0-25-0010",
+   "fechaSolicitud": "2025-04-08",
+   "tipo": "LSR",
+   "estado": "terminado"
+  },
+  {
+   "hoja": "2025",
+   "fila": 12,
+   "radicado": "68745-0-25-0011",
+   "fechaSolicitud": "2025-04-21",
+   "tipo": "PH",
+   "estado": "terminado"
+  },
+  {
+   "hoja": "2025",
+   "fila": 13,
+   "radicado": "68745-0-25-0012",
+   "fechaSolicitud": "2025-04-21",
+   "tipo": "LSR",
+   "estado": "terminado"
+  },
+  {
+   "hoja": "2025",
+   "fila": 14,
+   "radicado": "68745-0-25-0013",
+   "fechaSolicitud": "2025-04-21",
+   "tipo": "LR",
+   "estado": "terminado"
+  },
+  {
+   "hoja": "2025",
+   "fila": 15,
+   "radicado": "68745-0-25-0014",
+   "fechaSolicitud": "2025-05-05",
+   "tipo": "LR",
+   "estado": "revisado"
+  },
+  {
+   "hoja": "2025",
+   "fila": 16,
+   "radicado": "68745-0-25-0015",
+   "fechaSolicitud": "2025-05-05",
+   "tipo": "LR",
+   "estado": "terminado"
+  },
+  {
+   "hoja": "2025",
+   "fila": 17,
+   "radicado": "68745-0-25-0016",
+   "fechaSolicitud": "2025-05-05",
+   "tipo": "LR",
+   "estado": "terminado"
+  },
+  {
+   "hoja": "2025",
+   "fila": 18,
+   "radicado": "68745-0-25-0017",
+   "fechaSolicitud": "2025-05-07",
+   "tipo": "LSU",
+   "estado": "terminado"
+  },
+  {
+   "hoja": "2025",
+   "fila": 19,
+   "radicado": "68745-0-25-0018",
+   "fechaSolicitud": "2025-05-27",
+   "tipo": "LSR",
+   "estado": "terminado"
+  },
+  {
+   "hoja": "2025",
+   "fila": 20,
+   "radicado": "68745-0-25-0019",
+   "fechaSolicitud": "2025-06-05",
+   "tipo": "LSR",
+   "estado": "terminado"
+  },
+  {
+   "hoja": "2025",
+   "fila": 21,
+   "radicado": "68745-0-25-0020",
+   "fechaSolicitud": "2025-06-12",
+   "tipo": "LSU",
+   "estado": "revisado"
+  },
+  {
+   "hoja": "2025",
+   "fila": 22,
+   "radicado": "68745-0-25-0021",
+   "fechaSolicitud": "2025-06-16",
+   "tipo": "LC",
+   "estado": "terminado"
+  },
+  {
+   "hoja": "2025",
+   "fila": 23,
+   "radicado": "68745-0-25-0022",
+   "fechaSolicitud": "2025-06-18",
+   "tipo": "LSR",
+   "estado": "terminado"
+  },
+  {
+   "hoja": "2025",
+   "fila": 24,
+   "radicado": "68745-0-25-0023",
+   "fechaSolicitud": "2025-06-24",
+   "tipo": "LSR",
+   "estado": "terminado"
+  },
+  {
+   "hoja": "2025",
+   "fila": 25,
+   "radicado": "68745-0-25-0024",
+   "fechaSolicitud": "2025-06-24",
+   "tipo": "LSR",
+   "estado": "terminado"
+  },
+  {
+   "hoja": "2025",
+   "fila": 26,
+   "radicado": "68745-0-25-0025",
+   "fechaSolicitud": "2025-06-24",
+   "tipo": "LC",
+   "estado": "terminado"
+  },
+  {
+   "hoja": "2025",
+   "fila": 27,
+   "radicado": "68745-0-25-0026",
+   "fechaSolicitud": "2025-07-02",
+   "tipo": "LA",
+   "estado": "revisado"
+  },
+  {
+   "hoja": "2025",
+   "fila": 28,
+   "radicado": "68745-0-25-0027",
+   "fechaSolicitud": "2025-07-02",
+   "tipo": "LSR",
+   "estado": "terminado"
+  },
+  {
+   "hoja": "2025",
+   "fila": 29,
+   "radicado": "68745-0-25-0028",
+   "fechaSolicitud": "2025-07-08",
+   "tipo": "LSR",
+   "estado": "revisado"
+  },
+  {
+   "hoja": "2025",
+   "fila": 30,
+   "radicado": "68745-0-25-0029",
+   "fechaSolicitud": "2025-07-18",
+   "tipo": "LSR",
+   "estado": "terminado"
+  },
+  {
+   "hoja": "2025",
+   "fila": 31,
+   "radicado": "68745-0-25-0030",
+   "fechaSolicitud": "2025-07-22",
+   "tipo": "LA",
+   "estado": "revisado"
+  },
+  {
+   "hoja": "2025",
+   "fila": 32,
+   "radicado": "68745-0-25-0031",
+   "fechaSolicitud": "2025-07-22",
+   "tipo": "LSR",
+   "estado": "terminado"
+  },
+  {
+   "hoja": "2025",
+   "fila": 33,
+   "radicado": "68745-0-25-0032",
+   "fechaSolicitud": "2025-07-29",
+   "tipo": "LSR",
+   "estado": "terminado"
+  },
+  {
+   "hoja": "2025",
+   "fila": 34,
+   "radicado": "68745-0-25-0033",
+   "fechaSolicitud": "2025-07-29",
+   "tipo": "LC",
+   "estado": "terminado"
+  },
+  {
+   "hoja": "2025",
+   "fila": 35,
+   "radicado": "68745-0-25-0034",
+   "fechaSolicitud": "2025-08-05",
+   "tipo": "LC",
+   "estado": "terminado"
+  },
+  {
+   "hoja": "2025",
+   "fila": 36,
+   "radicado": "68745-0-25-0035",
+   "fechaSolicitud": "2025-09-16",
+   "tipo": "LSR",
+   "estado": "revisado"
+  },
+  {
+   "hoja": "2025",
+   "fila": 37,
+   "radicado": "68745-0-25-0036",
+   "fechaSolicitud": "2025-09-16",
+   "tipo": "LC",
+   "estado": "terminado"
+  },
+  {
+   "hoja": "2025",
+   "fila": 38,
+   "radicado": "68745-0-25-0037",
+   "fechaSolicitud": "2025-09-17",
+   "tipo": "LA",
+   "estado": "revisado"
+  },
+  {
+   "hoja": "2025",
+   "fila": 39,
+   "radicado": "68745-0-25-0037",
+   "fechaSolicitud": "2025-09-30",
+   "tipo": "LR",
+   "estado": "revisado"
+  },
+  {
+   "hoja": "2025",
+   "fila": 40,
+   "radicado": "68745-0-25-0038",
+   "fechaSolicitud": "2025-10-03",
+   "tipo": "LSR",
+   "estado": "revisado"
+  },
+  {
+   "hoja": "2025",
+   "fila": 41,
+   "radicado": "68745-0-25-0039",
+   "fechaSolicitud": "2025-10-09",
+   "tipo": "LC",
+   "estado": "revisado"
+  },
+  {
+   "hoja": "2025",
+   "fila": 42,
+   "radicado": "68745-0-25-0040",
+   "fechaSolicitud": "2025-10-15",
+   "tipo": "LSR",
+   "estado": "revisado"
+  },
+  {
+   "hoja": "2025",
+   "fila": 43,
+   "radicado": "68745-0-25-0041",
+   "fechaSolicitud": "2025-10-17",
+   "tipo": "LC",
+   "estado": "terminado"
+  },
+  {
+   "hoja": "2025",
+   "fila": 44,
+   "radicado": "68745-0-25-0042",
+   "fechaSolicitud": "2025-11-07",
+   "tipo": "LSR",
+   "estado": "revisado"
+  },
+  {
+   "hoja": "2025",
+   "fila": 45,
+   "radicado": "68745-0-25-0043",
+   "fechaSolicitud": "2025-11-18",
+   "tipo": "LSR",
+   "estado": "terminado"
+  },
+  {
+   "hoja": "2025",
+   "fila": 46,
+   "radicado": "68745-0-25-0044",
+   "fechaSolicitud": "2025-11-24",
+   "tipo": "LC",
+   "estado": "terminado"
+  },
+  {
+   "hoja": "2025",
+   "fila": 47,
+   "radicado": "68745-0-25-0045",
+   "fechaSolicitud": "2025-11-24",
+   "tipo": "PH",
+   "estado": "terminado"
+  },
+  {
+   "hoja": "2025",
+   "fila": 48,
+   "radicado": "68745-0-25-0046",
+   "fechaSolicitud": "2025-11-24",
+   "tipo": "LSR",
+   "estado": "revisado"
+  },
+  {
+   "hoja": "2025",
+   "fila": 49,
+   "radicado": "68745-0-25-0047",
+   "fechaSolicitud": "2025-11-25",
+   "tipo": "LSR",
+   "estado": "terminado"
+  },
+  {
+   "hoja": "2025",
+   "fila": 50,
+   "radicado": "68745-0-25-0048",
+   "fechaSolicitud": "2025-12-02",
+   "tipo": "LSR",
+   "estado": "revisado"
+  },
+  {
+   "hoja": "2025",
+   "fila": 51,
+   "radicado": "68745-0-25-0049",
+   "fechaSolicitud": "2025-11-04",
+   "tipo": "LSR",
+   "estado": "revisado"
+  },
+  {
+   "hoja": "2025",
+   "fila": 52,
+   "radicado": "68745-0-25-0050",
+   "fechaSolicitud": "2025-12-16",
+   "tipo": "LSR",
+   "estado": "terminado"
+  },
+  {
+   "hoja": "CONSECUTIVO",
+   "fila": 5,
+   "radicado": "68745-0-22-0001",
+   "fechaSolicitud": "2022-01-17",
+   "tipo": "LR"
+  },
+  {
+   "hoja": "CONSECUTIVO",
+   "fila": 6,
+   "radicado": "68745-0-22-0002",
+   "fechaSolicitud": "2022-01-17",
+   "tipo": "LR y LC,A"
+  },
+  {
+   "hoja": "CONSECUTIVO",
+   "fila": 7,
+   "radicado": "68745-0-22-0003",
+   "fechaSolicitud": "2022-01-19",
+   "tipo": "LC"
+  },
+  {
+   "hoja": "CONSECUTIVO",
+   "fila": 8,
+   "radicado": "68745-0-22-0004",
+   "fechaSolicitud": "2022-01-20",
+   "tipo": "LC y PH"
+  },
+  {
+   "hoja": "CONSECUTIVO",
+   "fila": 9,
+   "radicado": "68745-0-22-0005",
+   "fechaSolicitud": "2022-02-21",
+   "tipo": "LC"
+  },
+  {
+   "hoja": "CONSECUTIVO",
+   "fila": 10,
+   "radicado": "68745-0-22-0006",
+   "fechaSolicitud": "2022-02-15",
+   "tipo": "LSR"
+  },
+  {
+   "hoja": "CONSECUTIVO",
+   "fila": 11,
+   "radicado": "68745-0-22-0007",
+   "fechaSolicitud": "2022-02-22",
+   "tipo": "LSR"
+  },
+  {
+   "hoja": "CONSECUTIVO",
+   "fila": 12,
+   "radicado": "68745-0-22-0008",
+   "fechaSolicitud": "2022-03-01",
+   "tipo": "LSR"
+  },
+  {
+   "hoja": "CONSECUTIVO",
+   "fila": 13,
+   "radicado": "68745-0-22-0009",
+   "fechaSolicitud": "2022-03-08",
+   "tipo": "LSU"
+  },
+  {
+   "hoja": "CONSECUTIVO",
+   "fila": 14,
+   "radicado": "68745-0-22-0010",
+   "fechaSolicitud": "2022-03-08",
+   "tipo": "LSR"
+  },
+  {
+   "hoja": "CONSECUTIVO",
+   "fila": 15,
+   "radicado": "68745-0-22-0011",
+   "fechaSolicitud": "2022-03-15",
+   "tipo": "LC"
+  },
+  {
+   "hoja": "CONSECUTIVO",
+   "fila": 16,
+   "radicado": "68745-0-22-0012",
+   "fechaSolicitud": "2022-03-15",
+   "tipo": "LR"
+  },
+  {
+   "hoja": "CONSECUTIVO",
+   "fila": 17,
+   "radicado": "68745-0-22-0013",
+   "fechaSolicitud": "2022-03-17",
+   "tipo": "LSR"
+  },
+  {
+   "hoja": "CONSECUTIVO",
+   "fila": 18,
+   "radicado": "68745-0-22-0014",
+   "tipo": "LC"
+  },
+  {
+   "hoja": "CONSECUTIVO",
+   "fila": 19,
+   "radicado": "68745-0-22-0015",
+   "tipo": "LC"
+  },
+  {
+   "hoja": "CONSECUTIVO",
+   "fila": 20,
+   "radicado": "68745-0-22-0016",
+   "fechaSolicitud": "2022-04-04",
+   "tipo": "LC, PH y LSU"
+  },
+  {
+   "hoja": "CONSECUTIVO",
+   "fila": 21,
+   "radicado": "68745-0-22-0017",
+   "fechaSolicitud": "2022-04-05",
+   "tipo": "LSR"
+  },
+  {
+   "hoja": "CONSECUTIVO",
+   "fila": 22,
+   "radicado": "68745-0-22-0018",
+   "fechaSolicitud": "2022-04-21",
+   "tipo": "LSU"
+  },
+  {
+   "hoja": "CONSECUTIVO",
+   "fila": 23,
+   "radicado": "68745-0-22-0019",
+   "fechaSolicitud": "2022-04-28",
+   "tipo": "LSR"
+  },
+  {
+   "hoja": "CONSECUTIVO",
+   "fila": 24,
+   "radicado": "68745-0-22-0020",
+   "fechaSolicitud": "2022-04-28",
+   "tipo": "LC"
+  },
+  {
+   "hoja": "CONSECUTIVO",
+   "fila": 25,
+   "radicado": "68745-0-22-0021",
+   "fechaSolicitud": "2022-05-16",
+   "tipo": "LA, PH"
+  },
+  {
+   "hoja": "CONSECUTIVO",
+   "fila": 26,
+   "radicado": "68745-0-22-0022",
+   "fechaSolicitud": "2022-06-06",
+   "tipo": "LR"
+  },
+  {
+   "hoja": "CONSECUTIVO",
+   "fila": 27,
+   "radicado": "68745-0-22-0023",
+   "fechaSolicitud": "2022-05-25",
+   "tipo": "LC"
+  },
+  {
+   "hoja": "CONSECUTIVO",
+   "fila": 28,
+   "radicado": "68745-0-22-0024",
+   "fechaSolicitud": "2022-05-27",
+   "tipo": "LC"
+  },
+  {
+   "hoja": "CONSECUTIVO",
+   "fila": 29,
+   "radicado": "68745-0-22-0025",
+   "fechaSolicitud": "2022-09-07",
+   "tipo": "LC y PH"
+  },
+  {
+   "hoja": "CONSECUTIVO",
+   "fila": 30,
+   "radicado": "68745-0-22-0026",
+   "fechaSolicitud": "2022-09-01",
+   "tipo": "LC"
+  },
+  {
+   "hoja": "CONSECUTIVO",
+   "fila": 31,
+   "radicado": "68745-0-22-0027",
+   "fechaSolicitud": "2022-08-04",
+   "tipo": "LC"
+  },
+  {
+   "hoja": "CONSECUTIVO",
+   "fila": 32,
+   "radicado": "68745-0-22-0028",
+   "fechaSolicitud": "2022-09-12",
+   "tipo": "LSR"
+  },
+  {
+   "hoja": "CONSECUTIVO",
+   "fila": 33,
+   "radicado": "68745-0-22-0029",
+   "fechaSolicitud": "2022-09-02",
+   "tipo": "LSR"
+  },
+  {
+   "hoja": "CONSECUTIVO",
+   "fila": 34,
+   "radicado": "68745-0-22-0030",
+   "fechaSolicitud": "2022-09-13",
+   "tipo": "LSR"
+  },
+  {
+   "hoja": "CONSECUTIVO",
+   "fila": 35,
+   "radicado": "68745-0-22-0031",
+   "fechaSolicitud": "2022-09-14",
+   "tipo": "LC"
+  },
+  {
+   "hoja": "CONSECUTIVO",
+   "fila": 36,
+   "radicado": "68745-0-22-0032",
+   "fechaSolicitud": "2022-09-20",
+   "tipo": "LSR"
+  },
+  {
+   "hoja": "CONSECUTIVO",
+   "fila": 37,
+   "radicado": "68745-0-22-0033",
+   "fechaSolicitud": "2022-09-14",
+   "tipo": "LSR"
+  },
+  {
+   "hoja": "CONSECUTIVO",
+   "fila": 38,
+   "radicado": "68745-0-22-0034",
+   "fechaSolicitud": "2022-09-14",
+   "tipo": "LSR"
+  },
+  {
+   "hoja": "CONSECUTIVO",
+   "fila": 39,
+   "radicado": "68745-0-22-0035",
+   "fechaSolicitud": "2022-09-19",
+   "tipo": "LSR"
+  },
+  {
+   "hoja": "CONSECUTIVO",
+   "fila": 40,
+   "radicado": "68745-0-22-0036",
+   "fechaSolicitud": "2022-09-28",
+   "tipo": "PH"
+  },
+  {
+   "hoja": "CONSECUTIVO",
+   "fila": 41,
+   "radicado": "68745-0-22-0037",
+   "fechaSolicitud": "2022-10-13",
+   "tipo": "LC"
+  },
+  {
+   "hoja": "CONSECUTIVO",
+   "fila": 42,
+   "radicado": "68745-0-22-0038",
+   "fechaSolicitud": "2022-10-17",
+   "tipo": "LSU"
+  },
+  {
+   "hoja": "CONSECUTIVO",
+   "fila": 43,
+   "radicado": "68745-0-22-0039",
+   "fechaSolicitud": "2022-11-03",
+   "tipo": "LSR"
+  },
+  {
+   "hoja": "CONSECUTIVO",
+   "fila": 44,
+   "radicado": "68745-0-22-0040",
+   "fechaSolicitud": "2022-11-09",
+   "tipo": "LC, A"
+  },
+  {
+   "hoja": "CONSECUTIVO",
+   "fila": 45,
+   "radicado": "68745-0-22-0041",
+   "fechaSolicitud": "2022-11-22",
+   "tipo": "LSR"
+  },
+  {
+   "hoja": "CONSECUTIVO",
+   "fila": 46,
+   "radicado": "68745-0-22-0042",
+   "fechaSolicitud": "2022-11-30",
+   "tipo": "LSR"
+  },
+  {
+   "hoja": "CONSECUTIVO",
+   "fila": 47,
+   "radicado": "68745-0-22-0043",
+   "fechaSolicitud": "2022-11-30",
+   "tipo": "LSR"
+  },
+  {
+   "hoja": "CONSECUTIVO",
+   "fila": 48,
+   "radicado": "68745-0-22-0044",
+   "fechaSolicitud": "2022-11-01",
+   "tipo": "LR y  LC, A"
+  },
+  {
+   "hoja": "CONSECUTIVO",
+   "fila": 49,
+   "radicado": "68745-0-22-0045",
+   "fechaSolicitud": "2022-12-21",
+   "tipo": "LU"
+  },
+  {
+   "hoja": "CONSECUTIVO",
+   "fila": 50,
+   "radicado": "68745-0-22-0046",
+   "fechaSolicitud": "2022-12-20",
+   "tipo": "LSR"
+  },
+  {
+   "hoja": "CONSECUTIVO",
+   "fila": 51,
+   "radicado": "68745-0-22-0047",
+   "fechaSolicitud": "2022-10-21",
+   "tipo": "LC"
+  },
+  {
+   "hoja": "CONSECUTIVO",
+   "fila": 52,
+   "radicado": "68745-0-22-0048",
+   "fechaSolicitud": "2022-12-29",
+   "tipo": "PH"
+  },
+  {
+   "hoja": "CONSECUTIVO",
+   "fila": 53,
+   "radicado": "68745-0-22-0049",
+   "fechaSolicitud": "2022-12-20",
+   "tipo": "LSU"
+  },
+  {
+   "hoja": "CONSECUTIVO",
+   "fila": 56,
+   "radicado": "68745-0-23-0001",
+   "fechaSolicitud": "2023-01-19",
+   "tipo": "LC, A"
+  },
+  {
+   "hoja": "CONSECUTIVO",
+   "fila": 57,
+   "radicado": "68745-0-23-0002",
+   "fechaSolicitud": "2023-01-30",
+   "tipo": "LSR"
+  },
+  {
+   "hoja": "CONSECUTIVO",
+   "fila": 58,
+   "radicado": "68745-0-23-0003",
+   "fechaSolicitud": "2023-01-30",
+   "tipo": "LC"
+  },
+  {
+   "hoja": "CONSECUTIVO",
+   "fila": 59,
+   "radicado": "68745-0-23-0004",
+   "fechaSolicitud": "2023-02-14",
+   "tipo": "LSR"
+  },
+  {
+   "hoja": "CONSECUTIVO",
+   "fila": 60,
+   "radicado": "68745-0-23-0005",
+   "fechaSolicitud": "2023-02-13",
+   "tipo": "LC"
+  },
+  {
+   "hoja": "CONSECUTIVO",
+   "fila": 61,
+   "radicado": "68745-0-23-0006",
+   "fechaSolicitud": "2023-02-14",
+   "tipo": "LSR"
+  },
+  {
+   "hoja": "CONSECUTIVO",
+   "fila": 62,
+   "radicado": "68745-0-23-0007",
+   "fechaSolicitud": "2023-03-13",
+   "tipo": "LSR"
+  },
+  {
+   "hoja": "CONSECUTIVO",
+   "fila": 63,
+   "radicado": "68745-0-23-0008",
+   "fechaSolicitud": "2023-02-28",
+   "tipo": "LC"
+  },
+  {
+   "hoja": "CONSECUTIVO",
+   "fila": 64,
+   "radicado": "68745-0-23-0009",
+   "fechaSolicitud": "2023-04-25",
+   "tipo": "LSR"
+  },
+  {
+   "hoja": "CONSECUTIVO",
+   "fila": 65,
+   "radicado": "68745-0-23-0010",
+   "fechaSolicitud": "2023-03-06",
+   "tipo": "LSR"
+  },
+  {
+   "hoja": "CONSECUTIVO",
+   "fila": 66,
+   "radicado": "68745-0-23-0011",
+   "fechaSolicitud": "2023-05-05",
+   "tipo": "LC"
+  },
+  {
+   "hoja": "CONSECUTIVO",
+   "fila": 67,
+   "radicado": "68745-0-23-0012",
+   "fechaSolicitud": "2023-05-10",
+   "tipo": "LSR"
+  },
+  {
+   "hoja": "CONSECUTIVO",
+   "fila": 68,
+   "radicado": "68745-0-23-0013",
+   "fechaSolicitud": "2023-05-29",
+   "tipo": "LC"
+  },
+  {
+   "hoja": "CONSECUTIVO",
+   "fila": 69,
+   "radicado": "68745-0-23-0014",
+   "fechaSolicitud": "2023-06-08",
+   "tipo": "LSR"
+  },
+  {
+   "hoja": "CONSECUTIVO",
+   "fila": 70,
+   "radicado": "68745-0-23-0015",
+   "fechaSolicitud": "2023-06-15",
+   "tipo": "LSR"
+  },
+  {
+   "hoja": "CONSECUTIVO",
+   "fila": 71,
+   "radicado": "68745-0-23-0016",
+   "fechaSolicitud": "2023-06-16",
+   "tipo": "LC"
+  },
+  {
+   "hoja": "CONSECUTIVO",
+   "fila": 72,
+   "radicado": "68745-0-23-0017",
+   "fechaSolicitud": "2023-06-15",
+   "tipo": "LC"
+  },
+  {
+   "hoja": "CONSECUTIVO",
+   "fila": 73,
+   "radicado": "68745-0-23-0018",
+   "fechaSolicitud": "2023-06-14",
+   "tipo": "LC"
+  },
+  {
+   "hoja": "CONSECUTIVO",
+   "fila": 74,
+   "radicado": "68745-0-23-0019",
+   "fechaSolicitud": "2023-06-23",
+   "tipo": "LC"
+  },
+  {
+   "hoja": "CONSECUTIVO",
+   "fila": 75,
+   "radicado": "68745-0-23-0020",
+   "fechaSolicitud": "2023-07-24",
+   "tipo": "LC, A"
+  },
+  {
+   "hoja": "CONSECUTIVO",
+   "fila": 76,
+   "radicado": "68745-0-23-0021",
+   "fechaSolicitud": "2023-07-12",
+   "tipo": "LSR"
+  },
+  {
+   "hoja": "CONSECUTIVO",
+   "fila": 77,
+   "radicado": "68745-0-23-0022",
+   "fechaSolicitud": "2023-07-13",
+   "tipo": "LSR"
+  },
+  {
+   "hoja": "CONSECUTIVO",
+   "fila": 78,
+   "radicado": "68745-0-23-0023",
+   "fechaSolicitud": "2023-08-30",
+   "tipo": "LC"
+  },
+  {
+   "hoja": "CONSECUTIVO",
+   "fila": 79,
+   "radicado": "68745-0-23-0024",
+   "fechaSolicitud": "2023-08-30",
+   "tipo": "LC"
+  },
+  {
+   "hoja": "CONSECUTIVO",
+   "fila": 80,
+   "radicado": "68745-0-23-0025",
+   "fechaSolicitud": "2023-06-15",
+   "tipo": "LC"
+  },
+  {
+   "hoja": "CONSECUTIVO",
+   "fila": 81,
+   "radicado": "68745-0-23-0026",
+   "fechaSolicitud": "2023-09-01",
+   "tipo": "LC"
+  },
+  {
+   "hoja": "CONSECUTIVO",
+   "fila": 82,
+   "radicado": "68745-0-23-0027",
+   "fechaSolicitud": "2023-09-12",
+   "tipo": "LSU"
+  },
+  {
+   "hoja": "CONSECUTIVO",
+   "fila": 83,
+   "radicado": "68745-0-23-0028",
+   "fechaSolicitud": "2023-09-14",
+   "tipo": "LC"
+  },
+  {
+   "hoja": "CONSECUTIVO",
+   "fila": 84,
+   "radicado": "68745-0-23-0029",
+   "fechaSolicitud": "2023-09-18",
+   "tipo": "LC"
+  },
+  {
+   "hoja": "CONSECUTIVO",
+   "fila": 85,
+   "radicado": "68745-0-23-0030",
+   "fechaSolicitud": "2023-10-13",
+   "tipo": "LC"
+  },
+  {
+   "hoja": "CONSECUTIVO",
+   "fila": 86,
+   "radicado": "68745-0-23-0031",
+   "fechaSolicitud": "2023-10-18",
+   "tipo": "LR, PH"
+  },
+  {
+   "hoja": "CONSECUTIVO",
+   "fila": 87,
+   "radicado": "68745-0-23-0032",
+   "fechaSolicitud": "2023-11-31",
+   "tipo": "LA, PH"
+  },
+  {
+   "hoja": "CONSECUTIVO",
+   "fila": 88,
+   "radicado": "68745-0-23-0033",
+   "fechaSolicitud": "2023-11-31",
+   "tipo": "LSU"
+  },
+  {
+   "hoja": "CONSECUTIVO",
+   "fila": 89,
+   "radicado": "68745-0-23-0034",
+   "fechaSolicitud": "2023-02-10",
+   "tipo": "LSU"
+  },
+  {
+   "hoja": "CONSECUTIVO",
+   "fila": 90,
+   "radicado": "68745-0-23-0035",
+   "fechaSolicitud": "2023-11-23",
+   "tipo": "LC"
+  },
+  {
+   "hoja": "CONSECUTIVO",
+   "fila": 91,
+   "radicado": "68745-0-23-0036",
+   "fechaSolicitud": "2023-11-29",
+   "tipo": "LSU"
+  },
+  {
+   "hoja": "CONSECUTIVO",
+   "fila": 92,
+   "radicado": "68745-0-23-0037",
+   "fechaSolicitud": "2023-12-06",
+   "tipo": "LR"
+  },
+  {
+   "hoja": "CONSECUTIVO",
+   "fila": 93,
+   "radicado": "68745-0-23-0038",
+   "fechaSolicitud": "2023-12-11",
+   "tipo": "PH"
+  },
+  {
+   "hoja": "CONSECUTIVO",
+   "fila": 94,
+   "radicado": "68745-0-23-0039",
+   "fechaSolicitud": "2023-12-12",
+   "tipo": "LSR"
+  },
+  {
+   "hoja": "CONSECUTIVO",
+   "fila": 95,
+   "radicado": "68745-0-23-0040",
+   "fechaSolicitud": "2023-12-12",
+   "tipo": "LSR"
+  },
+  {
+   "hoja": "CONSECUTIVO",
+   "fila": 96,
+   "radicado": "68745-0-23-0041",
+   "fechaSolicitud": "2023-11-10",
+   "tipo": "LC"
+  },
+  {
+   "hoja": "CONSECUTIVO",
+   "fila": 97,
+   "radicado": "68745-0-23-0042",
+   "fechaSolicitud": "2023-11-11",
+   "tipo": "LSR"
+  },
+  {
+   "hoja": "CONSECUTIVO",
+   "fila": 98,
+   "radicado": "68745-0-23-0043",
+   "fechaSolicitud": "2023-11-24",
+   "tipo": "LC"
+  },
+  {
+   "hoja": "CONSECUTIVO",
+   "fila": 99,
+   "radicado": "68745-0-23-0044",
+   "fechaSolicitud": "2023-11-28",
+   "tipo": "LSR"
+  },
+  {
+   "hoja": "CONSECUTIVO",
+   "fila": 102,
+   "radicado": "68745-0-24-0001",
+   "fechaSolicitud": "2024-01-15",
+   "tipo": "LSR"
+  },
+  {
+   "hoja": "CONSECUTIVO",
+   "fila": 103,
+   "radicado": "68745-0-24-0002",
+   "fechaSolicitud": "2024-01-17",
+   "tipo": "LCR VISR"
+  },
+  {
+   "hoja": "CONSECUTIVO",
+   "fila": 104,
+   "radicado": "68745-0-24-0003",
+   "fechaSolicitud": "2024-02-15",
+   "tipo": "LC"
+  },
+  {
+   "hoja": "CONSECUTIVO",
+   "fila": 105,
+   "radicado": "68745-0-24-0004",
+   "fechaSolicitud": "2024-03-05",
+   "tipo": "LC"
+  },
+  {
+   "hoja": "CONSECUTIVO",
+   "fila": 106,
+   "radicado": "68745-0-24-0005",
+   "fechaSolicitud": "2024-03-19",
+   "tipo": "LC"
+  },
+  {
+   "hoja": "CONSECUTIVO",
+   "fila": 107,
+   "radicado": "68745-0-24-0006",
+   "fechaSolicitud": "2024-04-01",
+   "tipo": "LC"
+  },
+  {
+   "hoja": "CONSECUTIVO",
+   "fila": 108,
+   "radicado": "68745-0-24-0007",
+   "fechaSolicitud": "2024-04-02",
+   "tipo": "LSR"
+  },
+  {
+   "hoja": "CONSECUTIVO",
+   "fila": 109,
+   "radicado": "68745-0-24-0008",
+   "fechaSolicitud": "2024-04-03",
+   "tipo": "LC"
+  },
+  {
+   "hoja": "CONSECUTIVO",
+   "fila": 110,
+   "radicado": "68745-0-24-0009",
+   "fechaSolicitud": "2024-04-09",
+   "tipo": "LC"
+  },
+  {
+   "hoja": "CONSECUTIVO",
+   "fila": 111,
+   "radicado": "68745-0-24-0010",
+   "fechaSolicitud": "2024-04-10",
+   "tipo": "LSR"
+  },
+  {
+   "hoja": "CONSECUTIVO",
+   "fila": 112,
+   "radicado": "68745-0-24-0011",
+   "fechaSolicitud": "2024-04-16",
+   "tipo": "LR"
+  },
+  {
+   "hoja": "CONSECUTIVO",
+   "fila": 113,
+   "radicado": "68745-0-24-0012",
+   "fechaSolicitud": "2024-04-23",
+   "tipo": "PH"
+  },
+  {
+   "hoja": "CONSECUTIVO",
+   "fila": 114,
+   "radicado": "68745-0-24-0013",
+   "fechaSolicitud": "2024-05-16",
+   "tipo": "LSU"
+  },
+  {
+   "hoja": "CONSECUTIVO",
+   "fila": 115,
+   "radicado": "68745-0-24-0014",
+   "fechaSolicitud": "2024-05-16",
+   "tipo": "LC"
+  },
+  {
+   "hoja": "CONSECUTIVO",
+   "fila": 116,
+   "radicado": "68745-0-24-0015",
+   "fechaSolicitud": "2024-05-16",
+   "tipo": "LC"
+  },
+  {
+   "hoja": "CONSECUTIVO",
+   "fila": 117,
+   "radicado": "68745-0-24-0016",
+   "fechaSolicitud": "2024-06-06",
+   "tipo": "LC"
+  },
+  {
+   "hoja": "CONSECUTIVO",
+   "fila": 118,
+   "radicado": "68745-0-24-0017",
+   "fechaSolicitud": "2024-06-20",
+   "tipo": "LSR"
+  },
+  {
+   "hoja": "CONSECUTIVO",
+   "fila": 119,
+   "radicado": "68745-0-24-0018",
+   "fechaSolicitud": "2024-06-24",
+   "tipo": "LC"
+  },
+  {
+   "hoja": "CONSECUTIVO",
+   "fila": 120,
+   "radicado": "68745-0-24-0019",
+   "fechaSolicitud": "2024-06-26",
+   "tipo": "LSR"
+  },
+  {
+   "hoja": "CONSECUTIVO",
+   "fila": 121,
+   "radicado": "68745-0-24-0020",
+   "fechaSolicitud": "2024-07-02",
+   "tipo": "LSU"
+  },
+  {
+   "hoja": "CONSECUTIVO",
+   "fila": 122,
+   "radicado": "68745-0-24-0021",
+   "fechaSolicitud": "2024-07-11",
+   "tipo": "LRC"
+  },
+  {
+   "hoja": "CONSECUTIVO",
+   "fila": 123,
+   "radicado": "68745-0-24-0022",
+   "fechaSolicitud": "2024-07-24",
+   "tipo": "LSR"
+  },
+  {
+   "hoja": "CONSECUTIVO",
+   "fila": 124,
+   "radicado": "68745-0-24-0023",
+   "fechaSolicitud": "2024-07-31",
+   "tipo": "LSR"
+  },
+  {
+   "hoja": "CONSECUTIVO",
+   "fila": 125,
+   "radicado": "68745-0-24-0024",
+   "fechaSolicitud": "2024-08-14",
+   "tipo": "LSR"
+  },
+  {
+   "hoja": "CONSECUTIVO",
+   "fila": 126,
+   "radicado": "68745-0-24-0025",
+   "fechaSolicitud": "2024-08-08",
+   "tipo": "LSR"
+  },
+  {
+   "hoja": "CONSECUTIVO",
+   "fila": 127,
+   "radicado": "68745-0-24-0026",
+   "fechaSolicitud": "2024-08-26",
+   "tipo": "LSU"
+  },
+  {
+   "hoja": "CONSECUTIVO",
+   "fila": 128,
+   "radicado": "68745-0-24-0027",
+   "fechaSolicitud": "2024-08-29",
+   "tipo": "LA"
+  },
+  {
+   "hoja": "CONSECUTIVO",
+   "fila": 129,
+   "radicado": "68745-0-24-0028",
+   "fechaSolicitud": "2024-09-02",
+   "tipo": "LSR"
+  },
+  {
+   "hoja": "CONSECUTIVO",
+   "fila": 130,
+   "radicado": "68745-0-24-0029",
+   "fechaSolicitud": "2024-09-24",
+   "tipo": "LSU"
+  },
+  {
+   "hoja": "CONSECUTIVO",
+   "fila": 131,
+   "radicado": "68745-0-24-0030",
+   "fechaSolicitud": "2024-09-27",
+   "tipo": "LA"
+  },
+  {
+   "hoja": "CONSECUTIVO",
+   "fila": 132,
+   "radicado": "68745-0-24-0031",
+   "fechaSolicitud": "2024-10-09",
+   "tipo": "PH"
+  },
+  {
+   "hoja": "CONSECUTIVO",
+   "fila": 133,
+   "radicado": "68745-0-24-0032",
+   "fechaSolicitud": "2024-10-16",
+   "tipo": "PH"
+  },
+  {
+   "hoja": "CONSECUTIVO",
+   "fila": 134,
+   "radicado": "68745-0-24-0033",
+   "fechaSolicitud": "2024-10-22",
+   "tipo": "LA"
+  },
+  {
+   "hoja": "CONSECUTIVO",
+   "fila": 135,
+   "radicado": "68745-0-24-0034",
+   "fechaSolicitud": "2024-10-23",
+   "tipo": "LSR"
+  },
+  {
+   "hoja": "CONSECUTIVO",
+   "fila": 136,
+   "radicado": "68745-0-24-0035",
+   "fechaSolicitud": "2024-10-29",
+   "tipo": "LC"
+  },
+  {
+   "hoja": "CONSECUTIVO",
+   "fila": 137,
+   "radicado": "68745-0-24-0036",
+   "fechaSolicitud": "2024-11-05",
+   "tipo": "LSR"
+  },
+  {
+   "hoja": "CONSECUTIVO",
+   "fila": 138,
+   "radicado": "68745-0-24-0037",
+   "fechaSolicitud": "2024-11-18",
+   "tipo": "LSR"
+  },
+  {
+   "hoja": "CONSECUTIVO",
+   "fila": 139,
+   "radicado": "68745-0-24-0038",
+   "fechaSolicitud": "2024-11-25",
+   "tipo": "LC"
+  },
+  {
+   "hoja": "CONSECUTIVO",
+   "fila": 140,
+   "radicado": "68745-0-24-0039",
+   "fechaSolicitud": "2024-12-04",
+   "tipo": "LSR"
+  }
+ ]
+}

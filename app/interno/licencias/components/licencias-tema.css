@@ -1,0 +1,34 @@
+/* ══════════════════════════════════════════════════════════════
+   Tema visual — modales de Licencias (rediseño aprobado en Figma,
+   encargo del propietario, 31-ago-2026).
+
+   Variables CSS DEL MÓDULO, no globales. Viven bajo `.tema-licencias`,
+   que se aplica en el contenedor raíz de `RadicarSolicitudModal` y
+   `CrearDesdeRadicadoModal` (y, por si se usa suelto algún día, en el
+   propio `SelectorSubtiposNormativos`) — así que cualquier hijo puede
+   leerlas con `var(--nombre)` sin que ningún otro módulo las herede.
+
+   Deliberadamente NO mapean 1:1 a los tokens de `app/globals.css`: el
+   verde institucional de este mockup es `#14452F`, el global es
+   `#14532D`. Son paletas hermanas, no la misma — el mockup manda aquí.
+══════════════════════════════════════════════════════════════ */
+
+.tema-licencias {
+  --verde-institucional: #14452F;
+  --dorado: #8A6D2B;
+
+  --ambar-fondo: #FBF3DF;
+  --ambar-borde: #EAD9AC;
+  --ambar-texto: #7A5B12;
+
+  --texto: #24312B;
+  --texto-suave: #67736C;
+
+  --superficie: #FFFFFF;
+  --superficie-tinte: #EEF5F0;
+  --borde: #D9E0DB;
+
+  /* Radios: tarjetas/inputs/botones 10px, contenedor del modal 16px. */
+  --radio-control: 10px;
+  --radio-modal: 16px;
+}

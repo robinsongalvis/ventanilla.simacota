@@ -1,0 +1,366 @@
+/**
+ * Término como PROYECCIÓN sobre una serie de eventos — Fase 2 (arranque,
+ * PASO 7 / Tareas 3-4 de la orden).
+ *
+ * PURO, sin I/O. A diferencia del reloj de subsanación de BM-B33
+ * (`lib/tiempos-radicado.ts`), que calcula un vencimiento FIJO a partir de
+ * un único ancla, este módulo modela el vencimiento como una PROYECCIÓN
+ * que cambia según qué eventos ocurrieron en el expediente — necesario
+ * porque el efecto de una subsanación sobre el término NO es uniforme
+ * entre regímenes reales: el Decreto 1077 (licencias) usa un efecto, y
+ * otros regímenes pueden usar otro. `PoliticaTermino` hace ese efecto un
+ * DATO, no una rama hardcodeada de código (mismo principio D5/D9 del resto
+ * del motor).
+ *
+ * Fechas: convención `atLocalNoon` ya establecida en
+ * `lib/tiempos-radicado.ts` (RS-1, PASO 1 de este arranque) — mediodía del
+ * día CIVIL de Bogotá. NO se introduce un tipo `FechaLocal` paralelo; los
+ * eventos llevan `Date` ya anclado.
+ */
+
+import { diasRestantesHabiles, sumarDiasHabiles, atLocalNoon } from '@/lib/tiempos-radicado';
+import type { Actuacion } from './tipos';
+
+/* ──────────────────────────────────────────────
+   Tipos
+────────────────────────────────────────────── */
+
+/**
+ * DF-7 (ADR-0029) amplió el vocabulario con 5 tipos nuevos —
+ * `COMUNICACION_ACTA`, `RENUNCIA_PLAZO_RESTANTE`, `ACTO_VIABILIDAD`,
+ * `ENTREGA_DOCUMENTOS_PAGO`, `PRORROGA_TERMINO_ADMINISTRACION` — que el
+ * anexo normativo confirma como hitos reales del ciclo (comunicación del
+ * acta ≠ su expedición; renuncia expresa al plazo restante; suspensión por
+ * pagos en el acto de viabilidad; prórroga administrativa del término),
+ * pero cuyo EFECTO sobre el cómputo del vencimiento queda ⚖️ BLOQUEADO
+ * (hueco 1, ADR-0029) hasta el concepto escrito de Jurídica —
+ * `calcularVencimiento` los trata como INERTES (ver su JSDoc y el switch
+ * exhaustivo `esEventoQueReinicia`): se reconocen sin alterar el resultado
+ * de ninguna de las dos políticas.
+ */
+export type TipoEventoTermino =
+  | 'RADICACION_DEBIDA_FORMA'
+  | 'ACTA_OBSERVACIONES'
+  | 'RESPUESTA_SUBSANACION'
+  | 'MODIFICACION_SOLICITUD'
+  | 'COMUNICACION_ACTA'
+  | 'RENUNCIA_PLAZO_RESTANTE'
+  | 'ACTO_VIABILIDAD'
+  | 'ENTREGA_DOCUMENTOS_PAGO'
+  | 'PRORROGA_TERMINO_ADMINISTRACION';
+
+export interface EventoTermino {
+  tipo: TipoEventoTermino;
+  /** Mediodía del día civil de Bogotá (`atLocalNoon`) — nunca un instante crudo. */
+  fecha: Date;
+}
+
+/**
+ * Política de cómputo del término — SIN valor por defecto en ningún punto
+ * de este módulo (obligatoria en cada llamada a `calcularVencimiento`):
+ * cada régimen real declara la suya explícitamente, nunca se asume una.
+ *
+ * - `efectoSubsanacion: 'REINICIO_A_CERO'`: el plazo son `plazoDias` días
+ *   hábiles contados desde el ÚLTIMO evento que reinicia (acta de
+ *   observaciones, respuesta de subsanación, o modificación de la
+ *   solicitud) — SIN TOPE al número de reinicios (confirmado por Jurídica,
+ *   respuesta 4: el Decreto 1077 no limita cuántas veces puede reiniciarse
+ *   el plazo por actas sucesivas).
+ * - `efectoSubsanacion: 'SUSPENSION_REANUDACION'`: el reloj se DETIENE en
+ *   `ACTA_OBSERVACIONES` (se congelan los días hábiles que quedaban) y se
+ *   REANUDA en `RESPUESTA_SUBSANACION`, con esos mismos días hábiles
+ *   restantes contados desde la respuesta — el tiempo usado antes del acta
+ *   NUNCA se recupera. `MODIFICACION_SOLICITUD` no tiene efecto declarado
+ *   bajo esta política (supuesto explícito, Principio 13: ningún régimen
+ *   real conocido hoy combina modificación de solicitud con suspensión/
+ *   reanudación; se amplía si aparece un caso real).
+ */
+export interface PoliticaTermino {
+  plazoDias: number;
+  computo: 'HABILES';
+  efectoSubsanacion: 'REINICIO_A_CERO' | 'SUSPENSION_REANUDACION';
+  anclaje: 'RADICACION_EN_DEBIDA_FORMA';
+}
+
+/**
+ * ¿Este tipo de evento reinicia el plazo bajo `REINICIO_A_CERO`? Switch
+ * EXHAUSTIVO (no un `Array.includes`) a propósito: el caso `default` con
+ * asignación a `never` fuerza al COMPILADOR a rechazar el build si algún
+ * día se añade un `TipoEventoTermino` nuevo sin decidir aquí si reinicia o
+ * no — nunca queda un tipo "sin decidir" en silencio. Los 5 tipos nuevos de
+ * DF-7 (ADR-0029) son INERTES también bajo esta política — su semántica
+ * real (⚖️ hueco 1) no está definida, así que NO reinician nada.
+ */
+function esEventoQueReinicia(tipo: TipoEventoTermino): boolean {
+  switch (tipo) {
+    case 'ACTA_OBSERVACIONES':
+    case 'RESPUESTA_SUBSANACION':
+    case 'MODIFICACION_SOLICITUD':
+      return true;
+    case 'RADICACION_DEBIDA_FORMA':
+    case 'COMUNICACION_ACTA':
+    case 'RENUNCIA_PLAZO_RESTANTE':
+    case 'ACTO_VIABILIDAD':
+    case 'ENTREGA_DOCUMENTOS_PAGO':
+    case 'PRORROGA_TERMINO_ADMINISTRACION':
+      return false;
+    default: {
+      const _exhaustivo: never = tipo;
+      throw new Error(`Tipo de evento de término no contemplado en esEventoQueReinicia: ${String(_exhaustivo)}`);
+    }
+  }
+}
+
+/**
+ * Calcula el vencimiento vigente a partir de la serie de eventos y la
+ * política. `null` si no hay evento de anclaje (`RADICACION_DEBIDA_FORMA`)
+ * — sin radicación en debida forma no hay término que proyectar (D5).
+ *
+ * `eventos` no necesita llegar ordenado — esta función ordena por `fecha`
+ * internamente antes de proyectar. Si hay más de un evento del mismo tipo
+ * relevante (p. ej. dos actas de observaciones sucesivas bajo
+ * SUSPENSION_REANUDACION), se procesan en orden cronológico: cada
+ * suspensión/reanudación es independiente de la anterior.
+ */
+/**
+ * EL RELOJ DETENIDO, CON SUS NÚMEROS.
+ *
+ * ── POR QUÉ EXISTE ────────────────────────────────────────────────────────
+ *
+ * `calcularVencimiento` ya congelaba los días que quedaban al llegar el acta
+ * —`diasRestantesGuardados`, unas líneas más abajo— y acto seguido los TIRABA:
+ * la función devolvía solo una fecha. Por eso la tarjeta de Planeación decía
+ * «Reloj detenido» sin un solo número, y su propio comentario lo reconocía:
+ * «cuántos días quedaban al congelarse depende de la serie de eventos, y el
+ * servidor todavía no manda ese dato».
+ *
+ * El dato existía. Lo que faltaba era devolverlo.
+ *
+ * Lo pidió el propietario: que se vea el tiempo que lleva parado y cuánto le
+ * queda cuando arranque de nuevo.
+ *
+ * ── LO QUE NO DICE, Y HAY QUE SABERLO ─────────────────────────────────────
+ *
+ * Solo el ACTA DE OBSERVACIONES congela días aquí. El acto de viabilidad —la
+ * otra causa de suspensión que reconoce la norma— sigue INERTE en este cómputo
+ * (⚖️ hueco 1, DF-7 del ADR-0029: a la espera del concepto escrito de
+ * Jurídica). Para un expediente en `EN_VIABILIDAD` esta función devuelve
+ * `null`: el reloj se ve detenido en pantalla, pero aquí no hay días
+ * acreditados que devolver. No se inventan — y la pantalla lo dice con
+ * palabras en vez de callarlo.
+ */
+export interface RelojDetenido {
+  /** ISO del día en que el reloj se detuvo — el acta que lo paró. */
+  desdeIso: string;
+  /**
+   * Días hábiles que le quedaban al término en ese momento. Son los que se
+   * restauran al reanudar: el tiempo gastado ANTES del acta no se recupera.
+   */
+  diasHabilesGuardados: number;
+}
+
+export interface ProyeccionComputo {
+  vencimiento: Date | null;
+  /** Presente solo si la serie de eventos TERMINA con el reloj parado. */
+  relojDetenido: RelojDetenido | null;
+}
+
+/**
+ * Una sola pasada produce las dos respuestas. Separarlas en dos funciones
+ * habría dejado dos recorridos del mismo calendario que pueden divergir — el
+ * defecto que este módulo lleva evitando desde que el criterio subió del cron.
+ */
+export function proyectarComputo(eventos: EventoTermino[], politica: PoliticaTermino): ProyeccionComputo {
+  const ordenados = [...eventos].sort((a, b) => a.fecha.getTime() - b.fecha.getTime());
+  const radicacion = ordenados.find((e) => e.tipo === 'RADICACION_DEBIDA_FORMA');
+  if (!radicacion) return { vencimiento: null, relojDetenido: null };
+
+  if (politica.efectoSubsanacion === 'REINICIO_A_CERO') {
+    const reinicios = ordenados.filter((e) => esEventoQueReinicia(e.tipo));
+    const ancla = reinicios.length > 0 ? reinicios[reinicios.length - 1]! : radicacion;
+    /* Bajo reinicio no hay reloj detenido que describir: el plazo vuelve a
+       empezar entero, no se guarda nada. */
+    return { vencimiento: sumarDiasHabiles(ancla.fecha, politica.plazoDias), relojDetenido: null };
+  }
+
+  // SUSPENSION_REANUDACION
+  let vencimiento = sumarDiasHabiles(radicacion.fecha, politica.plazoDias);
+  /* UNA sola variable para el reloj parado — antes eran dos (los días guardados
+     y el día en que se paró) que había que acordarse de limpiar juntas. El
+     banco de mutaciones lo demostró: quitar una de las dos limpiezas no ponía
+     roja ni una prueba, porque la otra ya bastaba. Dos estados que siempre
+     valen lo mismo son un estado con una copia que puede quedarse atrás. */
+  let relojDetenido: RelojDetenido | null = null;
+
+  for (const evento of ordenados) {
+    // Switch EXHAUSTIVO (ver `esEventoQueReinicia` arriba para el mismo
+    // patrón bajo REINICIO_A_CERO): el `default` con `never` obliga al
+    // compilador a rechazar el build si se añade un tipo sin decidir su
+    // efecto aquí.
+    switch (evento.tipo) {
+      case 'RADICACION_DEBIDA_FORMA':
+        break; // ya se usó como ancla arriba
+      case 'ACTA_OBSERVACIONES':
+        if (relojDetenido === null) {
+          // Congela los días hábiles que quedaban ENTRE el acta y el vencimiento vigente.
+          relojDetenido = {
+            desdeIso: evento.fecha.toISOString(),
+            diasHabilesGuardados: diasRestantesHabiles(vencimiento, evento.fecha),
+          };
+        }
+        break;
+      case 'RESPUESTA_SUBSANACION':
+        if (relojDetenido !== null) {
+          vencimiento = sumarDiasHabiles(evento.fecha, relojDetenido.diasHabilesGuardados);
+          relojDetenido = null;
+        }
+        break;
+      case 'MODIFICACION_SOLICITUD':
+      case 'COMUNICACION_ACTA':
+      case 'RENUNCIA_PLAZO_RESTANTE':
+      case 'ACTO_VIABILIDAD':
+      case 'ENTREGA_DOCUMENTOS_PAGO':
+      case 'PRORROGA_TERMINO_ADMINISTRACION':
+        // INERTES (⚖️ hueco 1, DF-7 ADR-0029): su semántica real —
+        // reanudación al plazo MÁXIMO salvo renuncia expresa, descuento
+        // expedición→comunicación del acta, suspensión por el acto de
+        // viabilidad mientras se aportan documentos de pago, prórroga
+        // administrativa ≤ mitad del término — queda BLOQUEADA hasta el
+        // concepto escrito de Jurídica (P7 del anexo normativo). Se
+        // reconocen (no lanzan) pero NO alteran el cómputo.
+        break;
+      default: {
+        const _exhaustivo: never = evento.tipo;
+        throw new Error(`Tipo de evento de término no contemplado en calcularVencimiento: ${String(_exhaustivo)}`);
+      }
+    }
+  }
+
+  /* SIGUE DETENIDO si al acabar la serie nadie reanudó: es el estado de HOY, no
+     un hecho histórico. Un acta seguida de su respuesta deja esto en `null`
+     aunque el acta exista. */
+  return { vencimiento, relojDetenido };
+}
+
+/**
+ * La fecha de vencimiento, a secas. Envoltorio de `proyectarComputo` para los
+ * llamadores que solo necesitan eso — y para no cambiarle la firma a lo que ya
+ * existía.
+ */
+export function calcularVencimiento(eventos: EventoTermino[], politica: PoliticaTermino): Date | null {
+  return proyectarComputo(eventos, politica).vencimiento;
+}
+
+/* ──────────────────────────────────────────────
+   Doble cómputo (Bloque "Términos y vigencias protectores", 10-ago-2026)
+────────────────────────────────────────────── */
+
+export interface VencimientoTermino {
+  /** La fecha en que vence el término. `null` sin radicación en debida forma. */
+  vencimiento: Date | null;
+  /**
+   * El reloj parado con sus números, o `null` si está corriendo.
+   *
+   * NO SE LLAMA `suspension`, y el nombre está elegido: ese campo YA EXISTIÓ en
+   * este mismo contrato con otro significado —una de las dos hipótesis de
+   * vencimiento del «hueco 1»— y el ADR-0038 lo retiró. Reusar la palabra
+   * habría hecho que una prueba que custodia esa retirada empezara a hablar de
+   * otra cosa sin que nadie se enterara. Ver `RelojDetenido`.
+   */
+  relojDetenido: RelojDetenido | null;
+  /**
+   * El artículo que sostiene el cómputo. Se devuelve para que la pantalla lo
+   * CITE en vez de explicar una incertidumbre que ya no existe.
+   */
+  fundamento: string;
+}
+
+/**
+ * ── UNA SOLA FECHA, CON SU ARTÍCULO (ADR-0038) ────────────────────────────
+ *
+ * Aquí hubo un DOBLE CÓMPUTO: se calculaba el vencimiento bajo las dos lecturas
+ * posibles —suspensión con reanudación, y reinicio a cero— y se alertaba sobre
+ * la más temprana, porque el «hueco 1» del ADR-0029 declaraba que nadie sabía
+ * cuál regía. La pantalla mostraba las dos fechas y una nota que decía que la
+ * interpretación seguía «pendiente de concepto escrito de Jurídica».
+ *
+ * NO HABÍA TAL HUECO. El Decreto 1077 lo dice expresamente en el art.
+ * 2.2.6.1.2.2.4 — el MISMO artículo que este proyecto ya citaba veinte veces
+ * para el acta única, el desistimiento y los 30 días:
+ *
+ *   «Durante este plazo se suspenderá el término para la expedición de la
+ *    licencia»
+ *
+ * «Se suspenderá». En derecho administrativo eso es preciso: parar y continuar
+ * donde iba. Reiniciar exigiría decirlo, y no lo dice. Se construyó un cómputo
+ * entero para una pregunta que el artículo contestaba en una línea.
+ *
+ * `REINICIO_A_CERO` se conserva en `PoliticaTermino` porque el motor es
+ * TRÁMITE-AGNÓSTICO (A3, ADR-0026): otro trámite, con otra norma, podría
+ * reiniciar. Lo que se retira es su uso para LICENCIAS.
+ *
+ * `plazoDias` sigue siendo OBLIGATORIO: el caller declara el plazo de SU
+ * régimen y este módulo no conoce ninguno.
+ */
+export const FUNDAMENTO_SUSPENSION_REANUDACION =
+  'D.1077/2015 art. 2.2.6.1.2.2.4 — «Durante este plazo se suspenderá el término para la expedición de la licencia».';
+
+export function calcularVencimientoTermino(
+  eventos: EventoTermino[],
+  plazoDias: number,
+): VencimientoTermino {
+  const proyeccion = proyectarComputo(eventos, {
+    plazoDias,
+    computo: 'HABILES',
+    anclaje: 'RADICACION_EN_DEBIDA_FORMA',
+    efectoSubsanacion: 'SUSPENSION_REANUDACION',
+  });
+  return {
+    vencimiento: proyeccion.vencimiento,
+    relojDetenido: proyeccion.relojDetenido,
+    fundamento: FUNDAMENTO_SUSPENSION_REANUDACION,
+  };
+}
+
+/* ──────────────────────────────────────────────
+   Derivación pura desde la trazabilidad real (Actuacion)
+────────────────────────────────────────────── */
+
+/**
+ * Mapa de slugs de `Actuacion.tipo` (dato abierto, D1) a los tipos de
+ * evento que SÍ son relevantes para el término. Cualquier `tipo` de
+ * actuación no listado aquí se excluye de la proyección — no es un error:
+ * la mayoría de actuaciones de un expediente (p. ej. una nota interna) no
+ * mueven el reloj legal.
+ */
+const SLUG_A_TIPO_EVENTO: Readonly<Record<string, TipoEventoTermino>> = {
+  'radicacion-debida-forma': 'RADICACION_DEBIDA_FORMA',
+  'acta-observaciones': 'ACTA_OBSERVACIONES',
+  'respuesta-subsanacion': 'RESPUESTA_SUBSANACION',
+  'modificacion-solicitud': 'MODIFICACION_SOLICITUD',
+};
+
+/**
+ * Deriva la serie de `EventoTermino` a partir de la trazabilidad REAL de
+ * un expediente (`Actuacion[]`, `lib/motor-expedientes/tipos.ts`) — pura,
+ * sin I/O.
+ *
+ * R9 (exclusión de reconstruidos): toda `Actuacion` con
+ * `origen === 'RECONSTRUIDO'` se EXCLUYE de la proyección, sin excepción.
+ * Una actuación reconstruida (D6: migración de un expediente en trámite)
+ * representa un evento histórico aproximado — dejarla mover el reloj de un
+ * término LEGAL VIVO reintroduciría, para el término, el mismo defecto que
+ * el guard D9 previene para los consecutivos (`verificarAvanceCounter`,
+ * `lib/server/consecutivo-legal.ts`): un dato reconstruido no debe alterar
+ * el cómputo vigente de algo que corre en tiempo real.
+ */
+export function derivarEventosTermino(actuaciones: Actuacion[]): EventoTermino[] {
+  const eventos: EventoTermino[] = [];
+  for (const actuacion of actuaciones) {
+    if (actuacion.origen === 'RECONSTRUIDO') continue; // R9
+    const tipo = SLUG_A_TIPO_EVENTO[actuacion.tipo];
+    if (!tipo) continue; // actuación sin relevancia para el término (D1: tipo es dato abierto)
+    eventos.push({ tipo, fecha: atLocalNoon(actuacion.fecha) });
+  }
+  return eventos;
+}

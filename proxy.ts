@@ -1,19 +1,46 @@
 import { NextResponse, type NextRequest } from 'next/server';
-import { INTERNAL_AUTH_COOKIE } from '@/lib/auth-cookie';
+import { SESSION_COOKIE_NAME } from '@/lib/auth-cookie';
+import { getFirebaseAdminAuth, getFirebaseAdminDb } from '@/lib/firebase-admin';
 
-export function proxy(request: NextRequest) {
-  const { pathname } = request.nextUrl;
-  const hasInternalSession = request.cookies.get(INTERNAL_AUTH_COOKIE)?.value === '1';
+async function hasValidInternalSession(request: NextRequest): Promise<boolean> {
+  const sessionCookie = request.cookies.get(SESSION_COOKIE_NAME)?.value;
+  if (!sessionCookie) return false;
 
-  if (pathname === '/interno/login') {
-    if (hasInternalSession) {
-      return NextResponse.redirect(new URL('/interno/dashboard', request.url));
+  try {
+    const decoded = await getFirebaseAdminAuth().verifySessionCookie(sessionCookie, true);
+    if (typeof decoded.tenantId !== 'string' || typeof decoded.rol !== 'string') {
+      return false;
     }
 
-    return NextResponse.next();
+    const userSnap = await getFirebaseAdminDb().doc(`users/${decoded.uid}`).get();
+    const data = userSnap.data();
+    return userSnap.exists && data?.activo !== false && data?.archivado !== true;
+  } catch {
+    return false;
+  }
+}
+
+function unauthorizedApi() {
+  return NextResponse.json({ error: 'No autorizado.' }, { status: 401 });
+}
+
+export async function proxy(request: NextRequest) {
+  const { pathname } = request.nextUrl;
+  const isLogin = pathname === '/interno/login';
+  const isInternalApi = pathname.startsWith('/api/interno/');
+  const validSession = await hasValidInternalSession(request);
+
+  if (isInternalApi) {
+    return validSession ? NextResponse.next() : unauthorizedApi();
   }
 
-  if (!hasInternalSession) {
+  if (isLogin) {
+    return validSession
+      ? NextResponse.redirect(new URL('/interno/dashboard', request.url))
+      : NextResponse.next();
+  }
+
+  if (!validSession) {
     const loginUrl = new URL('/interno/login', request.url);
     loginUrl.searchParams.set('next', pathname);
     return NextResponse.redirect(loginUrl);
@@ -23,5 +50,5 @@ export function proxy(request: NextRequest) {
 }
 
 export const config = {
-  matcher: ['/interno/:path*'],
+  matcher: ['/interno/:path*', '/api/interno/:path*'],
 };

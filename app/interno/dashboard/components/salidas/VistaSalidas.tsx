@@ -1,0 +1,237 @@
+'use client';
+
+import { useMemo, useState } from 'react';
+import { NOMBRES_TENANT } from '@/src/types/reglas-negocio';
+import type { SalidaOficial } from '@/src/types/salida';
+import { formatFechaCortaColombia } from '@/lib/fecha-colombia';
+import { SelloDespacho } from './SelloDespacho';
+import { SectionHeader } from '@/app/components/design-system/SectionHeader';
+import { EmptyState } from '@/app/components/design-system/EmptyState';
+
+/* ══════════════════════════════════════════════════════════════
+   Sprint Radicación de salida — libro de correspondencia despachada.
+
+   La serie 2-SAL completa, consultable y buscable: lo que control
+   interno audita y lo que Laura consulta cuando alguien pregunta
+   "¿ustedes me enviaron ese oficio?". El amarre abre el radicado de
+   entrada correspondiente.
+══════════════════════════════════════════════════════════════ */
+
+const VERDE_INST = '#14532D';
+
+const MEDIO_LABEL: Record<string, string> = {
+  CORREO:     'Correo electrónico',
+  FISICO:     'Correo físico',
+  MENSAJERO:  'Mensajero',
+  PRESENCIAL: 'Entrega presencial',
+};
+
+function normalizar(texto: string): string {
+  return texto.normalize('NFD').replace(/\p{Diacritic}/gu, '').toLowerCase();
+}
+
+export interface VistaSalidasProps {
+  salidas:        SalidaOficial[];
+  cargando:       boolean;
+  error:          string | null;
+  onAbrirEntrada: (radicadoId: string) => void;
+  onNuevaSalida:  () => void;
+}
+
+export function VistaSalidas({
+  salidas,
+  cargando,
+  error,
+  onAbrirEntrada,
+  onNuevaSalida,
+}: VistaSalidasProps) {
+  const [busqueda, setBusqueda] = useState('');
+  // Fase B — constancia de despacho reimprimible desde el libro.
+  const [constanciaDe, setConstanciaDe] = useState<SalidaOficial | null>(null);
+
+  const visibles = useMemo(() => {
+    const q = normalizar(busqueda.trim());
+    if (!q) return salidas;
+    return salidas.filter((s) =>
+      s.salidaId.toLowerCase().includes(q)
+      || normalizar(s.destinatario.nombre).includes(q)
+      || normalizar(s.destinatario.entidad ?? '').includes(q)
+      || normalizar(s.asunto).includes(q)
+      || (s.radicadoEntradaId ?? '').toLowerCase().includes(q));
+  }, [salidas, busqueda]);
+
+  return (
+    <div className="flex-1 overflow-y-auto px-4 sm:px-6 py-6" style={{ background: '#F8FAF7' }}>
+      <SectionHeader
+        titulo="Libro de salidas"
+        subtitulo="Correspondencia despachada"
+        indicador={<span className="w-1.5 h-1.5 rounded-full shrink-0" style={{ background: '#8A6A12' }} />}
+        acciones={
+          <button
+            type="button"
+            onClick={onNuevaSalida}
+            className="inline-flex items-center gap-1.5 text-[13px] font-bold px-4 py-2.5 rounded-[10px] transition-opacity hover:opacity-90"
+            style={{ background: '#D4A017', color: '#3D2C00', border: '1px solid #B8890F' }}
+          >
+            <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2.5}>
+              <path strokeLinecap="round" strokeLinejoin="round" d="M12 5v14M5 12h14" />
+            </svg>
+            Registrar salida
+          </button>
+        }
+      />
+
+      <div className="mb-4">
+        <input
+          type="text"
+          value={busqueda}
+          onChange={(e) => setBusqueda(e.target.value)}
+          placeholder="Buscar por número de salida, destinatario, asunto o radicado de entrada…"
+          aria-label="Buscar en el libro de salidas"
+          className="input-internal w-full max-w-xl"
+        />
+      </div>
+
+      {error && (
+        <p role="alert" className="rounded-lg px-3 py-2 mb-4 text-xs"
+           style={{ background: '#FEF2F2', border: '1px solid #FECACA', color: '#991B1B' }}>
+          {error}
+        </p>
+      )}
+
+      {cargando && salidas.length === 0 ? (
+        <p className="text-xs" style={{ color: '#7A8B7F' }}>Cargando libro de salidas…</p>
+      ) : visibles.length === 0 ? (
+        <EmptyState
+          titulo={salidas.length === 0 ? 'Sin salidas registradas' : 'Sin resultados'}
+          descripcion={salidas.length === 0
+            ? 'Aún no hay salidas registradas. La primera correspondencia despachada aparecerá aquí con su número 2-SAL.'
+            : 'Ninguna salida coincide con la búsqueda.'}
+        />
+      ) : (
+        <div className="rounded-xl bg-white overflow-hidden" style={{ border: '1px solid #E3EAE3' }}>
+          {visibles.map((s, i) => (
+            <div
+              key={s.salidaId}
+              className="flex items-center gap-3 px-4 py-3 flex-wrap"
+              style={i > 0 ? { borderTop: '1px solid #EEF2EE' } : undefined}
+            >
+              <div className="min-w-0 flex-1">
+                <div className="flex items-center gap-2 flex-wrap">
+                  <span className="font-mono text-[13px] font-bold" style={{ color: '#12261A' }}>
+                    {s.salidaId}
+                  </span>
+                  <span
+                    className="text-[10.5px] font-semibold px-2 py-0.5 rounded-full"
+                    style={s.tipoSalida === 'RESPUESTA'
+                      ? { background: '#E6F1FB', color: '#185FA5' }
+                      : { background: '#EEF2F5', color: '#3A4551' }}
+                  >
+                    {s.tipoSalida === 'RESPUESTA' ? 'Respuesta' : 'Oficio independiente'}
+                  </span>
+                  <span className="text-[11px]" style={{ color: '#7A8B7F' }}>
+                    {formatFechaCortaColombia(s.fechaSalida)} · {MEDIO_LABEL[s.medioEnvio] ?? s.medioEnvio}
+                  </span>
+                </div>
+                <p className="text-[12px] mt-0.5 truncate" style={{ color: '#3A4551' }}>
+                  Para: <span className="font-semibold">{s.destinatario.nombre}</span>
+                  {s.destinatario.entidad ? ` (${s.destinatario.entidad})` : ''}
+                  {' · '}{s.asunto}
+                </p>
+                <p className="text-[11px] mt-0.5" style={{ color: '#7A8B7F' }}>
+                  Despacha: {NOMBRES_TENANT[s.dependenciaOrigen] ?? s.dependenciaOrigen} · Firma: {s.firmante.nombre}
+                </p>
+              </div>
+              {/* Fase B — el oficio despachado, servido por la descarga
+                  segura (H-01): URL firmada corta tras autorización. */}
+              {s.archivoPath && (
+                <a
+                  href={`/api/interno/archivo?path=${encodeURIComponent(s.archivoPath)}`}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  aria-label={`Ver oficio despachado de ${s.salidaId}`}
+                  title={s.archivoNombre ?? 'Oficio despachado (PDF)'}
+                  className="inline-flex items-center gap-1 text-[11.5px] font-semibold shrink-0 px-2.5 py-1 rounded-lg"
+                  style={{ border: '1px solid #14532D', color: VERDE_INST, background: 'white' }}
+                >
+                  <svg className="w-3 h-3" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2}>
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M19.5 14.25v-2.625a3.375 3.375 0 00-3.375-3.375h-1.5A1.125 1.125 0 0113.5 7.125v-1.5a3.375 3.375 0 00-3.375-3.375H8.25m6.75 12l-3 3m0 0l-3-3m3 3v-6m-1.5-9H5.625c-.621 0-1.125.504-1.125 1.125v17.25c0 .621.504 1.125 1.125 1.125h12.75c.621 0 1.125-.504 1.125-1.125V11.25a9 9 0 00-9-9z" />
+                  </svg>
+                  Ver oficio
+                </a>
+              )}
+              <button
+                type="button"
+                onClick={() => setConstanciaDe(s)}
+                aria-label={`Imprimir constancia de despacho de ${s.salidaId}`}
+                className="text-[11.5px] font-semibold shrink-0 px-2.5 py-1 rounded-lg"
+                style={{ border: '1px solid #D9E2D9', color: '#475569', background: 'white' }}
+              >
+                Constancia
+              </button>
+              {s.radicadoEntradaId && (
+                <button
+                  type="button"
+                  onClick={() => onAbrirEntrada(s.radicadoEntradaId as string)}
+                  aria-label={`Abrir radicado de entrada ${s.radicadoEntradaId}`}
+                  className="inline-flex items-center gap-1 text-[11.5px] font-semibold shrink-0 hover:underline"
+                  style={{ color: VERDE_INST }}
+                >
+                  Entrada {s.radicadoEntradaId}
+                  <svg className="w-3 h-3" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2.5}>
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M5 12h14M13 6l6 6-6 6" />
+                  </svg>
+                </button>
+              )}
+            </div>
+          ))}
+        </div>
+      )}
+
+      <p className="mt-3 text-[11px]" style={{ color: '#7A8B7F' }}>
+        {visibles.length} salida{visibles.length !== 1 ? 's' : ''} · el libro es inmutable:
+        una corrección se registra como salida nueva.
+      </p>
+
+      {/* Fase B — modal ligero de la constancia de despacho. */}
+      {constanciaDe && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center px-3 py-3"
+          role="dialog"
+          aria-modal="true"
+          aria-label={`Constancia de despacho de ${constanciaDe.salidaId}`}
+        >
+          {/* Velo sólido — sin blur (lección de rendimiento). */}
+          <button
+            type="button"
+            aria-label="Cerrar"
+            onClick={() => setConstanciaDe(null)}
+            className="absolute inset-0 bg-black/55"
+          />
+          <div
+            className="relative w-full max-w-lg bg-white rounded-2xl shadow-2xl overflow-y-auto flex flex-col items-center gap-4 px-6 py-6"
+            style={{ border: '1px solid #D9E2D9', maxHeight: 'calc(100dvh - 24px)' }}
+          >
+            <div className="text-center">
+              <p className="text-[10px] font-bold uppercase tracking-[0.12em]" style={{ color: '#8A6A12' }}>
+                Constancia de despacho
+              </p>
+              <p className="text-lg font-black font-mono" style={{ color: VERDE_INST }}>
+                {constanciaDe.salidaId}
+              </p>
+            </div>
+            <SelloDespacho salida={constanciaDe} />
+            <button
+              type="button"
+              onClick={() => setConstanciaDe(null)}
+              className="px-5 py-2 rounded-xl text-sm font-bold"
+              style={{ border: '1px solid #D9E2D9', color: '#475569' }}
+            >
+              Cerrar
+            </button>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}

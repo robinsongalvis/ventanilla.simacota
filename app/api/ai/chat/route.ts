@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import { SIMI_SYSTEM_PROMPT } from '@/lib/ai/prompts/simi';
 import { registrarLogIA } from '@/lib/ai/telemetry';
 import { ejecutarConResiliencia } from '@/lib/ai/resilience';
+import { evaluarAccesoIA } from '@/lib/ai/guard-publico-ia';
 import type { DatosExtraidos } from '@/src/types/simi';
 
 /* ══════════════════════════════════════════════════════════════
@@ -43,12 +44,12 @@ function generarRespuestaFallback(
   const ultimoMensaje = messages[messages.length - 1]?.content?.toLowerCase() ?? '';
 
   let respuesta =
-    '¡Hola, mano! Bienvenido a la Ventanilla Única de Simacota. ' +
-    '¿En qué le puedo colaborar? Si quiere radicar rápido, use el botón 📎 para escanear su documento.';
+    '¡Hola! Bienvenido a la Ventanilla Única de Simacota. ' +
+    '¿En qué le puedo ayudar? Si quiere radicar rápido, use el botón 📎 para escanear su documento.';
 
   if (ultimoMensaje.includes('agua') || ultimoMensaje.includes('acueducto')) {
     respuesta =
-      'Eso va para **Planeación e Infraestructura**, sumercé. ' +
+      'Eso va para **Planeación e Infraestructura**. ' +
       'Adjunte una foto del daño si puede y use el botón 📎 para escanear su cédula — así llena el formulario más rápido.';
   } else if (ultimoMensaje.includes('sisben') || ultimoMensaje.includes('encuesta')) {
     respuesta =
@@ -60,14 +61,14 @@ function generarRespuestaFallback(
       'SIMI llenará el formulario por usted en segundos.';
   } else if (messages.length > 1) {
     respuesta =
-      'Entendido, mano. ¿Quiere que le ayude a redactar el asunto, ' +
+      'Entendido. ¿Quiere que le ayude a redactar el asunto, ' +
       'o prefiere usar el botón 📎 para escanear su documento?';
   }
 
   if (esFallbackError) {
     respuesta =
       '[Mantenimiento momentáneo] ' + respuesta +
-      ' Estamos restableciendo el servicio, sumercé. Intente en unos segundos.';
+      ' Estamos restableciendo el servicio. Intente en unos segundos.';
   }
 
   return { role: 'assistant', content: respuesta };
@@ -81,6 +82,24 @@ export async function POST(request: Request): Promise<NextResponse<RespuestaChat
   const inicio = Date.now();
   const apiKey = process.env.GEMINI_API_KEY;
   let body: ChatRequestBody = { messages: [] };
+
+  // C-1: guard compartido (origen + rate limit en Firestore).
+  const acceso = await evaluarAccesoIA(request, 'chat');
+  if (!acceso.permitido) {
+    return NextResponse.json(
+      {
+        role: 'assistant',
+        content: acceso.motivo === 'ORIGEN'
+          ? 'No fue posible procesar la solicitud desde este origen.'
+          : 'SIMI recibió muchas solicitudes seguidas desde esta conexión. ' +
+            'Espere un momento e intente nuevamente para continuar con la atención.',
+      },
+      {
+        status: acceso.status ?? 429,
+        headers: acceso.retryAfterSeconds ? { 'Retry-After': String(acceso.retryAfterSeconds) } : {},
+      },
+    );
+  }
 
   try {
     body = (await request.json()) as ChatRequestBody;

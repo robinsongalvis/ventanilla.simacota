@@ -1,472 +1,363 @@
 'use client';
 
-import { Suspense, useCallback, useEffect, useRef, useState } from 'react';
+import { Suspense, useRef, useState } from 'react';
 import { useSearchParams } from 'next/navigation';
 import Link from 'next/link';
-import { DIRECTORIO_TENANTS } from '@/src/types/reglas-negocio';
-import type { EstadoRadicado, AccionAuditoria, TenantId } from '@/src/types/radicado';
+import { InstitucionalHeader } from '@/app/components/institucional/InstitucionalHeader';
+import { SelloRadicado } from '@/app/components/institucional/SelloRadicado';
+import { formatFechaHoraColombia } from '@/lib/fecha-colombia';
+import {
+  ESTADO_CIUDADANO_DESC,
+  ESTADO_CIUDADANO_LABELS,
+  type EstadoCiudadano,
+  type RadicadoPublico,
+} from '@/src/types/simi-citizen';
 
-/* ══════════════════════════════════════════════════════════════
-   DATOS: ESTADOS Y AUDITORÍA EN LENGUAJE CIUDADANO
-══════════════════════════════════════════════════════════════ */
+import type { LicenciaPublica } from '@/lib/seguridad/consulta-publica-licencia';
 
-const DESCRIPCION_ESTADO: Record<EstadoRadicado, { titulo: string; descripcion: string; color: string; bg: string; border: string }> = {
-  PENDIENTE: {
-    titulo:      'Pendiente',
-    descripcion: 'Su solicitud fue recibida y está en espera de ser revisada por un funcionario.',
-    color:       'text-amber-400',
-    bg:          'bg-amber-500/10',
-    border:      'border-amber-500/30',
-  },
-  EN_REVISION: {
-    titulo:      'En revisión',
-    descripcion: 'Un funcionario de la Alcaldía está revisando su solicitud.',
-    color:       'text-indigo-400',
-    bg:          'bg-indigo-500/10',
-    border:      'border-indigo-500/30',
-  },
-  EN_PROCESO: {
-    titulo:      'En proceso',
-    descripcion: 'Su solicitud está siendo atendida. Se están realizando las gestiones necesarias.',
-    color:       'text-sky-400',
-    bg:          'bg-sky-500/10',
-    border:      'border-sky-500/30',
-  },
-  RESUELTO: {
-    titulo:      'Resuelto',
-    descripcion: 'Su solicitud fue atendida y resuelta. Si tiene preguntas, contacte la dependencia asignada.',
-    color:       'text-emerald-400',
-    bg:          'bg-emerald-500/10',
-    border:      'border-emerald-500/30',
-  },
-  DEVUELTO: {
-    titulo:      'Requiere acción del ciudadano',
-    descripcion: 'Se requiere información o documentación adicional de su parte. Contacte la dependencia asignada.',
-    color:       'text-rose-400',
-    bg:          'bg-rose-500/10',
-    border:      'border-rose-500/30',
-  },
-  RECHAZADO: {
-    titulo:      'No admitido',
-    descripcion: 'Su solicitud no pudo ser procesada. Contacte la dependencia asignada para más información.',
-    color:       'text-slate-400',
-    bg:          'bg-slate-500/10',
-    border:      'border-slate-500/30',
-  },
+const ESTADO_VISUAL: Record<EstadoCiudadano, { icono: string; color: string; fondo: string; borde: string }> = {
+  radicado_recibido:       { icono: '✓', color: 'text-emerald-800', fondo: 'bg-emerald-50', borde: 'border-emerald-200' },
+  en_revision:             { icono: '⌕', color: 'text-indigo-800', fondo: 'bg-indigo-50', borde: 'border-indigo-200' },
+  asignado_dependencia:    { icono: '→', color: 'text-sky-800', fondo: 'bg-sky-50', borde: 'border-sky-200' },
+  en_proyeccion_respuesta: { icono: '⋯', color: 'text-amber-800', fondo: 'bg-amber-50', borde: 'border-amber-200' },
+  pendiente_aprobacion:    { icono: '⌛', color: 'text-amber-800', fondo: 'bg-amber-50', borde: 'border-amber-200' },
+  requiere_aclaracion:     { icono: '!', color: 'text-rose-800', fondo: 'bg-rose-50', borde: 'border-rose-200' },
+  trasladado:              { icono: '↗', color: 'text-sky-800', fondo: 'bg-sky-50', borde: 'border-sky-200' },
+  respondido:              { icono: '✓', color: 'text-emerald-800', fondo: 'bg-emerald-50', borde: 'border-emerald-200' },
+  cerrado:                 { icono: '✓', color: 'text-slate-800', fondo: 'bg-slate-50', borde: 'border-slate-200' },
 };
-
-const EMOJI_ESTADO: Record<EstadoRadicado, string> = {
-  PENDIENTE:   '⏳',
-  EN_REVISION: '🔍',
-  EN_PROCESO:  '⚙️',
-  RESUELTO:    '✅',
-  DEVUELTO:    '↩️',
-  RECHAZADO:   '⛔',
-};
-
-const ACCION_CIUDADANO: Partial<Record<AccionAuditoria, string>> = {
-  RADICACION:             'Solicitud recibida',
-  CLASIFICACION_IA:       'Solicitud clasificada',
-  ASIGNACION:             'Asignada a dependencia',
-  CAMBIO_ESTADO:          'Estado actualizado',
-  RESPUESTA_FUNCIONARIO:  'Respuesta del funcionario',
-  DEVOLUCION:             'Se requiere documentación adicional',
-  RECLASIFICACION:        'Reasignada a otra dependencia',
-  NOTIFICACION_WHATSAPP:  'Notificación enviada',
-};
-
-interface RadicadoPublico {
-  radicadoId: string;
-  fechaCreacion?: string;
-  estadoActual?: EstadoRadicado;
-  clasificacionIA?: {
-    oficinaDestino?: TenantId;
-  } | null;
-  auditoria?: {
-    fecha: string;
-    accion: AccionAuditoria;
-  }[];
-}
-
-/* ══════════════════════════════════════════════════════════════
-   UTILIDADES
-══════════════════════════════════════════════════════════════ */
 
 function formatearFecha(iso: string): string {
-  const d = new Date(iso);
-  return d.toLocaleDateString('es-CO', {
-    year:   'numeric',
-    month:  'long',
-    day:    'numeric',
-    hour:   '2-digit',
-    minute: '2-digit',
-  });
+  return formatFechaHoraColombia(iso);
 }
 
-function formatearFechaCorta(iso: string): string {
-  const d = new Date(iso);
-  return `${String(d.getDate()).padStart(2, '0')}/${String(d.getMonth() + 1).padStart(2, '0')} ${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`;
+function labelCanalRespuesta(canal: string): string {
+  const labels: Record<string, string> = {
+    CORREO: 'Correo electrónico',
+    TELEFONO: 'Teléfono',
+    PRESENCIAL: 'Presencial',
+    DIRECCION_FISICA: 'Dirección física',
+  };
+  return labels[canal] ?? canal;
 }
-
-/* ══════════════════════════════════════════════════════════════
-   COMPONENTE INTERNO (necesita Suspense por useSearchParams)
-══════════════════════════════════════════════════════════════ */
 
 function ConsultaInterna() {
-  const searchParams   = useSearchParams();
-  const idParam        = searchParams.get('id') ?? '';
+  const searchParams = useSearchParams();
+  const [numeroRadicado, setNumeroRadicado] = useState(
+    searchParams.get('id') ?? searchParams.get('radicadoId') ?? '',
+  );
+  const [datoVerificacion, setDatoVerificacion] = useState('');
+  const [buscando, setBuscando] = useState(false);
+  const [radicado, setRadicado] = useState<RadicadoPublico | null>(null);
+  /* El bloque de licencia, cuando el radicado tiene expediente vinculado.
+     Ausente para la inmensa mayoría de radicados, que no son licencias. */
+  const [licencia, setLicencia] = useState<LicenciaPublica | null>(null);
+  const [mensaje, setMensaje] = useState('');
+  const [fallos, setFallos] = useState(0);
+  const [copiado, setCopiado] = useState(false);
+  const numeroRef = useRef<HTMLInputElement>(null);
+  const verificacionRef = useRef<HTMLInputElement>(null);
 
-  const [inputId,      setInputId]      = useState(idParam);
-  const [buscando,     setBuscando]     = useState(false);
-  const [radicado,     setRadicado]     = useState<RadicadoPublico | null>(null);
-  const [noEncontrado, setNoEncontrado] = useState(false);
-  const [error,        setError]        = useState('');
-  const [copiado,      setCopiado]      = useState(false);
-  const inputRef                        = useRef<HTMLInputElement>(null);
-
-  // Formatear número al escribir (solo letras mayúsculas y guiones)
-  function handleInputChange(valor: string) {
-    setInputId(valor.toUpperCase().replace(/[^A-Z0-9\-]/g, ''));
-    setNoEncontrado(false);
-    setError('');
+  function limpiarResultado() {
     setRadicado(null);
+    setLicencia(null);
+    setMensaje('');
   }
 
-  const buscar = useCallback(async (id: string) => {
-    const idLimpio = id.trim().toUpperCase();
-    if (!idLimpio) {
-      inputRef.current?.focus();
-      return;
-    }
+  async function buscar(event: React.FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    const numero = numeroRadicado.trim().toUpperCase();
+    const dato = datoVerificacion.trim();
+    if (!numero) return numeroRef.current?.focus();
+    if (!dato) return verificacionRef.current?.focus();
 
     setBuscando(true);
-    setRadicado(null);
-    setNoEncontrado(false);
-    setError('');
-
+    limpiarResultado();
     try {
-      const res = await fetch(`/api/consulta/${encodeURIComponent(idLimpio)}`);
+      const response = await fetch('/api/public/radicado/consulta', {
+        method: 'POST',
+        cache: 'no-store',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ numeroRadicado: numero, datoVerificacion: dato }),
+      });
+      const payload = await response.json().catch(() => null) as {
+        licencia?: LicenciaPublica | null;
+        ok?: boolean;
+        error?: string;
+        radicado?: RadicadoPublico;
+      } | null;
 
-      if (res.status === 404) {
-        setNoEncontrado(true);
+      if (!response.ok || !payload?.ok || !payload.radicado) {
+        const siguientesFallos = fallos + 1;
+        setFallos(siguientesFallos);
+        if (siguientesFallos >= 3) {
+          setDatoVerificacion('');
+          setFallos(0);
+        }
+        setMensaje(payload?.error ?? 'No fue posible realizar la consulta. Intente nuevamente.');
         return;
       }
 
-      const payload = await res.json().catch(() => null);
-
-      if (!res.ok) {
-        throw new Error(
-          payload && typeof payload.error === 'string'
-            ? payload.error
-            : 'Error al consultar. Intente nuevamente.'
-        );
-      }
-
-      setRadicado(payload as RadicadoPublico);
-    } catch (err: unknown) {
-      setError(err instanceof Error ? err.message : 'Error al consultar. Intente nuevamente.');
+      setRadicado(payload.radicado);
+      setLicencia(payload.licencia ?? null);
+      setFallos(0);
+    } catch {
+      setMensaje('No fue posible realizar la consulta. Revise su conexión e intente nuevamente.');
     } finally {
       setBuscando(false);
     }
-  }, []);
-
-  // Auto-búsqueda si la URL trae ?id=XXX
-  useEffect(() => {
-    if (idParam) {
-      buscar(idParam);
-    }
-  }, [idParam, buscar]);
+  }
 
   function copiarEnlace() {
-    const url = `${window.location.origin}/consulta?id=${inputId.trim()}`;
+    const url = `${window.location.origin}/consulta?id=${encodeURIComponent(numeroRadicado.trim())}`;
     navigator.clipboard.writeText(url).then(() => {
       setCopiado(true);
-      setTimeout(() => setCopiado(false), 2000);
+      setTimeout(() => setCopiado(false), 2_000);
     });
   }
 
-  /* ── Extracción tipada de datos del radicado ── */
-  const estado       = radicado?.estadoActual;
-  const estadoInfo   = estado ? DESCRIPCION_ESTADO[estado] : null;
-  const auditoria    = radicado?.auditoria ?? [];
-  const oficinaId    = radicado?.clasificacionIA?.oficinaDestino;
-  const oficina      = oficinaId ? DIRECTORIO_TENANTS[oficinaId] : null;
-  const fechaCreacion = radicado?.fechaCreacion;
+  const estadoVisual = radicado ? ESTADO_VISUAL[radicado.estadoPublico] : null;
 
   return (
-    <main
-      className="min-h-screen"
-      style={{
-        background: `
-          radial-gradient(ellipse 70% 40% at 50% -5%, rgba(99,102,241,0.10) 0%, transparent 55%),
-          #0A0A0B
-        `,
-      }}
-    >
-      {/* ── Header ── */}
-      <header className="border-b border-white/[0.06] backdrop-blur-[20px] bg-[#0A0A0B]/70">
-        <div className="max-w-4xl mx-auto px-4 sm:px-6 py-5 flex items-center gap-3">
-          <div className="w-9 h-9 rounded-xl border border-indigo-500/30 bg-indigo-500/15 flex items-center justify-center shrink-0">
-            <svg viewBox="0 0 24 24" fill="none" stroke="#6366F1" strokeWidth={2} className="w-5 h-5">
-              <path strokeLinecap="round" strokeLinejoin="round" d="M12 3l8 4v5c0 5.25-3.5 10.15-8 11.5C7.5 22.15 4 17.25 4 12V7l8-4z" />
-            </svg>
-          </div>
-          <div>
-            <p className="text-[10px] font-bold uppercase tracking-widest text-indigo-400 leading-none mb-0.5">
-              Alcaldía de Simacota
-            </p>
-            <p className="text-slate-200 text-sm font-black tracking-tight leading-none" style={{ fontFamily: 'var(--font-manrope)' }}>
-              Consulta de Estado de Solicitud
-            </p>
-          </div>
-          <Link
-            href="/"
-            className="ml-auto text-[10px] font-bold uppercase tracking-widest text-slate-600 hover:text-slate-400 transition-colors"
-          >
+    <main className="min-h-screen bg-institucional-light" style={{ color: 'var(--text-primary-2)' }}>
+      <header className="sticky top-0 z-40 border-b border-[var(--border-soft)] bg-white/90 backdrop-blur-[20px]">
+        <div className="mx-auto flex max-w-4xl items-center gap-3 px-4 py-4 sm:px-6">
+          <InstitucionalHeader compact theme="light" subtitle="Consulta segura de solicitudes" />
+          <Link href="/" className="link-gradient-underline ml-auto font-label text-[11px]" style={{ color: 'var(--text-secondary-2)' }}>
             Inicio
           </Link>
         </div>
       </header>
 
-      <div className="max-w-4xl mx-auto px-4 sm:px-6 py-10 sm:py-16 space-y-6">
-
-        {/* ── Título ── */}
-        <div className="text-center mb-8">
-          <h1
-            className="text-3xl sm:text-4xl font-black tracking-tighter text-slate-50 mb-3"
-            style={{ fontFamily: 'var(--font-manrope)' }}
-          >
-            ¿En qué estado está<br className="hidden sm:block" /> su solicitud?
+      <div className="mx-auto max-w-4xl space-y-6 px-4 py-10 sm:px-6 sm:py-16">
+        <div className="mb-8 text-center">
+          <p className="mb-3 font-label text-[10px] tracking-[0.22em]" style={{ color: 'var(--brand-green-action)' }}>
+            Consulta protegida
+          </p>
+          <h1 className="mb-3 text-3xl font-black tracking-tighter sm:text-4xl" style={{ fontFamily: 'var(--font-manrope)' }}>
+            Consulte el estado de su solicitud
           </h1>
-          <p className="text-slate-400 text-sm leading-relaxed max-w-sm mx-auto">
-            Ingrese el número de radicado para ver el estado actual de su caso.
+          <p className="mx-auto max-w-lg text-sm leading-relaxed" style={{ color: 'var(--text-secondary-2)' }}>
+            Para proteger su información, ingrese el número de radicado y el dato de verificación asociado a su solicitud.
           </p>
         </div>
 
-        {/* ── Caja de búsqueda ── */}
-        <div
-          className="rounded-2xl border border-white/10 p-6"
-          style={{ background: 'rgba(15,23,42,0.40)', backdropFilter: 'blur(25px)' }}
-        >
-          <label htmlFor="radicado-input" className="block text-xs font-bold uppercase tracking-widest text-slate-400 mb-3">
-            Número de radicado
-          </label>
-          <div className="flex gap-2">
-            <input
-              ref={inputRef}
-              id="radicado-input"
-              type="text"
-              value={inputId}
-              onChange={(e) => handleInputChange(e.target.value)}
-              onKeyDown={(e) => e.key === 'Enter' && buscar(inputId)}
-              placeholder="EXT-2026-04-14-093022-A7K2"
-              className="flex-1 bg-slate-800/50 border border-white/10 rounded-xl px-4 py-3
-                text-slate-50 placeholder:text-slate-600 text-sm font-mono
-                focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/20 outline-none
-                transition-all duration-300"
-              autoComplete="off"
-              spellCheck={false}
-            />
-            <button
-              onClick={() => buscar(inputId)}
-              disabled={buscando}
-              className="px-5 py-3 rounded-xl font-bold text-sm text-white
-                bg-gradient-to-r from-indigo-600 to-indigo-500
-                hover:from-indigo-500 hover:to-indigo-400
-                disabled:opacity-50 disabled:cursor-not-allowed
-                transition-all duration-300 flex items-center gap-2 shrink-0"
-            >
-              {buscando ? (
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} className="w-4 h-4 animate-spin-smooth">
-                  <path strokeLinecap="round" strokeLinejoin="round" d="M16.023 9.348h4.992v-.001M2.985 19.644v-4.992m0 0h4.992m-4.993 0l3.181 3.183a8.25 8.25 0 0013.803-3.7M4.031 9.865a8.25 8.25 0 0113.803-3.7l3.181 3.182m0-4.991v4.99" />
-                </svg>
-              ) : (
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} className="w-4 h-4">
-                  <path strokeLinecap="round" strokeLinejoin="round" d="M21 21l-5.197-5.197m0 0A7.5 7.5 0 105.196 5.196a7.5 7.5 0 0010.607 10.607z" />
-                </svg>
-              )}
-              Consultar
-            </button>
-          </div>
-        </div>
-
-        {/* ── Resultado: no encontrado ── */}
-        {noEncontrado && (
-          <div className="rounded-2xl border border-rose-500/20 bg-rose-500/5 p-6 text-center">
-            <p className="text-4xl mb-3">🔍</p>
-            <p className="text-slate-200 font-bold mb-2">Radicado no encontrado</p>
-            <p className="text-slate-400 text-sm leading-relaxed">
-              No se encontró un radicado con el número <span className="text-rose-400 font-mono">{inputId}</span>.
-              Verifique que lo escribió correctamente.
+        <form onSubmit={buscar} className="card-institucional overflow-hidden" style={{ boxShadow: 'var(--shadow-institutional-md)' }}>
+          <div className="border-l-4 px-5 py-4" style={{ borderLeftColor: 'var(--brand-green-action)', background: 'rgba(15,95,53,0.04)' }}>
+            <p className="text-sm font-bold">Verificación de identidad</p>
+            <p className="mt-1 text-xs leading-relaxed" style={{ color: 'var(--text-secondary-2)' }}>
+              El dato de verificación no se guarda en este dispositivo ni se incluye en la dirección de la página.
             </p>
           </div>
-        )}
+          <div className="grid gap-5 p-5 sm:p-6">
+            <div>
+              <label htmlFor="radicado-input" className="mb-2 block text-xs font-bold uppercase tracking-widest" style={{ color: 'var(--text-secondary-2)' }}>
+                Número de radicado
+              </label>
+              <input
+                ref={numeroRef}
+                id="radicado-input"
+                value={numeroRadicado}
+                onChange={(event) => {
+                  setNumeroRadicado(event.target.value.toUpperCase().replace(/[^A-Z0-9-]/g, ''));
+                  limpiarResultado();
+                }}
+                placeholder="1-WEB-2026-00000047"
+                className="input-internal w-full font-mono text-sm"
+                autoComplete="off"
+                spellCheck={false}
+              />
+            </div>
+            <div>
+              <label htmlFor="verificacion-input" className="mb-2 block text-xs font-bold uppercase tracking-widest" style={{ color: 'var(--text-secondary-2)' }}>
+                Dato de verificación
+              </label>
+              <input
+                ref={verificacionRef}
+                id="verificacion-input"
+                type="password"
+                value={datoVerificacion}
+                onChange={(event) => {
+                  setDatoVerificacion(event.target.value);
+                  limpiarResultado();
+                }}
+                placeholder="Correo, últimos 4 dígitos o código de consulta"
+                className="input-internal w-full text-sm"
+                autoComplete="off"
+                spellCheck={false}
+                aria-describedby="ayuda-verificacion"
+              />
+              <p id="ayuda-verificacion" className="mt-2 text-xs leading-relaxed" style={{ color: 'var(--text-secondary-2)' }}>
+                Ingrese el correo utilizado al radicar, los últimos cuatro dígitos del documento o el código de consulta recibido.
+              </p>
+            </div>
+            <button
+              type="submit"
+              disabled={buscando}
+              className="btn-institucional-primary inline-flex min-h-11 items-center justify-center gap-2 rounded-xl px-5 py-3 text-sm font-bold disabled:cursor-not-allowed disabled:opacity-60"
+            >
+              {buscando ? 'Verificando…' : 'Consultar de forma segura'}
+            </button>
+          </div>
+        </form>
 
-        {/* ── Resultado: error ── */}
-        {error && (
-          <div className="rounded-2xl border border-rose-500/20 bg-rose-500/5 p-4 text-center">
-            <p className="text-rose-400 text-sm">{error}</p>
+        {mensaje && (
+          <div role="alert" className="card-institucional border-rose-200 bg-rose-50 p-5 text-center">
+            <p className="text-sm font-semibold leading-relaxed text-rose-800">{mensaje}</p>
+            <p className="mt-2 text-xs text-rose-700">Si su solicitud es histórica y no cuenta con un dato de verificación, comuníquese con la Ventanilla Única.</p>
           </div>
         )}
 
-        {/* ── Resultado: radicado encontrado ── */}
-        {radicado && estadoInfo && (
-          <div
-            className="rounded-2xl border border-white/10 overflow-hidden"
-            style={{ background: 'rgba(15,23,42,0.40)', backdropFilter: 'blur(25px)' }}
-          >
-            {/* Cabecera del resultado */}
-            <div className="px-6 pt-6 pb-4 border-b border-white/[0.06]">
-              <div className="flex items-start justify-between gap-4 flex-wrap">
-                <div>
-                  <p className="text-[10px] font-bold uppercase tracking-widest text-slate-500 mb-1">
-                    Número de radicado
-                  </p>
-                  <p
-                    className="text-xl font-black tracking-widest text-indigo-400 font-mono break-all"
-                    style={{ fontFamily: 'var(--font-manrope)' }}
-                  >
-                    {radicado.radicadoId}
-                  </p>
-                </div>
-                {fechaCreacion && (
-                  <div className="text-right shrink-0">
-                    <p className="text-[10px] font-bold uppercase tracking-widest text-slate-500 mb-1">
-                      Fecha de radicación
-                    </p>
-                    <p className="text-xs text-slate-300">{formatearFecha(fechaCreacion)}</p>
-                  </div>
-                )}
-              </div>
-            </div>
-
-            {/* Estado actual */}
-            <div className="px-6 py-5 border-b border-white/[0.06]">
-              <p className="text-[10px] font-bold uppercase tracking-widest text-slate-500 mb-3">
-                Estado actual
-              </p>
-              <div className={`rounded-xl border ${estadoInfo.border} ${estadoInfo.bg} p-4`}>
-                <div className="flex items-center gap-3 mb-2">
-                  <span className="text-2xl">{EMOJI_ESTADO[estado!]}</span>
-                  <span className={`text-lg font-black tracking-tight ${estadoInfo.color}`} style={{ fontFamily: 'var(--font-manrope)' }}>
-                    {estadoInfo.titulo}
-                  </span>
-                </div>
-                <p className="text-sm text-slate-300 leading-relaxed">{estadoInfo.descripcion}</p>
-              </div>
-            </div>
-
-            {/* Dependencia asignada */}
-            {oficina && (
-              <div className="px-6 py-5 border-b border-white/[0.06]">
-                <p className="text-[10px] font-bold uppercase tracking-widest text-slate-500 mb-3">
-                  Dependencia asignada
+        {radicado && estadoVisual && (
+          <article className="card-institucional overflow-hidden" style={{ boxShadow: 'var(--shadow-institutional-md)' }}>
+            <div className="flex flex-wrap items-start justify-between gap-4 border-b border-[var(--border-soft)] px-6 py-5">
+              <div>
+                <p className="mb-1 text-[10px] font-bold uppercase tracking-widest text-slate-500">Número de radicado</p>
+                <p className="break-all font-mono text-xl font-black tracking-wider" style={{ color: 'var(--brand-forest)' }}>
+                  {radicado.numeroRadicado}
                 </p>
-                <p className="text-slate-200 font-bold mb-2">{oficina.nombreOficial}</p>
-                <div className="space-y-1.5">
-                  <a
-                    href={`mailto:${oficina.emailOficial}`}
-                    className="flex items-center gap-2 text-sm text-slate-400 hover:text-indigo-400 transition-colors"
-                  >
-                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.5} className="w-4 h-4 shrink-0">
-                      <path strokeLinecap="round" strokeLinejoin="round" d="M21.75 6.75v10.5a2.25 2.25 0 01-2.25 2.25h-15a2.25 2.25 0 01-2.25-2.25V6.75m19.5 0A2.25 2.25 0 0019.5 4.5h-15a2.25 2.25 0 00-2.25 2.25m19.5 0v.243a2.25 2.25 0 01-1.07 1.916l-7.5 4.615a2.25 2.25 0 01-2.36 0L3.32 8.91a2.25 2.25 0 01-1.07-1.916V6.75" />
-                    </svg>
-                    {oficina.emailOficial}
-                  </a>
-                  <a
-                    href={`tel:${oficina.celularOficial}`}
-                    className="flex items-center gap-2 text-sm text-slate-400 hover:text-indigo-400 transition-colors"
-                  >
-                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.5} className="w-4 h-4 shrink-0">
-                      <path strokeLinecap="round" strokeLinejoin="round" d="M2.25 6.75c0 8.284 6.716 15 15 15h2.25a2.25 2.25 0 002.25-2.25v-1.372c0-.516-.351-.966-.852-1.091l-4.423-1.106c-.44-.11-.902.055-1.173.417l-.97 1.293c-.282.376-.769.542-1.21.38a12.035 12.035 0 01-7.143-7.143c-.162-.441.004-.928.38-1.21l1.293-.97c.363-.271.527-.734.417-1.173L6.963 3.102a1.125 1.125 0 00-1.091-.852H4.5A2.25 2.25 0 002.25 4.5v2.25z" />
-                    </svg>
-                    {oficina.celularOficial.replace(/(\d{3})(\d{3})(\d{4})/, '$1 $2 $3')}
-                  </a>
+              </div>
+              <div className="text-left sm:text-right">
+                <p className="mb-1 text-[10px] font-bold uppercase tracking-widest text-slate-500">Fecha de radicación</p>
+                <p className="text-xs text-slate-700">{formatearFecha(radicado.fechaRadicacion)}</p>
+              </div>
+            </div>
+
+            <div className="border-b border-[var(--border-soft)] px-6 py-5">
+              <p className="mb-3 text-[10px] font-bold uppercase tracking-widest text-slate-500">Estado actual</p>
+              <div className={`rounded-xl border p-4 ${estadoVisual.borde} ${estadoVisual.fondo}`}>
+                <div className="mb-2 flex items-center gap-3">
+                  <span aria-hidden className={`flex h-8 w-8 items-center justify-center rounded-full border text-sm font-black ${estadoVisual.borde} ${estadoVisual.color}`}>
+                    {estadoVisual.icono}
+                  </span>
+                  <h2 className={`text-lg font-black tracking-tight ${estadoVisual.color}`} style={{ fontFamily: 'var(--font-manrope)' }}>
+                    {ESTADO_CIUDADANO_LABELS[radicado.estadoPublico]}
+                  </h2>
+                </div>
+                <p className="text-sm leading-relaxed text-slate-700">{ESTADO_CIUDADANO_DESC[radicado.estadoPublico]}</p>
+              </div>
+            </div>
+
+            {licencia && (
+              /* SU LICENCIA, EN SU IDIOMA. El estado jurídico traducido a lo que
+                 necesita saber: qué pasó y si le toca hacer algo. Las etiquetas
+                 internas («con acta de observaciones», «en viabilidad») son
+                 exactas y no significan nada fuera de Planeación. */
+              <div className="border-b border-[var(--border-soft)] px-6 py-5">
+                <p className="mb-3 text-[10px] font-bold uppercase tracking-widest text-slate-500">
+                  Su licencia urbanística
+                </p>
+                {/* CON SU RÓTULO (ADR-0041): el ciudadano ya consultó con su
+                    radicado y aquí ve un SEGUNDO número. Sin decir cuál es,
+                    dos números en la misma pantalla solo generan la llamada
+                    al mostrador que este bloque existe para evitar. */}
+                {licencia.numeroExpediente && (
+                  <p className="mb-2 text-xs text-slate-600">
+                    <span className="text-slate-500">Expediente en Planeación: </span>
+                    <span className="font-mono">{licencia.numeroExpediente}</span>
+                  </p>
+                )}
+                <h2 className="text-base font-black text-slate-900">{licencia.estado.titulo}</h2>
+                <p className="mt-1 text-sm leading-relaxed text-slate-700">{licencia.estado.explicacion}</p>
+
+                {licencia.estado.accionDelCiudadano !== 'NINGUNA' && (
+                  <p role="alert" className="mt-3 rounded-lg border border-amber-300 bg-amber-50 px-3 py-2 text-sm font-semibold text-amber-900">
+                    {licencia.estado.accionDelCiudadano === 'DEBE_COMPLETAR'
+                      ? 'Usted debe atender las observaciones para que su solicitud continúe.'
+                      : 'Usted debe notificarse de la decisión para que produzca efectos.'}
+                  </p>
+                )}
+
+                <p className="mt-3 text-xs text-slate-600">
+                  {licencia.avisoPlazo
+                    ? licencia.avisoPlazo
+                    : `El plazo de respuesta corre desde el ${formatearFecha(licencia.desdeCuandoCorreElPlazo!)}.`}
+                </p>
+              </div>
+            )}
+
+            <div className="border-b border-[var(--border-soft)] px-6 py-5">
+              <SelloRadicado
+                variant="compact"
+                data={{
+                  radicadoId: radicado.numeroRadicado,
+                  fechaRadicado: radicado.fechaRadicacion,
+                  medioRecepcion: radicado.numeroRadicado.includes('-WEB-') ? 'WEB' : null,
+                  tipoSolicitud: radicado.tipoSolicitud,
+                  canalRespuesta: radicado.canalRespuesta ?? null,
+                  dependencia: radicado.dependencia ?? 'Información protegida',
+                  estado: ESTADO_CIUDADANO_LABELS[radicado.estadoPublico],
+                  esAnonimo: !radicado.dependencia,
+                }}
+              />
+              <p className="mt-3 text-xs text-slate-600">
+                Fecha límite estimada: <span className="font-semibold text-slate-700">{formatearFecha(radicado.fechaVencimiento)}</span>
+              </p>
+            </div>
+
+            <div className="grid gap-4 border-b border-[var(--border-soft)] px-6 py-5 sm:grid-cols-2">
+              <div>
+                <p className="mb-2 text-[10px] font-bold uppercase tracking-widest text-slate-500">Tipo de solicitud</p>
+                <p className="text-sm font-semibold text-slate-800">{radicado.tipoSolicitud}</p>
+              </div>
+              {radicado.canalRespuesta && (
+                <div>
+                  <p className="mb-2 text-[10px] font-bold uppercase tracking-widest text-slate-500">Canal de respuesta</p>
+                  <p className="text-sm font-semibold text-slate-800">{labelCanalRespuesta(radicado.canalRespuesta)}</p>
+                </div>
+              )}
+            </div>
+
+            {radicado.respuestaOficial && (
+              <div className="border-b border-[var(--border-soft)] px-6 py-5">
+                <p className="mb-3 text-[10px] font-bold uppercase tracking-widest text-emerald-700">Respuesta oficial de la Alcaldía</p>
+                <div className="rounded-xl border border-emerald-200 bg-emerald-50 p-4">
+                  <p className="whitespace-pre-wrap text-sm leading-relaxed text-slate-800">{radicado.respuestaOficial.nota}</p>
+                  <p className="mt-4 border-t border-emerald-200 pt-3 text-[11px] text-slate-600">
+                    {radicado.respuestaOficial.dependenciaNombre} · {formatearFecha(radicado.respuestaOficial.fecha)}
+                  </p>
                 </div>
               </div>
             )}
 
-            {/* Historial */}
-            {auditoria.length > 0 && (
-              <div className="px-6 py-5 border-b border-white/[0.06]">
-                <p className="text-[10px] font-bold uppercase tracking-widest text-slate-500 mb-4">
-                  Historial
-                </p>
+            {radicado.lineaTiempo && radicado.lineaTiempo.length > 0 && (
+              <div className="border-b border-[var(--border-soft)] px-6 py-5">
+                <p className="mb-4 text-[10px] font-bold uppercase tracking-widest text-slate-500">Línea de tiempo pública</p>
                 <ol className="space-y-3">
-                  {auditoria.map((entrada, i) => {
-                    const textoAmigable = ACCION_CIUDADANO[entrada.accion as AccionAuditoria] ?? 'Actualización';
-                    return (
-                      <li key={i} className="flex items-start gap-3">
-                        <div className="mt-0.5 w-5 h-5 rounded-full border border-indigo-500/30 bg-indigo-500/10 flex items-center justify-center shrink-0">
-                          <div className="w-1.5 h-1.5 rounded-full bg-indigo-400" />
-                        </div>
-                        <div>
-                          <p className="text-xs text-slate-300">{textoAmigable}</p>
-                          <p className="text-[10px] text-slate-600 mt-0.5">{formatearFechaCorta(entrada.fecha)}</p>
-                        </div>
-                      </li>
-                    );
-                  })}
+                  {radicado.lineaTiempo.map((item, index) => (
+                    <li key={`${item.fecha}-${item.evento}-${index}`} className="flex gap-3 text-sm">
+                      <span className="mt-1.5 h-2 w-2 shrink-0 rounded-full" style={{ background: 'var(--brand-green-action)' }} />
+                      <div>
+                        <p className="font-semibold text-slate-800">{item.evento}</p>
+                        <p className="mt-0.5 text-xs text-slate-500">{formatearFecha(item.fecha)}</p>
+                      </div>
+                    </li>
+                  ))}
                 </ol>
               </div>
             )}
 
-            {/* Acciones */}
-            <div className="px-6 py-4 flex flex-wrap gap-2">
-              <button
-                onClick={copiarEnlace}
-                className="flex items-center gap-1.5 text-xs font-bold uppercase tracking-wider
-                  text-slate-500 hover:text-slate-300 transition-colors px-3 py-2 rounded-lg
-                  border border-white/[0.06] hover:border-white/10"
-              >
-                {copiado ? (
-                  <>
-                    <svg viewBox="0 0 24 24" fill="none" stroke="#10B981" strokeWidth={2.5} className="w-3.5 h-3.5">
-                      <path strokeLinecap="round" strokeLinejoin="round" d="M4.5 12.75l6 6 9-13.5" />
-                    </svg>
-                    ¡Copiado!
-                  </>
-                ) : (
-                  <>
-                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} className="w-3.5 h-3.5">
-                      <path strokeLinecap="round" strokeLinejoin="round" d="M13.19 8.688a4.5 4.5 0 011.242 7.244l-4.5 4.5a4.5 4.5 0 01-6.364-6.364l1.757-1.757m13.35-.622l1.757-1.757a4.5 4.5 0 00-6.364-6.364l-4.5 4.5a4.5 4.5 0 001.242 7.244" />
-                    </svg>
-                    Copiar enlace de consulta
-                  </>
-                )}
+            <div className="px-6 py-4">
+              <button type="button" onClick={copiarEnlace} className="rounded-lg border border-[var(--border-soft)] px-3 py-2 text-xs font-bold uppercase tracking-wider text-slate-600 transition-colors hover:bg-slate-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-700/30">
+                {copiado ? 'Enlace copiado' : 'Copiar enlace sin dato de verificación'}
               </button>
             </div>
-          </div>
+          </article>
         )}
 
-        {/* ── Ayuda: no tiene número ── */}
-        <div
-          className="rounded-2xl border border-white/[0.07] p-5"
-          style={{ background: 'rgba(15,23,42,0.30)', backdropFilter: 'blur(25px)' }}
-        >
-          <p className="text-sm font-bold text-slate-300 mb-2">¿No tiene número de radicado?</p>
-          <p className="text-xs text-slate-500 leading-relaxed mb-4">
-            Si presentó su solicitud en persona, el número está en el comprobante que le entregó
-            la recepcionista. Si la presentó por internet, revise su correo electrónico o anote
-            el número que apareció en la pantalla de confirmación.
+        <div className="card-institucional p-5">
+          <p className="mb-2 text-sm font-bold">¿No tiene número o dato de verificación?</p>
+          <p className="mb-4 text-xs leading-relaxed" style={{ color: 'var(--text-secondary-2)' }}>
+            Revise el comprobante o el correo de confirmación. Para solicitudes históricas sin código, comuníquese con la Ventanilla Única para recibir orientación.
           </p>
-          <Link
-            href="/radicacion"
-            className="inline-flex items-center gap-2 text-xs font-bold uppercase tracking-wider
-              text-indigo-400 hover:text-indigo-300 transition-colors"
-          >
+          <Link href="/radicacion" className="link-gradient-underline text-xs font-bold uppercase tracking-wider" style={{ color: 'var(--brand-green-action)' }}>
             Radicar nueva solicitud
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} className="w-3.5 h-3.5">
-              <path strokeLinecap="round" strokeLinejoin="round" d="M13.5 4.5L21 12m0 0l-7.5 7.5M21 12H3" />
-            </svg>
           </Link>
         </div>
-
       </div>
 
-      {/* ── Footer ── */}
-      <footer className="border-t border-white/[0.06] py-6 text-center mt-4">
-        <p className="text-[10px] font-bold uppercase tracking-widest text-slate-700">
+      <footer className="mt-4 border-t border-[var(--border-soft)] bg-white/40 py-6 text-center">
+        <p className="text-[10px] font-bold uppercase tracking-widest" style={{ color: 'var(--text-secondary-2)' }}>
           Alcaldía Municipal de Simacota · Santander · Sistema de Ventanilla Única Digital
         </p>
       </footer>
@@ -474,24 +365,9 @@ function ConsultaInterna() {
   );
 }
 
-/* ══════════════════════════════════════════════════════════════
-   EXPORT DEFAULT — envuelto en Suspense (requerido por useSearchParams)
-══════════════════════════════════════════════════════════════ */
-
 export default function ConsultaPage() {
   return (
-    <Suspense
-      fallback={
-        <div className="min-h-screen bg-[#0A0A0B] flex items-center justify-center">
-          <div className="flex items-center gap-3 text-slate-500">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} className="w-5 h-5 animate-spin-smooth">
-              <path strokeLinecap="round" strokeLinejoin="round" d="M16.023 9.348h4.992v-.001M2.985 19.644v-4.992m0 0h4.992m-4.993 0l3.181 3.183a8.25 8.25 0 0013.803-3.7M4.031 9.865a8.25 8.25 0 0113.803-3.7l3.181 3.182m0-4.991v4.99" />
-            </svg>
-            <span className="text-sm">Cargando...</span>
-          </div>
-        </div>
-      }
-    >
+    <Suspense fallback={<div className="flex min-h-screen items-center justify-center bg-institucional-light text-sm text-slate-600">Cargando consulta segura…</div>}>
       <ConsultaInterna />
     </Suspense>
   );

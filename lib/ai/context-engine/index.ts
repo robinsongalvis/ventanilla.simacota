@@ -1,4 +1,4 @@
-import type { VentanillaRadicado } from '@/src/types/ventanilla';
+import type { TrazabilidadRadicado, VentanillaRadicado } from '@/src/types/ventanilla';
 import { calcularRiesgoVencimiento } from '../predictive/riesgo-vencimiento';
 import { calcularSaturacionDependencias } from '../predictive/saturacion';
 import { calcularRiesgoTerritorial } from '../predictive/zonas';
@@ -26,7 +26,8 @@ export interface ContextoIARadicado {
 export function construirContextoAgente(
   radicado: VentanillaRadicado,
   todosLosRadicados: VentanillaRadicado[],
-  overridesAuditoria: Array<{ clasificacionOriginal?: string | null }> = []
+  overridesAuditoria: Array<{ clasificacionOriginal?: string | null }> = [],
+  trazabilidad: TrazabilidadRadicado[] = [],
 ): ContextoIARadicado {
   // 1. Calcular riesgo matemático
   const riesgo = calcularRiesgoVencimiento(radicado, todosLosRadicados);
@@ -40,7 +41,7 @@ export function construirContextoAgente(
   const territorial = riesgoTerritorial.find((z) => z.zona === radicado.clasificacion.zonaGeografica);
 
   // 4. Formatear la bitácora cronológica de trazabilidad
-  const resumenTrazabilidad = radicado.trazabilidad.map((t) => {
+  const resumenTrazabilidad = trazabilidad.map((t) => {
     const fecha = t.fecha ? t.fecha.split('T')[0] : 'Sin fecha';
     return `[${fecha}] Acción: ${t.accion} por ${t.actorNombre}. Nota: ${t.nota}`;
   });

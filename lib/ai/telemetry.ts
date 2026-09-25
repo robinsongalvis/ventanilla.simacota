@@ -1,5 +1,4 @@
-import { doc, setDoc } from 'firebase/firestore';
-import { getDb } from '@/lib/firebase';
+import { getFirebaseAdminDb } from '@/lib/firebase-admin';
 
 interface LogAiParams {
   radicadoId?: string;
@@ -19,7 +18,7 @@ export async function registrarLogIA({
   promptVersion = 'unknown',
 }: LogAiParams) {
   try {
-    const db = getDb();
+    const db = getFirebaseAdminDb();
     const ahora = new Date().toISOString();
     const logId = `log_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`;
 
@@ -34,7 +33,7 @@ export async function registrarLogIA({
       timestamp: ahora,
     };
 
-    await setDoc(doc(db, 'ai_logs', logId), logDoc);
+    await db.doc(`ai_logs/${logId}`).set(logDoc);
   } catch (err) {
     console.error('Error al registrar log de IA en telemetría:', err);
   }

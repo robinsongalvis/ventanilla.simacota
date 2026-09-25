@@ -2,28 +2,61 @@ rules_version = '2';
 
 service firebase.storage {
   match /b/{bucket}/o {
-    function signedIn() {
-      return request.auth != null;
-    }
-
-    function isAllowedRadicadoFile() {
-      return request.resource != null
-        && request.resource.size > 0
-        && request.resource.size <= 10 * 1024 * 1024
-        && (
-          request.resource.contentType.matches('image/.*')
-          || request.resource.contentType == 'application/pdf'
-        );
-    }
+    // PT-3 (24-ago-2026): el bucket ENTERO es Admin-SDK-only. Las dos
+    // puertas de subida directa autenticada que había (/radicados/ y
+    // /respuestas/) eran PUERTAS MUERTAS: la pública sube por
+    // /api/radicacion, la interna por /api/radicacion/interna desde el
+    // cutover PT-1, la resolución por /api/radicados/{id}/resolver, y
+    // `subirArchivos` de lib/storage quedó sin un solo llamador (verificado
+    // sin truncar). Su único uso posible era el abuso: cualquier token de
+    // Auth — sin perfil interno siquiera — podía subir 10 MB a discreción o
+    // plantar «respuestas oficiales». La validación de tipo/tamaño vive en
+    // el servidor (magic-bytes + límites del handler), donde no se esquiva.
 
     match /radicados/{radicadoId}/{archivo} {
-      // Permite radicacion ciudadana sin cuenta, con limites estrictos de tipo y tamano.
-      allow create: if isAllowedRadicadoFile();
+      allow read, write: if false;
+    }
 
-      // Solo funcionarios autenticados pueden abrir adjuntos desde el panel interno.
-      allow read: if signedIn();
+    match /respuestas/{radicadoId}/{archivo} {
+      allow read, write: if false;
+    }
 
-      allow update, delete: if false;
+    // Sprint Ventanilla Operativa 3 — copias selladas.
+    // Escritura SOLO por Admin SDK desde /api/radicados/{id}/sellar-documento.
+    // Los clientes nunca escriben aquí; el original queda en /radicados/ intacto.
+    // Lectura solo via Admin SDK en /api/interno/archivo — nunca directa.
+    match /sellados/{radicadoId}/{archivo} {
+      allow read, write: if false;
+    }
+
+    // Fase B · PDF adjunto — oficios de salida 2-SAL.
+    // Escritura SOLO por Admin SDK desde /api/salidas/registrar; el libro
+    // es inmutable y su archivo también. Lectura solo via Admin SDK en
+    // /api/interno/archivo (autorizarDescargaSalida) — nunca directa.
+    match /salidas/{salidaId}/{archivo} {
+      allow read, write: if false;
+    }
+
+    // Planilla de reparto — escaneo de la hoja firmada.
+    // Escritura SOLO por Admin SDK desde /api/planillas/entregas; la
+    // evidencia de firmas es inmutable. Lectura via Admin SDK.
+    match /planillas/{planillaId}/{archivo} {
+      allow read, write: if false;
+    }
+
+    // Motor de expedientes — D7 ADR-0026 (Bloque A·A1): binarios de
+    // versiones INMUTABLES de documentos. Dos formas de ruta, ambas SOLO
+    // Admin SDK (patrón H3 de /api/radicacion: staging → transacción
+    // Firestore → move a ruta final), por eso el glob {resto=**}:
+    //   · staging: expedientes/_pendientes/{requestId}/{archivo}
+    //   · final:   expedientes/{expedienteId}/{documentoId}/{vNNNN}/{archivo}
+    // Una versión JAMÁS se sobrescribe ni se borra (append-only); corregir
+    // = subir vNNNN+1. Lectura NUNCA directa ni pública: descarga
+    // autorizada server-side por tenant (anti-IDOR), mismo patrón de
+    // /api/interno/archivo + lib/seguridad/autorizar-descarga-archivo.ts.
+    // Contrato de rutas: lib/server/expedientes-documentos-tipos.ts.
+    match /expedientes/{resto=**} {
+      allow read, write: if false;
     }
 
     match /{path=**} {

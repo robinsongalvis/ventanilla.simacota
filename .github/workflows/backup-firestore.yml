@@ -1,0 +1,291 @@
+name: Backup Firestore (respaldo diario · Roadmap P2.4)
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Respaldo automatizado de Firestore de PRODUCCIÓN mediante export gestionado a
+# Google Cloud Storage. Es la contraparte EJECUTABLE de docs/disaster-recovery.md
+# (antes solo describía el export como si estuviera programado — CR-3 de la
+# auditoría 2026-07-20). El export es ADITIVO: escribe un backup nuevo, jamás
+# toca ni borra datos de Firestore.
+#
+# Vía elegida: GitHub Actions programado (no Cloud Scheduler) — justificación en
+# scripts/backups/README.md y docs/disaster-recovery.md §3.1. Resumen: la config
+# queda versionada en el repo (raíz del hallazgo CR-3), corre sobre la misma
+# superficie de CI que el equipo ya opera, y estampa la carpeta por día sin
+# infraestructura extra (Cloud Scheduler no puede plantillar la fecha sin una
+# Cloud Function adicional).
+#
+# REQUISITOS DE INFRAESTRUCTURA (los provisiona el propietario UNA vez con
+# scripts/backups/setup-gcp-backups.sh):
+#   - Bucket GCS de respaldos con política de retención (lifecycle).
+#   - Service account de backups con roles/datastore.importExportAdmin.
+#   - Federación de identidad (WIF) GitHub↔GCP  ·  o clave JSON como fallback.
+#   - Secrets/vars del repo (ver §Secrets abajo y VARIABLES_ENTORNO.md).
+# ─────────────────────────────────────────────────────────────────────────────
+
+on:
+  schedule:
+    # 07:00 UTC = 02:00 America/Bogota (ventana de bajo tráfico). Diario.
+    - cron: '0 7 * * *'
+  # Permite disparar un backup de prueba manual desde la pestaña Actions.
+  workflow_dispatch:
+    inputs:
+      confirmar:
+        description: 'Escribe "backup" para confirmar un export manual'
+        required: true
+        default: ''
+
+# Nunca dos exports solapados (uno diario + uno manual a la vez).
+concurrency:
+  group: backup-firestore
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+  id-token: write   # requerido por la federación de identidad (WIF, keyless).
+  issues: write     # para el aviso de fallo (ver el paso "Avisar si el respaldo falló").
+
+jobs:
+  export:
+    name: Export Firestore -> GCS
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    env:
+      # Ajustar en Settings -> Secrets and variables -> Actions -> Variables.
+      GCP_PROJECT: ${{ vars.GCP_BACKUP_PROJECT || 'ventanilla-unica-f31b1' }}
+      BACKUP_BUCKET: ${{ vars.GCP_BACKUP_BUCKET || 'ventanilla-simacota-backups' }}
+      # Secrets izados a env: el contexto secrets NO esta permitido en los if:
+      # de pasos — GitHub invalidaba el workflow completo (runs failure/0-jobs,
+      # hallazgo G6 del ADR-0025). Los if: condicionan sobre env, que si lo esta.
+      WIF_PROVIDER: ${{ secrets.GCP_WORKLOAD_IDENTITY_PROVIDER }}
+      SA_KEY_JSON: ${{ secrets.GCP_BACKUP_SA_KEY }}
+
+    steps:
+      - name: Validar disparo manual
+        if: ${{ github.event_name == 'workflow_dispatch' && github.event.inputs.confirmar != 'backup' }}
+        run: |
+          echo "::error::Disparo manual sin confirmar. Escribe 'backup' en el input."
+          exit 1
+
+      - name: Verificar que la infraestructura está provisionada
+        run: |
+          faltan=""
+          if [ -z "$WIF_PROVIDER" ] && [ -z "$SA_KEY_JSON" ]; then
+            faltan="$faltan\n  - Auth GCP: define GCP_WORKLOAD_IDENTITY_PROVIDER+GCP_BACKUP_SA (WIF, recomendado) o GCP_BACKUP_SA_KEY (clave JSON, fallback)."
+          fi
+          if [ -n "$faltan" ]; then
+            echo "::error::Backup NO ejecutado — infraestructura sin provisionar."
+            echo "Ejecuta scripts/backups/setup-gcp-backups.sh y carga los secrets. Falta:"
+            echo -e "$faltan"
+            exit 1
+          fi
+
+      # ── Autenticación (elige UNA de las dos vías con los secrets que existan) ──
+      # Vía A (recomendada, keyless): Workload Identity Federation.
+      - name: Autenticar a GCP (WIF)
+        if: ${{ env.WIF_PROVIDER != '' }}
+        uses: google-github-actions/auth@v3
+        with:
+          workload_identity_provider: ${{ secrets.GCP_WORKLOAD_IDENTITY_PROVIDER }}
+          service_account: ${{ secrets.GCP_BACKUP_SA }}
+
+      # Vía B (fallback): clave JSON de un service account guardada como secret.
+      - name: Autenticar a GCP (clave JSON)
+        if: ${{ env.WIF_PROVIDER == '' && env.SA_KEY_JSON != '' }}
+        uses: google-github-actions/auth@v3
+        with:
+          credentials_json: ${{ secrets.GCP_BACKUP_SA_KEY }}
+
+      - name: Configurar gcloud
+        uses: google-github-actions/setup-gcloud@v3
+
+      # ── Export + ESPERA REAL + verificación del resultado ──────────────
+      #
+      # Por qué no basta con `gcloud firestore export` a secas (hallazgo del
+      # 12-ago-2026): aunque se invoque SIN `--async`, gcloud retorna en
+      # cuanto la operación queda registrada — los logs del backup del
+      # 12-ago muestran "Waiting for [operations/...] to finish..." seguido
+      # de `operationState: PROCESSING` y salida exitosa 4 segundos después,
+      # con la copia todavía en curso del lado de GCP. Es decir: el job
+      # marcaba SUCCESS cuando el respaldo apenas había EMPEZADO, y si
+      # fallaba a mitad (cuota, permisos, indisponibilidad) nadie se
+      # enteraba. Un respaldo que nadie verifica no es un respaldo: es una
+      # promesa.
+      #
+      # Ahora: se captura el nombre de la operación, se ESPERA a que termine
+      # de verdad, y solo se declara éxito si además el destino contiene
+      # objetos con bytes > 0. Cualquiera de las tres condiciones que falle
+      # pone el job en rojo.
+      - name: Ejecutar export de Firestore y ESPERAR a que termine
+        id: export
+        run: |
+          set -euo pipefail
+          FECHA="$(date -u +%F)"                      # p.ej. 2026-07-20
+          DESTINO="gs://${BACKUP_BUCKET}/diario/${FECHA}"
+          echo "DESTINO=${DESTINO}" >> "$GITHUB_OUTPUT"
+          echo "Exportando Firestore de ${GCP_PROJECT} -> ${DESTINO}"
+
+          # Un export ya COMPLETADO deja este marcador. Si existe, el
+          # respaldo del día ya está hecho: se salta el export y se pasa a
+          # verificarlo. Sin esto, reintentar un día que falló es imposible —
+          # `gcloud firestore export` responde "Path already exists" y el job
+          # vuelve a caer, ahora por una razón distinta y confusa
+          # (comprobado el 17-ago-2026 al intentar justamente eso).
+          MARCADOR="${DESTINO}/${FECHA}.overall_export_metadata"
+          if gcloud storage ls "${MARCADOR}" >/dev/null 2>&1; then
+            echo "El respaldo de ${FECHA} YA existe (marcador de export completado presente)."
+            echo "Se salta el export y se verifica el existente."
+            exit 0
+          fi
+
+          OPERACION="$(gcloud firestore export "${DESTINO}" \
+            --project="${GCP_PROJECT}" \
+            --database='(default)' \
+            --async --format='value(name)')"
+          echo "Operación: ${OPERACION}"
+
+          # Espera activa: hasta 25 min (el job tiene timeout de 30).
+          for _ in $(seq 1 150); do
+            ESTADO="$(gcloud firestore operations describe "${OPERACION}" \
+              --project="${GCP_PROJECT}" --format='value(metadata.operationState)')"
+            echo "  estado: ${ESTADO}"
+            case "${ESTADO}" in
+              SUCCESSFUL) echo "Export COMPLETADO."; exit 0 ;;
+              FAILED|CANCELLED)
+                echo "::error::El export terminó en estado ${ESTADO}."
+                gcloud firestore operations describe "${OPERACION}" --project="${GCP_PROJECT}"
+                exit 1 ;;
+            esac
+            sleep 10
+          done
+          echo "::error::El export no terminó dentro de la ventana de espera."
+          exit 1
+
+      # Un export puede reportar SUCCESSFUL y aun así dejar un destino vacío
+      # (p. ej. si la base estuviera vacía). Se verifica el resultado en el
+      # bucket: debe haber objetos y pesar algo. El tamaño se publica en el
+      # resumen para poder VIGILAR la tendencia — una caída brusca de un día
+      # a otro es la señal temprana de que algo se rompió.
+      - name: Verificar que el respaldo existe y tiene datos
+        run: |
+          set -euo pipefail
+          DESTINO="${{ steps.export.outputs.DESTINO }}"
+          OBJETOS="$(gcloud storage ls --recursive "${DESTINO}/**" 2>/dev/null | wc -l | tr -d ' ')"
+          if [ "${OBJETOS}" -eq 0 ]; then
+            echo "::error::El destino ${DESTINO} está VACÍO tras un export marcado como exitoso."
+            exit 1
+          fi
+          # `du` sobre el PREFIJO (sin glob) y con `--format=value(size)` no
+          # devolvía nada: entre el 13 y el 17-ago-2026 el job falló cinco
+          # días seguidos con "pesa 0 bytes" mientras el respaldo se estaba
+          # escribiendo bien — la comprobación de arriba (OBJETOS) pasaba.
+          # Una alarma que grita en falso cinco días seguidos deja de leerse,
+          # y habría tapado un fallo real. Se usa el mismo glob que la
+          # comprobación de objetos y se toma el primer campo, que es robusto
+          # a cambios de formato de salida entre versiones de gcloud.
+          BYTES="$(gcloud storage du --summarize "${DESTINO}/**" 2>/dev/null | awk 'NR==1{print $1}')"
+          if ! printf '%s' "${BYTES:-}" | grep -qE '^[0-9]+$'; then
+            # NO se pudo medir. Distinto de "pesa cero": hay objetos, así que
+            # el respaldo existe, pero el control no puede acreditar su
+            # tamaño. Se falla igual —el control no acredita a medias— pero
+            # el mensaje dice cuál de los dos problemas es.
+            echo "::error::Hay ${OBJETOS} objeto(s) en ${DESTINO}, pero NO se pudo medir su tamaño (salida de 'gcloud storage du': '${BYTES:-vacía}'). El respaldo probablemente existe; lo que falla es la verificación."
+            exit 1
+          fi
+          if [ "${BYTES}" -eq 0 ]; then
+            echo "::error::El respaldo en ${DESTINO} tiene ${OBJETOS} objeto(s) pero pesa 0 bytes."
+            exit 1
+          fi
+          # En KiB, no en MiB: la base cabe hoy en menos de 1 MiB, así que
+          # redondear a MiB imprimía "0" todos los días y anulaba justo lo
+          # que este número existe para dar — la TENDENCIA. Una caída brusca
+          # respecto a ayer es la señal temprana de un export incompleto.
+          KB=$(( BYTES / 1024 ))
+          MB=$(( BYTES / 1024 / 1024 ))
+          echo "Respaldo verificado: ${OBJETOS} objeto(s), ${KB} KiB (${BYTES} bytes)."
+          {
+            echo "OBJETOS=${OBJETOS}"
+            echo "BYTES=${BYTES}"
+            echo "KB=${KB}"
+            echo "MB=${MB}"
+          } >> "$GITHUB_ENV"
+
+      - name: Resumen
+        if: ${{ always() }}
+        run: |
+          echo "### Backup Firestore" >> "$GITHUB_STEP_SUMMARY"
+          echo "- Proyecto: \`${GCP_PROJECT}\`" >> "$GITHUB_STEP_SUMMARY"
+          echo "- Destino: \`gs://${BACKUP_BUCKET}/diario/$(date -u +%F)\`" >> "$GITHUB_STEP_SUMMARY"
+          echo "- Resultado del job: \`${{ job.status }}\`" >> "$GITHUB_STEP_SUMMARY"
+          # Tamaño verificado del respaldo — vigilar la TENDENCIA: una caída
+          # brusca respecto a días anteriores delata un export incompleto
+          # aunque el job esté en verde.
+          if [ -n "${MB:-}" ]; then
+            echo "- Contenido verificado: \`${OBJETOS} objeto(s)\`, \`${KB} KiB\`" >> "$GITHUB_STEP_SUMMARY"
+          else
+            echo "- ⚠️ Contenido NO verificado (el job no llegó al paso de verificación)." >> "$GITHUB_STEP_SUMMARY"
+          fi
+
+      # ── AVISO DE FALLO ────────────────────────────────────────────────
+      #
+      # POR QUÉ EXISTE. Entre el 21-jul y el 17-ago-2026 este workflow falló
+      # 73 veces de 82 y NADIE se enteró: no había ningún aviso, y la única
+      # forma de saberlo era entrar a mano a la pestaña Actions — que es
+      # justo lo que nadie hace a diario. El fallo se descubrió por una
+      # auditoría, no por el control.
+      #
+      # Se abre un aviso en el repositorio, que no necesita ningún secret ni
+      # servicio externo. Si ya hay uno abierto, se COMENTA en vez de abrir
+      # otro: 73 avisos habrían sido tan invisibles como ninguno.
+      - name: Avisar si el respaldo falló
+        if: ${{ failure() }}
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          TITULO="⚠️ El respaldo diario de Firestore está fallando"
+          CUERPO="$(printf '%s\n' \
+            "El respaldo diario falló el $(date -u +%F) a las $(date -u +%H:%M) UTC." \
+            "" \
+            "- Ejecución: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}" \
+            "- Destino: \`gs://${BACKUP_BUCKET}/diario/$(date -u +%F)\`" \
+            "" \
+            "**Por qué importa:** la retención del bucket es de 30 días. Si los respaldos" \
+            "siguen fallando, los que ya existen se borran solos y el municipio se queda" \
+            "sin plan de continuidad." \
+            "" \
+            "**Qué mirar primero:** en el registro de la ejecución, si el mensaje dice" \
+            "\"NO se pudo medir su tamaño\" el respaldo probablemente existe y lo que" \
+            "falla es la verificación; si dice \"pesa 0 bytes\", falla el respaldo." \
+            "" \
+            "Este aviso se cierra solo cuando un respaldo vuelva a salir bien.")"
+
+          ABIERTO="$(gh issue list --repo "${{ github.repository }}" --state open \
+            --label respaldo --json number --jq '.[0].number // empty')"
+          if [ -n "${ABIERTO}" ]; then
+            gh issue comment "${ABIERTO}" --repo "${{ github.repository }}" --body "${CUERPO}"
+            echo "Comentado en el aviso #${ABIERTO} (ya estaba abierto)."
+          else
+            gh label create respaldo --repo "${{ github.repository }}" \
+              --color B60205 --description "Fallos del respaldo diario" 2>/dev/null || true
+            gh issue create --repo "${{ github.repository }}" \
+              --title "${TITULO}" --label respaldo --body "${CUERPO}"
+            echo "Aviso abierto."
+          fi
+
+      # Cerrar el aviso cuando el respaldo vuelve a salir bien: si no, queda
+      # abierto para siempre y se convierte en ruido de fondo — el mismo
+      # defecto que este aviso viene a corregir.
+      - name: Cerrar el aviso si el respaldo salió bien
+        if: ${{ success() }}
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          ABIERTO="$(gh issue list --repo "${{ github.repository }}" --state open \
+            --label respaldo --json number --jq '.[0].number // empty')"
+          if [ -n "${ABIERTO}" ]; then
+            gh issue close "${ABIERTO}" --repo "${{ github.repository }}" \
+              --comment "Respaldo correcto el $(date -u +%F): ${OBJETOS:-?} objeto(s), ${KB:-?} KiB. Se cierra el aviso."
+            echo "Aviso #${ABIERTO} cerrado."
+          fi
+

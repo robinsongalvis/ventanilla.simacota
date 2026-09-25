@@ -38,82 +38,44 @@ service cloud.firestore {
       return userRole() == 'RECEPCIONISTA';
     }
 
-    function isInternalUser() {
-      return isAdmin() || isFuncionario() || isRecepcionista();
+    /** Jefe de Dependencia: lectura de su tenant, sin acciones de resolución. */
+    function isJefeDependencia() {
+      return userRole() == 'JEFE_DEPENDENCIA';
     }
 
+    /** Control Interno: lectura de todos los tenants, sin escritura. */
+    function isControlInterno() {
+      return userRole() == 'CONTROL_INTERNO';
+    }
+
+    /** Cualquier rol que puede acceder al panel interno. */
+    function isInternalUser() {
+      return isAdmin() || isFuncionario() || isRecepcionista()
+          || isJefeDependencia() || isControlInterno();
+    }
+
+    /**
+     * Roles que pueden escribir entradas de trazabilidad, CON aislamiento por
+     * tenant (ADR-0008 / R8). Refleja el mismo patrón `get()` del `allow read`
+     * de esta subcolección: Admin y Recepcionista operan cross-tenant (ventanilla
+     * única, igual que en su lectura); el Funcionario solo puede escribir sobre
+     * radicados cuyo `oficinaDestino` coincide con su propio tenant. Jefe y
+     * Control Interno quedan fuera (son solo lectura).
+     */
     function assignedTenant(data) {
       return data.clasificacionIA != null
         && data.clasificacionIA.oficinaDestino == userTenant();
     }
 
     function validRole(role) {
-      return role in ['ADMIN', 'FUNCIONARIO', 'RECEPCIONISTA'];
+      return role in ['ADMIN', 'FUNCIONARIO', 'RECEPCIONISTA', 'JEFE_DEPENDENCIA', 'CONTROL_INTERNO'];
     }
 
-    function validEstado(estado) {
-      return estado in [
-        'PENDIENTE',
-        'EN_REVISION',
-        'EN_PROCESO',
-        'RESUELTO',
-        'DEVUELTO',
-        'RECHAZADO'
-      ];
-    }
-
-    function validRadicadoCreate() {
-      return request.resource.data.keys().hasAll([
-        'radicadoId',
-        'origen',
-        'fechaCreacion',
-        'estadoActual',
-        'prioridad',
-        'ciudadano',
-        'clasificacionIA',
-        'archivos',
-        'auditoria'
-      ])
-      && request.resource.data.keys().hasOnly([
-        'radicadoId',
-        'origen',
-        'fechaCreacion',
-        'estadoActual',
-        'prioridad',
-        'ciudadano',
-        'clasificacionIA',
-        'archivos',
-        'auditoria',
-        'notasInternas'
-      ])
-      && request.resource.data.radicadoId is string
-      && request.resource.data.origen in ['WEB', 'FISICO_ESCANER']
-      && (
-        request.resource.data.origen == 'WEB'
-        || (request.resource.data.origen == 'FISICO_ESCANER' && (isAdmin() || isRecepcionista()))
-      )
-      && (
-        !request.resource.data.keys().hasAny(['notasInternas'])
-        || isAdmin()
-        || isRecepcionista()
-      )
-      && request.resource.data.estadoActual == 'PENDIENTE'
-      && request.resource.data.prioridad in ['ROJO', 'NARANJA', 'AMARILLO']
-      && request.resource.data.ciudadano.nombre is string
-      && request.resource.data.ciudadano.email is string
-      && request.resource.data.ciudadano.telefono is string
-      && request.resource.data.archivos is list
-      && request.resource.data.auditoria is list;
-    }
-
-    function validRadicadoUpdate() {
-      return request.resource.data.diff(resource.data).affectedKeys().hasOnly([
-        'estadoActual',
-        'auditoria'
-      ])
-      && validEstado(request.resource.data.estadoActual)
-      && request.resource.data.auditoria is list;
-    }
+    // NOTA: los validadores de escritura cliente (validRadicadoCreate,
+    // validRadicadoUpdate, validVentanillaUpdate, validVentanillaEstado)
+    // se retiraron: desde "Cierra seguridad go-live" (bf42175) toda mutación
+    // de radicados es server-side vía Admin SDK y los allow quedaron en false.
+    // La validación de estados vive en los endpoints de acción de /api.
 
     function canReadRadicado(data) {
       return isAdmin()
@@ -121,15 +83,11 @@ service cloud.firestore {
         || (isRecepcionista() && assignedTenant(data));
     }
 
-    function canUpdateRadicado(data) {
-      return isAdmin()
-        || (isFuncionario() && assignedTenant(data))
-        || (isRecepcionista() && assignedTenant(data));
-    }
-
     match /users/{uid} {
       allow get: if signedIn() && (request.auth.uid == uid || isAdmin());
-      allow list: if isAdmin();
+      // Recepcionista y Admin necesitan listar usuarios para el selector
+      // de responsable funcional (MIPG-2 — asignación).
+      allow list: if isAdmin() || isRecepcionista();
 
       allow create: if isAdmin()
         && request.resource.data.rol is string
@@ -153,42 +111,251 @@ service cloud.firestore {
       allow list: if isAdmin()
         || ((isFuncionario() || isRecepcionista()) && canReadRadicado(resource.data));
 
-      // Radicacion web publica y radicacion fisica desde recepcion.
-      allow create: if validRadicadoCreate()
-        && request.resource.data.radicadoId == radicadoId;
+      // Legacy cerrado para nuevas escrituras. La radicación vigente usa
+      // /api/radicacion + Admin SDK sobre ventanilla_radicados.
+      allow create: if false;
 
-      // Cambios de estado/respuesta desde el panel interno.
-      allow update: if canUpdateRadicado(resource.data)
-        && validRadicadoUpdate();
+      allow update: if false;
 
       allow delete: if false;
     }
 
     // ── Sistema MIPG: radicados institucionales ─────────────────────────────
     match /ventanilla_radicados/{radicadoId} {
-      // Admin y recepcionista ven todo; funcionario solo los de su dependencia.
-      allow get: if isAdmin() || isRecepcionista()
-        || (isFuncionario() && resource.data.clasificacion.oficinaDestino == userTenant());
+      // Admin, Recepcionista y Control Interno ven todos los tenants.
+      // Funcionario y Jefe de Dependencia solo ven su propia dependencia.
+      allow get: if isAdmin() || isRecepcionista() || isControlInterno()
+        || ((isFuncionario() || isJefeDependencia())
+            && resource.data.clasificacion.oficinaDestino == userTenant());
 
-      // Las queries del hook están filtradas por tenant en servidor para FUNCIONARIO.
-      allow list: if isAdmin() || isRecepcionista()
-        || (isFuncionario() && resource.data.clasificacion.oficinaDestino == userTenant());
+      allow list: if isAdmin() || isRecepcionista() || isControlInterno()
+        || ((isFuncionario() || isJefeDependencia())
+            && resource.data.clasificacion.oficinaDestino == userTenant());
 
-      // Solo admin y recepcionista pueden radicar institucionalmente.
-      allow create: if (isAdmin() || isRecepcionista())
-        && request.resource.data.radicadoId == radicadoId;
+      // CR-2 CERRADO (cutover PT-1, 23-ago-2026): la radicación corre por
+      // el SERVIDOR (/api/radicacion/interna, Admin SDK) desde el flip de
+      // USA_RADICACION_INTERNA_SERVER. Un create de cliente era un registro
+      // oficial forjable: ningún campo de negocio se validaba aquí.
+      allow create: if false;
 
-      // Traslados, trazabilidad, prórroga y respuesta desde el panel interno.
-      allow update: if isAdmin() || isRecepcionista()
-        || (isFuncionario() && resource.data.clasificacion.oficinaDestino == userTenant());
+      // Mutaciones críticas pasan por APIs server-side con Admin SDK.
+      // Esto blinda cumplioTermino, estadoActual, clasificación, prórrogas y respuesta oficial.
+      allow update: if false;
 
       allow delete: if false;
     }
 
+    match /ai_logs/{logId} {
+      allow read: if isAdmin();
+      allow write: if false;
+    }
+
+    match /ai_feedback/{feedbackId} {
+      allow read: if isInternalUser();
+      allow write: if false;
+    }
+
+    match /ai_auditoria/{auditoriaId} {
+      allow read: if isInternalUser();
+      allow write: if false;
+    }
+
+    match /ventanilla_radicados/{radicadoId}/trazabilidad/{eventoId} {
+      // Lectura: todos los roles internos (incluye Jefe y Control Interno para auditoría).
+      allow read: if isAdmin() || isRecepcionista() || isControlInterno()
+        || ((isFuncionario() || isJefeDependencia())
+            && get(/databases/$(database)/documents/ventanilla_radicados/$(radicadoId))
+                  .data.clasificacion.oficinaDestino == userTenant());
+      // Escritura: roles operativos CON aislamiento por tenant (ADR-0008 / R8).
+      // PR-C del cutover (24-ago-2026): la trazabilidad es SERVER-ONLY,
+      // patrón D8. Los dos únicos escritores de cliente resultaron código
+      // muerto (el resolver DEPRECATED sin llamadores y la radicación
+      // legada, inalcanzable tras el flip) — se extirparon en vez de
+      // migrarse. Con create de cliente, cualquier FUNCIONARIO podía
+      // inyectar eventos con actor forjado: el registro probatorio de
+      // notificaciones perdía no-repudio. El actor lo captura el servidor
+      // (appendTrazabilidadAdmin / el handler de radicación).
+      allow create: if false;
+      allow update, delete: if false;
+    }
+
+    // ── Sprint Radicación de salida: correspondencia despachada ───────────
+    // Serie propia 2-SAL-{año}. El registro es inmutable: una corrección
+    // se hace con una salida nueva — el libro de salidas nunca se edita.
+    match /ventanilla_salidas/{salidaId} {
+      // Admin, Recepcionista y Control Interno leen el libro completo;
+      // Funcionario y Jefe solo las salidas despachadas por su dependencia.
+      allow get, list: if isAdmin() || isRecepcionista() || isControlInterno()
+        || ((isFuncionario() || isJefeDependencia())
+            && resource.data.dependenciaOrigen == userTenant());
+
+      // Cutover PT-1 (23-ago-2026): toda salida se registra por
+      // /api/salidas/registrar (Admin SDK) — verificado que NINGÚN flujo de
+      // cliente escribía esta colección; la regla abierta era pura
+      // superficie de forja del libro (que se declara inmutable).
+      allow create: if false;
+
+      allow update, delete: if false;
+    }
+
+    // ── Planilla de reparto: control de entrega del documento físico ──────
+    // Toda escritura pasa por /api/planillas/* con Admin SDK (consecutivo
+    // transaccional, entregas todo-o-nada, anulación solo sin firmas).
+    // Lectura para quienes operan o auditan la cadena de custodia.
+    match /ventanilla_planillas/{planillaId} {
+      allow get, list: if isAdmin() || isRecepcionista() || isControlInterno();
+      allow create, update, delete: if false;
+    }
+
     // ── Contadores de consecutivo anual ────────────────────────────────────
     match /counters/{document} {
-      // Lectura y escritura transaccional para generar el número de radicado.
-      allow read, write: if isAdmin() || isRecepcionista();
+      // CR-1 CERRADO (cutover PT-1, 23-ago-2026): el consecutivo legal solo
+      // avanza en el SERVIDOR (consecutivo-legal.ts, guard D9 de
+      // monotonicidad). Con write de cliente, cualquier sesión ADMIN o
+      // RECEPCIONISTA podía saltar, reiniciar o colisionar la foliación
+      // AGN 060 — el hallazgo CR-1 abierto desde julio. La lectura queda:
+      // es inofensiva y algún tablero podría consultarla.
+      allow read: if isAdmin() || isRecepcionista();
+      allow write: if false;
+    }
+
+    // ── Reserva de unicidad de números de expediente (Fase 2) ─────────────
+    // Doc id = número de expediente formateado. Escrita SOLO por el servidor
+    // (Admin SDK, tx.create en lib/server/emitir-numero-expediente.ts);
+    // ningún cliente lee ni escribe.
+    /* Reserva de unicidad de las series de radicación (radicados, salidas,
+       planillas). Mismo régimen que unicidad_expedientes: Admin SDK y nadie
+       más. Un cliente que pudiera crear aquí podría "quemar" un número que
+       nunca se usa, o peor, impedir que la emisión legítima lo reserve. */
+    match /unicidad_radicados/{id} { allow read, write: if false; }
+    match /unicidad_salidas/{id}   { allow read, write: if false; }
+    match /unicidad_planillas/{id} { allow read, write: if false; }
+
+    match /unicidad_expedientes/{id} {
+      allow read, write: if false;
+    }
+
+    // ── Motor de expedientes — persistencia (D3 ADR-0026; DF-1..DF-9 ADR-0029)
+    // ESQUEMA (decisión firestore-datos, 2026-08-08):
+    //  · expedientes/{expedienteId}: id SINTÉTICO (DF-9) — el número de
+    //    expediente NUNCA es el doc id; viaja como atributo
+    //    `numeroExpediente {numero, serieId, año, colision?}` emitido en
+    //    transacción por lib/server/emitir-numero-expediente.ts. El doc
+    //    raíz es el contrato `Expediente` (lib/motor-expedientes/tipos.ts,
+    //    congelado por ADR-0029) MÁS: `estadoJuridico`
+    //    (EstadoJuridicoLicencia, DF-5) y `esPrueba?: boolean` — marca de
+    //    DEMO: un expediente de demo JAMÁS consume la serie legal y su
+    //    `numeroExpediente.numero` lleva prefijo 'DEMO-', nunca el formato
+    //    legal puro {dane}-{curaduria}-{AA}-{CCCC} (DF-1).
+    //  · Subcolección actuaciones/{actuacionId}: trazabilidad APPEND-ONLY
+    //    (D8) = contrato `Actuacion` + `tenantId` DENORMALIZADO — cierra,
+    //    para esta subcolección, la deuda #6 de ADR-0026 §A2: habilita
+    //    collectionGroup y futuras reglas de lectura por tenant sin get()
+    //    del documento padre.
+    //  · Subcolección documentos/{documentoId} (D7, Bloque A·A1): documento
+    //    LÓGICO — nombre, requisitoId?, tenantId DENORMALIZADO (misma deuda
+    //    #6), espejo `versionVigente` + `totalVersiones` para que el
+    //    checklist resuelva con UNA query sin tocar versiones. Contrato:
+    //    lib/server/expedientes-documentos-tipos.ts (invariantes INV-1..5).
+    //  · Sub-subcolección versiones/{vNNNN} (D7): versión INMUTABLE
+    //    append-only — cada subida es tx.create() de un doc NUEVO (id
+    //    determinista v0001, v0002… = candado anti-duplicado concurrente)
+    //    + tx.update del espejo del lógico en la MISMA transacción; una
+    //    versión JAMÁS se edita ni se borra (anti-pérdida). hashSha256
+    //    calculado SERVER-side; binario en Storage bajo
+    //    expedientes/{expedienteId}/{documentoId}/{vNNNN}/{archivo}
+    //    (ver storage.rules).
+    // ACCESO (D3): escritura EXCLUSIVAMENTE server-side — Admin SDK, que
+    // bypasea estas reglas — así que create/update/delete quedan en false
+    // y cierran por diseño las clases CR-1/CR-2/R8. La lectura TAMBIÉN
+    // queda en false: bandeja y detalle se sirven por route handlers
+    // server-side que filtran por tenant (mismo patrón server-only de
+    // unicidad_expedientes). Si una fase futura habilita lectura cliente,
+    // exigirá resource.data.tenantId == userTenant() y query con filtro
+    // explícito (ver ADVERTENCIA sobre 'list' más abajo).
+    match /expedientes/{expedienteId} {
+      allow read, write: if false;
+
+      // Append-only real: ni siquiera el create es de cliente (D8 — actor
+      // capturado en servidor; el cliente nunca escribe trazabilidad del
+      // expediente, a diferencia de ventanilla_radicados/trazabilidad).
+      match /actuaciones/{actuacionId} {
+        allow read, write: if false;
+      }
+
+      // D7 — documentos del expediente: mismo régimen server-only. Si una
+      // fase futura habilita lectura cliente, exigirá
+      // resource.data.tenantId == userTenant() (ya denormalizado aquí,
+      // sin get() del padre) + query con filtro explícito por tenant.
+      match /documentos/{documentoId} {
+        allow read, write: if false;
+
+        // Versiones INMUTABLES (D7): ninguna vía cliente, y el servidor
+        // solo hace tx.create de docs nuevos — nunca update/delete.
+        match /versiones/{versionId} {
+          allow read, write: if false;
+        }
+      }
+    }
+
+    // ── Auditoría administrativa — append-only, solo lectura Admin ────────
+    match /admin_auditoria/{eventoId} {
+      allow read: if isAdmin();
+      allow write: if false;
+    }
+
+    // ── Auditoría SIMI — append-only, solo lectura Admin ─────────────────
+    match /simi_auditoria/{eventoId} {
+      allow read: if isAdmin();
+      allow write: if false;
+    }
+
+    // ── Control Interno: hallazgos, planes de mejora, alertas y eventos ─
+    // Todas las escrituras pasan por APIs server-side con Admin SDK que
+    // validan rol, tenantId y dejan trazabilidad. Las reglas blindan
+    // el acceso de lectura (Admin y Control Interno ven todo; Jefe y
+    // Funcionario solo su dependencia — H-10).
+    //
+    // ADVERTENCIA sobre 'list': Firestore evalúa la regla por documento,
+    // pero si el cliente lanza una query 'list' que NO filtra por
+    // tenantId, la consulta entera falla aunque algunos docs cumplan la
+    // regla. Si en el futuro se consulta desde cliente como
+    // JEFE_DEPENDENCIA o FUNCIONARIO, la query DEBE incluir
+    // .where('tenantId', '==', userTenant).
+
+    match /control_interno_hallazgos/{hallazgoId} {
+      allow get, list: if isAdmin() || isControlInterno()
+        || (isJefeDependencia() && resource.data.tenantId == userTenant());
+      allow create, update, delete: if false;
+    }
+
+    match /control_interno_planes_mejora/{planId} {
+      allow get, list: if isAdmin() || isControlInterno()
+        || ((isJefeDependencia() || isFuncionario())
+            && resource.data.tenantId == userTenant());
+      allow create, update, delete: if false;
+    }
+
+    match /control_interno_alertas/{alertaId} {
+      allow get, list: if isAdmin() || isControlInterno();
+      allow create, update, delete: if false;
+    }
+
+    match /control_interno_eventos/{eventoId} {
+      allow get, list: if isAdmin() || isControlInterno();
+      allow create, update, delete: if false;
+    }
+
+    /* Memoria del vigía del término de licencias (ADR-0033 §4.6-bis).
+       CERRADA A CLIENTE, igual que `expedientes`: es un derivado de esa
+       colección, y abrirla sería un canal lateral alrededor de su cierre. El
+       tablero la lee por ruta de servidor, no por SDK. */
+    match /vigilancia_termino_licencias/{expedienteId} {
+      allow read, write: if false;
+    }
+
+    match /vigilancia_termino_corridas/{corridaId} {
+      allow read, write: if false;
     }
 
     match /{document=**} {

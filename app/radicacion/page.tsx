@@ -2,12 +2,16 @@
 
 import { useCallback, useRef, useState } from 'react';
 import Link from 'next/link';
-import { radicarSolicitud } from '@/lib/radicacion';
 import type { UploadProgress } from '@/lib/storage';
-import type { AnalisisIA } from '@/src/types/ventanilla';
-import { NOMBRES_TENANT } from '@/src/types/reglas-negocio';
-import { useSimiDataReceiver } from '@/lib/store/simiContext';
-import type { DatosExtraidos } from '@/src/types/simi';
+import type { AnalisisIA }    from '@/src/types/ventanilla';
+import { NOMBRES_TENANT }      from '@/src/types/reglas-negocio';
+import { useSimiDataReceiver }  from '@/lib/store/simiContext';
+import type { DatosExtraidos }  from '@/src/types/simi';
+import { TIPOS_SOLICITUD, TIPOS_PQRSD_CIUDADANO } from '@/lib/tiempos-radicado';
+import type { TipoSolicitudId } from '@/lib/tiempos-radicado';
+import { InstitucionalHeader } from '@/app/components/institucional/InstitucionalHeader';
+import { ConstanciaRadicacion } from '@/app/components/institucional/ConstanciaRadicacion';
+import type { SelloRadicadoData } from '@/app/components/institucional/SelloRadicado';
 
 /* ══════════════════════════════════════════════════════════════
    TIPOS TYPESCRIPT
@@ -17,10 +21,24 @@ interface FormData {
   nombre: string;
   email: string;
   telefono: string;
+  direccion: string;
+  tipoSolicitudId: TipoSolicitudId;
+  tipoPresentacion: 'IDENTIFICADA' | 'ANONIMA' | 'RESERVADA';
+  canalRespuesta: 'CORREO' | 'PRESENCIAL' | 'TELEFONO' | 'DIRECCION_FISICA';
   descripcion: string;
 }
 
 type CampoForm = keyof FormData;
+
+interface RadicacionApiResponse {
+  exito: boolean;
+  radicadoId?: string;
+  errores?: string[];
+  error?: string;
+  fechaRadicado?: string;
+  dependenciaReceptora?: string;
+  consultaToken?: string;
+}
 
 
 /* ══════════════════════════════════════════════════════════════
@@ -31,7 +49,21 @@ const EMAIL_RE      = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 const TEL_RE        = /^3[0-9]{9}$/;
 const MAX_ARCHIVOS  = 3;
 const MAX_BYTES     = 5 * 1024 * 1024; // 5 MB
-const TIPOS_VALIDOS = new Set(['application/pdf', 'image/jpeg', 'image/png']);
+const MAX_DESCRIPCION = 5000;
+// Nota: el accept=".pdf,.jpg,.jpeg,.png,.docx,.xlsx" del input ya permitía
+// elegir DOCX/XLSX en el selector de archivos, pero este set no los incluía
+// y los rechazaba de inmediato tras la selección — se corrige junto con el
+// alta de PPTX. La validación real y no falsificable ocurre en el servidor
+// (verificarMagicBytes) — este set solo evita una subida que el backend
+// rechazaría de todos modos.
+const TIPOS_VALIDOS = new Set([
+  'application/pdf',
+  'image/jpeg',
+  'image/png',
+  'application/vnd.openxmlformats-officedocument.wordprocessingml.document',   // DOCX
+  'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',         // XLSX
+  'application/vnd.openxmlformats-officedocument.presentationml.presentation', // PPTX
+]);
 
 /* ══════════════════════════════════════════════════════════════
    UTILIDADES
@@ -43,19 +75,36 @@ function formatBytes(bytes: number): string {
   return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
 }
 
-function validarCampo(campo: CampoForm, valor: string): string {
+function validarCampo(campo: CampoForm, valor: string, form?: FormData): string {
+  const esAnonimo = form?.tipoPresentacion === 'ANONIMA';
+
   switch (campo) {
     case 'nombre':
+      if (esAnonimo) return '';
       if (!valor.trim() || valor.trim().length < 3)
         return 'Ingresa tu nombre completo (mínimo 3 caracteres).';
       return '';
     case 'email':
+      if (esAnonimo && !valor.trim()) return '';
+      if (!valor.trim() && form?.canalRespuesta !== 'CORREO') return '';
       if (!EMAIL_RE.test(valor.trim()))
         return 'Ingresa un correo electrónico válido.';
       return '';
     case 'telefono':
+      if (esAnonimo && !valor.trim()) return '';
+      if (!valor.trim() && form?.canalRespuesta !== 'TELEFONO') return '';
       if (!TEL_RE.test(valor.replace(/\s/g, '')))
         return 'Celular colombiano: 10 dígitos, debe comenzar por 3.';
+      return '';
+    case 'direccion':
+      if (esAnonimo && !valor.trim()) return '';
+      if (!valor.trim() && form?.canalRespuesta !== 'DIRECCION_FISICA') return '';
+      if (valor.trim().length < 8)
+        return 'Ingresa una dirección física válida para recibir respuesta.';
+      return '';
+    case 'tipoSolicitudId':
+    case 'tipoPresentacion':
+    case 'canalRespuesta':
       return '';
     case 'descripcion':
       if (valor.trim().length < 20)
@@ -68,130 +117,53 @@ function validarCampo(campo: CampoForm, valor: string): string {
 
 function validarTodo(form: FormData): Record<CampoForm, string> {
   return {
-    nombre:      validarCampo('nombre',      form.nombre),
-    email:       validarCampo('email',       form.email),
-    telefono:    validarCampo('telefono',    form.telefono),
-    descripcion: validarCampo('descripcion', form.descripcion),
+    nombre:           validarCampo('nombre',           form.nombre, form),
+    email:            validarCampo('email',            form.email, form),
+    telefono:         validarCampo('telefono',         form.telefono, form),
+    direccion:        validarCampo('direccion',        form.direccion, form),
+    tipoSolicitudId:  '',
+    tipoPresentacion: '',
+    canalRespuesta:   '',
+    descripcion:      validarCampo('descripcion',      form.descripcion, form),
   };
 }
 
-/* ══════════════════════════════════════════════════════════════
-   SUBCOMPONENTES PUROS
-══════════════════════════════════════════════════════════════ */
+async function radicarEnVentanillaModerna(
+  form: FormData,
+  archivos: File[],
+  analisisIa: AnalisisIA | null,
+): Promise<RadicacionApiResponse> {
+  const payload = new globalThis.FormData();
+  payload.set('nombre', form.tipoPresentacion === 'ANONIMA' ? '' : form.nombre.trim());
+  payload.set('email', form.email.trim().toLowerCase());
+  payload.set('telefono', form.telefono.replace(/\s/g, ''));
+  payload.set('direccion', form.direccion.trim());
+  payload.set('tipoSolicitudId', form.tipoSolicitudId);
+  payload.set('tipoPresentacion', form.tipoPresentacion);
+  payload.set('canalRespuesta', form.canalRespuesta);
+  payload.set('descripcion', form.descripcion.trim());
 
-function IconoCheck() {
-  return (
-    <div className="animate-success-bounce">
-      <svg viewBox="0 0 52 52" className="w-20 h-20" fill="none" aria-hidden="true">
-        <circle cx="26" cy="26" r="25" stroke="#10B981" strokeWidth="2" className="svg-circle-draw" strokeLinecap="round" />
-        <circle cx="26" cy="26" r="24" fill="rgba(16,185,129,0.12)" />
-        <path d="M14 27 L22 35 L38 17" stroke="#10B981" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" className="svg-check-draw" />
-      </svg>
-    </div>
-  );
-}
-
-function PantallaConfirmacion({
-  radicadoId,
-  errores,
-  onNueva,
-}: {
-  radicadoId: string;
-  errores:    string[];
-  onNueva:    () => void;
-}) {
-  const [copiado, setCopiado] = useState(false);
-
-  function copiarRadicado() {
-    navigator.clipboard.writeText(radicadoId).then(() => {
-      setCopiado(true);
-      setTimeout(() => setCopiado(false), 2000);
-    });
+  if (analisisIa) {
+    payload.set('analisisIa', JSON.stringify(analisisIa));
   }
 
-  return (
-    <div className="flex flex-col items-center justify-center py-12 px-4 text-center animate-fade-in-up">
-      <div className="mb-8">
-        <IconoCheck />
-      </div>
+  archivos.forEach((archivo) => payload.append('archivos', archivo));
 
-      <h2
-        className="text-2xl font-black tracking-tighter text-slate-50 mb-3"
-        style={{ fontFamily: 'var(--font-manrope)' }}
-      >
-        Solicitud radicada exitosamente
-      </h2>
-      <p className="text-slate-400 text-sm leading-relaxed max-w-sm mb-8">
-        Su solicitud fue recibida y será clasificada por el sistema de IA.
-        Recibirá respuesta por WhatsApp en los próximos días hábiles.
-      </p>
+  const response = await fetch('/api/radicacion', {
+    method: 'POST',
+    body: payload,
+  });
+  const data = await response.json().catch(() => null) as RadicacionApiResponse | null;
 
-      {errores.length > 0 && (
-        <div className="w-full max-w-sm rounded-xl border border-amber-500/30 bg-amber-500/10 p-4 mb-6 text-left">
-          <p className="text-xs font-bold uppercase tracking-widest text-amber-400 mb-2">Advertencias</p>
-          <ul className="space-y-1">
-            {errores.map((e, i) => (
-              <li key={i} className="text-xs text-amber-300/80 leading-relaxed">• {e}</li>
-            ))}
-          </ul>
-        </div>
-      )}
+  if (!response.ok || !data?.exito || !data.radicadoId) {
+    throw new Error(
+      data?.errores?.[0]
+      ?? data?.error
+      ?? 'No fue posible radicar la solicitud. Intenta nuevamente.',
+    );
+  }
 
-      <div
-        className="w-full max-w-sm rounded-2xl border border-white/10 p-6 mb-6"
-        style={{ background: 'rgba(15,23,42,0.40)', backdropFilter: 'blur(25px)' }}
-      >
-        <p className="text-xs font-bold uppercase tracking-widest text-slate-500 mb-3">Número de radicado</p>
-        <p className="text-2xl font-black tracking-widest text-indigo-400 break-all" style={{ fontFamily: 'var(--font-manrope)' }}>
-          {radicadoId}
-        </p>
-        <p className="text-slate-500 text-xs mt-3 leading-relaxed">
-          Conserve este número para hacer seguimiento de su caso.
-        </p>
-      </div>
-
-      <div className="flex flex-col gap-3 w-full max-w-sm">
-        <button
-          onClick={copiarRadicado}
-          className="w-full py-3 px-6 rounded-xl font-bold text-sm uppercase tracking-wider transition-all duration-300
-            border border-indigo-500/40 text-indigo-400 hover:border-indigo-500 hover:bg-indigo-500/10 flex items-center justify-center gap-2"
-        >
-          {copiado ? (
-            <>
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2.5} className="w-4 h-4">
-                <path strokeLinecap="round" strokeLinejoin="round" d="M4.5 12.75l6 6 9-13.5" />
-              </svg>
-              ¡Copiado!
-            </>
-          ) : (
-            <>
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} className="w-4 h-4">
-                <path strokeLinecap="round" strokeLinejoin="round" d="M15.75 17.25v3.375c0 .621-.504 1.125-1.125 1.125h-9.75a1.125 1.125 0 01-1.125-1.125V7.875c0-.621.504-1.125 1.125-1.125H6.75a9.06 9.06 0 011.5.124m7.5 10.376h3.375c.621 0 1.125-.504 1.125-1.125V11.25c0-4.46-3.243-8.161-7.5-8.876a9.06 9.06 0 00-1.5-.124H9.375c-.621 0-1.125.504-1.125 1.125v3.5m7.5 10.375H9.375a1.125 1.125 0 01-1.125-1.125v-9.25m12 6.625v-1.875a3.375 3.375 0 00-3.375-3.375h-1.5a1.125 1.125 0 01-1.125-1.125v-1.5a3.375 3.375 0 00-3.375-3.375H9.75" />
-              </svg>
-              Copiar número de radicado
-            </>
-          )}
-        </button>
-
-        <Link
-          href={`/consulta?id=${radicadoId}`}
-          className="w-full py-3 px-6 rounded-xl font-bold text-sm uppercase tracking-wider text-white text-center
-            bg-gradient-to-r from-indigo-600 to-indigo-500 hover:from-indigo-500 hover:to-indigo-400
-            hover:shadow-lg hover:shadow-indigo-500/25 transition-all duration-300"
-        >
-          Consultar estado de mi solicitud
-        </Link>
-
-        <button
-          onClick={onNueva}
-          className="w-full py-3 px-6 rounded-xl font-bold text-sm uppercase tracking-wider text-slate-400
-            border border-white/10 hover:border-white/20 hover:text-slate-200 transition-all duration-300"
-        >
-          Radicar otra solicitud
-        </button>
-      </div>
-    </div>
-  );
+  return data;
 }
 
 /* ══════════════════════════════════════════════════════════════
@@ -200,12 +172,26 @@ function PantallaConfirmacion({
 
 export default function PortalCiudadano() {
   const [form, setForm] = useState<FormData>({
-    nombre: '', email: '', telefono: '', descripcion: '',
+    nombre: '',
+    email: '',
+    telefono: '',
+    direccion: '',
+    tipoSolicitudId: 'PETICION_GENERAL',
+    tipoPresentacion: 'IDENTIFICADA',
+    canalRespuesta: 'CORREO',
+    descripcion: '',
   });
 
   const [touched, setTouched] = useState<Partial<Record<CampoForm, true>>>({});
   const [errors, setErrors] = useState<Record<CampoForm, string>>({
-    nombre: '', email: '', telefono: '', descripcion: '',
+    nombre: '',
+    email: '',
+    telefono: '',
+    direccion: '',
+    tipoSolicitudId: '',
+    tipoPresentacion: '',
+    canalRespuesta: '',
+    descripcion: '',
   });
 
   /* ══════════════════════════════════════════════════════════════
@@ -250,20 +236,20 @@ export default function PortalCiudadano() {
       setErrors((prev) => ({
         ...prev,
         ...(actualizados.nombre !== undefined
-          ? { nombre: validarCampo('nombre', actualizados.nombre) }
+          ? { nombre: validarCampo('nombre', actualizados.nombre, { ...form, ...actualizados }) }
           : {}),
         ...(actualizados.email !== undefined
-          ? { email: validarCampo('email', actualizados.email) }
+          ? { email: validarCampo('email', actualizados.email, { ...form, ...actualizados }) }
           : {}),
         ...(actualizados.telefono !== undefined
-          ? { telefono: validarCampo('telefono', actualizados.telefono) }
+          ? { telefono: validarCampo('telefono', actualizados.telefono, { ...form, ...actualizados }) }
           : {}),
         ...(actualizados.descripcion !== undefined
-          ? { descripcion: validarCampo('descripcion', actualizados.descripcion) }
+          ? { descripcion: validarCampo('descripcion', actualizados.descripcion, { ...form, ...actualizados }) }
           : {}),
       }));
     },
-    [], // validarCampo es una función pura definida fuera del componente
+    [form],
   );
 
   // Registra el handler con el Context de SIMI.
@@ -280,16 +266,17 @@ export default function PortalCiudadano() {
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const [estado, setEstado] = useState<'formulario' | 'enviando' | 'confirmacion'>('formulario');
-  const [radicadoId, setRadicadoId] = useState('');
+  const [selloRadicado, setSelloRadicado] = useState<SelloRadicadoData | null>(null);
   const [progresoMensaje, setProgresoMensaje] = useState('');
   const [progresoPct, setProgresoPct] = useState(0);
   const [progresosArchivos, setProgresosArchivos] = useState<UploadProgress[]>([]);
   const [erroresSubmit, setErroresSubmit] = useState<string[]>([]);
 
   function handleChange(campo: CampoForm, valor: string) {
-    setForm((prev) => ({ ...prev, [campo]: valor }));
+    const siguiente = { ...form, [campo]: valor };
+    setForm(siguiente);
     if (touched[campo]) {
-      setErrors((prev) => ({ ...prev, [campo]: validarCampo(campo, valor) }));
+      setErrors((prev) => ({ ...prev, [campo]: validarCampo(campo, valor, siguiente) }));
     }
 
     if (campo === 'descripcion') {
@@ -323,7 +310,7 @@ export default function PortalCiudadano() {
 
   function handleBlur(campo: CampoForm) {
     setTouched((prev) => ({ ...prev, [campo]: true }));
-    setErrors((prev) => ({ ...prev, [campo]: validarCampo(campo, form[campo]) }));
+    setErrors((prev) => ({ ...prev, [campo]: validarCampo(campo, form[campo], form) }));
   }
 
   function procesarArchivos(nuevos: FileList | null) {
@@ -341,7 +328,7 @@ export default function PortalCiudadano() {
 
     for (const archivo of lista.slice(0, disponible)) {
       if (!TIPOS_VALIDOS.has(archivo.type)) {
-        rechazados.push(`"${archivo.name}": tipo no permitido (solo PDF, JPG, PNG).`);
+        rechazados.push(`"${archivo.name}": tipo no permitido (solo PDF, imágenes o documentos de Office: DOCX, XLSX, PPTX).`);
       } else if (archivo.size > MAX_BYTES) {
         rechazados.push(`"${archivo.name}": supera 5 MB.`);
       } else {
@@ -367,7 +354,7 @@ export default function PortalCiudadano() {
   async function handleSubmit(e: { preventDefault(): void }) {
     e.preventDefault();
 
-    setTouched({ nombre: true, email: true, telefono: true, descripcion: true });
+    setTouched({ nombre: true, email: true, telefono: true, direccion: true, tipoSolicitudId: true, tipoPresentacion: true, canalRespuesta: true, descripcion: true });
     const erroresFinal = validarTodo(form);
     setErrors(erroresFinal);
 
@@ -381,40 +368,86 @@ export default function PortalCiudadano() {
     setEstado('enviando');
     setProgresoMensaje('Iniciando radicación...');
     setProgresoPct(0);
-    setProgresosArchivos([]);
+    setProgresosArchivos(archivos.map((archivo) => ({
+      archivo: archivo.name,
+      porcentaje: 0,
+      estado: 'subiendo',
+    })));
+    const fechaSolicitud = new Date();
 
-    const res = await radicarSolicitud(
-      {
-        origen: 'WEB',
-        ciudadano: {
-          nombre:   form.nombre.trim(),
-          email:    form.email.trim().toLowerCase(),
-          telefono: form.telefono.replace(/\s/g, ''),
-        },
-        descripcion: form.descripcion.trim(),
-        archivos,
-        analisisIa: analisisIa || undefined,
-      },
-      (mensaje, pct, progresos) => {
-        setProgresoMensaje(mensaje);
-        setProgresoPct(pct);
-        if (progresos) setProgresosArchivos(progresos);
-      },
-    );
+    try {
+      setProgresoMensaje('Enviando solicitud al servidor institucional...');
+      setProgresoPct(35);
+      const res = await radicarEnVentanillaModerna(form, archivos, analisisIa);
+      const fechaRadicado = res.fechaRadicado ? new Date(res.fechaRadicado) : fechaSolicitud;
 
-    setErroresSubmit(res.errores);
-    setRadicadoId(res.radicadoId);
-    setEstado('confirmacion');
+      setProgresoMensaje('Radicado creado y trazabilidad inicial registrada.');
+      setProgresoPct(100);
+      setProgresosArchivos((prev) => prev.map((progreso) => ({
+        ...progreso,
+        porcentaje: 100,
+        estado: 'completado',
+      })));
+      setErroresSubmit(res.errores ?? []);
+      setSelloRadicado({
+        radicadoId: res.radicadoId!,
+        fechaRadicado,
+        horaRadicado: fechaRadicado,
+        medioRecepcion: 'WEB',
+        tipoSolicitud: TIPOS_SOLICITUD[form.tipoSolicitudId].nombre,
+        canalRespuesta: form.canalRespuesta,
+        dependencia: 'Ventanilla Única',
+        estado: 'Radicado',
+        solicitante: form.tipoPresentacion === 'ANONIMA' ? null : form.nombre.trim(),
+        documento: null,
+        correo: form.tipoPresentacion === 'ANONIMA' ? null : form.email.trim().toLowerCase() || null,
+        esAnonimo: form.tipoPresentacion === 'ANONIMA',
+        identidadReservada: form.tipoPresentacion === 'RESERVADA',
+        consultaToken: res.consultaToken,
+      });
+      setEstado('confirmacion');
+    } catch (error) {
+      const message = error instanceof Error
+        ? error.message
+        : 'No fue posible radicar la solicitud. Intenta nuevamente.';
+      setErroresSubmit([message]);
+      setProgresoMensaje('');
+      setProgresoPct(0);
+      setProgresosArchivos((prev) => prev.map((progreso) => ({
+        ...progreso,
+        estado: 'error',
+        error: message,
+      })));
+      setEstado('formulario');
+    }
   }
 
   function resetFormulario() {
-    setForm({ nombre: '', email: '', telefono: '', descripcion: '' });
+    setForm({
+      nombre: '',
+      email: '',
+      telefono: '',
+      direccion: '',
+      tipoSolicitudId: 'PETICION_GENERAL',
+      tipoPresentacion: 'IDENTIFICADA',
+      canalRespuesta: 'CORREO',
+      descripcion: '',
+    });
     setTouched({});
-    setErrors({ nombre: '', email: '', telefono: '', descripcion: '' });
+    setErrors({
+      nombre: '',
+      email: '',
+      telefono: '',
+      direccion: '',
+      tipoSolicitudId: '',
+      tipoPresentacion: '',
+      canalRespuesta: '',
+      descripcion: '',
+    });
     setArchivos([]);
     setErrorArchivo('');
     setEstado('formulario');
-    setRadicadoId('');
+    setSelloRadicado(null);
     setProgresoMensaje('');
     setProgresoPct(0);
     setProgresosArchivos([]);
@@ -461,19 +494,7 @@ export default function PortalCiudadano() {
             </svg>
           </Link>
 
-          <div className="w-8 h-8 rounded-lg border border-indigo-500/30 bg-indigo-500/15 flex items-center justify-center shrink-0">
-            <svg viewBox="0 0 24 24" fill="none" stroke="#6366F1" strokeWidth={2} className="w-4 h-4">
-              <path strokeLinecap="round" strokeLinejoin="round" d="M12 3l8 4v5c0 5.25-3.5 10.15-8 11.5C7.5 22.15 4 17.25 4 12V7l8-4z" />
-            </svg>
-          </div>
-          <div className="min-w-0">
-            <p className="text-[10px] font-bold uppercase tracking-widest text-indigo-400 leading-none mb-0.5">
-              Alcaldía de Simacota
-            </p>
-            <p className="text-slate-200 text-sm font-black tracking-tight leading-none truncate" style={{ fontFamily: 'var(--font-manrope)' }}>
-              Ventanilla Única Digital
-            </p>
-          </div>
+          <InstitucionalHeader compact />
 
           <nav className="ml-auto hidden sm:flex items-center gap-2 text-[10px] font-bold uppercase tracking-widest text-slate-600">
             <Link href="/" className="hover:text-slate-400 transition-colors">Inicio</Link>
@@ -487,12 +508,9 @@ export default function PortalCiudadano() {
       <div className="max-w-4xl mx-auto px-4 sm:px-6 py-10 sm:py-16">
 
         {estado === 'confirmacion' ? (
-          <div
-            className="rounded-2xl border border-white/10"
-            style={{ background: 'rgba(15,23,42,0.40)', backdropFilter: 'blur(25px)' }}
-          >
-            <PantallaConfirmacion radicadoId={radicadoId} errores={erroresSubmit} onNueva={resetFormulario} />
-          </div>
+          selloRadicado ? (
+            <ConstanciaRadicacion sello={selloRadicado} errores={erroresSubmit} onNueva={resetFormulario} />
+          ) : null
         ) : (
           <>
             <div className="text-center mb-10 field-animate" style={{ animationDelay: '0ms' }}>
@@ -515,10 +533,81 @@ export default function PortalCiudadano() {
               className="rounded-2xl border border-white/10 p-6 sm:p-8 space-y-6"
               style={{ background: 'rgba(15,23,42,0.40)', backdropFilter: 'blur(25px)' }}
             >
+              {/* ─ Tipo PQRSD ─ */}
+              <div className="field-animate" style={{ animationDelay: `${STAGGER[0]}ms` }}>
+                <label htmlFor="tipoSolicitudId" className="block text-xs font-bold uppercase tracking-widest text-slate-400 mb-2">
+                  Tipo de solicitud PQRSD *
+                </label>
+                <select
+                  id="tipoSolicitudId"
+                  className={inputClass('tipoSolicitudId')}
+                  value={form.tipoSolicitudId}
+                  onChange={(e) => handleChange('tipoSolicitudId', e.target.value as TipoSolicitudId)}
+                  disabled={estado === 'enviando'}
+                >
+                  {TIPOS_PQRSD_CIUDADANO.map((id) => {
+                    const tipo = TIPOS_SOLICITUD[id];
+                    return (
+                      <option key={id} value={id}>
+                        {tipo.nombre} - {tipo.diasRespuesta} dias {tipo.unidad.toLowerCase()}
+                      </option>
+                    );
+                  })}
+                </select>
+                <p className="mt-2 text-xs text-slate-500">
+                  El término legal se calcula según el tipo seleccionado.
+                </p>
+              </div>
+
+              {/* ─ Presentacion + canal ─ */}
+              <div className="grid sm:grid-cols-2 gap-6 field-animate" style={{ animationDelay: `${STAGGER[1]}ms` }}>
+                <div>
+                  <label htmlFor="tipoPresentacion" className="block text-xs font-bold uppercase tracking-widest text-slate-400 mb-2">
+                    Forma de presentación *
+                  </label>
+                  <select
+                    id="tipoPresentacion"
+                    className={inputClass('tipoPresentacion')}
+                    value={form.tipoPresentacion}
+                    onChange={(e) => handleChange('tipoPresentacion', e.target.value)}
+                    disabled={estado === 'enviando'}
+                  >
+                    <option value="IDENTIFICADA">Identificada</option>
+                    <option value="ANONIMA">Anónima</option>
+                    <option value="RESERVADA">Identidad reservada</option>
+                  </select>
+                  <p className="mt-2 text-xs text-slate-500">
+                    La opción anónima no exige datos personales. La reservada protege la identidad en el trámite interno.
+                  </p>
+                </div>
+
+                <div>
+                  <label htmlFor="canalRespuesta" className="block text-xs font-bold uppercase tracking-widest text-slate-400 mb-2">
+                    Canal de respuesta preferido *
+                  </label>
+                  <select
+                    id="canalRespuesta"
+                    className={inputClass('canalRespuesta')}
+                    value={form.canalRespuesta}
+                    onChange={(e) => handleChange('canalRespuesta', e.target.value)}
+                    disabled={estado === 'enviando'}
+                  >
+                    <option value="CORREO">Correo electrónico</option>
+                    <option value="TELEFONO">Teléfono</option>
+                    <option value="PRESENCIAL">Presencial</option>
+                    <option value="DIRECCION_FISICA">Dirección física</option>
+                  </select>
+                  <p className="mt-2 text-xs text-slate-500">
+                    Si elige correo, teléfono o dirección física, ese dato será obligatorio salvo que la solicitud sea anónima.
+                  </p>
+                </div>
+              </div>
+
               {/* ─ Nombre ─ */}
-              <div className="field-animate" style={{ animationDelay: `${STAGGER[1]}ms` }}>
+              {form.tipoPresentacion !== 'ANONIMA' && (
+              <div className="field-animate" style={{ animationDelay: `${STAGGER[2]}ms` }}>
                 <label htmlFor="nombre" className="block text-xs font-bold uppercase tracking-widest text-slate-400 mb-2">
-                  Nombre completo *
+                  Nombre completo {form.tipoPresentacion === 'RESERVADA' ? '(identidad reservada)' : '*'}
                 </label>
                 <input
                   id="nombre"
@@ -535,12 +624,13 @@ export default function PortalCiudadano() {
                 />
                 <FeedbackCampo id="error-nombre" error={errors.nombre} touched={!!touched.nombre} valorOk={form.nombre.trim().length >= 3} />
               </div>
+              )}
 
               {/* ─ Email + Teléfono ─ */}
-              <div className="grid sm:grid-cols-2 gap-6 field-animate" style={{ animationDelay: `${STAGGER[2]}ms` }}>
+              <div className="grid sm:grid-cols-2 gap-6 field-animate" style={{ animationDelay: `${STAGGER[3]}ms` }}>
                 <div>
                   <label htmlFor="email" className="block text-xs font-bold uppercase tracking-widest text-slate-400 mb-2">
-                    Correo electrónico *
+                    Correo electrónico {form.canalRespuesta === 'CORREO' && form.tipoPresentacion !== 'ANONIMA' ? '*' : '(opcional)'}
                   </label>
                   <input
                     id="email"
@@ -560,7 +650,7 @@ export default function PortalCiudadano() {
 
                 <div>
                   <label htmlFor="telefono" className="block text-xs font-bold uppercase tracking-widest text-slate-400 mb-2">
-                    Celular WhatsApp *
+                    Celular WhatsApp {form.canalRespuesta === 'TELEFONO' && form.tipoPresentacion !== 'ANONIMA' ? '*' : '(opcional)'}
                   </label>
                   <input
                     id="telefono"
@@ -581,14 +671,36 @@ export default function PortalCiudadano() {
                 </div>
               </div>
 
+              {form.tipoPresentacion !== 'ANONIMA' && (
+                <div className="field-animate" style={{ animationDelay: `${STAGGER[4]}ms` }}>
+                  <label htmlFor="direccion" className="block text-xs font-bold uppercase tracking-widest text-slate-400 mb-2">
+                    Dirección física {form.canalRespuesta === 'DIRECCION_FISICA' ? '*' : '(opcional)'}
+                  </label>
+                  <input
+                    id="direccion"
+                    type="text"
+                    className={inputClass('direccion')}
+                    placeholder="Ej. Calle 4 # 5-20, barrio Centro"
+                    value={form.direccion}
+                    onChange={(e) => handleChange('direccion', e.target.value)}
+                    onBlur={() => handleBlur('direccion')}
+                    disabled={estado === 'enviando'}
+                    autoComplete="street-address"
+                    aria-describedby={errors.direccion ? 'error-direccion' : undefined}
+                    aria-invalid={!!errors.direccion}
+                  />
+                  <FeedbackCampo id="error-direccion" error={errors.direccion} touched={!!touched.direccion} valorOk={form.direccion.trim().length >= 8} />
+                </div>
+              )}
+
               {/* ─ Descripción ─ */}
-              <div className="field-animate" style={{ animationDelay: `${STAGGER[3]}ms` }}>
+              <div className="field-animate" style={{ animationDelay: `${STAGGER[5]}ms` }}>
                 <div className="flex items-center justify-between mb-2">
                   <label htmlFor="descripcion" className="block text-xs font-bold uppercase tracking-widest text-slate-400">
                     Descripción de la solicitud *
                   </label>
                   <span className={`text-xs tabular-nums ${form.descripcion.length >= 20 ? 'text-emerald-500' : 'text-slate-600'}`}>
-                    {form.descripcion.length}/1 000
+                    {form.descripcion.length}/{MAX_DESCRIPCION.toLocaleString('es-CO')}
                   </span>
                 </div>
                 <textarea
@@ -597,7 +709,7 @@ export default function PortalCiudadano() {
                   className={`${inputClass('descripcion')} resize-none`}
                   placeholder="Describe con detalle tu solicitud. Si es de una vereda rural (ej. zona Yariguíes), indícalo para un mejor enrutamiento..."
                   value={form.descripcion}
-                  onChange={(e) => handleChange('descripcion', e.target.value.slice(0, 1000))}
+                  onChange={(e) => handleChange('descripcion', e.target.value.slice(0, MAX_DESCRIPCION))}
                   onBlur={() => handleBlur('descripcion')}
                   disabled={estado === 'enviando'}
                   aria-describedby={errors.descripcion ? 'error-descripcion' : undefined}
@@ -654,7 +766,7 @@ export default function PortalCiudadano() {
               </div>
 
               {/* ─ Archivos adjuntos ─ */}
-              <div className="field-animate" style={{ animationDelay: `${STAGGER[4]}ms` }}>
+              <div className="field-animate" style={{ animationDelay: `${STAGGER[5]}ms` }}>
                 <div className="flex items-center justify-between mb-2">
                   <p className="text-xs font-bold uppercase tracking-widest text-slate-400">
                     Archivos adjuntos <span className="text-slate-600 normal-case tracking-normal font-normal">(opcional — máx. {MAX_ARCHIVOS})</span>
@@ -685,7 +797,7 @@ export default function PortalCiudadano() {
                       ref={fileInputRef}
                       type="file"
                       className="sr-only"
-                      accept=".pdf,.jpg,.jpeg,.png"
+                      accept=".pdf,.jpg,.jpeg,.png,.docx,.xlsx,.pptx"
                       multiple
                       onChange={(e) => procesarArchivos(e.target.files)}
                       disabled={estado === 'enviando'}
@@ -705,7 +817,7 @@ export default function PortalCiudadano() {
                           Arrastra aquí o{' '}
                           <span className="text-indigo-400 underline underline-offset-2">selecciona archivos</span>
                         </p>
-                        <p className="text-xs text-slate-600 mt-1">PDF, JPG, PNG — máx. 5 MB por archivo</p>
+                        <p className="text-xs text-slate-600 mt-1">PDF, imágenes o documentos de Office (.docx, .xlsx, .pptx) — máx. 5 MB por archivo</p>
                       </div>
                     </div>
                   </div>
@@ -758,6 +870,17 @@ export default function PortalCiudadano() {
 
               {/* ─ Submit ─ */}
               <div className="pt-2 field-animate" style={{ animationDelay: `${STAGGER[5]}ms` }}>
+                {estado === 'formulario' && erroresSubmit.length > 0 && (
+                  <div className="mb-4 rounded-xl border border-rose-500/25 bg-rose-500/10 p-4">
+                    <p className="text-sm font-semibold text-rose-200">No fue posible radicar la solicitud</p>
+                    <ul className="mt-2 space-y-1 text-xs text-rose-100/80">
+                      {erroresSubmit.map((error, index) => (
+                        <li key={`${error}-${index}`}>{error}</li>
+                      ))}
+                    </ul>
+                  </div>
+                )}
+
                 {estado === 'enviando' && (
                   <div className="mb-4 rounded-xl border border-white/10 p-4 bg-slate-800/40">
                     <div className="flex items-center justify-between mb-1.5">
@@ -843,7 +966,7 @@ export default function PortalCiudadano() {
                 </div>
                 <div>
                   <p className="text-xs font-bold uppercase tracking-widest text-amber-400 mb-1">Tiempo de respuesta</p>
-                  <p className="text-slate-400 text-xs leading-relaxed">Máximo 15 días hábiles según la Ley 1437 de 2011 (CPACA).</p>
+                  <p className="text-slate-400 text-xs leading-relaxed">El término depende del tipo de solicitud: 10, 15 o 30 días hábiles según la Ley 1755 de 2015.</p>
                 </div>
               </div>
 

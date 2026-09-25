@@ -1,0 +1,8 @@
+{
+  "sha": "PENDIENTE",
+  "fecha": "PENDIENTE",
+  "resultado": "pendiente",
+  "corridaPor": "coordinador",
+  "specs": "e2e/*.spec.ts (15 flujos Playwright)",
+  "notas": "Registro del último E2E de stage. El E2E NO corre en CI (requiere stage + credenciales). El coordinador actualiza este archivo tras cada corrida contra stage: pega el SHA exacto verificado, la fecha ISO-8601 y el resultado ('verde' | 'rojo'). Mientras 'sha' no coincida con el SHA candidato de la corrida de CI, la categoría Funcional del informe queda AMBER (no hay corrida E2E reciente). Ver docs/auditorias/README-e2e-input.md."
+}

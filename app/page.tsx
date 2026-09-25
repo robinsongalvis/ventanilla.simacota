@@ -1,7 +1,10 @@
 import Link from 'next/link';
+import { InstitucionalHeader } from '@/app/components/institucional/InstitucionalHeader';
+import { INSTITUCION } from '@/lib/institucion';
+import { DIRECTORIO_TENANTS } from '@/src/types/reglas-negocio';
 
 const STATS = [
-  { value: '16', label: 'Dependencias conectadas' },
+  { value: String(Object.keys(DIRECTORIO_TENANTS).length), label: 'Dependencias conectadas' },
   { value: '24/7', label: 'Disponibilidad digital' },
   { value: '100%', label: 'Trazabilidad de casos' },
 ];
@@ -38,36 +41,23 @@ const FEATURES = [
 
 export default function HomePage() {
   return (
-    <div className="bg-obsidian-gradient min-h-screen flex flex-col">
+    <div className="bg-institucional-light min-h-screen flex flex-col" style={{ color: '#1F2933' }}>
 
       {/* ── Navbar ── */}
-      <header className="border-b border-white/[0.06] sticky top-0 z-50 backdrop-blur-[20px] bg-[#0A0A0B]/70" role="banner">
-        <div className="max-w-6xl mx-auto px-6 py-4 flex items-center justify-between">
-          {/* Logo + identidad institucional */}
-          <div
-            className="flex items-center gap-3"
-            aria-label="Alcaldía Municipal de Simacota — Ventanilla Única Digital"
-          >
-            <div
-              className="w-9 h-9 rounded-lg bg-indigo-500/20 border border-indigo-500/30 flex items-center justify-center"
-              aria-hidden="true"
-            >
-              <svg viewBox="0 0 24 24" fill="none" stroke="#6366F1" strokeWidth={2} className="w-5 h-5" aria-hidden="true">
-                <path strokeLinecap="round" strokeLinejoin="round" d="M12 3l8 4v5c0 5.25-3.5 10.15-8 11.5C7.5 22.15 4 17.25 4 12V7l8-4z" />
-              </svg>
-            </div>
-            <div>
-              <p className="font-label text-indigo-400 text-[10px]">Alcaldía Municipal</p>
-              <p className="text-slate-100 font-semibold text-sm leading-tight" style={{ fontFamily: 'var(--font-manrope)' }}>
-                Simacota, Santander
-              </p>
-            </div>
-          </div>
+      <header className="border-b border-[var(--color-border)] sticky top-0 z-50 backdrop-blur-[20px] bg-white/85" role="banner">
+        <div className="max-w-6xl mx-auto px-4 sm:px-6 py-3 sm:py-4 flex items-center justify-between gap-2">
+          <InstitucionalHeader compact theme="light" />
           {/* Navegación principal */}
-          <nav aria-label="Navegación principal">
+          <nav aria-label="Navegación principal" className="flex items-center gap-5">
+            <Link
+              href="/directorio"
+              className="font-label text-slate-700 link-gradient-underline text-[11px]"
+            >
+              Directorio
+            </Link>
             <Link
               href="/interno/dashboard"
-              className="font-label text-slate-400 hover:text-slate-200 transition-colors text-[11px]"
+              className="font-label text-slate-800 link-gradient-underline text-[11px]"
               aria-label="Acceso al panel interno para funcionarios de la Alcaldía"
             >
               Acceso funcionarios →
@@ -81,49 +71,68 @@ export default function HomePage() {
 
         {/* Badge — estado del sistema en tiempo real */}
         <div
-          className="inline-flex items-center gap-2 px-4 py-2 rounded-full border border-indigo-500/30 bg-indigo-500/10 mb-8 animate-fade-in-up"
+          className="inline-flex items-center gap-2 px-4 py-2 rounded-full mb-8 animate-fade-in-up"
+          style={{
+            background: 'var(--brand-green-soft)',
+            border: '1px solid var(--border-accent)',
+            boxShadow: 'var(--shadow-institutional-sm)',
+          }}
           aria-live="polite"
           aria-label="Estado del sistema: activo"
         >
-          <span className="w-2 h-2 rounded-full bg-indigo-400 animate-pulse-glow" aria-hidden="true" />
-          <span className="font-label text-indigo-400 text-[11px]">Sistema activo — Cuentas Claras</span>
+          <span className="w-2 h-2 rounded-full animate-pulse-glow" style={{ background: 'var(--brand-green-action)' }} aria-hidden="true" />
+          <span className="font-label text-[11px]" style={{ color: 'var(--brand-forest)' }}>
+            {INSTITUCION.contexto} — Sistema activo
+          </span>
         </div>
 
-        {/* Headline */}
+        {/* Headline — degradado institucional verde→dorado en "Digital" */}
         <h1
-          className="font-headline text-5xl md:text-7xl text-slate-50 max-w-4xl mb-6 animate-fade-in-up"
-          style={{ animationDelay: '0.1s', opacity: 0 }}
+          className="font-headline text-5xl md:text-7xl max-w-4xl mb-6 animate-fade-in-up"
+          style={{ animationDelay: '0.1s', opacity: 0, color: 'var(--text-primary-2)' }}
         >
           Ventanilla Única{' '}
-          <span className="text-transparent bg-clip-text bg-gradient-to-r from-indigo-400 to-purple-400">
-            Digital
-          </span>
+          <span className="text-gradient-digital">Digital</span>
         </h1>
 
         {/* Subtítulo */}
         <p
-          className="text-slate-400 text-lg md:text-xl max-w-2xl leading-relaxed mb-12 animate-fade-in-up"
-          style={{ animationDelay: '0.2s', opacity: 0 }}
+          className="text-lg md:text-xl max-w-2xl leading-relaxed mb-12 animate-fade-in-up"
+          style={{ animationDelay: '0.2s', opacity: 0, color: 'var(--text-secondary-2)' }}
         >
           Radica tu solicitud desde cualquier lugar. La inteligencia artificial la clasifica
           y la envía a la dependencia correcta en segundos.{' '}
-          <span className="text-slate-300 font-medium">Trazabilidad total, cuentas claras.</span>
+          <span className="font-semibold" style={{ color: 'var(--text-primary-2)' }}>Trazabilidad total, cuentas claras.</span>
         </p>
 
         {/* CTAs */}
         <div
-          className="flex flex-col sm:flex-row gap-4 items-center animate-fade-in-up"
+          className="flex flex-col sm:flex-row gap-4 items-stretch sm:items-center animate-fade-in-up w-full sm:w-auto"
           style={{ animationDelay: '0.3s', opacity: 0 }}
         >
-          <Link href="/radicacion" className="btn-primary text-base px-8 py-4 rounded-xl">
+          <Link
+            href="/radicacion"
+            className="btn-institucional-primary inline-flex items-center justify-center gap-2 text-base font-bold px-8 py-4 rounded-xl w-full sm:w-auto"
+          >
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} className="w-5 h-5">
               <path strokeLinecap="round" strokeLinejoin="round" d="M12 4.5v15m7.5-7.5h-15" />
             </svg>
             Radicar mi Solicitud
           </Link>
+          <Link
+            href="/consulta"
+            className="btn-institucional-secondary inline-flex items-center justify-center gap-2 text-base font-bold px-8 py-4 rounded-xl w-full sm:w-auto"
+            aria-label="Consultar el estado de un radicado"
+          >
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} className="w-5 h-5">
+              <path strokeLinecap="round" strokeLinejoin="round" d="M21 21l-5.197-5.197m0 0A7.5 7.5 0 105.196 5.196a7.5 7.5 0 0010.607 10.607z" />
+            </svg>
+            Consultar radicado
+          </Link>
           <a
             href="#como-funciona"
-            className="text-slate-400 hover:text-slate-200 transition-colors font-medium text-base px-6 py-4"
+            className="link-gradient-underline text-base font-medium px-6 py-4 text-center"
+            style={{ color: 'var(--text-secondary-2)' }}
           >
             ¿Cómo funciona?
           </a>
@@ -131,14 +140,24 @@ export default function HomePage() {
 
         {/* Stats — datos clave de la plataforma */}
         <dl
-          className="grid grid-cols-3 gap-8 mt-20 animate-fade-in-up"
+          className="grid grid-cols-3 gap-3 sm:gap-4 mt-16 sm:mt-20 animate-fade-in-up max-w-3xl w-full"
           style={{ animationDelay: '0.4s', opacity: 0 }}
           aria-label="Estadísticas de la plataforma"
         >
           {STATS.map((s) => (
-            <div key={s.label} className="text-center">
-              <dd className="font-headline text-3xl text-slate-50 mb-1">{s.value}</dd>
-              <dt className="font-label text-slate-500 text-[10px]">{s.label}</dt>
+            <div
+              key={s.label}
+              className="card-institucional is-hoverable text-center px-3 py-5 sm:px-5 sm:py-6"
+            >
+              <dd
+                className="font-headline text-2xl sm:text-3xl mb-1"
+                style={{ color: 'var(--brand-forest)' }}
+              >
+                {s.value}
+              </dd>
+              <dt className="font-label text-[10px] leading-snug" style={{ color: 'var(--text-secondary-2)' }}>
+                {s.label}
+              </dt>
             </div>
           ))}
         </dl>
@@ -147,47 +166,58 @@ export default function HomePage() {
       {/* ── Cómo funciona ── */}
       <section
         id="como-funciona"
-        className="max-w-6xl mx-auto px-6 pb-24 w-full"
+        className="max-w-6xl mx-auto px-4 sm:px-6 pb-16 sm:pb-24 w-full"
         aria-labelledby="como-funciona-titulo"
       >
         <div className="text-center mb-12">
-          <p className="font-label text-indigo-400 mb-3" aria-hidden="true">Proceso</p>
-          <h2 id="como-funciona-titulo" className="font-headline text-3xl md:text-4xl text-slate-100">Cómo funciona</h2>
+          <p className="font-label mb-3" style={{ color: 'var(--brand-green-action)' }} aria-hidden="true">Proceso</p>
+          <h2 id="como-funciona-titulo" className="font-headline text-3xl md:text-4xl" style={{ color: 'var(--text-primary-2)' }}>
+            Cómo funciona
+          </h2>
         </div>
 
         <div className="grid md:grid-cols-3 gap-6" role="list" aria-label="Características del sistema">
           {FEATURES.map((f, i) => (
-            <article key={f.title} className="glass-card p-8 relative overflow-hidden group" role="listitem">
-              <span className="absolute top-4 right-5 font-headline text-6xl text-white/[0.04] select-none" aria-hidden="true">
+            <article key={f.title} className="card-institucional is-hoverable p-8 group" role="listitem">
+              <span
+                className="absolute top-4 right-5 font-headline text-6xl select-none"
+                style={{ color: 'rgba(15, 61, 46, 0.06)' }}
+                aria-hidden="true"
+              >
                 {i + 1}
               </span>
               <div
-                className="w-12 h-12 rounded-xl bg-indigo-500/15 border border-indigo-500/25 flex items-center justify-center text-indigo-400 mb-5 group-hover:bg-indigo-500/25 transition-colors"
+                className="w-12 h-12 rounded-xl flex items-center justify-center mb-5 transition-colors relative"
+                style={{
+                  background: 'var(--brand-green-soft)',
+                  border: '1px solid var(--border-accent)',
+                  color: 'var(--brand-green-action)',
+                }}
                 aria-hidden="true"
               >
                 {f.icon}
               </div>
-              <h3 className="font-headline text-xl text-slate-100 mb-3">{f.title}</h3>
-              <p className="text-slate-400 text-sm leading-relaxed">{f.desc}</p>
+              <h3 className="font-headline text-xl mb-3 relative" style={{ color: 'var(--text-primary-2)' }}>{f.title}</h3>
+              <p className="text-sm leading-relaxed relative" style={{ color: 'var(--text-secondary-2)' }}>{f.desc}</p>
             </article>
           ))}
         </div>
 
         {/* Zona Yariguíes */}
-        <div className="mt-8 glass-card p-6 border-l-2 border-l-rose-500/60 flex gap-4 items-start">
-          <div className="w-10 h-10 rounded-lg bg-rose-500/15 border border-rose-500/25 flex items-center justify-center text-rose-400 shrink-0 mt-0.5">
+        <div className="mt-8 card-institucional p-6 border-l-4 border-l-amber-500 flex gap-4 items-start">
+          <div className="w-10 h-10 rounded-lg bg-amber-50 border border-amber-500/30 flex items-center justify-center text-amber-700 shrink-0 mt-0.5">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.5} className="w-5 h-5">
               <path strokeLinecap="round" strokeLinejoin="round" d="M15 10.5a3 3 0 11-6 0 3 3 0 016 0z" />
               <path strokeLinecap="round" strokeLinejoin="round" d="M19.5 10.5c0 7.142-7.5 11.25-7.5 11.25S4.5 17.642 4.5 10.5a7.5 7.5 0 1115 0z" />
             </svg>
           </div>
           <div>
-            <p className="font-label text-rose-400 mb-1 text-[10px]">Zona Especial</p>
-            <p className="text-slate-300 text-sm leading-relaxed">
+            <p className="font-label text-amber-700 mb-1 text-[10px]">Zona Especial</p>
+            <p className="text-slate-700 text-sm leading-relaxed">
               Las solicitudes de las veredas de la{' '}
-              <span className="text-rose-300 font-medium">Zona Yariguíes</span> (Bajo Simacota)
+              <span className="text-amber-800 font-medium">Zona Yariguíes</span> (Bajo Simacota)
               se enrutan automáticamente a la{' '}
-              <span className="text-slate-200 font-medium">Subinspección de Policía Rural</span>{' '}
+              <span className="text-slate-900 font-medium">Subinspección de Policía Rural</span>{' '}
               y la Subhacienda Yariguíes, garantizando atención especializada para tu territorio.
             </p>
           </div>
@@ -195,9 +225,9 @@ export default function HomePage() {
       </section>
 
       {/* ── Footer ── */}
-      <footer className="border-t border-white/[0.06] py-8 text-center" role="contentinfo">
-        <p className="font-label text-slate-600 text-[10px]">
-          Alcaldía Municipal de Simacota · Santander, Colombia · Sistema de Ventanilla Única Digital
+      <footer className="border-t border-[var(--color-border)] py-8 text-center bg-white/40" role="contentinfo">
+        <p className="font-label text-slate-500 text-[10px]">
+          {INSTITUCION.nombre} · {INSTITUCION.departamento}, {INSTITUCION.pais} · {INSTITUCION.sistema}
         </p>
       </footer>
     </div>

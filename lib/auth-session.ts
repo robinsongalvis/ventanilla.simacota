@@ -1,25 +1,52 @@
 'use client';
 
-import { INTERNAL_AUTH_COOKIE } from './auth-cookie';
-
-const COOKIE_MAX_AGE_SECONDS = 60 * 60 * 24 * 7;
-
-export function markInternalSessionActive() {
-  const parts = [
-    `${INTERNAL_AUTH_COOKIE}=1`,
-    `Max-Age=${COOKIE_MAX_AGE_SECONDS}`,
-    'Path=/',
-    'SameSite=Lax',
-  ];
-
-  if (window.location.protocol === 'https:') {
-    parts.push('Secure');
-  }
-
-  document.cookie = parts.join('; ');
+interface SessionResponse {
+  refreshRequired?: boolean;
+  error?: string;
+  uid?: string;
+  email?: string | null;
+  rol?: string;
+  tenantId?: string;
 }
 
-export function clearInternalSession() {
-  const secure = window.location.protocol === 'https:' ? '; Secure' : '';
-  document.cookie = `${INTERNAL_AUTH_COOKIE}=; Max-Age=0; Path=/; SameSite=Lax${secure}`;
+const SESSION_TIMEOUT_MS = 15_000;
+
+async function fetchWithTimeout(input: RequestInfo | URL, init: RequestInit): Promise<Response> {
+  const controller = new AbortController();
+  const timer = window.setTimeout(() => controller.abort(), SESSION_TIMEOUT_MS);
+
+  try {
+    return await fetch(input, { ...init, signal: controller.signal });
+  } finally {
+    window.clearTimeout(timer);
+  }
+}
+
+export async function createInternalSession(
+  idToken: string,
+  retryWithFreshToken?: () => Promise<string>,
+): Promise<SessionResponse> {
+  const response = await fetchWithTimeout('/api/auth/session', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    credentials: 'include',
+    body: JSON.stringify({ idToken }),
+  });
+
+  if (response.status === 409 && retryWithFreshToken) {
+    const freshToken = await retryWithFreshToken();
+    return createInternalSession(freshToken);
+  }
+
+  const data = await response.json().catch(() => null) as SessionResponse | null;
+
+  if (!response.ok) {
+    throw new Error(data?.error ?? 'No fue posible crear la sesion interna.');
+  }
+
+  return data ?? {};
+}
+
+export async function clearInternalSession() {
+  await fetch('/api/auth/logout', { method: 'POST', credentials: 'include' }).catch(() => null);
 }

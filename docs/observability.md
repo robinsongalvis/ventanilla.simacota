@@ -57,3 +57,26 @@ graph LR
 ## 3. Logs de Operación Administrativa: `ai_auditoria`
 
 A diferencia de `ai_logs` (que almacena telemetría estrictamente técnica), la colección `ai_auditoria` captura eventos operativos donde el funcionario humano corrige o complementa las sugerencias algorítmicas (Overrides). Esto constituye la bitácora institucional de gobernanza que valida la supervisión humana sobre la máquina.
+
+---
+
+## 4. Observabilidad de Flujos Institucionales (ADR-0005, Ola 1)
+
+Además de la telemetría de IA (`ai_logs`), los cuatro flujos críticos del ciclo
+del trámite emiten un **evento de negocio estructurado** al completarse (éxito o
+fallo), para que la confiabilidad sea medible (habilita el KPI #3 de la Fase 3 y
+el auditor de rendimiento de la Ola 2).
+
+- **Primitivo:** `lib/observabilidad/eventos-negocio.ts` → `registrarEventoNegocio()`.
+  Emite a stdout como JSON one-liner (`[ventanilla:evento-negocio]`) + breadcrumb
+  Sentry best-effort. Nunca lanza; sin persistencia en Firestore.
+- **Flujos instrumentados:** radicación (`app/api/radicacion`), asignación,
+  prórroga y respuesta (`app/api/radicados/[radicadoId]/{asignar,prorroga,resolver}`).
+- **Campos del evento:** `operacion`, `resultado` (ok|error), `latenciaMs`,
+  `correlacion` (radicadoId + timestamp), `actorRol`, `tenant`, `radicadoId`,
+  `timestamp`, y `mensaje` **solo en error** (saneado con `sanitizarTextoObservabilidad`).
+- **PII:** el evento no tiene campos de identidad del ciudadano; revisión cruzada
+  de seguridad **CONFORME**. Riesgo residual conocido y aceptado: un nombre propio
+  en claro dentro de un `Error.message` (limitación heredada de `logError`, H-N03).
+- **Control de regresión:** `__tests__/eventos-negocio.test.ts` (forma del evento,
+  ausencia de PII, un caso por flujo).
