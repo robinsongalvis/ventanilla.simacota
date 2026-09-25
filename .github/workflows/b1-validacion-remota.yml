@@ -4,17 +4,83 @@ on:
   pull_request:
     types: [labeled]
 
-permissions:
-  contents: read
-  deployments: read
+permissions: {}
 
 jobs:
-  validar-candidato-exacto:
+  verificar-destino-preview:
     if: >-
       github.event.label.name == 'run-b1-stage-e2e' &&
       github.event.pull_request.head.repo.full_name == github.repository
     runs-on: ubuntu-latest
+    permissions:
+      deployments: read
+    env:
+      CANDIDATE_SHA: 54256f54cf1ad0cd1b3c61e59fc3c1424889e3f9
+      PREVIEW_URL: https://ventanilla-simacota-6qaz5ct8o-robinsongalvis-projects.vercel.app
+      PREVIEW_HOST: ventanilla-simacota-6qaz5ct8o-robinsongalvis-projects.vercel.app
+    outputs:
+      preview_url: ${{ steps.preview.outputs.preview_url }}
+
+    steps:
+      - name: Verificar identidad del disparo antes de solicitar secretos
+        env:
+          PR_BASE_REF: ${{ github.event.pull_request.base.ref }}
+          PR_HEAD_REF: ${{ github.event.pull_request.head.ref }}
+          PR_HEAD_REPOSITORY: ${{ github.event.pull_request.head.repo.full_name }}
+        run: |
+          set -euo pipefail
+          test "$PR_BASE_REF" = "release/fase5-hardening"
+          test "$PR_HEAD_REF" = "validation/b1-54256f5"
+          test "$PR_HEAD_REPOSITORY" = "${{ github.repository }}"
+          node <<'NODE'
+          const preview = new URL(process.env.PREVIEW_URL);
+          const productionHosts = new Set([
+            'ventanilla.simacota.gov.co',
+            'ventanilla-simacota.vercel.app',
+          ]);
+          if (preview.protocol !== 'https:') throw new Error('El Preview autorizado debe usar HTTPS.');
+          if (preview.hostname !== process.env.PREVIEW_HOST) throw new Error('Host Preview no autorizado.');
+          if (preview.pathname !== '/' || preview.search || preview.hash) {
+            throw new Error('PREVIEW_URL debe ser un origen exacto, sin ruta, query ni fragmento.');
+          }
+          if (productionHosts.has(preview.hostname)) throw new Error('GUARDA: el destino corresponde a Production.');
+          NODE
+          echo "PR #${{ github.event.pull_request.number }} autorizado para preflight B1."
+
+      - name: Verificar que el Preview pertenece al SHA candidato
+        id: preview
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          DESPLIEGUES="$(mktemp)"
+          ESTADOS="$(mktemp)"
+          trap 'rm -f "$DESPLIEGUES" "$ESTADOS"' EXIT
+          curl --fail --silent --show-error \
+            -H "Authorization: Bearer $GH_TOKEN" \
+            -H "Accept: application/vnd.github+json" \
+            "https://api.github.com/repos/${{ github.repository }}/deployments?sha=${CANDIDATE_SHA}&environment=Preview&per_page=100" \
+            > "$DESPLIEGUES"
+          URL_ESTADOS="$(jq -r --arg sha "$CANDIDATE_SHA" \
+            '[.[] | select(.sha == $sha and .environment == "Preview") | .statuses_url][0] // empty' \
+            "$DESPLIEGUES")"
+          test -n "$URL_ESTADOS"
+          curl --fail --silent --show-error \
+            -H "Authorization: Bearer $GH_TOKEN" \
+            -H "Accept: application/vnd.github+json" \
+            "$URL_ESTADOS" > "$ESTADOS"
+          URL_REAL="$(jq -r '[.[] | select(.state == "success") | .environment_url][0] // empty' "$ESTADOS")"
+          test "$URL_REAL" = "$PREVIEW_URL"
+          echo "preview_url=$URL_REAL" >> "$GITHUB_OUTPUT"
+          echo "Preview verificado para SHA $CANDIDATE_SHA: $URL_REAL"
+
+  validar-candidato-exacto:
+    needs: verificar-destino-preview
+    runs-on: ubuntu-latest
     environment: stage-e2e
+    permissions:
+      contents: read
+      id-token: write
     timeout-minutes: 50
     concurrency:
       group: b1-validacion-54256f5
@@ -22,12 +88,18 @@ jobs:
     env:
       CANDIDATE_SHA: 54256f54cf1ad0cd1b3c61e59fc3c1424889e3f9
       PREVIEW_URL: https://ventanilla-simacota-6qaz5ct8o-robinsongalvis-projects.vercel.app
+      PREVIEW_HOST: ventanilla-simacota-6qaz5ct8o-robinsongalvis-projects.vercel.app
       STAGE_PROJECT_ID: ventanilla-simacota-stage
 
     steps:
       - name: Verificar que el disparo es la validación B1 esperada
+        env:
+          PREFLIGHT_PREVIEW_URL: ${{ needs.verificar-destino-preview.outputs.preview_url }}
         run: |
+          set -euo pipefail
           test "${{ github.event.pull_request.base.ref }}" = "release/fase5-hardening"
+          test "${{ github.event.pull_request.head.ref }}" = "validation/b1-54256f5"
+          test "$PREFLIGHT_PREVIEW_URL" = "$PREVIEW_URL"
           echo "PR #${{ github.event.pull_request.number }} autorizado para validación B1."
 
       - name: Checkout literal del candidato
@@ -43,29 +115,10 @@ jobs:
           test -z "$(git status --porcelain)"
           echo "SHA probado: $ACTUAL"
 
-      - name: Verificar que el preview pertenece al SHA
-        env:
-          GH_TOKEN: ${{ github.token }}
+      - name: Registrar identidad verificada del Preview
         run: |
-          set -euo pipefail
           mkdir -p .b1-artifacts
-          DESPLIEGUES="$(mktemp)"
-          ESTADOS="$(mktemp)"
-          trap 'rm -f "$DESPLIEGUES" "$ESTADOS"' EXIT
-          curl --fail --silent --show-error \
-            -H "Authorization: Bearer $GH_TOKEN" \
-            -H "Accept: application/vnd.github+json" \
-            "https://api.github.com/repos/${{ github.repository }}/deployments?sha=${CANDIDATE_SHA}" \
-            > "$DESPLIEGUES"
-          URL_ESTADOS="$(jq -r '.[] | select(.environment == "Preview") | .statuses_url' "$DESPLIEGUES" | head -n 1)"
-          test -n "$URL_ESTADOS"
-          curl --fail --silent --show-error \
-            -H "Authorization: Bearer $GH_TOKEN" \
-            -H "Accept: application/vnd.github+json" \
-            "$URL_ESTADOS" > "$ESTADOS"
-          URL_REAL="$(jq -r '.[] | select(.state == "success") | .environment_url' "$ESTADOS" | head -n 1)"
-          test "$URL_REAL" = "$PREVIEW_URL"
-          printf 'preview=%s\nsha=%s\n' "$URL_REAL" "$CANDIDATE_SHA" | tee .b1-artifacts/identidad-preview.txt
+          printf 'preview=%s\nsha=%s\n' "$PREVIEW_URL" "$CANDIDATE_SHA" | tee .b1-artifacts/identidad-preview.txt
 
       - name: Configurar Node 22
         uses: actions/setup-node@v7
@@ -136,6 +189,126 @@ jobs:
       - name: Instalar Chromium en Linux
         run: npx playwright install --with-deps chromium
 
+      - name: Obtener JWT OIDC efímero para probes del Preview
+        id: oidc-probes
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const token = await core.getIDToken();
+            const claims = JSON.parse(Buffer.from(token.split('.')[1], 'base64url'));
+            const audiencias = Array.isArray(claims.aud) ? claims.aud : [claims.aud];
+            if (claims.repository !== 'robinsongalvis/ventanilla.simacota') throw new Error('OIDC: repositorio no autorizado.');
+            if (claims.repository_owner !== 'robinsongalvis') throw new Error('OIDC: propietario no autorizado.');
+            if (claims.head_ref !== 'validation/b1-54256f5') throw new Error('OIDC: rama origen no autorizada.');
+            if (claims.base_ref !== 'release/fase5-hardening') throw new Error('OIDC: rama base no autorizada.');
+            if (claims.environment !== 'stage-e2e') throw new Error('OIDC: Environment no autorizado.');
+            if (!audiencias.includes('https://github.com/robinsongalvis')) throw new Error('OIDC: audience no autorizada.');
+            core.setSecret(token);
+            core.setOutput('token', token);
+
+      - name: Probar acceso controlado y perímetro antes del E2E
+        env:
+          VERCEL_TRUSTED_OIDC_TOKEN: ${{ steps.oidc-probes.outputs.token }}
+        run: |
+          set -euo pipefail
+          node --input-type=module <<'NODE' | tee .b1-artifacts/probes-preview.log
+          const base = new URL(process.env.PREVIEW_URL);
+          const token = process.env.VERCEL_TRUSTED_OIDC_TOKEN;
+          const hostAutorizado = process.env.PREVIEW_HOST;
+          const productionHosts = new Set([
+            'ventanilla.simacota.gov.co',
+            'ventanilla-simacota.vercel.app',
+          ]);
+
+          if (!token) throw new Error('GitHub no emitió el JWT OIDC para los probes.');
+          if (base.protocol !== 'https:' || base.hostname !== hostAutorizado) {
+            throw new Error('GUARDA: origen Preview no autorizado.');
+          }
+          if (productionHosts.has(base.hostname)) throw new Error('GUARDA: se intentó apuntar a Production.');
+
+          async function solicitar(pathname, conOidc) {
+            const url = new URL(pathname, base);
+            if (url.origin !== base.origin) throw new Error(`GUARDA: origen no autorizado en ${pathname}.`);
+            const response = await fetch(url, {
+              redirect: 'manual',
+              signal: AbortSignal.timeout(30_000),
+              headers: conOidc ? { 'x-vercel-trusted-oidc-idp-token': token } : {},
+            });
+            const location = response.headers.get('location');
+            if (conOidc && location) {
+              const destino = new URL(location, url);
+              if (destino.origin !== base.origin) {
+                throw new Error(`GUARDA: ${pathname} intentó redirigir fuera del Preview autorizado.`);
+              }
+            }
+            return { response, location };
+          }
+
+          function exigirEstado(nombre, response, esperado) {
+            if (response.status !== esperado) {
+              throw new Error(`${nombre}: HTTP ${response.status}; esperado ${esperado}.`);
+            }
+          }
+
+          // 1/5 — Control negativo: Deployment Protection debe seguir activa.
+          {
+            const { response, location } = await solicitar('/api/health', false);
+            if (response.status !== 302 || !location) {
+              throw new Error(`control-sin-oidc: HTTP ${response.status}; se esperaba redirect de Vercel SSO.`);
+            }
+            const destino = new URL(location, base);
+            if (destino.origin !== 'https://vercel.com' || destino.pathname !== '/sso-api') {
+              throw new Error('control-sin-oidc: redirect inesperado; Deployment Protection no quedó acreditada.');
+            }
+            console.log('1/5 control-sin-oidc: 302 Vercel SSO');
+          }
+
+          // 2/5 — Health de la aplicación con OIDC.
+          {
+            const { response } = await solicitar('/api/health', true);
+            exigirEstado('health-con-oidc', response, 200);
+            const body = await response.json();
+            if (body?.status !== 'healthy') throw new Error('health-con-oidc: respuesta no saludable.');
+            console.log('2/5 health-con-oidc: 200 healthy');
+          }
+
+          // 3/5 — Login real de Ventanilla, no la pantalla de Vercel.
+          {
+            const { response } = await solicitar('/interno/login', true);
+            exigirEstado('login-con-oidc', response, 200);
+            const body = await response.text();
+            if (!body.includes('Correo institucional') || body.includes('Login – Vercel')) {
+              throw new Error('login-con-oidc: el HTML no corresponde al login de Ventanilla.');
+            }
+            console.log('3/5 login-con-oidc: 200 Ventanilla');
+          }
+
+          // 4/5 — La ruta UI protegida debe redirigir dentro del mismo Preview.
+          {
+            const { response, location } = await solicitar('/interno/dashboard', true);
+            exigirEstado('dashboard-sin-sesion', response, 307);
+            if (!location) throw new Error('dashboard-sin-sesion: falta Location.');
+            const destino = new URL(location, base);
+            if (destino.pathname !== '/interno/login' || destino.searchParams.get('next') !== '/interno/dashboard') {
+              throw new Error('dashboard-sin-sesion: redirect funcional inesperado.');
+            }
+            console.log('4/5 dashboard-sin-sesion: 307 login interno');
+          }
+
+          // 5/5 — La API protegida debe responder desde Ventanilla con 401 JSON.
+          {
+            const { response } = await solicitar('/api/interno/resumen-diario', true);
+            exigirEstado('api-sin-sesion', response, 401);
+            const contentType = response.headers.get('content-type') ?? '';
+            if (!contentType.includes('application/json')) {
+              throw new Error('api-sin-sesion: la respuesta 401 no es JSON.');
+            }
+            const body = await response.json();
+            if (typeof body?.error !== 'string') throw new Error('api-sin-sesion: falta contrato de error.');
+            console.log('5/5 api-sin-sesion: 401 JSON Ventanilla');
+          }
+          NODE
+
       - name: Preparar entorno efímero E2E de stage
         env:
           LAB_PASSWORD: ${{ secrets.LAB_PASSWORD }}
@@ -157,31 +330,81 @@ jobs:
           cat > playwright.b1-preview.config.ts <<'EOF'
           import baseConfig from './playwright.config';
 
+          const oidcToken = process.env.VERCEL_TRUSTED_OIDC_TOKEN;
+          if (!oidcToken) throw new Error('Falta el JWT OIDC efímero para acceder al Preview protegido.');
+
           export default {
             ...baseConfig,
             use: {
               ...baseConfig.use,
               baseURL: process.env.B1_PREVIEW_URL,
+              extraHTTPHeaders: {
+                ...baseConfig.use?.extraHTTPHeaders,
+                'x-vercel-trusted-oidc-idp-token': oidcToken,
+              },
             },
           };
           EOF
 
+      - name: Obtener JWT OIDC nuevo para Playwright
+        id: oidc-e2e
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const token = await core.getIDToken();
+            const claims = JSON.parse(Buffer.from(token.split('.')[1], 'base64url'));
+            const audiencias = Array.isArray(claims.aud) ? claims.aud : [claims.aud];
+            if (claims.repository !== 'robinsongalvis/ventanilla.simacota') throw new Error('OIDC: repositorio no autorizado.');
+            if (claims.repository_owner !== 'robinsongalvis') throw new Error('OIDC: propietario no autorizado.');
+            if (claims.head_ref !== 'validation/b1-54256f5') throw new Error('OIDC: rama origen no autorizada.');
+            if (claims.base_ref !== 'release/fase5-hardening') throw new Error('OIDC: rama base no autorizada.');
+            if (claims.environment !== 'stage-e2e') throw new Error('OIDC: Environment no autorizado.');
+            if (!audiencias.includes('https://github.com/robinsongalvis')) throw new Error('OIDC: audience no autorizada.');
+            core.setSecret(token);
+            core.setOutput('token', token);
+
       - name: E2E crítico contra el preview stage
         env:
           B1_PREVIEW_URL: ${{ env.PREVIEW_URL }}
+          VERCEL_TRUSTED_OIDC_TOKEN: ${{ steps.oidc-e2e.outputs.token }}
         run: |
           set -o pipefail
           npx playwright test --config=playwright.b1-preview.config.ts e2e/01-ciclo-dorado.spec.ts e2e/06-perimetro-sin-sesion.spec.ts 2>&1 | tee .b1-artifacts/e2e.log
 
+      - name: Obtener JWT OIDC nuevo para smoke final
+        id: oidc-smoke
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const token = await core.getIDToken();
+            const claims = JSON.parse(Buffer.from(token.split('.')[1], 'base64url'));
+            const audiencias = Array.isArray(claims.aud) ? claims.aud : [claims.aud];
+            if (claims.repository !== 'robinsongalvis/ventanilla.simacota') throw new Error('OIDC: repositorio no autorizado.');
+            if (claims.repository_owner !== 'robinsongalvis') throw new Error('OIDC: propietario no autorizado.');
+            if (claims.head_ref !== 'validation/b1-54256f5') throw new Error('OIDC: rama origen no autorizada.');
+            if (claims.base_ref !== 'release/fase5-hardening') throw new Error('OIDC: rama base no autorizada.');
+            if (claims.environment !== 'stage-e2e') throw new Error('OIDC: Environment no autorizado.');
+            if (!audiencias.includes('https://github.com/robinsongalvis')) throw new Error('OIDC: audience no autorizada.');
+            core.setSecret(token);
+            core.setOutput('token', token);
+
       - name: Smoke HTTP posterior al E2E
+        env:
+          VERCEL_TRUSTED_OIDC_TOKEN: ${{ steps.oidc-smoke.outputs.token }}
         run: |
           set -euo pipefail
           : > .b1-artifacts/smoke.log
+          HEADERS="$(mktemp)"
+          trap 'rm -f "$HEADERS"' EXIT
           for RUTA in /api/health / /interno/login /consulta; do
-            CODIGO="$(curl -sSL -o /dev/null -w '%{http_code}' --max-time 30 "${PREVIEW_URL}${RUTA}" || true)"
+            : > "$HEADERS"
+            CODIGO="$(curl --silent --show-error -D "$HEADERS" -o /dev/null -w '%{http_code}' --max-time 30 \
+              -H "x-vercel-trusted-oidc-idp-token: $VERCEL_TRUSTED_OIDC_TOKEN" \
+              "${PREVIEW_URL}${RUTA}" || true)"
             CODIGO="${CODIGO:-000}"
             echo "${RUTA} ${CODIGO}" | tee -a .b1-artifacts/smoke.log
             test "$CODIGO" = 200
+            test -z "$(awk 'BEGIN{IGNORECASE=1} /^location:/ {print $2}' "$HEADERS" | tr -d '\r')"
           done
 
       - name: Publicar evidencia B1
