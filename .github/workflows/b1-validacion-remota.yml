@@ -336,6 +336,8 @@ jobs:
               ...baseConfig.use,
               baseURL: process.env.B1_PREVIEW_URL,
               serviceWorkers: 'block',
+              trace: 'off',
+              video: 'off',
             },
           };
           EOF
@@ -346,9 +348,26 @@ jobs:
             Browser,
             BrowserContext,
             BrowserContextOptions,
-            Route,
+            CDPSession,
+            Page,
           } from '@playwright/test';
           import { test as base, expect } from './fixtures';
+
+          type ValorHeaderCdp = string | number | boolean;
+
+          type EventoPeticionPausada = {
+            redirectedRequestId?: string;
+            requestId: string;
+            request: {
+              headers: Record<string, ValorHeaderCdp>;
+              url: string;
+            };
+          };
+
+          type HeaderCdp = {
+            name: string;
+            value: string;
+          };
 
           const NOMBRE_HEADER_OIDC = 'x-vercel-trusted-oidc-idp-token';
           const ORIGEN_PREVIEW_AUTORIZADO = 'https://ventanilla-simacota-apjpqguzy-robinsongalvis-projects.vercel.app';
@@ -375,6 +394,16 @@ jobs:
             return Object.keys(headers).some((nombre) => nombre.toLowerCase() === NOMBRE_HEADER_OIDC);
           }
 
+          function headersCdpSinOidc(headers: Record<string, ValorHeaderCdp>): HeaderCdp[] {
+            return Object.entries(headers)
+              .filter(([nombre]) => nombre.toLowerCase() !== NOMBRE_HEADER_OIDC)
+              .map(([name, value]) => ({ name, value: String(value) }));
+          }
+
+          function conteniaOidcCdp(headers: Record<string, ValorHeaderCdp>): boolean {
+            return Object.keys(headers).some((nombre) => nombre.toLowerCase() === NOMBRE_HEADER_OIDC);
+          }
+
           function validarLocation(response: APIResponse, origen: URL): void {
             const location = response.headers().location;
             if (!location) return;
@@ -384,36 +413,56 @@ jobs:
             }
           }
 
-          async function enrutarConOidcSeguro(route: Route): Promise<void> {
-            const request = route.request();
-            const url = new URL(request.url());
-            const headersOriginales = request.headers();
+          async function continuarPeticionPausada(
+            session: CDPSession,
+            evento: EventoPeticionPausada,
+            origenesPorRequestId: Map<string, string>,
+          ): Promise<void> {
+            const destino = new URL(evento.request.url);
+            const headersOriginales = evento.request.headers;
+            const origenAnterior = evento.redirectedRequestId
+              ? origenesPorRequestId.get(evento.redirectedRequestId)
+              : undefined;
+            origenesPorRequestId.set(evento.requestId, destino.origin);
 
-            if (url.origin !== preview.origin) {
-              if (conteniaOidc(headersOriginales)) {
-                await route.abort('blockedbyclient');
-                throw new Error(`GUARDA OIDC: JWT detectado en origin externo ${url.origin}.`);
+            if (destino.origin !== preview.origin) {
+              if (origenAnterior === preview.origin) {
+                throw new Error(`GUARDA OIDC: redirect fuera del Preview bloqueado (${destino.origin}).`);
               }
-              await route.continue();
+              if (conteniaOidcCdp(headersOriginales)) {
+                throw new Error(`GUARDA OIDC: JWT detectado en origin externo ${destino.origin}.`);
+              }
+              await session.send('Fetch.continueRequest', { requestId: evento.requestId });
               return;
             }
 
-            const response = await route.fetch({
-              headers: {
-                ...sinOidc(headersOriginales),
-                [NOMBRE_HEADER_OIDC]: oidcToken,
-              },
-              maxRedirects: 0,
+            await session.send('Fetch.continueRequest', {
+              requestId: evento.requestId,
+              headers: [
+                ...headersCdpSinOidc(headersOriginales),
+                { name: NOMBRE_HEADER_OIDC, value: oidcToken },
+              ],
             });
+          }
 
-            try {
-              validarLocation(response, url);
-              await route.fulfill({ response });
-            } catch (error) {
-              await response.dispose();
-              await route.abort('blockedbyclient');
-              throw error;
-            }
+          async function instalarOidcSeguroEnPagina(
+            context: BrowserContext,
+            page: Page,
+          ): Promise<void> {
+            const session = await context.newCDPSession(page);
+            const origenesPorRequestId = new Map<string, string>();
+            session.on('Fetch.requestPaused', (evento: EventoPeticionPausada) => {
+              void continuarPeticionPausada(session, evento, origenesPorRequestId).catch(async (error: Error) => {
+                console.error(`Intercepción OIDC abortada: ${error.message}`);
+                await session.send('Fetch.failRequest', {
+                  requestId: evento.requestId,
+                  errorReason: 'BlockedByClient',
+                }).catch(() => undefined);
+              });
+            });
+            await session.send('Fetch.enable', {
+              patterns: [{ urlPattern: '*', requestStage: 'Request' }],
+            });
           }
 
           async function crearContextoSeguro(
@@ -424,7 +473,12 @@ jobs:
               throw new Error('GUARDA OIDC: no se permite configurar el JWT como header global.');
             }
             const context = await browser.newContext({ ...options, serviceWorkers: 'block' });
-            await context.route('**/*', enrutarConOidcSeguro);
+            const nuevaPaginaOriginal = context.newPage.bind(context);
+            context.newPage = async (): Promise<Page> => {
+              const page = await nuevaPaginaOriginal();
+              await instalarOidcSeguroEnPagina(context, page);
+              return page;
+            };
             return context;
           }
 
@@ -604,6 +658,69 @@ jobs:
             test -z "$(awk 'BEGIN{IGNORECASE=1} /^location:/ {print $2}' "$HEADERS" | tr -d '\r')"
           done
 
+      - name: Sanear evidencia sensible antes de publicar
+        if: ${{ always() }}
+        env:
+          LAB_PASSWORD: ${{ secrets.LAB_PASSWORD }}
+          FIREBASE_SERVICE_ACCOUNT: ${{ secrets.FIREBASE_SERVICE_ACCOUNT }}
+          OIDC_PROBES: ${{ steps.oidc-probes.outputs.token }}
+          OIDC_E2E_01: ${{ steps.oidc_e2e_01.outputs.token }}
+          OIDC_E2E_06: ${{ steps.oidc_e2e_06.outputs.token }}
+          OIDC_SMOKE: ${{ steps.oidc-smoke.outputs.token }}
+        run: |
+          node <<'NODE'
+          const fs = require('node:fs');
+          const path = require('node:path');
+
+          const raices = ['.b1-artifacts', 'playwright-report', 'test-results'];
+          const secretos = [
+            process.env.LAB_PASSWORD,
+            process.env.FIREBASE_SERVICE_ACCOUNT,
+            process.env.OIDC_PROBES,
+            process.env.OIDC_E2E_01,
+            process.env.OIDC_E2E_06,
+            process.env.OIDC_SMOKE,
+          ].filter((valor) => typeof valor === 'string' && valor.length > 0);
+          const eliminados = [];
+
+          function archivosEn(ruta) {
+            if (!fs.existsSync(ruta)) return [];
+            return fs.readdirSync(ruta, { withFileTypes: true }).flatMap((entrada) => {
+              const destino = path.join(ruta, entrada.name);
+              return entrada.isDirectory() ? archivosEn(destino) : [destino];
+            });
+          }
+
+          for (const archivo of raices.flatMap(archivosEn)) {
+            const normalizado = archivo.split(path.sep).join('/');
+            const adjuntoNoPublicable =
+              normalizado.endsWith('/trace.zip') ||
+              /(^|\/)playwright-report\/data\/.*\.(zip|md)$/.test(normalizado) ||
+              normalizado.endsWith('/error-context.md');
+            const contenido = fs.readFileSync(archivo);
+            const contieneSecreto = secretos.some((secreto) => contenido.includes(Buffer.from(secreto)));
+            if (adjuntoNoPublicable || contieneSecreto) {
+              fs.unlinkSync(archivo);
+              eliminados.push(archivo);
+            }
+          }
+
+          for (const archivo of raices.flatMap(archivosEn)) {
+            const contenido = fs.readFileSync(archivo);
+            if (secretos.some((secreto) => contenido.includes(Buffer.from(secreto)))) {
+              throw new Error(`Evidencia sensible no saneada en ${archivo}.`);
+            }
+          }
+
+          fs.mkdirSync('.b1-artifacts', { recursive: true });
+          fs.writeFileSync(
+            '.b1-artifacts/sanitizacion-evidencia.log',
+            `archivos_eliminados=${eliminados.length}\nsecretos_verificados=${secretos.length}\n`,
+            { mode: 0o600 },
+          );
+          console.log(`Evidencia saneada: ${eliminados.length} adjunto(s) sensible(s) eliminado(s).`);
+          NODE
+
       - name: Publicar evidencia B1
         if: ${{ always() }}
         uses: actions/upload-artifact@v7
@@ -614,6 +731,7 @@ jobs:
             playwright-report/
             test-results/
           if-no-files-found: warn
+          include-hidden-files: true
           retention-days: 30
 
       - name: Eliminar archivos efímeros y logs del emulador
