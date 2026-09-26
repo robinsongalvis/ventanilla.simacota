@@ -16,8 +16,8 @@ jobs:
       deployments: read
     env:
       CANDIDATE_SHA: 54256f54cf1ad0cd1b3c61e59fc3c1424889e3f9
-      PREVIEW_URL: https://ventanilla-simacota-qyqzkvap8-robinsongalvis-projects.vercel.app
-      PREVIEW_HOST: ventanilla-simacota-qyqzkvap8-robinsongalvis-projects.vercel.app
+      PREVIEW_URL: https://ventanilla-simacota-apjpqguzy-robinsongalvis-projects.vercel.app
+      PREVIEW_HOST: ventanilla-simacota-apjpqguzy-robinsongalvis-projects.vercel.app
     outputs:
       preview_url: ${{ steps.preview.outputs.preview_url }}
 
@@ -87,8 +87,8 @@ jobs:
       cancel-in-progress: false
     env:
       CANDIDATE_SHA: 54256f54cf1ad0cd1b3c61e59fc3c1424889e3f9
-      PREVIEW_URL: https://ventanilla-simacota-qyqzkvap8-robinsongalvis-projects.vercel.app
-      PREVIEW_HOST: ventanilla-simacota-qyqzkvap8-robinsongalvis-projects.vercel.app
+      PREVIEW_URL: https://ventanilla-simacota-apjpqguzy-robinsongalvis-projects.vercel.app
+      PREVIEW_HOST: ventanilla-simacota-apjpqguzy-robinsongalvis-projects.vercel.app
       STAGE_PROJECT_ID: ventanilla-simacota-stage
 
     steps:
@@ -351,7 +351,7 @@ jobs:
           import { test as base, expect } from './fixtures';
 
           const NOMBRE_HEADER_OIDC = 'x-vercel-trusted-oidc-idp-token';
-          const ORIGEN_PREVIEW_AUTORIZADO = 'https://ventanilla-simacota-qyqzkvap8-robinsongalvis-projects.vercel.app';
+          const ORIGEN_PREVIEW_AUTORIZADO = 'https://ventanilla-simacota-apjpqguzy-robinsongalvis-projects.vercel.app';
           const preview = new URL(process.env.B1_PREVIEW_URL ?? '');
           const oidcToken = (() => {
             const token = process.env.VERCEL_TRUSTED_OIDC_TOKEN;
