@@ -1104,6 +1104,7 @@ jobs:
       - name: E2E 01 ciclo dorado con Node 24
         id: e2e_node24_01
         env:
+          B1_PREVIEW_URL: ${{ env.PREVIEW_URL }}
           NODE24_PREVIEW_URL: ${{ env.PREVIEW_URL }}
           VERCEL_TRUSTED_OIDC_TOKEN: ${{ steps.oidc_node24_e2e_01.outputs.token }}
         run: |
@@ -1132,6 +1133,7 @@ jobs:
       - name: E2E 06 perímetro sin sesión con Node 24
         id: e2e_node24_06
         env:
+          B1_PREVIEW_URL: ${{ env.PREVIEW_URL }}
           NODE24_PREVIEW_URL: ${{ env.PREVIEW_URL }}
           VERCEL_TRUSTED_OIDC_TOKEN: ${{ steps.oidc_node24_e2e_06.outputs.token }}
         run: |
