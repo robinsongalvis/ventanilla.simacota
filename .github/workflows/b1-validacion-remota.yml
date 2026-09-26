@@ -1,0 +1,1274 @@
+name: B1 — validación remota exacta del candidato
+
+on:
+  pull_request:
+    types: [labeled]
+
+permissions: {}
+
+jobs:
+  verificar-destino-preview:
+    if: >-
+      github.event.label.name == 'run-b1-stage-e2e' &&
+      github.event.pull_request.head.repo.full_name == github.repository
+    runs-on: ubuntu-latest
+    permissions:
+      deployments: read
+    env:
+      CANDIDATE_SHA: 54256f54cf1ad0cd1b3c61e59fc3c1424889e3f9
+      PREVIEW_URL: https://ventanilla-simacota-apjpqguzy-robinsongalvis-projects.vercel.app
+      PREVIEW_HOST: ventanilla-simacota-apjpqguzy-robinsongalvis-projects.vercel.app
+    outputs:
+      preview_url: ${{ steps.preview.outputs.preview_url }}
+
+    steps:
+      - name: Verificar identidad del disparo antes de solicitar secretos
+        env:
+          PR_BASE_REF: ${{ github.event.pull_request.base.ref }}
+          PR_HEAD_REF: ${{ github.event.pull_request.head.ref }}
+          PR_HEAD_REPOSITORY: ${{ github.event.pull_request.head.repo.full_name }}
+        run: |
+          set -euo pipefail
+          test "$PR_BASE_REF" = "release/fase5-hardening"
+          test "$PR_HEAD_REF" = "validation/b1-54256f5"
+          test "$PR_HEAD_REPOSITORY" = "${{ github.repository }}"
+          node <<'NODE'
+          const preview = new URL(process.env.PREVIEW_URL);
+          const productionHosts = new Set([
+            'ventanilla.simacota.gov.co',
+            'ventanilla-simacota.vercel.app',
+          ]);
+          if (preview.protocol !== 'https:') throw new Error('El Preview autorizado debe usar HTTPS.');
+          if (preview.hostname !== process.env.PREVIEW_HOST) throw new Error('Host Preview no autorizado.');
+          if (preview.pathname !== '/' || preview.search || preview.hash) {
+            throw new Error('PREVIEW_URL debe ser un origen exacto, sin ruta, query ni fragmento.');
+          }
+          if (productionHosts.has(preview.hostname)) throw new Error('GUARDA: el destino corresponde a Production.');
+          NODE
+          echo "PR #${{ github.event.pull_request.number }} autorizado para preflight B1."
+
+      - name: Verificar que el Preview pertenece al SHA candidato
+        id: preview
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          DESPLIEGUES="$(mktemp)"
+          ESTADOS="$(mktemp)"
+          trap 'rm -f "$DESPLIEGUES" "$ESTADOS"' EXIT
+          curl --fail --silent --show-error \
+            -H "Authorization: Bearer $GH_TOKEN" \
+            -H "Accept: application/vnd.github+json" \
+            "https://api.github.com/repos/${{ github.repository }}/deployments?sha=${CANDIDATE_SHA}&environment=Preview&per_page=100" \
+            > "$DESPLIEGUES"
+          URL_ESTADOS="$(jq -r --arg sha "$CANDIDATE_SHA" \
+            '[.[] | select(.sha == $sha and .environment == "Preview") | .statuses_url][0] // empty' \
+            "$DESPLIEGUES")"
+          test -n "$URL_ESTADOS"
+          curl --fail --silent --show-error \
+            -H "Authorization: Bearer $GH_TOKEN" \
+            -H "Accept: application/vnd.github+json" \
+            "$URL_ESTADOS" > "$ESTADOS"
+          URL_REAL="$(jq -r '[.[] | select(.state == "success") | .environment_url][0] // empty' "$ESTADOS")"
+          test "$URL_REAL" = "$PREVIEW_URL"
+          echo "preview_url=$URL_REAL" >> "$GITHUB_OUTPUT"
+          echo "Preview verificado para SHA $CANDIDATE_SHA: $URL_REAL"
+
+  validar-candidato-exacto:
+    needs: verificar-destino-preview
+    runs-on: ubuntu-latest
+    environment: stage-e2e
+    permissions:
+      contents: read
+      id-token: write
+    timeout-minutes: 50
+    concurrency:
+      group: b1-validacion-54256f5
+      cancel-in-progress: false
+    env:
+      CANDIDATE_SHA: 54256f54cf1ad0cd1b3c61e59fc3c1424889e3f9
+      PREVIEW_URL: https://ventanilla-simacota-apjpqguzy-robinsongalvis-projects.vercel.app
+      PREVIEW_HOST: ventanilla-simacota-apjpqguzy-robinsongalvis-projects.vercel.app
+      STAGE_PROJECT_ID: ventanilla-simacota-stage
+
+    steps:
+      - name: Verificar que el disparo es la validación B1 esperada
+        env:
+          PREFLIGHT_PREVIEW_URL: ${{ needs.verificar-destino-preview.outputs.preview_url }}
+        run: |
+          set -euo pipefail
+          test "${{ github.event.pull_request.base.ref }}" = "release/fase5-hardening"
+          test "${{ github.event.pull_request.head.ref }}" = "validation/b1-54256f5"
+          test "$PREFLIGHT_PREVIEW_URL" = "$PREVIEW_URL"
+          echo "PR #${{ github.event.pull_request.number }} autorizado para validación B1."
+
+      - name: Checkout literal del candidato
+        uses: actions/checkout@v7
+        with:
+          ref: ${{ env.CANDIDATE_SHA }}
+          fetch-depth: 1
+
+      - name: Probar identidad exacta del candidato
+        run: |
+          ACTUAL="$(git rev-parse HEAD)"
+          test "$ACTUAL" = "$CANDIDATE_SHA"
+          test -z "$(git status --porcelain)"
+          echo "SHA probado: $ACTUAL"
+
+      - name: Registrar identidad verificada del Preview
+        run: |
+          mkdir -p .b1-artifacts
+          printf 'preview=%s\nsha=%s\n' "$PREVIEW_URL" "$CANDIDATE_SHA" | tee .b1-artifacts/identidad-preview.txt
+
+      - name: Configurar Node 22
+        uses: actions/setup-node@v7
+        with:
+          node-version-file: '.nvmrc'
+          cache: npm
+
+      - name: Configurar Java 21 para Firestore Emulator
+        uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: '21'
+
+      - name: Verificar secretos estrictamente de stage
+        env:
+          LAB_PASSWORD: ${{ secrets.LAB_PASSWORD }}
+          FIREBASE_SERVICE_ACCOUNT: ${{ secrets.FIREBASE_SERVICE_ACCOUNT }}
+          NEXT_PUBLIC_FIREBASE_API_KEY: ${{ secrets.NEXT_PUBLIC_FIREBASE_API_KEY }}
+          NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN: ${{ secrets.NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN }}
+          NEXT_PUBLIC_FIREBASE_PROJECT_ID: ${{ secrets.NEXT_PUBLIC_FIREBASE_PROJECT_ID }}
+          NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET: ${{ secrets.NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET }}
+          NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID: ${{ secrets.NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID }}
+          NEXT_PUBLIC_FIREBASE_APP_ID: ${{ secrets.NEXT_PUBLIC_FIREBASE_APP_ID }}
+        run: |
+          node <<'NODE'
+          const required = [
+            'LAB_PASSWORD',
+            'FIREBASE_SERVICE_ACCOUNT',
+            'NEXT_PUBLIC_FIREBASE_API_KEY',
+            'NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN',
+            'NEXT_PUBLIC_FIREBASE_PROJECT_ID',
+            'NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET',
+            'NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID',
+            'NEXT_PUBLIC_FIREBASE_APP_ID',
+          ];
+          for (const name of required) {
+            if (!process.env[name]) throw new Error(`Falta el secreto protegido ${name}.`);
+          }
+          if (process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID !== process.env.STAGE_PROJECT_ID) {
+            throw new Error('NEXT_PUBLIC_FIREBASE_PROJECT_ID no corresponde a STAGE.');
+          }
+          const account = JSON.parse(process.env.FIREBASE_SERVICE_ACCOUNT);
+          if (account.project_id !== process.env.STAGE_PROJECT_ID) {
+            throw new Error('FIREBASE_SERVICE_ACCOUNT no corresponde a STAGE.');
+          }
+          NODE
+
+      - name: Instalar dependencias bloqueadas
+        run: npm ci
+
+      - name: Build de producción sobre el SHA exacto
+        env:
+          NEXT_PUBLIC_FIREBASE_API_KEY: ${{ secrets.NEXT_PUBLIC_FIREBASE_API_KEY }}
+          NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN: ${{ secrets.NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN }}
+          NEXT_PUBLIC_FIREBASE_PROJECT_ID: ${{ secrets.NEXT_PUBLIC_FIREBASE_PROJECT_ID }}
+          NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET: ${{ secrets.NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET }}
+          NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID: ${{ secrets.NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID }}
+          NEXT_PUBLIC_FIREBASE_APP_ID: ${{ secrets.NEXT_PUBLIC_FIREBASE_APP_ID }}
+        run: |
+          set -o pipefail
+          npm run build 2>&1 | tee .b1-artifacts/build.log
+
+      - name: Reglas Firestore con Java 21 y emulador
+        run: |
+          set -o pipefail
+          npx --yes firebase-tools@15.19.0 emulators:exec --only firestore --project demo-ventanilla-lab "npm run test:rules" 2>&1 | tee .b1-artifacts/firestore-rules.log
+
+      - name: Instalar Chromium en Linux
+        run: npx playwright install --with-deps chromium
+
+      - name: Obtener JWT OIDC efímero para probes del Preview
+        id: oidc-probes
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const token = await core.getIDToken();
+            const claims = JSON.parse(Buffer.from(token.split('.')[1], 'base64url'));
+            const audiencias = Array.isArray(claims.aud) ? claims.aud : [claims.aud];
+            if (claims.repository !== 'robinsongalvis/ventanilla.simacota') throw new Error('OIDC: repositorio no autorizado.');
+            if (claims.repository_owner !== 'robinsongalvis') throw new Error('OIDC: propietario no autorizado.');
+            if (claims.head_ref !== 'validation/b1-54256f5') throw new Error('OIDC: rama origen no autorizada.');
+            if (claims.base_ref !== 'release/fase5-hardening') throw new Error('OIDC: rama base no autorizada.');
+            if (claims.environment !== 'stage-e2e') throw new Error('OIDC: Environment no autorizado.');
+            if (!audiencias.includes('https://github.com/robinsongalvis')) throw new Error('OIDC: audience no autorizada.');
+            core.setSecret(token);
+            core.setOutput('token', token);
+
+      - name: Probar acceso controlado y perímetro antes del E2E
+        env:
+          VERCEL_TRUSTED_OIDC_TOKEN: ${{ steps.oidc-probes.outputs.token }}
+        run: |
+          set -euo pipefail
+          node --input-type=module <<'NODE' | tee .b1-artifacts/probes-preview.log
+          const base = new URL(process.env.PREVIEW_URL);
+          const token = process.env.VERCEL_TRUSTED_OIDC_TOKEN;
+          const hostAutorizado = process.env.PREVIEW_HOST;
+          const productionHosts = new Set([
+            'ventanilla.simacota.gov.co',
+            'ventanilla-simacota.vercel.app',
+          ]);
+
+          if (!token) throw new Error('GitHub no emitió el JWT OIDC para los probes.');
+          if (base.protocol !== 'https:' || base.hostname !== hostAutorizado) {
+            throw new Error('GUARDA: origen Preview no autorizado.');
+          }
+          if (productionHosts.has(base.hostname)) throw new Error('GUARDA: se intentó apuntar a Production.');
+
+          async function solicitar(pathname, conOidc) {
+            const url = new URL(pathname, base);
+            if (url.origin !== base.origin) throw new Error(`GUARDA: origen no autorizado en ${pathname}.`);
+            const response = await fetch(url, {
+              redirect: 'manual',
+              signal: AbortSignal.timeout(30_000),
+              headers: conOidc ? { 'x-vercel-trusted-oidc-idp-token': token } : {},
+            });
+            const location = response.headers.get('location');
+            if (conOidc && location) {
+              const destino = new URL(location, url);
+              if (destino.origin !== base.origin) {
+                throw new Error(`GUARDA: ${pathname} intentó redirigir fuera del Preview autorizado.`);
+              }
+            }
+            return { response, location };
+          }
+
+          function exigirEstado(nombre, response, esperado) {
+            if (response.status !== esperado) {
+              throw new Error(`${nombre}: HTTP ${response.status}; esperado ${esperado}.`);
+            }
+          }
+
+          // 1/5 — Control negativo: Deployment Protection debe seguir activa.
+          {
+            const { response, location } = await solicitar('/api/health', false);
+            if (response.status !== 302 || !location) {
+              throw new Error(`control-sin-oidc: HTTP ${response.status}; se esperaba redirect de Vercel SSO.`);
+            }
+            const destino = new URL(location, base);
+            if (destino.origin !== 'https://vercel.com' || destino.pathname !== '/sso-api') {
+              throw new Error('control-sin-oidc: redirect inesperado; Deployment Protection no quedó acreditada.');
+            }
+            console.log('1/5 control-sin-oidc: 302 Vercel SSO');
+          }
+
+          // 2/5 — Health de la aplicación con OIDC.
+          {
+            const { response } = await solicitar('/api/health', true);
+            exigirEstado('health-con-oidc', response, 200);
+            const body = await response.json();
+            if (body?.status !== 'healthy') throw new Error('health-con-oidc: respuesta no saludable.');
+            console.log('2/5 health-con-oidc: 200 healthy');
+          }
+
+          // 3/5 — Login real de Ventanilla, no la pantalla de Vercel.
+          {
+            const { response } = await solicitar('/interno/login', true);
+            exigirEstado('login-con-oidc', response, 200);
+            const body = await response.text();
+            if (!body.includes('Correo institucional') || body.includes('Login – Vercel')) {
+              throw new Error('login-con-oidc: el HTML no corresponde al login de Ventanilla.');
+            }
+            console.log('3/5 login-con-oidc: 200 Ventanilla');
+          }
+
+          // 4/5 — La ruta UI protegida debe redirigir dentro del mismo Preview.
+          {
+            const { response, location } = await solicitar('/interno/dashboard', true);
+            exigirEstado('dashboard-sin-sesion', response, 307);
+            if (!location) throw new Error('dashboard-sin-sesion: falta Location.');
+            const destino = new URL(location, base);
+            if (destino.pathname !== '/interno/login' || destino.searchParams.get('next') !== '/interno/dashboard') {
+              throw new Error('dashboard-sin-sesion: redirect funcional inesperado.');
+            }
+            console.log('4/5 dashboard-sin-sesion: 307 login interno');
+          }
+
+          // 5/5 — La API protegida debe responder desde Ventanilla con 401 JSON.
+          {
+            const { response } = await solicitar('/api/interno/resumen-diario', true);
+            exigirEstado('api-sin-sesion', response, 401);
+            const contentType = response.headers.get('content-type') ?? '';
+            if (!contentType.includes('application/json')) {
+              throw new Error('api-sin-sesion: la respuesta 401 no es JSON.');
+            }
+            const body = await response.json();
+            if (typeof body?.error !== 'string') throw new Error('api-sin-sesion: falta contrato de error.');
+            console.log('5/5 api-sin-sesion: 401 JSON Ventanilla');
+          }
+          NODE
+
+      - name: Preparar entorno efímero E2E de stage
+        env:
+          LAB_PASSWORD: ${{ secrets.LAB_PASSWORD }}
+          FIREBASE_SERVICE_ACCOUNT: ${{ secrets.FIREBASE_SERVICE_ACCOUNT }}
+        run: |
+          umask 077
+          node <<'NODE'
+          const fs = require('node:fs');
+          const password = process.env.LAB_PASSWORD;
+          if (!password || /[\r\n]/.test(password)) throw new Error('LAB_PASSWORD no es apta para .env.stage.');
+          const account = JSON.stringify(JSON.parse(process.env.FIREBASE_SERVICE_ACCOUNT));
+          fs.writeFileSync('.env.stage', [
+            `LAB_PASSWORD=${password}`,
+            `FIREBASE_SERVICE_ACCOUNT=${account}`,
+            `NEXT_PUBLIC_FIREBASE_PROJECT_ID=${process.env.STAGE_PROJECT_ID}`,
+            '',
+          ].join('\n'), { mode: 0o600 });
+          NODE
+          cat > playwright.b1-preview.config.ts <<'EOF'
+          import baseConfig from './playwright.config';
+
+          export default {
+            ...baseConfig,
+            use: {
+              ...baseConfig.use,
+              baseURL: process.env.B1_PREVIEW_URL,
+              serviceWorkers: 'block',
+              trace: 'off',
+              video: 'off',
+            },
+          };
+          EOF
+          cat > e2e/b1-oidc-fixtures.ts <<'EOF'
+          import type {
+            APIRequestContext,
+            APIResponse,
+            Browser,
+            BrowserContext,
+            BrowserContextOptions,
+            CDPSession,
+            Page,
+          } from '@playwright/test';
+          import { test as base, expect } from './fixtures';
+
+          type ValorHeaderCdp = string | number | boolean;
+
+          type EventoPeticionPausada = {
+            redirectedRequestId?: string;
+            requestId: string;
+            request: {
+              headers: Record<string, ValorHeaderCdp>;
+              url: string;
+            };
+          };
+
+          type HeaderCdp = {
+            name: string;
+            value: string;
+          };
+
+          const NOMBRE_HEADER_OIDC = 'x-vercel-trusted-oidc-idp-token';
+          const ORIGEN_PREVIEW_AUTORIZADO = 'https://ventanilla-simacota-apjpqguzy-robinsongalvis-projects.vercel.app';
+          const preview = new URL(process.env.B1_PREVIEW_URL ?? '');
+          const oidcToken = (() => {
+            const token = process.env.VERCEL_TRUSTED_OIDC_TOKEN;
+            if (!token) throw new Error('Falta el JWT OIDC efímero para acceder al Preview protegido.');
+            return token;
+          })();
+          if (
+            preview.origin !== ORIGEN_PREVIEW_AUTORIZADO ||
+            preview.href !== `${ORIGEN_PREVIEW_AUTORIZADO}/`
+          ) {
+            throw new Error('GUARDA: el origen E2E no es el Preview exacto autorizado.');
+          }
+
+          function sinOidc(headers: Record<string, string>): Record<string, string> {
+            return Object.fromEntries(
+              Object.entries(headers).filter(([nombre]) => nombre.toLowerCase() !== NOMBRE_HEADER_OIDC),
+            );
+          }
+
+          function conteniaOidc(headers: Record<string, string>): boolean {
+            return Object.keys(headers).some((nombre) => nombre.toLowerCase() === NOMBRE_HEADER_OIDC);
+          }
+
+          function headersCdpSinOidc(headers: Record<string, ValorHeaderCdp>): HeaderCdp[] {
+            return Object.entries(headers)
+              .filter(([nombre]) => nombre.toLowerCase() !== NOMBRE_HEADER_OIDC)
+              .map(([name, value]) => ({ name, value: String(value) }));
+          }
+
+          function conteniaOidcCdp(headers: Record<string, ValorHeaderCdp>): boolean {
+            return Object.keys(headers).some((nombre) => nombre.toLowerCase() === NOMBRE_HEADER_OIDC);
+          }
+
+          function validarLocation(response: APIResponse, origen: URL): void {
+            const location = response.headers().location;
+            if (!location) return;
+            const destino = new URL(location, origen);
+            if (destino.origin !== preview.origin) {
+              throw new Error(`GUARDA OIDC: redirect fuera del Preview bloqueado (${destino.origin}).`);
+            }
+          }
+
+          async function continuarPeticionPausada(
+            session: CDPSession,
+            evento: EventoPeticionPausada,
+            origenesPorRequestId: Map<string, string>,
+          ): Promise<void> {
+            const destino = new URL(evento.request.url);
+            const headersOriginales = evento.request.headers;
+            const origenAnterior = evento.redirectedRequestId
+              ? origenesPorRequestId.get(evento.redirectedRequestId)
+              : undefined;
+            origenesPorRequestId.set(evento.requestId, destino.origin);
+
+            if (destino.origin !== preview.origin) {
+              if (origenAnterior === preview.origin) {
+                throw new Error(`GUARDA OIDC: redirect fuera del Preview bloqueado (${destino.origin}).`);
+              }
+              if (conteniaOidcCdp(headersOriginales)) {
+                throw new Error(`GUARDA OIDC: JWT detectado en origin externo ${destino.origin}.`);
+              }
+              await session.send('Fetch.continueRequest', { requestId: evento.requestId });
+              return;
+            }
+
+            await session.send('Fetch.continueRequest', {
+              requestId: evento.requestId,
+              headers: [
+                ...headersCdpSinOidc(headersOriginales),
+                { name: NOMBRE_HEADER_OIDC, value: oidcToken },
+              ],
+            });
+          }
+
+          async function instalarOidcSeguroEnPagina(
+            context: BrowserContext,
+            page: Page,
+          ): Promise<void> {
+            const session = await context.newCDPSession(page);
+            const origenesPorRequestId = new Map<string, string>();
+            session.on('Fetch.requestPaused', (evento: EventoPeticionPausada) => {
+              void continuarPeticionPausada(session, evento, origenesPorRequestId).catch(async (error: Error) => {
+                console.error(`Intercepción OIDC abortada: ${error.message}`);
+                await session.send('Fetch.failRequest', {
+                  requestId: evento.requestId,
+                  errorReason: 'BlockedByClient',
+                }).catch(() => undefined);
+              });
+            });
+            await session.send('Fetch.enable', {
+              patterns: [{ urlPattern: '*', requestStage: 'Request' }],
+            });
+          }
+
+          async function crearContextoSeguro(
+            browser: Browser,
+            options: BrowserContextOptions = {},
+          ): Promise<BrowserContext> {
+            if (options.extraHTTPHeaders && conteniaOidc(options.extraHTTPHeaders)) {
+              throw new Error('GUARDA OIDC: no se permite configurar el JWT como header global.');
+            }
+            const context = await browser.newContext({ ...options, serviceWorkers: 'block' });
+            const nuevaPaginaOriginal = context.newPage.bind(context);
+            context.newPage = async (): Promise<Page> => {
+              const page = await nuevaPaginaOriginal();
+              await instalarOidcSeguroEnPagina(context, page);
+              return page;
+            };
+            return context;
+          }
+
+          function browserSeguro(browser: Browser): Browser {
+            const protegido = Object.create(browser) as Browser;
+            protegido.newContext = (options?: BrowserContextOptions) => crearContextoSeguro(browser, options);
+            return protegido;
+          }
+
+          async function validarRespuestaApi(response: APIResponse, url: URL): Promise<APIResponse> {
+            try {
+              validarLocation(response, url);
+              return response;
+            } catch (error) {
+              await response.dispose();
+              throw error;
+            }
+          }
+
+          function requestSeguro(request: APIRequestContext): APIRequestContext {
+            const protegido = Object.create(request) as APIRequestContext;
+
+            protegido.get = async (url, options = {}) => {
+              const destino = new URL(String(url), preview);
+              const headers = sinOidc(options.headers ?? {});
+              if (destino.origin !== preview.origin && conteniaOidc(options.headers ?? {})) {
+                throw new Error(`GUARDA OIDC: JWT detectado en request externo ${destino.origin}.`);
+              }
+              const response = await request.get(url, {
+                ...options,
+                headers: destino.origin === preview.origin ? { ...headers, [NOMBRE_HEADER_OIDC]: oidcToken } : headers,
+                maxRedirects: 0,
+              });
+              return validarRespuestaApi(response, destino);
+            };
+
+            protegido.post = async (url, options = {}) => {
+              const destino = new URL(String(url), preview);
+              const headers = sinOidc(options.headers ?? {});
+              if (destino.origin !== preview.origin && conteniaOidc(options.headers ?? {})) {
+                throw new Error(`GUARDA OIDC: JWT detectado en request externo ${destino.origin}.`);
+              }
+              const response = await request.post(url, {
+                ...options,
+                headers: destino.origin === preview.origin ? { ...headers, [NOMBRE_HEADER_OIDC]: oidcToken } : headers,
+                maxRedirects: 0,
+              });
+              return validarRespuestaApi(response, destino);
+            };
+
+            return protegido;
+          }
+
+          export const test = base.extend({
+            browser: [
+              async ({ browser }, use) => {
+                await use(browserSeguro(browser));
+              },
+              { scope: 'worker' },
+            ],
+            request: async ({ request }, use) => {
+              await use(requestSeguro(request));
+            },
+          });
+
+          export { expect };
+          EOF
+          node <<'NODE'
+          const fs = require('node:fs');
+          const cambios = [
+            {
+              archivo: 'e2e/01-ciclo-dorado.spec.ts',
+              original: "import { test, expect } from './fixtures';",
+              seguro: "import { test, expect } from './b1-oidc-fixtures';",
+            },
+            {
+              archivo: 'e2e/06-perimetro-sin-sesion.spec.ts',
+              original: "import { test, expect } from '@playwright/test';",
+              seguro: "import { test, expect } from './b1-oidc-fixtures';",
+            },
+          ];
+          for (const { archivo, original, seguro } of cambios) {
+            const contenido = fs.readFileSync(archivo, 'utf8');
+            if (contenido.split(original).length !== 2) {
+              throw new Error(`No se encontró exactamente un import esperado en ${archivo}.`);
+            }
+            fs.writeFileSync(archivo, contenido.replace(original, seguro));
+          }
+          NODE
+          git diff -- e2e/01-ciclo-dorado.spec.ts e2e/06-perimetro-sin-sesion.spec.ts \
+            | tee .b1-artifacts/harness-oidc-e2e.patch
+
+      - name: Obtener JWT OIDC nuevo para 01-ciclo-dorado
+        id: oidc_e2e_01
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const token = await core.getIDToken();
+            const claims = JSON.parse(Buffer.from(token.split('.')[1], 'base64url'));
+            const audiencias = Array.isArray(claims.aud) ? claims.aud : [claims.aud];
+            if (claims.repository !== 'robinsongalvis/ventanilla.simacota') throw new Error('OIDC: repositorio no autorizado.');
+            if (claims.repository_owner !== 'robinsongalvis') throw new Error('OIDC: propietario no autorizado.');
+            if (claims.head_ref !== 'validation/b1-54256f5') throw new Error('OIDC: rama origen no autorizada.');
+            if (claims.base_ref !== 'release/fase5-hardening') throw new Error('OIDC: rama base no autorizada.');
+            if (claims.environment !== 'stage-e2e') throw new Error('OIDC: Environment no autorizado.');
+            if (!audiencias.includes('https://github.com/robinsongalvis')) throw new Error('OIDC: audience no autorizada.');
+            core.setSecret(token);
+            core.setOutput('token', token);
+
+      - name: E2E 01 — ciclo dorado contra el preview stage
+        env:
+          B1_PREVIEW_URL: ${{ env.PREVIEW_URL }}
+          VERCEL_TRUSTED_OIDC_TOKEN: ${{ steps.oidc_e2e_01.outputs.token }}
+        run: |
+          set -o pipefail
+          : > .b1-artifacts/e2e.log
+          npx playwright test --config=playwright.b1-preview.config.ts e2e/01-ciclo-dorado.spec.ts 2>&1 | tee -a .b1-artifacts/e2e.log
+
+      - name: Obtener JWT OIDC nuevo para 06-perimetro-sin-sesion
+        id: oidc_e2e_06
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const token = await core.getIDToken();
+            const claims = JSON.parse(Buffer.from(token.split('.')[1], 'base64url'));
+            const audiencias = Array.isArray(claims.aud) ? claims.aud : [claims.aud];
+            if (claims.repository !== 'robinsongalvis/ventanilla.simacota') throw new Error('OIDC: repositorio no autorizado.');
+            if (claims.repository_owner !== 'robinsongalvis') throw new Error('OIDC: propietario no autorizado.');
+            if (claims.head_ref !== 'validation/b1-54256f5') throw new Error('OIDC: rama origen no autorizada.');
+            if (claims.base_ref !== 'release/fase5-hardening') throw new Error('OIDC: rama base no autorizada.');
+            if (claims.environment !== 'stage-e2e') throw new Error('OIDC: Environment no autorizado.');
+            if (!audiencias.includes('https://github.com/robinsongalvis')) throw new Error('OIDC: audience no autorizada.');
+            core.setSecret(token);
+            core.setOutput('token', token);
+
+      - name: E2E 06 — perímetro sin sesión contra el preview stage
+        env:
+          B1_PREVIEW_URL: ${{ env.PREVIEW_URL }}
+          VERCEL_TRUSTED_OIDC_TOKEN: ${{ steps.oidc_e2e_06.outputs.token }}
+        run: |
+          set -o pipefail
+          npx playwright test --config=playwright.b1-preview.config.ts e2e/06-perimetro-sin-sesion.spec.ts 2>&1 | tee -a .b1-artifacts/e2e.log
+
+      - name: Obtener JWT OIDC nuevo para smoke final
+        id: oidc-smoke
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const token = await core.getIDToken();
+            const claims = JSON.parse(Buffer.from(token.split('.')[1], 'base64url'));
+            const audiencias = Array.isArray(claims.aud) ? claims.aud : [claims.aud];
+            if (claims.repository !== 'robinsongalvis/ventanilla.simacota') throw new Error('OIDC: repositorio no autorizado.');
+            if (claims.repository_owner !== 'robinsongalvis') throw new Error('OIDC: propietario no autorizado.');
+            if (claims.head_ref !== 'validation/b1-54256f5') throw new Error('OIDC: rama origen no autorizada.');
+            if (claims.base_ref !== 'release/fase5-hardening') throw new Error('OIDC: rama base no autorizada.');
+            if (claims.environment !== 'stage-e2e') throw new Error('OIDC: Environment no autorizado.');
+            if (!audiencias.includes('https://github.com/robinsongalvis')) throw new Error('OIDC: audience no autorizada.');
+            core.setSecret(token);
+            core.setOutput('token', token);
+
+      - name: Smoke HTTP posterior al E2E
+        env:
+          VERCEL_TRUSTED_OIDC_TOKEN: ${{ steps.oidc-smoke.outputs.token }}
+        run: |
+          set -euo pipefail
+          : > .b1-artifacts/smoke.log
+          HEADERS="$(mktemp)"
+          trap 'rm -f "$HEADERS"' EXIT
+          for RUTA in /api/health / /interno/login /consulta; do
+            : > "$HEADERS"
+            CODIGO="$(curl --silent --show-error -D "$HEADERS" -o /dev/null -w '%{http_code}' --max-time 30 \
+              -H "x-vercel-trusted-oidc-idp-token: $VERCEL_TRUSTED_OIDC_TOKEN" \
+              "${PREVIEW_URL}${RUTA}" || true)"
+            CODIGO="${CODIGO:-000}"
+            echo "${RUTA} ${CODIGO}" | tee -a .b1-artifacts/smoke.log
+            test "$CODIGO" = 200
+            test -z "$(awk 'BEGIN{IGNORECASE=1} /^location:/ {print $2}' "$HEADERS" | tr -d '\r')"
+          done
+
+      - name: Sanear evidencia sensible antes de publicar
+        if: ${{ always() }}
+        env:
+          LAB_PASSWORD: ${{ secrets.LAB_PASSWORD }}
+          FIREBASE_SERVICE_ACCOUNT: ${{ secrets.FIREBASE_SERVICE_ACCOUNT }}
+          OIDC_PROBES: ${{ steps.oidc-probes.outputs.token }}
+          OIDC_E2E_01: ${{ steps.oidc_e2e_01.outputs.token }}
+          OIDC_E2E_06: ${{ steps.oidc_e2e_06.outputs.token }}
+          OIDC_SMOKE: ${{ steps.oidc-smoke.outputs.token }}
+        run: |
+          node <<'NODE'
+          const fs = require('node:fs');
+          const path = require('node:path');
+
+          const raices = ['.b1-artifacts', 'playwright-report', 'test-results'];
+          const secretos = [
+            process.env.LAB_PASSWORD,
+            process.env.FIREBASE_SERVICE_ACCOUNT,
+            process.env.OIDC_PROBES,
+            process.env.OIDC_E2E_01,
+            process.env.OIDC_E2E_06,
+            process.env.OIDC_SMOKE,
+          ].filter((valor) => typeof valor === 'string' && valor.length > 0);
+          const eliminados = [];
+
+          function archivosEn(ruta) {
+            if (!fs.existsSync(ruta)) return [];
+            return fs.readdirSync(ruta, { withFileTypes: true }).flatMap((entrada) => {
+              const destino = path.join(ruta, entrada.name);
+              return entrada.isDirectory() ? archivosEn(destino) : [destino];
+            });
+          }
+
+          for (const archivo of raices.flatMap(archivosEn)) {
+            const normalizado = archivo.split(path.sep).join('/');
+            const adjuntoNoPublicable =
+              normalizado.endsWith('/trace.zip') ||
+              /(^|\/)playwright-report\/data\/.*\.(zip|md)$/.test(normalizado) ||
+              normalizado.endsWith('/error-context.md');
+            const contenido = fs.readFileSync(archivo);
+            const contieneSecreto = secretos.some((secreto) => contenido.includes(Buffer.from(secreto)));
+            if (adjuntoNoPublicable || contieneSecreto) {
+              fs.unlinkSync(archivo);
+              eliminados.push(archivo);
+            }
+          }
+
+          for (const archivo of raices.flatMap(archivosEn)) {
+            const contenido = fs.readFileSync(archivo);
+            if (secretos.some((secreto) => contenido.includes(Buffer.from(secreto)))) {
+              throw new Error(`Evidencia sensible no saneada en ${archivo}.`);
+            }
+          }
+
+          fs.mkdirSync('.b1-artifacts', { recursive: true });
+          fs.writeFileSync(
+            '.b1-artifacts/sanitizacion-evidencia.log',
+            `archivos_eliminados=${eliminados.length}\nsecretos_verificados=${secretos.length}\n`,
+            { mode: 0o600 },
+          );
+          console.log(`Evidencia saneada: ${eliminados.length} adjunto(s) sensible(s) eliminado(s).`);
+          NODE
+
+      - name: Publicar evidencia B1
+        if: ${{ always() }}
+        uses: actions/upload-artifact@v7
+        with:
+          name: b1-validacion-54256f5
+          path: |
+            .b1-artifacts/
+            playwright-report/
+            test-results/
+          if-no-files-found: warn
+          include-hidden-files: true
+          retention-days: 30
+
+      - name: Eliminar archivos efímeros y logs del emulador
+        if: ${{ always() }}
+        run: |
+          git restore -- e2e/01-ciclo-dorado.spec.ts e2e/06-perimetro-sin-sesion.spec.ts
+          rm -f .env.stage playwright.b1-preview.config.ts e2e/b1-oidc-fixtures.ts firebase-debug.log firestore-debug.log
+
+  validar-candidato-node24:
+    if: >-
+      github.event.label.name == 'github_actions' &&
+      github.event.pull_request.head.repo.full_name == github.repository
+    runs-on: ubuntu-latest
+    environment: stage-e2e
+    permissions:
+      contents: read
+      deployments: read
+      id-token: write
+    timeout-minutes: 60
+    concurrency:
+      group: node24-validacion-54256f5
+      cancel-in-progress: false
+    env:
+      CANDIDATE_SHA: 54256f54cf1ad0cd1b3c61e59fc3c1424889e3f9
+      WORKFLOW_SHA: ${{ github.event.pull_request.head.sha }}
+      PREVIEW_URL: https://ventanilla-simacota-apjpqguzy-robinsongalvis-projects.vercel.app
+      PREVIEW_HOST: ventanilla-simacota-apjpqguzy-robinsongalvis-projects.vercel.app
+      STAGE_PROJECT_ID: ventanilla-simacota-stage
+
+    steps:
+      - name: Verificar disparo, workflow y destino Node 24
+        env:
+          GH_TOKEN: ${{ github.token }}
+          PR_BASE_REF: ${{ github.event.pull_request.base.ref }}
+          PR_HEAD_REF: ${{ github.event.pull_request.head.ref }}
+          PR_HEAD_REPOSITORY: ${{ github.event.pull_request.head.repo.full_name }}
+        run: |
+          set -euo pipefail
+          test "$PR_BASE_REF" = "release/fase5-hardening"
+          test "$PR_HEAD_REF" = "validation/b1-54256f5"
+          test "$PR_HEAD_REPOSITORY" = "${{ github.repository }}"
+          test -n "$WORKFLOW_SHA"
+          node <<'NODE'
+          const preview = new URL(process.env.PREVIEW_URL);
+          const productionHosts = new Set([
+            'ventanilla.simacota.gov.co',
+            'ventanilla-simacota.vercel.app',
+          ]);
+          if (preview.protocol !== 'https:') throw new Error('El Preview autorizado debe usar HTTPS.');
+          if (preview.hostname !== process.env.PREVIEW_HOST) throw new Error('Host Preview no autorizado.');
+          if (preview.pathname !== '/' || preview.search || preview.hash) {
+            throw new Error('PREVIEW_URL debe ser un origen exacto.');
+          }
+          if (productionHosts.has(preview.hostname)) throw new Error('GUARDA: el destino corresponde a Production.');
+          NODE
+          DESPLIEGUES="$(mktemp)"
+          ESTADOS="$(mktemp)"
+          trap 'rm -f "$DESPLIEGUES" "$ESTADOS"' EXIT
+          curl --fail --silent --show-error \
+            -H "Authorization: Bearer $GH_TOKEN" \
+            -H "Accept: application/vnd.github+json" \
+            "https://api.github.com/repos/${{ github.repository }}/deployments?sha=${CANDIDATE_SHA}&environment=Preview&per_page=100" \
+            > "$DESPLIEGUES"
+          URL_ESTADOS="$(jq -r --arg sha "$CANDIDATE_SHA" \
+            '[.[] | select(.sha == $sha and .environment == "Preview") | .statuses_url][0] // empty' \
+            "$DESPLIEGUES")"
+          test -n "$URL_ESTADOS"
+          curl --fail --silent --show-error \
+            -H "Authorization: Bearer $GH_TOKEN" \
+            -H "Accept: application/vnd.github+json" \
+            "$URL_ESTADOS" > "$ESTADOS"
+          URL_REAL="$(jq -r '[.[] | select(.state == "success") | .environment_url][0] // empty' "$ESTADOS")"
+          test "$URL_REAL" = "$PREVIEW_URL"
+          echo "WORKFLOW_SHA=$WORKFLOW_SHA"
+          echo "CANDIDATE_SHA=$CANDIDATE_SHA"
+
+      - name: Checkout literal del candidato para Node 24
+        uses: actions/checkout@v7
+        with:
+          ref: ${{ env.CANDIDATE_SHA }}
+          fetch-depth: 1
+
+      - name: Confirmar SHA exacto y árbol limpio
+        run: |
+          set -euo pipefail
+          ACTUAL="$(git rev-parse HEAD)"
+          test "$ACTUAL" = "$CANDIDATE_SHA"
+          test -z "$(git status --porcelain)"
+          mkdir -p .node24-artifacts
+          printf 'CANDIDATE_SHA=%s\nWORKFLOW_SHA=%s\n' "$ACTUAL" "$WORKFLOW_SHA" \
+            | tee .node24-artifacts/identidad.txt
+
+      - name: Configurar Node 24 explícito
+        uses: actions/setup-node@v7
+        with:
+          node-version: '24.x'
+          cache: npm
+
+      - name: Confirmar versiones reales Node y npm
+        run: |
+          set -euo pipefail
+          NODE_VERSION="$(node --version)"
+          NPM_VERSION="$(npm --version)"
+          test "$(node -p 'process.versions.node.split(".")[0]')" = "24"
+          printf 'NODE_VERSION=%s\nNPM_VERSION=%s\n' "$NODE_VERSION" "$NPM_VERSION" \
+            | tee .node24-artifacts/versiones.txt
+
+      - name: Configurar Java 21 para Firestore Emulator
+        uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: '21'
+
+      - name: Verificar secretos estrictamente de stage para Node 24
+        env:
+          LAB_PASSWORD: ${{ secrets.LAB_PASSWORD }}
+          FIREBASE_SERVICE_ACCOUNT: ${{ secrets.FIREBASE_SERVICE_ACCOUNT }}
+          NEXT_PUBLIC_FIREBASE_API_KEY: ${{ secrets.NEXT_PUBLIC_FIREBASE_API_KEY }}
+          NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN: ${{ secrets.NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN }}
+          NEXT_PUBLIC_FIREBASE_PROJECT_ID: ${{ secrets.NEXT_PUBLIC_FIREBASE_PROJECT_ID }}
+          NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET: ${{ secrets.NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET }}
+          NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID: ${{ secrets.NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID }}
+          NEXT_PUBLIC_FIREBASE_APP_ID: ${{ secrets.NEXT_PUBLIC_FIREBASE_APP_ID }}
+        run: |
+          node <<'NODE'
+          const required = [
+            'LAB_PASSWORD',
+            'FIREBASE_SERVICE_ACCOUNT',
+            'NEXT_PUBLIC_FIREBASE_API_KEY',
+            'NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN',
+            'NEXT_PUBLIC_FIREBASE_PROJECT_ID',
+            'NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET',
+            'NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID',
+            'NEXT_PUBLIC_FIREBASE_APP_ID',
+          ];
+          for (const name of required) {
+            if (!process.env[name]) throw new Error(`Falta el secreto protegido ${name}.`);
+          }
+          if (process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID !== process.env.STAGE_PROJECT_ID) {
+            throw new Error('NEXT_PUBLIC_FIREBASE_PROJECT_ID no corresponde a STAGE.');
+          }
+          const account = JSON.parse(process.env.FIREBASE_SERVICE_ACCOUNT);
+          if (account.project_id !== process.env.STAGE_PROJECT_ID) {
+            throw new Error('FIREBASE_SERVICE_ACCOUNT no corresponde a STAGE.');
+          }
+          NODE
+
+      - name: Instalar dependencias bloqueadas con Node 24
+        run: npm ci
+
+      - name: Build de producción con Node 24
+        id: build_node24
+        env:
+          NEXT_PUBLIC_FIREBASE_API_KEY: ${{ secrets.NEXT_PUBLIC_FIREBASE_API_KEY }}
+          NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN: ${{ secrets.NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN }}
+          NEXT_PUBLIC_FIREBASE_PROJECT_ID: ${{ secrets.NEXT_PUBLIC_FIREBASE_PROJECT_ID }}
+          NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET: ${{ secrets.NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET }}
+          NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID: ${{ secrets.NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID }}
+          NEXT_PUBLIC_FIREBASE_APP_ID: ${{ secrets.NEXT_PUBLIC_FIREBASE_APP_ID }}
+        run: |
+          set -euo pipefail
+          npm run build 2>&1 | tee .node24-artifacts/build.log
+
+      - name: Tests principales con Node 24
+        id: tests_node24
+        run: |
+          set -euo pipefail
+          : > .node24-artifacts/tests.log
+          npm run lint 2>&1 | tee -a .node24-artifacts/tests.log
+          npx tsc --noEmit 2>&1 | tee -a .node24-artifacts/tests.log
+          npm test 2>&1 | tee -a .node24-artifacts/tests.log
+
+      - name: Reglas Firestore con Node 24 y Java 21
+        id: firestore_node24
+        run: |
+          set -euo pipefail
+          npx --yes firebase-tools@15.19.0 emulators:exec --only firestore \
+            --project demo-ventanilla-lab "npm run test:rules" 2>&1 \
+            | tee .node24-artifacts/firestore-rules.log
+
+      - name: Instalar Chromium en Linux para Node 24
+        run: npx playwright install --with-deps chromium
+
+      - name: Obtener JWT OIDC efímero para probes Node 24
+        id: oidc_node24_probes
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const token = await core.getIDToken();
+            const claims = JSON.parse(Buffer.from(token.split('.')[1], 'base64url'));
+            const audiencias = Array.isArray(claims.aud) ? claims.aud : [claims.aud];
+            if (claims.repository !== 'robinsongalvis/ventanilla.simacota') throw new Error('OIDC: repositorio no autorizado.');
+            if (claims.repository_owner !== 'robinsongalvis') throw new Error('OIDC: propietario no autorizado.');
+            if (claims.head_ref !== 'validation/b1-54256f5') throw new Error('OIDC: rama origen no autorizada.');
+            if (claims.base_ref !== 'release/fase5-hardening') throw new Error('OIDC: rama base no autorizada.');
+            if (claims.environment !== 'stage-e2e') throw new Error('OIDC: Environment no autorizado.');
+            if (!audiencias.includes('https://github.com/robinsongalvis')) throw new Error('OIDC: audience no autorizada.');
+            core.setSecret(token);
+            core.setOutput('token', token);
+
+      - name: Probes protegidos antes del E2E Node 24
+        env:
+          VERCEL_TRUSTED_OIDC_TOKEN: ${{ steps.oidc_node24_probes.outputs.token }}
+        run: |
+          set -euo pipefail
+          node --input-type=module <<'NODE' | tee .node24-artifacts/probes.log
+          const base = new URL(process.env.PREVIEW_URL);
+          const token = process.env.VERCEL_TRUSTED_OIDC_TOKEN;
+          if (!token) throw new Error('GitHub no emitió el JWT OIDC.');
+          if (base.protocol !== 'https:' || base.hostname !== process.env.PREVIEW_HOST) {
+            throw new Error('GUARDA: origen Preview no autorizado.');
+          }
+          async function solicitar(pathname, conOidc) {
+            const url = new URL(pathname, base);
+            if (url.origin !== base.origin) throw new Error('GUARDA: origen no autorizado.');
+            const response = await fetch(url, {
+              redirect: 'manual',
+              signal: AbortSignal.timeout(30_000),
+              headers: conOidc ? { 'x-vercel-trusted-oidc-idp-token': token } : {},
+            });
+            const location = response.headers.get('location');
+            if (conOidc && location) {
+              const destino = new URL(location, url);
+              if (destino.origin !== base.origin) {
+                throw new Error(`GUARDA: redirect fuera del Preview (${destino.origin}).`);
+              }
+            }
+            return { response, location };
+          }
+          {
+            const { response, location } = await solicitar('/api/health', false);
+            if (response.status !== 302 || !location) throw new Error('Deployment Protection no está activa.');
+            const destino = new URL(location, base);
+            if (destino.origin !== 'https://vercel.com' || destino.pathname !== '/sso-api') {
+              throw new Error('Control sin OIDC no llegó a Vercel SSO.');
+            }
+            console.log('1/5 control-sin-oidc: 302 Vercel SSO');
+          }
+          {
+            const { response } = await solicitar('/api/health', true);
+            if (response.status !== 200) throw new Error(`health: HTTP ${response.status}.`);
+            const body = await response.json();
+            if (body?.status !== 'healthy') throw new Error('health: respuesta no saludable.');
+            console.log('2/5 health-con-oidc: 200 healthy');
+          }
+          {
+            const { response } = await solicitar('/interno/login', true);
+            if (response.status !== 200) throw new Error(`login: HTTP ${response.status}.`);
+            const body = await response.text();
+            if (!body.includes('Correo institucional') || body.includes('Login – Vercel')) {
+              throw new Error('El HTML no corresponde al login de Ventanilla.');
+            }
+            console.log('3/5 login-con-oidc: 200 Ventanilla');
+          }
+          {
+            const { response, location } = await solicitar('/interno/dashboard', true);
+            if (response.status !== 307 || !location) throw new Error('Dashboard no redirigió con 307.');
+            const destino = new URL(location, base);
+            if (destino.pathname !== '/interno/login' || destino.searchParams.get('next') !== '/interno/dashboard') {
+              throw new Error('Redirect funcional inesperado.');
+            }
+            console.log('4/5 dashboard-sin-sesion: 307 login interno');
+          }
+          {
+            const { response } = await solicitar('/api/interno/resumen-diario', true);
+            if (response.status !== 401) throw new Error(`API protegida: HTTP ${response.status}.`);
+            const contentType = response.headers.get('content-type') ?? '';
+            if (!contentType.includes('application/json')) throw new Error('La respuesta 401 no es JSON.');
+            console.log('5/5 api-sin-sesion: 401 JSON Ventanilla');
+          }
+          NODE
+
+      - name: Preparar harness OIDC efímero para E2E Node 24
+        env:
+          GH_TOKEN: ${{ github.token }}
+          LAB_PASSWORD: ${{ secrets.LAB_PASSWORD }}
+          FIREBASE_SERVICE_ACCOUNT: ${{ secrets.FIREBASE_SERVICE_ACCOUNT }}
+        run: |
+          set -euo pipefail
+          umask 077
+          node <<'NODE'
+          const fs = require('node:fs');
+          const password = process.env.LAB_PASSWORD;
+          if (!password || /[\r\n]/.test(password)) throw new Error('LAB_PASSWORD no es apta para .env.stage.');
+          const account = JSON.stringify(JSON.parse(process.env.FIREBASE_SERVICE_ACCOUNT));
+          fs.writeFileSync('.env.stage', [
+            `LAB_PASSWORD=${password}`,
+            `FIREBASE_SERVICE_ACCOUNT=${account}`,
+            `NEXT_PUBLIC_FIREBASE_PROJECT_ID=${process.env.STAGE_PROJECT_ID}`,
+            '',
+          ].join('\n'), { mode: 0o600 });
+          NODE
+          cat > playwright.node24-preview.config.ts <<'EOF'
+          import baseConfig from './playwright.config';
+
+          export default {
+            ...baseConfig,
+            use: {
+              ...baseConfig.use,
+              baseURL: process.env.NODE24_PREVIEW_URL,
+              serviceWorkers: 'block',
+              trace: 'off',
+              video: 'off',
+            },
+          };
+          EOF
+          curl --fail --silent --show-error \
+            -H "Authorization: Bearer $GH_TOKEN" \
+            -H "Accept: application/vnd.github.raw+json" \
+            "https://api.github.com/repos/${{ github.repository }}/contents/.github/workflows/b1-validacion-remota.yml?ref=${WORKFLOW_SHA}" \
+            > .node24-workflow-source.yml
+          node <<'NODE'
+          const fs = require('node:fs');
+          const workflow = fs.readFileSync('.node24-workflow-source.yml', 'utf8');
+          const inicio = "          cat > e2e/b1-oidc-fixtures.ts <<'EOF'\n";
+          const posicionInicio = workflow.indexOf(inicio);
+          if (posicionInicio < 0) throw new Error('No se encontró el harness OIDC aprobado.');
+          const resto = workflow.slice(posicionInicio + inicio.length);
+          const posicionFin = resto.indexOf('\n          EOF\n');
+          if (posicionFin < 0) throw new Error('El harness OIDC aprobado no tiene cierre.');
+          const fixture = resto.slice(0, posicionFin)
+            .split('\n')
+            .map((linea) => linea.startsWith('          ') ? linea.slice(10) : linea)
+            .join('\n') + '\n';
+          if (!fixture.includes('ORIGEN_PREVIEW_AUTORIZADO')) {
+            throw new Error('El harness extraído no contiene la guarda de origen.');
+          }
+          if (!fixture.includes('Fetch.requestPaused')) {
+            throw new Error('El harness extraído no contiene la intercepción CDP.');
+          }
+          fs.writeFileSync('e2e/b1-oidc-fixtures.ts', fixture, { mode: 0o600 });
+          const cambios = [
+            {
+              archivo: 'e2e/01-ciclo-dorado.spec.ts',
+              original: "import { test, expect } from './fixtures';",
+              seguro: "import { test, expect } from './b1-oidc-fixtures';",
+            },
+            {
+              archivo: 'e2e/06-perimetro-sin-sesion.spec.ts',
+              original: "import { test, expect } from '@playwright/test';",
+              seguro: "import { test, expect } from './b1-oidc-fixtures';",
+            },
+          ];
+          for (const { archivo, original, seguro } of cambios) {
+            const contenido = fs.readFileSync(archivo, 'utf8');
+            if (contenido.split(original).length !== 2) {
+              throw new Error(`No se encontró exactamente un import esperado en ${archivo}.`);
+            }
+            fs.writeFileSync(archivo, contenido.replace(original, seguro));
+          }
+          NODE
+
+      - name: Obtener JWT OIDC nuevo para E2E 01 Node 24
+        id: oidc_node24_e2e_01
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const token = await core.getIDToken();
+            const claims = JSON.parse(Buffer.from(token.split('.')[1], 'base64url'));
+            const audiencias = Array.isArray(claims.aud) ? claims.aud : [claims.aud];
+            if (claims.repository !== 'robinsongalvis/ventanilla.simacota') throw new Error('OIDC: repositorio no autorizado.');
+            if (claims.repository_owner !== 'robinsongalvis') throw new Error('OIDC: propietario no autorizado.');
+            if (claims.head_ref !== 'validation/b1-54256f5') throw new Error('OIDC: rama origen no autorizada.');
+            if (claims.base_ref !== 'release/fase5-hardening') throw new Error('OIDC: rama base no autorizada.');
+            if (claims.environment !== 'stage-e2e') throw new Error('OIDC: Environment no autorizado.');
+            if (!audiencias.includes('https://github.com/robinsongalvis')) throw new Error('OIDC: audience no autorizada.');
+            core.setSecret(token);
+            core.setOutput('token', token);
+
+      - name: E2E 01 ciclo dorado con Node 24
+        id: e2e_node24_01
+        env:
+          B1_PREVIEW_URL: ${{ env.PREVIEW_URL }}
+          NODE24_PREVIEW_URL: ${{ env.PREVIEW_URL }}
+          VERCEL_TRUSTED_OIDC_TOKEN: ${{ steps.oidc_node24_e2e_01.outputs.token }}
+        run: |
+          set -euo pipefail
+          : > .node24-artifacts/e2e.log
+          npx playwright test --config=playwright.node24-preview.config.ts \
+            e2e/01-ciclo-dorado.spec.ts 2>&1 | tee -a .node24-artifacts/e2e.log
+
+      - name: Obtener JWT OIDC nuevo para E2E 06 Node 24
+        id: oidc_node24_e2e_06
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const token = await core.getIDToken();
+            const claims = JSON.parse(Buffer.from(token.split('.')[1], 'base64url'));
+            const audiencias = Array.isArray(claims.aud) ? claims.aud : [claims.aud];
+            if (claims.repository !== 'robinsongalvis/ventanilla.simacota') throw new Error('OIDC: repositorio no autorizado.');
+            if (claims.repository_owner !== 'robinsongalvis') throw new Error('OIDC: propietario no autorizado.');
+            if (claims.head_ref !== 'validation/b1-54256f5') throw new Error('OIDC: rama origen no autorizada.');
+            if (claims.base_ref !== 'release/fase5-hardening') throw new Error('OIDC: rama base no autorizada.');
+            if (claims.environment !== 'stage-e2e') throw new Error('OIDC: Environment no autorizado.');
+            if (!audiencias.includes('https://github.com/robinsongalvis')) throw new Error('OIDC: audience no autorizada.');
+            core.setSecret(token);
+            core.setOutput('token', token);
+
+      - name: E2E 06 perímetro sin sesión con Node 24
+        id: e2e_node24_06
+        env:
+          B1_PREVIEW_URL: ${{ env.PREVIEW_URL }}
+          NODE24_PREVIEW_URL: ${{ env.PREVIEW_URL }}
+          VERCEL_TRUSTED_OIDC_TOKEN: ${{ steps.oidc_node24_e2e_06.outputs.token }}
+        run: |
+          set -euo pipefail
+          npx playwright test --config=playwright.node24-preview.config.ts \
+            e2e/06-perimetro-sin-sesion.spec.ts 2>&1 | tee -a .node24-artifacts/e2e.log
+
+      - name: Obtener JWT OIDC nuevo para smoke Node 24
+        id: oidc_node24_smoke
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const token = await core.getIDToken();
+            const claims = JSON.parse(Buffer.from(token.split('.')[1], 'base64url'));
+            const audiencias = Array.isArray(claims.aud) ? claims.aud : [claims.aud];
+            if (claims.repository !== 'robinsongalvis/ventanilla.simacota') throw new Error('OIDC: repositorio no autorizado.');
+            if (claims.repository_owner !== 'robinsongalvis') throw new Error('OIDC: propietario no autorizado.');
+            if (claims.head_ref !== 'validation/b1-54256f5') throw new Error('OIDC: rama origen no autorizada.');
+            if (claims.base_ref !== 'release/fase5-hardening') throw new Error('OIDC: rama base no autorizada.');
+            if (claims.environment !== 'stage-e2e') throw new Error('OIDC: Environment no autorizado.');
+            if (!audiencias.includes('https://github.com/robinsongalvis')) throw new Error('OIDC: audience no autorizada.');
+            core.setSecret(token);
+            core.setOutput('token', token);
+
+      - name: Smoke y health final con Node 24
+        id: smoke_node24
+        env:
+          VERCEL_TRUSTED_OIDC_TOKEN: ${{ steps.oidc_node24_smoke.outputs.token }}
+        run: |
+          set -euo pipefail
+          node -e "const u=new URL(process.env.PREVIEW_URL);if(u.protocol!=='https:'||u.hostname!==process.env.PREVIEW_HOST||u.pathname!=='/')process.exit(1)"
+          : > .node24-artifacts/smoke.log
+          HEADERS="$(mktemp)"
+          trap 'rm -f "$HEADERS"' EXIT
+          for RUTA in /api/health / /interno/login /consulta; do
+            : > "$HEADERS"
+            CODIGO="$(curl --silent --show-error -D "$HEADERS" -o /dev/null -w '%{http_code}' --max-time 30 \
+              -H "x-vercel-trusted-oidc-idp-token: $VERCEL_TRUSTED_OIDC_TOKEN" \
+              "${PREVIEW_URL}${RUTA}" || true)"
+            CODIGO="${CODIGO:-000}"
+            echo "${RUTA} ${CODIGO}" | tee -a .node24-artifacts/smoke.log
+            test "$CODIGO" = 200
+            test -z "$(awk 'BEGIN{IGNORECASE=1} /^location:/ {print $2}' "$HEADERS" | tr -d '\r')"
+          done
+
+      - name: Registrar resultado Node 24
+        run: |
+          set -euo pipefail
+          {
+            echo "CANDIDATE_SHA=$CANDIDATE_SHA"
+            echo "WORKFLOW_SHA=$WORKFLOW_SHA"
+            echo "NODE_VERSION=$(node --version)"
+            echo "NPM_VERSION=$(npm --version)"
+            echo "NODE24_VALIDATION=true"
+            echo "BUILD=true"
+            echo "TESTS=true"
+            echo "FIRESTORE_RULES=true"
+            echo "E2E=true"
+            echo "SMOKE=true"
+            echo "CANDIDATE_SHA_EXACT=true"
+          } | tee .node24-artifacts/resultado.txt
+
+      - name: Sanear evidencia Node 24
+        if: ${{ always() }}
+        env:
+          LAB_PASSWORD: ${{ secrets.LAB_PASSWORD }}
+          FIREBASE_SERVICE_ACCOUNT: ${{ secrets.FIREBASE_SERVICE_ACCOUNT }}
+          FIREBASE_API_KEY: ${{ secrets.NEXT_PUBLIC_FIREBASE_API_KEY }}
+          OIDC_PROBES: ${{ steps.oidc_node24_probes.outputs.token }}
+          OIDC_E2E_01: ${{ steps.oidc_node24_e2e_01.outputs.token }}
+          OIDC_E2E_06: ${{ steps.oidc_node24_e2e_06.outputs.token }}
+          OIDC_SMOKE: ${{ steps.oidc_node24_smoke.outputs.token }}
+        run: |
+          node <<'NODE'
+          const fs = require('node:fs');
+          const path = require('node:path');
+          const raices = ['.node24-artifacts', 'playwright-report', 'test-results'];
+          const secretos = [
+            process.env.LAB_PASSWORD,
+            process.env.FIREBASE_SERVICE_ACCOUNT,
+            process.env.FIREBASE_API_KEY,
+            process.env.OIDC_PROBES,
+            process.env.OIDC_E2E_01,
+            process.env.OIDC_E2E_06,
+            process.env.OIDC_SMOKE,
+          ].filter((valor) => typeof valor === 'string' && valor.length > 0);
+          function archivosEn(ruta) {
+            if (!fs.existsSync(ruta)) return [];
+            return fs.readdirSync(ruta, { withFileTypes: true }).flatMap((entrada) => {
+              const destino = path.join(ruta, entrada.name);
+              return entrada.isDirectory() ? archivosEn(destino) : [destino];
+            });
+          }
+          let eliminados = 0;
+          for (const archivo of raices.flatMap(archivosEn)) {
+            const normalizado = archivo.split(path.sep).join('/');
+            const noPublicable =
+              normalizado.endsWith('/trace.zip') ||
+              normalizado.endsWith('/error-context.md') ||
+              /(^|\/)playwright-report\/data\/.*\.(zip|md)$/.test(normalizado);
+            const contenido = fs.readFileSync(archivo);
+            const contieneSecreto = secretos.some((secreto) => contenido.includes(Buffer.from(secreto)));
+            if (noPublicable || contieneSecreto) {
+              fs.unlinkSync(archivo);
+              eliminados += 1;
+            }
+          }
+          for (const archivo of raices.flatMap(archivosEn)) {
+            const contenido = fs.readFileSync(archivo);
+            if (secretos.some((secreto) => contenido.includes(Buffer.from(secreto)))) {
+              throw new Error(`Evidencia sensible no saneada en ${archivo}.`);
+            }
+          }
+          fs.mkdirSync('.node24-artifacts', { recursive: true });
+          fs.writeFileSync(
+            '.node24-artifacts/sanitizacion.log',
+            `archivos_eliminados=${eliminados}\nsecretos_verificados=${secretos.length}\n`,
+            { mode: 0o600 },
+          );
+          console.log(`Evidencia Node 24 saneada: ${eliminados} archivo(s) eliminado(s).`);
+          NODE
+
+      - name: Publicar evidencia Node 24
+        if: ${{ always() }}
+        uses: actions/upload-artifact@v7
+        with:
+          name: node24-validacion-54256f5
+          path: .node24-artifacts/
+          if-no-files-found: warn
+          include-hidden-files: true
+          retention-days: 30
+
+      - name: Eliminar archivos efímeros Node 24
+        if: ${{ always() }}
+        run: |
+          git restore -- e2e/01-ciclo-dorado.spec.ts e2e/06-perimetro-sin-sesion.spec.ts
+          rm -f .env.stage playwright.node24-preview.config.ts e2e/b1-oidc-fixtures.ts
+          rm -f .node24-workflow-source.yml firebase-debug.log firestore-debug.log
