@@ -3,6 +3,7 @@
 /* eslint-disable @next/next/no-img-element */
 
 import { useState } from 'react';
+import type { EstadoAdjuntos } from '@/lib/recepcion/contingencia-storage';
 import {
   INSTITUCION,
   formatFechaInstitucional,
@@ -71,6 +72,7 @@ function buildPrintStyles(esquina: EsquinaSello): string {
 }
 
 export interface SelloRecibidoProps {
+  estadoAdjuntos?: EstadoAdjuntos;
   radicadoId:    string;
   fechaRadicado: string;
   horaRadicado:  string;
@@ -81,6 +83,7 @@ export interface SelloRecibidoProps {
 }
 
 export function SelloRecibido({
+  estadoAdjuntos,
   radicadoId,
   fechaRadicado,
   horaRadicado,
@@ -213,6 +216,11 @@ export function SelloRecibido({
               )}
             </div>
 
+            {estadoAdjuntos === 'PENDIENTE_STORAGE' && (
+              <p className="mt-1 text-[8px] font-bold text-amber-950">
+                PENDIENTE DE ADJUNTO · Soportes bajo custodia, pendientes de digitalización.
+              </p>
+            )}
             <p className="text-[8px] mt-1" style={{ color: '#94A3B8' }}>
               Consulte: {consultaCorta}
             </p>

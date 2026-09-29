@@ -21,6 +21,13 @@ function evento(overrides: Partial<TrazabilidadRadicado>): TrazabilidadRadicado 
 }
 
 describe('Panel Op Fase 1 — etiquetarUltimaActuacion', () => {
+  it('distingue custodia pendiente de carga verificada sin cambiar el código de auditoría', () => {
+    const pendiente = etiquetarUltimaActuacion(evento({ accion: 'ADJUNTOS_PENDIENTES_STORAGE' }));
+    expect(pendiente.label).toBe('Soportes pendientes de digitalización');
+    expect(pendiente.accionRaw).toBe('ADJUNTOS_PENDIENTES_STORAGE');
+    expect(etiquetarUltimaActuacion(evento({ accion: 'ADJUNTOS_REGULARIZADOS_STORAGE' })).label)
+      .toBe('Soportes digitalizados y verificados');
+  });
   /* 1 · Acciones conocidas del enum */
   it('traduce acciones conocidas a labels humanos cortos', () => {
     expect(etiquetarUltimaActuacion(evento({ accion: 'RADICACION' })).label)

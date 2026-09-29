@@ -94,6 +94,23 @@ export function ResumenEjecutivoRadicado({
         </div>
       </div>
 
+      {radicado.gestionAdjuntos?.estado === 'PENDIENTE_STORAGE' && (
+        <div role="status" className="space-y-1 rounded-lg border border-amber-300 bg-amber-50 p-3 text-xs text-amber-950">
+          <p className="font-bold">Pendiente de adjunto / Storage no disponible</p>
+          <p>Soportes pendientes de digitalización: {radicado.gestionAdjuntos.soportesPendientes.cantidad}.</p>
+          <p className="whitespace-pre-wrap">Inventario: {radicado.gestionAdjuntos.soportesPendientes.descripcion}</p>
+          <p>Custodia: {radicado.gestionAdjuntos.soportesPendientes.custodiaTipo === 'FISICA_EN_VENTANILLA' ? 'Física en ventanilla' : 'Correo institucional'}.</p>
+          <p className="break-words">Referencia: {radicado.gestionAdjuntos.soportesPendientes.custodiaReferencia}</p>
+          <p>Registró la custodia: {radicado.gestionAdjuntos.registradoPor.nombre}.</p>
+          <p>No hay carga digital acreditada. Conserve los originales hasta completar la regularización autenticada y verificada cuando Storage vuelva a estar operativo.</p>
+        </div>
+      )}
+      {radicado.gestionAdjuntos?.estado === 'COMPLETO' && (
+        <p className="rounded-lg border border-green-200 bg-green-50 p-2 text-xs text-green-950">
+          Soportes digitalizados: carga verificada y regularización registrada.
+        </p>
+      )}
+
       {/* Grid de datos claves — 2 columnas */}
       <div className="grid grid-cols-2 gap-x-4 gap-y-2 text-xs">
         <ResumenFila label="Llegada" value={`${formatFechaColombia(radicado.control.fechaRadicado)} · ${radicado.control.horaRadicado}`} />

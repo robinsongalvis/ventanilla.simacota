@@ -24,6 +24,7 @@ import {
 import type { TenantId } from '@/src/types/radicado';
 import type { VentanillaRadicado } from '@/src/types/ventanilla';
 import { esEstadoCerrado } from '@/lib/radicado-estados';
+import { esDatoDePrueba } from '@/lib/radicados/dato-de-prueba';
 import { logError } from '@/lib/logger';
 
 export const runtime = 'nodejs';
@@ -71,6 +72,7 @@ export async function GET(): Promise<NextResponse> {
     const candidatos: RadicadoCandidato[] = [];
     for (const doc of snap.docs) {
       const radicado = doc.data() as VentanillaRadicado;
+      if (esDatoDePrueba(radicado)) continue;
       if (radicado.vinculoExpediente) continue;
       if (esEstadoCerrado(radicado.estadoActual)) continue;
       candidatos.push({

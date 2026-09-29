@@ -37,6 +37,61 @@
 import { getFirestore } from 'firebase-admin/firestore';
 import { cert, getApps, initializeApp } from 'firebase-admin/app';
 
+export const PROPUESTA_CONTINGENCIA = Object.freeze({
+  desde: 1745,
+  autorizadoPor: 'Secretaría de Gobierno de Simacota — instrucción de contingencia comunicada el 29-sep-2026',
+  referencia: 'docs/actas/ACTA_APERTURA_CONTINGENCIA_RADICADOS_2026-09-29.md',
+});
+
+/** Evaluación pura: ninguna propuesta se escribe para hacer un dry-run. */
+export function evaluarContingencia({ ultimo, periodo, ocupados, reservas }) {
+  const d = decidir('radicados', ultimo, PROPUESTA_CONTINGENCIA);
+  const problemas = verificarEsperados(d.accion === 'ABRIR' ? [{ serie: 'radicados', d }] : [], { radicados: 1745 });
+  if (ultimo !== 27) problemas.push('El contador ya no está en 27; requiere nueva revisión.');
+  if (periodo !== '202609') problemas.push('El período America/Bogota ya no es septiembre de 2026; no se permite antedatar.');
+  if (ocupados > 0) problemas.push('Existe un documento que utiliza 1745 o 1746; no se abre.');
+  if (reservas > 0) problemas.push('Existe una reserva de 1745 o 1746; no se abre.');
+  return { d, problemas, ok: problemas.length === 0 };
+}
+
+/** Solo lecturas, proyección sin PII. Nunca abre una transacción de escritura. */
+export async function dryRunContingencia(db, fecha = new Date()) {
+  const partes = new Intl.DateTimeFormat('en-US', {
+    timeZone: 'America/Bogota', year: 'numeric', month: '2-digit',
+  }).formatToParts(fecha);
+  const anio = partes.find((p) => p.type === 'year').value;
+  const mes = partes.find((p) => p.type === 'month').value;
+  const counterRef = db.doc(`counters/radicados-${anio}`);
+  const antes = await counterRef.get();
+  const [radicados, reservas] = await Promise.all([
+    db.collection('ventanilla_radicados').select('control.radicadoId', 'control.consecutivo', 'isTest', 'excludeFromMetrics').get(),
+    db.collection('unicidad_radicados').select('radicadoId', 'consecutivo').get(),
+  ]);
+  // Cubre la máscara actual, las máscaras históricas y reservas con datos
+  // incompletos. Ante un número ambiguo 1745/1746 se rechaza, no se adivina.
+  const objetivo = (valor) => typeof valor === 'string' && /(?:^|-)0*(1745|1746)$/.test(valor);
+  const esNumeroObjetivo = (valor) => [1745, 1746].includes(Number(valor));
+  const ocupados = radicados.docs.filter((doc) => objetivo(doc.id) || objetivo(doc.data().control?.radicadoId) || esNumeroObjetivo(doc.data().control?.consecutivo)).length;
+  const reservados = reservas.docs.filter((doc) => objetivo(doc.id) || objetivo(doc.data().radicadoId) || esNumeroObjetivo(doc.data().consecutivo)).length;
+  const despues = await counterRef.get();
+  const evaluacion = evaluarContingencia({ ultimo: antes.data()?.ultimo, periodo: `${anio}${mes}`, ocupados, reservas: reservados });
+  if (!antes.updateTime?.isEqual(despues.updateTime)) {
+    evaluacion.problemas.push('El contador cambió durante la lectura; repetir el dry-run.');
+    evaluacion.ok = false;
+  }
+  console.log(`CURRENT_COUNTER=${antes.data()?.ultimo}`);
+  console.log('PROPOSED_COUNTER_VALUE=1744');
+  console.log('PROPOSED_FIRST_NUMBER=1745');
+  console.log(`EXPECTED_NUMBER_CHECK=${evaluacion.ok ? 'OK' : 'FAILED'}`);
+  console.log(`TARGET_DOCUMENT_COLLISIONS=${ocupados}`);
+  console.log(`TARGET_RESERVATION_COLLISIONS=${reservados}`);
+  console.log(`HISTORICAL_TEST_RECORDS=${radicados.docs.filter((doc) => doc.data().isTest === true && doc.data().excludeFromMetrics === true).length}`);
+  console.log('PRODUCTION_WRITES=false');
+  console.log(`SERIES_DRY_RUN_OK=${evaluacion.ok}`);
+  for (const problema of evaluacion.problemas) console.error(problema);
+  return evaluacion;
+}
+
 /* MISMA lista que `SERIES_CONSECUTIVO` (`lib/server/consecutivo-legal.ts`).
    `abrir-series-coherente.test.ts` enfrenta las dos: si una gana una serie y la
    otra no, la prueba lo dice. Las de actos entraron el 14-sep-2026, cuando
@@ -141,6 +196,11 @@ if (process.argv[1]?.endsWith('abrir-series.mjs')) {
   const arg = (n) => { const i = process.argv.indexOf(n); return i === -1 ? undefined : process.argv[i + 1]; };
   const proyecto = arg('--proyecto');
   const ejecutar = process.env.CONFIRMO_APERTURA === 'SI';
+  const propuestaContingencia = process.argv.includes('--propuesta-contingencia-solo-lectura');
+  if (propuestaContingencia && ejecutar) {
+    console.error('La propuesta de contingencia solo admite lectura. Retire CONFIRMO_APERTURA. Nada se escribió.');
+    process.exit(1);
+  }
   if (!proyecto) { console.error('Uso: --proyecto <project_id> [--esperado serie=N ...]'); process.exit(1); }
 
   /* `--esperado serie=N`, repetible: los primeros números que dice el acta.
@@ -160,13 +220,21 @@ if (process.argv[1]?.endsWith('abrir-series.mjs')) {
   const crudo = (process.env.FIREBASE_SERVICE_ACCOUNT ?? '').trim().replace(/^['"]/, '').replace(/['"]$/, '');
   if (!crudo) { console.error('Falta FIREBASE_SERVICE_ACCOUNT.'); process.exit(2); }
   let credencial;
-  try { credencial = JSON.parse(crudo); } catch (e) { console.error('Credencial no es JSON:', e.message); process.exit(2); }
+  try { credencial = JSON.parse(crudo); } catch { console.error('La credencial no es JSON válido.'); process.exit(2); }
   if (credencial.project_id !== proyecto) {
     console.error(`⛔ GUARDA: credencial de "${credencial.project_id}", se ordenó "${proyecto}". Nada se tocó.`);
     process.exit(3);
   }
   if (!getApps().length) initializeApp({ credential: cert(credencial), projectId: proyecto });
   const db = getFirestore();
+  if (propuestaContingencia) {
+    if (proyecto !== 'ventanilla-unica-f31b1') {
+      console.error('Esta propuesta corresponde exclusivamente al proyecto Production autorizado.');
+      process.exit(3);
+    }
+    const resultado = await dryRunContingencia(db);
+    process.exit(resultado.ok ? 0 : 5);
+  }
   const anio = new Date().getFullYear();
   const ahoraIso = new Date().toISOString();
 

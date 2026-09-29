@@ -128,6 +128,13 @@ beforeEach(() => {
 });
 
 describe('POST .../expedientes/desde-radicado', () => {
+  it.each([{ isTest: true }, { excludeFromMetrics: true }, { esPrueba: true }])('histórico de prueba %j no se vincula ni se notifica', async (marca) => {
+    store.set('ventanilla_radicados/1-110-202608-00000042', radicadoDoc(marca));
+    const res = await desdeRadicadoPOST(req({ radicadoId: '1-110-202608-00000042', subtipos: ['CONSTRUCCION'] }));
+    expect(res.status).toBe(409);
+    expect(escrituras).toHaveLength(0);
+    expect(correosEnviados).toHaveLength(0);
+  });
   it('feliz: crea expediente + actuación + vínculo del radicado en la MISMA tx', async () => {
     store.set('ventanilla_radicados/1-110-202608-00000042', radicadoDoc());
 
@@ -197,6 +204,16 @@ describe('POST .../expedientes/desde-radicado', () => {
 });
 
 describe('GET /api/licencias/radicados-candidatos', () => {
+  it('omite todos los marcadores de prueba y conserva el candidato real', async () => {
+    store.set('ventanilla_radicados/real', radicadoDoc({ radicadoId: 'real' }));
+    for (const [i, marca] of [{ isTest: true }, { excludeFromMetrics: true }, { esPrueba: true }].entries()) {
+      store.set(`ventanilla_radicados/prueba-${i}`, radicadoDoc({ radicadoId: `prueba-${i}`, ...marca }));
+    }
+    const response = await candidatosGET();
+    expect(response.status).toBe(200);
+    const body = await response.json();
+    expect(body.radicados.map((r: { radicadoId: string }) => r.radicadoId)).toEqual(['real']);
+  });
   it('excluye vinculados, cerrados y de otro tenant', async () => {
     store.set('ventanilla_radicados/r1', radicadoDoc({ radicadoId: 'r1' })); // candidato
     store.set('ventanilla_radicados/r2', radicadoDoc({ radicadoId: 'r2', vinculoExpediente: { expedienteId: 'e1', numeroExpediente: 'DEMO-26-x', fecha: '2026-08-01T00:00:00.000Z' } })); // ya vinculado

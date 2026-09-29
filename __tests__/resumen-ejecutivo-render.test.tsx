@@ -1,7 +1,9 @@
-import { describe, expect, it } from 'vitest';
-import { render, screen } from '@testing-library/react';
+import { afterEach, describe, expect, it } from 'vitest';
+import { cleanup, render, screen } from '@testing-library/react';
 import type { TrazabilidadRadicado, VentanillaRadicado } from '@/src/types/ventanilla';
 import { ResumenEjecutivoRadicado } from '@/app/interno/dashboard/components/ResumenEjecutivoRadicado';
+
+afterEach(() => cleanup());
 
 /* ══════════════════════════════════════════════════════════════
    Panel Operativo Fase 1 — tests de render del componente.
@@ -68,6 +70,22 @@ function radicadoBase(overrides: Partial<VentanillaRadicado> = {}): VentanillaRa
 }
 
 describe('Panel Op Fase 1 — ResumenEjecutivoRadicado', () => {
+  it('expone el inventario y custodia pendientes sin afirmar carga digital', () => {
+    render(<ResumenEjecutivoRadicado radicado={radicadoBase({
+      gestionAdjuntos: {
+        version: 1, estado: 'PENDIENTE_STORAGE', registradoEn: AHORA.toISOString(),
+        registradoPor: { uid: 'stage-sintetico', nombre: 'Recepción de prueba' },
+        soportesPendientes: {
+          descripcion: 'Solicitud física de dos folios', cantidad: 1,
+          custodiaTipo: 'FISICA_EN_VENTANILLA', custodiaReferencia: 'Caja de contingencia, carpeta 01',
+          confirmacionCustodia: true,
+        },
+      },
+    })} ultimoEvento={null} ahora={AHORA} />);
+    expect(screen.getByRole('status').textContent).toMatch(/Pendiente de adjunto/);
+    expect(screen.getByRole('status').textContent).toMatch(/Caja de contingencia, carpeta 01/);
+    expect(screen.getByRole('status').textContent).toMatch(/No hay carga digital acreditada/);
+  });
   /* 1 · Vista base: radicado, solicitante, dependencia, responsable, tipo */
   it('renderiza los datos claves del radicado activo', () => {
     render(

@@ -15,6 +15,9 @@
  */
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 
+// Regresión del modo normal; el cierre real de contingencia se prueba aparte.
+vi.mock('@/lib/recepcion/contingencia-storage', () => ({ CONTINGENCIA_STORAGE_ACTIVA: false }));
+
 vi.mock('@/lib/server/internal-auth', () => ({
   InternalAuthError: class extends Error { status = 401; },
   requireActiveInternalUser: vi.fn(async () => ({

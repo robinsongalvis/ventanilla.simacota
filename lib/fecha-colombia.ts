@@ -10,11 +10,23 @@
    servidor que las renderice.
 
    El almacenamiento sigue siendo ISO UTC (Timestamp Firestore o string
-   ISO). Esta capa solo afecta la PRESENTACIÓN.
+   ISO). También fija el calendario institucional del número de radicado.
 ══════════════════════════════════════════════════════════════ */
 
 export const TIMEZONE_COLOMBIA = 'America/Bogota';
 export const LOCALE_COLOMBIA = 'es-CO';
+
+/** Año/mes institucionales, independientes de la zona del servidor o navegador. */
+export function periodoColombia(fecha: Date): { anio: number; mes: string } {
+  if (!Number.isFinite(fecha.getTime())) throw new Error('La fecha institucional no es válida.');
+  const partes = new Intl.DateTimeFormat('en-US', {
+    timeZone: TIMEZONE_COLOMBIA, year: 'numeric', month: '2-digit',
+  }).formatToParts(fecha);
+  const anio = Number(partes.find((p) => p.type === 'year')?.value);
+  const mes = partes.find((p) => p.type === 'month')?.value;
+  if (!Number.isInteger(anio) || !mes) throw new Error('No se pudo determinar el período institucional.');
+  return { anio, mes };
+}
 
 const FALLBACK_NO_REGISTRADA = 'No registrada';
 const FALLBACK_CORTO = '—';

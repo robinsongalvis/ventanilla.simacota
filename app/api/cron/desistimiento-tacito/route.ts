@@ -6,6 +6,7 @@ import { debeProponerDesistimiento, planPropuestaDesistimiento } from '@/lib/ser
 import { logError } from '@/lib/logger';
 import type { VentanillaRadicado } from '@/src/types/ventanilla';
 import { registrarEventoNegocio } from '@/lib/observabilidad/eventos-negocio';
+import { esDatoDePrueba } from '@/lib/radicados/dato-de-prueba';
 
 export const runtime = 'nodejs';
 // Techo del plan (Vercel Hobby/Pro: 300s en funciones cron) — mismo estándar
@@ -60,8 +61,8 @@ export async function GET(request: Request): Promise<NextResponse> {
       .limit(TECHO_LECTURA_CRON)
       .get();
     const candidatos = snap.docs
-      .map((d) => ({ id: d.id, r: d.data() as VentanillaRadicado & { isTest?: boolean; excludeFromMetrics?: boolean } }))
-      .filter(({ r }) => !r.isTest && !r.excludeFromMetrics
+      .map((d) => ({ id: d.id, r: d.data() as VentanillaRadicado }))
+      .filter(({ r }) => !esDatoDePrueba(r)
         && debeProponerDesistimiento(r, ahora));
 
     for (const { id, r } of candidatos) {

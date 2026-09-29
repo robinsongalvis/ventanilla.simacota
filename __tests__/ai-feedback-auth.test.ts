@@ -13,6 +13,7 @@ import { readFileSync } from 'node:fs';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 let sesion: { uid: string; nombre: string; rol: string; tenantId: string } | null = null;
+let radicadoDePrueba = false;
 
 vi.mock('@/lib/server/internal-auth', async (importOriginal) => ({
   ...await importOriginal<typeof import('@/lib/server/internal-auth')>(),
@@ -43,7 +44,10 @@ vi.mock('@/lib/firebase-admin', () => ({
       ruta,
       get: async () => ({
         exists: true,
-        data: () => ({ clasificacion: { oficinaDestino: 'SEC_GOBIERNO' } }),
+        data: () => ({
+          isTest: radicadoDePrueba,
+          clasificacion: { oficinaDestino: 'SEC_GOBIERNO' },
+        }),
       }),
     }),
     collection: (ruta: string) => ({ doc: () => ({ id: 'id-auto', ruta: `${ruta}/id-auto` }) }),
@@ -70,10 +74,18 @@ function peticion(body: Record<string, unknown>): Request {
 
 beforeEach(() => {
   sesion = null;
+  radicadoDePrueba = false;
   escrituras.length = 0;
 });
 
 describe('/api/ai/feedback — autenticación (PT-3)', () => {
+  it('un histórico de prueba no admite feedback ni nuevas escrituras', async () => {
+    sesion = { uid: 'uid-real', nombre: 'Funcionaria Real', rol: 'FUNCIONARIO', tenantId: 'SEC_GOBIERNO' };
+    radicadoDePrueba = true;
+    const res = await POST(peticion({ radicadoId: '1-110-202608-00000001', puntuacion: 'POSITIVO' }));
+    expect(res.status).toBe(404);
+    expect(escrituras).toHaveLength(0);
+  });
   it('sin sesión → 401 y NO escribe absolutamente nada', async () => {
     const res = await POST(peticion({ radicadoId: '1-110-202608-00000001', puntuacion: 'POSITIVO' }));
     expect(res.status).toBe(401);

@@ -51,6 +51,7 @@ import { diasRestantesHabiles, resolverTipoSolicitud } from '@/lib/tiempos-radic
 import { RadicacionFuncionarioForm }       from '@/app/interno/recepcion/components/RadicacionFuncionarioForm';
 import { radicarSegunFlag }                from '@/lib/recepcion/radicar-segun-flag';
 import { ComprobanteRadicado }             from '@/app/interno/dashboard/components/ComprobanteRadicado';
+import type { EstadoAdjuntos } from '@/lib/recepcion/contingencia-storage';
 import { SelloRecibido }                   from '@/app/interno/dashboard/components/SelloRecibido';
 import { CompletarDatosSolicitante }       from '@/app/interno/dashboard/components/CompletarDatosSolicitante';
 import { datosConstanciaDesdeRadicado }    from '@/lib/mostrador/constancia-desde-radicado';
@@ -3418,6 +3419,8 @@ function PanelDerecho({
 ══════════════════════════════════════════════════════════════ */
 
 interface DatosComprobante {
+  estadoAdjuntos?: EstadoAdjuntos;
+  mensajeAdjuntos?: string;
   solicitanteNombre: string;
   numeroDocumento:   string;
   tipoDocumento:     string;
@@ -3513,7 +3516,7 @@ function DrawerNuevoRadicado({
       // Camino ÚNICO por el servidor desde el cutover PT-1 (24-ago-2026):
       // POST /api/radicacion/interna. El kill-switch se retiró en el PR-C
       // — ver la cabecera de lib/recepcion/radicar-segun-flag.ts.
-      const { radicadoId } = await radicarSegunFlag(
+      const { radicadoId, estadoAdjuntos, mensajeAdjuntos, fechaRadicado, horaRadicado } = await radicarSegunFlag(
         payload,
         { uid: usuario.uid, nombre: usuario.nombre, tenantId: usuario.tenantId },
         (msg, pct) => { setProgreso(msg); setProgresoPct(pct); },
@@ -3527,11 +3530,13 @@ function DrawerNuevoRadicado({
         ? null
         : (payload.telefonoMovil?.trim() || payload.telefono?.trim() || null);
       setDatosComprobante({
+        estadoAdjuntos,
+        mensajeAdjuntos,
         solicitanteNombre: payload.nombreCompleto,
         numeroDocumento:   payload.numeroDocumento,
         tipoDocumento:     payload.tipoDocumento,
-        fechaRadicado:     ahora.toISOString(),
-        horaRadicado:      formatHoraColombia(ahora),
+        fechaRadicado:     fechaRadicado ?? ahora.toISOString(),
+        horaRadicado:      horaRadicado ?? formatHoraColombia(ahora),
         medioRecepcion:    payload.medioRecepcion,
         tipoTramite:       tipoConf.nombre,
         diasRespuesta:     tipoConf.diasRespuesta,
@@ -3626,6 +3631,13 @@ function DrawerNuevoRadicado({
                 <p className="text-2xl font-black font-mono" style={{ color: 'var(--tema-texto-007049)' }}>{radicadoGenerado}</p>
                 <p className="text-xs mt-1" style={{ color: 'var(--text-secondary)' }}>Informe este número al ciudadano para seguimiento.</p>
               </div>
+              {datosComprobante.estadoAdjuntos === 'PENDIENTE_STORAGE' && (
+                <div role="status" className="max-w-xl rounded-lg border border-amber-300 bg-amber-50 p-4 text-sm text-amber-950">
+                  <p className="font-bold">Radicado creado con soportes pendientes de digitalización</p>
+                  <p className="mt-1">{datosComprobante.mensajeAdjuntos ?? 'Pendiente de adjunto / Storage no disponible. No se guardaron archivos digitales.'}</p>
+                  <p className="mt-1">Conserve los originales inventariados bajo la custodia registrada. El expediente digital aún no está completo.</p>
+                </div>
+              )}
 
               {/* Sprint Recepción fluida — elegir entre la constancia
                   completa y el sello sobre la copia física del ciudadano. */}
@@ -3658,6 +3670,7 @@ function DrawerNuevoRadicado({
                   numeroFolios={datosComprobante.numeroFolios}
                   numeroAnexos={datosComprobante.numeroAnexos}
                   mediosAnexos={datosComprobante.mediosAnexos}
+                  estadoAdjuntos={datosComprobante.estadoAdjuntos}
                 />
               )}
 
@@ -3683,6 +3696,7 @@ function DrawerNuevoRadicado({
                 correoSolicitante={datosComprobante.correoSolicitante}
                 telefonoSolicitante={datosComprobante.telefonoSolicitante}
                 canalRespuesta={datosComprobante.canalRespuesta}
+                estadoAdjuntos={datosComprobante.estadoAdjuntos}
                 onEnviarCorreo={handleEnviarConstancia}
                 enviandoCorreo={estadoEnvioConstancia === 'enviando'}
                 estadoEnvio={estadoEnvioConstancia}

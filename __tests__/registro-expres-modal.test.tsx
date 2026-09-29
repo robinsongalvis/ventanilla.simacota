@@ -2,6 +2,10 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 import { cleanup, render, screen, fireEvent, waitFor } from '@testing-library/react';
 import { RegistroExpresModal } from '@/app/interno/dashboard/components/RegistroExpresModal';
 
+// Conserva la cobertura del flujo ordinario. El bloqueo real de esta entrega
+// (bandera true sin mock) se verifica en contingencia-ui.test.tsx.
+vi.mock('@/lib/recepcion/contingencia-storage', () => ({ CONTINGENCIA_STORAGE_ACTIVA: false }));
+
 afterEach(() => {
   cleanup();
   vi.restoreAllMocks();

@@ -34,13 +34,21 @@ const RUTA_ROUTE = path.join(REPO_ROOT, 'app', 'api', 'radicacion', 'interna', '
 const RUTA_AUTH_STUB = path.join(__dirname, 'fase3-stub-internal-auth.mjs');
 const RUTA_STORAGE_STUB = path.join(__dirname, 'fase3-stub-firebase-admin.mjs');
 
-function pluginFronterasMock() {
+function pluginFronterasMock(contingencia) {
   return {
     name: 'fase3-fronteras-mock',
     enforce: 'pre',
     resolveId(id) {
       if (id === '@/lib/server/internal-auth') return RUTA_AUTH_STUB;
       if (id === '@/lib/firebase-admin') return RUTA_STORAGE_STUB;
+      return null;
+    },
+    // Pruebas históricas de Storage siguen ensayando el modo normal; los
+    // casos de contingencia solicitan el flag REAL sin transformación.
+    transform(code, id) {
+      if (!contingencia && id.endsWith('/lib/recepcion/contingencia-storage.ts')) {
+        return code.replace('export const CONTINGENCIA_STORAGE_ACTIVA = true;', 'export const CONTINGENCIA_STORAGE_ACTIVA = false;');
+      }
       return null;
     },
   };
@@ -82,7 +90,7 @@ let servidorVite = null;
  * este arnés SOLO corre dentro de `firebase emulators:exec` (igual que
  * `e2e/rules/setup.mjs`); nunca contra Firestore real.
  */
-export async function iniciarEntorno() {
+export async function iniciarEntorno({ contingencia = false } = {}) {
   if (!process.env.FIRESTORE_EMULATOR_HOST) {
     throw new Error(
       '⛔ fase3-entorno.mjs solo corre contra el emulador de Firestore ' +
@@ -102,7 +110,7 @@ export async function iniciarEntorno() {
     configFile: false,
     root: REPO_ROOT,
     resolve: { tsconfigPaths: true },
-    plugins: [pluginFronterasMock()],
+    plugins: [pluginFronterasMock(contingencia)],
     logLevel: 'warn',
     optimizeDeps: { noDiscovery: true },
   });

@@ -151,6 +151,19 @@ describe('construirFormDataRadicacionInterna — contrato campo por campo', () =
     expect(fd.get(C.numeroDocumento)).toBe('');
     expect(fd.get(C.email)).toBe('');
   });
+
+  it('serializa inventario y custodia sin fingir un archivo cargado', () => {
+    const soportesPendientes = {
+      descripcion: 'Solicitud física de dos folios y un anexo',
+      cantidad: 2,
+      custodiaTipo: 'FISICA_EN_VENTANILLA' as const,
+      custodiaReferencia: 'Caja de contingencia, carpeta de recepción',
+      confirmacionCustodia: true,
+    };
+    const fd = construirFormDataRadicacionInterna({ ...DATOS_MINIMOS, soportesPendientes });
+    expect(JSON.parse(String(fd.get(CAMPOS_RADICACION_INTERNA.soportesPendientes)))).toEqual(soportesPendientes);
+    expect(fd.getAll(CAMPOS_RADICACION_INTERNA.archivos)).toEqual([]);
+  });
 });
 
 describe('radicarInternaCliente — traducción de la respuesta del endpoint', () => {
@@ -175,6 +188,20 @@ describe('radicarInternaCliente — traducción de la respuesta del endpoint', (
     expect(init.method).toBe('POST');
     expect(init.body).toBeInstanceOf(FormData);
     expect(onProgress).toHaveBeenCalled();
+  });
+
+  it('conserva el estado pendiente y la fecha/hora real devueltos por el servidor', async () => {
+    const datosServidor = {
+      radicadoId: '1-110-202609-00000028', consecutivo: 28,
+      estadoAdjuntos: 'PENDIENTE_STORAGE', mensajeAdjuntos: 'Soportes pendientes de digitalización.',
+      fechaRadicado: '2026-09-30T04:59:00.000Z', horaRadicado: '23:59',
+    };
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue({
+      ok: true, json: async () => ({ ok: true, archivosSubidos: 0, ...datosServidor }),
+    }));
+    const progreso = vi.fn();
+    await expect(radicarInternaCliente(DATOS_MINIMOS, progreso)).resolves.toEqual(datosServidor);
+    expect(progreso).toHaveBeenLastCalledWith(datosServidor.mensajeAdjuntos, 90);
   });
 
   it('400 → junta los mensajes de `errores` en el Error', async () => {

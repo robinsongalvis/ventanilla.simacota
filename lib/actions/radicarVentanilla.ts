@@ -10,12 +10,14 @@ import type {
   TipoPersona,
 } from '@/src/types/ventanilla';
 import type { TenantId } from '@/src/types/radicado';
+import type { EstadoAdjuntos, SoportesPendientesInput } from '@/lib/recepcion/contingencia-storage';
 
 /* ══════════════════════════════════════════════════════════════
    TIPOS
 ══════════════════════════════════════════════════════════════ */
 
 export interface DatosRadicacionInstitucional {
+  soportesPendientes?: SoportesPendientesInput;
   tipoPersona:       TipoPersona;
   tipoDocumento:     TipoDocumento;
   numeroDocumento:   string;
@@ -102,6 +104,10 @@ export interface ActorRadicacion {
 export interface ResultadoRadicacion {
   radicadoId:  string;
   consecutivo: number;
+  estadoAdjuntos?: EstadoAdjuntos;
+  mensajeAdjuntos?: string;
+  fechaRadicado?: string;
+  horaRadicado?: string;
 }
 
 /* ══════════════════════════════════════════════════════════════

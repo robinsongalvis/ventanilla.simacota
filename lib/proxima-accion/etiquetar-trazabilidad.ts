@@ -10,6 +10,8 @@ import type { TrazabilidadRadicado } from '@/src/types/ventanilla';
 
 const LABELS_ULTIMA_ACTUACION: Record<string, string> = {
   RADICACION:                          'Radicado recibido',
+  ADJUNTOS_PENDIENTES_STORAGE:          'Soportes pendientes de digitalización',
+  ADJUNTOS_REGULARIZADOS_STORAGE:       'Soportes digitalizados y verificados',
   CLASIFICACION_IA:                    'Clasificación asistida por IA',
   ASIGNACION:                          'Asignada a dependencia',
   CAMBIO_ESTADO:                       'Estado actualizado',

@@ -2,6 +2,7 @@
 
 import { useState } from 'react';
 import { formatFechaColombia } from '@/lib/fecha-colombia';
+import { CONTINGENCIA_STORAGE_ACTIVA } from '@/lib/recepcion/contingencia-storage';
 
 /* ══════════════════════════════════════════════════════════════
    EL ACTO DE RADICAR, DESDE LA PANTALLA.
@@ -72,6 +73,26 @@ const EXPLICACION_BASE: Record<NonNullable<VistaPreviaDebidaForma['baseDelAncla'
 };
 
 export function RadicarDebidaFormaModal({
+  expedienteId,
+  previa,
+  onCerrar,
+  onRadicado,
+}: RadicarDebidaFormaModalProps) {
+  if (CONTINGENCIA_STORAGE_ACTIVA) {
+    return (
+      <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/55 p-4">
+        <section role="dialog" aria-modal="true" aria-labelledby="radicacion-licencias-contingencia" className="max-w-lg space-y-4 rounded-xl border border-amber-300 bg-white p-6">
+          <h2 id="radicacion-licencias-contingencia" className="text-lg font-bold text-slate-900">Radicación de licencias suspendida durante la contingencia</h2>
+          <p className="text-sm text-slate-700">La serie de entrada está protegida. No se pueden transcribir ni reservar consecutivos desde licencias; solamente recepción interna puede emitirlos. No se modificó el expediente.</p>
+          <button type="button" onClick={onCerrar} className="rounded-lg bg-green-900 px-4 py-2 font-semibold text-white">Cerrar</button>
+        </section>
+      </div>
+    );
+  }
+  return <FormularioDebidaForma expedienteId={expedienteId} previa={previa} onCerrar={onCerrar} onRadicado={onRadicado} />;
+}
+
+function FormularioDebidaForma({
   expedienteId,
   previa,
   onCerrar,

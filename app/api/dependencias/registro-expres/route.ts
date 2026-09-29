@@ -1,4 +1,5 @@
 import { NextResponse } from 'next/server';
+import { CONTINGENCIA_STORAGE_ACTIVA } from '@/lib/recepcion/contingencia-storage';
 import {
   InternalAuthError,
   requireActiveInternalUser,
@@ -62,6 +63,12 @@ export async function POST(request: Request): Promise<NextResponse> {
         { error: 'Su rol no puede usar el registro exprés.' },
         { status: 403 },
       );
+    }
+
+    if (CONTINGENCIA_STORAGE_ACTIVA) {
+      return NextResponse.json({
+        error: 'El registro exprés está temporalmente suspendido. Durante la contingencia, solo la radicación interna autorizada puede emitir consecutivos.',
+      }, { status: 503 });
     }
 
     let body: Body;

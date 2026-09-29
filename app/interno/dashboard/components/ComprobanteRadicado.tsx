@@ -3,12 +3,14 @@
 import Image from 'next/image';
 import { useRef, useState } from 'react';
 import { INSTITUCION } from '@/lib/institucion';
+import type { EstadoAdjuntos } from '@/lib/recepcion/contingencia-storage';
 
 /* ══════════════════════════════════════════════════════════════
    TIPOS
 ══════════════════════════════════════════════════════════════ */
 
 export interface ComprobanteProps {
+  estadoAdjuntos?: EstadoAdjuntos;
   radicadoId: string;
   solicitanteNombre: string;
   numeroDocumento: string;
@@ -126,6 +128,7 @@ const PRINT_STYLES = `
 ══════════════════════════════════════════════════════════════ */
 
 export function ComprobanteRadicado({
+  estadoAdjuntos,
   radicadoId,
   solicitanteNombre,
   numeroDocumento,
@@ -284,6 +287,13 @@ export function ComprobanteRadicado({
         </div>
 
         {/* Datos del radicado */}
+        {estadoAdjuntos === 'PENDIENTE_STORAGE' && (
+          <p className="mb-3 rounded border border-amber-300 bg-amber-50 p-2 text-[10px] text-amber-950">
+            <strong>PENDIENTE DE ADJUNTO / STORAGE NO DISPONIBLE.</strong>{' '}
+            Radicado registrado con soportes bajo custodia, pendientes de digitalización.
+            Esta constancia no acredita la carga de archivos digitales.
+          </p>
+        )}
         <table className="mb-3 w-full border-collapse text-[10px]">
           <tbody>
             <Row label="Fecha" value={formatFecha(fechaRadicado)} />

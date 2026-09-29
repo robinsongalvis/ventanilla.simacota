@@ -7,7 +7,7 @@ import { RadicadoActionError } from '@/lib/server/radicados-security';
 import { getFirebaseAdminDb } from '@/lib/firebase-admin';
 import { removeUndefinedDeep } from '@/lib/firestore/removeUndefined';
 import { aplicarEntregas } from '@/lib/planillas/entregas';
-import { uploadEscaneoPlanillaAdmin } from '@/lib/server/planillas-security';
+import { assertPlanillaOperativa, uploadEscaneoPlanillaAdmin } from '@/lib/server/planillas-security';
 import type { EntregaSolicitada, PlanillaReparto } from '@/src/types/planilla';
 import { logError } from '@/lib/logger';
 
@@ -94,6 +94,7 @@ export async function POST(request: Request): Promise<NextResponse> {
       return NextResponse.json({ error: 'La planilla no existe.' }, { status: 404 });
     }
     const planilla = snap.data() as PlanillaReparto;
+    await assertPlanillaOperativa(db, planilla);
 
     const ahora = new Date();
     const actor = { uid: usuario.uid, nombre: usuario.nombre };

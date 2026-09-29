@@ -4,6 +4,7 @@ import { useState } from 'react';
 import type { TenantId } from '@/src/types/radicado';
 import { NOMBRES_TENANT } from '@/src/types/reglas-negocio';
 import { getTiposSolicitudInternos } from '@/lib/catalogos/tipos-solicitud';
+import { CONTINGENCIA_STORAGE_ACTIVA } from '@/lib/recepcion/contingencia-storage';
 
 /* ══════════════════════════════════════════════════════════════
    Sprint Registro exprés — el minuto de trazabilidad DESPUÉS de
@@ -30,6 +31,21 @@ export interface RegistroExpresModalProps {
 }
 
 export function RegistroExpresModal({ usuario, onCerrar }: RegistroExpresModalProps) {
+  if (CONTINGENCIA_STORAGE_ACTIVA) {
+    return (
+      <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/55 px-4" role="dialog" aria-modal="true" aria-labelledby="registro-expres-contingencia">
+        <section className="max-w-lg space-y-4 rounded-xl border border-amber-300 bg-white p-6">
+          <h2 id="registro-expres-contingencia" className="text-lg font-bold text-slate-900">Registro exprés suspendido durante la contingencia</h2>
+          <p className="text-sm text-slate-700">Solo la radicación interna autenticada puede emitir consecutivos de entrada. Remita la solicitud y los soportes a recepción; no se ha reservado ningún número.</p>
+          <button type="button" onClick={onCerrar} className="rounded-lg bg-green-900 px-4 py-2 font-semibold text-white">Cerrar</button>
+        </section>
+      </div>
+    );
+  }
+  return <FormularioRegistroExpres usuario={usuario} onCerrar={onCerrar} />;
+}
+
+function FormularioRegistroExpres({ usuario, onCerrar }: RegistroExpresModalProps) {
   const eligeDependencia = usuario.rol === 'ADMIN' || usuario.rol === 'RECEPCIONISTA';
 
   const [remitenteNombre, setRemitenteNombre] = useState('');

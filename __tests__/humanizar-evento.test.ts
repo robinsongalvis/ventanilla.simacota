@@ -65,6 +65,14 @@ const SECUENCIA_REAL: TrazabilidadRadicado[] = [
 ];
 
 describe('Panel claro — construirHistoria', () => {
+  it('mantiene visible el pendiente de Storage y diferencia su regularización posterior', () => {
+    const [dia] = construirHistoria([
+      evento({ accion: 'ADJUNTOS_PENDIENTES_STORAGE', fecha: '2026-07-06T20:00:00Z', nota: 'No se guardaron soportes digitales.' }),
+      evento({ accion: 'ADJUNTOS_REGULARIZADOS_STORAGE', fecha: '2026-07-06T21:00:00Z', nota: 'Hash y referencias verificados.' }),
+    ], AHORA);
+    expect(dia.eventos[0]).toMatchObject({ titulo: 'Soportes digitalizados y verificados', tono: 'VERDE' });
+    expect(dia.eventos[1]).toMatchObject({ titulo: 'Soportes bajo custodia, pendientes de digitalización', tono: 'AMBAR', detalle: 'No se guardaron soportes digitales.' });
+  });
   /* 1 · los códigos se vuelven frases */
   it('traduce cada código a un título humano', () => {
     const [dia] = construirHistoria(SECUENCIA_REAL, AHORA);

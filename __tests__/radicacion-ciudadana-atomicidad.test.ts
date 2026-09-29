@@ -9,6 +9,9 @@
  */
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 
+// Regresión del modo normal; el cierre real de contingencia se prueba aparte.
+vi.mock('@/lib/recepcion/contingencia-storage', () => ({ CONTINGENCIA_STORAGE_ACTIVA: false }));
+
 const YEAR = new Date().getFullYear();
 const COUNTER = `counters/radicados-${YEAR}`;
 

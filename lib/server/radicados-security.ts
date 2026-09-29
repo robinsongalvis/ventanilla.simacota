@@ -6,6 +6,7 @@ import type { ResponsableFuncionario } from '@/lib/actions/asignarRadicado';
 import { NOMBRES_TENANT } from '@/src/types/reglas-negocio';
 import type { TenantId } from '@/src/types/radicado';
 import { esEstadoCerrado } from '@/lib/radicado-estados';
+import { esDatoDePrueba } from '@/lib/radicados/dato-de-prueba';
 import type {
   ArchivoRadicado,
   RespuestaOficial,
@@ -22,12 +23,21 @@ export class RadicadoActionError extends Error {
   }
 }
 
+/**
+ * Lectura de un radicado para una acción operativa o notificación.
+ * Los históricos de prueba permanecen disponibles para los lectores de auditoría,
+ * pero ninguna ruta de acción que usa este helper puede mutarlos o notificarlos.
+ */
 export async function getRadicadoOrFail(radicadoId: string): Promise<VentanillaRadicado> {
   const snap = await getFirebaseAdminDb().doc(`ventanilla_radicados/${radicadoId}`).get();
   if (!snap.exists) {
     throw new RadicadoActionError('Radicado no encontrado.', 404);
   }
-  return snap.data() as VentanillaRadicado;
+  const radicado = snap.data() as VentanillaRadicado;
+  if (esDatoDePrueba(radicado)) {
+    throw new RadicadoActionError('Radicado no disponible para operación.', 404);
+  }
+  return radicado;
 }
 
 export async function appendTrazabilidadAdmin(

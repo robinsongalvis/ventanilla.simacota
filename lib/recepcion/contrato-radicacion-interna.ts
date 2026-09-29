@@ -21,7 +21,10 @@
 /** Nombres de campo del `multipart/form-data` que espera
  *  `POST /api/radicacion/interna`. Único origen de verdad para quien arma
  *  el FormData (cliente) y quien lo lee (endpoint). */
+import type { EstadoAdjuntos } from './contingencia-storage';
+
 export const CAMPOS_RADICACION_INTERNA = {
+  soportesPendientes: 'soportesPendientes',
   tipoSolicitudId: 'tipoSolicitudId',
   tipoPresentacion: 'tipoPresentacion',
   canalRespuesta: 'canalRespuesta',
@@ -63,6 +66,10 @@ export interface RespuestaRadicacionInternaOk {
   radicadoId: string;
   consecutivo: number;
   archivosSubidos: number;
+  estadoAdjuntos?: EstadoAdjuntos;
+  mensajeAdjuntos?: string;
+  fechaRadicado?: string;
+  horaRadicado?: string;
 }
 
 /** Respuesta de error (400/401/403/429/500). `errores` solo viaja en 400

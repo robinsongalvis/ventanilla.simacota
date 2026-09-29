@@ -1,4 +1,5 @@
 import type { VentanillaRadicado } from '@/src/types/ventanilla';
+import { esDatoDePrueba } from '@/lib/radicados/dato-de-prueba';
 import type {
   FilaPlanilla,
   PlanillaReparto,
@@ -27,6 +28,7 @@ export function esPendienteDeReparto(
   radicado: VentanillaRadicado,
   idsEnPlanillasAbiertas: ReadonlySet<string>,
 ): boolean {
+  if (esDatoDePrueba(radicado)) return false;
   if (radicado.control?.origen !== 'FISICO_ESCANER') return false;
   // PQRSD verbal (P-014): no existe documento físico que repartir.
   if (radicado.control?.medioRecepcion?.startsWith('VERBAL')) return false;
@@ -100,6 +102,7 @@ export function construirPlanilla(
   ahora: Date,
 ): PlanillaReparto {
   const filas = radicados
+    .filter((radicado) => !esDatoDePrueba(radicado))
     .map(filaDesdeRadicado)
     .sort((a, b) =>
       a.dependenciaDestino === b.dependenciaDestino

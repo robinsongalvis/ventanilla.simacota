@@ -34,6 +34,7 @@ import type {
 } from '@/src/types/ventanilla';
 import type { TenantId } from '@/src/types/radicado';
 import { NOMBRES_TENANT } from '@/src/types/reglas-negocio';
+import { CONTINGENCIA_STORAGE_ACTIVA, validarSoportesPendientes, type SoportesPendientesInput } from '@/lib/recepcion/contingencia-storage';
 
 // Anexos Office (OOXML) — mismos 3 tipos que valida el servidor en
 // lib/seguridad/magic-bytes.ts. Los formatos antiguos (.doc/.xls/.ppt, OLE)
@@ -132,7 +133,7 @@ const TIPO_PERSONA_OPCIONES: [TipoPersona, string][] = [
 
 interface Props {
   radicadoPreview: string;
-  onSubmit?: (payload: FormState & { archivos: File[]; fechaVencimiento: string }) => Promise<void> | void;
+  onSubmit?: (payload: FormState & { archivos: File[]; fechaVencimiento: string; soportesPendientes?: SoportesPendientesInput }) => Promise<void> | void;
   /** Sprint UI Radicación Rápida: id del <form> para disparar submit desde un botón externo (footer modal). */
   formId?: string;
   /** Sprint UI Radicación Rápida: ocultar el botón Submit interno cuando el contenedor pone su propio footer. */
@@ -210,6 +211,11 @@ export function RadicacionFuncionarioForm({ radicadoPreview, onSubmit, formId, h
   const [archivos, setArchivos] = useState<File[]>([]);
   const [dragging, setDragging] = useState(false);
   const [guardando, setGuardando] = useState(false);
+  const [soportesPendientes, setSoportesPendientes] = useState<SoportesPendientesInput>({
+    descripcion: '', cantidad: 1, custodiaTipo: 'FISICA_EN_VENTANILLA',
+    custodiaReferencia: '', confirmacionCustodia: false,
+  });
+  const [errorCustodia, setErrorCustodia] = useState<string | null>(null);
   const fechaRadicado = useMemo(() => new Date(), []);
 
   const vencimiento = useMemo(
@@ -287,7 +293,7 @@ export function RadicacionFuncionarioForm({ radicadoPreview, onSubmit, formId, h
   }
 
   function addFiles(files: FileList | null) {
-    if (!files) return;
+    if (CONTINGENCIA_STORAGE_ACTIVA || !files) return;
     const nuevos = Array.from(files).filter((file) =>
       file.type === 'application/pdf'
       || file.type.startsWith('image/')
@@ -298,12 +304,21 @@ export function RadicacionFuncionarioForm({ radicadoPreview, onSubmit, formId, h
 
   async function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
+    setErrorCustodia(null);
+    if (CONTINGENCIA_STORAGE_ACTIVA) {
+      const validacionCustodia = validarSoportesPendientes(JSON.stringify(soportesPendientes));
+      if (!validacionCustodia.ok) {
+        setErrorCustodia(validacionCustodia.error);
+        return;
+      }
+    }
     setGuardando(true);
     try {
       await onSubmit?.({
         ...form,
         archivos,
         fechaVencimiento: vencimiento.fechaVencimiento,
+        ...(CONTINGENCIA_STORAGE_ACTIVA ? { soportesPendientes } : {}),
       });
     } finally {
       setGuardando(false);
@@ -462,6 +477,7 @@ export function RadicacionFuncionarioForm({ radicadoPreview, onSubmit, formId, h
         {notaPrecargado && (
           <p
             role="status"
+            aria-label="Verificación de datos precargados"
             className="mb-3 rounded-lg px-3 py-2 text-xs"
             style={{ background: 'var(--tema-fondo-fdf9ee)', border: '1px solid var(--tema-borde-e7d9a8)', color: 'var(--tema-texto-7a5b0b)' }}
           >
@@ -797,6 +813,54 @@ export function RadicacionFuncionarioForm({ radicadoPreview, onSubmit, formId, h
       {/* ── Anexos ── */}
       <section className={sectionCls} style={sectionStyle}>
         <SectionTitle eyebrow="Anexos" title="Archivos y soportes" />
+        {CONTINGENCIA_STORAGE_ACTIVA ? (
+          <div className="space-y-4">
+            <div role="status" aria-label="Contingencia de soportes" className="rounded-lg border border-amber-300 bg-amber-50 p-3 text-sm text-amber-950">
+              <p className="font-bold">Contingencia: pendiente de adjunto / Storage no disponible</p>
+              <p className="mt-1">No se cargarán archivos digitales. El radicado quedará con soportes pendientes de digitalización. Conserve los originales en la ubicación que registre hasta completar la carga verificada.</p>
+            </div>
+            <label className="block">
+              <span className={labelCls} style={labelStyle}>Inventario de soportes pendientes</span>
+              <textarea required minLength={10} maxLength={2000} rows={3} className="input-internal"
+                value={soportesPendientes.descripcion}
+                onChange={(e) => setSoportesPendientes((prev) => ({ ...prev, descripcion: e.target.value, confirmacionCustodia: false }))}
+                aria-describedby="ayuda-inventario-contingencia"
+              />
+            </label>
+            <p id="ayuda-inventario-contingencia" className="text-xs text-slate-600">Detalle documentos, anexos y folios para poder conciliarlos después. En una solicitud verbal, conserve el acta de recepción y descríbala aquí.</p>
+            <label className="block">
+              <span className={labelCls} style={labelStyle}>Cantidad de soportes pendientes</span>
+              <input required type="number" min={1} max={1000} step={1} className="input-internal"
+                value={soportesPendientes.cantidad || ''}
+                onChange={(e) => setSoportesPendientes((prev) => ({ ...prev, cantidad: Number(e.target.value), confirmacionCustodia: false }))}
+              />
+            </label>
+            <SelectField label="Tipo de custodia" value={soportesPendientes.custodiaTipo}
+              options={[
+                ['FISICA_EN_VENTANILLA', 'Originales físicos en ventanilla'],
+                ['CORREO_INSTITUCIONAL', 'Mensaje y adjuntos en correo institucional'],
+              ]}
+              onChange={(v) => setSoportesPendientes((prev) => ({ ...prev, custodiaTipo: v as SoportesPendientesInput['custodiaTipo'], confirmacionCustodia: false }))}
+            />
+            <label className="block">
+              <span className={labelCls} style={labelStyle}>Referencia de custodia</span>
+              <input required minLength={5} maxLength={500} className="input-internal"
+                value={soportesPendientes.custodiaReferencia}
+                onChange={(e) => setSoportesPendientes((prev) => ({ ...prev, custodiaReferencia: e.target.value, confirmacionCustodia: false }))}
+                aria-describedby="ayuda-custodia-contingencia"
+              />
+            </label>
+            <p id="ayuda-custodia-contingencia" className="text-xs text-slate-600">Indique carpeta, caja y ubicación o buzón institucional y referencia del mensaje. No incluya contraseñas ni enlaces de acceso. La plataforma no verifica la conservación en el correo.</p>
+            <label className="flex items-start gap-2 text-sm text-slate-800">
+              <input required type="checkbox" className="mt-1" checked={soportesPendientes.confirmacionCustodia}
+                onChange={(e) => setSoportesPendientes((prev) => ({ ...prev, confirmacionCustodia: e.target.checked }))}
+              />
+              <span>Confirmo que conservo todos los originales inventariados bajo custodia y que los completaré cuando Storage esté disponible. No se han guardado archivos digitales en Ventanilla.</span>
+            </label>
+            {errorCustodia && <p role="alert" className="text-sm text-red-700">{errorCustodia}</p>}
+          </div>
+        ) : (
+          <>
         <div
           role="button"
           tabIndex={0}
@@ -843,6 +907,8 @@ export function RadicacionFuncionarioForm({ radicadoPreview, onSubmit, formId, h
               </li>
             ))}
           </ul>
+        )}
+          </>
         )}
       </section>
 

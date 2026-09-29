@@ -12,6 +12,7 @@ import type { TipoSolicitudId } from '@/lib/tiempos-radicado';
 import { InstitucionalHeader } from '@/app/components/institucional/InstitucionalHeader';
 import { ConstanciaRadicacion } from '@/app/components/institucional/ConstanciaRadicacion';
 import type { SelloRadicadoData } from '@/app/components/institucional/SelloRadicado';
+import { CONTINGENCIA_STORAGE_ACTIVA } from '@/lib/recepcion/contingencia-storage';
 
 /* ══════════════════════════════════════════════════════════════
    TIPOS TYPESCRIPT
@@ -171,6 +172,22 @@ async function radicarEnVentanillaModerna(
 ══════════════════════════════════════════════════════════════ */
 
 export default function PortalCiudadano() {
+  if (CONTINGENCIA_STORAGE_ACTIVA) {
+    return (
+      <main className="min-h-screen bg-slate-50 px-5 py-12">
+        <section className="mx-auto max-w-2xl space-y-4 rounded-xl border border-amber-300 bg-white p-6" aria-label="Radicación en contingencia">
+          <h1 className="text-xl font-bold text-slate-900">Radicación web temporalmente no disponible</h1>
+          <p className="text-slate-700">Durante la contingencia, las nuevas solicitudes se registran únicamente por personal autorizado en la ventanilla interna de la Alcaldía.</p>
+          <p className="text-slate-700">Esta página no recibe solicitudes ni archivos y no genera un número de radicado. Acuda a la ventanilla de atención para registrar su solicitud y conservar sus soportes.</p>
+          <Link href="/consulta" className="inline-block font-semibold text-green-900 underline">Consultar un radicado existente</Link>
+        </section>
+      </main>
+    );
+  }
+  return <FormularioPortalCiudadano />;
+}
+
+function FormularioPortalCiudadano() {
   const [form, setForm] = useState<FormData>({
     nombre: '',
     email: '',

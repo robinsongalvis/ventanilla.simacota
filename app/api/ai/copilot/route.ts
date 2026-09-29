@@ -8,6 +8,7 @@ import { checkRateLimit, rateLimitHeaders } from '@/lib/ai/rate-limit';
 import { construirContextoAgente } from '@/lib/ai/context-engine';
 import { invocarCopilotoEspecializado } from '@/lib/ai/agents';
 import { registrarLogIA } from '@/lib/ai/telemetry';
+import { esDatoDePrueba, soloOperacionReal } from '@/lib/radicados/dato-de-prueba';
 import type { TrazabilidadRadicado, VentanillaRadicado } from '@/src/types/ventanilla';
 
 export async function POST(request: Request) {
@@ -46,6 +47,9 @@ export async function POST(request: Request) {
     if (!canReadTenant(sesion, radicadoData.clasificacion.oficinaDestino)) {
       return NextResponse.json({ error: 'Sin acceso a este radicado.' }, { status: 403 });
     }
+    if (esDatoDePrueba(radicadoData)) {
+      return NextResponse.json({ error: 'Radicado no disponible para operación.' }, { status: 404 });
+    }
     const db = getDb();
     const trazSnap = await getDocs(collection(db, 'ventanilla_radicados', radicadoId, 'trazabilidad'));
     const trazabilidad = trazSnap.docs
@@ -55,7 +59,9 @@ export async function POST(request: Request) {
     // 2. Consultar el resto de radicados para promedios históricos de dependencias
     const querySnapshot = await getDocs(query(collection(db, 'ventanilla_radicados'),
       where('clasificacion.oficinaDestino', '==', radicadoData.clasificacion.oficinaDestino)));
-    const todosLosRadicados = querySnapshot.docs.map((d) => d.data() as VentanillaRadicado);
+    const todosLosRadicados = soloOperacionReal(
+      querySnapshot.docs.map((d) => d.data() as VentanillaRadicado),
+    );
 
     // 3. Consultar las auditorías acumuladas en 'ai_auditoria' para calcular fricción de overrides
     const auditSnapshot = await getDocs(query(collection(db, 'ai_auditoria'),

@@ -70,6 +70,9 @@
 process.env.TZ = 'America/Bogota';
 
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
+
+// Paridad histórica del modo normal, sin desactivar el gate en la aplicación.
+vi.mock('@/lib/recepcion/contingencia-storage', () => ({ CONTINGENCIA_STORAGE_ACTIVA: false }));
 import { calcularFechaVencimiento, TIPOS_SOLICITUD } from '@/lib/tiempos-radicado';
 import { formatearRadicadoInstitucional } from '@/lib/radicado-institucional';
 import { sugerirSerieDocumental } from '@/lib/catalogos/series-documentales';

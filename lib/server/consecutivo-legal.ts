@@ -4,6 +4,7 @@ import type {
   Transaction,
 } from 'firebase-admin/firestore';
 import type { OrigenActuacion } from '@/lib/motor-expedientes/tipos';
+import { periodoColombia } from '@/lib/fecha-colombia';
 
 /**
  * Helper transaccional de consecutivos legales — Bloque 2, corrección de H3.
@@ -133,6 +134,8 @@ export interface SolicitudSerie {
    * Convierte un duplicado silencioso en un fallo ruidoso — fail-closed.
    */
   exigeAperturaExplicita?: boolean;
+  /** Contingencia: apertura formal requerida; no permite emitir antes de abrir. */
+  aperturaMinima?: number;
   /**
    * Datos adicionales que el caller quiere ver EN la reserva de unicidad.
    *
@@ -165,6 +168,18 @@ export class SerieNoAbiertaError extends Error {
     this.serie = serie;
     this.anio = anio;
   }
+}
+
+export class AperturaContingenciaPendienteError extends Error {
+  constructor() {
+    super('La serie de contingencia aún no tiene la apertura formal autorizada. No se consumió ningún consecutivo.');
+    this.name = 'AperturaContingenciaPendienteError';
+  }
+}
+
+/** Solo radicados cambia de calendario: las demás series conservan su contrato. */
+function anioDeSerie(serie: SerieConsecutivo, fecha: Date): number {
+  return serie === 'radicados' ? periodoColombia(fecha).anio : fecha.getFullYear();
 }
 
 /** Consecutivo leído (aún no confirmado) para una serie. */
@@ -277,17 +292,23 @@ export async function leerConsecutivosLegales(
   fecha: Date,
   solicitudes: SolicitudSerie[],
 ): Promise<ConsecutivoPendiente[]> {
-  const anio = fecha.getFullYear();
-  const refs = solicitudes.map((s) => db.doc(`counters/${s.serie}-${anio}`));
+  const refs = solicitudes.map((s) => db.doc(`counters/${s.serie}-${anioDeSerie(s.serie, fecha)}`));
   const snaps = await Promise.all(refs.map((ref) => tx.get(ref)));
 
   const pendientes: ConsecutivoPendiente[] = solicitudes.map((s, i) => {
     // Fail-closed para las series con libro previo: sin documento de
     // contador no se inventa el punto de partida (ver `exigeAperturaExplicita`).
     if (s.exigeAperturaExplicita && !snaps[i].exists) {
-      throw new SerieNoAbiertaError(s.serie, anio);
+      throw new SerieNoAbiertaError(s.serie, anioDeSerie(s.serie, fecha));
     }
     const ultimoActual = Number(snaps[i].data()?.ultimo ?? 0);
+    if (s.aperturaMinima !== undefined && (
+      !Number.isSafeInteger(s.aperturaMinima) || s.aperturaMinima < 1 ||
+      snaps[i].data()?.apertura?.abiertoEn !== s.aperturaMinima ||
+      !snaps[i].data()?.apertura?.autorizadoPor?.trim() ||
+      !snaps[i].data()?.apertura?.referencia?.trim() ||
+      ultimoActual < s.aperturaMinima - 1
+    )) throw new AperturaContingenciaPendienteError();
     // Coherencia con la propia historia del contador — ANTES de calcular nada.
     verificarCoherenciaConApertura(s.serie, ultimoActual, snaps[i].data()?.apertura);
     const consecutivo = ultimoActual + 1;
@@ -350,8 +371,8 @@ export function confirmarConsecutivosLegales(
     });
   }
 
-  const marca = { anio: fecha.getFullYear(), actualizadoEn: fecha.toISOString() };
   for (const p of pendientes) {
+    const marca = { anio: anioDeSerie(p.serie, fecha), actualizadoEn: fecha.toISOString() };
     /* RESERVA DE UNICIDAD — hace IMPOSIBLE el duplicado, no solo detectable.
 
        El guard D9 de arriba impide que el contador RETROCEDA al emitir, pero no
