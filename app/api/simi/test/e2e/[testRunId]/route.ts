@@ -51,6 +51,14 @@ export async function DELETE(
   _request: Request,
   { params }: { params: Promise<{ testRunId: string }> },
 ): Promise<NextResponse> {
+  /* CERRADO EN PRODUCCIÓN (§6), igual que el POST que crea estos ensayos: si
+     allí no se pueden sembrar, aquí no hay nada que limpiar — y este handler
+     BORRA documentos. Mismo criterio: VERCEL_ENV (Preview sigue abierto, que es
+     donde se ensaya) y 404 en vez de 403. */
+  if (process.env.VERCEL_ENV === 'production') {
+    return NextResponse.json({ error: 'No encontrado.' }, { status: 404 });
+  }
+
   const usuario = await verificarAdmin();
   if (!usuario) return NextResponse.json({ error: 'No autorizado.' }, { status: 401 });
 

@@ -237,15 +237,65 @@ Verifica una por una que estén en **Production**, no solo en Preview.
 - `WHATSAPP_PROVIDER` / `WHATSAPP_API_TOKEN` / `WHATSAPP_PHONE_NUMBER_ID` — solo si se habilita el aviso por WhatsApp (hoy no implementado).
 - `DIGITAL_SIGNATURE_PROVIDER` — solo si se usa firma digital.
 
-- [ ] Todas las **imprescindibles** configuradas en Production.
+> 🟡 **REVISADO EL 2026-09-29 — una duda abierta y un desajuste.** El proyecto de
+> Production es `ventanilla-unica-f31b1` (`NEXT_PUBLIC_FIREBASE_PROJECT_ID`), así
+> que **ambos** buckets deben ser `ventanilla-unica-f31b1.firebasestorage.app`:
+> el de los archivos tiene que ser el del mismo proyecto que la base.
+>
+Verificado con `vercel env ls production` y `vercel env pull`:
+>
+> | Variable | Valor en Production |
+> |---|---|
+> | `NEXT_PUBLIC_FIREBASE_PROJECT_ID` | `ventanilla-unica-f31b1` |
+> | `NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET` | `ventanilla-unica-f31b1.firebasestorage.app` ✅ alineado |
+> | `FIREBASE_STORAGE_BUCKET` | **`[SENSITIVE]` — no verificable** |
+>
+> **Todas las variables imprescindibles de esta sección existen en Production.**
+> El bucket del cliente coincide con el proyecto de la base.
+>
+> **Lo único que no se puede comprobar** es el bucket del servidor: está marcada
+> como *Sensitive* en Vercel, y eso la vuelve **irrecuperable por diseño** — ni
+> la consola ni `vercel env pull` devuelven su contenido. Solo se puede
+> sobrescribir.
+>
+> Que exista no basta: una variable definida con el bucket de otro proyecto
+> guardaría los archivos donde nadie los buscaría, y **eso no da error** — deja
+> la base en un proyecto y los adjuntos en otro. La forma limpia de cerrar la
+> duda es **sobrescribirla** con `ventanilla-unica-f31b1.firebasestorage.app`:
+> no hace falta leer el valor actual y, si ya era ese, la operación es inocua.
+>
+> Alternativa sin tocar configuración: **probarlo funcionalmente** en producción
+> —adjuntar un documento a un radicado de prueba— y comprobar que el archivo
+> aparece en el bucket de `f31b1`. Eso responde la pregunta de verdad, porque
+> mide el comportamiento en vez del ajuste.
+>
+> ⚠️ **Dos lecturas equivocadas durante esta revisión**, anotadas para quien
+> venga después: (1) una variable encriptada **se ve vacía** en la consola —
+> «no se ve» no es «no está»; (2) el valor `…-stage…` que aparecía en pantalla
+> era de **otro entorno**, no de Production. En Vercel hay que leer *siempre* la
+> columna de entorno antes de concluir nada.
+>
+> Si falta del todo, el código no degrada: lanza —`if (!bucketName) throw new
+> RadicadoActionError('FIREBASE_STORAGE_BUCKET no configurado.', 400)` en
+> `salidas-security` (×2), `planillas-security`, `radicados-security` y
+> `api/radicacion/interna`— y el motivo solo se ve en los logs del servidor.
+>
+> Tras cualquier cambio hay que **redesplegar**: Vercel inyecta las variables en
+> el build, así que editarlas no basta.
+>
+> 📌 Esta sección ya avisaba —*«que estén en Production, no solo en Preview»*—
+> desde la auditoría de julio. Nota para quien verifique: en Vercel una variable
+> encriptada **se ve vacía**. «No se ve» no es «no está»; confirmar el valor
+> exige sobrescribirlo o traerlo con `vercel env pull`.
+
+- [ ] Todas las **imprescindibles** configuradas en Production **y con el valor correcto** — revisado el 2026-09-29: están definidas, pero el valor de las encriptadas no se pudo confirmar (ver recuadro).
 - [ ] Las **recomendadas** revisadas.
 
 ---
 
 ## 2. Base de datos y reglas
 
-- [ ] `firestore.rules` desplegadas al proyecto (`ventanilla-unica-f31b1`).
-- [ ] `storage.rules` desplegadas (incluyen la ruta `salidas/` de los oficios PDF). — *desbloqueado el 2026-09-29 (§0)*.
+- [x] `firestore.rules` **y** `storage.rules` desplegadas al proyecto (`ventanilla-unica-f31b1`) — verificado el 2026-09-29 trayendo las reglas VIVAS por la API de Firebase Rules y comparándolas con el repo: **coinciden** (publicadas el 2026-04-14). Que el archivo exista en el repo no prueba nada; lo que protege los datos es lo publicado.
 - [x] **Backup antes de abrir**: export completo ejecutado y verificado — 2026-09-29 (§0).
 - [ ] **Cadencia restablecida**: el respaldo diario (GitHub Actions) estuvo **20 días caído**. Confirmar que volvió a correr — ver §0.
 - [x] Normograma núcleo cargado (12 normas citables) — hecho el 2026-07-07.
@@ -254,8 +304,11 @@ Verifica una por una que estén en **Production**, no solo en Preview.
 
 ## 3. Cron y tareas programadas
 
-- [ ] Confirmar que corre el cron de alertas: `vercel.json` → `/api/cron/alertas-vencimiento` (lun–vie 12:00 UTC = 7 a.m. Colombia).
-- [ ] Decidir el segundo cron `/api/cron/simi/alertas-vencimiento` — existe pero **no está agendado**: agéndalo o quítalo.
+- [x] Cron de alertas agendado — verificado el 2026-09-29 en `vercel.json`.
+- [x] El segundo cron `/api/cron/simi/alertas-vencimiento` **ya está agendado** (lun–vie 12:00 UTC) — la duda que dejó la auditoría de julio quedó resuelta.
+- [ ] Confirmar que los 5 crons **se ejecutan de verdad** en Vercel. Estar declarados en `vercel.json` no prueba que corran: mirar el historial de ejecuciones (es la misma lección del respaldo — declarado ≠ funcionando).
+
+Los 5 declarados hoy: `alertas-vencimiento` (lun–vie 13:00 UTC), `desistimiento-tacito` (diario 06:00), `auditoria-consecutivos` (lun 13:00), `vencimientos-licencias` (lun–vie 12:30), `simi/alertas-vencimiento` (lun–vie 12:00).
 
 ---
 
@@ -279,7 +332,7 @@ Verifica una por una que estén en **Production**, no solo en Preview.
 
 ## 6. Limpieza pendiente (no bloquea el piloto interno; sí antes del público general)
 
-- [ ] Bloquear el endpoint `/api/simi/test/e2e` en producción (gate por `NODE_ENV`).
+- [x] Bloquear el endpoint `/api/simi/test/e2e` en producción — hecho el 2026-09-29. Se cerró **por `VERCEL_ENV`, no por `NODE_ENV`**: `NODE_ENV` vale `production` también en Preview, y ahí el banco debe seguir vivo porque es donde se ensaya. Cerrados el `POST` que siembra y el `DELETE` que limpia, con 404 (a un endpoint que no debe existir no se le confirma la existencia) y **antes** del guard de sesión. Custodiado por `simi-e2e-cerrado-en-produccion.test.ts`, que también asevera el orden.
 - [ ] Agendar o eliminar el segundo cron (ver sección 3).
 - [ ] Aumentar cobertura de tests en la capa de endpoints (hoy los helpers puros están bien probados; los guards de auth/validación de las rutas, poco).
 - [ ] Consolidar los ~20 guards de sesión duplicados en un helper único.
