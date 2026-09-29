@@ -64,10 +64,18 @@ describe('Panel de Alertas Predictivas — navegación Ver radicado', () => {
     // enuncian AMBAS causas sin confirmar cuál: afirmar la ventana le diría
     // a un funcionario que un radicado ajeno EXISTE. El id tampoco se
     // interpola en el mensaje visible.
+    /* El cierre del bloque se busca A PARTIR del inicio, no desde el principio
+       del archivo: `setErrorAbrirRadicado(null)` aparece también antes, en los
+       efectos que descartan el aviso al cambiar de vista. Sin el `fromIndex`,
+       `slice` recibía fin < inicio y devolvía cadena vacía — el test pasaba a
+       aseverar sobre nada. Se corrige la DELIMITACIÓN; las tres aserciones de
+       abajo siguen siendo las mismas. */
+    const inicio = dashboard.indexOf('const radicado = todosLosRadicados.find');
     const bloque = dashboard.slice(
-      dashboard.indexOf('const radicado = todosLosRadicados.find'),
-      dashboard.indexOf('setErrorAbrirRadicado(null)'),
+      inicio,
+      dashboard.indexOf('setErrorAbrirRadicado(null)', inicio),
     );
+    expect(bloque, 'el bloque delimitado no puede quedar vacío').not.toBe('');
     expect(bloque).toContain('o fuera de su dependencia');
     expect(bloque).toContain('Búsqueda avanzada');
     expect(bloque).not.toMatch(/setErrorAbrirRadicado\(\s*`[^`]*\$\{id\}/);
@@ -79,6 +87,8 @@ describe('Panel de Alertas Predictivas — navegación Ver radicado', () => {
       dashboard.indexOf("vistaActual === 'REPORTES'"),
     );
     expect(bloqueAlertas).not.toContain("SET_FILTRO_MIPG");
-    expect(vistaAlertas).toContain('const { alertas } = useAnalytics(');
+    // Las alertas salen de la definición única compartida con el contador
+    // del menú (corrección de alcance, 23-sep-2026), no de lógica propia.
+    expect(vistaAlertas).toContain('calcularAlertasPredictivas(radicados, alcanceAlertas(alcanceMunicipal, tenantIdUsuario))');
   });
 });
