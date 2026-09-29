@@ -333,7 +333,7 @@ Los 5 declarados hoy: `alertas-vencimiento` (lun–vie 13:00 UTC), `desistimient
 ## 6. Limpieza pendiente (no bloquea el piloto interno; sí antes del público general)
 
 - [x] Bloquear el endpoint `/api/simi/test/e2e` en producción — hecho el 2026-09-29. Se cerró **por `VERCEL_ENV`, no por `NODE_ENV`**: `NODE_ENV` vale `production` también en Preview, y ahí el banco debe seguir vivo porque es donde se ensaya. Cerrados el `POST` que siembra y el `DELETE` que limpia, con 404 (a un endpoint que no debe existir no se le confirma la existencia) y **antes** del guard de sesión. Custodiado por `simi-e2e-cerrado-en-produccion.test.ts`, que también asevera el orden.
-- [ ] Agendar o eliminar el segundo cron (ver sección 3).
+- [x] Agendar o eliminar el segundo cron — resuelto: ya está agendado (ver §3).
 - [ ] Aumentar cobertura de tests en la capa de endpoints (hoy los helpers puros están bien probados; los guards de auth/validación de las rutas, poco).
 - [ ] Consolidar los ~20 guards de sesión duplicados en un helper único.
 - [ ] Borrar ramas viejas sin fusionar (`chore/uat-hardening-*`, `feat/seguridad-h10-aislamiento-*`).
