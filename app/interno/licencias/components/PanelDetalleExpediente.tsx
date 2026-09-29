@@ -9,7 +9,8 @@
    `actuaciones`, `documentos` incluidos) y reutiliza sus mismos paneles de
    presentación (`PanelTerminoDual`, `PanelVigenciaActo`, `EventoTimeline`)
    en vez de reimplementarlos. NO reemplaza la pantalla de Detalle completa
-   ("Ver expediente completo →" enlaza a `/interno/licencias/{id}"): este
+   ("Ver expediente completo →" enlaza a su dirección canónica en el panel,
+   `urlLicencias`, ADR-0046 §7): este
    panel no registra actuaciones ni sube documentos, es una consulta rápida
    sin salir del Libro.
 
@@ -52,6 +53,7 @@ import { EtiquetaColisionNumero } from './EtiquetaColisionNumero';
 import { EventoTimeline } from './EventoTimeline';
 import { PanelTerminoDual } from './PanelTerminoDual';
 import { PanelVigenciaActo } from './PanelVigenciaActo';
+import { urlLicencias } from '../rutas-licencias';
 
 export interface PanelDetalleExpedienteProps {
   expedienteId: string;
@@ -286,7 +288,7 @@ export function PanelDetalleExpediente({ expedienteId, onCerrar, textoColision =
           )}
 
           {estadoCarga === 'error' && (
-            <p role="alert" className="rounded-lg px-3 py-2 text-sm" style={{ background: '#FEF2F2', border: '1px solid #FECACA', color: '#991B1B' }}>
+            <p role="alert" className="rounded-lg px-3 py-2 text-sm" style={{ background: 'var(--tema-fondo-fef2f2)', border: '1px solid var(--tema-borde-fecaca)', color: 'var(--tema-texto-991b1b)' }}>
               {errorMsg}
             </p>
           )}
@@ -294,9 +296,9 @@ export function PanelDetalleExpediente({ expedienteId, onCerrar, textoColision =
           {estadoCarga === 'listo' && expediente && (
             <>
               <Link
-                href={`/interno/licencias/${expediente.id}`}
+                href={urlLicencias({ expedienteId: expediente.id })}
                 className="self-start text-xs font-bold underline underline-offset-2 focus-visible:outline-none focus-visible:ring-2 rounded"
-                style={{ color: 'var(--color-primary)' }}
+                style={{ color: 'var(--tema-texto-007049)' }}
               >
                 Ver expediente completo →
               </Link>
@@ -372,24 +374,37 @@ export function PanelDetalleExpediente({ expedienteId, onCerrar, textoColision =
                   <p className="text-xs" style={{ color: 'var(--text-secondary)' }}>Sin documentos cargados todavía.</p>
                 ) : (
                   <ul className="flex flex-col gap-2">
-                    {documentos.map((doc) => (
-                      <li key={doc.id} className="flex flex-col gap-1 text-xs">
-                        <div className="flex flex-wrap items-center gap-x-2 gap-y-0.5">
-                          <span className="truncate max-w-full font-medium" style={{ color: 'var(--text-primary)' }}>{doc.nombre}</span>
-                          <span className="shrink-0 font-mono" style={{ color: 'var(--text-secondary)' }}>v{doc.versionVigente.numeroVersion}</span>
-                          <span className="shrink-0" style={{ color: 'var(--text-muted)' }}>{formatFechaHoraColombia(doc.versionVigente.subidoEn)}</span>
-                        </div>
-                        {/* El sello del mostrador, en digital: número y fecha en
-                            cada página de la COPIA. El original no se toca. */}
-                        {expediente && (
-                          <BotonDescargarSellado
-                            expedienteId={expediente.id}
-                            documentoId={doc.id}
-                            mimeType={doc.versionVigente.mimeType}
-                          />
-                        )}
-                      </li>
-                    ))}
+                    {documentos.map((doc) => {
+                      /* Lectura defensiva (issue #308): sin `versionVigente` no
+                         hay versión, ni fecha, ni mimeType con el que sellar —
+                         se degrada esa fila en vez de tumbar el panel entero. */
+                      const version = doc.versionVigente;
+                      return (
+                        <li key={doc.id} className="flex flex-col gap-1 text-xs">
+                          <div className="flex flex-wrap items-center gap-x-2 gap-y-0.5">
+                            <span className="truncate max-w-full font-medium" style={{ color: 'var(--text-primary)' }}>{doc.nombre}</span>
+                            {version ? (
+                              <>
+                                <span className="shrink-0 font-mono" style={{ color: 'var(--text-secondary)' }}>v{version.numeroVersion}</span>
+                                <span className="shrink-0" style={{ color: 'var(--text-secondary)' }}>{formatFechaHoraColombia(version.subidoEn)}</span>
+                              </>
+                            ) : (
+                              <span className="shrink-0" style={{ color: '#8E5C06' }}>Sin versión registrada</span>
+                            )}
+                          </div>
+                          {/* El sello del mostrador, en digital: número y fecha en
+                              cada página de la COPIA. El original no se toca.
+                              Sin versión no hay nada que sellar. */}
+                          {expediente && version && (
+                            <BotonDescargarSellado
+                              expedienteId={expediente.id}
+                              documentoId={doc.id}
+                              mimeType={version.mimeType}
+                            />
+                          )}
+                        </li>
+                      );
+                    })}
                   </ul>
                 )}
               </Seccion>

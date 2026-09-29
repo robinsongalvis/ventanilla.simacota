@@ -61,14 +61,14 @@ function etiquetaEstado(estado: EstadoVisualRequisito, tipo: RequisitoDefinicion
 function MarcadorTipo({ tipo }: { tipo: RequisitoDefinicion['tipo'] }) {
   if (tipo === 'OBLIGATORIO') {
     return (
-      <span className="inline-flex items-center gap-1 text-[10.5px] font-semibold mt-0.5" style={{ color: '#5B6B7B' }}>
-        <span aria-hidden className="inline-block h-[9px] w-[9px] rounded-full border-2" style={{ borderColor: '#B4BEC9' }} />
+      <span className="inline-flex items-center gap-1 text-[10.5px] font-semibold mt-0.5" style={{ color: 'var(--tema-texto-5b6b7b)' }}>
+        <span aria-hidden className="inline-block h-[9px] w-[9px] rounded-full border-2" style={{ borderColor: 'var(--tema-borde-b4bec9)' }} />
         Obligatorio
       </span>
     );
   }
   return (
-    <span className="text-[10.5px] mt-0.5 inline-block" style={{ color: 'var(--text-muted)' }}>
+    <span className="text-[10.5px] mt-0.5 inline-block" style={{ color: 'var(--text-secondary)' }}>
       {tipo === 'OPCIONAL' ? 'Opcional' : 'Condicional'}
     </span>
   );
@@ -171,8 +171,18 @@ export function RequisitoItem({
 }: RequisitoItemProps) {
   const estilo = ESTILOS_ESTADO_REQUISITO[estado];
   const atenuado = estado === 'NO_APLICA';
-  const urlArchivo = documento
-    ? `/api/interno/archivo?path=${encodeURIComponent(documento.versionVigente.storagePath)}`
+  /* LECTURA DEFENSIVA (issue #308). El tipo declara `versionVigente` como
+     obligatorio y el flujo normal de subida siempre la escribe (INV-5), pero la
+     realidad puede no cumplirlo: un histórico migrado, un documento sembrado
+     con datos mínimos, una escritura interrumpida. Una pantalla institucional
+     no puede caerse entera por un campo ausente en UN documento — ese documento
+     se pinta degradado y el resto del expediente se sigue viendo.
+
+     Sin `storagePath` no se ofrece descarga: un enlace que no puede resolver a
+     un archivo es peor que no ofrecerlo. */
+  const version = documento?.versionVigente;
+  const urlArchivo = version?.storagePath
+    ? `/api/interno/archivo?path=${encodeURIComponent(version.storagePath)}`
     : null;
 
   /* Acción principal según el estado (la consigna: pendiente ⇒ "Adjuntar" es lo
@@ -186,7 +196,7 @@ export function RequisitoItem({
             target="_blank"
             rel="noopener noreferrer"
             className="inline-flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-semibold transition-colors hover:brightness-95 focus-visible:outline-none focus-visible:ring-2"
-            style={{ border: '1px solid var(--color-border)', color: '#14532D', background: 'var(--bg-surface)' }}
+            style={{ border: '1px solid var(--color-border)', color: 'var(--tema-texto-007049)', background: 'var(--bg-surface)' }}
           >
             <IconoVer /> Ver
           </a>
@@ -217,9 +227,9 @@ export function RequisitoItem({
                     />
                   </div>
                 )}
-                <p className="px-3 pt-1.5 pb-1 text-[10.5px]" style={{ color: 'var(--text-muted)' }}>
+                <p className="px-3 pt-1.5 pb-1 text-[10.5px]" style={{ color: 'var(--text-secondary)' }}>
                   {documento.totalVersiones > 1
-                    ? `${documento.totalVersiones} versiones · vigente v${documento.versionVigente.numeroVersion}`
+                    ? `${documento.totalVersiones} versiones · vigente v${version?.numeroVersion ?? '—'}`
                     : 'Versión única (v1)'}
                 </p>
               </>
@@ -243,7 +253,7 @@ export function RequisitoItem({
       );
     }
 
-    return <span className="text-xs md:text-right block" style={{ color: 'var(--text-muted)' }}>—</span>;
+    return <span className="text-xs md:text-right block" style={{ color: 'var(--text-secondary)' }}>—</span>;
   }
 
   return (
@@ -253,11 +263,16 @@ export function RequisitoItem({
     >
       <div className={`grid min-w-0 items-center gap-x-3 gap-y-1.5 [grid-template-columns:minmax(0,1fr)] ${GRID_TEMPLATE_MD}`}>
         {/* # */}
-        <span className="hidden md:block text-xs tabular-nums" style={{ color: 'var(--text-muted)' }}>{indice}</span>
+        <span className="hidden md:block text-xs tabular-nums" style={{ color: 'var(--text-secondary)' }}>{indice}</span>
 
         {/* Documento: nombre + tipo */}
         <div className="min-w-0">
-          <p className="break-words text-sm font-semibold leading-snug" style={{ color: 'var(--text-primary)', overflowWrap: 'anywhere' }}>{requisito.nombre}</p>
+          {/* `break-word` (no `anywhere`): el nombre se parte por palabras. Los
+              nombres de ARCHIVO, más abajo, sí conservan `anywhere`. Límite
+              conocido: a 768 px las seis columnas no dejan sitio a las palabras
+              más largas («representación»); resolverlo es decidir el diseño de
+              la tabla en tableta, no un ajuste de clase. */}
+          <p className="break-words text-sm font-semibold leading-snug" style={{ color: 'var(--text-primary)', overflowWrap: 'break-word' }}>{requisito.nombre}</p>
           <MarcadorTipo tipo={requisito.tipo} />
         </div>
 
@@ -268,7 +283,7 @@ export function RequisitoItem({
               {requisito.descripcion}
             </p>
           ) : (
-            <span className="hidden md:inline text-xs" style={{ color: 'var(--text-muted)' }}>—</span>
+            <span className="hidden md:inline text-xs" style={{ color: 'var(--text-secondary)' }}>—</span>
           )}
         </div>
 
@@ -288,12 +303,16 @@ export function RequisitoItem({
           {documento ? (
             <p className="break-words text-xs leading-tight" title={documento.nombre} style={{ color: 'var(--text-secondary)', overflowWrap: 'anywhere' }}>
               <span style={{ color: 'var(--text-primary)' }}>{documento.nombre}</span>
-              <span className="block" style={{ color: 'var(--text-muted)' }}>
-                v{documento.versionVigente.numeroVersion} · {formatFechaColombia(documento.versionVigente.subidoEn)}
+              <span className="block" style={{ color: 'var(--text-secondary)' }}>
+                {version
+                  ? <>v{version.numeroVersion} · {formatFechaColombia(version.subidoEn)}</>
+                  /* Degradado explícito (#308): se dice que el archivo está
+                     registrado pero su versión no, en vez de callar o romper. */
+                  : <span style={{ color: '#8E5C06' }}>Sin versión registrada</span>}
               </span>
             </p>
           ) : (
-            <span className="text-xs" style={{ color: 'var(--text-muted)' }}>Sin archivo</span>
+            <span className="text-xs" style={{ color: 'var(--text-secondary)' }}>Sin archivo</span>
           )}
         </div>
 
@@ -303,19 +322,19 @@ export function RequisitoItem({
 
       {/* Notas de estado a ancho completo (no compiten con el nombre) */}
       {estado === 'DUPLICADO' && (
-        <p className="mt-2 text-xs rounded-lg px-3 py-2" style={{ background: '#FCEBEB', color: '#911111' }}>
+        <p className="mt-2 text-xs rounded-lg px-3 py-2" style={{ background: 'var(--tema-fondo-fcebeb)', color: 'var(--tema-texto-911111)' }}>
           Este requisito tiene más de un aporte registrado en el expediente — revísalo y reemplaza por la versión correcta.
         </p>
       )}
       {estado === 'INDETERMINADO' && (
-        <p className="mt-2 text-xs" style={{ color: '#1E4FA0' }}>
+        <p className="mt-2 text-xs" style={{ color: 'var(--tema-texto-1e4fa0)' }}>
           Falta definir en «Hechos del caso»
           {clavesFaltantesIndeterminado && clavesFaltantesIndeterminado.length > 0 && <>: {clavesFaltantesIndeterminado.join(', ')}</>}
           {' '}para saber si se exige.
         </p>
       )}
       {estado === 'NO_APLICA' && requisito.tipo === 'CONDICIONAL' && (
-        <p className="mt-1.5 text-xs" style={{ color: 'var(--text-muted)' }}>
+        <p className="mt-1.5 text-xs" style={{ color: 'var(--text-secondary)' }}>
           No se exige en este caso ({condicionLegible(requisito.condicion)}).
         </p>
       )}
