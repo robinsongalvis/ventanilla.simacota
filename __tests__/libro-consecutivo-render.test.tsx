@@ -137,15 +137,15 @@ function detalleExpediente(expediente: ExpedienteLicenciaDoc, overrides: { actua
 }
 
 /**
- * Localiza la TARJETA KPI por su overline — no `screen.getByText`, porque
+ * Localiza la TARJETA KPI por su etiqueta — no `screen.getByText`, porque
  * "En trámite"/"Por vencer"/"Históricos incompletos" son el MISMO texto que
- * la etiqueta del chip de filtro homónimo (`ChipFiltroLibro`); la tarjeta
- * KPI pinta su overline en un `<p>`, el chip la suya en un `<span>` — se
- * distingue por esa etiqueta, no por orden en el DOM (más resistente a
- * reordenar el layout).
+ * la etiqueta del chip de filtro homónimo. Desde la Ola 3 (ADR-0046) las
+ * tarjetas son `TarjetaIndicador` dentro del grupo «Resumen del libro
+ * consecutivo»: se distingue por ese grupo, no por orden en el DOM.
  */
 function tarjetaKpi(overline: string): HTMLElement {
-  const el = screen.getAllByText(overline).find((n) => n.tagName === 'P');
+  const grupo = screen.getByRole('group', { name: 'Resumen del libro consecutivo' });
+  const el = within(grupo).getAllByText(overline)[0];
   if (!el) throw new Error(`No se encontró la tarjeta KPI "${overline}"`);
   return el.parentElement!;
 }
@@ -431,7 +431,10 @@ describe('LibroConsecutivoClient', () => {
     await seleccionarAño2026();
 
     const nombre = await screen.findByText('Comercializadora El Roble S.A.S.');
-    expect(nombre.style.wordBreak).toBe('break-word');
+    // `overflow-wrap: break-word` (cierre Ola 3): el nombre se ajusta por
+    // palabras y nunca se recorta; `word-break: break-word` dejaba encoger la
+    // columna por debajo de la palabra más larga y la partía («Constructora»).
+    expect(nombre.style.overflowWrap).toBe('break-word');
   });
 
   it('panel de detalle: se abre al hacer clic en la fila, Escape lo cierra y devuelve el foco al control que lo abrió', async () => {

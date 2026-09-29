@@ -38,24 +38,24 @@ export function SelectorModalidadesConstruccion({
 
   return (
     <fieldset>
-      <legend className="mb-1 block text-[10px] font-bold uppercase tracking-widest" style={{ color: '#667085' }}>
+      <legend className="mb-1 block text-[10px] font-bold uppercase tracking-widest" style={{ color: 'var(--text-secondary)' }}>
         Modalidad de la construcción — selecciona al menos una
       </legend>
-      <p className="text-[11px] mb-1.5" style={{ color: '#94A3B8' }}>
+      <p className="text-[11px] mb-1.5" style={{ color: 'var(--text-secondary)' }}>
         Puede marcar varias si la solicitud las combina (art. 2.2.6.1.1.7, par. 1).
       </p>
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-3 gap-y-1.5">
         {MODALIDADES_CONSTRUCCION.map((m) => (
-          <label key={m.codigo} className="flex items-start gap-2 text-sm" style={{ color: '#1F2933' }}>
+          <label key={m.codigo} className="flex items-start gap-2 text-sm" style={{ color: 'var(--tema-texto-172033)' }}>
             <input
               type="checkbox"
               checked={seleccionadas.includes(m.codigo)}
               onChange={() => onAlternar(m.codigo)}
-              className="mt-0.5 h-4 w-4 rounded border-[#D9E2D9] accent-[#14532D] focus-visible:outline-none focus-visible:ring-2"
+              className="mt-0.5 h-4 w-4 rounded border-[var(--tema-borde-dce4ea)] accent-[#007049] focus-visible:outline-none focus-visible:ring-2"
             />
             <span>
               {m.nombre}{' '}
-              <span className="font-mono text-[11px]" style={{ color: '#94A3B8' }}>
+              <span className="font-mono text-[11px]" style={{ color: 'var(--text-secondary)' }}>
                 (núm. {m.numeral})
               </span>
             </span>

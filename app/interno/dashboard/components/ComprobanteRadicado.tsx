@@ -180,7 +180,8 @@ export function ComprobanteRadicado({
     typeof onEnviarCorreo === 'function' && Boolean(correoSolicitante);
 
   return (
-    <div className="space-y-3">
+    /* `isla-clara`: documento oficial, siempre en claro aunque el panel esté en oscuro (ADR-0045). */
+    <div className="isla-clara space-y-3">
       {/* Botones de acción (pantalla) */}
       <div className="flex flex-wrap gap-2 print:hidden">
         <button

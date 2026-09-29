@@ -10,6 +10,7 @@ import { SelectorSubtiposNormativos } from './SelectorSubtiposNormativos';
 import { SelectorModalidadesConstruccion } from './SelectorModalidadesConstruccion';
 import { exigeModalidadConstruccion } from '@/lib/motor-expedientes/modalidad-construccion';
 import './licencias-tema.css';
+import { urlLicencias } from '../rutas-licencias';
 
 /* ══════════════════════════════════════════════════════════════
    Modal "Crear desde radicado" — Bloque A·A4 (handoff radicado⇄expediente).
@@ -180,7 +181,7 @@ export function CrearDesdeRadicadoModal({ onCerrar, onCreado }: CrearDesdeRadica
   }
 
   const labelCls = 'mb-1 block text-[10px] font-bold uppercase tracking-widest';
-  const labelStyle = { color: '#667085' };
+  const labelStyle = { color: 'var(--text-secondary)' };
 
   return (
     <div
@@ -231,10 +232,10 @@ export function CrearDesdeRadicadoModal({ onCerrar, onCreado }: CrearDesdeRadica
             <p className="text-xs font-bold uppercase tracking-widest" style={{ color: 'var(--color-success-text)' }}>
               Expediente creado
             </p>
-            <p className="text-2xl font-black font-mono" style={{ color: '#12261A' }}>
+            <p className="text-2xl font-black font-mono" style={{ color: 'var(--tema-texto-172033)' }}>
               {creado.expediente.numeroExpediente?.numero ?? creado.expediente.id}
             </p>
-            <p className="text-xs max-w-sm" style={{ color: '#667085' }}>
+            <p className="text-xs max-w-sm" style={{ color: 'var(--text-secondary)' }}>
               Número de demostración (esPrueba) — no es un consecutivo legal. Vinculado al radicado{' '}
               <NumeroLegal value={radicadoSeleccionado ?? ''} variant="radicado" size="sm" />.
               {creado.constanciaEnviada && ' Se envió al solicitante el acuse de recibo de su solicitud.'}
@@ -243,7 +244,7 @@ export function CrearDesdeRadicadoModal({ onCerrar, onCreado }: CrearDesdeRadica
               <p
                 role="alert"
                 className="rounded-lg px-3 py-2 text-xs max-w-sm text-left font-semibold"
-                style={{ background: '#FFFBEB', border: '1px solid #FDE68A', color: '#92400E' }}
+                style={{ background: 'var(--tema-fondo-fffbeb)', border: '1px solid var(--tema-borde-fde68a)', color: 'var(--tema-texto-92400e)' }}
               >
                 ⚠ Acuse de recibo NO enviado al ciudadano. Mientras el candado de emisión real (R10) siga cerrado, el expediente lleva un número de DEMOSTRACIÓN y la plataforma no le entrega al ciudadano un número que no pertenece a la serie legal. Si el candado ya está abierto, la causa sería que el radicado no tiene un correo de contacto habilitado.
               </p>
@@ -253,15 +254,15 @@ export function CrearDesdeRadicadoModal({ onCerrar, onCreado }: CrearDesdeRadica
                 type="button"
                 onClick={onCerrar}
                 className="px-4 py-2.5 rounded-xl text-sm font-bold"
-                style={{ border: '1px solid #D9E2D9', color: '#475569' }}
+                style={{ border: '1px solid var(--tema-borde-dce4ea)', color: 'var(--tema-texto-475569)' }}
               >
                 Volver a la bandeja
               </button>
               <button
                 type="button"
-                onClick={() => router.push(`/interno/licencias/${creado.expediente.id}`)}
+                onClick={() => router.push(urlLicencias({ expedienteId: creado.expediente.id }))}
                 className="px-5 py-2.5 rounded-xl text-sm font-bold text-white"
-                style={{ background: '#14532D' }}
+                style={{ background: 'var(--tema-fondo-007049)' }}
               >
                 Ver expediente →
               </button>
@@ -275,7 +276,7 @@ export function CrearDesdeRadicadoModal({ onCerrar, onCreado }: CrearDesdeRadica
               </legend>
 
               {cargandoCandidatos && (
-                <p className="text-sm py-3" style={{ color: '#667085' }}>
+                <p className="text-sm py-3" style={{ color: 'var(--text-secondary)' }}>
                   Cargando radicados…
                 </p>
               )}
@@ -284,14 +285,14 @@ export function CrearDesdeRadicadoModal({ onCerrar, onCreado }: CrearDesdeRadica
                 <p
                   role="alert"
                   className="rounded-lg px-3 py-2 text-xs"
-                  style={{ background: '#FEF2F2', border: '1px solid #FECACA', color: '#991B1B' }}
+                  style={{ background: 'var(--tema-fondo-fef2f2)', border: '1px solid var(--tema-borde-fecaca)', color: 'var(--tema-texto-991b1b)' }}
                 >
                   {errorCandidatos}
                 </p>
               )}
 
               {!cargandoCandidatos && !errorCandidatos && candidatos.length === 0 && (
-                <p className="text-sm py-3" style={{ color: '#667085' }}>
+                <p className="text-sm py-3" style={{ color: 'var(--text-secondary)' }}>
                   No hay radicados de Planeación pendientes de expediente.
                 </p>
               )}
@@ -310,10 +311,10 @@ export function CrearDesdeRadicadoModal({ onCerrar, onCreado }: CrearDesdeRadica
                     role="radiogroup"
                     aria-label="Radicados candidatos"
                     className="flex flex-col gap-0 max-h-56 overflow-y-auto rounded-lg"
-                    style={{ border: '1px solid #D9E2D9' }}
+                    style={{ border: '1px solid var(--tema-borde-dce4ea)' }}
                   >
                     {candidatosFiltrados.length === 0 ? (
-                      <p className="text-sm px-3 py-3" style={{ color: '#667085' }}>
+                      <p className="text-sm px-3 py-3" style={{ color: 'var(--text-secondary)' }}>
                         Ningún radicado coincide con &quot;{busqueda}&quot;.
                       </p>
                     ) : (
@@ -322,8 +323,8 @@ export function CrearDesdeRadicadoModal({ onCerrar, onCreado }: CrearDesdeRadica
                           key={r.radicadoId}
                           className="flex items-start gap-2.5 px-3 py-2.5 text-sm cursor-pointer"
                           style={{
-                            borderTop: i === 0 ? 'none' : '1px solid #EEF4EE',
-                            background: radicadoSeleccionado === r.radicadoId ? '#FBF3D9' : 'transparent',
+                            borderTop: i === 0 ? 'none' : '1px solid var(--tema-borde-f4f9f6)',
+                            background: radicadoSeleccionado === r.radicadoId ? 'var(--tema-fondo-fbf3d9)' : 'transparent',
                           }}
                         >
                           <input
@@ -332,12 +333,12 @@ export function CrearDesdeRadicadoModal({ onCerrar, onCreado }: CrearDesdeRadica
                             value={r.radicadoId}
                             checked={radicadoSeleccionado === r.radicadoId}
                             onChange={() => setRadicadoSeleccionado(r.radicadoId)}
-                            className="mt-1 h-4 w-4 accent-[#14532D] focus-visible:outline-none focus-visible:ring-2"
+                            className="mt-1 h-4 w-4 accent-[#007049] focus-visible:outline-none focus-visible:ring-2"
                           />
                           <span className="flex flex-col gap-0.5 min-w-0">
                             <NumeroLegal value={r.radicadoId} variant="radicado" size="sm" />
-                            <span style={{ color: '#1F2933' }}>{r.solicitanteNombre || 'Sin nombre registrado'}</span>
-                            <span className="text-xs" style={{ color: '#667085' }}>
+                            <span style={{ color: 'var(--tema-texto-172033)' }}>{r.solicitanteNombre || 'Sin nombre registrado'}</span>
+                            <span className="text-xs" style={{ color: 'var(--text-secondary)' }}>
                               {r.tipoSolicitud || 'Tipo de solicitud sin registrar'} · {formatFechaColombia(r.fechaRadicado)}
                             </span>
                           </span>
@@ -368,7 +369,7 @@ export function CrearDesdeRadicadoModal({ onCerrar, onCreado }: CrearDesdeRadica
               <p
                 role="alert"
                 className="rounded-lg px-3 py-2 text-xs"
-                style={{ background: '#FEF2F2', border: '1px solid #FECACA', color: '#991B1B' }}
+                style={{ background: 'var(--tema-fondo-fef2f2)', border: '1px solid var(--tema-borde-fecaca)', color: 'var(--tema-texto-991b1b)' }}
               >
                 {errorServidor}
               </p>

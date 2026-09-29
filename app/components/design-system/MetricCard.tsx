@@ -57,12 +57,12 @@ export function MetricCard({
   const rielAncho = dominante ? 4 : 2;
   const contenido = (
     <div
-      className={`flex flex-col rounded-xl bg-white overflow-hidden ${className}`}
+      className={`flex flex-col rounded-xl bg-[var(--tema-fondo-ffffff)] overflow-hidden ${className}`}
       style={{
-        border: `1px solid ${activo ? '#14532D' : dominante ? color : '#E3EAE3'}`,
+        border: `1px solid ${activo ? 'var(--tema-borde-007049)' : dominante ? color : 'var(--tema-borde-e4ebf0)'}`,
         borderTop: `${rielAncho}px solid ${color}`,
         opacity: atenuada ? 0.5 : 1,
-        boxShadow: dominante ? `0 2px 8px ${color}22` : '0 1px 2px rgba(20,83,45,0.04)',
+        boxShadow: dominante ? `0 2px 8px color-mix(in srgb, ${color} 13.3%, transparent)` : '0 1px 2px rgba(0, 112, 73,0.04)',
       }}
     >
       <div className="px-3 pt-2.5 pb-1.5">
@@ -74,7 +74,7 @@ export function MetricCard({
           {chipLabel && (
             <span
               className="text-[9px] font-semibold px-1.5 py-0.5 rounded-full"
-              style={{ background: `${color}15`, color }}
+              style={{ background: `color-mix(in srgb, ${color} 8.2%, transparent)`, color }}
             >
               {chipLabel}
             </span>
@@ -82,7 +82,7 @@ export function MetricCard({
         </div>
         <p
           className={`${numeroSize} font-black tabular-nums leading-none mt-1`}
-          style={{ color: atenuada ? '#64748B' : '#12261A' }}
+          style={{ color: atenuada ? 'var(--tema-texto-64748b)' : 'var(--tema-texto-172033)' }}
         >
           {valor}
         </p>

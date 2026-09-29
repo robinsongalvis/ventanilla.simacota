@@ -76,7 +76,7 @@ export function PanelTerminoDual({ terminoDual, origen, fechaRadicacion, estadoJ
         {/* La frase del ADR-0034 como TITULAR: la funcionaria tiene que poder
             leérsela al ciudadano tal cual. El motivo concreto va debajo, en
             gris, sin anillo ni fechas inventadas. */}
-        <p className="text-base font-bold mt-2" style={{ color: '#9A6206' }}>
+        <p className="text-base font-bold mt-2" style={{ color: 'var(--tema-texto-9a6206)' }}>
           El plazo aún no ha empezado a correr
         </p>
         <p className="text-sm mt-1" style={{ color: 'var(--text-secondary)' }}>
@@ -105,7 +105,7 @@ export function PanelTerminoDual({ terminoDual, origen, fechaRadicacion, estadoJ
         aria-expanded={detalleAbierto}
         aria-controls="detalle-computo"
         className="inline-flex items-center gap-1.5 text-xs font-bold self-start transition-colors hover:underline focus-visible:outline-none focus-visible:ring-2 rounded"
-        style={{ color: '#14532D' }}
+        style={{ color: 'var(--tema-texto-007049)' }}
       >
         <span aria-hidden>ⓘ</span>
         {detalleAbierto ? 'Ocultar el detalle del cómputo' : 'Detalle del cómputo (ancla, suspensiones, criterio)'}
@@ -137,16 +137,16 @@ export function PanelTerminoDual({ terminoDual, origen, fechaRadicacion, estadoJ
           role="alert"
           aria-describedby="panel-termino-dual-detalle"
           className="rounded-[10px] p-3 flex flex-col gap-1"
-          style={{ background: '#FCEBEB', border: '1px solid rgba(220,38,38,0.35)' }}
+          style={{ background: 'var(--tema-fondo-fcebeb)', border: '1px solid rgba(220,38,38,0.35)' }}
         >
-          <p className="text-[10px] font-bold uppercase tracking-widest" style={{ color: '#911111' }}>
+          <p className="text-[10px] font-bold uppercase tracking-widest" style={{ color: 'var(--tema-texto-911111)' }}>
             Fecha con la que debe trabajar
           </p>
-          <p className="font-black" style={{ fontSize: 20, color: '#911111' }}>
+          <p className="font-black" style={{ fontSize: 20, color: 'var(--tema-texto-911111)' }}>
             {formatFechaColombia(fechaAlertaConservadora)}
           </p>
           {diasRestantes !== null && (
-            <p className="text-xs" style={{ color: '#911111' }}>
+            <p className="text-xs" style={{ color: 'var(--tema-texto-911111)' }}>
               {diasRestantes < 0
                 ? `Vencido hace ${Math.abs(diasRestantes)} días hábiles`
                 : `Quedan ${diasRestantes} días hábiles`}

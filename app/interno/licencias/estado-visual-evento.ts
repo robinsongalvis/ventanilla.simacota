@@ -67,7 +67,7 @@ export interface DefinicionEstadoVisual {
 export const ESTADOS_VISUALES: Record<EstadoVisual, DefinicionEstadoVisual> = {
   completed: {
     estado: 'completed', etiqueta: 'COMPLETADO', emoji: '🟢',
-    color: '#16A34A', chipFondo: '#E7F5EC', chipTexto: '#117937',
+    color: '#008F5A', chipFondo: '#E7F5EC', chipTexto: '#007A4D',
     significado: 'La actuación ya ocurrió y quedó finalizada.',
   },
   in_progress: {
@@ -92,7 +92,7 @@ export const ESTADOS_VISUALES: Record<EstadoVisual, DefinicionEstadoVisual> = {
   },
   suspended: {
     estado: 'suspended', etiqueta: 'SUSPENDIDO', emoji: '🔴',
-    color: '#DC2626', chipFondo: '#FCEAEA', chipTexto: '#B91C1C',
+    color: '#D81E1E', chipFondo: '#FCEAEA', chipTexto: '#B91C1C',
     significado: 'El trámite está detenido; el término no corre.',
   },
   cancelled: {

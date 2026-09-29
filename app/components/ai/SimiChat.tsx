@@ -469,29 +469,29 @@ export function SimiChat() {
         aria-label={isOpen ? 'Cerrar asistente SIMI' : 'Abrir asistente SIMI'}
         aria-expanded={isOpen}
         aria-controls="simi-chat-panel"
-        className="w-14 h-14 rounded-full flex items-center justify-center cursor-pointer focus:outline-none focus-visible:ring-2 focus-visible:ring-[#14532D] focus-visible:ring-offset-2"
+        className="w-14 h-14 rounded-full flex items-center justify-center cursor-pointer focus:outline-none focus-visible:ring-2 focus-visible:ring-[#007049] focus-visible:ring-offset-2"
         style={{
-          background: isOpen ? '#1F2933' : '#14532D',
-          border: isOpen ? '1px solid rgba(255,255,255,0.10)' : '1px solid rgba(20,83,45,0.30)',
+          background: isOpen ? '#172033' : '#007049',
+          border: isOpen ? '1px solid rgba(255,255,255,0.10)' : '1px solid rgba(0, 112, 73,0.30)',
           boxShadow: isOpen
             ? '0 4px 14px rgba(0,0,0,0.35)'
-            : '0 6px 20px rgba(20,83,45,0.35)',
+            : '0 6px 20px rgba(0, 112, 73,0.35)',
           transform: isOpen ? 'scale(0.95)' : 'scale(1)',
           transition: 'background 0.2s ease-out, transform 0.2s ease-out, box-shadow 0.2s ease-out',
         }}
         onMouseEnter={(e) => {
           if (!isOpen) {
-            (e.currentTarget as HTMLElement).style.background = '#166534';
+            (e.currentTarget as HTMLElement).style.background = '#006B45';
             (e.currentTarget as HTMLElement).style.transform = 'scale(1.06) translateY(-2px)';
-            (e.currentTarget as HTMLElement).style.boxShadow = '0 10px 28px rgba(20,83,45,0.45)';
+            (e.currentTarget as HTMLElement).style.boxShadow = '0 10px 28px rgba(0, 112, 73,0.45)';
           }
         }}
         onMouseLeave={(e) => {
-          (e.currentTarget as HTMLElement).style.background = isOpen ? '#1F2933' : '#14532D';
+          (e.currentTarget as HTMLElement).style.background = isOpen ? '#172033' : '#007049';
           (e.currentTarget as HTMLElement).style.transform = isOpen ? 'scale(0.95)' : 'scale(1)';
           (e.currentTarget as HTMLElement).style.boxShadow = isOpen
             ? '0 4px 14px rgba(0,0,0,0.35)'
-            : '0 6px 20px rgba(20,83,45,0.35)';
+            : '0 6px 20px rgba(0, 112, 73,0.35)';
         }}
         onMouseDown={(e) => {
           (e.currentTarget as HTMLElement).style.transform = 'scale(0.93)';
@@ -511,7 +511,7 @@ export function SimiChat() {
             </svg>
             {/* Badge dorado — solo el punto pulsa, no el botón */}
             <span className="absolute -top-1 -right-1 w-3.5 h-3.5 rounded-full border-2 border-white animate-pulse"
-                  style={{ background: '#D4A017' }} />
+                  style={{ background: '#E5A31A' }} />
           </div>
         )}
       </button>

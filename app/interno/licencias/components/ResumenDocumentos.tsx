@@ -44,7 +44,7 @@ export function ResumenDocumentos({ documentos, aportados, aplicables, onVerTodo
       className="w-full min-w-0 rounded-xl p-4"
       style={{ background: 'var(--bg-surface)', border: '1px solid var(--color-border)' }}
     >
-      <p className="text-[10px] font-bold uppercase tracking-widest mb-3" style={{ color: '#667085' }}>
+      <p className="text-[10px] font-bold uppercase tracking-widest mb-3" style={{ color: 'var(--text-secondary)' }}>
         Documentos del expediente
         {hayConteo && (
           <span className="normal-case font-normal" style={{ color: 'var(--text-secondary)' }}>
@@ -70,7 +70,7 @@ export function ResumenDocumentos({ documentos, aportados, aplicables, onVerTodo
             </div>
             <span
               className="shrink-0 text-[10px] font-bold px-2 py-0.5 rounded-full"
-              style={{ background: '#E7F6EC', color: '#116932' }}
+              style={{ background: 'var(--tema-fondo-e7f6ec)', color: 'var(--tema-texto-116932)' }}
             >
               Aportado
             </span>
@@ -83,7 +83,7 @@ export function ResumenDocumentos({ documentos, aportados, aplicables, onVerTodo
           type="button"
           onClick={onVerTodos}
           className="mt-3 w-full text-center text-sm font-bold focus-visible:outline-none focus-visible:ring-2 rounded py-1.5"
-          style={{ color: '#14532D' }}
+          style={{ color: 'var(--tema-texto-007049)' }}
         >
           Ver los {documentos.length} documentos →
         </button>

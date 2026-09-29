@@ -177,12 +177,15 @@ describe('BandejaLicenciasClient — buscador rápido', () => {
     );
     render(<BandejaLicenciasClient />);
     await waitFor(() => expect(screen.getByText('68745-0-26-0002')).toBeTruthy());
-    expect(screen.getByText('2', { selector: 'p' })).toBeTruthy();
+    // Ola 3 (ADR-0046): la cifra se lee en SU tarjeta, dentro del resumen.
+    const enTramite = () => within(screen.getByRole('group', { name: 'Resumen de la bandeja de licencias' }))
+      .getByText('En trámite').previousElementSibling?.textContent;
+    expect(enTramite()).toBe('2');
 
     fireEvent.change(screen.getByLabelText(ETIQUETA_BUSCADOR), { target: { value: 'Distinto' } });
 
     await waitFor(() => expect(screen.queryByText('68745-0-26-0002')).toBeNull());
-    expect(screen.getByText('2', { selector: 'p' })).toBeTruthy(); // "En trámite" sigue en 2
+    expect(enTramite()).toBe('2'); // "En trámite" sigue en 2
   });
 
   it('sin coincidencias: muestra el término buscado y un botón para limpiar (nunca una tabla vacía muda)', async () => {

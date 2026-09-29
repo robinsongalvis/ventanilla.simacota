@@ -164,9 +164,9 @@ export function RadicarDebidaFormaModal({
            style={{
              background: 'var(--bg-surface)',
              boxShadow: '0 24px 60px rgba(15,23,42,.34), 0 4px 12px rgba(15,23,42,.18)',
-             border: '1px solid rgba(20,83,45,.22)',
+             border: '1px solid rgba(0, 112, 73,.22)',
            }}>
-        <div className="px-5 py-4" style={{ background: '#14532D' }}>
+        <div className="px-5 py-4" style={{ background: 'var(--tema-fondo-007049)' }}>
           <p className="text-[10px] font-bold uppercase tracking-widest" style={{ color: '#FDF6E3' }}>
             Secretaría de Planeación
           </p>
@@ -183,7 +183,7 @@ export function RadicarDebidaFormaModal({
                   ? exito.mensaje
                   : 'El expediente quedó radicado en legal y debida forma.'}
               </p>
-              <p className="font-mono text-lg font-extrabold" style={{ color: '#14532D' }}>
+              <p className="font-mono text-lg font-extrabold" style={{ color: 'var(--tema-texto-007049)' }}>
                 {exito.numeroExpediente}
               </p>
               {exito.seNormalizo && exito.transcrito && (
@@ -205,7 +205,7 @@ export function RadicarDebidaFormaModal({
             <div role="status" className="flex flex-col gap-1">
               <p className="text-sm" style={{ color: 'var(--text-primary)' }}>{previa.motivo}</p>
               {previa.numeroExpediente && (
-                <p className="font-mono text-base font-extrabold" style={{ color: '#14532D' }}>
+                <p className="font-mono text-base font-extrabold" style={{ color: 'var(--tema-texto-007049)' }}>
                   {previa.numeroExpediente}
                 </p>
               )}
@@ -220,10 +220,10 @@ export function RadicarDebidaFormaModal({
           ) : (
             <>
               <div className="rounded-lg px-3 py-2 flex flex-col gap-1" style={{ background: 'var(--bg-surface-2)' }}>
-                <p className={etiqueta} style={{ color: '#3F6B4E' }}>El plazo empezará a correr el</p>
+                <p className={etiqueta} style={{ color: 'var(--tema-texto-3f6b4e)' }}>El plazo empezará a correr el</p>
                 {/* ES EL DATO DEL ACTO, no una línea más: desde esta fecha
                     corren los 45 días hábiles. Se lee de lejos. */}
-                <p className="font-headline text-3xl font-black leading-tight" style={{ color: '#14532D' }}>
+                <p className="font-headline text-3xl font-black leading-tight" style={{ color: 'var(--tema-texto-007049)' }}>
                   {previa.anclaPropuesta ? formatFechaColombia(previa.anclaPropuesta) : '—'}
                 </p>
                 {previa.baseDelAncla && (
@@ -255,7 +255,7 @@ export function RadicarDebidaFormaModal({
               )}
 
               <div>
-                <label htmlFor="numero-radicado" className={etiqueta} style={{ color: '#667085' }}>
+                <label htmlFor="numero-radicado" className={etiqueta} style={{ color: 'var(--text-secondary)' }}>
                   Número de radicado del libro de ventanilla
                 </label>
                 <input
@@ -281,21 +281,21 @@ export function RadicarDebidaFormaModal({
                   autoComplete="off"
                   inputMode="numeric"
                   className="w-full rounded-lg px-3.5 py-3 text-base font-mono tracking-wide"
-                  style={{ background: 'var(--bg-surface)', color: 'var(--text-primary)', border: '2px solid #14532D' }}
+                  style={{ background: 'var(--bg-surface)', color: 'var(--text-primary)', border: '2px solid var(--tema-borde-007049)' }}
                 />
                 <p className="text-xs mt-1.5 leading-relaxed" style={{ color: 'var(--text-secondary)' }}>
                   Escriba solo los <strong>ocho dígitos finales</strong>. El año y el mes vienen puestos
                   con la fecha de hoy — <strong>si el radicado es de otro mes, corríjalos</strong>: el sistema
                   sugiere el formato, no el número.
                 </p>
-                <p className="text-xs mt-1" style={{ color: '#94A3B8' }}>
+                <p className="text-xs mt-1" style={{ color: 'var(--text-secondary)' }}>
                   Escríbalo tal como aparece en el libro. El sistema lo completa al formato oficial
                   si hace falta; no lo inventa ni lo corrige.
                 </p>
               </div>
 
               <div>
-                <label htmlFor="observacion-radicar" className={etiqueta} style={{ color: '#667085' }}>
+                <label htmlFor="observacion-radicar" className={etiqueta} style={{ color: 'var(--text-secondary)' }}>
                   Observación (opcional)
                 </label>
                 <input
@@ -303,7 +303,7 @@ export function RadicarDebidaFormaModal({
                   value={observacion}
                   onChange={(e) => setObservacion(e.target.value)}
                   className="w-full rounded-lg px-3 py-2 text-sm"
-                  style={{ background: 'var(--bg-surface-2)', color: 'var(--text-primary)', border: '1px solid #D9E2D9' }}
+                  style={{ background: 'var(--bg-surface-2)', color: 'var(--text-primary)', border: '1px solid var(--tema-borde-dce4ea)' }}
                 />
               </div>
             </>
@@ -322,7 +322,7 @@ export function RadicarDebidaFormaModal({
           {!exito && previa.procede && !previa.yaRadicada && (
             <button type="button" onClick={radicar} disabled={enviando}
                     className="text-sm font-bold px-4 py-2 rounded-lg"
-                    style={{ background: '#14532D', color: '#fff', opacity: enviando ? 0.6 : 1 }}>
+                    style={{ background: 'var(--tema-fondo-007049)', color: '#fff', opacity: enviando ? 0.6 : 1 }}>
               {enviando ? 'Radicando…' : 'Radicar en debida forma'}
             </button>
           )}

@@ -47,8 +47,11 @@ import { InstitucionalHeader } from '@/app/components/institucional/Instituciona
 import { ChipEstadoJuridico } from './ChipEstadoJuridico';
 import { ChipPrueba } from './ChipPrueba';
 import { NumeroLegal } from './NumeroLegal';
-import { TarjetaKpiLibro } from './TarjetaKpiLibro';
-import { ChipFiltroLibro } from './ChipFiltroLibro';
+import { BookOpen, Clock3, FileWarning, FolderOpen, Printer } from 'lucide-react';
+import { FilaTarjetas, TarjetaIndicador } from '@/app/components/design-system/TarjetaIndicador';
+import { ChipFiltro } from '@/app/components/design-system/ChipFiltro';
+import { BotonAccion } from '@/app/components/design-system/BotonAccion';
+import { SectionHeader } from '@/app/components/design-system/SectionHeader';
 import { EtiquetaDatoFaltante } from './EtiquetaDatoFaltante';
 import { EtiquetaColisionNumero } from './EtiquetaColisionNumero';
 import { PanelDetalleExpediente } from './PanelDetalleExpediente';
@@ -273,58 +276,46 @@ export function LibroConsecutivoClient() {
     // la tabla se desplazara (medido en la verificación E2E del 12-ago-2026).
     // `w-full` le da anchura definida = la del viewport; `min-w-0` impide que
     // el mínimo automático la vuelva a inflar.
-    <div className="libro-consecutivo w-full min-w-0 p-4 md:p-6 flex flex-col gap-5 max-w-[1400px] mx-auto">
-      {/* ── Encabezado de pantalla (oculto al imprimir) ── */}
-      <div className="flex flex-col md:flex-row md:items-end md:justify-between gap-4 print:hidden">
-        <div>
-          <p className="text-[10.5px] font-bold uppercase tracking-widest" style={{ color: 'var(--text-secondary)' }}>
-            Secretaría de Planeación · Licencias Urbanísticas
-          </p>
-          <h1 className="font-headline text-2xl md:text-[28px] mt-1" style={{ color: 'var(--text-primary)' }}>
-            Libro consecutivo
-          </h1>
-          <p className="text-sm mt-1" style={{ color: 'var(--text-secondary)' }}>
-            Un expediente por fila, en el orden en que se radicó — reemplaza el Excel de consecutivo de Planeación.
-          </p>
-        </div>
-        <div className="shrink-0 flex flex-wrap items-end gap-2">
-          <label className="flex flex-col gap-1">
-            <span className="text-[10.5px] font-bold uppercase tracking-widest" style={{ color: 'var(--text-secondary)' }}>
-              Año
-            </span>
-            <select
-              className="select-internal"
-              value={año}
-              onChange={(e) => setAño(Number(e.target.value))}
-              aria-label="Año del libro consecutivo"
-            >
-              {años.map((a) => (
-                <option key={a} value={a}>
-                  {a}
-                </option>
-              ))}
-            </select>
-          </label>
-          <button
-            type="button"
-            onClick={exportarCsv}
-            disabled={cargando || filas.length === 0}
-            className="inline-flex items-center gap-2 rounded-[10px] px-4 py-2.5 text-sm font-bold transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-1 hover:brightness-95 active:scale-[0.98] disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:brightness-100"
-            style={{ background: 'var(--color-accent)', color: 'var(--color-primary)', boxShadow: '0 2px 8px rgba(212,160,23,0.25)' }}
-          >
-            Exportar CSV ↓
-          </button>
-          <button
-            type="button"
-            onClick={imprimirLibro}
-            className="inline-flex items-center gap-2 rounded-[10px] px-4 py-2.5 text-sm font-bold transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-1 hover:brightness-95 active:scale-[0.98]"
-            style={{ background: 'transparent', color: 'var(--color-primary)', border: '1px solid var(--color-primary)' }}
-          >
-            Imprimir
-          </button>
-        </div>
-      </div>
-
+    <>
+      {/* ── Encabezado de pantalla: el subencabezado del panel (armazón único,
+          ADR-0046 §7). Oculto al imprimir: el papel lleva su encabezado
+          institucional propio. ── */}
+      <SectionHeader
+        className="print:hidden"
+        titulo="Libro consecutivo"
+        subtitulo="Secretaría de Planeación · Licencias Urbanísticas"
+        nota="Un expediente por fila, en el orden en que se radicó — reemplaza el Excel de consecutivo de Planeación."
+        acciones={
+          <>
+              <label className="flex items-center gap-2">
+                <span className="text-[10.5px] font-bold uppercase tracking-widest" style={{ color: 'var(--text-secondary)' }}>
+                  Año
+                </span>
+                <select
+                  className="select-internal"
+                  value={año}
+                  onChange={(e) => setAño(Number(e.target.value))}
+                  aria-label="Año del libro consecutivo"
+                >
+                  {años.map((a) => (
+                    <option key={a} value={a}>
+                      {a}
+                    </option>
+                  ))}
+                </select>
+              </label>
+              {/* Ola 3: exportar es la acción principal (verde, como «Exportar
+                  Excel MIPG» en Reportes); el dorado queda para recibir al ciudadano. */}
+              <BotonAccion variante="primaria" onClick={exportarCsv} disabled={cargando || filas.length === 0}>
+                Exportar CSV ↓
+              </BotonAccion>
+              <BotonAccion Icono={Printer} onClick={imprimirLibro}>
+                Imprimir
+              </BotonAccion>
+          </>
+        }
+      />
+    <div className="libro-consecutivo w-full min-w-0 px-4 pb-6 lg:px-6 flex flex-col gap-5">
       {/* ── Encabezado SOLO impresión: institucional + año, sin controles ── */}
       <div className="hidden print:block">
         <InstitucionalHeader
@@ -336,7 +327,7 @@ export function LibroConsecutivoClient() {
       </div>
 
       {error && (
-        <p role="alert" className="rounded-lg px-3 py-2 text-sm print:hidden" style={{ background: '#FEF2F2', border: '1px solid #FECACA', color: '#991B1B' }}>
+        <p role="alert" className="rounded-lg px-3 py-2 text-sm print:hidden" style={{ background: 'var(--tema-fondo-fef2f2)', border: '1px solid var(--tema-borde-fecaca)', color: 'var(--tema-texto-991b1b)' }}>
           {error}
         </p>
       )}
@@ -346,9 +337,9 @@ export function LibroConsecutivoClient() {
         role="note"
         aria-label="Aviso sobre el alcance histórico del libro"
         className="rounded-xl p-3.5 print:hidden"
-        style={{ background: '#E9F0FC', border: '1px solid rgba(37,99,235,0.25)' }}
+        style={{ background: 'var(--tema-fondo-e9f0fc)', border: '1px solid rgba(37,99,235,0.25)' }}
       >
-        <p className="text-[13px] leading-relaxed" style={{ color: '#1E4FA0' }}>
+        <p className="text-[13px] leading-relaxed" style={{ color: 'var(--tema-texto-1e4fa0)' }}>
           <strong>Libro del sistema</strong> — incluye los expedientes históricos del Excel de Planeación (2022–2026),
           migrados el 11-ago-2026. Entraron como <em>Histórico sin resolver</em>: conservan lo que decía el libro,
           pero les falta completar cédula y estado desde los expedientes físicos — el filtro
@@ -357,22 +348,28 @@ export function LibroConsecutivoClient() {
       </div>
 
       {/* ── KPIs ── */}
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 print:hidden">
-        <TarjetaKpiLibro overline="Total" valor={conteosKpi.total} tono="normal" detalle={<span>Expedientes de {año}</span>} />
-        <TarjetaKpiLibro overline="En trámite" valor={conteosKpi.enTramite} tono="normal" detalle={<span>Radicados, en revisión, con acta o en viabilidad</span>} />
-        <TarjetaKpiLibro
-          overline="Por vencer"
+      {/* Tarjetas de la referencia visual (Ola 3): mismos conteos y tonos
+          («Por vencer» en rojo, «Históricos incompletos» en ámbar). */}
+      <FilaTarjetas etiqueta="Resumen del libro consecutivo" className="print:hidden">
+        <TarjetaIndicador etiqueta="Total" valor={conteosKpi.total} tono="gris" Icono={BookOpen} descripcion={`Expedientes de ${año}`} descripcionVisible />
+        <TarjetaIndicador etiqueta="En trámite" valor={conteosKpi.enTramite} tono="azul" Icono={FolderOpen} descripcion="Radicados, en revisión, con acta o en viabilidad" descripcionVisible />
+        <TarjetaIndicador
+          etiqueta="Por vencer"
           valor={conteosKpi.porVencer}
-          tono="peligro"
-          detalle={<span>Con alerta de término calculada por el sistema</span>}
+          tono="rojo"
+          Icono={Clock3}
+          descripcion="Con alerta de término calculada por el sistema"
+          descripcionVisible
         />
-        <TarjetaKpiLibro
-          overline="Históricos incompletos"
+        <TarjetaIndicador
+          etiqueta="Históricos incompletos"
           valor={conteosKpi.historicosIncompletos}
-          tono="advertencia"
-          detalle={<span>Migrados sin cédula o sin estado registrado</span>}
+          tono="ambar"
+          Icono={FileWarning}
+          descripcion="Migrados sin cédula o sin estado registrado"
+          descripcionVisible
         />
-      </div>
+      </FilaTarjetas>
 
       {/* ── Buscador rápido ── */}
       <div className="print:hidden">
@@ -388,9 +385,9 @@ export function LibroConsecutivoClient() {
       </div>
 
       {/* ── Chips de filtro ── */}
-      <div role="group" aria-label="Filtrar libro consecutivo" className="flex flex-wrap gap-2 print:hidden">
+      <div role="group" aria-label="Filtrar libro consecutivo" className="flex flex-wrap gap-1.5 print:hidden">
         {FILTROS_LIBRO_CONSECUTIVO.filter(({ id }) => id !== 'COLISIONES' || conteosFiltro.COLISIONES > 0).map(({ id, etiqueta }) => (
-          <ChipFiltroLibro key={id} etiqueta={etiqueta} conteo={conteosFiltro[id]} activo={filtro === id} onClick={() => setFiltro(id)} />
+          <ChipFiltro key={id} etiqueta={etiqueta} valor={conteosFiltro[id]} activo={filtro === id} onClick={() => setFiltro(id)} />
         ))}
       </div>
 
@@ -448,7 +445,7 @@ export function LibroConsecutivoClient() {
                           type="button"
                           onClick={() => setBusqueda('')}
                           className="text-xs font-bold underline focus-visible:outline-none focus-visible:ring-2 rounded"
-                          style={{ color: 'var(--color-primary)' }}
+                          style={{ color: 'var(--tema-texto-007049)' }}
                         >
                           Limpiar búsqueda
                         </button>
@@ -513,12 +510,12 @@ export function LibroConsecutivoClient() {
                       <td className="px-3 py-2.5 align-top" style={{ maxWidth: 220 }}>
                         {fila.faltaCedula ? (
                           <div className="flex flex-col gap-1 items-start">
-                            <span style={{ color: 'var(--text-primary)', wordBreak: 'break-word' }}>{fila.solicitanteNombre || 'Sin nombre registrado'}</span>
+                            <span style={{ color: 'var(--text-primary)', overflowWrap: 'break-word' }}>{fila.solicitanteNombre || 'Sin nombre registrado'}</span>
                             <EtiquetaDatoFaltante texto="Sin cédula" />
                           </div>
                         ) : (
                           <>
-                            <p style={{ color: 'var(--text-primary)', wordBreak: 'break-word' }}>{fila.solicitanteNombre}</p>
+                            <p style={{ color: 'var(--text-primary)', overflowWrap: 'break-word' }}>{fila.solicitanteNombre}</p>
                             <p style={{ color: 'var(--text-secondary)' }}>{fila.solicitanteDocumento}</p>
                           </>
                         )}
@@ -529,7 +526,7 @@ export function LibroConsecutivoClient() {
                             <span
                               key={s.codigo + i}
                               className="text-xs"
-                              style={s.enCuarentena ? { color: '#9A6206', fontStyle: 'italic' } : { color: 'var(--text-secondary)' }}
+                              style={s.enCuarentena ? { color: 'var(--tema-texto-9a6206)', fontStyle: 'italic' } : { color: 'var(--text-secondary)' }}
                             >
                               {i > 0 ? ' · ' : ''}
                               {s.enCuarentena ? `? ${s.nombre}` : s.nombre}
@@ -596,6 +593,7 @@ export function LibroConsecutivoClient() {
         />
       )}
     </div>
+    </>
   );
 }
 

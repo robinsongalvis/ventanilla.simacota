@@ -34,13 +34,13 @@ export function BarraFiltrosActivos({
   return (
     <div
       className="flex items-center gap-2 flex-wrap px-3 sm:px-4 py-2 shrink-0"
-      style={{ background: '#FEFCE8', borderBottom: '1px solid #FDE68A' }}
+      style={{ background: 'var(--tema-fondo-fefce8)', borderBottom: '1px solid var(--tema-borde-fde68a)' }}
       role="region"
       aria-label="Filtros activos"
     >
       <span
         className="shrink-0 text-[10px] font-bold uppercase tracking-widest"
-        style={{ color: '#854D0E' }}
+        style={{ color: 'var(--tema-texto-854d0e)' }}
       >
         Filtrando por
       </span>
@@ -49,7 +49,7 @@ export function BarraFiltrosActivos({
         <span
           key={chip.dimension}
           className="inline-flex items-center gap-1 pl-2.5 pr-1 py-0.5 rounded-full text-[11px] font-semibold border"
-          style={{ background: 'white', color: '#78350F', borderColor: '#FBBF24' }}
+          style={{ background: 'var(--tema-fondo-ffffff)', color: 'var(--tema-texto-78350f)', borderColor: 'var(--tema-borde-fbbf24)' }}
         >
           {chip.label}
           <button
@@ -57,8 +57,8 @@ export function BarraFiltrosActivos({
             onClick={() => onQuitarDimension(chip.dimension)}
             aria-label={`Quitar filtro ${chip.label}`}
             title={`Quitar filtro ${chip.label}`}
-            className="shrink-0 w-4 h-4 flex items-center justify-center rounded-full transition-colors hover:bg-amber-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-500/50"
-            style={{ color: '#92400E' }}
+            className="shrink-0 w-4 h-4 flex items-center justify-center rounded-full transition-colors hover:bg-amber-100 oscuro:hover:bg-amber-500/15 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-500/50"
+            style={{ color: 'var(--tema-texto-92400e)' }}
           >
             <svg className="w-3 h-3" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2.5}>
               <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
@@ -71,7 +71,7 @@ export function BarraFiltrosActivos({
         type="button"
         onClick={onLimpiarTodo}
         className="shrink-0 ml-auto text-[10px] font-bold uppercase tracking-widest px-2.5 py-1 rounded-md border transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-500/50"
-        style={{ background: 'white', color: '#854D0E', borderColor: '#FBBF24' }}
+        style={{ background: 'var(--tema-fondo-ffffff)', color: 'var(--tema-texto-854d0e)', borderColor: 'var(--tema-borde-fbbf24)' }}
       >
         Limpiar todo
       </button>

@@ -43,9 +43,9 @@ interface PriorityBannerProps {
 }
 
 const COLORES_NIVEL = {
-  critico: { border: '#DC2626', bg: '#FEF2F2', text: '#991B1B', icon: '#DC2626' },
-  alerta:  { border: '#F59E0B', bg: '#FFFBEB', text: '#92400E', icon: '#F59E0B' },
-  normal:  { border: '#14532D', bg: '#F0FDF4', text: '#14532D', icon: '#14532D' },
+  critico: { border: '#D81E1E', bg: 'var(--tema-fondo-fef2f2)', text: 'var(--tema-texto-991b1b)', icon: 'var(--tema-texto-d81e1e)' },
+  alerta:  { border: '#F59E0B', bg: 'var(--tema-fondo-fffbeb)', text: 'var(--tema-texto-92400e)', icon: 'var(--tema-texto-f59e0b)' },
+  normal:  { border: 'var(--tema-borde-007049)', bg: 'var(--tema-fondo-f0fdf4)', text: 'var(--tema-texto-007049)', icon: 'var(--tema-texto-007049)' },
 };
 
 export function PriorityBanner({
@@ -65,8 +65,8 @@ export function PriorityBanner({
   if (minimizado && contenidoMinimizado) {
     return (
       <div
-        className="flex items-center justify-between gap-3 px-3 py-2 rounded-xl bg-white"
-        style={{ border: `1px solid ${colores.border}22` }}
+        className="flex items-center justify-between gap-3 px-3 py-2 rounded-xl bg-[var(--tema-fondo-ffffff)]"
+        style={{ border: `1px solid color-mix(in srgb, ${colores.border} 13.3%, transparent)` }}
       >
         {contenidoMinimizado}
         {onMinimizar && (
@@ -74,7 +74,7 @@ export function PriorityBanner({
             type="button"
             onClick={onMinimizar}
             className="shrink-0 text-[10px] font-bold px-2 py-1 rounded-md"
-            style={{ color: '#14532D', background: '#F8FAF7', border: '1px solid #D9E2D9' }}
+            style={{ color: 'var(--tema-texto-007049)', background: 'var(--tema-fondo-f7f9fb)', border: '1px solid var(--tema-borde-dce4ea)' }}
             aria-expanded="false"
           >
             Mostrar
@@ -86,11 +86,11 @@ export function PriorityBanner({
 
   return (
     <div
-      className="flex items-center gap-3 px-3 sm:px-4 py-2 rounded-xl bg-white transition-shadow duration-200 hover:shadow-sm"
+      className="flex items-center gap-3 px-3 sm:px-4 py-2 rounded-xl bg-[var(--tema-fondo-ffffff)] transition-shadow duration-200 hover:shadow-sm"
       style={{
-        border: `1px solid ${colores.border}33`,
+        border: `1px solid color-mix(in srgb, ${colores.border} 20%, transparent)`,
         borderLeft: `4px solid ${colores.border}`,
-        boxShadow: nivel === 'critico' ? `0 2px 8px ${colores.border}15` : undefined,
+        boxShadow: nivel === 'critico' ? `0 2px 8px color-mix(in srgb, ${colores.border} 8.2%, transparent)` : undefined,
       }}
     >
       {/* Icono de urgencia */}
@@ -98,7 +98,7 @@ export function PriorityBanner({
         className="shrink-0 w-8 h-8 rounded-lg flex items-center justify-center"
         style={{ background: colores.bg }}
       >
-        <AlertTriangle size={17} strokeWidth={1.9} color={colores.icon} aria-hidden="true" />
+        <AlertTriangle size={17} strokeWidth={1.9} style={{ color: colores.icon }} aria-hidden="true" />
       </div>
 
       {/* Contenido */}
@@ -107,18 +107,18 @@ export function PriorityBanner({
           {mensaje}
         </p>
         {descripcion && (
-          <p className="mt-0.5 break-words text-xs font-semibold" style={{ color: '#1F2933' }}>
+          <p className="mt-0.5 break-words text-xs font-semibold" style={{ color: 'var(--tema-texto-172033)' }}>
             {descripcion}
           </p>
         )}
         {radicadoId && (
           <div className="flex items-center gap-2 mt-0.5">
-            <span className="font-mono text-xs font-bold" style={{ color: '#14532D' }}>{radicadoId}</span>
+            <span className="font-mono text-xs font-bold" style={{ color: 'var(--tema-texto-007049)' }}>{radicadoId}</span>
             {asunto && (
-              <span className="text-[10px] truncate" style={{ color: '#667085' }}>{asunto}</span>
+              <span className="text-[10px] truncate" style={{ color: 'var(--text-secondary)' }}>{asunto}</span>
             )}
             {responsable && (
-              <span className="text-[10px] hidden sm:inline" style={{ color: '#94A3B8' }}>· {responsable}</span>
+              <span className="text-[10px] hidden sm:inline" style={{ color: 'var(--text-secondary)' }}>· {responsable}</span>
             )}
           </div>
         )}
@@ -132,7 +132,7 @@ export function PriorityBanner({
             type="button"
             onClick={onMinimizar}
             className="text-[10px] font-bold px-2 py-1 rounded-md"
-            style={{ color: '#14532D', background: '#F8FAF7', border: '1px solid #D9E2D9' }}
+            style={{ color: 'var(--tema-texto-007049)', background: 'var(--tema-fondo-f7f9fb)', border: '1px solid var(--tema-borde-dce4ea)' }}
             aria-expanded="true"
           >
             Minimizar

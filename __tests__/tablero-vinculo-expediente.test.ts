@@ -34,7 +34,8 @@ describe('tablero — el radicado muestra su expediente de licencias vinculado',
     /* El `numeroExpediente` (p. ej. `DEMO-26-a1b2c3d4`) es lo que se MUESTRA;
        la ruta se arma con el `expedienteId`, que es la identidad real del
        documento. Enlazar por el número llevaría a un 404. */
-    expect(TABLERO).toMatch(/href=\{`\/interno\/licencias\/\$\{vinculo\.expedienteId\}`\}/);
+    // Desde el armazón único (ADR-0046 §7) la dirección es la canónica del panel.
+    expect(TABLERO).toMatch(/href=\{urlLicencias\(\{ expedienteId: vinculo\.expedienteId \}\)\}/);
   });
 
   it('no pinta nada cuando el radicado no tiene expediente', () => {

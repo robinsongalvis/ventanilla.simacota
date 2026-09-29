@@ -62,9 +62,9 @@ export const ESTILOS_ESTADO_JURIDICO: Record<EstadoJuridicoLicencia, EstiloChipE
     label: 'Radicada en debida forma',
   },
   EN_REVISION: {
-    dot: '#14532D',
-    texto: '#14532D',
-    fondo: '#EEF4EE',
+    dot: '#007049',
+    texto: '#007049',
+    fondo: '#F4F9F6',
     label: 'En revisión',
   },
   CON_ACTA_DE_OBSERVACIONES: {
@@ -74,19 +74,19 @@ export const ESTILOS_ESTADO_JURIDICO: Record<EstadoJuridicoLicencia, EstiloChipE
     label: 'Con acta de observaciones',
   },
   EN_VIABILIDAD: {
-    dot: '#14532D',
-    texto: '#14532D',
-    fondo: '#EEF4EE',
+    dot: '#007049',
+    texto: '#007049',
+    fondo: '#F4F9F6',
     label: 'En viabilidad',
   },
   CONCEDIDA: {
-    dot: '#16A34A',
+    dot: '#008F5A',
     texto: '#116932',
     fondo: '#E7F6EC',
     label: 'Concedida',
   },
   NEGADA: {
-    dot: '#DC2626',
+    dot: '#D81E1E',
     texto: '#911111',
     fondo: '#FCEBEB',
     label: 'Negada',

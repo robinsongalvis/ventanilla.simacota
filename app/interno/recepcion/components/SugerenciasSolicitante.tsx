@@ -29,8 +29,8 @@ export function SugerenciasSolicitante({
     <ul
       role="listbox"
       aria-label="Solicitantes que ya han radicado"
-      className="absolute left-0 right-0 top-full mt-1 z-20 rounded-lg bg-white overflow-hidden shadow-lg"
-      style={{ border: '1px solid #D9E2D9' }}
+      className="absolute left-0 right-0 top-full mt-1 z-20 rounded-lg bg-[var(--tema-fondo-ffffff)] overflow-hidden shadow-lg"
+      style={{ border: '1px solid var(--tema-borde-dce4ea)' }}
     >
       {sugerencias.map((s) => (
         <li key={s.numeroDocumento} role="presentation">
@@ -43,12 +43,12 @@ export function SugerenciasSolicitante({
               e.preventDefault();
               onSeleccionar(s);
             }}
-            className="w-full text-left px-3 py-2 transition-colors hover:bg-[#F4F8F4]"
+            className="w-full text-left px-3 py-2 transition-colors hover:bg-[var(--tema-fondo-f4f8f4)]"
           >
-            <span className="block text-sm font-semibold truncate" style={{ color: '#12261A' }}>
+            <span className="block text-sm font-semibold truncate" style={{ color: 'var(--tema-texto-172033)' }}>
               {s.nombreCompleto}
             </span>
-            <span className="block text-[11px]" style={{ color: '#667085' }}>
+            <span className="block text-[11px]" style={{ color: 'var(--tema-texto-64748b)' }}>
               {s.documentoEnmascarado} · últ. radicación {formatFechaCortaColombia(s.ultimaRadicacion)}
             </span>
           </button>

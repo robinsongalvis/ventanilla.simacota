@@ -41,7 +41,7 @@ const FEATURES = [
 
 export default function HomePage() {
   return (
-    <div className="bg-institucional-light min-h-screen flex flex-col" style={{ color: '#1F2933' }}>
+    <div className="bg-institucional-light min-h-screen flex flex-col" style={{ color: '#172033' }}>
 
       {/* ── Navbar ── */}
       <header className="border-b border-[var(--color-border)] sticky top-0 z-50 backdrop-blur-[20px] bg-white/85" role="banner">

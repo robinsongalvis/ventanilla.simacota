@@ -40,10 +40,10 @@ export function AvisoPoliticaSubsanacion({
       role="note"
       aria-label="Aviso: política de subsanación pendiente de concepto jurídico"
       className="rounded-xl p-3.5 flex gap-2.5"
-      style={{ background: '#FDF2E2', border: '1px solid rgba(217,119,6,0.30)' }}
+      style={{ background: 'var(--tema-fondo-fdf2e2)', border: '1px solid rgba(217,119,6,0.30)' }}
     >
       <span aria-hidden="true" className="text-base leading-none">⚖️</span>
-      <p className="text-[13px] leading-relaxed" style={{ color: '#7A4F0A' }}>
+      <p className="text-[13px] leading-relaxed" style={{ color: 'var(--tema-texto-7a4f0a)' }}>
         <strong>Política de subsanación: PENDIENTE DE JURÍDICA</strong> — Si{' '}
         <strong>REINICIO A CERO</strong> → vence{' '}
         <span className="font-mono font-semibold">

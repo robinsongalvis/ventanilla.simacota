@@ -31,17 +31,17 @@ import type { TokensEstadoKpi } from '@/lib/kpis-mipg/tokens-estado-kpi';
    solo id, dependencia y razón (respeta identidades reservadas).
 ══════════════════════════════════════════════════════════════ */
 
-const VERDE_INST = '#14532D';
+const VERDE_INST = '#007049';
 
 /** Trío de color neutro para el estado "atenuado" (valor === 0).
  *  El texto usa un gris casi negro a propósito: tras el opacity 0.55
  *  del contenedor sigue cumpliendo AA (ver nota arriba). */
 const TOKENS_ATENUADOS: TokensEstadoKpi = {
   riel:      '#CBD5D1',
-  texto:     '#0F172A',
-  tinte:     '#F8FAFC',
-  chipBg:    '#F1F5F9',
-  chipTexto: '#0F172A',
+  texto:     'var(--tema-texto-0f172a)',
+  tinte:     'var(--tema-fondo-f8fafc)',
+  chipBg:    'var(--tema-fondo-f1f5f9)',
+  chipTexto: 'var(--tema-texto-0f172a)',
   chipLabel: 'sin casos',
 };
 
@@ -85,9 +85,9 @@ export function TarjetaMIPGGrande({
 
   return (
     <div
-      className="shrink-0 rounded-[14px] bg-white flex flex-col overflow-hidden"
+      className="shrink-0 rounded-[14px] bg-[var(--tema-fondo-ffffff)] flex flex-col overflow-hidden"
       style={{
-        border: `${bordeAncho}px solid ${activo ? VERDE_INST : dominante ? t.riel : '#E3EAE3'}`,
+        border: `${bordeAncho}px solid ${activo ? VERDE_INST : dominante ? t.riel : 'var(--tema-borde-e4ebf0)'}`,
         borderTop: `${rielAncho}px solid ${t.riel}`,
         boxShadow: dominante ? '0 2px 8px rgba(220,38,38,.12)' : '0 1px 3px rgba(20,50,30,.05)',
         opacity: atenuada ? 0.55 : 1,
@@ -101,7 +101,7 @@ export function TarjetaMIPGGrande({
         aria-pressed={activo}
         aria-label={`Filtrar bandeja por ${label} (${valor})`}
         className="text-left px-3 pt-3 pb-1 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-700/30"
-        style={{ background: activo ? '#EEF4EE' : 'transparent' }}
+        style={{ background: activo ? 'var(--tema-fondo-f4f9f6)' : 'transparent' }}
       >
         <span className="flex items-center justify-between gap-2">
           <span
@@ -120,7 +120,7 @@ export function TarjetaMIPGGrande({
         </span>
         <span
           className="block font-black tabular-nums leading-none mt-1.5"
-          style={{ fontSize: numeroFontSize, color: atenuada ? t.texto : '#12261A' }}
+          style={{ fontSize: numeroFontSize, color: atenuada ? t.texto : 'var(--tema-texto-172033)' }}
         >
           {valor}
         </span>
@@ -128,7 +128,7 @@ export function TarjetaMIPGGrande({
 
       {/* Zona inferior: panel tintado del radicado más crítico. */}
       <div className="m-2.5 mt-2 rounded-[10px] px-3 py-2.5" style={{ background: t.tinte }}>
-        <span className="block text-[10px] font-semibold uppercase tracking-widest" style={{ color: atenuada ? t.texto : '#94A3B8' }}>
+        <span className="block text-[10px] font-semibold uppercase tracking-widest" style={{ color: atenuada ? t.texto : 'var(--tema-texto-94a3b8)' }}>
           {criticoLabel}
         </span>
         {critico ? (
@@ -138,7 +138,7 @@ export function TarjetaMIPGGrande({
             aria-label={`Abrir radicado ${critico.radicadoId}`}
             className="mt-1 text-left w-full focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-700/30 rounded"
           >
-            <span className="block font-mono text-[13px] font-bold" style={{ color: atenuada ? t.texto : '#12261A' }}>
+            <span className="block font-mono text-[13px] font-bold" style={{ color: atenuada ? t.texto : 'var(--tema-texto-172033)' }}>
               {critico.radicadoId}
             </span>
             <span className="flex items-center justify-between gap-2 mt-0.5">
@@ -154,7 +154,7 @@ export function TarjetaMIPGGrande({
             </span>
           </button>
         ) : (
-          <span className="block text-[11px] italic mt-1" style={{ color: atenuada ? t.texto : '#94A3B8' }}>Sin radicados</span>
+          <span className="block text-[11px] italic mt-1" style={{ color: atenuada ? t.texto : 'var(--tema-texto-94a3b8)' }}>Sin radicados</span>
         )}
       </div>
     </div>

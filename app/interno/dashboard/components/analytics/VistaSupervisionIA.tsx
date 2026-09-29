@@ -5,6 +5,15 @@ import { collection, onSnapshot, query, limit, orderBy } from 'firebase/firestor
 import { getDb } from '@/lib/firebase';
 import { NOMBRES_TENANT } from '@/src/types/reglas-negocio';
 import { AI_FEATURE_FLAGS } from '@/lib/ai-flags';
+import { SectionHeader } from '@/app/components/design-system/SectionHeader';
+import { StatusBadge } from '@/app/components/design-system/StatusBadge';
+import { type IndicadorEstaticoProps } from '@/app/components/design-system/Indicador';
+import { FilaTarjetas, TarjetaIndicador } from '@/app/components/design-system/TarjetaIndicador';
+import { CabeceraTablaSticky } from '@/app/components/design-system/SuperficieTabla';
+import { AlertTriangle, Gauge, Route, Target, Timer } from 'lucide-react';
+
+/* Ola 3 (ADR-0046): lenguaje del Tablero y lenguaje institucional (sin
+   emojis ni jerga en pantalla). Los cálculos no cambian. */
 
 interface FeedbackDoc {
   feedbackId: string;
@@ -84,19 +93,19 @@ export function VistaSupervisionIA() {
 
   const healthStatus = useMemo(() => {
     if (logs.length === 0) {
-      return { status: '🟢 GEMINI ACTIVO', style: { background: '#F0FDF4', border: '1px solid #BBF7D0', color: '#166534' } };
+      return { status: 'IA en servicio (Gemini)', tono: 'success' as const };
     }
     const ultimos10 = logs.slice(0, 10);
     const errores = ultimos10.filter(l => l.error !== null).length;
     const latenciasAltas = ultimos10.filter(l => l.latenciaMs > 8000).length;
     const fallbacks = ultimos10.filter(l => l.fallbackActivo).length;
     if (errores >= 3 || latenciasAltas >= 3) {
-      return { status: '🔴 IA DEGRADADA',       style: { background: '#FEF2F2', border: '1px solid #FECACA', color: '#DC2626' } };
+      return { status: 'IA degradada', tono: 'danger' as const };
     }
     if (fallbacks > 0) {
-      return { status: '🟡 FALLBACK LOCAL ACTIVO', style: { background: '#FFFBEB', border: '1px solid #FDE68A', color: '#B45309' } };
+      return { status: 'Respaldo local activo', tono: 'warning' as const };
     }
-    return { status: '🟢 GEMINI ACTIVO', style: { background: '#F0FDF4', border: '1px solid #BBF7D0', color: '#166534' } };
+    return { status: 'IA en servicio (Gemini)', tono: 'success' as const };
   }, [logs]);
 
   const driftAlerts = useMemo(() => {
@@ -120,7 +129,7 @@ export function VistaSupervisionIA() {
         const ratio = (count / totalOverrides) * 100;
         if (ratio > 40) {
           const nombreDep = NOMBRES_TENANT[dep as keyof typeof NOMBRES_TENANT] || dep;
-          alerts.push(`Desvío Crítico en Dependencia: La IA presenta alta tasa de corrección (${count} overrides) en ${nombreDep}, representando el ${ratio.toFixed(0)}% del total de fallos.`);
+          alerts.push(`Desvío Crítico en Dependencia: La IA presenta alta tasa de corrección (${count} correcciones) en ${nombreDep}, representando el ${ratio.toFixed(0)}% del total de fallos.`);
         }
       });
     }
@@ -131,87 +140,51 @@ export function VistaSupervisionIA() {
     return (
       <div className="flex h-full items-center justify-center">
         <span className="w-8 h-8 border-4 rounded-full animate-spin"
-              style={{ borderColor: '#D9E2D9', borderTopColor: '#14532D' }} />
+              style={{ borderColor: 'var(--tema-borde-dce4ea)', borderTopColor: 'var(--tema-borde-007049)' }} />
       </div>
     );
   }
 
+  const indicadores: IndicadorEstaticoProps[] = [
+    { etiqueta: 'Precisión Global IA', valor: `${kpis.precisionGlobal}%`, tono: 'verde', Icono: Target, descripcion: 'Valoraciones positivas sobre el total' },
+    { etiqueta: 'Aceptación de Enrutamiento', valor: `${kpis.tasaAceptacion}%`, tono: 'verde', Icono: Route, descripcion: 'PQRS no corregidas' },
+    { etiqueta: 'Confianza Promedio', valor: `${kpis.confianzaPromedio}%`, tono: 'ambar', Icono: Gauge, descripcion: 'Certeza promedio del modelo (Gemini)' },
+    { etiqueta: 'Latencia Promedio', valor: `${kpis.latenciaPromedio}ms`, tono: 'gris', Icono: Timer, descripcion: 'Tiempo de respuesta' },
+  ];
+
   return (
-    <div className="space-y-5 md:space-y-6 animate-fade-in-up">
+    <div className="animate-fade-in-up">
 
-      {/* Cabecera */}
-      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-        <div>
-          <h2 className="text-xl font-black tracking-tight" style={{ fontFamily: 'var(--font-manrope)', color: '#1F2933' }}>
-            Supervisión y Gobernanza de IA
-          </h2>
-          <p className="text-xs mt-0.5" style={{ color: '#667085' }}>
-            Monitoreo en tiempo real, deriva de confianza, telemetría y feature flags.
-          </p>
-        </div>
-
-        {/* Health badge */}
-        <div className="px-4 py-2 rounded-xl font-bold text-xs uppercase tracking-wider flex items-center gap-2"
-             style={healthStatus.style}>
-          <span className="w-2.5 h-2.5 rounded-full bg-current shrink-0" />
-          {healthStatus.status}
-        </div>
-      </div>
+      <SectionHeader
+        titulo="Supervisión y Gobernanza de IA"
+        subtitulo="Monitoreo en tiempo real de precisión, confianza, telemetría y módulos de IA."
+        acciones={<StatusBadge tono={healthStatus.tono} conPunto tamano="sm">{healthStatus.status}</StatusBadge>}
+      />
 
       {/* Alertas de deriva */}
       {driftAlerts.length > 0 && (
-        <div className="rounded-xl p-4" style={{ background: '#FFFBEB', border: '1px solid #FDE68A' }}>
-          <div className="flex items-center gap-2 mb-2 font-bold text-xs uppercase tracking-wider text-amber-700">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2.5} className="w-4 h-4 shrink-0">
-              <path strokeLinecap="round" strokeLinejoin="round" d="M12 9v3.75m-9.303 3.376c-.866 1.5.217 3.374 1.948 3.374h14.71c1.73 0 2.813-1.874 1.948-3.374L13.949 3.378c-.866-1.5-3.032-1.5-3.898 0L2.697 16.126zM12 15.75h.007v.008H12v-.008z" />
-            </svg>
+        <div role="alert" className="mx-3 mb-2 rounded-xl p-3 sm:mx-4 lg:mx-6" style={{ background: 'var(--tema-fondo-fffbeb)', border: '1px solid var(--tema-borde-fde68a)', borderLeft: '4px solid #F59E0B' }}>
+          <div className="flex items-center gap-2 mb-1.5 font-bold text-xs text-amber-700 oscuro:text-amber-300">
+            <AlertTriangle className="w-4 h-4 shrink-0" strokeWidth={2.5} aria-hidden="true" />
             Alertas de Deriva Semántica Detectadas
           </div>
-          <ul className="space-y-1.5 list-disc pl-4 text-xs leading-relaxed" style={{ color: '#92400E' }}>
+          <ul className="space-y-1.5 list-disc pl-4 text-xs leading-relaxed" style={{ color: 'var(--tema-texto-92400e)' }}>
             {driftAlerts.map((alert, i) => <li key={i}>{alert}</li>)}
           </ul>
         </div>
       )}
 
-      {/* KPIs */}
-      <div className="grid grid-cols-1 min-[420px]:grid-cols-2 md:grid-cols-4 gap-3 md:gap-4">
-        <KpiCard
-          label="Precisión Global IA"
-          value={`${kpis.precisionGlobal}%`}
-          desc="Ratio de votos 👍 vs ❌"
-          valueStyle={{ color: '#14532D' }}
-          iconStyle={{ background: '#EEF4EE', color: '#14532D' }}
-        />
-        <KpiCard
-          label="Aceptación de Enrutamiento"
-          value={`${kpis.tasaAceptacion}%`}
-          desc="PQRS no corregidas"
-          valueStyle={{ color: '#16A34A' }}
-          iconStyle={{ background: '#F0FDF4', color: '#16A34A' }}
-        />
-        <KpiCard
-          label="Confianza Promedio"
-          value={`${kpis.confianzaPromedio}%`}
-          desc="Score de certeza Gemini"
-          valueStyle={{ color: '#D97706' }}
-          iconStyle={{ background: '#FFFBEB', color: '#D97706' }}
-        />
-        <KpiCard
-          label="Latencia Promedio"
-          value={`${kpis.latenciaPromedio}ms`}
-          desc="Tiempo de respuesta"
-          valueStyle={{ color: '#667085' }}
-          iconStyle={{ background: '#F8FAF7', color: '#94A3B8' }}
-        />
-      </div>
+      {/* Indicadores (lenguaje del Tablero) */}
+      <FilaTarjetas etiqueta="Indicadores de la IA" className="px-3 sm:px-4 lg:px-6">
+        {indicadores.map((i) => <TarjetaIndicador key={i.etiqueta} {...i} descripcionVisible />)}
+      </FilaTarjetas>
 
-      <div className="grid md:grid-cols-3 gap-4 md:gap-6">
-        {/* Feature Flags */}
-        <div className="md:col-span-1 rounded-2xl p-4 md:p-5 space-y-4 bg-white"
-             style={{ border: '1px solid #D9E2D9', boxShadow: '0 1px 3px rgba(20,83,45,0.06)' }}>
+      <div className="mt-3 grid grid-cols-1 gap-3 px-3 sm:px-4 lg:px-6 md:grid-cols-3 *:min-w-0">
+        {/* Módulos de IA */}
+        <div className="md:col-span-1 rounded-xl p-3 space-y-3 bg-[var(--tema-fondo-ffffff)]">
           <div>
-            <h3 className="text-sm font-bold uppercase tracking-wider" style={{ color: '#1F2933' }}>
-              Feature Flags (Caliente)
+            <h3 className="text-xs font-black" style={{ color: 'var(--tema-texto-172033)' }}>
+              Módulos de IA (estado compilado)
             </h3>
             {/* PT-7 (24-ago-2026): estos interruptores eran DECORATIVOS —
                 solo movían un useState local; los flags reales son constantes
@@ -221,7 +194,7 @@ export function VistaSupervisionIA() {
                 Ahora son indicadores de SOLO LECTURA con la verdad al pie;
                 cablearlos de verdad (Firestore + consulta en runtime) exige
                 diseño propio — anotado en el plan. */}
-            <p className="text-[10px] mt-0.5" style={{ color: '#667085' }}>
+            <p className="text-[10px] mt-0.5" style={{ color: 'var(--tema-texto-64748b)' }}>
               Estado compilado de los módulos de IA — solo lectura. Cambiarlos
               requiere un despliegue; estos indicadores no son interruptores.
             </p>
@@ -235,51 +208,39 @@ export function VistaSupervisionIA() {
         </div>
 
         {/* Telemetría */}
-        <div className="md:col-span-2 rounded-2xl p-4 md:p-5 space-y-4 bg-white"
-             style={{ border: '1px solid #D9E2D9', boxShadow: '0 1px 3px rgba(20,83,45,0.06)' }}>
+        <div className="md:col-span-2 rounded-xl p-3 space-y-3 bg-[var(--tema-fondo-ffffff)]">
           <div>
-            <h3 className="text-sm font-bold uppercase tracking-wider" style={{ color: '#1F2933' }}>
+            <h3 className="text-xs font-black" style={{ color: 'var(--tema-texto-172033)' }}>
               Telemetría de Ejecución
             </h3>
-            <p className="text-[10px] mt-0.5" style={{ color: '#94A3B8' }}>
+            <p className="text-[10px] mt-0.5" style={{ color: 'var(--tema-texto-64748b)' }}>
               Últimos logs operacionales capturados del servidor.
             </p>
           </div>
           <div className="overflow-x-auto">
             <table className="w-full text-left text-xs border-collapse">
-              <thead>
-                <tr style={{ borderBottom: '1px solid #D9E2D9', background: '#EEF4EE' }}>
-                  {['Endpoint','Latencia','Modo','Estado','Fecha / Hora'].map(h => (
-                    <th key={h} className="pb-2 pt-2 px-2 font-bold uppercase tracking-wider"
-                        style={{ color: '#14532D' }}>
-                      {h}
-                    </th>
-                  ))}
-                </tr>
-              </thead>
+              <CabeceraTablaSticky columnas={['Endpoint', 'Latencia', 'Modo', 'Estado', 'Fecha / Hora']} />
               <tbody>
                 {logs.slice(0, 6).map((log) => (
-                  <tr key={log.logId} className="transition-colors"
-                      style={{ borderBottom: '1px solid #EEF4EE' }}
-                      onMouseEnter={(e) => { (e.currentTarget as HTMLElement).style.background = '#F8FAF7'; }}
-                      onMouseLeave={(e) => { (e.currentTarget as HTMLElement).style.background = ''; }}>
-                    <td className="py-2.5 px-2 font-semibold" style={{ color: '#1F2933' }}>/{log.endpoint}</td>
-                    <td className="py-2.5 px-2 tabular-nums" style={{ color: '#667085' }}>{log.latenciaMs}ms</td>
+                  <tr key={log.logId} className="micro-row"
+                      style={{ borderBottom: '1px solid var(--tema-borde-f4f9f6)' }}>
+                    <td className="py-2.5 px-2 font-semibold" style={{ color: 'var(--tema-texto-172033)' }}>/{log.endpoint}</td>
+                    <td className="py-2.5 px-2 tabular-nums" style={{ color: 'var(--tema-texto-64748b)' }}>{log.latenciaMs}ms</td>
                     <td className="py-2.5 px-2">
-                      <span className={`px-1.5 py-0.5 rounded text-[9px] font-bold uppercase ${
-                        log.fallbackActivo ? 'bg-amber-50 text-amber-700' : 'bg-green-50 text-green-700'
+                      <span className={`px-1.5 py-0.5 rounded text-[10px] font-bold uppercase ${
+                        log.fallbackActivo ? 'bg-amber-50 oscuro:bg-amber-500/15 text-amber-700 oscuro:text-amber-300' : 'bg-green-50 oscuro:bg-green-500/15 text-green-700 oscuro:text-green-300'
                       }`}>
                         {log.fallbackActivo ? 'Fallback' : 'Gemini'}
                       </span>
                     </td>
                     <td className="py-2.5 px-2">
-                      <span className={`px-1.5 py-0.5 rounded text-[9px] font-bold uppercase ${
-                        log.error ? 'bg-red-50 text-red-700' : 'bg-green-50 text-green-700'
+                      <span className={`px-1.5 py-0.5 rounded text-[10px] font-bold uppercase ${
+                        log.error ? 'bg-red-50 oscuro:bg-red-500/15 text-red-700 oscuro:text-red-300' : 'bg-green-50 oscuro:bg-green-500/15 text-green-700 oscuro:text-green-300'
                       }`}>
                         {log.error ? 'Error' : 'Exitoso'}
                       </span>
                     </td>
-                    <td className="py-2.5 px-2 tabular-nums" style={{ color: '#94A3B8' }}>
+                    <td className="py-2.5 px-2 tabular-nums" style={{ color: 'var(--tema-texto-64748b)' }}>
                       {new Date(log.timestamp).toLocaleTimeString('es-CO')}
                     </td>
                   </tr>
@@ -295,45 +256,23 @@ export function VistaSupervisionIA() {
 
 /* ── Sub-componentes ─────────────────────────────────────────── */
 
-function KpiCard({
-  label, value, desc, valueStyle, iconStyle,
-}: {
-  label: string; value: string; desc: string;
-  valueStyle: React.CSSProperties; iconStyle: React.CSSProperties;
-}) {
-  return (
-    <div className="rounded-2xl p-4 min-w-0 bg-white"
-         style={{ border: '1px solid #D9E2D9', boxShadow: '0 1px 3px rgba(20,83,45,0.06)' }}>
-      <div className="w-8 h-8 rounded-lg flex items-center justify-center mb-3 text-lg" style={iconStyle}>
-        ✦
-      </div>
-      <p className="text-[10px] font-bold uppercase tracking-widest" style={{ color: '#94A3B8' }}>{label}</p>
-      <p className="text-2xl font-black mt-1.5 tracking-tight break-words"
-         style={{ fontFamily: 'var(--font-manrope)', ...valueStyle }}>
-        {value}
-      </p>
-      <p className="text-[9px] mt-1 leading-relaxed" style={{ color: '#94A3B8' }}>{desc}</p>
-    </div>
-  );
-}
-
 function EstadoModuloIA({
   label, desc, activo,
 }: { label: string; desc: string; activo: boolean }) {
   return (
     <div
       className="flex items-center justify-between gap-4 p-2.5 rounded-xl"
-      style={{ border: '1px solid #D9E2D9', background: activo ? '#EEF4EE' : '#F8FAF7' }}
+      style={{ border: '1px solid var(--tema-borde-dce4ea)', background: activo ? 'var(--tema-fondo-f4f9f6)' : 'var(--tema-fondo-f7f9fb)' }}
     >
       <div className="min-w-0">
-        <p className="text-xs font-bold" style={{ color: '#1F2933' }}>{label}</p>
-        <p className="text-[9px] leading-normal truncate" style={{ color: '#667085' }}>{desc}</p>
+        <p className="text-xs font-bold" style={{ color: 'var(--tema-texto-172033)' }}>{label}</p>
+        <p className="text-[10px] leading-normal truncate" style={{ color: 'var(--tema-texto-475569)' }}>{desc}</p>
       </div>
       <span
-        className="text-[9px] font-bold uppercase tracking-wider px-2 py-1 rounded-md shrink-0"
+        className="text-[10px] font-bold uppercase tracking-wider px-2 py-1 rounded-md shrink-0"
         style={activo
-          ? { background: '#ECFDF5', color: 'var(--color-success-text)', border: '1px solid #A7F3D0' }
-          : { background: '#F8FAF7', color: 'var(--text-secondary)', border: '1px solid #D9E2D9' }}
+          ? { background: 'var(--tema-fondo-ecfdf5)', color: 'var(--color-success-text)', border: '1px solid var(--tema-borde-a7f3d0)' }
+          : { background: 'var(--tema-fondo-f7f9fb)', color: 'var(--text-secondary)', border: '1px solid var(--tema-borde-dce4ea)' }}
       >
         {activo ? 'Activo' : 'Apagado'}
       </span>

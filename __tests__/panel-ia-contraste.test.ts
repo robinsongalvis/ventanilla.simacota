@@ -70,7 +70,10 @@ describe('panel de detalle · bloque «Análisis Asistido IA»', () => {
   });
 
   it.each(CLASES_DE_TEMA_OSCURO)('no reincide en la clase de tema oscuro «%s»', (clase) => {
-    expect(bloque).not.toContain(clase);
+    // Las variantes `oscuro:` (ADR-0045) solo aplican con el tema oscuro
+    // activo: ahí esas clases son las correctas. Lo prohibido es usarlas
+    // en el modo claro, sin prefijo.
+    expect(bloque.replace(/oscuro:\S+/g, '')).not.toContain(clase);
   });
 
   it('usa los tokens de texto del ADR-0030 para calificar la sugerencia', () => {

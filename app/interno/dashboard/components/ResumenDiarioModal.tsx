@@ -230,7 +230,7 @@ export function ResumenDiarioModal({
           aria-modal="true"
           aria-labelledby="resumen-diario-title"
           onKeyDown={trapTab}
-          className={`pointer-events-auto w-full max-w-3xl max-h-[92dvh] overflow-hidden rounded-2xl border border-white/10 bg-[#0D1117] transition-all duration-150 ${cerrando ? 'scale-[0.98] opacity-0' : 'scale-100 opacity-100'}`}
+          className={`pointer-events-auto w-full max-w-3xl max-h-[92dvh] overflow-hidden rounded-2xl border border-white/10 bg-[var(--tema-fondo-0d1117)] transition-all duration-150 ${cerrando ? 'scale-[0.98] opacity-0' : 'scale-100 opacity-100'}`}
         >
           <header className="border-b border-white/[0.07] px-5 py-4 sm:px-6 sm:py-5">
             <div className="flex items-start justify-between gap-4">
@@ -284,10 +284,10 @@ export function ResumenDiarioModal({
             {data.prioridades.length > 0 && (
               <div className="mt-5 rounded-xl border border-white/10 bg-white/[0.035]">
                 <div className="flex items-center justify-between gap-3 border-b border-white/[0.07] px-4 py-3">
-                  <p className="text-[10px] font-bold uppercase tracking-widest text-slate-500">
+                  <p className="text-[10px] font-bold uppercase tracking-widest text-slate-500 oscuro:text-slate-400">
                     Atención prioritaria
                   </p>
-                  <span className="text-[10px] font-mono text-slate-600">
+                  <span className="text-[10px] font-mono text-slate-600 oscuro:text-slate-400">
                     {Math.min(data.prioridades.length, 5)} de {cantidadAlertas}
                   </span>
                 </div>
@@ -307,7 +307,7 @@ export function ResumenDiarioModal({
                                 {meta.label}
                               </span>
                             </div>
-                            <p className="mt-1 text-xs text-slate-500">
+                            <p className="mt-1 text-xs text-slate-500 oscuro:text-slate-400">
                               {descripcionPrioridad(p)}
                             </p>
                           </div>

@@ -7,40 +7,55 @@
 
 import { useState, useEffect, useCallback } from 'react';
 import type { ApprovalFlow, ApprovalStatus } from '@/src/types/simi-approval';
-import { APPROVAL_STATUS_LABELS, APPROVAL_STATUS_COLOR } from '@/src/types/simi-approval';
+import { APPROVAL_STATUS_LABELS } from '@/src/types/simi-approval';
 import { LegalRiskBadge } from './LegalRiskBadge';
+import { SectionHeader } from '@/app/components/design-system/SectionHeader';
+import { StatusBadge } from '@/app/components/design-system/StatusBadge';
+import { EmptyState } from '@/app/components/design-system/EmptyState';
+import { BotonAccion } from '@/app/components/design-system/BotonAccion';
+import { type IndicadorEstaticoProps } from '@/app/components/design-system/Indicador';
+import { FilaTarjetas, TarjetaIndicador } from '@/app/components/design-system/TarjetaIndicador';
+import { AlertTriangle, Check, CheckCircle2, Download, Gavel, RefreshCw, Send, ShieldAlert, Undo2, UserCheck } from 'lucide-react';
 
-/* ── Sub-componentes ── */
+/* Ola 3 (ADR-0046): lenguaje del Tablero. Las reglas de quién aprueba,
+   escala o devuelve en cada estado NO cambian (son del flujo). */
 
-function StatusBadge({ estado }: { estado: ApprovalStatus }) {
-  const cls = APPROVAL_STATUS_COLOR[estado] ?? 'bg-gray-100 text-gray-600 border-gray-200';
-  return (
-    <span className={`inline-flex px-2 py-0.5 rounded-full text-[10px] font-bold border ${cls}`}>
-      {APPROVAL_STATUS_LABELS[estado] ?? estado}
-    </span>
-  );
+/**
+ * Estado del flujo con el `StatusBadge` del sistema. Mismo matiz por estado
+ * que antes (APPROVAL_STATUS_COLOR), ahora también en tema oscuro.
+ */
+const TONO_ESTADO: Record<ApprovalStatus, 'success' | 'warning' | 'danger' | 'info' | 'neutral' | 'accent'> = {
+  borrador_generado:           'neutral',
+  pendiente_revision_jefe:     'accent',
+  pendiente_revision_juridica: 'danger',
+  devuelto_para_ajustes:       'warning',
+  aprobado_por_jefe:           'info',
+  aprobado_por_juridica:       'success',
+  listo_para_envio:            'success',
+  enviado:                     'success',
+};
+
+function EstadoAprobacion({ estado }: { estado: ApprovalStatus }) {
+  return <StatusBadge tono={TONO_ESTADO[estado] ?? 'neutral'} tamano="sm">{APPROVAL_STATUS_LABELS[estado] ?? estado}</StatusBadge>;
 }
 
 function Stats({ stats }: { stats: Record<string, number> }) {
-  const items = [
-    { label: 'Pendientes jefe',     valor: stats.pendientesJefe,     color: '#D97706' },
-    { label: 'Pendientes jurídica', valor: stats.pendientesJuridica,  color: '#DC2626' },
-    { label: 'Devueltos',           valor: stats.devueltos,           color: '#EA580C' },
-    { label: 'Aprobados',           valor: stats.aprobados,           color: '#14532D' },
-    { label: 'Riesgo alto',         valor: stats.riesgoAlto,          color: '#DC2626' },
+  const items: IndicadorEstaticoProps[] = [
+    { etiqueta: 'Pendientes jefe',     valor: stats.pendientesJefe ?? '—',     tono: 'ambar', Icono: UserCheck },
+    { etiqueta: 'Pendientes jurídica', valor: stats.pendientesJuridica ?? '—', tono: 'rojo',  Icono: Gavel },
+    { etiqueta: 'Devueltos',           valor: stats.devueltos ?? '—',          tono: 'ambar', Icono: Undo2 },
+    { etiqueta: 'Aprobados',           valor: stats.aprobados ?? '—',          tono: 'verde', Icono: CheckCircle2 },
+    { etiqueta: 'Riesgo alto',         valor: stats.riesgoAlto ?? '—',         tono: 'rojo',  Icono: AlertTriangle },
   ];
   return (
-    <div className="grid grid-cols-3 sm:grid-cols-5 gap-2">
-      {items.map(({ label, valor, color }) => (
-        <div key={label} className="rounded-lg p-2.5 bg-white text-center"
-             style={{ border: '1px solid #D9E2D9' }}>
-          <p className="text-xl font-black tabular-nums" style={{ color }}>{valor}</p>
-          <p className="text-[9px] font-bold uppercase tracking-widest mt-0.5" style={{ color: '#94A3B8' }}>{label}</p>
-        </div>
-      ))}
-    </div>
+    <FilaTarjetas etiqueta="Resumen de aprobaciones">
+      {items.map((i) => <TarjetaIndicador key={i.etiqueta} {...i} />)}
+    </FilaTarjetas>
   );
 }
+
+const CLASE_ENLACE_CSV = 'inline-flex items-center gap-1.5 rounded-lg border px-3 py-2 text-xs font-bold hover:bg-[var(--tema-fondo-f4f9f6)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-700/30';
+const ESTILO_ENLACE_CSV = { background: 'var(--tema-fondo-ffffff)', color: 'var(--tema-texto-007049)', borderColor: 'var(--tema-borde-007049)' } as const;
 
 type Accion = 'aprobar' | 'devolver' | 'escalar_juridica' | 'marcar_listo_para_envio';
 
@@ -121,66 +136,60 @@ export function JefeAprobacionesPanel({ usuarioRol }: JefeAprobacionesPanelProps
   ];
 
   return (
-    <div className="flex-1 overflow-y-auto" style={{ background: '#F8FAF7' }}>
-      {/* Header */}
-      <div className="px-5 py-4 bg-white" style={{ borderBottom: '1px solid #D9E2D9' }}>
-        <p className="text-[10px] font-bold uppercase tracking-widest" style={{ color: '#14532D' }}>SIMI Jurídico</p>
-        <h2 className="text-lg font-black" style={{ color: '#1F2933', fontFamily: 'var(--font-manrope)' }}>
-          Cola de Aprobaciones
-        </h2>
-        <p className="text-xs mt-0.5" style={{ color: '#667085' }}>
-          Revise, apruebe o devuelva borradores antes de su envío al ciudadano.
-        </p>
-      </div>
+    <div className="flex-1 overflow-y-auto" style={{ background: 'var(--tema-fondo-f7f9fb)' }}>
+      <SectionHeader
+        titulo="Cola de Aprobaciones"
+        subtitulo="SIMI Jurídico · Revise, apruebe o devuelva borradores antes de su envío al ciudadano."
+        nota={usuarioRol === 'CONTROL_INTERNO'
+          ? 'Consulta de solo lectura: aprobar, devolver o escalar corresponde al jefe de dependencia o al administrador.'
+          : undefined}
+      />
 
-      <div className="p-4 sm:p-5 space-y-4">
-        {/* Stats */}
+      <div className="px-3 pb-6 space-y-3 sm:px-4 lg:px-6">
+        {/* Indicadores */}
         {!cargando && <Stats stats={stats} />}
 
         {/* Filtros */}
-        <div className="flex flex-wrap gap-2">
+        <div className="flex flex-wrap items-center gap-2">
           <select value={filtroEstado} onChange={(e) => setFiltroEstado(e.target.value)}
+            aria-label="Filtrar por estado"
             className="select-internal text-xs">
             {FILTROS_ESTADO.map((f) => <option key={f.value} value={f.value}>{f.label}</option>)}
           </select>
           <select value={filtroRiesgo} onChange={(e) => setFiltroRiesgo(e.target.value)}
+            aria-label="Filtrar por riesgo"
             className="select-internal text-xs">
             <option value="">Todos los riesgos</option>
             <option value="bajo">Riesgo bajo</option>
             <option value="medio">Riesgo medio</option>
             <option value="alto">Riesgo alto</option>
           </select>
-          <button onClick={cargar}
-            className="px-3 py-1.5 rounded-lg text-xs font-bold"
-            style={{ background: '#EEF4EE', border: '1px solid #D9E2D9', color: '#14532D' }}>
-            🔄 Actualizar
-          </button>
+          <BotonAccion Icono={RefreshCw} onClick={cargar}>Actualizar</BotonAccion>
 
           {/* Exportar CSV */}
-          <a href="/api/simi/reportes?tipo=aprobaciones"
-             className="px-3 py-1.5 rounded-lg text-xs font-bold"
-             style={{ background: '#F8FAF7', border: '1px solid #D9E2D9', color: '#667085' }}>
-            ↓ Exportar CSV
+          <a href="/api/simi/reportes?tipo=aprobaciones" className={CLASE_ENLACE_CSV} style={ESTILO_ENLACE_CSV}>
+            <Download className="h-3.5 w-3.5" strokeWidth={2} aria-hidden="true" />
+            Exportar CSV
           </a>
         </div>
 
         {/* Mensajes */}
-        {error && <div className="rounded-lg p-3 text-xs" style={{ background: '#FEF2F2', border: '1px solid #FECACA', color: '#DC2626' }}>{error}</div>}
-        {exito && <div className="rounded-lg p-3 text-xs" style={{ background: '#F0FDF4', border: '1px solid #BBF7D0', color: '#166534' }}>{exito}</div>}
+        {error && <div role="alert" className="rounded-lg p-3 text-xs" style={{ background: 'var(--tema-fondo-fef2f2)', border: '1px solid var(--tema-borde-fecaca)', color: 'var(--tema-texto-991b1b)' }}>{error}</div>}
+        {exito && <div role="status" className="rounded-lg p-3 text-xs" style={{ background: 'var(--tema-fondo-f0fdf4)', border: '1px solid var(--tema-borde-bbf7d0)', color: 'var(--tema-texto-006b45)' }}>{exito}</div>}
 
         {/* Loading */}
         {cargando ? (
-          <div className="flex items-center gap-3 py-8 justify-center" style={{ color: '#94A3B8' }}>
-            <span className="w-5 h-5 border-2 rounded-full animate-spin" style={{ borderColor: '#D9E2D9', borderTopColor: '#14532D' }} />
+          <div role="status" className="flex items-center gap-3 py-8 justify-center" style={{ color: 'var(--tema-texto-64748b)' }}>
+            <span className="w-5 h-5 border-2 rounded-full animate-spin" style={{ borderColor: 'var(--tema-borde-dce4ea)', borderTopColor: 'var(--tema-borde-007049)' }} aria-hidden="true" />
             Cargando aprobaciones...
           </div>
         ) : aprobaciones.length === 0 ? (
-          <div className="text-center py-12 rounded-2xl bg-white" style={{ border: '1px solid #D9E2D9' }}>
-            <p className="text-3xl mb-2">✅</p>
-            <p className="font-bold" style={{ color: '#1F2933' }}>Sin casos pendientes</p>
-            <p className="text-xs mt-1" style={{ color: '#94A3B8' }}>
-              {filtroEstado || filtroRiesgo ? 'No hay casos con los filtros aplicados.' : 'Todos los borradores han sido procesados.'}
-            </p>
+          <div className="rounded-xl bg-[var(--tema-fondo-ffffff)]">
+            <EmptyState
+              icono={<CheckCircle2 className="h-6 w-6" strokeWidth={1.9} style={{ color: 'var(--tema-texto-007049)' }} aria-hidden="true" />}
+              titulo="Sin casos pendientes"
+              descripcion={filtroEstado || filtroRiesgo ? 'No hay casos con los filtros aplicados.' : 'Todos los borradores han sido procesados.'}
+            />
           </div>
         ) : (
           /* Tabla de aprobaciones */
@@ -194,23 +203,22 @@ export function JefeAprobacionesPanel({ usuarioRol }: JefeAprobacionesPanelProps
               const estaCargando = accionando === a.id;
 
               return (
-                <div key={a.id} className="rounded-xl bg-white p-4 space-y-3"
-                     style={{ border: '1px solid #D9E2D9', boxShadow: '0 1px 3px rgba(20,83,45,0.04)' }}>
+                <div key={a.id} className="rounded-xl bg-[var(--tema-fondo-ffffff)] p-3 space-y-3">
                   {/* Cabecera de la card */}
                   <div className="flex items-start justify-between gap-3 flex-wrap">
                     <div className="min-w-0">
                       <div className="flex items-center gap-2 flex-wrap mb-1">
-                        <p className="font-mono text-xs font-bold" style={{ color: '#14532D' }}>{a.radicadoId}</p>
-                        <StatusBadge estado={a.estado} />
+                        <p className="font-mono text-xs font-bold" style={{ color: 'var(--tema-texto-007049)' }}>{a.radicadoId}</p>
+                        <EstadoAprobacion estado={a.estado} />
                         <LegalRiskBadge nivel={a.nivelRiesgo} size="sm" />
                       </div>
                       {a.motivoRevision?.length > 0 && (
-                        <p className="text-[10px] leading-snug" style={{ color: '#667085' }}>
+                        <p className="text-[10px] leading-snug" style={{ color: 'var(--tema-texto-64748b)' }}>
                           {a.motivoRevision[0]}
                         </p>
                       )}
                     </div>
-                    <p className="text-[10px] shrink-0" style={{ color: '#94A3B8' }}>
+                    <p className="text-[10px] shrink-0" style={{ color: 'var(--tema-texto-64748b)' }}>
                       {a.createdAt ? new Date(a.createdAt).toLocaleDateString('es-CO', { day: '2-digit', month: '2-digit', year: '2-digit' }) : ''}
                     </p>
                   </div>
@@ -220,9 +228,9 @@ export function JefeAprobacionesPanel({ usuarioRol }: JefeAprobacionesPanelProps
                     <div className="flex items-center gap-2 overflow-x-auto pb-0.5">
                       {a.historial.slice(-3).map((h, i) => (
                         <div key={i} className="flex items-center gap-1.5 shrink-0">
-                          {i > 0 && <span style={{ color: '#D9E2D9' }}>→</span>}
-                          <span className="text-[9px] px-1.5 py-0.5 rounded"
-                                style={{ background: '#EEF4EE', color: '#14532D' }}>
+                          {i > 0 && <span style={{ color: 'var(--tema-texto-64748b)' }} aria-hidden="true">→</span>}
+                          <span className="text-[10px] px-1.5 py-0.5 rounded"
+                                style={{ background: 'var(--tema-fondo-f4f9f6)', color: 'var(--tema-texto-007049)' }}>
                             {h.rol} · {h.estado.replace(/_/g, ' ').slice(0, 20)}
                           </span>
                         </div>
@@ -232,45 +240,36 @@ export function JefeAprobacionesPanel({ usuarioRol }: JefeAprobacionesPanelProps
 
                   {/* Acciones */}
                   {(puedeAprobar || puedeEscalar || puedeListoEnvio) && (
-                    <div className="pt-3 space-y-2" style={{ borderTop: '1px solid #EEF4EE' }}>
+                    <div className="pt-3 space-y-2" style={{ borderTop: '1px solid var(--tema-borde-f4f9f6)' }}>
                       <div className="flex flex-wrap gap-2">
                         {puedeAprobar && (
-                          <button
-                            onClick={() => ejecutarAccion(a.id, 'aprobar')}
-                            disabled={estaCargando}
-                            className="px-4 py-2 rounded-lg text-white text-xs font-bold disabled:opacity-50"
-                            style={{ background: '#14532D' }}>
-                            {estaCargando ? '...' : '✓ Aprobar'}
-                          </button>
+                          <BotonAccion variante="primaria" Icono={Check} onClick={() => ejecutarAccion(a.id, 'aprobar')} disabled={estaCargando} aria-busy={estaCargando}>
+                            {estaCargando ? '...' : 'Aprobar'}
+                          </BotonAccion>
                         )}
 
                         {puedeListoEnvio && (
-                          <button
-                            onClick={() => ejecutarAccion(a.id, 'marcar_listo_para_envio')}
-                            disabled={estaCargando}
-                            className="px-4 py-2 rounded-lg text-xs font-bold disabled:opacity-50"
-                            style={{ background: '#D4A017', color: '#14532D' }}>
-                            {estaCargando ? '...' : '📤 Listo para envío'}
-                          </button>
+                          <BotonAccion variante="primaria" Icono={Send} onClick={() => ejecutarAccion(a.id, 'marcar_listo_para_envio')} disabled={estaCargando} aria-busy={estaCargando}>
+                            {estaCargando ? '...' : 'Listo para envío'}
+                          </BotonAccion>
                         )}
 
                         {puedeEscalar && (
                           <button
+                            type="button"
                             onClick={() => ejecutarAccion(a.id, 'escalar_juridica')}
                             disabled={estaCargando}
-                            className="px-4 py-2 rounded-lg text-xs font-bold disabled:opacity-50"
-                            style={{ background: '#FEF2F2', border: '1px solid #FECACA', color: '#DC2626' }}>
-                            🚨 Escalar
+                            className="inline-flex items-center gap-1.5 px-3 py-2 rounded-lg text-xs font-bold disabled:opacity-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-700/30"
+                            style={{ background: 'var(--tema-fondo-fef2f2)', border: '1px solid var(--tema-borde-fecaca)', color: 'var(--tema-texto-b91c1c)' }}>
+                            <ShieldAlert className="h-3.5 w-3.5" strokeWidth={2} aria-hidden="true" />
+                            Escalar
                           </button>
                         )}
 
                         {puedeAprobar && (
-                          <button
-                            onClick={() => setShowDev((p) => ({ ...p, [a.id]: !p[a.id] }))}
-                            className="px-4 py-2 rounded-lg text-xs"
-                            style={{ border: '1px solid #D9E2D9', color: '#667085' }}>
-                            ↩ Devolver
-                          </button>
+                          <BotonAccion Icono={Undo2} onClick={() => setShowDev((p) => ({ ...p, [a.id]: !p[a.id] }))} aria-expanded={!!showDev[a.id]}>
+                            Devolver
+                          </BotonAccion>
                         )}
                       </div>
 
@@ -282,12 +281,14 @@ export function JefeAprobacionesPanel({ usuarioRol }: JefeAprobacionesPanelProps
                             onChange={(e) => setMotiDev((p) => ({ ...p, [a.id]: e.target.value }))}
                             rows={2}
                             placeholder="Motivo de la devolución (se notificará al funcionario)..."
+                            aria-label={`Motivo de la devolución de ${a.radicadoId}`}
                             className="input-internal resize-none w-full text-xs"
                           />
                           <button
+                            type="button"
                             onClick={() => ejecutarAccion(a.id, 'devolver', motiDev[a.id])}
                             disabled={!motiDev[a.id]?.trim() || estaCargando}
-                            className="px-4 py-2 rounded-lg text-xs font-bold disabled:opacity-50"
+                            className="px-3 py-2 rounded-lg text-xs font-bold disabled:opacity-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-700/40"
                             style={{ background: '#B45309', color: '#fff' }}>
                             Confirmar devolución
                           </button>
@@ -302,18 +303,17 @@ export function JefeAprobacionesPanel({ usuarioRol }: JefeAprobacionesPanelProps
         )}
 
         {/* Reportes rápidos */}
-        <div className="pt-4" style={{ borderTop: '1px solid #D9E2D9' }}>
-          <p className="text-[10px] font-bold uppercase tracking-widest mb-2" style={{ color: '#94A3B8' }}>Exportar reportes</p>
+        <div className="pt-3" style={{ borderTop: '1px solid var(--tema-borde-dce4ea)' }}>
+          <p className="text-xs font-black mb-2" style={{ color: 'var(--tema-texto-172033)' }}>Exportar reportes</p>
           <div className="flex flex-wrap gap-2">
             {[
               { tipo: 'aprobaciones', label: 'Aprobaciones' },
               { tipo: 'vencimientos', label: 'Vencimientos' },
               { tipo: 'metricas',     label: 'Métricas' },
             ].map(({ tipo, label }) => (
-              <a key={tipo} href={`/api/simi/reportes?tipo=${tipo}`}
-                 className="px-3 py-1.5 rounded-lg text-[11px] font-bold transition-colors"
-                 style={{ background: '#EEF4EE', border: '1px solid #D9E2D9', color: '#14532D' }}>
-                ↓ {label} CSV
+              <a key={tipo} href={`/api/simi/reportes?tipo=${tipo}`} className={CLASE_ENLACE_CSV} style={ESTILO_ENLACE_CSV}>
+                <Download className="h-3.5 w-3.5" strokeWidth={2} aria-hidden="true" />
+                {label} CSV
               </a>
             ))}
           </div>

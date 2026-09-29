@@ -73,7 +73,7 @@ export default function DashboardError({
 
         {/* Detalle diagnóstico — mensaje y digest, nunca stack ni rutas. */}
         <details className="mt-6 text-left">
-          <summary className="cursor-pointer text-[11px] font-bold uppercase tracking-widest text-slate-500">
+          <summary className="cursor-pointer text-[11px] font-bold uppercase tracking-widest text-slate-500 oscuro:text-slate-400">
             Detalle técnico
           </summary>
           <p className="mt-2 rounded-lg border border-white/10 bg-black/30 px-3 py-2 font-mono text-[11px] leading-relaxed text-slate-400 break-words">

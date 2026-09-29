@@ -1,6 +1,8 @@
 'use client';
 
 import { useState } from 'react';
+import { BotonAccion } from '@/app/components/design-system/BotonAccion';
+import { FileDown } from 'lucide-react';
 
 export function PanelReportesControl() {
   const [desde, setDesde] = useState('');
@@ -51,56 +53,50 @@ export function PanelReportesControl() {
 
   return (
     <div className="space-y-4">
-      <header className="rounded-xl bg-white p-4" style={{ border: '1px solid #D9E2D9' }}>
-        <p className="text-[10px] font-bold uppercase tracking-widest" style={{ color: '#14532D' }}>Informe de Control Interno</p>
-        <p className="text-sm mt-1" style={{ color: '#1F2933' }}>
+      <header className="rounded-xl bg-[var(--tema-fondo-ffffff)] p-4" style={{ border: '1px solid var(--tema-borde-dce4ea)' }}>
+        <p className="text-[10px] font-bold uppercase tracking-widest" style={{ color: 'var(--tema-texto-007049)' }}>Informe de Control Interno</p>
+        <p className="text-sm mt-1" style={{ color: 'var(--tema-texto-172033)' }}>
           Documento institucional con resumen, alertas, hallazgos, planes de mejora, dependencias y radicados revisados.
         </p>
-        <p className="text-xs mt-1" style={{ color: '#667085' }}>
+        <p className="text-xs mt-1" style={{ color: 'var(--tema-texto-64748b)' }}>
           Sirve como soporte de seguimiento interno. La descarga queda registrada en la trazabilidad del módulo.
         </p>
       </header>
 
-      <div className="rounded-xl bg-white p-4" style={{ border: '1px solid #D9E2D9' }}>
-        <p className="text-[10px] font-bold uppercase tracking-widest" style={{ color: '#94A3B8' }}>Período del informe</p>
+      <div className="rounded-xl bg-[var(--tema-fondo-ffffff)] p-4" style={{ border: '1px solid var(--tema-borde-dce4ea)' }}>
+        <p className="text-[10px] font-bold uppercase tracking-widest" style={{ color: 'var(--tema-texto-64748b)' }}>Período del informe</p>
         <div className="flex flex-wrap items-end gap-3 mt-2">
-          <label className="flex flex-col text-[10px] font-bold uppercase tracking-widest" style={{ color: '#94A3B8' }}>
+          <label className="flex flex-col text-[10px] font-bold uppercase tracking-widest" style={{ color: 'var(--tema-texto-64748b)' }}>
             Desde
             <input type="date" className="input-internal mt-1 text-xs" value={desde} onChange={(e) => setDesde(e.target.value)} />
           </label>
-          <label className="flex flex-col text-[10px] font-bold uppercase tracking-widest" style={{ color: '#94A3B8' }}>
+          <label className="flex flex-col text-[10px] font-bold uppercase tracking-widest" style={{ color: 'var(--tema-texto-64748b)' }}>
             Hasta
             <input type="date" className="input-internal mt-1 text-xs" value={hasta} onChange={(e) => setHasta(e.target.value)} />
           </label>
-          <button
-            type="button"
-            onClick={descargar}
-            disabled={generando}
-            className="px-3 py-2 rounded-lg text-xs font-bold text-white disabled:opacity-60"
-            style={{ background: '#14532D' }}
-          >
+          <BotonAccion variante="primaria" Icono={FileDown} onClick={descargar} disabled={generando}>
             {generando ? 'Generando informe…' : 'Exportar informe de Control Interno'}
-          </button>
+          </BotonAccion>
         </div>
-        <p className="text-[10px] mt-3" style={{ color: '#94A3B8' }}>
+        <p className="text-[10px] mt-3" style={{ color: 'var(--tema-texto-64748b)' }}>
           Si no indica fechas, el informe incluye toda la información disponible.
         </p>
       </div>
 
       {exito && (
-        <div className="rounded-xl p-4 text-sm" style={{ background: '#F0FDF4', border: '1px solid #BBF7D0', color: '#14532D' }}>
+        <div role="status" className="rounded-xl p-4 text-sm" style={{ background: 'var(--tema-fondo-f0fdf4)', border: '1px solid var(--tema-borde-bbf7d0)', color: 'var(--tema-texto-007049)' }}>
           {exito}
         </div>
       )}
       {error && (
-        <div className="rounded-xl p-4 text-sm" style={{ background: '#FEF2F2', border: '1px solid #FECACA', color: '#991B1B' }}>
+        <div role="alert" className="rounded-xl p-4 text-sm" style={{ background: 'var(--tema-fondo-fef2f2)', border: '1px solid var(--tema-borde-fecaca)', color: 'var(--tema-texto-991b1b)' }}>
           {error}
         </div>
       )}
 
-      <div className="rounded-xl bg-white p-4" style={{ border: '1px solid #D9E2D9' }}>
-        <p className="text-[10px] font-bold uppercase tracking-widest" style={{ color: '#14532D' }}>Qué contiene el informe</p>
-        <ul className="mt-2 text-xs space-y-1 list-disc pl-4" style={{ color: '#1F2933' }}>
+      <div className="rounded-xl bg-[var(--tema-fondo-ffffff)] p-4" style={{ border: '1px solid var(--tema-borde-dce4ea)' }}>
+        <p className="text-[10px] font-bold uppercase tracking-widest" style={{ color: 'var(--tema-texto-007049)' }}>Qué contiene el informe</p>
+        <ul className="mt-2 text-xs space-y-1 list-disc pl-4" style={{ color: 'var(--tema-texto-172033)' }}>
           <li><strong>Resumen</strong> — indicadores principales con semáforo.</li>
           <li><strong>Alertas</strong> — situaciones detectadas que requieren atención.</li>
           <li><strong>Hallazgos</strong> — registros creados por Control Interno.</li>

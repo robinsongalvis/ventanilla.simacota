@@ -15,37 +15,75 @@ import { coincideIdentidadFiltroRapido } from '@/lib/busqueda/coincidencia-filtr
 import { SectionHeader } from '@/app/components/design-system/SectionHeader';
 import { EmptyState } from '@/app/components/design-system/EmptyState';
 import { StatusBadge } from '@/app/components/design-system/StatusBadge';
+import { BarraTrabajo } from '@/app/components/design-system/BarraTrabajo';
+import { BotonAccion } from '@/app/components/design-system/BotonAccion';
+import { ChipFiltro } from '@/app/components/design-system/ChipFiltro';
+import type { TonoIndicador } from '@/app/components/design-system/Indicador';
+import { FilaTarjetas, TarjetaIndicador } from '@/app/components/design-system/TarjetaIndicador';
+import { ArrowRight, BookOpen, ClipboardList, Clock3, FileWarning, Inbox, MailX, Plus, Send, SlidersHorizontal, UserRoundX } from 'lucide-react';
 
 /* ══════════════════════════════════════════════════════════════
    Ventanilla · módulo de mostrador — "Atención al ciudadano".
 
-   Intención distinta del Tablero: aquí no hay panorama ni KPIs, hay
-   un ciudadano al frente. La búsqueda es la protagonista y "Nueva
-   radicación" la acción primaria (única superficie dorada).
+   Centro operativo de la recepción (decisión del propietario, 23-sep-2026):
+   arriba, el estado de la operación en tarjetas (mismas cifras que el
+   Tablero y la Bandeja) y todas las herramientas de recepción; debajo, el
+   mostrador de siempre. Cada tarjeta LLEVA a donde ese estado se gestiona
+   (Bandeja o Tablero filtrado); no filtra aquí. Sin flujos nuevos: solo
+   se reúne lo que ya existe. La búsqueda sigue siendo la protagonista y
+   "Nueva radicación" la acción primaria (única superficie dorada).
 
    La búsqueda tiene estado PROPIO: no comparte el `busqueda` del
    reducer del Tablero para no arrastrar filtros apilados entre
    módulos (lección del Nivel 3A).
 ══════════════════════════════════════════════════════════════ */
 
-const VERDE_INST = '#14532D';
-const DORADO     = '#D4A017';
-
+/* Ola 3 (ADR-0046): colores por token de tema (claro/oscuro). El dorado del
+   punto del encabezado es la marca del mostrador y no cambia con el tema. */
+const VERDE_INST = 'var(--tema-texto-007049)';
+const DORADO     = '#E5A31A';
 const MAX_RESULTADOS = 8;
 
 /** Trío visual de cada chip de pendiente (color = estado, nunca decora). */
 const CHIP_PENDIENTE: Record<PendienteMostrador, { label: string; bg: string; texto: string }> = {
-  SELLAR_PDF:            { label: 'PDF sin sellar',        bg: '#FAEEDA', texto: '#7A4F0A' },
-  DATOS_INCOMPLETOS:     { label: 'Datos incompletos',     bg: '#FAEEDA', texto: '#7A4F0A' },
-  CORREO_FALLIDO:        { label: 'Correo fallido',        bg: '#FCEBEB', texto: '#911111' },
-  CONSTANCIA_SIN_ENVIAR: { label: 'Constancia sin enviar', bg: '#FAEEDA', texto: '#7A4F0A' },
+  SELLAR_PDF:            { label: 'PDF sin sellar',        bg: 'var(--tema-fondo-faeeda)', texto: 'var(--tema-texto-7a4f0a)' },
+  DATOS_INCOMPLETOS:     { label: 'Datos incompletos',     bg: 'var(--tema-fondo-faeeda)', texto: 'var(--tema-texto-7a4f0a)' },
+  CORREO_FALLIDO:        { label: 'Correo fallido',        bg: 'var(--tema-fondo-fcebeb)', texto: 'var(--tema-texto-911111)' },
+  CONSTANCIA_SIN_ENVIAR: { label: 'Constancia sin enviar', bg: 'var(--tema-fondo-faeeda)', texto: 'var(--tema-texto-7a4f0a)' },
 };
 
 /** Riel izquierdo de la fila según su pendiente más urgente. */
 function rielFila(f: FilaTrabajoHoy): string {
-  if (f.pendientes.includes('CORREO_FALLIDO')) return '#DC2626';
-  if (f.pendientes.length > 0)                 return '#D97706';
+  if (f.pendientes.includes('CORREO_FALLIDO')) return 'var(--tema-texto-d81e1e)';
+  if (f.pendientes.length > 0)                 return 'var(--tema-texto-d97706)';
   return VERDE_INST;
+}
+
+/** Chips de «Trabajo de hoy»: mismo orden, conteos y alternancia de antes. */
+const CHIPS_HOY: readonly { id: Exclude<FiltroTrabajoHoy, 'TODOS'>; conteo: keyof ReturnType<typeof trabajoDeHoy>['conteos']; tono: TonoIndicador }[] = [
+  { id: 'SELLAR_PDF',            conteo: 'sellarPdf',           tono: 'ambar' },
+  { id: 'DATOS_INCOMPLETOS',     conteo: 'datosIncompletos',    tono: 'ambar' },
+  { id: 'CORREO_FALLIDO',        conteo: 'correoFallido',       tono: 'rojo' },
+  { id: 'CONSTANCIA_SIN_ENVIAR', conteo: 'constanciaSinEnviar', tono: 'ambar' },
+];
+
+/** Destinos del Tablero a los que lleva una tarjeta del hub (filtros que ya existen). */
+export type DestinoTableroVentanilla = 'DATOS_INCOMPLETOS' | 'CORREOS_FALLIDOS' | 'POR_VENCER';
+
+/**
+ * Estado de la operación para el hub. Lo calcula la página con las MISMAS
+ * fuentes del Tablero y de la Bandeja, así que al pulsar una tarjeta la
+ * cifra coincide con las filas que se ven al llegar.
+ */
+export interface ResumenOperacionVentanilla {
+  /** Radicados en la Bandeja de asignación. */
+  porAsignar: number;
+  /** Radicados con datos no aportados por el solicitante. */
+  datosIncompletos: number;
+  /** Notificaciones fallidas («Con errores» del Tablero). */
+  conErrores: number;
+  /** «Por vencer» del Tablero. */
+  porVencer: number;
 }
 
 export interface VistaVentanillaProps {
@@ -60,6 +98,14 @@ export interface VistaVentanillaProps {
   /** Sprint Planilla de reparto — presente solo para Recepción/Admin;
    *  abre el panel de entrega de documentos físicos. */
   onAbrirReparto?: () => void;
+  /** Hub: estado de la operación. Sin él, la vista es solo el mostrador. */
+  resumenOperacion?: ResumenOperacionVentanilla;
+  /** Hub: abre la Bandeja de asignación (solo con permiso de usarla). */
+  onAbrirBandeja?: () => void;
+  /** Hub: abre el Tablero con el filtro existente de ese estado. */
+  onVerEnTablero?: (destino: DestinoTableroVentanilla) => void;
+  /** Hub: abre el libro de salidas (solo con permiso de leerlo). */
+  onAbrirSalidas?: () => void;
   /** Referencia temporal inyectable para tests deterministas. */
   ahora?: Date;
 }
@@ -86,6 +132,10 @@ export function VistaVentanilla({
   onAbrirRadicado,
   onRegistrarSalida,
   onAbrirReparto,
+  resumenOperacion,
+  onAbrirBandeja,
+  onVerEnTablero,
+  onAbrirSalidas,
   ahora,
 }: VistaVentanillaProps) {
   const [consulta, setConsulta] = useState('');
@@ -120,7 +170,7 @@ export function VistaVentanilla({
   };
 
   return (
-    <div className="flex-1 overflow-y-auto min-h-0" style={{ background: '#F8FAF7' }}>
+    <div className="flex-1 overflow-y-auto min-h-0" style={{ background: 'var(--tema-fondo-f7f9fb)' }}>
       {/* ── Header del mostrador ── */}
       <SectionHeader
         titulo="Ventanilla · Atención al ciudadano"
@@ -130,117 +180,114 @@ export function VistaVentanilla({
         }
         acciones={
           <>
+            {onAbrirSalidas && (
+              <BotonAccion Icono={BookOpen} onClick={onAbrirSalidas}>Libro de salidas</BotonAccion>
+            )}
             {onAbrirReparto && (
-              <button
-                type="button"
-                onClick={onAbrirReparto}
-                className="inline-flex items-center gap-1.5 text-[13px] font-bold px-4 py-2.5 rounded-[10px] transition-colors hover:bg-[#EEF4EE]"
-                style={{ border: '1px solid #14532D', color: '#14532D', background: 'white' }}
-              >
-                Reparto del día
-              </button>
+              <BotonAccion Icono={ClipboardList} onClick={onAbrirReparto}>Reparto del día</BotonAccion>
             )}
             {onRegistrarSalida && (
-              <button
-                type="button"
-                onClick={onRegistrarSalida}
-                className="inline-flex items-center gap-1.5 text-[13px] font-bold px-4 py-2.5 rounded-[10px] transition-colors hover:bg-[#EEF4EE]"
-                style={{ border: '1px solid #14532D', color: '#14532D', background: 'white' }}
-              >
-                Registrar salida
-              </button>
+              <BotonAccion Icono={Send} onClick={onRegistrarSalida}>Registrar salida</BotonAccion>
             )}
             {puedeRadicar && (
-              <button
-                type="button"
-                onClick={onNuevaRadicacion}
-                className="inline-flex items-center gap-1.5 text-[13px] font-bold px-4 py-2.5 rounded-[10px] shrink-0 transition-opacity hover:opacity-90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-600/40"
-                style={{ background: DORADO, color: '#3D2C00', border: '1px solid #B8890F' }}
-              >
-                <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2.5}>
-                  <path strokeLinecap="round" strokeLinejoin="round" d="M12 5v14M5 12h14" />
-                </svg>
-                Nueva radicación
-              </button>
+              <BotonAccion variante="destacada" Icono={Plus} onClick={onNuevaRadicacion}>Nueva radicación</BotonAccion>
             )}
           </>
         }
       />
 
-      {/* ── Búsqueda protagonista ── */}
-      <div className="px-4 md:px-6 py-4 bg-white" style={{ borderBottom: '1px solid #E3EAE3' }}>
-        <div
-          className="flex items-center gap-2.5 h-12 px-4 rounded-xl bg-white"
-          style={{ border: `1.5px solid ${VERDE_INST}` }}
-        >
-          <svg className="w-5 h-5 shrink-0" style={{ color: VERDE_INST }} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2}>
-            <path strokeLinecap="round" strokeLinejoin="round" d="M21 21l-5.197-5.197m0 0A7.5 7.5 0 105.196 5.196a7.5 7.5 0 0010.607 10.607z" />
-          </svg>
-          <input
-            type="text"
-            value={consulta}
-            onChange={(e) => setConsulta(e.target.value)}
-            onKeyDown={(e) => { if (e.key === 'Enter') abrirCoincidenciaExacta(); }}
-            placeholder="Radicado, expediente, cédula o nombre…"
-            aria-label="Buscar radicado por número, cédula o nombre"
-            className="flex-1 min-w-0 text-sm bg-transparent outline-none placeholder:text-slate-400"
-            style={{ color: '#12261A' }}
-          />
-          {consulta && (
-            <button
-              type="button"
-              onClick={() => setConsulta('')}
-              aria-label="Limpiar búsqueda"
-              className="text-slate-400 hover:text-slate-600 shrink-0"
-            >
-              <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2}>
-                <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
-              </svg>
-            </button>
-          )}
+      {/* ── Estado de la operación: tarjetas que llevan a donde se gestiona ── */}
+      {resumenOperacion && (
+        <div className="px-3 pt-1 pb-1 sm:px-4 lg:px-6">
+          <FilaTarjetas etiqueta="Estado de la operación de recepción">
+            <TarjetaIndicador
+              etiqueta="Radicados hoy"
+              valor={hoy.filas.length}
+              descripcion="Recibidos hoy en la Ventanilla"
+              tono="gris"
+              Icono={Inbox}
+            />
+            <TarjetaIndicador
+              etiqueta="Por asignar"
+              valor={resumenOperacion.porAsignar}
+              descripcion="En la bandeja de asignación"
+              tono="ambar"
+              Icono={UserRoundX}
+              onAbrir={onAbrirBandeja}
+              etiquetaAbrir="Abrir la bandeja de asignación"
+            />
+            <TarjetaIndicador
+              etiqueta="Datos incompletos"
+              valor={resumenOperacion.datosIncompletos}
+              descripcion="Datos no aportados por el solicitante"
+              tono="ambar"
+              Icono={FileWarning}
+              onAbrir={onVerEnTablero ? () => onVerEnTablero('DATOS_INCOMPLETOS') : undefined}
+              etiquetaAbrir="Ver en el Tablero"
+            />
+            <TarjetaIndicador
+              etiqueta="Con errores"
+              valor={resumenOperacion.conErrores}
+              descripcion="Notificaciones fallidas"
+              tono="rojo"
+              Icono={MailX}
+              onAbrir={onVerEnTablero ? () => onVerEnTablero('CORREOS_FALLIDOS') : undefined}
+              etiquetaAbrir="Ver en el Tablero"
+            />
+            <TarjetaIndicador
+              etiqueta="Por vencer"
+              valor={resumenOperacion.porVencer}
+              descripcion="Próximos a vencer"
+              tono="ambar"
+              Icono={Clock3}
+              onAbrir={onVerEnTablero ? () => onVerEnTablero('POR_VENCER') : undefined}
+              etiquetaAbrir="Ver en el Tablero"
+            />
+          </FilaTarjetas>
         </div>
-        <div className="flex items-center justify-between gap-3 mt-2">
-          <span className="text-[11px]" style={{ color: '#7A8B7F' }}>
-            Un radicado completo abre el detalle con Enter
-          </span>
-          <button
-            type="button"
-            onClick={onAbrirBusquedaAvanzada}
-            className="inline-flex items-center gap-1 text-xs font-semibold shrink-0 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-700/30 rounded"
-            style={{ color: VERDE_INST }}
-          >
-            Búsqueda avanzada
-            <svg className="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2.5}>
-              <path strokeLinecap="round" strokeLinejoin="round" d="M5 12h14M13 6l6 6-6 6" />
-            </svg>
-          </button>
-        </div>
-      </div>
+      )}
+
+      {/* ── Búsqueda protagonista: la barra de trabajo del Tablero ── */}
+      <BarraTrabajo
+        busqueda={consulta}
+        onBusquedaChange={setConsulta}
+        placeholder="Radicado, expediente, cédula o nombre…"
+        ariaLabel="Buscar radicado por número, cédula o nombre"
+        onEnter={abrirCoincidenciaExacta}
+        limpiable
+      >
+        <BotonAccion Icono={SlidersHorizontal} onClick={onAbrirBusquedaAvanzada} title="Búsqueda histórica y filtros avanzados">
+          Búsqueda avanzada
+        </BotonAccion>
+      </BarraTrabajo>
+      <p className="px-3 pt-1 text-[11px] sm:px-4 lg:px-6" style={{ color: 'var(--tema-texto-64748b)' }}>
+        Un radicado completo abre el detalle con Enter
+      </p>
 
       {/* ── Resultados de la consulta ── */}
       {q && (
-        <div className="px-4 md:px-6 py-4">
-          <p className="text-[11px] font-bold uppercase tracking-widest mb-2" style={{ color: '#5F8A6E' }}>
+        <div className="px-3 py-3 sm:px-4 lg:px-6">
+          <p className="text-[11px] font-bold uppercase tracking-widest mb-2" style={{ color: 'var(--tema-texto-007049)' }}>
             {resultados.length === 0
               ? 'Sin coincidencias'
               : `${resultados.length} coincidencia${resultados.length === 1 ? '' : 's'}`}
           </p>
           {resultados.length > 0 && (
-            <div className="rounded-xl bg-white overflow-hidden" style={{ border: '1px solid #E3EAE3' }}>
+            <div className="rounded-xl bg-[var(--tema-fondo-ffffff)] overflow-hidden" style={{ border: '1px solid var(--tema-borde-e4ebf0)' }}>
               {resultados.map((r, i) => (
                 <button
                   key={r.radicadoId}
                   type="button"
                   onClick={() => onAbrirRadicado(r.radicadoId)}
                   aria-label={`Abrir radicado ${r.radicadoId}`}
-                  className="w-full flex items-center gap-3 px-4 py-3 text-left hover:bg-[#F4F8F4] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-700/30"
-                  style={i > 0 ? { borderTop: '1px solid #EEF2EE' } : undefined}
+                  className="w-full flex items-center gap-3 px-3 py-2.5 text-left hover:bg-[var(--tema-fondo-f4f8f4)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-emerald-700/30"
+                  style={i > 0 ? { borderTop: '1px solid var(--tema-borde-eef2ee)' } : undefined}
                 >
                   <div className="flex-1 min-w-0">
-                    <p className="font-mono text-[13px] font-bold truncate" style={{ color: '#12261A' }}>
+                    <p className="font-mono text-[13px] font-bold truncate" style={{ color: 'var(--tema-texto-172033)' }}>
                       {r.radicadoId}
                     </p>
-                    <p className="text-[11px] truncate" style={{ color: '#5F6F64' }}>
+                    <p className="text-[11px] truncate" style={{ color: 'var(--tema-texto-5f6f64)' }}>
                       {nombreSolicitanteVisible(r, r.solicitante.nombreCompleto)}
                       {' · '}
                       {NOMBRES_TENANT[r.clasificacion.oficinaDestino] ?? r.clasificacion.oficinaDestino}
@@ -248,9 +295,7 @@ export function VistaVentanilla({
                   </div>
                   <span className="inline-flex items-center gap-1 text-[11.5px] font-semibold shrink-0" style={{ color: VERDE_INST }}>
                     Abrir
-                    <svg className="w-3 h-3" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2.5}>
-                      <path strokeLinecap="round" strokeLinejoin="round" d="M5 12h14M13 6l6 6-6 6" />
-                    </svg>
+                    <ArrowRight className="h-3 w-3" strokeWidth={2.5} aria-hidden="true" />
                   </span>
                 </button>
               ))}
@@ -267,64 +312,37 @@ export function VistaVentanilla({
 
       {/* ── Trabajo de hoy (oculto mientras se busca) ── */}
       {!q && (
-        <div className="px-4 md:px-6 py-4">
-          <div className="flex items-baseline justify-between gap-3 flex-wrap">
-            <div className="flex items-baseline gap-2 min-w-0">
-              <span className="text-[13px] font-bold" style={{ color: '#12261A' }}>
-                Trabajo de hoy
-              </span>
-              <span className="text-[11px] truncate" style={{ color: '#7A8B7F' }}>
-                {fechaLegible} · {hoy.filas.length} radicado{hoy.filas.length === 1 ? '' : 's'}
-              </span>
-            </div>
-            {hoy.filas.length > 0 && (
-              <div className="flex gap-1.5 flex-wrap">
-                <ChipFiltroHoy
-                  label="Todos"
-                  conteo={hoy.filas.length}
-                  activo={filtroHoy === 'TODOS'}
-                  color={VERDE_INST}
-                  onClick={() => setFiltroHoy('TODOS')}
-                />
-                {hoy.conteos.sellarPdf > 0 && (
-                  <ChipFiltroHoy
-                    label="PDF sin sellar"
-                    conteo={hoy.conteos.sellarPdf}
-                    activo={filtroHoy === 'SELLAR_PDF'}
-                    color="#854F0B"
-                    onClick={() => setFiltroHoy(filtroHoy === 'SELLAR_PDF' ? 'TODOS' : 'SELLAR_PDF')}
-                  />
-                )}
-                {hoy.conteos.datosIncompletos > 0 && (
-                  <ChipFiltroHoy
-                    label="Datos incompletos"
-                    conteo={hoy.conteos.datosIncompletos}
-                    activo={filtroHoy === 'DATOS_INCOMPLETOS'}
-                    color="#854F0B"
-                    onClick={() => setFiltroHoy(filtroHoy === 'DATOS_INCOMPLETOS' ? 'TODOS' : 'DATOS_INCOMPLETOS')}
-                  />
-                )}
-                {hoy.conteos.correoFallido > 0 && (
-                  <ChipFiltroHoy
-                    label="Correo fallido"
-                    conteo={hoy.conteos.correoFallido}
-                    activo={filtroHoy === 'CORREO_FALLIDO'}
-                    color="#A32D2D"
-                    onClick={() => setFiltroHoy(filtroHoy === 'CORREO_FALLIDO' ? 'TODOS' : 'CORREO_FALLIDO')}
-                  />
-                )}
-                {hoy.conteos.constanciaSinEnviar > 0 && (
-                  <ChipFiltroHoy
-                    label="Constancia sin enviar"
-                    conteo={hoy.conteos.constanciaSinEnviar}
-                    activo={filtroHoy === 'CONSTANCIA_SIN_ENVIAR'}
-                    color="#854F0B"
-                    onClick={() => setFiltroHoy(filtroHoy === 'CONSTANCIA_SIN_ENVIAR' ? 'TODOS' : 'CONSTANCIA_SIN_ENVIAR')}
-                  />
-                )}
-              </div>
-            )}
+        <div className="px-3 py-3 sm:px-4 lg:px-6">
+          <div className="flex items-baseline gap-2 min-w-0">
+            <span className="text-xs font-black" style={{ color: 'var(--tema-texto-172033)' }}>
+              Trabajo de hoy
+            </span>
+            <span className="text-[11px] truncate" style={{ color: 'var(--tema-texto-64748b)' }}>
+              {fechaLegible} · {hoy.filas.length} radicado{hoy.filas.length === 1 ? '' : 's'}
+            </span>
           </div>
+          {hoy.filas.length > 0 && (
+            <div className="mt-1.5 flex flex-wrap gap-1.5" role="group" aria-label="Filtros de trabajo de hoy">
+              <ChipFiltro
+                etiqueta="Todos"
+                valor={hoy.filas.length}
+                activo={filtroHoy === 'TODOS'}
+                onClick={() => setFiltroHoy('TODOS')}
+                ariaLabel={`Filtrar trabajo de hoy: Todos (${hoy.filas.length})`}
+              />
+              {CHIPS_HOY.filter((c) => hoy.conteos[c.conteo] > 0).map((c) => (
+                <ChipFiltro
+                  key={c.id}
+                  etiqueta={CHIP_PENDIENTE[c.id].label}
+                  valor={hoy.conteos[c.conteo]}
+                  tono={c.tono}
+                  activo={filtroHoy === c.id}
+                  onClick={() => setFiltroHoy(filtroHoy === c.id ? 'TODOS' : c.id)}
+                  ariaLabel={`Filtrar trabajo de hoy: ${CHIP_PENDIENTE[c.id].label} (${hoy.conteos[c.conteo]})`}
+                />
+              ))}
+            </div>
+          )}
 
           {hoy.filas.length === 0 ? (
             <EmptyState
@@ -332,7 +350,7 @@ export function VistaVentanilla({
               descripcion="Hoy no se han radicado documentos. El primero del día aparecerá aquí con sus pendientes de recepción."
             />
           ) : (
-            <div className="mt-2.5 rounded-xl bg-white overflow-hidden" style={{ border: '1px solid #E3EAE3' }}>
+            <div className="mt-2.5 rounded-xl bg-[var(--tema-fondo-ffffff)] overflow-hidden" style={{ border: '1px solid var(--tema-borde-e4ebf0)' }}>
               {filasVisibles.map((f, i) => (
                 <FilaTrabajoHoyItem
                   key={f.radicadoId}
@@ -353,39 +371,10 @@ export function VistaVentanilla({
       )}
 
       {/* ── Recordatorio de límites del módulo ── */}
-      <p className="px-4 md:px-6 py-3 text-[11px]" style={{ color: '#7A8B7F' }}>
+      <p className="px-3 pb-3 text-[11px] sm:px-4 lg:px-6" style={{ color: 'var(--tema-texto-64748b)' }}>
         ¿Panorama del municipio y prioridades? Eso vive en el Tablero.
       </p>
     </div>
-  );
-}
-
-function ChipFiltroHoy({
-  label,
-  conteo,
-  activo,
-  color,
-  onClick,
-}: {
-  label: string;
-  conteo: number;
-  activo: boolean;
-  color: string;
-  onClick: () => void;
-}) {
-  return (
-    <button
-      type="button"
-      onClick={onClick}
-      aria-pressed={activo}
-      aria-label={`Filtrar trabajo de hoy: ${label} (${conteo})`}
-      className="text-[11px] font-semibold px-2.5 py-1 rounded-full transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-700/30"
-      style={activo
-        ? { background: '#EEF4EE', border: `1px solid ${VERDE_INST}`, color: VERDE_INST }
-        : { background: '#FFFFFF', border: '1px solid #E3EAE3', color }}
-    >
-      {label} · {conteo}
-    </button>
   );
 }
 
@@ -403,22 +392,24 @@ function FilaTrabajoHoyItem({
       type="button"
       onClick={onAbrir}
       aria-label={`Abrir radicado ${fila.radicadoId}`}
-      className="w-full flex items-center gap-3 pr-4 text-left hover:bg-[#F4F8F4] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-700/30"
-      style={primera ? undefined : { borderTop: '1px solid #EEF2EE' }}
+      /* Móvil: rejilla de dos líneas (las insignias bajan bajo el número y no
+         lo estrujan). Desde `sm`: una sola línea, como siempre. */
+      className="w-full grid grid-cols-[3px_2.5rem_minmax(0,1fr)_auto] items-center gap-x-3 pr-3 text-left hover:bg-[var(--tema-fondo-f4f8f4)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-emerald-700/30 sm:flex"
+      style={primera ? undefined : { borderTop: '1px solid var(--tema-borde-eef2ee)' }}
     >
-      <span className="w-[3px] self-stretch shrink-0" style={{ background: rielFila(fila) }} />
-      <span className="text-[11px] w-10 shrink-0 py-3 tabular-nums" style={{ color: '#7A8B7F' }}>
+      <span className="w-[3px] self-stretch shrink-0 row-span-2" style={{ background: rielFila(fila) }} />
+      <span className="text-[11px] w-10 shrink-0 py-3 tabular-nums row-span-2 self-start sm:self-auto" style={{ color: 'var(--tema-texto-64748b)' }}>
         {fila.horaRadicado}
       </span>
       <span className="flex-1 min-w-0 py-2.5">
-        <span className="block font-mono text-[13px] font-bold truncate" style={{ color: '#12261A' }}>
+        <span className="block font-mono text-[13px] font-bold truncate" style={{ color: 'var(--tema-texto-172033)' }}>
           {fila.radicadoId}
         </span>
-        <span className="block text-[11px] truncate" style={{ color: '#5F6F64' }}>
+        <span className="block text-[11px] truncate" style={{ color: 'var(--tema-texto-5f6f64)' }}>
           {fila.tipoSolicitudNombre} · {NOMBRES_TENANT[fila.oficinaDestino] ?? fila.oficinaDestino}
         </span>
       </span>
-      <span className="flex items-center gap-1.5 flex-wrap justify-end shrink-0">
+      <span className="col-start-3 col-span-2 row-start-2 flex items-center gap-1.5 flex-wrap justify-start pb-2.5 shrink-0 sm:justify-end sm:pb-0">
         {fila.identidadReservada && (
           <StatusBadge tono="neutral" tamano="sm">Identidad reservada</StatusBadge>
         )}
@@ -439,11 +430,9 @@ function FilaTrabajoHoyItem({
           <StatusBadge tono="success" tamano="sm">Al día</StatusBadge>
         )}
       </span>
-      <span className="inline-flex items-center gap-1 text-[11.5px] font-semibold shrink-0" style={{ color: VERDE_INST }}>
-        Abrir
-        <svg className="w-3 h-3" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2.5}>
-          <path strokeLinecap="round" strokeLinejoin="round" d="M5 12h14M13 6l6 6-6 6" />
-        </svg>
+      <span className="col-start-4 row-start-1 inline-flex items-center gap-1 text-[11.5px] font-semibold shrink-0" style={{ color: VERDE_INST }}>
+        <span className="hidden sm:inline">Abrir</span>
+        <ArrowRight className="h-3 w-3" strokeWidth={2.5} aria-hidden="true" />
       </span>
     </button>
   );

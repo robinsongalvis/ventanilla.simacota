@@ -4,18 +4,20 @@ import { useEffect } from 'react';
 import { usePathname, useRouter } from 'next/navigation';
 import { useAuth } from '@/lib/hooks/useAuth';
 import { useSingleTab } from '@/lib/hooks/useSingleTab';
+import { useTemaInterno } from '@/lib/hooks/useTemaInterno';
 import { DashboardErrorBoundary } from '@/app/components/ErrorBoundary';
 import { TabBloqueada } from '@/app/components/TabBloqueada';
+import { destinoTrasLogin, urlLoginConRetorno } from '@/lib/auth/destino-tras-login';
 
 /** Pantallas internas cuyo raíz tiene altura fija y scroll interno propio — ver el efecto que usa esta lista. */
 const RUTAS_CON_SCROLL_PROPIO = ['/interno/dashboard', '/interno/licencias'] as const;
 
 function CargandoModuloInterno() {
   return (
-    <div className="min-h-screen bg-[#0A0A0B] flex items-center justify-center">
+    <div className="min-h-screen bg-[var(--tema-fondo-0a0a0b)] flex items-center justify-center">
       <div className="flex flex-col items-center gap-3">
         <span className="w-8 h-8 border-2 border-indigo-500/30 border-t-indigo-500 rounded-full animate-spin-smooth" />
-        <span className="text-sm text-slate-500">Verificando sesion...</span>
+        <span className="text-sm text-slate-500 oscuro:text-slate-400">Verificando sesion...</span>
       </div>
     </div>
   );
@@ -37,13 +39,17 @@ export default function InternoLayout({
   useEffect(() => {
     if (cargando) return;
 
+    // El retorno conserva los parámetros (`?vista=licencias&expediente=…`,
+    // `?radicadoId=…`): `usePathname()` no los incluye.
     if (!usuario && !esLogin) {
-      router.replace(`/interno/login?next=${encodeURIComponent(pathname)}`);
+      router.replace(urlLoginConRetorno(pathname, window.location.search));
       return;
     }
 
+    // Con sesión en la página de login se respeta el mismo `next` que usa el
+    // formulario; antes se iba siempre al Tablero y el enlace se perdía.
     if (usuario && esLogin) {
-      router.replace('/interno/dashboard');
+      router.replace(destinoTrasLogin(new URLSearchParams(window.location.search).get('next')));
     }
   }, [cargando, esLogin, pathname, router, usuario]);
 
@@ -83,6 +89,22 @@ export default function InternoLayout({
     window.scrollTo(0, 0);
     return () => document.body.classList.remove('sin-scroll-de-pagina');
   }, [pathname]);
+
+  /**
+   * Tema claro/oscuro de TODO el panel interno (ADR-0045). Va en `<html>` y
+   * no en un contenedor: así lo heredan también los modales, el panel de
+   * detalle y lo que se abre en portales. Se retira al salir de `/interno`
+   * (el portal ciudadano no tiene tema oscuro) y no aplica al login.
+   * No hay destello: mientras se verifica la sesión solo se pinta la
+   * pantalla de carga, y el efecto corre antes de que aparezca el panel.
+   */
+  const { tema } = useTemaInterno();
+  useEffect(() => {
+    if (esLogin) return;
+    const raiz = document.documentElement;
+    raiz.dataset.tema = tema;
+    return () => { delete raiz.dataset.tema; };
+  }, [esLogin, tema]);
 
   // La página de login no requiere control de pestaña única
   if (esLogin) return <>{children}</>;

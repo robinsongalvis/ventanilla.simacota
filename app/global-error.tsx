@@ -25,7 +25,7 @@ export default function GlobalError({
 
   return (
     <html lang="es">
-      <body style={{ fontFamily: 'system-ui, sans-serif', background: '#F8FAF7', margin: 0 }}>
+      <body style={{ fontFamily: 'system-ui, sans-serif', background: '#F7F9FB', margin: 0 }}>
         <main
           style={{
             minHeight: '100vh',
@@ -37,10 +37,10 @@ export default function GlobalError({
             textAlign: 'center',
           }}
         >
-          <h1 style={{ color: '#14532D', fontSize: '1.25rem', marginBottom: '0.5rem' }}>
+          <h1 style={{ color: '#007049', fontSize: '1.25rem', marginBottom: '0.5rem' }}>
             El sistema tuvo un problema inesperado
           </h1>
-          <p style={{ color: '#667085', maxWidth: '28rem', fontSize: '0.9rem' }}>
+          <p style={{ color: '#64748B', maxWidth: '28rem', fontSize: '0.9rem' }}>
             El error ya quedó registrado para el equipo técnico. Puede intentar de nuevo;
             si persiste, comuníquese con la Alcaldía de Simacota.
           </p>
@@ -52,7 +52,7 @@ export default function GlobalError({
               padding: '0.6rem 1.4rem',
               borderRadius: '10px',
               border: 'none',
-              background: '#14532D',
+              background: '#007049',
               color: '#FFFFFF',
               fontWeight: 700,
               cursor: 'pointer',

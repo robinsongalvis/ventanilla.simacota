@@ -11,6 +11,10 @@ import { NormogramaPanel } from './NormogramaPanel';
 import { QualityMetricsPanel } from './QualityMetricsPanel';
 import { E2ETestPanel } from './E2ETestPanel';
 import type { UsuarioAutenticado } from '@/lib/hooks/useAuth';
+import { SectionHeader } from '@/app/components/design-system/SectionHeader';
+import { PanelPestana, Pestanas } from '@/app/components/design-system/Pestanas';
+import { BotonAccion } from '@/app/components/design-system/BotonAccion';
+import { BarChart3, BookOpen, FilePlus2, FileText, FlaskConical, type LucideIcon } from 'lucide-react';
 
 type GobTab = 'normograma' | 'plantillas' | 'metricas' | 'pruebas';
 
@@ -39,77 +43,66 @@ export function SimiGobernanzaPanel({ usuario }: SimiGobernanzaPanelProps) {
     }
   }
 
-  const TABS: { id: GobTab; label: string; icono: string; roles: string[] }[] = [
-    { id: 'normograma', label: 'Normograma',  icono: '📚', roles: ['ADMIN'] },
-    { id: 'plantillas', label: 'Plantillas',  icono: '📝', roles: ['ADMIN'] },
-    { id: 'metricas',   label: 'Métricas',    icono: '📊', roles: ['ADMIN', 'CONTROL_INTERNO', 'JEFE_DEPENDENCIA'] },
-    { id: 'pruebas',    label: 'Pruebas E2E', icono: '🧪', roles: ['ADMIN'] },
+  /* Ola 3 (ADR-0046): íconos SVG en lugar de emojis; mismos roles por pestaña. */
+  const TABS: { id: GobTab; label: string; Icono: LucideIcon; roles: string[] }[] = [
+    { id: 'normograma', label: 'Normograma',  Icono: BookOpen,     roles: ['ADMIN'] },
+    { id: 'plantillas', label: 'Plantillas',  Icono: FileText,     roles: ['ADMIN'] },
+    { id: 'metricas',   label: 'Métricas',    Icono: BarChart3,    roles: ['ADMIN', 'CONTROL_INTERNO', 'JEFE_DEPENDENCIA'] },
+    { id: 'pruebas',    label: 'Pruebas E2E', Icono: FlaskConical, roles: ['ADMIN'] },
   ];
 
   const tabsVisibles = TABS.filter((t) => t.roles.includes(usuario.rol));
 
   return (
-    <div className="flex-1 overflow-y-auto" style={{ background: '#F8FAF7' }}>
-      {/* Header */}
-      <div className="px-5 py-4 bg-white" style={{ borderBottom: '1px solid #D9E2D9' }}>
-        <p className="text-[10px] font-bold uppercase tracking-widest" style={{ color: '#14532D' }}>SIMI Jurídico</p>
-        <h2 className="text-lg font-black" style={{ color: '#1F2933', fontFamily: 'var(--font-manrope)' }}>
-          Centro de Gobernanza
-        </h2>
-        <p className="text-xs" style={{ color: '#667085' }}>
-          Administración del normograma, plantillas y métricas de calidad jurídica.
-        </p>
-      </div>
+    <div className="flex-1 overflow-y-auto" style={{ background: 'var(--tema-fondo-f7f9fb)' }}>
+      <SectionHeader
+        titulo="Centro de Gobernanza"
+        subtitulo="SIMI Jurídico · Administración del normograma, plantillas y métricas de calidad jurídica."
+      />
 
-      {/* Tabs */}
-      <div className="flex bg-white" style={{ borderBottom: '1px solid #D9E2D9' }}>
-        {tabsVisibles.map((t) => (
-          <button key={t.id} onClick={() => setTab(t.id)}
-            className="px-4 py-2.5 text-xs font-bold transition-colors whitespace-nowrap"
-            style={tab === t.id
-              ? { color: '#14532D', borderBottom: '2px solid #14532D' }
-              : { color: '#94A3B8' }}>
-            {t.icono} {t.label}
-          </button>
-        ))}
+      <div className="px-3 sm:px-4 lg:px-6">
+        <Pestanas
+          idBase="gobernanza-simi"
+          etiquetaGrupo="Secciones del Centro de Gobernanza"
+          pestanas={tabsVisibles.map((t) => ({ id: t.id, etiqueta: t.label, Icono: t.Icono }))}
+          activa={tab}
+          onCambiar={setTab}
+        />
       </div>
 
       {/* Contenido */}
-      <div className="p-5">
+      <PanelPestana idBase="gobernanza-simi" activa={tab} className="px-3 pt-3 pb-6 sm:px-4 lg:px-6">
         {tab === 'normograma' && usuario.rol === 'ADMIN' && (
           <NormogramaPanel />
         )}
 
         {tab === 'plantillas' && usuario.rol === 'ADMIN' && (
           <div className="space-y-4">
-            <div className="flex items-center justify-between">
+            <div className="flex flex-wrap items-center justify-between gap-2">
               <div>
-                <p className="text-[10px] font-bold uppercase tracking-widest" style={{ color: '#14532D' }}>Plantillas oficiales</p>
-                <h3 className="text-base font-black" style={{ color: '#1F2933' }}>Gestión de plantillas de respuesta</h3>
+                <p className="text-[10px] font-bold uppercase tracking-widest" style={{ color: 'var(--tema-texto-007049)' }}>Plantillas oficiales</p>
+                <h3 className="text-base font-black" style={{ color: 'var(--tema-texto-172033)' }}>Gestión de plantillas de respuesta</h3>
               </div>
-              <button
-                onClick={sembrarPlantillas}
-                disabled={seeding}
-                className="px-4 py-2 rounded-xl text-white text-sm font-bold disabled:opacity-50"
-                style={{ background: '#D4A017', color: '#14532D' }}>
-                {seeding ? 'Cargando...' : '📝 Cargar plantillas base'}
-              </button>
+              <BotonAccion variante="primaria" Icono={FilePlus2} onClick={sembrarPlantillas} disabled={seeding}>
+                {seeding ? 'Cargando...' : 'Cargar plantillas base'}
+              </BotonAccion>
             </div>
 
             {seedMsg && (
-              <div className="rounded-lg p-3 text-xs" style={{ background: '#F0FDF4', border: '1px solid #BBF7D0', color: '#166534' }}>
+              <div role="status" className="rounded-lg p-3 text-xs" style={{ background: 'var(--tema-fondo-f0fdf4)', border: '1px solid var(--tema-borde-bbf7d0)', color: 'var(--tema-texto-006b45)' }}>
                 {seedMsg}
               </div>
             )}
 
-            <div className="rounded-xl bg-white p-5 text-center" style={{ border: '1px solid #D9E2D9' }}>
-              <p className="text-2xl mb-2">📝</p>
-              <p className="font-bold text-sm" style={{ color: '#1F2933' }}>10 plantillas base disponibles</p>
-              <p className="text-xs mt-1" style={{ color: '#94A3B8' }}>
+            <div className="rounded-xl bg-[var(--tema-fondo-ffffff)] p-4 text-center">
+              <FileText className="mx-auto mb-2 h-6 w-6" strokeWidth={1.9} style={{ color: 'var(--tema-texto-007049)' }} aria-hidden="true" />
+              <p className="font-bold text-sm" style={{ color: 'var(--tema-texto-172033)' }}>10 plantillas base disponibles</p>
+              <p className="text-xs mt-1" style={{ color: 'var(--tema-texto-64748b)' }}>
                 Incluyen: respuesta de fondo, solicitud de aclaración, traslado por competencia, respuesta negativa,
                 información pública, reserva legal, visita técnica, queja, reclamo y trámite en curso.
               </p>
-              <p className="text-[10px] mt-3 font-semibold" style={{ color: '#D4A017' }}>
+              {/* #8E5C06: el dorado #E5A31A como texto sobre blanco se queda en 2,1:1. */}
+              <p className="text-[10px] mt-3 font-semibold" style={{ color: 'var(--tema-texto-8e5c06)' }}>
                 Haga clic en Cargar plantillas base para inicializar el normograma de plantillas de su dependencia.
               </p>
             </div>
@@ -123,7 +116,7 @@ export function SimiGobernanzaPanel({ usuario }: SimiGobernanzaPanelProps) {
         {tab === 'pruebas' && usuario.rol === 'ADMIN' && (
           <E2ETestPanel />
         )}
-      </div>
+      </PanelPestana>
     </div>
   );
 }

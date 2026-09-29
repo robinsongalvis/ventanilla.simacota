@@ -48,36 +48,42 @@ export function SectionHeader({
   variante = 'default',
   className = '',
 }: SectionHeaderProps) {
+  /* Subencabezado bajo el encabezado común de pantalla (ADR-0045): sin
+     franja propia, mismo gutter que el resto del panel. `compact` es el
+     título DENTRO de un panel (Ola 3): el panel ya trae su padding, así
+     que no suma gutter propio; antes el título quedaba 24 px a la derecha
+     del contenido que encabeza. */
   const estilos = {
-    default: { padding: 'px-4 pt-3 pb-2', bg: 'bg-white' },
-    compact: { padding: 'px-3 pt-2 pb-1', bg: 'bg-[#F8FAF7]' },
-    highlight: { padding: 'px-4 pt-3 pb-2', bg: 'bg-white' },
+    default: { padding: 'px-4 pt-3 pb-2 lg:px-6', bg: '' },
+    compact: { padding: 'pb-2', bg: '' },
+    highlight: { padding: 'px-4 pt-3 pb-2 lg:px-6', bg: '' },
   };
 
   const s = estilos[variante];
 
   return (
-    <div className={`flex items-start justify-between gap-3 ${s.padding} ${s.bg} shrink-0 ${className}`}>
+    <div className={`flex flex-wrap items-start justify-between gap-x-3 gap-y-1.5 ${s.padding} ${s.bg} shrink-0 ${className}`}>
       <div className="flex items-center gap-2 min-w-0">
         {indicador}
         <div className="min-w-0">
           <h2 className={`font-black leading-tight ${
             variante === 'compact' ? 'text-sm' : 'text-base'
-          }`} style={{ color: '#12261A' }}>
+          }`} style={{ color: 'var(--tema-texto-172033)' }}>
             {titulo}
             {contador && (
-              <span className="ml-2 text-[10px] font-semibold tabular-nums" style={{ color: '#94A3B8' }}>
+              <span className="ml-2 text-[10px] font-semibold tabular-nums" style={{ color: 'var(--tema-texto-64748b)' }}>
                 {contador}
               </span>
             )}
           </h2>
+          {/* Subtítulo en --text-secondary: el gris muted (#94A3B8) no llega a AA. */}
           {subtitulo && (
-            <p className="text-[10px] mt-0.5" style={{ color: '#94A3B8' }}>
+            <p className="text-[11px] mt-0.5" style={{ color: 'var(--text-secondary)' }}>
               {subtitulo}
             </p>
           )}
           {/* --text-secondary, no --text-muted: una aclaración de alcance que
-              no se puede leer no delimita nada. #667085 sobre blanco rinde
+              no se puede leer no delimita nada. #64748B sobre blanco rinde
               5,3:1; el gris muted del proyecto se queda en 2,5:1. */}
           {nota && (
             <p className="text-[10px] mt-1 font-medium" style={{ color: 'var(--text-secondary)' }}>
@@ -86,7 +92,9 @@ export function SectionHeader({
           )}
         </div>
       </div>
-      {acciones && <div className="shrink-0 flex items-center gap-2">{acciones}</div>}
+      {/* max-w-full + flex-wrap: en pantallas angostas las acciones bajan de
+          línea y se reparten, en vez de salirse por la derecha (Ola 3). */}
+      {acciones && <div className="flex max-w-full flex-wrap items-center gap-2">{acciones}</div>}
     </div>
   );
 }

@@ -105,14 +105,14 @@ export function NormogramaPanel() {
       {/* Header */}
       <div className="flex items-center justify-between gap-3 flex-wrap">
         <div>
-          <p className="text-[10px] font-bold uppercase tracking-widest" style={{ color: '#14532D' }}>Administración</p>
-          <h2 className="text-base font-black" style={{ color: '#1F2933', fontFamily: 'var(--font-manrope)' }}>
+          <p className="text-[10px] font-bold uppercase tracking-widest" style={{ color: 'var(--tema-texto-007049)' }}>Administración</p>
+          <h2 className="text-base font-black" style={{ color: 'var(--tema-texto-172033)', fontFamily: 'var(--font-manrope)' }}>
             Normograma Jurídico
           </h2>
         </div>
         <button onClick={() => setShowForm(!showForm)}
           className="flex items-center gap-2 px-4 py-2 rounded-xl text-white text-sm font-bold"
-          style={{ background: '#14532D' }}>
+          style={{ background: 'var(--tema-fondo-007049)' }}>
           {showForm ? 'Cancelar' : '+ Cargar norma'}
         </button>
       </div>
@@ -123,75 +123,75 @@ export function NormogramaPanel() {
           <button key={col} onClick={() => setColActual(col)}
             className="px-3 py-1.5 rounded-lg text-xs font-bold transition-all"
             style={colActual === col
-              ? { background: '#14532D', color: '#fff' }
-              : { background: '#F8FAF7', border: '1px solid #D9E2D9', color: '#667085' }}>
+              ? { background: 'var(--tema-fondo-007049)', color: '#fff' }
+              : { background: 'var(--tema-fondo-f7f9fb)', border: '1px solid var(--tema-borde-dce4ea)', color: 'var(--tema-texto-64748b)' }}>
             {col === 'normatividad_nacional' ? '🏛️ Nacional' : '🏘️ Municipal'}
           </button>
         ))}
       </div>
 
       {/* Mensajes */}
-      {error && <div className="rounded-lg p-3 text-xs" style={{ background: '#FEF2F2', border: '1px solid #FECACA', color: '#DC2626' }}>{error}</div>}
-      {exito && <div className="rounded-lg p-3 text-xs" style={{ background: '#F0FDF4', border: '1px solid #BBF7D0', color: '#166534' }}>{exito}</div>}
+      {error && <div className="rounded-lg p-3 text-xs" style={{ background: 'var(--tema-fondo-fef2f2)', border: '1px solid var(--tema-borde-fecaca)', color: 'var(--tema-texto-d81e1e)' }}>{error}</div>}
+      {exito && <div className="rounded-lg p-3 text-xs" style={{ background: 'var(--tema-fondo-f0fdf4)', border: '1px solid var(--tema-borde-bbf7d0)', color: 'var(--tema-texto-006b45)' }}>{exito}</div>}
 
       {/* Formulario */}
       {showForm && (
-        <form onSubmit={guardar} className="rounded-xl bg-white p-4 space-y-3" style={{ border: '1px solid #D9E2D9' }}>
-          <p className="text-[10px] font-bold uppercase tracking-widest" style={{ color: '#14532D' }}>Nuevo documento normativo</p>
+        <form onSubmit={guardar} className="rounded-xl bg-[var(--tema-fondo-ffffff)] p-4 space-y-3" style={{ border: '1px solid var(--tema-borde-dce4ea)' }}>
+          <p className="text-[10px] font-bold uppercase tracking-widest" style={{ color: 'var(--tema-texto-007049)' }}>Nuevo documento normativo</p>
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <div className="sm:col-span-2">
-              <label className="block text-[10px] font-bold uppercase tracking-widest mb-1" style={{ color: '#667085' }}>Título *</label>
+              <label className="block text-[10px] font-bold uppercase tracking-widest mb-1" style={{ color: 'var(--tema-texto-64748b)' }}>Título *</label>
               <input value={form.titulo} onChange={(e) => setForm({ ...form, titulo: e.target.value })}
                 required className="input-obsidian" placeholder="Ej. Ley 1755 de 2015 — Derecho de Petición" />
             </div>
             <div>
-              <label className="block text-[10px] font-bold uppercase tracking-widest mb-1" style={{ color: '#667085' }}>Tipo *</label>
+              <label className="block text-[10px] font-bold uppercase tracking-widest mb-1" style={{ color: 'var(--tema-texto-64748b)' }}>Tipo *</label>
               <select value={form.tipo_norma} onChange={(e) => setForm({ ...form, tipo_norma: e.target.value as NormativeDocumentType })}
                 className="select-internal w-full">
                 {TIPOS.map((t) => <option key={t} value={t}>{t}</option>)}
               </select>
             </div>
             <div>
-              <label className="block text-[10px] font-bold uppercase tracking-widest mb-1" style={{ color: '#667085' }}>Estado *</label>
+              <label className="block text-[10px] font-bold uppercase tracking-widest mb-1" style={{ color: 'var(--tema-texto-64748b)' }}>Estado *</label>
               <select value={form.estado} onChange={(e) => setForm({ ...form, estado: e.target.value as NormativeDocumentStatus })}
                 className="select-internal w-full">
                 {ESTADOS.map((s) => <option key={s} value={s}>{s}</option>)}
               </select>
             </div>
             <div>
-              <label className="block text-[10px] font-bold uppercase tracking-widest mb-1" style={{ color: '#667085' }}>Número</label>
+              <label className="block text-[10px] font-bold uppercase tracking-widest mb-1" style={{ color: 'var(--tema-texto-64748b)' }}>Número</label>
               <input value={form.numero} onChange={(e) => setForm({ ...form, numero: e.target.value })}
                 className="input-obsidian" placeholder="1755" />
             </div>
             <div>
-              <label className="block text-[10px] font-bold uppercase tracking-widest mb-1" style={{ color: '#667085' }}>Año</label>
+              <label className="block text-[10px] font-bold uppercase tracking-widest mb-1" style={{ color: 'var(--tema-texto-64748b)' }}>Año</label>
               <input value={form.anio} onChange={(e) => setForm({ ...form, anio: e.target.value })}
                 className="input-obsidian" placeholder="2015" />
             </div>
             <div className="sm:col-span-2">
-              <label className="block text-[10px] font-bold uppercase tracking-widest mb-1" style={{ color: '#667085' }}>Entidad emisora *</label>
+              <label className="block text-[10px] font-bold uppercase tracking-widest mb-1" style={{ color: 'var(--tema-texto-64748b)' }}>Entidad emisora *</label>
               <input value={form.entidad_emisora} onChange={(e) => setForm({ ...form, entidad_emisora: e.target.value })}
                 required className="input-obsidian" placeholder="Congreso de Colombia / Alcaldía de Simacota" />
             </div>
             <div className="sm:col-span-2">
-              <label className="block text-[10px] font-bold uppercase tracking-widest mb-1" style={{ color: '#667085' }}>Resumen</label>
+              <label className="block text-[10px] font-bold uppercase tracking-widest mb-1" style={{ color: 'var(--tema-texto-64748b)' }}>Resumen</label>
               <textarea value={form.resumen} onChange={(e) => setForm({ ...form, resumen: e.target.value })}
                 rows={3} className="input-internal resize-none w-full" placeholder="Descripción breve para búsquedas RAG..." />
             </div>
             <div className="sm:col-span-2">
-              <label className="block text-[10px] font-bold uppercase tracking-widest mb-1" style={{ color: '#667085' }}>
-                Palabras clave <span className="normal-case font-normal" style={{ color: '#94A3B8' }}>(separadas por coma)</span>
+              <label className="block text-[10px] font-bold uppercase tracking-widest mb-1" style={{ color: 'var(--tema-texto-64748b)' }}>
+                Palabras clave <span className="normal-case font-normal" style={{ color: 'var(--tema-texto-94a3b8)' }}>(separadas por coma)</span>
               </label>
               <input value={form.palabras_clave} onChange={(e) => setForm({ ...form, palabras_clave: e.target.value })}
                 className="input-obsidian" placeholder="petición, PQRSD, derecho, ciudadano" />
             </div>
             <div>
-              <label className="block text-[10px] font-bold uppercase tracking-widest mb-1" style={{ color: '#667085' }}>Fuente</label>
+              <label className="block text-[10px] font-bold uppercase tracking-widest mb-1" style={{ color: 'var(--tema-texto-64748b)' }}>Fuente</label>
               <input value={form.fuente} onChange={(e) => setForm({ ...form, fuente: e.target.value })}
                 className="input-obsidian" placeholder="Secretaría del Senado" />
             </div>
             <div>
-              <label className="block text-[10px] font-bold uppercase tracking-widest mb-1" style={{ color: '#667085' }}>Colección</label>
+              <label className="block text-[10px] font-bold uppercase tracking-widest mb-1" style={{ color: 'var(--tema-texto-64748b)' }}>Colección</label>
               <select value={form.coleccion} onChange={(e) => setForm({ ...form, coleccion: e.target.value as typeof form.coleccion })}
                 className="select-internal w-full">
                 <option value="normatividad_nacional">Nacional</option>
@@ -201,10 +201,10 @@ export function NormogramaPanel() {
           </div>
           <div className="flex justify-end gap-3 pt-2">
             <button type="button" onClick={() => setShowForm(false)}
-              className="px-4 py-2 rounded-xl text-sm" style={{ color: '#667085' }}>Cancelar</button>
+              className="px-4 py-2 rounded-xl text-sm" style={{ color: 'var(--tema-texto-64748b)' }}>Cancelar</button>
             <button type="submit" disabled={guardando}
               className="px-5 py-2 rounded-xl text-white text-sm font-bold disabled:opacity-50"
-              style={{ background: '#14532D' }}>
+              style={{ background: 'var(--tema-fondo-007049)' }}>
               {guardando ? 'Guardando...' : 'Guardar norma'}
             </button>
           </div>
@@ -213,47 +213,47 @@ export function NormogramaPanel() {
 
       {/* Lista de documentos */}
       {cargando ? (
-        <div className="text-center py-8" style={{ color: '#94A3B8' }}>
+        <div className="text-center py-8" style={{ color: 'var(--tema-texto-94a3b8)' }}>
           <div className="w-5 h-5 border-2 rounded-full animate-spin mx-auto mb-2"
-               style={{ borderColor: '#D9E2D9', borderTopColor: '#14532D' }} />
+               style={{ borderColor: 'var(--tema-borde-dce4ea)', borderTopColor: 'var(--tema-borde-007049)' }} />
           Cargando normograma...
         </div>
       ) : docs.length === 0 ? (
-        <div className="text-center py-12 rounded-xl bg-white" style={{ border: '1px solid #D9E2D9' }}>
+        <div className="text-center py-12 rounded-xl bg-[var(--tema-fondo-ffffff)]" style={{ border: '1px solid var(--tema-borde-dce4ea)' }}>
           <p className="text-2xl mb-2">📚</p>
-          <p className="font-bold" style={{ color: '#1F2933' }}>Sin documentos cargados</p>
-          <p className="text-xs mt-1" style={{ color: '#94A3B8' }}>Cargue normas para mejorar el análisis RAG de SIMI</p>
+          <p className="font-bold" style={{ color: 'var(--tema-texto-172033)' }}>Sin documentos cargados</p>
+          <p className="text-xs mt-1" style={{ color: 'var(--tema-texto-64748b)' }}>Cargue normas para mejorar el análisis RAG de SIMI</p>
         </div>
       ) : (
-        <div className="rounded-xl bg-white overflow-hidden" style={{ border: '1px solid #D9E2D9' }}>
+        <div className="rounded-xl bg-[var(--tema-fondo-ffffff)] overflow-hidden" style={{ border: '1px solid var(--tema-borde-dce4ea)' }}>
           <div className="overflow-x-auto">
             <table className="w-full text-xs">
               <thead>
-                <tr style={{ background: '#EEF4EE', borderBottom: '1px solid #D9E2D9' }}>
+                <tr style={{ background: 'var(--tema-fondo-f4f9f6)', borderBottom: '1px solid var(--tema-borde-dce4ea)' }}>
                   {['Documento', 'Tipo', 'Estado', 'Fuente', 'Acción'].map((h) => (
-                    <th key={h} className="px-3 py-2.5 text-left text-[10px] font-bold uppercase tracking-widest" style={{ color: '#14532D' }}>{h}</th>
+                    <th key={h} className="px-3 py-2.5 text-left text-[10px] font-bold uppercase tracking-widest" style={{ color: 'var(--tema-texto-007049)' }}>{h}</th>
                   ))}
                 </tr>
               </thead>
               <tbody>
                 {docs.map((doc) => (
-                  <tr key={doc.id} style={{ borderBottom: '1px solid #EEF4EE' }}>
+                  <tr key={doc.id} style={{ borderBottom: '1px solid var(--tema-borde-f4f9f6)' }}>
                     <td className="px-3 py-2.5 max-w-[200px]">
-                      <p className="font-medium truncate" style={{ color: '#1F2933' }}>{doc.titulo}</p>
-                      {doc.numero && <p style={{ color: '#94A3B8' }}>N.° {doc.numero} / {doc.anio}</p>}
+                      <p className="font-medium truncate" style={{ color: 'var(--tema-texto-172033)' }}>{doc.titulo}</p>
+                      {doc.numero && <p style={{ color: 'var(--tema-texto-94a3b8)' }}>N.° {doc.numero} / {doc.anio}</p>}
                     </td>
-                    <td className="px-3 py-2.5 whitespace-nowrap" style={{ color: '#667085' }}>{doc.tipo_norma}</td>
+                    <td className="px-3 py-2.5 whitespace-nowrap" style={{ color: 'var(--tema-texto-64748b)' }}>{doc.tipo_norma}</td>
                     <td className="px-3 py-2.5 whitespace-nowrap">
                       <NormativeValidationBadge estado={doc.estado} />
                     </td>
                     <td className="px-3 py-2.5 max-w-[120px]">
-                      <p className="truncate" style={{ color: '#94A3B8' }}>{doc.fuente ?? '—'}</p>
+                      <p className="truncate" style={{ color: 'var(--tema-texto-94a3b8)' }}>{doc.fuente ?? '—'}</p>
                     </td>
                     <td className="px-3 py-2.5 whitespace-nowrap">
                       {doc.estado === 'pendiente_verificacion' && (
                         <button onClick={() => cambiarEstado(doc.id!, 'interna_validada')}
                           className="text-[10px] font-bold px-2 py-1 rounded"
-                          style={{ background: '#EEF4EE', color: '#14532D', border: '1px solid #D9E2D9' }}>
+                          style={{ background: 'var(--tema-fondo-f4f9f6)', color: 'var(--tema-texto-007049)', border: '1px solid var(--tema-borde-dce4ea)' }}>
                           Validar
                         </button>
                       )}

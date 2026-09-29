@@ -67,7 +67,7 @@ export function PwaInstallPrompt() {
   return (
     <div className="fixed bottom-4 left-4 right-4 z-40 mx-auto max-w-md rounded-2xl border border-emerald-500/20 bg-slate-950/95 p-4 shadow-2xl shadow-black/30 backdrop-blur print:hidden animate-fade-in-up">
       <div className="flex items-start gap-3">
-        <div className="shrink-0 w-9 h-9 rounded-xl flex items-center justify-center" style={{ background: '#14532D' }}>
+        <div className="shrink-0 w-9 h-9 rounded-xl flex items-center justify-center" style={{ background: '#007049' }}>
           <svg className="w-5 h-5 text-emerald-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2}>
             <path strokeLinecap="round" strokeLinejoin="round" d="M3 16.5v2.25A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75V16.5M16.5 12L12 16.5m0 0L7.5 12m4.5 4.5V3" />
           </svg>
@@ -80,7 +80,7 @@ export function PwaInstallPrompt() {
           <div className="mt-2.5 flex gap-2">
             <button type="button" onClick={instalar}
               className="rounded-lg px-3 py-1.5 text-[11px] font-bold text-white transition-colors"
-              style={{ background: '#14532D' }}>
+              style={{ background: '#007049' }}>
               Instalar
             </button>
             <button type="button" onClick={descartar}

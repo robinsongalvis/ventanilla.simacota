@@ -16,7 +16,7 @@ import { getTiposSolicitudInternos } from '@/lib/catalogos/tipos-solicitud';
    Su forma de trabajar no cambia; la memoria institucional sí.
 ══════════════════════════════════════════════════════════════ */
 
-const VERDE_INST = '#14532D';
+const VERDE_INST = '#007049';
 
 /** ISO local "yyyy-MM-ddTHH:mm" para <input type=datetime-local>. */
 function aDatetimeLocal(d: Date): string {
@@ -83,7 +83,7 @@ export function RegistroExpresModal({ usuario, onCerrar }: RegistroExpresModalPr
   }
 
   const labelCls = 'mb-1 block text-[10px] font-bold uppercase tracking-widest';
-  const labelStyle = { color: '#667085' };
+  const labelStyle = { color: 'var(--tema-texto-64748b)' };
 
   return (
     <div
@@ -95,17 +95,17 @@ export function RegistroExpresModal({ usuario, onCerrar }: RegistroExpresModalPr
       <button type="button" aria-label="Cerrar" onClick={onCerrar} className="absolute inset-0 bg-black/55" />
 
       <div
-        className="relative w-full max-w-2xl bg-white rounded-2xl shadow-2xl overflow-hidden flex flex-col"
-        style={{ border: '1px solid #D9E2D9', maxHeight: 'calc(100dvh - 24px)' }}
+        className="relative w-full max-w-2xl bg-[var(--tema-fondo-ffffff)] rounded-2xl shadow-2xl overflow-hidden flex flex-col"
+        style={{ border: '1px solid var(--tema-borde-dce4ea)', maxHeight: 'calc(100dvh - 24px)' }}
       >
-        <header className="px-5 py-4" style={{ borderBottom: '1px solid #D9E2D9' }}>
-          <p className="text-[10px] font-bold uppercase tracking-[0.12em]" style={{ color: '#8A6A12' }}>
+        <header className="px-5 py-4" style={{ borderBottom: '1px solid var(--tema-borde-dce4ea)' }}>
+          <p className="text-[10px] font-bold uppercase tracking-[0.12em]" style={{ color: 'var(--tema-texto-8a6a12)' }}>
             Correspondencia respondida desde el correo institucional
           </p>
-          <h2 className="text-lg font-black leading-tight" style={{ color: '#12261A' }}>
+          <h2 className="text-lg font-black leading-tight" style={{ color: 'var(--tema-texto-172033)' }}>
             Registro exprés
           </h2>
-          <p className="text-xs mt-1" style={{ color: '#5F6F64' }}>
+          <p className="text-xs mt-1" style={{ color: 'var(--tema-texto-5f6f64)' }}>
             Ya respondiste — esto solo deja la historia escrita: genera la
             entrada, la salida amarrada y la trazabilidad en un paso.
           </p>
@@ -113,18 +113,18 @@ export function RegistroExpresModal({ usuario, onCerrar }: RegistroExpresModalPr
 
         {resultado ? (
           <div className="flex flex-col items-center gap-4 px-6 py-10 text-center">
-            <p className="text-xs font-bold uppercase tracking-widest" style={{ color: '#16A34A' }}>
+            <p className="text-xs font-bold uppercase tracking-widest" style={{ color: 'var(--tema-texto-008f5a)' }}>
               Registro completo
             </p>
             <div>
-              <p className="text-[10px] uppercase tracking-widest" style={{ color: '#94A3B8' }}>Entrada</p>
-              <p className="text-xl font-black font-mono" style={{ color: '#12261A' }}>{resultado.radicadoId}</p>
+              <p className="text-[10px] uppercase tracking-widest" style={{ color: 'var(--tema-texto-94a3b8)' }}>Entrada</p>
+              <p className="text-xl font-black font-mono" style={{ color: 'var(--tema-texto-172033)' }}>{resultado.radicadoId}</p>
             </div>
             <div>
-              <p className="text-[10px] uppercase tracking-widest" style={{ color: '#94A3B8' }}>Salida amarrada</p>
+              <p className="text-[10px] uppercase tracking-widest" style={{ color: 'var(--tema-texto-94a3b8)' }}>Salida amarrada</p>
               <p className="text-xl font-black font-mono" style={{ color: VERDE_INST }}>{resultado.salidaId}</p>
             </div>
-            <p className="text-xs max-w-sm" style={{ color: '#667085' }}>
+            <p className="text-xs max-w-sm" style={{ color: 'var(--tema-texto-64748b)' }}>
               Quedó resuelto en tu dependencia, con la respuesta y las fechas
               reales en la trazabilidad y la salida en el libro.
             </p>
@@ -197,14 +197,14 @@ export function RegistroExpresModal({ usuario, onCerrar }: RegistroExpresModalPr
             </div>
 
             {!eligeDependencia && (
-              <p className="text-[11px]" style={{ color: '#7A8B7F' }}>
+              <p className="text-[11px]" style={{ color: 'var(--tema-texto-7a8b7f)' }}>
                 Se registrará en tu dependencia: {NOMBRES_TENANT[usuario.tenantId] ?? usuario.tenantId}.
               </p>
             )}
 
             {errorLocal && (
               <p role="alert" className="rounded-lg px-3 py-2 text-xs"
-                 style={{ background: '#FEF2F2', border: '1px solid #FECACA', color: '#991B1B' }}>
+                 style={{ background: 'var(--tema-fondo-fef2f2)', border: '1px solid var(--tema-borde-fecaca)', color: 'var(--tema-texto-991b1b)' }}>
                 {errorLocal}
               </p>
             )}
@@ -212,7 +212,7 @@ export function RegistroExpresModal({ usuario, onCerrar }: RegistroExpresModalPr
             <footer className="flex items-center justify-end gap-2 pt-1">
               <button type="button" onClick={onCerrar}
                 className="px-4 py-2 rounded-xl text-sm font-bold"
-                style={{ border: '1px solid #D9E2D9', color: '#475569' }}>
+                style={{ border: '1px solid var(--tema-borde-dce4ea)', color: 'var(--tema-texto-475569)' }}>
                 Cancelar
               </button>
               <button type="submit" disabled={guardando}

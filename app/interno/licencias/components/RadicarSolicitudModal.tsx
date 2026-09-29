@@ -7,6 +7,7 @@ import { SelectorSubtiposNormativos } from './SelectorSubtiposNormativos';
 import { SelectorModalidadesConstruccion } from './SelectorModalidadesConstruccion';
 import { exigeModalidadConstruccion } from '@/lib/motor-expedientes/modalidad-construccion';
 import './licencias-tema.css';
+import { urlLicencias } from '../rutas-licencias';
 
 /* ══════════════════════════════════════════════════════════════
    Formulario "Recibir solicitud" — bloque "Integración UI y demo".
@@ -137,7 +138,7 @@ export function RadicarSolicitudModal({ onCerrar, onCreado }: RadicarSolicitudMo
   }
 
   const labelCls = 'mb-1 block text-[10px] font-bold uppercase tracking-widest';
-  const labelStyle = { color: '#667085' };
+  const labelStyle = { color: 'var(--text-secondary)' };
 
   return (
     <div
@@ -188,10 +189,10 @@ export function RadicarSolicitudModal({ onCerrar, onCreado }: RadicarSolicitudMo
             <p className="text-xs font-bold uppercase tracking-widest" style={{ color: 'var(--color-success-text)' }}>
               Expediente creado
             </p>
-            <p className="text-2xl font-black font-mono" style={{ color: '#12261A' }}>
+            <p className="text-2xl font-black font-mono" style={{ color: 'var(--tema-texto-172033)' }}>
               {creado.numeroExpediente?.numero ?? creado.id}
             </p>
-            <p className="text-xs max-w-sm" style={{ color: '#667085' }}>
+            <p className="text-xs max-w-sm" style={{ color: 'var(--text-secondary)' }}>
               Número de demostración (esPrueba) — no es un consecutivo legal. Puedes verlo en el detalle o volver a la bandeja.
             </p>
             <div className="flex gap-2">
@@ -199,15 +200,15 @@ export function RadicarSolicitudModal({ onCerrar, onCreado }: RadicarSolicitudMo
                 type="button"
                 onClick={onCerrar}
                 className="px-4 py-2.5 rounded-xl text-sm font-bold"
-                style={{ border: '1px solid #D9E2D9', color: '#475569' }}
+                style={{ border: '1px solid var(--tema-borde-dce4ea)', color: 'var(--tema-texto-475569)' }}
               >
                 Volver a la bandeja
               </button>
               <button
                 type="button"
-                onClick={() => router.push(`/interno/licencias/${creado.id}`)}
+                onClick={() => router.push(urlLicencias({ expedienteId: creado.id }))}
                 className="px-5 py-2.5 rounded-xl text-sm font-bold text-white"
-                style={{ background: '#14532D' }}
+                style={{ background: 'var(--tema-fondo-007049)' }}
               >
                 Ver expediente →
               </button>
@@ -332,7 +333,7 @@ export function RadicarSolicitudModal({ onCerrar, onCreado }: RadicarSolicitudMo
 
             {errorServidor && (
               <p role="alert" className="rounded-lg px-3 py-2 text-xs"
-                 style={{ background: '#FEF2F2', border: '1px solid #FECACA', color: '#991B1B' }}>
+                 style={{ background: 'var(--tema-fondo-fef2f2)', border: '1px solid var(--tema-borde-fecaca)', color: 'var(--tema-texto-991b1b)' }}>
                 {errorServidor}
               </p>
             )}

@@ -26,8 +26,8 @@ import { puedeAnular, resumenPlanilla } from '@/lib/planillas/entregas';
    evidencia por escáner, y solo Recepción/Admin registra.
 ══════════════════════════════════════════════════════════════ */
 
-const VERDE_INST = '#14532D';
-const DORADO     = '#D4A017';
+const VERDE_INST = '#007049';
+const DORADO     = '#E5A31A';
 
 const PRINT_STYLES = `
 @media print {
@@ -237,17 +237,17 @@ export function PanelReparto({ onCerrar }: PanelRepartoProps) {
 
   return (
     <div className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-black/40 p-3 md:p-6 print:hidden">
-      <div className="w-full max-w-4xl rounded-2xl bg-white shadow-2xl" style={{ border: '1px solid #E3EAE3' }}>
+      <div className="w-full max-w-4xl rounded-2xl bg-[var(--tema-fondo-ffffff)] shadow-2xl" style={{ border: '1px solid var(--tema-borde-e4ebf0)' }}>
         {/* ── Header ── */}
-        <div className="flex items-center justify-between gap-3 px-5 py-4" style={{ borderBottom: '1px solid #E3EAE3' }}>
+        <div className="flex items-center justify-between gap-3 px-5 py-4" style={{ borderBottom: '1px solid var(--tema-borde-e4ebf0)' }}>
           <div>
             <div className="flex items-center gap-2">
-              <span className="text-[10px] font-bold uppercase tracking-[0.12em]" style={{ color: '#8A6A12' }}>
+              <span className="text-[10px] font-bold uppercase tracking-[0.12em]" style={{ color: 'var(--tema-texto-8a6a12)' }}>
                 Mostrador · Reparto
               </span>
               <span className="h-1.5 w-1.5 rounded-full" style={{ background: DORADO }} />
             </div>
-            <p className="mt-0.5 text-lg font-black leading-tight" style={{ color: '#12261A' }}>
+            <p className="mt-0.5 text-lg font-black leading-tight" style={{ color: 'var(--tema-texto-172033)' }}>
               Entrega de documentos físicos
             </p>
           </div>
@@ -255,7 +255,7 @@ export function PanelReparto({ onCerrar }: PanelRepartoProps) {
             type="button"
             onClick={onCerrar}
             aria-label="Cerrar reparto"
-            className="rounded-lg p-2 text-slate-400 transition-colors hover:bg-slate-100 hover:text-slate-600"
+            className="rounded-lg p-2 text-slate-400 transition-colors hover:bg-slate-100 oscuro:hover:bg-white/5 hover:text-slate-600 oscuro:hover:text-slate-400"
           >
             <svg className="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2}>
               <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
@@ -265,17 +265,17 @@ export function PanelReparto({ onCerrar }: PanelRepartoProps) {
 
         <div className="space-y-5 px-5 py-4">
           {cargando && (
-            <p className="py-8 text-center text-sm" style={{ color: '#7A8B7F' }}>Consultando el reparto…</p>
+            <p className="py-8 text-center text-sm" style={{ color: 'var(--tema-texto-7a8b7f)' }}>Consultando el reparto…</p>
           )}
 
           {!cargando && error && (
-            <div className="rounded-xl px-4 py-3 text-[13px] font-semibold" style={{ background: '#FCEBEB', color: '#911111' }}>
+            <div className="rounded-xl px-4 py-3 text-[13px] font-semibold" style={{ background: 'var(--tema-fondo-fcebeb)', color: 'var(--tema-texto-911111)' }}>
               {error}
             </div>
           )}
 
           {!cargando && mensaje && (
-            <div className="rounded-xl px-4 py-3 text-[13px] font-semibold" style={{ background: '#EEF4EE', color: VERDE_INST }}>
+            <div className="rounded-xl px-4 py-3 text-[13px] font-semibold" style={{ background: 'var(--tema-fondo-f4f9f6)', color: VERDE_INST }}>
               {mensaje}
             </div>
           )}
@@ -283,12 +283,12 @@ export function PanelReparto({ onCerrar }: PanelRepartoProps) {
           {/* ── Planilla en ruta ── */}
           {!cargando && abierta && resumen && (
             <section className="rounded-xl" style={{ border: `1.5px solid ${VERDE_INST}` }}>
-              <div className="flex flex-wrap items-center justify-between gap-2 px-4 py-3" style={{ borderBottom: '1px solid #E3EAE3' }}>
+              <div className="flex flex-wrap items-center justify-between gap-2 px-4 py-3" style={{ borderBottom: '1px solid var(--tema-borde-e4ebf0)' }}>
                 <div className="min-w-0">
-                  <p className="font-mono text-[15px] font-black" style={{ color: '#12261A' }}>
+                  <p className="font-mono text-[15px] font-black" style={{ color: 'var(--tema-texto-172033)' }}>
                     {abierta.planillaId}
                   </p>
-                  <p className="text-[11px]" style={{ color: '#5F6F64' }}>
+                  <p className="text-[11px]" style={{ color: 'var(--tema-texto-5f6f64)' }}>
                     En ruta · generada el {fechaCorta(abierta.fechaGeneracion)} ·{' '}
                     {resumen.pendientes} por entregar · {resumen.entregadas} entregada{resumen.entregadas === 1 ? '' : 's'}
                   </p>
@@ -297,8 +297,8 @@ export function PanelReparto({ onCerrar }: PanelRepartoProps) {
                   <button
                     type="button"
                     onClick={imprimirPlanilla}
-                    className="rounded-[10px] px-3.5 py-2 text-[12.5px] font-bold transition-colors hover:bg-[#EEF4EE]"
-                    style={{ border: `1px solid ${VERDE_INST}`, color: VERDE_INST, background: 'white' }}
+                    className="rounded-[10px] px-3.5 py-2 text-[12.5px] font-bold transition-colors hover:bg-[var(--tema-fondo-f4f9f6)]"
+                    style={{ border: `1px solid ${VERDE_INST}`, color: VERDE_INST, background: 'var(--tema-fondo-ffffff)' }}
                   >
                     Imprimir planilla
                   </button>
@@ -306,8 +306,8 @@ export function PanelReparto({ onCerrar }: PanelRepartoProps) {
                     <button
                       type="button"
                       onClick={() => setAnulando(true)}
-                      className="rounded-[10px] px-3.5 py-2 text-[12.5px] font-bold text-red-800 transition-colors hover:bg-red-50"
-                      style={{ border: '1px solid #E8C4C4', background: 'white' }}
+                      className="rounded-[10px] px-3.5 py-2 text-[12.5px] font-bold text-red-800 oscuro:text-red-300 transition-colors hover:bg-red-50 oscuro:hover:bg-red-500/15"
+                      style={{ border: '1px solid var(--tema-borde-e8c4c4)', background: 'var(--tema-fondo-ffffff)' }}
                     >
                       Anular
                     </button>
@@ -316,7 +316,7 @@ export function PanelReparto({ onCerrar }: PanelRepartoProps) {
               </div>
 
               {anulando && (
-                <div className="flex flex-wrap items-center gap-2 px-4 py-3" style={{ background: '#FCF7F7', borderBottom: '1px solid #E3EAE3' }}>
+                <div className="flex flex-wrap items-center gap-2 px-4 py-3" style={{ background: 'var(--tema-fondo-fcf7f7)', borderBottom: '1px solid var(--tema-borde-e4ebf0)' }}>
                   <input
                     type="text"
                     value={motivoAnulacion}
@@ -324,7 +324,7 @@ export function PanelReparto({ onCerrar }: PanelRepartoProps) {
                     placeholder="Motivo de la anulación…"
                     aria-label="Motivo de la anulación"
                     className="min-w-0 flex-1 rounded-lg px-3 py-2 text-[13px] outline-none"
-                    style={{ border: '1px solid #E3EAE3', color: '#12261A' }}
+                    style={{ border: '1px solid var(--tema-borde-e4ebf0)', color: 'var(--tema-texto-172033)' }}
                   />
                   <button
                     type="button"
@@ -339,7 +339,7 @@ export function PanelReparto({ onCerrar }: PanelRepartoProps) {
                     type="button"
                     onClick={() => { setAnulando(false); setMotivoAnulacion(''); }}
                     className="rounded-lg px-3 py-2 text-[12.5px] font-semibold"
-                    style={{ color: '#5F6F64' }}
+                    style={{ color: 'var(--tema-texto-5f6f64)' }}
                   >
                     Cancelar
                   </button>
@@ -352,13 +352,13 @@ export function PanelReparto({ onCerrar }: PanelRepartoProps) {
                   <div
                     key={fila.radicadoId}
                     className="flex flex-wrap items-center gap-x-3 gap-y-1.5 px-4 py-2.5"
-                    style={i > 0 ? { borderTop: '1px solid #EEF2EE' } : undefined}
+                    style={i > 0 ? { borderTop: '1px solid var(--tema-borde-eef2ee)' } : undefined}
                   >
                     <div className="min-w-0 flex-1 basis-52">
-                      <p className="truncate font-mono text-[12.5px] font-bold" style={{ color: '#12261A' }}>
+                      <p className="truncate font-mono text-[12.5px] font-bold" style={{ color: 'var(--tema-texto-172033)' }}>
                         {fila.radicadoId}
                       </p>
-                      <p className="truncate text-[11px]" style={{ color: '#5F6F64' }}>
+                      <p className="truncate text-[11px]" style={{ color: 'var(--tema-texto-5f6f64)' }}>
                         {nombreDependencia(fila.dependenciaDestino)} · {fila.asunto}
                       </p>
                     </div>
@@ -378,7 +378,7 @@ export function PanelReparto({ onCerrar }: PanelRepartoProps) {
                           placeholder="Recibió (nombre)…"
                           aria-label={`Nombre de quien recibió ${fila.radicadoId}`}
                           className="min-w-0 flex-1 rounded-lg px-2.5 py-1.5 text-[12.5px] outline-none focus:border-emerald-700"
-                          style={{ border: '1px solid #E3EAE3', color: '#12261A' }}
+                          style={{ border: '1px solid var(--tema-borde-e4ebf0)', color: 'var(--tema-texto-172033)' }}
                         />
                         <input
                           type="text"
@@ -393,13 +393,13 @@ export function PanelReparto({ onCerrar }: PanelRepartoProps) {
                           placeholder="Lugar/nota (opcional)"
                           aria-label={`Nota de entrega de ${fila.radicadoId}`}
                           className="min-w-0 flex-1 rounded-lg px-2.5 py-1.5 text-[12.5px] outline-none focus:border-emerald-700"
-                          style={{ border: '1px solid #E3EAE3', color: '#12261A' }}
+                          style={{ border: '1px solid var(--tema-borde-e4ebf0)', color: 'var(--tema-texto-172033)' }}
                         />
                       </div>
                     )}
 
                     {fila.estado === 'ENTREGADA' && fila.entrega && (
-                      <span className="inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-[11px] font-semibold" style={{ background: '#EEF4EE', color: VERDE_INST }}>
+                      <span className="inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-[11px] font-semibold" style={{ background: 'var(--tema-fondo-f4f9f6)', color: VERDE_INST }}>
                         <svg className="h-3 w-3" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={3}>
                           <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
                         </svg>
@@ -408,7 +408,7 @@ export function PanelReparto({ onCerrar }: PanelRepartoProps) {
                     )}
 
                     {fila.estado === 'LIBERADA' && (
-                      <span className="rounded-full px-2.5 py-1 text-[11px] font-semibold" style={{ background: '#EEF2F5', color: '#3A4551' }}>
+                      <span className="rounded-full px-2.5 py-1 text-[11px] font-semibold" style={{ background: 'var(--tema-fondo-eef2f5)', color: 'var(--tema-texto-3a4551)' }}>
                         Rueda a la próxima planilla
                       </span>
                     )}
@@ -417,9 +417,9 @@ export function PanelReparto({ onCerrar }: PanelRepartoProps) {
               </div>
 
               {/* Cierre de la ronda */}
-              <div className="space-y-3 px-4 py-3" style={{ borderTop: '1px solid #E3EAE3', background: '#F8FAF7' }}>
+              <div className="space-y-3 px-4 py-3" style={{ borderTop: '1px solid var(--tema-borde-e4ebf0)', background: 'var(--tema-fondo-f7f9fb)' }}>
                 <div className="flex flex-wrap items-center gap-3">
-                  <label className="flex cursor-pointer items-center gap-2 text-[12.5px] font-semibold" style={{ color: '#12261A' }}>
+                  <label className="flex cursor-pointer items-center gap-2 text-[12.5px] font-semibold" style={{ color: 'var(--tema-texto-172033)' }}>
                     <input
                       type="checkbox"
                       checked={cerrarDia}
@@ -431,8 +431,8 @@ export function PanelReparto({ onCerrar }: PanelRepartoProps) {
                 </div>
                 <div className="flex flex-wrap items-center gap-3">
                   <label
-                    className="cursor-pointer rounded-[10px] px-3.5 py-2 text-[12.5px] font-bold transition-colors hover:bg-[#EEF4EE]"
-                    style={{ border: '1px solid #E3EAE3', color: escaneo ? VERDE_INST : '#5F6F64', background: 'white' }}
+                    className="cursor-pointer rounded-[10px] px-3.5 py-2 text-[12.5px] font-bold transition-colors hover:bg-[var(--tema-fondo-f4f9f6)]"
+                    style={{ border: '1px solid var(--tema-borde-e4ebf0)', color: escaneo ? VERDE_INST : 'var(--tema-texto-5f6f64)', background: 'var(--tema-fondo-ffffff)' }}
                   >
                     <input
                       ref={inputEscaneo}
@@ -448,7 +448,7 @@ export function PanelReparto({ onCerrar }: PanelRepartoProps) {
                     disabled={ocupado}
                     onClick={() => void registrarEntregas()}
                     className="rounded-[10px] px-4 py-2.5 text-[13px] font-bold transition-opacity hover:opacity-90 disabled:opacity-50"
-                    style={{ background: DORADO, color: '#3D2C00', border: '1px solid #B8890F' }}
+                    style={{ background: DORADO, color: 'var(--tema-texto-3d2c00)', border: '1px solid #B8890F' }}
                   >
                     {ocupado ? 'Registrando…' : 'Registrar entregas'}
                   </button>
@@ -466,9 +466,9 @@ export function PanelReparto({ onCerrar }: PanelRepartoProps) {
           {!cargando && !abierta && (
             <section>
               <div className="flex flex-wrap items-center justify-between gap-3">
-                <p className="text-[13px] font-bold" style={{ color: '#12261A' }}>
+                <p className="text-[13px] font-bold" style={{ color: 'var(--tema-texto-172033)' }}>
                   Pendientes de entrega
-                  <span className="ml-2 text-[11px] font-semibold" style={{ color: '#7A8B7F' }}>
+                  <span className="ml-2 text-[11px] font-semibold" style={{ color: 'var(--tema-texto-7a8b7f)' }}>
                     {datos?.pendientes.length ?? 0} documento{(datos?.pendientes.length ?? 0) === 1 ? '' : 's'} físico{(datos?.pendientes.length ?? 0) === 1 ? '' : 's'}
                   </span>
                 </p>
@@ -477,38 +477,38 @@ export function PanelReparto({ onCerrar }: PanelRepartoProps) {
                   disabled={ocupado || (datos?.pendientes.length ?? 0) === 0}
                   onClick={() => void generarPlanilla()}
                   className="rounded-[10px] px-4 py-2.5 text-[13px] font-bold transition-opacity hover:opacity-90 disabled:opacity-50"
-                  style={{ background: DORADO, color: '#3D2C00', border: '1px solid #B8890F' }}
+                  style={{ background: DORADO, color: 'var(--tema-texto-3d2c00)', border: '1px solid #B8890F' }}
                 >
                   {ocupado ? 'Generando…' : 'Generar planilla del día'}
                 </button>
               </div>
 
               {(datos?.pendientes.length ?? 0) === 0 ? (
-                <p className="mt-3 text-xs" style={{ color: '#7A8B7F' }}>
+                <p className="mt-3 text-xs" style={{ color: 'var(--tema-texto-7a8b7f)' }}>
                   No hay documentos físicos esperando reparto. Los radicados en papel
                   aparecen aquí hasta que se registra su entrega.
                 </p>
               ) : (
-                <div className="mt-2.5 overflow-hidden rounded-xl bg-white" style={{ border: '1px solid #E3EAE3' }}>
+                <div className="mt-2.5 overflow-hidden rounded-xl bg-[var(--tema-fondo-ffffff)]" style={{ border: '1px solid var(--tema-borde-e4ebf0)' }}>
                   {pendientesPorDependencia.map(([dep, filas]) => (
                     <div key={dep}>
-                      <p className="px-4 pb-1 pt-2.5 text-[10.5px] font-bold uppercase tracking-widest" style={{ color: '#5F8A6E', background: '#F8FAF7' }}>
+                      <p className="px-4 pb-1 pt-2.5 text-[10.5px] font-bold uppercase tracking-widest" style={{ color: 'var(--tema-texto-5f8a6e)', background: 'var(--tema-fondo-f7f9fb)' }}>
                         {nombreDependencia(dep)} · {filas.length}
                       </p>
                       {filas.map((p) => (
-                        <div key={p.radicadoId} className="flex items-center gap-3 px-4 py-2" style={{ borderTop: '1px solid #EEF2EE' }}>
-                          <span className="w-10 shrink-0 text-[11px] tabular-nums" style={{ color: '#7A8B7F' }}>
+                        <div key={p.radicadoId} className="flex items-center gap-3 px-4 py-2" style={{ borderTop: '1px solid var(--tema-borde-eef2ee)' }}>
+                          <span className="w-10 shrink-0 text-[11px] tabular-nums" style={{ color: 'var(--tema-texto-7a8b7f)' }}>
                             {p.horaRadicado || fechaCorta(p.fechaRadicado)}
                           </span>
                           <span className="min-w-0 flex-1">
-                            <span className="block truncate font-mono text-[12.5px] font-bold" style={{ color: '#12261A' }}>
+                            <span className="block truncate font-mono text-[12.5px] font-bold" style={{ color: 'var(--tema-texto-172033)' }}>
                               {p.radicadoId}
                             </span>
-                            <span className="block truncate text-[11px]" style={{ color: '#5F6F64' }}>
+                            <span className="block truncate text-[11px]" style={{ color: 'var(--tema-texto-5f6f64)' }}>
                               {p.asunto}
                             </span>
                           </span>
-                          <span className="shrink-0 text-[11px] tabular-nums" style={{ color: '#7A8B7F' }}>
+                          <span className="shrink-0 text-[11px] tabular-nums" style={{ color: 'var(--tema-texto-7a8b7f)' }}>
                             {p.numeroFolios} folio{p.numeroFolios === 1 ? '' : 's'}
                           </span>
                         </div>
@@ -523,37 +523,37 @@ export function PanelReparto({ onCerrar }: PanelRepartoProps) {
           {/* ── Historial reciente ── */}
           {!cargando && (datos?.planillas.length ?? 0) > 0 && (
             <section>
-              <p className="text-[11px] font-bold uppercase tracking-widest" style={{ color: '#5F8A6E' }}>
+              <p className="text-[11px] font-bold uppercase tracking-widest" style={{ color: 'var(--tema-texto-5f8a6e)' }}>
                 Planillas recientes
               </p>
-              <div className="mt-2 overflow-hidden rounded-xl bg-white" style={{ border: '1px solid #E3EAE3' }}>
+              <div className="mt-2 overflow-hidden rounded-xl bg-[var(--tema-fondo-ffffff)]" style={{ border: '1px solid var(--tema-borde-e4ebf0)' }}>
                 {datos!.planillas.slice(0, 8).map((p, i) => {
                   const r = resumenPlanilla(p);
                   return (
                     <div
                       key={p.planillaId}
                       className="flex flex-wrap items-center gap-x-3 gap-y-1 px-4 py-2.5"
-                      style={i > 0 ? { borderTop: '1px solid #EEF2EE' } : undefined}
+                      style={i > 0 ? { borderTop: '1px solid var(--tema-borde-eef2ee)' } : undefined}
                     >
-                      <span className="font-mono text-[12.5px] font-bold" style={{ color: '#12261A' }}>
+                      <span className="font-mono text-[12.5px] font-bold" style={{ color: 'var(--tema-texto-172033)' }}>
                         {p.planillaId}
                       </span>
-                      <span className="text-[11px]" style={{ color: '#7A8B7F' }}>
+                      <span className="text-[11px]" style={{ color: 'var(--tema-texto-7a8b7f)' }}>
                         {fechaCorta(p.fechaGeneracion)} · {r.entregadas}/{r.total} entregada{r.entregadas === 1 ? '' : 's'}
                       </span>
                       <span className="ml-auto flex items-center gap-1.5">
                         {p.escaneoPath && (
-                          <span className="rounded-full px-2 py-0.5 text-[10.5px] font-semibold" style={{ background: '#EEF4EE', color: VERDE_INST }}>
+                          <span className="rounded-full px-2 py-0.5 text-[10.5px] font-semibold" style={{ background: 'var(--tema-fondo-f4f9f6)', color: VERDE_INST }}>
                             Escaneo ✓
                           </span>
                         )}
                         <span
                           className="rounded-full px-2 py-0.5 text-[10.5px] font-semibold"
                           style={p.estado === 'POR_ENTREGAR'
-                            ? { background: '#FAEEDA', color: '#7A4F0A' }
+                            ? { background: 'var(--tema-fondo-faeeda)', color: 'var(--tema-texto-7a4f0a)' }
                             : p.estado === 'ANULADA'
-                              ? { background: '#FCEBEB', color: '#911111' }
-                              : { background: '#EEF4EE', color: VERDE_INST }}
+                              ? { background: 'var(--tema-fondo-fcebeb)', color: 'var(--tema-texto-911111)' }
+                              : { background: 'var(--tema-fondo-f4f9f6)', color: VERDE_INST }}
                         >
                           {p.estado === 'POR_ENTREGAR' ? 'En ruta' : p.estado === 'ANULADA' ? 'Anulada' : 'Cerrada'}
                         </span>
@@ -650,7 +650,7 @@ function PlanillaImprimible({ planilla }: { planilla: PlanillaReparto }) {
         <thead>
           <tr>
             {COLUMNAS_PLANILLA.map((h) => (
-              <th key={h} style={{ ...CELDA, background: '#EFEFEF', textAlign: 'left', fontWeight: 700 }}>
+              <th key={h} style={{ ...CELDA, background: 'var(--tema-fondo-efefef)', textAlign: 'left', fontWeight: 700 }}>
                 {h}
               </th>
             ))}

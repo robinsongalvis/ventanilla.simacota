@@ -546,7 +546,7 @@ export function filtrarFilasLibro(
   return filas.filter((f) => coincideFiltroLibro(f, filtro, hoy));
 }
 
-/** Conteo por cada filtro — alimenta el número de cada chip (`ChipFiltroLibro`) sin recorrer `filas` una vez por chip por separado en el componente. */
+/** Conteo por cada filtro — alimenta el número de cada chip de filtro (`ChipFiltro`) sin recorrer `filas` una vez por chip por separado en el componente. */
 export function calcularConteosPorFiltroLibro(
   filas: readonly FilaLibroConsecutivo[],
   hoy: Date = new Date(),

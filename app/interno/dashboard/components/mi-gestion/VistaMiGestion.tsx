@@ -13,21 +13,25 @@ import { planDeSemana } from '@/lib/mi-gestion/plan-semana';
 import { SectionHeader } from '@/app/components/design-system/SectionHeader';
 import { StatusBadge } from '@/app/components/design-system/StatusBadge';
 import { EmptyState } from '@/app/components/design-system/EmptyState';
+import type { IndicadorEstaticoProps } from '@/app/components/design-system/Indicador';
+import { FilaTarjetas, TarjetaIndicador } from '@/app/components/design-system/TarjetaIndicador';
+import { CheckCircle2, Clock3, FileText, Timer, UsersRound } from 'lucide-react';
 
 /* ══════════════════════════════════════════════════════════════
    Sprint Mi gestión — dashboard personal del funcionario.
 
    Réplica fiel del boceto aprobado ("limpio y puro"): header con chip
    de semáforo, barra de cumplimiento con zonas de color y marcador,
-   cinco tarjetas con riel superior, "Atiende primero" clicable y la
+   cinco indicadores (desde la Ola 3, los del Tablero — ADR-0046),
+   "Atiende primero" clicable y la
    tendencia semanal en barras. Autocontrol: cada quien ve SOLO lo
    suyo — al entrar, en dos segundos sabe cómo va su gestión.
 ══════════════════════════════════════════════════════════════ */
 
 const CHIP_SEMAFORO: Record<SemaforoGestion, { label: string; bg: string; texto: string; borde: string }> = {
-  VERDE: { label: 'Al día',    bg: '#EAF3DE', texto: '#27500A', borde: '#97C459' },
-  AMBAR: { label: 'En riesgo', bg: '#FAEEDA', texto: '#633806', borde: '#EF9F27' },
-  ROJO:  { label: 'Atrasado',  bg: '#FCEBEB', texto: '#791F1F', borde: '#F09595' },
+  VERDE: { label: 'Al día',    bg: 'var(--tema-fondo-eaf3de)', texto: 'var(--tema-texto-27500a)', borde: 'var(--tema-borde-97c459)' },
+  AMBAR: { label: 'En riesgo', bg: 'var(--tema-fondo-faeeda)', texto: 'var(--tema-texto-633806)', borde: '#EF9F27' },
+  ROJO:  { label: 'Atrasado',  bg: 'var(--tema-fondo-fcebeb)', texto: 'var(--tema-texto-791f1f)', borde: '#F09595' },
 };
 
 const COLOR_BARRA: Record<SemaforoGestion, string> = {
@@ -38,10 +42,10 @@ const COLOR_BARRA: Record<SemaforoGestion, string> = {
 
 /* Sprint Cola personal — chip de término y riel por nivel de urgencia. */
 const CHIP_PENDIENTE: Record<NivelPendiente, { bg: string; texto: string; riel: string }> = {
-  ROJO:        { bg: '#FCEBEB', texto: '#791F1F', riel: '#DC2626' },
-  AMBAR:       { bg: '#FAEEDA', texto: '#633806', riel: '#D97706' },
-  VERDE:       { bg: '#EAF3DE', texto: '#27500A', riel: '#97C459' },
-  SIN_TERMINO: { bg: '#EEF2F5', texto: '#3A4551', riel: '#CBD5D1' },
+  ROJO:        { bg: 'var(--tema-fondo-fcebeb)', texto: 'var(--tema-texto-791f1f)', riel: 'var(--tema-texto-d81e1e)' },
+  AMBAR:       { bg: 'var(--tema-fondo-faeeda)', texto: 'var(--tema-texto-633806)', riel: 'var(--tema-texto-d97706)' },
+  VERDE:       { bg: 'var(--tema-fondo-eaf3de)', texto: 'var(--tema-texto-27500a)', riel: 'var(--tema-texto-97c459)' },
+  SIN_TERMINO: { bg: 'var(--tema-fondo-eef2f5)', texto: 'var(--tema-texto-3a4551)', riel: 'var(--tema-texto-cbd5d1)' },
 };
 
 const LABEL_ESTADO_PENDIENTE: Record<string, string> = {
@@ -87,19 +91,24 @@ export function VistaMiGestion({ radicados, usuario, onAbrirRadicado, ahora }: V
   const pct = g.pctCumplimiento;
   const maxTendencia = Math.max(1, ...g.tendencia.map((s) => s.resueltos));
 
-  const kpis: { valor: string; label: string; riel: string; color: string }[] = [
-    { valor: String(g.asignados),   label: 'Asignados',   riel: '#14532D', color: '#12261A' },
-    { valor: String(g.respondidos), label: 'Respondidos', riel: '#639922', color: '#3B6D11' },
-    { valor: String(g.pendientes),  label: 'Pendientes',  riel: '#475569', color: '#3A4551' },
+  /* Ola 3 (ADR-0046) — los mismos cinco indicadores, con el Indicador del
+     Tablero y sus tonos: Asignados en azul y Pendientes en gris, como allá.
+     Son de solo lectura: no filtran nada, así que no son botones. */
+  const kpis: IndicadorEstaticoProps[] = [
+    { etiqueta: 'Asignados',   valor: g.asignados,   tono: 'azul',  Icono: UsersRound },
+    { etiqueta: 'Respondidos', valor: g.respondidos, tono: 'verde', Icono: CheckCircle2 },
+    { etiqueta: 'Pendientes',  valor: g.pendientes,  tono: 'gris',  Icono: FileText },
     {
+      etiqueta: 'Tiempo promedio (días)',
       valor: g.tiempoPromedioDias !== null ? g.tiempoPromedioDias.toLocaleString('es-CO') : '—',
-      label: 'Tiempo promedio (días)', riel: '#1D4ED8', color: '#185FA5',
+      tono: 'gris',
+      Icono: Timer,
     },
-    { valor: String(g.porVencer + g.vencidos), label: 'Por vencer', riel: '#D97706', color: '#854F0B' },
+    { etiqueta: 'Por vencer', valor: g.porVencer + g.vencidos, descripcion: 'Incluye los ya vencidos', tono: 'ambar', Icono: Clock3 },
   ];
 
   return (
-    <div className="flex-1 overflow-y-auto min-h-0" style={{ background: '#F8FAF7' }}>
+    <div className="flex-1 overflow-y-auto min-h-0" style={{ background: 'var(--tema-fondo-f7f9fb)' }}>
       {/* ── Header con chip de semáforo ── */}
       <SectionHeader
         titulo={`${usuario.nombre} · ${NOMBRES_TENANT[usuario.tenantId] ?? usuario.tenantId}`}
@@ -117,51 +126,45 @@ export function VistaMiGestion({ radicados, usuario, onAbrirRadicado, ahora }: V
       />
 
       {/* ── Barra de cumplimiento con zonas y marcador ── */}
-      <div className="px-4 md:px-6 pt-4 pb-1 bg-white" style={{ borderBottom: '1px solid #E3EAE3' }}>
+      <div className="px-4 md:px-6 pt-4 pb-1 bg-[var(--tema-fondo-ffffff)]" style={{ borderBottom: '1px solid var(--tema-borde-e4ebf0)' }}>
         <div className="flex items-baseline justify-between mb-2">
-          <span className="text-xs font-bold" style={{ color: '#12261A' }}>Cumplimiento de términos</span>
-          <span className="font-black tabular-nums" style={{ fontSize: 26, color: pct !== null ? colorBarra : '#94A3B8' }}>
+          <span className="text-xs font-bold" style={{ color: 'var(--tema-texto-172033)' }}>Cumplimiento de términos</span>
+          <span className="font-black tabular-nums" style={{ fontSize: 26, color: pct !== null ? colorBarra : 'var(--tema-texto-64748b)' }}>
             {pct !== null ? `${pct}%` : '—'}
           </span>
         </div>
         <div className="relative h-3.5 rounded-full overflow-hidden flex" aria-label="Barra de cumplimiento">
           <div style={{ width: '60%', background: '#E24B4A', opacity: 0.25 }} />
           <div style={{ width: '25%', background: '#EF9F27', opacity: 0.3 }} />
-          <div style={{ width: '15%', background: '#63992255' }} />
+          <div style={{ width: '15%', background: 'color-mix(in srgb, #639922 33.3%, transparent)' }} />
           {pct !== null && (
             <>
               <div className="absolute inset-y-0 left-0 rounded-full" style={{ width: `${pct}%`, background: colorBarra }} />
-              <div className="absolute rounded-sm" style={{ top: -2, bottom: -2, left: `${pct}%`, width: 3, background: '#173404' }} />
+              {/* Marcador con el color de texto del tema: visible en claro y oscuro. */}
+              <div className="absolute rounded-sm" style={{ top: -2, bottom: -2, left: `calc(${pct}% - ${(pct / 100) * 3}px)`, width: 3, background: 'var(--tema-texto-172033)' }} />
             </>
           )}
         </div>
-        <div className="flex justify-between mt-1.5 text-[10.5px]" style={{ color: '#94A3B8' }}>
+        <div className="flex justify-between mt-1.5 text-[10.5px]" style={{ color: 'var(--tema-texto-64748b)' }}>
           <span>0–60 · atrasado</span><span>60–85 · en riesgo</span><span>85–100 · al día</span>
         </div>
-        <p className="mt-2 mb-2.5 text-[11.5px]" style={{ color: '#5F6F64' }}>
+        <p className="mt-2 mb-2.5 text-[11.5px]" style={{ color: 'var(--tema-texto-5f6f64)' }}>
           {pct !== null
             ? MENSAJE_SEMAFORO[g.semaforo]
             : 'El porcentaje aparece cuando resuelvas tus primeros radicados con dato de cumplimiento.'}
         </p>
       </div>
 
-      {/* ── Cinco tarjetas con riel superior ── */}
-      <div className="grid gap-2.5 px-4 md:px-6 py-3.5" style={{ gridTemplateColumns: 'repeat(auto-fit, minmax(105px, 1fr))' }}>
+      {/* ── Cinco indicadores (lenguaje del Tablero) ── */}
+      <FilaTarjetas etiqueta="Mis indicadores" className="px-4 py-3 md:px-6">
         {kpis.map((k) => (
-          <div
-            key={k.label}
-            className="rounded-[10px] bg-white px-3 py-2.5"
-            style={{ border: '1px solid #E3EAE3', borderTop: `3px solid ${k.riel}` }}
-          >
-            <p className="font-black tabular-nums leading-none" style={{ fontSize: 24, color: k.color }}>{k.valor}</p>
-            <p className="text-[11px] mt-1" style={{ color: '#667085' }}>{k.label}</p>
-          </div>
+          <TarjetaIndicador key={k.etiqueta} {...k} />
         ))}
-      </div>
+      </FilaTarjetas>
 
       {/* ── Atiende primero + tendencia semanal ── */}
       <div className="grid gap-3 px-4 md:px-6 pb-4 grid-cols-1 md:grid-cols-2">
-        <div className="rounded-xl bg-white px-3.5 py-3" style={{ border: '1px solid #E3EAE3' }}>
+        <div className="rounded-xl bg-[var(--tema-fondo-ffffff)] px-3.5 py-3" style={{ border: '1px solid var(--tema-borde-e4ebf0)' }}>
           <SectionHeader titulo="Atiende primero" variante="compact" />
           {g.atencionPrioritaria.length === 0 ? (
             <EmptyState titulo="Sin urgencias" descripcion="Nada vence en los próximos 2 días." />
@@ -172,18 +175,18 @@ export function VistaMiGestion({ radicados, usuario, onAbrirRadicado, ahora }: V
                 type="button"
                 onClick={() => onAbrirRadicado(a.radicadoId)}
                 aria-label={`Abrir radicado ${a.radicadoId}`}
-                className="w-full flex items-center gap-2 py-1.5 text-left hover:bg-[#F4F8F4] rounded focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-700/30"
-                style={i > 0 ? { borderTop: '1px solid #EEF2EE' } : undefined}
+                className="w-full flex items-center gap-2 py-1.5 text-left hover:bg-[var(--tema-fondo-f4f8f4)] rounded focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-700/30"
+                style={i > 0 ? { borderTop: '1px solid var(--tema-borde-eef2ee)' } : undefined}
               >
-                <span className="w-[3px] self-stretch rounded-sm shrink-0" style={{ background: a.nivel === 'ROJO' ? '#DC2626' : '#D97706' }} />
-                <span className="font-mono text-[11.5px] font-bold truncate" style={{ color: '#12261A' }}>
+                <span className="w-[3px] self-stretch rounded-sm shrink-0" style={{ background: a.nivel === 'ROJO' ? 'var(--tema-texto-d81e1e)' : 'var(--tema-texto-d97706)' }} />
+                <span className="font-mono text-[11.5px] font-bold truncate" style={{ color: 'var(--tema-texto-172033)' }}>
                   {a.radicadoId}
                 </span>
                 <span
                   className="ml-auto text-[10.5px] font-semibold px-2 py-0.5 rounded-full shrink-0"
                   style={a.nivel === 'ROJO'
-                    ? { background: '#FCEBEB', color: '#791F1F' }
-                    : { background: '#FAEEDA', color: '#633806' }}
+                    ? { background: 'var(--tema-fondo-fcebeb)', color: 'var(--tema-texto-791f1f)' }
+                    : { background: 'var(--tema-fondo-faeeda)', color: 'var(--tema-texto-633806)' }}
                 >
                   {a.etiqueta}
                 </span>
@@ -192,7 +195,7 @@ export function VistaMiGestion({ radicados, usuario, onAbrirRadicado, ahora }: V
           )}
         </div>
 
-        <div className="rounded-xl bg-white px-3.5 py-3" style={{ border: '1px solid #E3EAE3' }}>
+        <div className="rounded-xl bg-[var(--tema-fondo-ffffff)] px-3.5 py-3" style={{ border: '1px solid var(--tema-borde-e4ebf0)' }}>
           <SectionHeader titulo="Respondidos por semana" variante="compact" />
           <div className="flex items-end gap-2" style={{ height: 64 }}>
             {g.tendencia.map((s) => (
@@ -201,7 +204,7 @@ export function VistaMiGestion({ radicados, usuario, onAbrirRadicado, ahora }: V
                 className="flex-1 rounded-t"
                 title={`${s.etiqueta}: ${s.resueltos}`}
                 style={{
-                  background: s.etiqueta === 'Esta' ? '#639922' : '#97C459',
+                  background: s.etiqueta === 'Esta' ? '#639922' : 'var(--tema-fondo-97c459)',
                   height: `${s.resueltos === 0 ? 4 : Math.max(12, Math.round((s.resueltos / maxTendencia) * 90))}%`,
                   opacity: s.resueltos === 0 ? 0.35 : 1,
                 }}
@@ -214,8 +217,8 @@ export function VistaMiGestion({ radicados, usuario, onAbrirRadicado, ahora }: V
                 key={s.etiqueta}
                 className="flex-1 text-center text-[10px]"
                 style={s.etiqueta === 'Esta'
-                  ? { color: '#12261A', fontWeight: 600 }
-                  : { color: '#94A3B8' }}
+                  ? { color: 'var(--tema-texto-172033)', fontWeight: 600 }
+                  : { color: 'var(--tema-texto-64748b)' }}
               >
                 {s.etiqueta}
               </span>
@@ -226,7 +229,7 @@ export function VistaMiGestion({ radicados, usuario, onAbrirRadicado, ahora }: V
 
       {/* ── Tu semana: cómo se distribuyen los vencimientos ── */}
       <div className="px-4 md:px-6 pb-3">
-        <div className="rounded-xl bg-white px-3.5 py-3" style={{ border: '1px solid #E3EAE3' }}>
+        <div className="rounded-xl bg-[var(--tema-fondo-ffffff)] px-3.5 py-3" style={{ border: '1px solid var(--tema-borde-e4ebf0)' }}>
           <SectionHeader
             titulo="Tu semana"
             variante="compact"
@@ -238,7 +241,7 @@ export function VistaMiGestion({ radicados, usuario, onAbrirRadicado, ahora }: V
                   </StatusBadge>
                 )}
                 {semana.despues > 0 && (
-                  <span className="text-[10.5px]" style={{ color: '#7A8B7F' }}>
+                  <span className="text-[10.5px]" style={{ color: 'var(--tema-texto-64748b)' }}>
                     +{semana.despues} después de esta semana
                   </span>
                 )}
@@ -254,20 +257,20 @@ export function VistaMiGestion({ radicados, usuario, onAbrirRadicado, ahora }: V
                   key={d.ymd}
                   className="rounded-lg px-1 py-1.5 text-center"
                   style={d.esHoy
-                    ? { background: '#F4F8F4', border: '1.5px solid #14532D' }
-                    : { border: '1px solid #EEF2EE' }}
+                    ? { background: 'var(--tema-fondo-f4f8f4)', border: '1.5px solid var(--tema-borde-007049)' }
+                    : { border: '1px solid var(--tema-borde-eef2ee)' }}
                 >
                   <p
                     className="font-black tabular-nums leading-none"
-                    style={{ fontSize: 18, color: d.vencen > 0 ? '#12261A' : '#CBD5D1' }}
+                    style={{ fontSize: 18, color: d.vencen > 0 ? 'var(--tema-texto-172033)' : 'var(--tema-texto-475569)' }}
                   >
                     {d.vencen}
                   </p>
                   <p
                     className="text-[9.5px] mt-1"
                     style={d.esHoy
-                      ? { color: '#14532D', fontWeight: 700 }
-                      : { color: '#94A3B8' }}
+                      ? { color: 'var(--tema-texto-007049)', fontWeight: 700 }
+                      : { color: 'var(--tema-texto-64748b)' }}
                   >
                     {d.etiqueta}
                   </p>
@@ -280,7 +283,7 @@ export function VistaMiGestion({ radicados, usuario, onAbrirRadicado, ahora }: V
 
       {/* ── Mis pendientes: la cola completa de trabajo ── */}
       <div className="px-4 md:px-6 pb-5">
-        <div className="rounded-xl bg-white px-3.5 py-3" style={{ border: '1px solid #E3EAE3' }}>
+        <div className="rounded-xl bg-[var(--tema-fondo-ffffff)] px-3.5 py-3" style={{ border: '1px solid var(--tema-borde-e4ebf0)' }}>
           <SectionHeader
             titulo="Mis pendientes"
             variante="compact"
@@ -297,23 +300,23 @@ export function VistaMiGestion({ radicados, usuario, onAbrirRadicado, ahora }: V
                   type="button"
                   onClick={() => onAbrirRadicado(p.radicadoId)}
                   aria-label={`Abrir radicado ${p.radicadoId}`}
-                  className="w-full flex items-center gap-2.5 py-2 text-left hover:bg-[#F4F8F4] rounded focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-700/30"
-                  style={i > 0 ? { borderTop: '1px solid #EEF2EE' } : undefined}
+                  className="w-full flex items-center gap-2.5 py-2 text-left hover:bg-[var(--tema-fondo-f4f8f4)] rounded focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-700/30"
+                  style={i > 0 ? { borderTop: '1px solid var(--tema-borde-eef2ee)' } : undefined}
                 >
                   <span className="w-[3px] self-stretch rounded-sm shrink-0" style={{ background: chip.riel }} />
                   <div className="min-w-0 flex-1">
                     <div className="flex items-center gap-2 flex-wrap">
-                      <span className="font-mono text-[11.5px] font-bold" style={{ color: '#12261A' }}>
+                      <span className="font-mono text-[11.5px] font-bold" style={{ color: 'var(--tema-texto-172033)' }}>
                         {p.radicadoId}
                       </span>
                       <span
                         className="text-[10px] font-semibold uppercase px-1.5 py-0.5 rounded"
-                        style={{ background: '#F4F8F4', color: '#5F6F64', border: '1px solid #E3EAE3' }}
+                        style={{ background: 'var(--tema-fondo-f4f8f4)', color: 'var(--tema-texto-5f6f64)', border: '1px solid var(--tema-borde-e4ebf0)' }}
                       >
                         {LABEL_ESTADO_PENDIENTE[p.estado] ?? p.estado}
                       </span>
                     </div>
-                    <p className="text-[11.5px] mt-0.5 truncate" style={{ color: '#3A4551' }}>
+                    <p className="text-[11.5px] mt-0.5 truncate" style={{ color: 'var(--tema-texto-3a4551)' }}>
                       {p.asunto || 'Sin asunto'}
                     </p>
                   </div>

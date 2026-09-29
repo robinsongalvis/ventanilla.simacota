@@ -66,11 +66,11 @@ export class DashboardErrorBoundary extends React.Component<Props, State> {
     return (
       <div
         className="flex-1 flex items-center justify-center p-6"
-        style={{ background: '#F8FAF7', minHeight: '400px' }}
+        style={{ background: '#F7F9FB', minHeight: '400px' }}
       >
         <div
           className="w-full max-w-md rounded-2xl p-8 text-center bg-white"
-          style={{ border: '1px solid #D9E2D9', boxShadow: '0 4px 16px rgba(20,83,45,0.08)' }}
+          style={{ border: '1px solid #DCE4EA', boxShadow: '0 4px 16px rgba(0, 112, 73,0.08)' }}
         >
           {/* Ícono */}
           <div
@@ -79,7 +79,7 @@ export class DashboardErrorBoundary extends React.Component<Props, State> {
           >
             <svg
               className="w-7 h-7"
-              style={{ color: '#DC2626' }}
+              style={{ color: '#D81E1E' }}
               fill="none"
               viewBox="0 0 24 24"
               stroke="currentColor"
@@ -96,17 +96,17 @@ export class DashboardErrorBoundary extends React.Component<Props, State> {
           {/* Texto */}
           <p
             className="text-[10px] font-bold uppercase tracking-widest mb-2"
-            style={{ color: '#DC2626' }}
+            style={{ color: '#D81E1E' }}
           >
             Error del sistema
           </p>
           <h2
             className="text-base font-black mb-3"
-            style={{ color: '#1F2933', fontFamily: 'var(--font-manrope)' }}
+            style={{ color: '#172033', fontFamily: 'var(--font-manrope)' }}
           >
             Panel temporalmente no disponible
           </h2>
-          <p className="text-sm leading-relaxed mb-6" style={{ color: '#667085' }}>
+          <p className="text-sm leading-relaxed mb-6" style={{ color: '#64748B' }}>
             {mensaje}
           </p>
 
@@ -122,14 +122,14 @@ export class DashboardErrorBoundary extends React.Component<Props, State> {
             <button
               onClick={this.handleReload}
               className="px-5 py-2.5 rounded-xl text-white text-sm font-bold transition-all active:scale-[0.98]"
-              style={{ background: '#14532D' }}
+              style={{ background: '#007049' }}
             >
               Recargar página
             </button>
             <button
               onClick={this.handleGoHome}
               className="px-5 py-2.5 rounded-xl text-sm font-medium transition-all active:scale-[0.98]"
-              style={{ border: '1px solid #D9E2D9', color: '#667085' }}
+              style={{ border: '1px solid #DCE4EA', color: '#64748B' }}
             >
               Ir al inicio
             </button>

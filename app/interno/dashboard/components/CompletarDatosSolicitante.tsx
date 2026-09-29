@@ -69,14 +69,14 @@ export function CompletarDatosSolicitante({ radicado }: { radicado: VentanillaRa
 
   const inputCls = 'input-internal';
   const labelCls = 'mb-1 block text-[10px] font-bold uppercase tracking-widest';
-  const labelStyle = { color: '#92400E' };
+  const labelStyle = { color: 'var(--tema-texto-92400e)' };
 
   return (
-    <div className="rounded-xl p-4" style={{ background: '#FEF3C7', border: '1px solid #FBBF24' }}>
-      <p className="text-[10px] font-bold uppercase tracking-widest mb-1" style={{ color: '#92400E' }}>
+    <div className="rounded-xl p-4" style={{ background: 'var(--tema-fondo-fef3c7)', border: '1px solid var(--tema-borde-fbbf24)' }}>
+      <p className="text-[10px] font-bold uppercase tracking-widest mb-1" style={{ color: 'var(--tema-texto-92400e)' }}>
         Datos pendientes del solicitante
       </p>
-      <p className="text-xs mb-3" style={{ color: '#92400E' }}>
+      <p className="text-xs mb-3" style={{ color: 'var(--tema-texto-92400e)' }}>
         Si el ciudadano aporta el dato, regístralo aquí: la marca se
         resuelve y queda evento en la trazabilidad.
       </p>
@@ -130,7 +130,7 @@ export function CompletarDatosSolicitante({ radicado }: { radicado: VentanillaRa
       </div>
 
       {marcas?.documento && (
-        <p className="mt-3 text-[11px] italic" style={{ color: '#92400E' }}>
+        <p className="mt-3 text-[11px] italic" style={{ color: 'var(--tema-texto-92400e)' }}>
           El documento de identidad no se completa por esta vía.
         </p>
       )}
@@ -142,7 +142,7 @@ export function CompletarDatosSolicitante({ radicado }: { radicado: VentanillaRa
             onClick={() => { void guardar(); }}
             disabled={!hayAlgoEscrito || estado === 'guardando'}
             className="text-xs font-bold px-4 py-2 rounded-lg text-white transition-all active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed"
-            style={{ background: '#14532D' }}
+            style={{ background: 'var(--tema-fondo-007049)' }}
           >
             {estado === 'guardando' ? 'Guardando…' : 'Guardar datos aportados'}
           </button>
@@ -150,7 +150,7 @@ export function CompletarDatosSolicitante({ radicado }: { radicado: VentanillaRa
             <p
               role="status"
               className="text-xs font-semibold"
-              style={{ color: estado === 'error' ? '#991B1B' : '#14532D' }}
+              style={{ color: estado === 'error' ? 'var(--tema-texto-991b1b)' : 'var(--tema-texto-007049)' }}
             >
               {mensaje}
             </p>
