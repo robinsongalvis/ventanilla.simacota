@@ -32,22 +32,34 @@ export function OtrosDocumentos({ expedienteId, documentos, soloLectura, onDocum
         <p className="text-xs" style={{ color: 'var(--text-secondary)' }}>Sin documentos adicionales.</p>
       ) : (
         <ul className="flex flex-col gap-2 mb-3">
-          {documentos.map((doc) => (
-            <li key={doc.id} className="flex min-w-0 flex-col gap-x-2 gap-y-1 text-xs sm:flex-row sm:flex-wrap sm:items-center" style={{ color: 'var(--text-secondary)' }}>
-              <span className="min-w-0 break-words" style={{ color: 'var(--text-primary)', overflowWrap: 'anywhere' }}>{doc.nombre}</span>
-              <span className="shrink-0 font-mono">v{doc.versionVigente.numeroVersion}</span>
-              <a
-                href={`/api/interno/archivo?path=${encodeURIComponent(doc.versionVigente.storagePath)}`}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="shrink-0 font-medium underline underline-offset-2 focus-visible:outline-none focus-visible:ring-2 rounded"
-                style={{ color: '#14532D' }}
-              >
-                Descargar
-              </a>
-              <span className="shrink-0" style={{ color: 'var(--text-muted)' }}>{formatFechaHoraColombia(doc.versionVigente.subidoEn)}</span>
-            </li>
-          ))}
+          {documentos.map((doc) => {
+            /* Lectura defensiva (issue #308): un documento sin `versionVigente`
+               —histórico migrado, siembra mínima, escritura a medias— no puede
+               tumbar la lista entera. Se muestra degradado y sin descarga. */
+            const version = doc.versionVigente;
+            return (
+              <li key={doc.id} className="flex min-w-0 flex-col gap-x-2 gap-y-1 text-xs sm:flex-row sm:flex-wrap sm:items-center" style={{ color: 'var(--text-secondary)' }}>
+                <span className="min-w-0 break-words" style={{ color: 'var(--text-primary)', overflowWrap: 'anywhere' }}>{doc.nombre}</span>
+                {version ? (
+                  <>
+                    <span className="shrink-0 font-mono">v{version.numeroVersion}</span>
+                    <a
+                      href={`/api/interno/archivo?path=${encodeURIComponent(version.storagePath)}`}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="shrink-0 font-medium underline underline-offset-2 focus-visible:outline-none focus-visible:ring-2 rounded"
+                      style={{ color: 'var(--tema-texto-007049)' }}
+                    >
+                      Descargar
+                    </a>
+                    <span className="shrink-0" style={{ color: 'var(--text-secondary)' }}>{formatFechaHoraColombia(version.subidoEn)}</span>
+                  </>
+                ) : (
+                  <span className="shrink-0" style={{ color: '#8E5C06' }}>Sin versión registrada</span>
+                )}
+              </li>
+            );
+          })}
         </ul>
       )}
 
