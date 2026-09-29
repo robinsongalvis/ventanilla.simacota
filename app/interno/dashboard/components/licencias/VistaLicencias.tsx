@@ -1,104 +1,106 @@
 'use client';
 
 /* ══════════════════════════════════════════════════════════════
-   VistaLicencias — Bloque B ("la ventanita").
+   VistaLicencias — Licencias urbanísticas (Secretaría de Planeación) en el
+   panel interno.
 
-   Licencias urbanísticas (Secretaría de Planeación) como pestaña REAL del
-   panel interno (`VistaActual === 'LICENCIAS'`, `lib/store/
-   ventanillaStore.tsx`), NO como página aparte. Reemplaza el antiguo link
-   de página completa a `/interno/licencias` — ver JSDoc de
-   `puedeVerLicencias` en `app/interno/dashboard/page.tsx`.
+   Armazón único (ADR-0046 §7): es la ÚNICA pantalla de Licencias, con el
+   mismo menú, encabezado, barra móvil y selector de tema que el resto del
+   panel. Las rutas antiguas `/interno/licencias/*` redirigen aquí.
 
-   Reutiliza literalmente los Client Components del módulo standalone
-   (`BandejaLicenciasClient`, `DetalleLicenciaClient`) en vez de duplicar su
-   lógica (fetch, KPIs, checklist…) — ambos ganaron props ADITIVAS y
-   opcionales (`onAbrirExpediente`, `onVolver`) para que, cuando se montan
-   aquí, la navegación bandeja↔detalle sea un cambio de ESTADO LOCAL de
-   este componente en vez de una navegación de ruta. Sin esas props (ruta
-   standalone `/interno/licencias`) su comportamiento no cambia: siguen
-   usando `<Link>`.
+   Navegación por dirección: en el panel, `page.tsx` pasa la pantalla que
+   indica la URL (`expedienteId`, `seccion`) y `onNavegar` escribe en ella
+   (`rutas-licencias.ts`). Así funcionan los enlaces directos, recargar y
+   los botones atrás/adelante del navegador. Sin `onNavegar` (pruebas,
+   usos sueltos) la navegación es estado local, como antes.
 
-   La sub-navegación local (Bandeja / Libro consecutivo) reemplaza aquí a
-   `LicenciasSidebar` (que sigue viva para la ruta standalone, deep-links).
+   Reutiliza los Client Components del módulo (`BandejaLicenciasClient`,
+   `DetalleLicenciaClient`, `LibroConsecutivoClient`) sin duplicar su
+   lógica: abrir un expediente o volver es `onAbrirExpediente`/`onVolver`.
 
-   Bloque C: "Libro consecutivo" monta `LibroConsecutivoClient` — el MISMO
-   Client Component que la ruta standalone (`app/interno/licencias/
-   libro-consecutivo/page.tsx`), patrón dual idéntico al de la Bandeja/
-   Detalle arriba. El botón "Exportar libro consecutivo ↓" del pie de la
-   Bandeja usa `onIrALibroConsecutivo` para cambiar de sub-pestaña LOCAL
-   en vez de navegar de ruta (mismo principio que `onAbrirExpediente`).
+   La clase `licencias-impresion` marca la raíz para las reglas de
+   impresión de `globals.css`: mientras Licencias está montada, imprimir
+   quita el armazón de pantalla y deja fluir el contenido en varias hojas
+   (libro consecutivo, proyecto de acto de desistimiento).
 
-   NO usa `GuardModuloPlaneacion` (ese guard asume `h-screen`, pensado para
-   la ruta standalone con su propio chrome de página completa — lo
-   rompería dentro de la columna del panel). El gating de acceso a esta
-   vista ya lo da `puedeAccederVista(usuario, 'LICENCIAS')` en
-   `page.tsx`, que delega en el mismo `puedeVerLicencias`.
+   El acceso lo decide `puedeAccederVista(usuario, 'LICENCIAS')` en
+   `page.tsx`, que delega en `puedeVerLicencias`.
 ══════════════════════════════════════════════════════════════ */
 
 import { useState } from 'react';
+import { BookOpen, Inbox } from 'lucide-react';
+import { PanelPestana, Pestanas, type Pestana } from '@/app/components/design-system/Pestanas';
 import { BandejaLicenciasClient } from '@/app/interno/licencias/components/BandejaLicenciasClient';
 import { DetalleLicenciaClient } from '@/app/interno/licencias/[expedienteId]/DetalleLicenciaClient';
 import { LibroConsecutivoClient } from '@/app/interno/licencias/components/LibroConsecutivoClient';
+import type { DestinoLicencias, SeccionLicencias } from '@/app/interno/licencias/rutas-licencias';
 
-type SubVistaLicencias = 'BANDEJA' | 'LIBRO_CONSECUTIVO';
-
-const SUB_TABS: readonly { id: SubVistaLicencias; label: string }[] = [
-  { id: 'BANDEJA', label: 'Bandeja' },
-  { id: 'LIBRO_CONSECUTIVO', label: 'Libro consecutivo' },
+/* Ola 3 (ADR-0046): las pestañas del sistema de diseño (tablist con foco
+   itinerante), las mismas de Control Interno y Administración. */
+const SUB_TABS: readonly Pestana<SeccionLicencias>[] = [
+  { id: 'BANDEJA', etiqueta: 'Bandeja', Icono: Inbox },
+  { id: 'LIBRO_CONSECUTIVO', etiqueta: 'Libro consecutivo', Icono: BookOpen },
 ];
 
-export function VistaLicencias() {
-  const [subVista, setSubVista] = useState<SubVistaLicencias>('BANDEJA');
-  const [expedienteSeleccionado, setExpedienteSeleccionado] = useState<string | null>(null);
+export interface VistaLicenciasProps {
+  /** Expediente abierto según la dirección (modo controlado). */
+  expedienteId?: string | null;
+  /** Pestaña según la dirección (modo controlado). */
+  seccion?: SeccionLicencias;
+  /** Escribe el destino en la dirección. Sin él, la navegación es local. */
+  onNavegar?: (destino: DestinoLicencias) => void;
+}
 
-  // El detalle reemplaza toda la vista (mismo comportamiento que la ruta
-  // standalone `/interno/licencias/{id}`) — las sub-pestañas Bandeja/Libro
-  // consecutivo no aplican mientras se mira un expediente puntual.
+export function VistaLicencias({ expedienteId, seccion, onNavegar }: VistaLicenciasProps = {}) {
+  const [seccionLocal, setSeccionLocal] = useState<SeccionLicencias>('BANDEJA');
+  const [expedienteLocal, setExpedienteLocal] = useState<string | null>(null);
+
+  const controlada = onNavegar !== undefined;
+  const subVista = controlada ? (seccion ?? 'BANDEJA') : seccionLocal;
+  const expedienteSeleccionado = controlada ? (expedienteId ?? null) : expedienteLocal;
+
+  function navegar(destino: DestinoLicencias) {
+    if (onNavegar) { onNavegar(destino); return; }
+    setExpedienteLocal(destino.expedienteId ?? null);
+    if (destino.seccion) setSeccionLocal(destino.seccion);
+  }
+
+  // El detalle reemplaza toda la vista — las pestañas Bandeja/Libro
+  // consecutivo no aplican mientras se mira un expediente puntual. «Volver»
+  // lleva a la Bandeja, como dice su etiqueta.
   if (expedienteSeleccionado) {
     return (
-      <DetalleLicenciaClient
-        expedienteId={expedienteSeleccionado}
-        onVolver={() => setExpedienteSeleccionado(null)}
-      />
+      <div className="licencias-impresion min-w-0">
+        <DetalleLicenciaClient
+          expedienteId={expedienteSeleccionado}
+          onVolver={() => navegar({ seccion: 'BANDEJA' })}
+        />
+      </div>
     );
   }
 
   return (
-    <div className="flex h-full w-full min-w-0 flex-col gap-3">
-      <div className="shrink-0 px-4 md:px-6 pt-4 print:hidden">
-        <div
-          className="flex max-w-full flex-wrap gap-1 rounded-full p-1"
-          style={{ background: '#EEF4EE' }}
-          role="tablist"
-          aria-label="Sección de Licencias"
-        >
-          {SUB_TABS.map(({ id, label }) => {
-            const activo = subVista === id;
-            return (
-              <button
-                key={id}
-                type="button"
-                role="tab"
-                aria-selected={activo}
-                onClick={() => setSubVista(id)}
-                className="px-4 py-1.5 rounded-full text-xs font-bold transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-1"
-                style={activo ? { background: '#14532D', color: '#FFFFFF' } : { color: '#14532D' }}
-              >
-                {label}
-              </button>
-            );
-          })}
-        </div>
+    <div className="licencias-impresion flex h-full w-full min-w-0 flex-col gap-3">
+      <div className="shrink-0 px-4 pt-3 lg:px-6 print:hidden">
+        <Pestanas
+          idBase="licencias"
+          etiquetaGrupo="Sección de Licencias"
+          pestanas={SUB_TABS}
+          activa={subVista}
+          onCambiar={(id) => navegar({ seccion: id })}
+        />
       </div>
 
-      {subVista === 'BANDEJA' ? (
-        <BandejaLicenciasClient
-          onAbrirExpediente={setExpedienteSeleccionado}
-          onIrALibroConsecutivo={() => setSubVista('LIBRO_CONSECUTIVO')}
-        />
-      ) : (
-        <LibroConsecutivoClient />
-      )}
+      <PanelPestana idBase="licencias" activa={subVista} className="min-w-0">
+        {subVista === 'BANDEJA' ? (
+          <BandejaLicenciasClient
+            onAbrirExpediente={(id) => navegar({ expedienteId: id })}
+            onIrALibroConsecutivo={() => navegar({ seccion: 'LIBRO_CONSECUTIVO' })}
+          />
+        ) : (
+          <LibroConsecutivoClient />
+        )}
+      </PanelPestana>
     </div>
   );
 }

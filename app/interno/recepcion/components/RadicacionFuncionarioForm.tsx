@@ -193,10 +193,10 @@ function formatDateTime(date: Date): string {
 }
 
 /* ── Estilos compartidos ─────────────────────────────────────── */
-const sectionCls = 'rounded-xl bg-white p-4 space-y-1';
-const sectionStyle = { border: '1px solid #D9E2D9', boxShadow: '0 1px 2px rgba(20,83,45,0.05)' };
+const sectionCls = 'rounded-xl bg-[var(--tema-fondo-ffffff)] p-4 space-y-1';
+const sectionStyle = { border: '1px solid var(--tema-borde-dce4ea)', boxShadow: '0 1px 2px rgba(0, 112, 73,0.05)' };
 const labelCls = 'mb-1 block text-[10px] font-bold uppercase tracking-widest';
-const labelStyle = { color: '#667085' };
+const labelStyle = { color: 'var(--tema-texto-64748b)' };
 
 export function RadicacionFuncionarioForm({ radicadoPreview, onSubmit, formId, hideSubmitButton = false, radicados = SIN_RADICADOS }: Props) {
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -427,9 +427,9 @@ export function RadicacionFuncionarioForm({ radicadoPreview, onSubmit, formId, h
           {sugerencia && sugerencia.oficina !== form.oficinaDestino && (
             <div
               className="md:col-span-2 xl:col-span-4 flex items-center gap-2 flex-wrap rounded-lg px-3 py-2"
-              style={{ background: '#FDF9EE', border: '1px solid #E7D9A8' }}
+              style={{ background: 'var(--tema-fondo-fdf9ee)', border: '1px solid var(--tema-borde-e7d9a8)' }}
             >
-              <span className="text-xs" style={{ color: '#7A5B0B' }}>
+              <span className="text-xs" style={{ color: 'var(--tema-texto-7a5b0b)' }}>
                 Sugerido: <strong>{sugerencia.nombre}</strong> · {sugerencia.razon}
               </span>
               <button
@@ -437,7 +437,7 @@ export function RadicacionFuncionarioForm({ radicadoPreview, onSubmit, formId, h
                 onClick={() => update('oficinaDestino', sugerencia.oficina)}
                 aria-label={`Aplicar sugerencia: dirigir a ${sugerencia.nombre}`}
                 className="text-xs font-bold px-3 py-1 rounded-full transition-opacity hover:opacity-90"
-                style={{ background: '#14532D', color: '#FFFFFF' }}
+                style={{ background: 'var(--tema-fondo-007049)', color: '#FFFFFF' }}
               >
                 Aplicar
               </button>
@@ -463,7 +463,7 @@ export function RadicacionFuncionarioForm({ radicadoPreview, onSubmit, formId, h
           <p
             role="status"
             className="mb-3 rounded-lg px-3 py-2 text-xs"
-            style={{ background: '#FDF9EE', border: '1px solid #E7D9A8', color: '#7A5B0B' }}
+            style={{ background: 'var(--tema-fondo-fdf9ee)', border: '1px solid var(--tema-borde-e7d9a8)', color: 'var(--tema-texto-7a5b0b)' }}
           >
             Datos cargados de una radicación anterior — verifícalos con el ciudadano.
           </p>
@@ -491,12 +491,12 @@ export function RadicacionFuncionarioForm({ radicadoPreview, onSubmit, formId, h
               ]}
             />
             {form.tipoPresentacion === 'ANONIMA' && (
-              <p className="mt-1 text-[10px]" style={{ color: '#92400E' }}>
+              <p className="mt-1 text-[10px]" style={{ color: 'var(--tema-texto-92400e)' }}>
                 No se registran nombre ni documento.
               </p>
             )}
             {form.tipoPresentacion === 'RESERVADA' && (
-              <p className="mt-1 text-[10px]" style={{ color: '#92400E' }}>
+              <p className="mt-1 text-[10px]" style={{ color: 'var(--tema-texto-92400e)' }}>
                 Los datos se registran pero quedan protegidos en las vistas.
               </p>
             )}
@@ -594,16 +594,16 @@ export function RadicacionFuncionarioForm({ radicadoPreview, onSubmit, formId, h
           <div className="relative md:col-span-2 xl:col-span-2">
             <TextField label="Municipio" value={form.municipio} onChange={(v) => update('municipio', v)} />
             {form.municipio && municipiosFiltrados.length > 0 && (
-              <div className="absolute z-20 mt-1 w-full rounded-xl shadow-lg bg-white"
-                   style={{ border: '1px solid #D9E2D9' }}>
+              <div className="absolute z-20 mt-1 w-full rounded-xl shadow-lg bg-[var(--tema-fondo-ffffff)]"
+                   style={{ border: '1px solid var(--tema-borde-dce4ea)' }}>
                 {municipiosFiltrados.slice(0, 5).map((m) => (
                   <button
                     key={m}
                     type="button"
                     onClick={() => update('municipio', m)}
                     className="block w-full px-3 py-2 text-left text-xs transition-colors"
-                    style={{ color: '#1F2933' }}
-                    onMouseEnter={(e) => { (e.currentTarget as HTMLElement).style.background = '#EEF4EE'; }}
+                    style={{ color: 'var(--tema-texto-172033)' }}
+                    onMouseEnter={(e) => { (e.currentTarget as HTMLElement).style.background = 'var(--tema-fondo-f4f9f6)'; }}
                     onMouseLeave={(e) => { (e.currentTarget as HTMLElement).style.background = ''; }}
                   >
                     {m}
@@ -621,7 +621,7 @@ export function RadicacionFuncionarioForm({ radicadoPreview, onSubmit, formId, h
           eyebrow="Verificación"
           title="Datos no aportados por el solicitante"
         />
-        <p className="text-xs mb-3" style={{ color: '#667085' }}>
+        <p className="text-xs mb-3" style={{ color: 'var(--tema-texto-64748b)' }}>
           Marca solo cuando el documento realmente no aporta el dato.
           Evita registrar información inventada.
         </p>
@@ -681,7 +681,7 @@ export function RadicacionFuncionarioForm({ radicadoPreview, onSubmit, formId, h
           {form.noAportaCorreo && form.canalRespuesta === 'CORREO' && (
             <div
               className="rounded-md border px-3 py-2 text-xs"
-              style={{ borderColor: '#EF4444', background: '#FEE2E2', color: '#991B1B' }}
+              style={{ borderColor: '#EF4444', background: 'var(--tema-fondo-fee2e2)', color: 'var(--tema-texto-991b1b)' }}
               role="alert"
             >
               Si el solicitante no aporta correo electrónico, el medio de
@@ -740,8 +740,8 @@ export function RadicacionFuncionarioForm({ radicadoPreview, onSubmit, formId, h
                     }}
                     className="text-xs font-semibold px-3 py-1.5 rounded-full transition-colors"
                     style={activo
-                      ? { background: '#EEF4EE', border: '1px solid #14532D', color: '#14532D' }
-                      : { background: '#FFFFFF', border: '1px solid #D9E2D9', color: '#667085' }}
+                      ? { background: 'var(--tema-fondo-f4f9f6)', border: '1px solid var(--tema-borde-007049)', color: 'var(--tema-texto-007049)' }
+                      : { background: 'var(--tema-fondo-ffffff)', border: '1px solid var(--tema-borde-dce4ea)', color: 'var(--tema-texto-64748b)' }}
                   >
                     {medio}
                   </button>
@@ -764,7 +764,7 @@ export function RadicacionFuncionarioForm({ radicadoPreview, onSubmit, formId, h
           {getTipoSolicitudById(form.tipoSolicitudId)?.requiereValidacionJuridica && (
             <div
               className="md:col-span-2 xl:col-span-4 rounded-md border px-3 py-2 text-xs"
-              style={{ borderColor: '#FBBF24', background: '#FEF3C7', color: '#92400E' }}
+              style={{ borderColor: 'var(--tema-borde-fbbf24)', background: 'var(--tema-fondo-fef3c7)', color: 'var(--tema-texto-92400e)' }}
               role="alert"
             >
               <strong>Validación jurídica pendiente:</strong>{' '}
@@ -807,8 +807,8 @@ export function RadicacionFuncionarioForm({ radicadoPreview, onSubmit, formId, h
           onDrop={(e) => { e.preventDefault(); setDragging(false); addFiles(e.dataTransfer.files); }}
           className="rounded-lg border border-dashed p-5 text-center transition-colors cursor-pointer"
           style={dragging
-            ? { borderColor: '#14532D', background: '#EEF4EE' }
-            : { borderColor: '#D9E2D9', background: '#F8FAF7' }}
+            ? { borderColor: 'var(--tema-borde-007049)', background: 'var(--tema-fondo-f4f9f6)' }
+            : { borderColor: 'var(--tema-borde-dce4ea)', background: 'var(--tema-fondo-f7f9fb)' }}
         >
           <input
             ref={fileInputRef}
@@ -818,11 +818,11 @@ export function RadicacionFuncionarioForm({ radicadoPreview, onSubmit, formId, h
             className="hidden"
             onChange={(e) => addFiles(e.target.files)}
           />
-          <svg className="w-6 h-6 mx-auto mb-2" style={{ color: '#94A3B8' }} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
+          <svg className="w-6 h-6 mx-auto mb-2" style={{ color: 'var(--tema-texto-94a3b8)' }} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
             <path strokeLinecap="round" strokeLinejoin="round" d="M19.5 14.25v-2.625a3.375 3.375 0 00-3.375-3.375h-1.5A1.125 1.125 0 0113.5 7.125v-1.5a3.375 3.375 0 00-3.375-3.375H8.25m6.75 12l-3-3m0 0l-3 3m3-3v6m-1.5-15H5.625c-.621 0-1.125.504-1.125 1.125v17.25c0 .621.504 1.125 1.125 1.125h12.75c.621 0 1.125-.504 1.125-1.125V11.25a9 9 0 00-9-9z" />
           </svg>
-          <p className="text-sm font-semibold" style={{ color: '#1F2933' }}>Arrastra PDF, imágenes o documentos de Office aquí</p>
-          <p className="mt-1 text-xs" style={{ color: '#94A3B8' }}>Máximo 10 archivos · PDF, JPG, PNG, WebP, DOCX, XLSX, PPTX</p>
+          <p className="text-sm font-semibold" style={{ color: 'var(--tema-texto-172033)' }}>Arrastra PDF, imágenes o documentos de Office aquí</p>
+          <p className="mt-1 text-xs" style={{ color: 'var(--tema-texto-94a3b8)' }}>Máximo 10 archivos · PDF, JPG, PNG, WebP, DOCX, XLSX, PPTX</p>
         </div>
         {archivos.length > 0 && (
           <ul className="mt-3 grid gap-2 md:grid-cols-2">
@@ -830,13 +830,13 @@ export function RadicacionFuncionarioForm({ radicadoPreview, onSubmit, formId, h
               <li
                 key={`${file.name}-${index}`}
                 className="flex items-center justify-between rounded-lg px-3 py-2 text-xs"
-                style={{ border: '1px solid #D9E2D9', background: '#F8FAF7' }}
+                style={{ border: '1px solid var(--tema-borde-dce4ea)', background: 'var(--tema-fondo-f7f9fb)' }}
               >
-                <span className="truncate" style={{ color: '#1F2933' }}>{file.name}</span>
+                <span className="truncate" style={{ color: 'var(--tema-texto-172033)' }}>{file.name}</span>
                 <button
                   type="button"
                   onClick={() => setArchivos((prev) => prev.filter((_, i) => i !== index))}
-                  className="ml-2 shrink-0 text-red-500 hover:text-red-700 transition-colors text-[11px] font-semibold"
+                  className="ml-2 shrink-0 text-red-500 oscuro:text-red-300 hover:text-red-700 oscuro:hover:text-red-300 transition-colors text-[11px] font-semibold"
                 >
                   Quitar
                 </button>
@@ -853,9 +853,9 @@ export function RadicacionFuncionarioForm({ radicadoPreview, onSubmit, formId, h
             type="submit"
             disabled={guardando}
             className="flex items-center gap-2 rounded-xl px-6 py-3 text-sm font-bold text-white transition-all disabled:opacity-60 active:scale-[0.98]"
-            style={{ background: '#14532D' }}
-            onMouseEnter={(e) => { if (!guardando) (e.currentTarget as HTMLElement).style.background = '#166534'; }}
-            onMouseLeave={(e) => { (e.currentTarget as HTMLElement).style.background = '#14532D'; }}
+            style={{ background: 'var(--tema-fondo-007049)' }}
+            onMouseEnter={(e) => { if (!guardando) (e.currentTarget as HTMLElement).style.background = '#006B45'; }}
+            onMouseLeave={(e) => { (e.currentTarget as HTMLElement).style.background = 'var(--tema-fondo-007049)'; }}
           >
             {guardando && (
               <span className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
@@ -873,8 +873,8 @@ export function RadicacionFuncionarioForm({ radicadoPreview, onSubmit, formId, h
 function SectionTitle({ eyebrow, title }: { eyebrow: string; title: string }) {
   return (
     <div className="mb-4">
-      <p className="text-[10px] font-bold uppercase tracking-widest" style={{ color: '#14532D' }}>{eyebrow}</p>
-      <h2 className="text-base font-black" style={{ color: '#1F2933' }}>{title}</h2>
+      <p className="text-[10px] font-bold uppercase tracking-widest" style={{ color: 'var(--tema-texto-007049)' }}>{eyebrow}</p>
+      <h2 className="text-base font-black" style={{ color: 'var(--tema-texto-172033)' }}>{title}</h2>
     </div>
   );
 }
@@ -934,7 +934,7 @@ function ReadOnlyField({ label, value }: { label: string; value: string }) {
       <p className={labelCls} style={labelStyle}>{label}</p>
       <p
         className="rounded-lg px-3 py-2 text-sm font-semibold"
-        style={{ border: '1px solid #D9E2D9', background: '#EEF4EE', color: '#1F2933' }}
+        style={{ border: '1px solid var(--tema-borde-dce4ea)', background: 'var(--tema-fondo-f4f9f6)', color: 'var(--tema-texto-172033)' }}
       >
         {value}
       </p>
@@ -954,7 +954,7 @@ function CheckboxField({
   return (
     <label
       className="flex items-center gap-2 rounded-lg px-3 py-2 text-xs cursor-pointer transition-colors"
-      style={{ border: '1px solid #D9E2D9', background: checked ? '#FEF3C7' : '#FFFFFF' }}
+      style={{ border: '1px solid var(--tema-borde-dce4ea)', background: checked ? 'var(--tema-fondo-fef3c7)' : 'var(--tema-fondo-ffffff)' }}
     >
       <input
         type="checkbox"
@@ -962,7 +962,7 @@ function CheckboxField({
         onChange={(e) => onChange(e.target.checked)}
         className="w-4 h-4"
       />
-      <span style={{ color: '#1F2933' }}>{label}</span>
+      <span style={{ color: 'var(--tema-texto-172033)' }}>{label}</span>
     </label>
   );
 }

@@ -52,7 +52,7 @@ export function BotonDescargarSellado({ expedienteId, documentoId, mimeType }: B
   if (mimeType !== MIME_SELLABLE) {
     const comoSeLlama = NOMBRE_TIPO[mimeType] ?? 'un archivo que no es PDF';
     return (
-      <p className="text-xs" style={{ color: '#94A3B8' }}>
+      <p className="text-xs" style={{ color: 'var(--text-secondary)' }}>
         Sin sello: es {comoSeLlama}, y el sello solo puede estamparse sobre PDF.
       </p>
     );
@@ -90,13 +90,13 @@ export function BotonDescargarSellado({ expedienteId, documentoId, mimeType }: B
         onClick={pedir}
         disabled={generando}
         className="inline-flex items-center gap-2 rounded-[10px] px-3 py-1.5 text-xs font-bold transition-all focus-visible:outline-none focus-visible:ring-2 disabled:opacity-60"
-        style={{ background: 'transparent', color: '#14532D', border: '1px solid #14532D' }}
+        style={{ background: 'transparent', color: 'var(--tema-texto-007049)', border: '1px solid var(--tema-borde-007049)' }}
       >
         {generando ? 'Preparando la copia sellada…' : 'Descargar con sello'}
       </button>
 
       {generando && (
-        <p className="text-[11px]" style={{ color: '#94A3B8' }}>
+        <p className="text-[11px]" style={{ color: 'var(--text-secondary)' }}>
           La primera vez tarda unos segundos; después es inmediata.
         </p>
       )}
@@ -106,7 +106,7 @@ export function BotonDescargarSellado({ expedienteId, documentoId, mimeType }: B
            el papel porque la página sin sello es, por definición, la que no
            tiene sitio para uno: escribirle encima la nota sería el mismo
            problema con otro texto. */
-        <p role="alert" className="text-[11px]" style={{ color: '#9A6206' }}>
+        <p role="alert" className="text-[11px]" style={{ color: 'var(--tema-texto-9a6206)' }}>
           {sinSello.length === 1
             ? `La página ${sinSello[0]} quedó sin sello: es demasiado pequeña para que el sello se pueda leer.`
             : `Quedaron sin sello las páginas ${sinSello.join(', ')}: son demasiado pequeñas para que el sello se pueda leer.`}

@@ -9,6 +9,9 @@ import type {
 import { LABEL_ESTADO_PLAN } from '@/src/types/control-interno';
 import { NOMBRES_TENANT } from '@/src/types/reglas-negocio';
 import { Aviso, Cargando, EstadoVacio } from './PanoramaGeneralPanel';
+import { CabeceraTablaSticky } from '@/app/components/design-system/SuperficieTabla';
+import { BotonAccion } from '@/app/components/design-system/BotonAccion';
+import { Plus, X } from 'lucide-react';
 
 const ESTADOS_AVANCE: EstadoPlanMejora[] = ['PENDIENTE', 'EN_EJECUCION', 'CUMPLIDO', 'VENCIDO'];
 
@@ -21,10 +24,10 @@ interface ResponsablePlan {
 }
 
 function colorEstado(e: EstadoPlanMejora): string {
-  if (e === 'CUMPLIDO')     return '#14532D';
-  if (e === 'EN_EJECUCION') return '#9A3412';
-  if (e === 'VENCIDO')      return '#991B1B';
-  return                          '#667085';
+  if (e === 'CUMPLIDO')     return 'var(--tema-texto-007049)';
+  if (e === 'EN_EJECUCION') return 'var(--tema-texto-9a3412)';
+  if (e === 'VENCIDO')      return 'var(--tema-texto-991b1b)';
+  return                          'var(--tema-texto-64748b)';
 }
 
 export function PanelPlanesMejora() {
@@ -154,29 +157,24 @@ export function PanelPlanesMejora() {
     <div className="space-y-4">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
-          <p className="text-[10px] font-bold uppercase tracking-widest" style={{ color: '#14532D' }}>Planes de mejora</p>
-          <p className="text-sm" style={{ color: '#667085' }}>
+          <p className="text-[10px] font-bold uppercase tracking-widest" style={{ color: 'var(--tema-texto-007049)' }}>Planes de mejora</p>
+          <p className="text-sm" style={{ color: 'var(--tema-texto-64748b)' }}>
             Acciones correctivas solicitadas a las dependencias. Seguimiento hasta el cierre.
           </p>
         </div>
-        <button
-          type="button"
-          onClick={() => setCrear((v) => !v)}
-          className="px-3 py-2 rounded-lg text-xs font-bold text-white"
-          style={{ background: crear ? '#94A3B8' : '#14532D' }}
-        >
+        <BotonAccion variante={crear ? 'secundaria' : 'primaria'} Icono={crear ? X : Plus} onClick={() => setCrear((v) => !v)}>
           {crear ? 'Cancelar' : 'Solicitar plan de mejora'}
-        </button>
+        </BotonAccion>
       </div>
 
       {exito && <Aviso tipo="info" mensaje={exito} />}
 
       {crear && (
-        <form onSubmit={guardar} className="rounded-xl bg-white p-4 space-y-3" style={{ border: '1px solid #D9E2D9' }}>
-          <p className="text-xs" style={{ color: '#667085' }}>
+        <form onSubmit={guardar} className="rounded-xl bg-[var(--tema-fondo-ffffff)] p-4 space-y-3" style={{ border: '1px solid var(--tema-borde-dce4ea)' }}>
+          <p className="text-xs" style={{ color: 'var(--tema-texto-64748b)' }}>
             Indique qué debe corregirse, quién debe hacerlo y hasta cuándo. La dependencia recibirá el plan para registrar avances.
           </p>
-          <label className="flex flex-col text-[10px] font-bold uppercase tracking-widest" style={{ color: '#94A3B8' }}>
+          <label className="flex flex-col text-[10px] font-bold uppercase tracking-widest" style={{ color: 'var(--tema-texto-64748b)' }}>
             Hallazgo relacionado
             <select required className="select-internal mt-1 text-xs" value={fHallazgo} onChange={(e) => setFHallazgo(e.target.value)}>
               <option value="">Seleccione un hallazgo abierto…</option>
@@ -186,16 +184,16 @@ export function PanelPlanesMejora() {
                 </option>
               ))}
             </select>
-            <span className="mt-1 text-[10px]" style={{ color: '#94A3B8' }}>El plan se vincula automáticamente al hallazgo.</span>
+            <span className="mt-1 text-[10px]" style={{ color: 'var(--tema-texto-64748b)' }}>El plan se vincula automáticamente al hallazgo.</span>
           </label>
-          <label className="flex flex-col text-[10px] font-bold uppercase tracking-widest" style={{ color: '#94A3B8' }}>
+          <label className="flex flex-col text-[10px] font-bold uppercase tracking-widest" style={{ color: 'var(--tema-texto-64748b)' }}>
             Acción de mejora
             <textarea required rows={3} className="input-internal mt-1 text-xs" value={fAccion} onChange={(e) => setFAccion(e.target.value)}
               placeholder="¿Qué debe corregirse para evitar que vuelva a ocurrir?" />
-            <span className="mt-1 text-[10px]" style={{ color: '#94A3B8' }}>Mínimo 10 caracteres.</span>
+            <span className="mt-1 text-[10px]" style={{ color: 'var(--tema-texto-64748b)' }}>Mínimo 10 caracteres.</span>
           </label>
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-            <label className="flex flex-col text-[10px] font-bold uppercase tracking-widest" style={{ color: '#94A3B8' }}>
+            <label className="flex flex-col text-[10px] font-bold uppercase tracking-widest" style={{ color: 'var(--tema-texto-64748b)' }}>
               Responsable de cumplirla
               <select
                 required
@@ -217,30 +215,30 @@ export function PanelPlanesMejora() {
                   </option>
                 ))}
               </select>
-              <span className="mt-1 text-[10px]" style={{ color: errorResponsables ? '#991B1B' : '#94A3B8' }}>
+              <span className="mt-1 text-[10px]" style={{ color: errorResponsables ? 'var(--tema-texto-991b1b)' : 'var(--tema-texto-64748b)' }}>
                 {errorResponsables ?? (fHallazgo ? 'Personas activas de la dependencia responsable.' : 'Primero seleccione el hallazgo relacionado.')}
               </span>
             </label>
-            <label className="flex flex-col text-[10px] font-bold uppercase tracking-widest" style={{ color: '#94A3B8' }}>
+            <label className="flex flex-col text-[10px] font-bold uppercase tracking-widest" style={{ color: 'var(--tema-texto-64748b)' }}>
               Fecha compromiso
               <input required type="date" className="input-internal mt-1 text-xs" value={fCompromiso} onChange={(e) => setFCompromiso(e.target.value)} />
-              <span className="mt-1 text-[10px]" style={{ color: '#94A3B8' }}>Hasta cuándo debe cumplirse la acción.</span>
+              <span className="mt-1 text-[10px]" style={{ color: 'var(--tema-texto-64748b)' }}>Hasta cuándo debe cumplirse la acción.</span>
             </label>
-            <label className="flex flex-col text-[10px] font-bold uppercase tracking-widest" style={{ color: '#94A3B8' }}>
+            <label className="flex flex-col text-[10px] font-bold uppercase tracking-widest" style={{ color: 'var(--tema-texto-64748b)' }}>
               Evidencia esperada
               <input required className="input-internal mt-1 text-xs" value={fEvidencia} onChange={(e) => setFEvidencia(e.target.value)} placeholder="Qué soporte debe entregar la dependencia" />
-              <span className="mt-1 text-[10px]" style={{ color: '#94A3B8' }}>Por ejemplo: copia del oficio, registro, captura del sistema…</span>
+              <span className="mt-1 text-[10px]" style={{ color: 'var(--tema-texto-64748b)' }}>Por ejemplo: copia del oficio, registro, captura del sistema…</span>
             </label>
           </div>
-          <label className="flex flex-col text-[10px] font-bold uppercase tracking-widest" style={{ color: '#94A3B8' }}>
+          <label className="flex flex-col text-[10px] font-bold uppercase tracking-widest" style={{ color: 'var(--tema-texto-64748b)' }}>
             Observaciones
             <textarea rows={2} className="input-internal mt-1 text-xs" value={fObservaciones} onChange={(e) => setFObservaciones(e.target.value)} placeholder="Aclaraciones o contexto adicional (opcional)" />
           </label>
           {errorForm && <Aviso tipo="error" mensaje={errorForm} />}
           <div className="flex justify-end">
-            <button type="submit" disabled={enviando} className="px-3 py-2 rounded-lg text-xs font-bold text-white disabled:opacity-60" style={{ background: '#14532D' }}>
+            <BotonAccion type="submit" variante="primaria" disabled={enviando}>
               {enviando ? 'Guardando…' : 'Solicitar plan de mejora'}
-            </button>
+            </BotonAccion>
           </div>
         </form>
       )}
@@ -251,44 +249,31 @@ export function PanelPlanesMejora() {
             titulo="No hay planes de mejora activos."
             mensaje="Los planes se crean a partir de hallazgos o recomendaciones de Control Interno."
             accion={hallazgos.length > 0 ? (
-              <button
-                type="button"
-                onClick={() => setCrear(true)}
-                className="px-3 py-2 rounded-lg text-xs font-bold text-white"
-                style={{ background: '#14532D' }}
-              >
-                Solicitar primer plan
-              </button>
+              <BotonAccion variante="primaria" Icono={Plus} onClick={() => setCrear(true)}>Solicitar primer plan</BotonAccion>
             ) : null}
           />
         ) : (
-          <div className="rounded-xl bg-white overflow-hidden" style={{ border: '1px solid #D9E2D9' }}>
+          <div className="rounded-xl bg-[var(--tema-fondo-ffffff)] overflow-hidden">
             <div className="overflow-x-auto">
               <table className="w-full text-xs">
-                <thead style={{ background: '#F8FAF7' }}>
-                  <tr>
-                    {['Estado', 'Dependencia', 'Acción', 'Responsable', 'Compromiso', 'Avances', 'Acciones'].map((h) => (
-                      <th key={h} className="px-3 py-2 text-left text-[10px] font-bold uppercase tracking-widest" style={{ color: '#667085' }}>{h}</th>
-                    ))}
-                  </tr>
-                </thead>
+                <CabeceraTablaSticky columnas={['Estado', 'Dependencia', 'Acción', 'Responsable', 'Compromiso', 'Avances', 'Acciones']} />
                 <tbody>
                   {planes.map((p) => (
-                    <tr key={p.id} style={{ borderTop: '1px solid #EEF4EE' }}>
-                      <td className="px-3 py-2 font-bold" style={{ color: colorEstado(p.estado) }}>{LABEL_ESTADO_PLAN[p.estado]}</td>
-                      <td className="px-3 py-2" style={{ color: '#667085' }}>{NOMBRES_TENANT[p.tenantId] ?? p.tenantId}</td>
-                      <td className="px-3 py-2" style={{ color: '#1F2933', maxWidth: 320 }}>{p.accionCorrectiva}</td>
-                      <td className="px-3 py-2" style={{ color: '#667085' }}>{p.responsableNombre}</td>
-                      <td className="px-3 py-2" style={{ color: '#667085' }}>{p.fechaCompromiso}</td>
-                      <td className="px-3 py-2 tabular-nums" style={{ color: '#94A3B8' }}>{p.avances?.length ?? 0}</td>
-                      <td className="px-3 py-2 whitespace-nowrap">
+                    <tr key={p.id} style={{ borderTop: '1px solid var(--tema-borde-f4f9f6)' }}>
+                      <td className="px-2 py-2 font-bold" style={{ color: colorEstado(p.estado) }}>{LABEL_ESTADO_PLAN[p.estado]}</td>
+                      <td className="px-2 py-2" style={{ color: 'var(--tema-texto-64748b)' }}>{NOMBRES_TENANT[p.tenantId] ?? p.tenantId}</td>
+                      <td className="px-2 py-2" style={{ color: 'var(--tema-texto-172033)', maxWidth: 320 }}>{p.accionCorrectiva}</td>
+                      <td className="px-2 py-2" style={{ color: 'var(--tema-texto-64748b)' }}>{p.responsableNombre}</td>
+                      <td className="px-2 py-2" style={{ color: 'var(--tema-texto-64748b)' }}>{p.fechaCompromiso}</td>
+                      <td className="px-2 py-2 tabular-nums" style={{ color: 'var(--tema-texto-64748b)' }}>{p.avances?.length ?? 0}</td>
+                      <td className="px-2 py-2 whitespace-nowrap">
                         {p.estado !== 'CUMPLIDO' && p.estado !== 'VENCIDO' && (
                           <>
                             <button type="button" className="px-2 py-1 rounded-md text-[10px] font-bold mr-1"
-                              style={{ background: '#EEF4EE', color: '#14532D', border: '1px solid #D9E2D9' }}
+                              style={{ background: 'var(--tema-fondo-f4f9f6)', color: 'var(--tema-texto-007049)', border: '1px solid var(--tema-borde-dce4ea)' }}
                               onClick={() => aprobarOCerrar(p, 'CUMPLIDO')}>Aprobar</button>
                             <button type="button" className="px-2 py-1 rounded-md text-[10px] font-bold"
-                              style={{ background: '#FEF2F2', color: '#991B1B', border: '1px solid #FECACA' }}
+                              style={{ background: 'var(--tema-fondo-fef2f2)', color: 'var(--tema-texto-991b1b)', border: '1px solid var(--tema-borde-fecaca)' }}
                               onClick={() => aprobarOCerrar(p, 'INCUMPLIDO')}>Marcar incumplido</button>
                           </>
                         )}

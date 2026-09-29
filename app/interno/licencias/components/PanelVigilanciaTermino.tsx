@@ -92,10 +92,10 @@ export function PanelVigilanciaTermino() {
   return (
     <div className="rounded-lg px-3 py-2" style={{ background: 'var(--bg-surface-2)' }}>
       <div className="flex flex-wrap items-baseline gap-x-3 gap-y-1">
-        <span className="text-[10px] font-bold uppercase tracking-widest" style={{ color: '#667085' }}>
+        <span className="text-[10px] font-bold uppercase tracking-widest" style={{ color: 'var(--text-secondary)' }}>
           Vigía del término
         </span>
-        <span className="text-[11px]" style={{ color: '#94A3B8' }}>
+        <span className="text-[11px]" style={{ color: 'var(--text-secondary)' }}>
           última revisión: {formatFechaColombia(c.corridaIso)} · {c.revisados} expedientes revisados
         </span>
       </div>
@@ -130,7 +130,7 @@ export function PanelVigilanciaTermino() {
         </p>
       )}
       {c.salidasNoCalculables && (
-        <p className="text-xs mt-1" style={{ color: '#94A3B8' }}>
+        <p className="text-xs mt-1" style={{ color: 'var(--text-secondary)' }}>
           Por esa misma razón no se pudo determinar qué expedientes salieron de alerta.
         </p>
       )}

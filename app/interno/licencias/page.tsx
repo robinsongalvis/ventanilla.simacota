@@ -1,17 +1,15 @@
-import { BandejaLicenciasClient } from './components/BandejaLicenciasClient';
+import { RedireccionLicencias } from './components/RedireccionLicencias';
 
 export const metadata = {
   title: 'Bandeja de Licencias',
 };
 
 /**
- * Pantalla 01 · Bandeja de Licencias — bloque "Integración UI y demo"
- * (ADR-0029). Cascarón Server Component (conserva `metadata` estático, no
- * disponible en Client Components) — toda la interactividad real (fetch,
- * KPIs, modal de radicación) vive en `BandejaLicenciasClient` ('use
- * client'), siguiendo el patrón "server-first, use client solo donde haga
- * falta".
+ * Ruta antigua de la Bandeja de Licencias. Licencias vive en el panel
+ * interno con el mismo armazón que el resto (ADR-0046 §7): esta dirección
+ * se conserva para enlaces guardados y correos ya enviados, y redirige a
+ * `/interno/dashboard?vista=licencias`.
  */
 export default function BandejaLicenciasPage() {
-  return <BandejaLicenciasClient />;
+  return <RedireccionLicencias />;
 }

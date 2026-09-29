@@ -6,6 +6,10 @@ import { useCargaDependencias, type AlertaTono, type CargaDependencia } from './
 import { filtroMipgParaCelda, type CeldaDependencia } from './filtro-celda';
 import { useVentanilla, type FiltroMIPG } from '@/lib/store/ventanillaStore';
 import { SectionHeader } from '@/app/components/design-system/SectionHeader';
+import type { IndicadorEstaticoProps } from '@/app/components/design-system/Indicador';
+import { FilaTarjetas, TarjetaIndicador } from '@/app/components/design-system/TarjetaIndicador';
+import { CabeceraTablaSticky, SuperficieTabla } from '@/app/components/design-system/SuperficieTabla';
+import { Activity, AlertTriangle, CircleDashed, Clock3 } from 'lucide-react';
 
 /* ── Paleta institucional clara por tono ──────────────────────── */
 
@@ -13,47 +17,31 @@ import { SectionHeader } from '@/app/components/design-system/SectionHeader';
 const SPINE_CLS: Record<AlertaTono, string> = {
   rose:   'border-l-red-400',
   amber:  'border-l-amber-400',
-  indigo: 'border-l-[#14532D]',
+  indigo: 'border-l-[var(--tema-borde-007049)]',
   slate:  'border-l-gray-300',
 };
 
 /** Color del número total */
 const VALOR_STYLE: Record<AlertaTono, React.CSSProperties> = {
-  rose:   { color: '#DC2626' },
-  amber:  { color: '#D97706' },
-  indigo: { color: '#14532D' },
-  slate:  { color: '#94A3B8' },
+  rose:   { color: 'var(--tema-texto-d81e1e)' },
+  amber:  { color: 'var(--tema-texto-d97706)' },
+  indigo: { color: 'var(--tema-texto-007049)' },
+  slate:  { color: 'var(--tema-texto-64748b)' },
 };
 
 /** Color de la barra de carga */
 const BARRA_CLS: Record<AlertaTono, string> = {
   rose:   'bg-red-500',
   amber:  'bg-amber-500',
-  indigo: 'bg-[#14532D]',
+  indigo: 'bg-[var(--tema-fondo-007049)]',
   slate:  'bg-gray-300',
 };
 
-/** Borde-left de la tarjeta KPI */
-const CARD_BORDER_COLOR: Record<AlertaTono, string> = {
-  rose:   '#F87171',
-  amber:  '#FBBF24',
-  indigo: '#14532D',
-  slate:  '#D9E2D9',
-};
-
-/** Color del número en la tarjeta KPI */
-const CARD_VALOR_STYLE: Record<AlertaTono, React.CSSProperties> = {
-  rose:   { color: '#DC2626' },
-  amber:  { color: '#D97706' },
-  indigo: { color: '#14532D' },
-  slate:  { color: '#94A3B8' },
-};
-
 /** Chips de estado — badge claro */
-const CHIP_CLS_PEND  = 'bg-yellow-50  text-yellow-700 border-yellow-200';
-const CHIP_CLS_PROC  = 'bg-sky-50     text-sky-700    border-sky-200';
-const CHIP_CLS_PV    = 'bg-amber-50   text-amber-700  border-amber-200';
-const CHIP_CLS_VENC  = 'bg-red-50     text-red-700    border-red-200';
+const CHIP_CLS_PEND  = 'bg-yellow-50 oscuro:bg-yellow-500/15  text-yellow-700 oscuro:text-yellow-300 border-yellow-200 oscuro:border-yellow-500/30';
+const CHIP_CLS_PROC  = 'bg-sky-50 oscuro:bg-sky-500/15     text-sky-700 oscuro:text-sky-300    border-sky-200 oscuro:border-sky-500/30';
+const CHIP_CLS_PV    = 'bg-amber-50 oscuro:bg-amber-500/15   text-amber-700 oscuro:text-amber-300  border-amber-200 oscuro:border-amber-500/30';
+const CHIP_CLS_VENC  = 'bg-red-50 oscuro:bg-red-500/15     text-red-700 oscuro:text-red-300    border-red-200 oscuro:border-red-500/30';
 
 /* ── ChipEstado ─────────────────────────────────────────────── */
 
@@ -111,58 +99,58 @@ function FilaDependencia({
   return (
     <tr
       className={`border-l-4 ${SPINE_CLS[dep.alertaTono]} transition-colors group`}
-      style={{
-        borderBottom: '1px solid #EEF4EE',
-        opacity: dep.total === 0 ? 0.45 : 1,
-      }}
-      onMouseEnter={(e) => { if (dep.total > 0) (e.currentTarget as HTMLElement).style.background = '#F8FAF7'; }}
+      /* Sin carga: antes se atenuaba la fila entera (opacidad 0,45) y el
+         nombre de la dependencia quedaba ilegible (2,8:1). Ahora se atenúa
+         con el gris más claro que cumple AA: se distingue y se lee. */
+      style={{ borderBottom: '1px solid var(--tema-borde-f4f9f6)' }}
+      onMouseEnter={(e) => { if (dep.total > 0) (e.currentTarget as HTMLElement).style.background = 'var(--tema-fondo-f7f9fb)'; }}
       onMouseLeave={(e) => { (e.currentTarget as HTMLElement).style.background = ''; }}
     >
       {/* Nombre */}
-      <td className="px-4 py-3 max-w-[220px]">
-        <p className="text-sm font-medium leading-snug truncate" style={{ color: '#1F2933' }}>{dep.nombre}</p>
+      <td className="px-2 py-2 max-w-[220px]">
+        <p className="text-sm font-medium leading-snug truncate" style={{ color: dep.total === 0 ? 'var(--tema-texto-64748b)' : 'var(--tema-texto-172033)' }}>{dep.nombre}</p>
       </td>
 
       {/* Total */}
-      <td className="px-4 py-3 whitespace-nowrap w-16">
+      <td className="px-2 py-2 whitespace-nowrap w-16">
         <span className="text-xl font-black tabular-nums leading-none" style={VALOR_STYLE[dep.alertaTono]}>
           {dep.total}
         </span>
       </td>
 
       {/* Chips de estado */}
-      <td className="px-4 py-3">
+      <td className="px-2 py-2">
         <div className="flex items-center gap-1 flex-wrap min-w-[160px]">
           <ChipEstado valor={dep.pendientes} label="PEND" cls={CHIP_CLS_PEND} {...celda('pendientes', dep.pendientes)} />
           <ChipEstado valor={dep.enProceso}  label="PROC" cls={CHIP_CLS_PROC} {...celda('enProceso',  dep.enProceso)}  />
           <ChipEstado valor={dep.porVencer}  label="PV"   cls={CHIP_CLS_PV}   {...celda('porVencer',  dep.porVencer)}  />
           <ChipEstado valor={dep.vencidos}   label="VENC" cls={CHIP_CLS_VENC} {...celda('vencidos',   dep.vencidos)}   />
           {dep.total === 0 && (
-            <span className="text-[10px] italic" style={{ color: '#94A3B8' }}>sin carga</span>
+            <span className="text-[10px] italic" style={{ color: 'var(--tema-texto-64748b)' }}>sin carga</span>
           )}
         </div>
       </td>
 
       {/* Barra de carga */}
-      <td className="px-4 py-3 w-36">
-        <div className="h-1.5 rounded-full overflow-hidden" style={{ background: '#EEF4EE' }}>
+      <td className="px-2 py-2 w-36">
+        <div className="h-1.5 rounded-full overflow-hidden" style={{ background: 'var(--tema-fondo-f4f9f6)' }}>
           <div
             className={`h-full rounded-full transition-all duration-500 ${BARRA_CLS[dep.alertaTono]}`}
             style={{ width: `${dep.cargaRelativa}%` }}
           />
         </div>
-        <p className="text-[10px] mt-1 tabular-nums" style={{ color: '#94A3B8' }}>{dep.cargaRelativa}%</p>
+        <p className="text-[10px] mt-1 tabular-nums" style={{ color: 'var(--tema-texto-64748b)' }}>{dep.cargaRelativa}%</p>
       </td>
 
       {/* Acción */}
-      <td className="px-3 py-3 whitespace-nowrap w-16">
+      <td className="px-2 py-2 whitespace-nowrap w-16">
         {dep.total > 0 && (
           <button
             onClick={() => onVer(dep.tenantId)}
-            className="px-3 py-1.5 rounded-lg text-xs font-bold transition-all duration-150 active:scale-95 opacity-0 group-hover:opacity-100 focus-visible:opacity-100"
-            style={{ color: '#14532D', background: '#EEF4EE', border: '1px solid #D9E2D9' }}
-            onMouseEnter={(e) => { (e.currentTarget as HTMLElement).style.background = '#D9E2D9'; }}
-            onMouseLeave={(e) => { (e.currentTarget as HTMLElement).style.background = '#EEF4EE'; }}
+            className="px-3 py-1.5 rounded-lg text-xs font-bold transition-all duration-150 active:scale-95 [@media(hover:hover)]:opacity-0 [@media(hover:hover)]:group-hover:opacity-100 focus-visible:opacity-100"
+            style={{ color: 'var(--tema-texto-007049)', background: 'var(--tema-fondo-f4f9f6)', border: '1px solid var(--tema-borde-dce4ea)' }}
+            onMouseEnter={(e) => { (e.currentTarget as HTMLElement).style.background = 'var(--tema-fondo-dce4ea)'; }}
+            onMouseLeave={(e) => { (e.currentTarget as HTMLElement).style.background = 'var(--tema-fondo-f4f9f6)'; }}
           >
             Ver →
           </button>
@@ -183,11 +171,13 @@ export function PanelCargaDependencias({ radicados }: { radicados: VentanillaRad
   const activas     = deps.filter((d) => d.total > 0).length;
   const sinCarga    = deps.filter((d) => d.total === 0).length;
 
-  const tarjetas: { label: string; valor: number; tono: AlertaTono }[] = [
-    { label: 'Con vencidos',  valor: conVencidos, tono: 'rose'  },
-    { label: 'Con alertas',   valor: conAlerta,   tono: 'amber' },
-    { label: 'Con actividad', valor: activas,     tono: 'indigo'},
-    { label: 'Sin carga',     valor: sinCarga,    tono: 'slate' },
+  /* Ola 3 (ADR-0046) — mismos cuatro conteos con el Indicador del Tablero.
+     Cuentan dependencias, no filtran: son de solo lectura, no botones. */
+  const tarjetas: IndicadorEstaticoProps[] = [
+    { etiqueta: 'Con vencidos',  valor: conVencidos, tono: 'rojo',  Icono: AlertTriangle },
+    { etiqueta: 'Con alertas',   valor: conAlerta,   tono: 'ambar', Icono: Clock3 },
+    { etiqueta: 'Con actividad', valor: activas,     tono: 'verde', Icono: Activity },
+    { etiqueta: 'Sin carga',     valor: sinCarga,    tono: 'gris',  Icono: CircleDashed },
   ];
 
   function verDependencia(tenantId: TenantId) {
@@ -208,7 +198,7 @@ export function PanelCargaDependencias({ radicados }: { radicados: VentanillaRad
   }
 
   return (
-    <div className="flex-1 flex flex-col overflow-hidden min-h-0 bg-[#F8FAF7]">
+    <div className="flex-1 flex flex-col overflow-hidden min-h-0 bg-[var(--tema-fondo-f7f9fb)]">
 
       {/* Header */}
       <SectionHeader
@@ -217,53 +207,28 @@ export function PanelCargaDependencias({ radicados }: { radicados: VentanillaRad
         indicador={<span className="w-1.5 h-1.5 rounded-full bg-green-500 animate-pulse" />}
       />
 
-      {/* KPI cards */}
-      <div className="px-5 py-3 shrink-0 bg-white" style={{ borderBottom: '1px solid #D9E2D9' }}>
-        <div className="flex gap-3 overflow-x-auto pb-0.5">
-          {tarjetas.map((t) => (
-            <div
-              key={t.label}
-              className="shrink-0 flex flex-col items-start px-4 py-3 rounded-xl border-l-4 bg-white"
-              style={{
-                border: '1px solid #D9E2D9',
-                borderLeftColor: CARD_BORDER_COLOR[t.tono],
-                borderLeftWidth: 4,
-              }}
-            >
-              <span className="text-2xl font-black leading-none tabular-nums" style={CARD_VALOR_STYLE[t.tono]}>
-                {t.valor}
-              </span>
-              <span className="text-[10px] font-bold uppercase tracking-widest mt-0.5" style={{ color: '#94A3B8' }}>
-                {t.label}
-              </span>
-            </div>
-          ))}
-        </div>
-      </div>
+      {/* Indicadores (lenguaje del Tablero) */}
+      <FilaTarjetas etiqueta="Resumen de carga por dependencia" className="shrink-0 px-4 pb-1 lg:px-6">
+        {tarjetas.map((t) => (
+          <TarjetaIndicador key={t.etiqueta} {...t} />
+        ))}
+      </FilaTarjetas>
 
-      {/* Tabla */}
-      <div className="flex-1 overflow-y-auto overflow-x-auto bg-white">
-        <table className="w-full text-sm">
-          <thead className="sticky top-0 z-10" style={{ background: '#EEF4EE' }}>
-            <tr style={{ borderBottom: '1px solid #D9E2D9' }}>
-              {['Dependencia', 'Total', 'Estado de carga', 'Carga relativa', ''].map((h) => (
-                <th
-                  key={h}
-                  className="px-4 py-2.5 text-left text-[10px] font-bold uppercase tracking-widest whitespace-nowrap"
-                  style={{ color: '#14532D' }}
-                >
-                  {h}
-                </th>
+      {/* Tabla: superficie y cabecera fija del sistema; scroll interno */}
+      <SuperficieTabla>
+        <div className="min-h-0 flex-1 overflow-auto bg-[var(--tema-fondo-ffffff)]">
+          <table className="w-full text-sm">
+            <CabeceraTablaSticky
+              columnas={['Dependencia', 'Total', 'Estado de carga', 'Carga relativa', { etiqueta: '', etiquetaAccesible: 'Acciones' }]}
+            />
+            <tbody>
+              {deps.map((dep) => (
+                <FilaDependencia key={dep.tenantId} dep={dep} onVer={verDependencia} onVerCelda={verCelda} />
               ))}
-            </tr>
-          </thead>
-          <tbody>
-            {deps.map((dep) => (
-              <FilaDependencia key={dep.tenantId} dep={dep} onVer={verDependencia} onVerCelda={verCelda} />
-            ))}
-          </tbody>
-        </table>
-      </div>
+            </tbody>
+          </table>
+        </div>
+      </SuperficieTabla>
     </div>
   );
 }

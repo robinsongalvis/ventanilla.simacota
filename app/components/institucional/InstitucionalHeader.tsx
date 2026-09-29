@@ -92,7 +92,7 @@ export function InstitucionalHeader({
      sin tener que retocar el archivo gráfico original. */
   const logoWrapStyle: React.CSSProperties = theme === 'light'
     ? {
-        background: 'linear-gradient(135deg, #0F3D2E 0%, #14532D 100%)',
+        background: 'linear-gradient(135deg, #0F3D2E 0%, #007049 100%)',
         borderRadius: '0.625rem',
         padding: '0.35rem 0.5rem',
         boxShadow: 'var(--shadow-institutional-sm)',

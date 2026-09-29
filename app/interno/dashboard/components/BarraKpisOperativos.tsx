@@ -27,10 +27,10 @@ interface PastillaConfig {
 }
 
 const TONOS: Record<PastillaConfig['tono'], { bg: string; text: string; border: string; textActivo: string; bgActivo: string }> = {
-  neutral: { bg: 'white', text: '#1F2933', border: '#D9E2D9', bgActivo: '#EEF4EE', textActivo: '#14532D' },
-  ambar:   { bg: 'white', text: '#B45309', border: '#FBBF24', bgActivo: '#FEF3C7', textActivo: '#78350F' },
-  rojo:    { bg: 'white', text: '#B91C1C', border: '#FECACA', bgActivo: '#FEF2F2', textActivo: '#7F1D1D' },
-  verde:   { bg: 'white', text: '#166534', border: '#BBF7D0', bgActivo: '#F0FDF4', textActivo: '#14532D' },
+  neutral: { bg: 'var(--tema-fondo-ffffff)', text: 'var(--tema-texto-172033)', border: 'var(--tema-borde-dce4ea)', bgActivo: 'var(--tema-fondo-f4f9f6)', textActivo: 'var(--tema-texto-007049)' },
+  ambar:   { bg: 'var(--tema-fondo-ffffff)', text: 'var(--tema-texto-b45309)', border: 'var(--tema-borde-fbbf24)', bgActivo: 'var(--tema-fondo-fef3c7)', textActivo: 'var(--tema-texto-78350f)' },
+  rojo:    { bg: 'var(--tema-fondo-ffffff)', text: 'var(--tema-texto-b91c1c)', border: 'var(--tema-borde-fecaca)', bgActivo: 'var(--tema-fondo-fef2f2)', textActivo: 'var(--tema-texto-7f1d1d)' },
+  verde:   { bg: 'var(--tema-fondo-ffffff)', text: 'var(--tema-texto-006b45)', border: 'var(--tema-borde-bbf7d0)', bgActivo: 'var(--tema-fondo-f0fdf4)', textActivo: 'var(--tema-texto-007049)' },
 };
 
 export interface BarraKpisOperativosProps {
@@ -76,14 +76,14 @@ export function BarraKpisOperativos({
 
   return (
     <div
-      className="px-3 sm:px-4 py-1.5 shrink-0 bg-white"
-      style={{ borderBottom: '1px solid #D9E2D9' }}
+      className="px-3 sm:px-4 py-1.5 shrink-0 bg-[var(--tema-fondo-ffffff)]"
+      style={{ borderBottom: '1px solid var(--tema-borde-dce4ea)' }}
       aria-label="Estado operativo del día"
     >
       <div className="flex min-w-0 flex-wrap items-center gap-2">
         <span
           className="shrink-0 text-[9px] font-bold uppercase tracking-widest"
-          style={{ color: '#667085' }}
+          style={{ color: 'var(--tema-texto-64748b)' }}
         >
           Estado operativo
         </span>
@@ -108,7 +108,7 @@ export function BarraKpisOperativos({
               style={{
                 background:  activo ? t.bgActivo : t.bg,
                 color:       activo ? t.textActivo : t.text,
-                borderColor: deshabilitada ? '#D9E2D9' : t.border,
+                borderColor: deshabilitada ? 'var(--tema-borde-dce4ea)' : t.border,
                 opacity:     deshabilitada ? 0.55 : 1,
               }}
               aria-pressed={activo}
@@ -129,8 +129,8 @@ export function BarraKpisOperativos({
             onClick={onToggleSoloMios}
             className="flex min-w-0 items-center gap-1.5 px-2.5 py-1 rounded-full border text-[10px] font-semibold uppercase tracking-wide transition-all sm:ml-auto"
             style={soloMios
-              ? { background: '#14532D', color: '#FFFFFF', borderColor: '#14532D' }
-              : { background: 'white', color: '#14532D', borderColor: '#97C459' }}
+              ? { background: 'var(--tema-fondo-007049)', color: '#FFFFFF', borderColor: 'var(--tema-borde-007049)' }
+              : { background: 'var(--tema-fondo-ffffff)', color: 'var(--tema-texto-007049)', borderColor: 'var(--tema-borde-97c459)' }}
             aria-pressed={soloMios}
             aria-label={`Solo los míos (${misAsignados} activos)`}
             title="Muestra solo los radicados asignados a ti; combinable con los demás filtros."

@@ -76,8 +76,8 @@ export function FormRespuesta({ radicado, usuario, onExito }: Props) {
           </svg>
           CASO RESUELTO
         </span>
-        <p className="text-xs text-slate-500">Resuelto el {fechaResolucion}</p>
-        <p className="text-xs text-slate-600 mt-1 text-center max-w-xs">
+        <p className="text-xs text-slate-500 oscuro:text-slate-400">Resuelto el {fechaResolucion}</p>
+        <p className="text-xs text-slate-600 oscuro:text-slate-400 mt-1 text-center max-w-xs">
           Este radicado ha sido cerrado. Los detalles de la resolución se encuentran en el historial de auditoría.
         </p>
       </div>
@@ -87,7 +87,7 @@ export function FormRespuesta({ radicado, usuario, onExito }: Props) {
   /* ── No available transitions ── */
   if (opciones.length === 0) {
     return (
-      <p className="text-sm text-slate-600 italic text-center py-2">
+      <p className="text-sm text-slate-600 oscuro:text-slate-400 italic text-center py-2">
         No hay acciones disponibles para el estado actual ({radicado.estadoActual}).
       </p>
     );
@@ -284,7 +284,7 @@ export function FormRespuesta({ radicado, usuario, onExito }: Props) {
             transition-all duration-300 resize-none
           "
         />
-        <span className="text-xs text-slate-600 text-right">{respuesta.length} / 10 min</span>
+        <span className="text-xs text-slate-600 oscuro:text-slate-400 text-right">{respuesta.length} / 10 min</span>
       </div>
 
       {/* WhatsApp toggle */}
@@ -302,13 +302,13 @@ export function FormRespuesta({ radicado, usuario, onExito }: Props) {
           `}
         >
           <span className={`
-            absolute top-0.5 w-4 h-4 rounded-full bg-white shadow transition-all
+            absolute top-0.5 w-4 h-4 rounded-full bg-[var(--tema-fondo-ffffff)] shadow transition-all
             ${notificarWA ? 'left-[22px]' : 'left-0.5'}
           `} />
         </div>
         <div className="flex flex-col gap-0.5">
           <span className="text-sm text-slate-200">Notificar al ciudadano por WhatsApp</span>
-          <span className="text-xs text-slate-500">Genera y registra el mensaje (simulado)</span>
+          <span className="text-xs text-slate-500 oscuro:text-slate-400">Genera y registra el mensaje (simulado)</span>
         </div>
       </label>
 

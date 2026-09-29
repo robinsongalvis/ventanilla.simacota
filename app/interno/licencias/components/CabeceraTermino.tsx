@@ -69,17 +69,17 @@ const MENSAJE: Record<'EN_TERMINO' | NivelTermino, { texto: string; estado: stri
   EN_TERMINO: {
     estado: 'En término',
     texto: 'Sin riesgo hoy. La revisión técnica puede avanzar con calma.',
-    fondo: '#E7F6EC', tinta: '#116932',
+    fondo: 'var(--tema-fondo-e7f6ec)', tinta: 'var(--tema-texto-116932)',
   },
   AVISO: {
     estado: 'Por vencer',
     texto: 'Entra en la ventana de aviso. Si va a haber observaciones, es el momento de prepararlas — el acta es lo único que suspende el término.',
-    fondo: '#FDF6E3', tinta: '#5A4A16',
+    fondo: 'var(--tema-fondo-fdf6e3)', tinta: 'var(--tema-texto-5a4a16)',
   },
   CRITICO: {
     estado: 'Crítico',
     texto: 'Quedan cinco días hábiles o menos. O sale la resolución, o sale el acta de observaciones: nada más detiene el reloj.',
-    fondo: '#FFF4ED', tinta: '#B54708',
+    fondo: 'var(--tema-fondo-fff4ed)', tinta: 'var(--tema-texto-b54708)',
   },
   VENCIDO: {
     /* La consecuencia con todas sus letras: el silencio administrativo POSITIVO
@@ -87,7 +87,7 @@ const MENSAJE: Record<'EN_TERMINO' | NivelTermino, { texto: string; estado: stri
        sería ocultar el riesgo real que corre la Administración. */
     estado: 'Vencido',
     texto: 'Riesgo de silencio administrativo positivo — la licencia podría entenderse concedida por ley. Resolver de inmediato.',
-    fondo: '#FEF2F2', tinta: '#B42318',
+    fondo: 'var(--tema-fondo-fef2f2)', tinta: 'var(--tema-texto-b42318)',
   },
 };
 
@@ -125,10 +125,10 @@ export function CabeceraTermino({
     return (
       <div
         className="microtarjeta rounded-xl overflow-hidden"
-        style={{ background: 'var(--bg-surface)', border: '1px solid var(--color-border)', borderTop: '3px solid #64748B' }}
+        style={{ background: 'var(--bg-surface)', border: '1px solid var(--color-border)', borderTop: '3px solid var(--tema-borde-64748b)' }}
       >
         <div className="p-4 flex flex-col gap-3">
-          <p className="text-[10px] font-bold uppercase tracking-widest" style={{ color: '#667085' }}>
+          <p className="text-[10px] font-bold uppercase tracking-widest" style={{ color: 'var(--text-secondary)' }}>
             Término para resolver
           </p>
           <div className="flex items-center gap-4">
@@ -138,27 +138,27 @@ export function CabeceraTermino({
             <svg width="72" height="72" viewBox="0 0 72 72" aria-hidden className="shrink-0">
               <circle cx="36" cy="36" r="30" fill="none" stroke="var(--bg-surface-2)" strokeWidth="7" />
               <circle
-                cx="36" cy="36" r="30" fill="none" stroke="#94A3B8" strokeWidth="7" strokeLinecap="round"
+                cx="36" cy="36" r="30" fill="none" style={{ stroke: 'var(--tema-borde-94a3b8)' }} strokeWidth="7" strokeLinecap="round"
                 strokeDasharray="10 10" transform="rotate(-90 36 36)"
               />
               {acreditada ? (
                 <>
-                  <text x="36" y="34" textAnchor="middle" fontSize="19" fontWeight="800" fill="#475569">
+                  <text x="36" y="34" textAnchor="middle" fontSize="19" fontWeight="800" style={{ fill: 'var(--tema-texto-475569)' }}>
                     {lectura.diasHabilesDetenido}
                   </text>
-                  <text x="36" y="47" textAnchor="middle" fontSize="7.5" fontWeight="700" fill="#94A3B8" letterSpacing="0.5">
+                  <text x="36" y="47" textAnchor="middle" fontSize="7.5" fontWeight="700" style={{ fill: 'var(--text-secondary)' }} letterSpacing="0.5">
                     DÍAS PARADO
                   </text>
                 </>
               ) : (
                 <>
-                  <rect x="29" y="27" width="5.5" height="18" rx="1.6" fill="#475569" />
-                  <rect x="37.5" y="27" width="5.5" height="18" rx="1.6" fill="#475569" />
+                  <rect x="29" y="27" width="5.5" height="18" rx="1.6" style={{ fill: 'var(--tema-texto-475569)' }} />
+                  <rect x="37.5" y="27" width="5.5" height="18" rx="1.6" style={{ fill: 'var(--tema-texto-475569)' }} />
                 </>
               )}
             </svg>
             <div className="min-w-0">
-              <p className="text-sm font-bold" style={{ color: '#475569' }}>Reloj detenido</p>
+              <p className="text-sm font-bold" style={{ color: 'var(--tema-texto-475569)' }}>Reloj detenido</p>
               <p className="font-headline text-xl font-black" style={{ color: 'var(--text-primary)' }}>
                 El término no está corriendo
               </p>
@@ -182,7 +182,7 @@ export function CabeceraTermino({
               arriba de la pantalla; su sitio es este — cuando el término de la
               Secretaría está parado, el plazo del ciudadano es lo que hay que
               mirar. */}
-          <div className="rounded-lg px-3 py-2 text-sm flex flex-col gap-1" style={{ background: '#F1F5F9', color: '#334155' }}>
+          <div className="rounded-lg px-3 py-2 text-sm flex flex-col gap-1" style={{ background: 'var(--tema-fondo-f1f5f9)', color: 'var(--tema-texto-334155)' }}>
             <p>
               El turno es del ciudadano: tiene 30 días hábiles para subsanar desde que se le
               notificó. Nada corre contra la Secretaría mientras tanto.
@@ -203,13 +203,13 @@ export function CabeceraTermino({
               /* UNA PRÓRROGA DESCARTADA EN SILENCIO ES PEOR QUE NINGUNA: la
                  funcionaria creería que el ciudadano tiene quince días que no
                  tiene, y dejaría correr un archivo que ya procede. */
-              <p role="alert" style={{ fontWeight: 700, color: '#B54708' }}>
+              <p role="alert" style={{ fontWeight: 700, color: 'var(--tema-texto-b54708)' }}>
                 ⚠ Consta una prórroga solicitada DESPUÉS de vencido el plazo: no lo amplía.
                 El término sigue siendo de 30 días hábiles.
               </p>
             )}
             {plazoCiudadano?.resultado === 'POR_ARCHIVAR' && (
-              <p role="alert" style={{ fontWeight: 700, color: '#B42318' }}>
+              <p role="alert" style={{ fontWeight: 700, color: 'var(--tema-texto-b42318)' }}>
                 ⚠ El plazo del ciudadano ya venció sin respuesta. Procede evaluar el desistimiento tácito.
               </p>
             )}
@@ -219,7 +219,7 @@ export function CabeceraTermino({
             /* NO ES UN DETALLE DE IMPLEMENTACIÓN: mientras esto siga así, los
                días de esta pausa se los come la Secretaría. Quien mira la
                pantalla tiene derecho a saberlo. */
-            <p role="alert" className="rounded-lg px-3 py-2 text-xs" style={{ background: '#FDF6E3', color: '#5A4A16' }}>
+            <p role="alert" className="rounded-lg px-3 py-2 text-xs" style={{ background: 'var(--tema-fondo-fdf6e3)', color: 'var(--tema-texto-5a4a16)' }}>
               Los días de esta pausa <strong>no se están descontando</strong> del término: la
               suspensión por el acto de viabilidad está pendiente del concepto escrito de
               Jurídica. El vencimiento se sigue calculando como si el reloj no se hubiera detenido.
@@ -244,7 +244,7 @@ export function CabeceraTermino({
   return (
     <div className="rounded-xl overflow-hidden" style={{ background: 'var(--bg-surface)', border: '1px solid var(--color-border)', borderTop: `3px solid ${acento}` }}>
       <div className="p-4 flex flex-col gap-3">
-        <p className="text-[10px] font-bold uppercase tracking-widest" style={{ color: '#667085' }}>
+        <p className="text-[10px] font-bold uppercase tracking-widest" style={{ color: 'var(--text-secondary)' }}>
           Término para resolver
         </p>
 
@@ -258,10 +258,10 @@ export function CabeceraTermino({
               strokeDashoffset={circunferencia * (1 - porcentaje / 100)}
               transform="rotate(-90 36 36)"
             />
-            <text x="36" y="34" textAnchor="middle" fontSize="19" fontWeight="800" fill={m.tinta}>
+            <text x="36" y="34" textAnchor="middle" fontSize="19" fontWeight="800" style={{ fill: m.tinta }}>
               {vencido ? `−${Math.abs(restantes)}` : restantes}
             </text>
-            <text x="36" y="47" textAnchor="middle" fontSize="7.5" fontWeight="700" fill="#94A3B8" letterSpacing="0.5">
+            <text x="36" y="47" textAnchor="middle" fontSize="7.5" fontWeight="700" style={{ fill: 'var(--text-secondary)' }} letterSpacing="0.5">
               DÍAS HÁBILES
             </text>
           </svg>

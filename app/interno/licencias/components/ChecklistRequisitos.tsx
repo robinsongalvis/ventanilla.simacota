@@ -207,7 +207,7 @@ export function ChecklistRequisitos({
         <span
           aria-hidden
           className="mt-0.5 inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-xl"
-          style={{ background: '#E7F6EC', color: '#14532D' }}
+          style={{ background: 'var(--tema-fondo-e7f6ec)', color: 'var(--tema-texto-007049)' }}
         >
           <IconoTecnicos />
         </span>
@@ -238,7 +238,7 @@ export function ChecklistRequisitos({
       />
 
       {soloLectura && motivoSoloLectura && (
-        <p className="rounded-xl px-4 py-2.5 text-sm" style={{ background: '#EEF2F5', color: 'var(--text-secondary)', border: '1px solid var(--color-border)' }}>
+        <p className="rounded-xl px-4 py-2.5 text-sm" style={{ background: 'var(--tema-fondo-eef2f5)', color: 'var(--text-secondary)', border: '1px solid var(--color-border)' }}>
           {motivoSoloLectura}
         </p>
       )}
@@ -263,7 +263,7 @@ export function ChecklistRequisitos({
           <ChipFiltro etiqueta="Rechazados" n={contadoresFiltro.rechazados} activo={filtro === 'rechazados'} onClick={() => setFiltro('rechazados')} color="rojo" icono={<IconoAlerta />} />
         </div>
         <div className="relative w-full min-w-0 lg:ml-auto lg:w-72">
-          <span aria-hidden className="absolute left-3 top-1/2 -translate-y-1/2" style={{ color: '#2563EB' }}><IconoBuscar /></span>
+          <span aria-hidden className="absolute left-3 top-1/2 -translate-y-1/2" style={{ color: 'var(--tema-texto-2563eb)' }}><IconoBuscar /></span>
           <input
             type="search"
             value={busqueda}
@@ -299,10 +299,10 @@ export function ChecklistRequisitos({
                 aria-expanded={expandida}
                 className="flex w-full min-w-0 flex-wrap items-center gap-3 px-4 py-3.5 text-left transition-colors hover:bg-black/[0.02] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset md:flex-nowrap"
               >
-                <span aria-hidden className="inline-flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-xs font-bold" style={{ background: '#14532D', color: '#fff' }}>
+                <span aria-hidden className="inline-flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-xs font-bold" style={{ background: 'var(--tema-fondo-007049)', color: '#fff' }}>
                   {cat.numero}
                 </span>
-                <span aria-hidden className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-lg" style={{ background: '#E7F6EC', color: '#14532D' }}>
+                <span aria-hidden className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-lg" style={{ background: 'var(--tema-fondo-e7f6ec)', color: 'var(--tema-texto-007049)' }}>
                   <IconoCategoria id={cat.id} />
                 </span>
                 <span className="min-w-0 flex-1">
@@ -321,7 +321,7 @@ export function ChecklistRequisitos({
                 <div style={{ borderTop: '1px solid var(--color-border)' }}>
                   {/* Encabezado de columnas (solo escritorio) */}
                   {totalVisibles > 0 && (
-                    <div className={`hidden md:grid items-center gap-x-3 px-4 pt-2.5 pb-1 text-[10px] font-bold uppercase tracking-wider ${GRID_TEMPLATE_MD}`} style={{ color: 'var(--text-muted)' }}>
+                    <div className={`hidden md:grid items-center gap-x-3 px-4 pt-2.5 pb-1 text-[10px] font-bold uppercase tracking-wider ${GRID_TEMPLATE_MD}`} style={{ color: 'var(--text-secondary)' }}>
                       <span>#</span><span>Documento</span><span>Requisito / Descripción</span><span>Estado</span><span>Archivo</span><span className="text-right">Acciones</span>
                     </div>
                   )}
@@ -347,7 +347,7 @@ export function ChecklistRequisitos({
 
                   {visiblesNoAplica.length > 0 && (
                     <div style={{ borderTop: '1px dashed var(--color-border)' }}>
-                      <p className="px-4 pt-2.5 pb-1 text-[10px] font-bold uppercase tracking-wider" style={{ color: 'var(--text-muted)' }}>
+                      <p className="px-4 pt-2.5 pb-1 text-[10px] font-bold uppercase tracking-wider" style={{ color: 'var(--text-secondary)' }}>
                         No se exigen en este caso · {visiblesNoAplica.length}
                       </p>
                       <ul className="flex flex-col">
@@ -382,7 +382,7 @@ export function ChecklistRequisitos({
       />
 
       {/* ── Nota informativa ── */}
-      <p className="flex items-start gap-2 rounded-xl px-4 py-3 text-xs" style={{ background: '#EEF4FF', color: '#1E4FA0' }}>
+      <p className="flex items-start gap-2 rounded-xl px-4 py-3 text-xs" style={{ background: 'var(--tema-fondo-eef4ff)', color: 'var(--tema-texto-1e4fa0)' }}>
         <span aria-hidden className="mt-0.5 shrink-0"><IconoInfo /></span>
         <span><strong>Importante:</strong> asegúrate de que los documentos sean legibles y no superen 10 MB por archivo.</span>
       </p>
@@ -403,17 +403,17 @@ function TarjetaResumen({
     <div
       className="rounded-2xl p-5 md:p-6 grid gap-5 md:grid-cols-[minmax(0,1fr)_minmax(0,1.1fr)_auto] md:items-center"
       style={completo
-        ? { background: '#F1F9F3', border: '1px solid #CDE9D6' }
+        ? { background: 'var(--tema-fondo-f1f9f3)', border: '1px solid var(--tema-borde-cde9d6)' }
         : { background: 'var(--bg-surface)', border: '1px solid var(--color-border)', boxShadow: 'var(--shadow-soft)' }}
     >
       {/* Estado */}
       <div className="flex items-center gap-3.5 min-w-0">
         <span aria-hidden className="inline-flex h-12 w-12 shrink-0 items-center justify-center rounded-full"
-          style={completo ? { background: '#16A34A', color: '#fff' } : { background: '#FAEEDA', color: '#B7791F' }}>
+          style={completo ? { background: '#008F5A', color: '#fff' } : { background: 'var(--tema-fondo-faeeda)', color: 'var(--tema-texto-b7791f)' }}>
           {completo ? <IconoCheckGrande /> : <IconoReloj />}
         </span>
         <div className="min-w-0">
-          <p className="text-lg font-bold leading-tight" style={{ color: completo ? '#116932' : 'var(--text-primary)' }}>
+          <p className="text-lg font-bold leading-tight" style={{ color: completo ? 'var(--tema-texto-116932)' : 'var(--text-primary)' }}>
             {completo ? 'Trámite completo' : `${faltan} documento${faltan === 1 ? '' : 's'} por completar`}
           </p>
           <p className="text-sm mt-0.5" style={{ color: 'var(--text-secondary)' }}>
@@ -431,24 +431,24 @@ function TarjetaResumen({
           <span style={{ color: 'var(--text-secondary)' }}>documentos</span>
         </p>
         <div className="flex items-center gap-3">
-          <div className="flex-1 h-2 rounded-full overflow-hidden" role="progressbar" aria-label="Documentos aportados" aria-valuenow={aportados} aria-valuemin={0} aria-valuemax={aplicables} style={{ background: '#E4EAE6' }}>
-            <div className="h-full rounded-full transition-[width] duration-500" style={{ width: `${pct}%`, background: completo ? '#16A34A' : '#4E9A5F' }} />
+          <div className="flex-1 h-2 rounded-full overflow-hidden" role="progressbar" aria-label="Documentos aportados" aria-valuenow={aportados} aria-valuemin={0} aria-valuemax={aplicables} style={{ background: 'var(--tema-fondo-e4eae6)' }}>
+            <div className="h-full rounded-full transition-[width] duration-500" style={{ width: `${pct}%`, background: completo ? '#008F5A' : '#4E9A5F' }} />
           </div>
-          <span className="text-sm font-bold shrink-0" style={{ color: completo ? '#116932' : '#4E9A5F' }}>{pct}%</span>
+          <span className="text-sm font-bold shrink-0" style={{ color: completo ? 'var(--tema-texto-116932)' : 'var(--tema-texto-007049)' }}>{pct}%</span>
         </div>
         {rechazados > 0 && (
-          <p className="text-xs mt-1.5" style={{ color: '#911111' }}>{rechazados} requiere{rechazados === 1 ? '' : 'n'} corrección.</p>
+          <p className="text-xs mt-1.5" style={{ color: 'var(--tema-texto-911111)' }}>{rechazados} requiere{rechazados === 1 ? '' : 'n'} corrección.</p>
         )}
         {porDefinir > 0 && (
-          <p className="text-xs mt-1.5" style={{ color: '#1E4FA0' }}>{porDefinir} por definir en «Hechos del caso».</p>
+          <p className="text-xs mt-1.5" style={{ color: 'var(--tema-texto-1e4fa0)' }}>{porDefinir} por definir en «Hechos del caso».</p>
         )}
       </div>
 
       {/* Acción / mensaje lateral */}
       {completo ? (
-        <div className="flex items-center gap-2.5 rounded-xl px-4 py-3 md:max-w-[220px]" style={{ background: '#E7F6EC' }}>
-          <span aria-hidden style={{ color: '#14532D' }}><IconoTecnicos /></span>
-          <p className="text-sm font-semibold leading-snug" style={{ color: '#14532D' }}>Puedes continuar con tu trámite</p>
+        <div className="flex items-center gap-2.5 rounded-xl px-4 py-3 md:max-w-[220px]" style={{ background: 'var(--tema-fondo-e7f6ec)' }}>
+          <span aria-hidden style={{ color: 'var(--tema-texto-007049)' }}><IconoTecnicos /></span>
+          <p className="text-sm font-semibold leading-snug" style={{ color: 'var(--tema-texto-007049)' }}>Puedes continuar con tu trámite</p>
         </div>
       ) : (
         <div className="flex flex-col items-start gap-2 md:max-w-[240px]">
@@ -456,7 +456,7 @@ function TarjetaResumen({
             type="button"
             onClick={onVerPendientes}
             className="inline-flex items-center gap-2 rounded-xl px-4 py-2.5 text-sm font-bold transition-all hover:brightness-95 active:scale-[0.98] focus-visible:outline-none focus-visible:ring-2"
-            style={{ background: '#14532D', color: '#fff', boxShadow: '0 2px 8px rgba(20,83,45,0.25)' }}
+            style={{ background: 'var(--tema-fondo-007049)', color: '#fff', boxShadow: '0 2px 8px rgba(0, 112, 73,0.25)' }}
           >
             Ver pendientes
           </button>
@@ -475,7 +475,7 @@ function ChipFiltro({ etiqueta, n, activo, onClick, color, icono }: {
   etiqueta: string; n: number; activo: boolean; onClick: () => void;
   color: 'verde' | 'ambar' | 'rojo'; icono: ReactNode;
 }) {
-  const acento = color === 'verde' ? '#14532D' : color === 'ambar' ? '#8E5C06' : '#911111';
+  const acento = color === 'verde' ? 'var(--tema-texto-007049)' : color === 'ambar' ? 'var(--tema-texto-8e5c06)' : 'var(--tema-texto-911111)';
   return (
     <button
       type="button"
@@ -483,14 +483,15 @@ function ChipFiltro({ etiqueta, n, activo, onClick, color, icono }: {
       aria-pressed={activo}
       className="inline-flex items-center gap-1.5 rounded-full px-3 py-1.5 text-sm font-semibold transition-colors focus-visible:outline-none focus-visible:ring-2"
       style={activo
-        ? { background: '#14532D', color: '#fff', border: '1px solid #14532D' }
+        ? { background: 'var(--tema-fondo-007049)', color: '#fff', border: '1px solid var(--tema-borde-007049)' }
         : { background: 'var(--bg-surface)', color: 'var(--text-secondary)', border: '1px solid var(--color-border)' }}
     >
       <span aria-hidden style={{ color: activo ? '#fff' : acento }}>{icono}</span>
       {etiqueta}
       <span
         className="inline-flex items-center justify-center min-w-[20px] h-5 px-1.5 rounded-full text-[11px] font-bold"
-        style={activo ? { background: 'rgba(255,255,255,0.22)', color: '#fff' } : { background: 'var(--bg-surface-2)', color: 'var(--text-secondary)' }}
+        /* Velo OSCURO sobre el chip activo, como `ChipFiltro`: el blanco quedaba en 3,9:1. */
+        style={activo ? { background: 'rgba(0,0,0,0.18)', color: '#fff' } : { background: 'var(--bg-surface-2)', color: 'var(--text-secondary)' }}
       >
         {n}
       </span>
@@ -502,10 +503,10 @@ function ContadorSeccion({ aportados, aplicables, completo }: { aportados: numbe
   return (
     <span
       className="inline-flex items-center gap-1.5 shrink-0 rounded-full px-2.5 py-1 text-xs font-bold whitespace-nowrap"
-      style={completo ? { background: '#E7F6EC', color: '#116932' } : { background: 'var(--bg-surface-2)', color: 'var(--text-secondary)' }}
+      style={completo ? { background: 'var(--tema-fondo-e7f6ec)', color: 'var(--tema-texto-116932)' } : { background: 'var(--bg-surface-2)', color: 'var(--text-secondary)' }}
     >
       {aportados} de {aplicables}
-      {completo && <span aria-hidden style={{ color: '#16A34A' }}><IconoCheck /></span>}
+      {completo && <span aria-hidden style={{ color: 'var(--tema-texto-008f5a)' }}><IconoCheck /></span>}
     </span>
   );
 }

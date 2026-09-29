@@ -1,6 +1,7 @@
 import { NextResponse, type NextRequest } from 'next/server';
 import { SESSION_COOKIE_NAME } from '@/lib/auth-cookie';
 import { getFirebaseAdminAuth, getFirebaseAdminDb } from '@/lib/firebase-admin';
+import { destinoTrasLogin } from '@/lib/auth/destino-tras-login';
 
 async function hasValidInternalSession(request: NextRequest): Promise<boolean> {
   const sessionCookie = request.cookies.get(SESSION_COOKIE_NAME)?.value;
@@ -34,15 +35,19 @@ export async function proxy(request: NextRequest) {
     return validSession ? NextResponse.next() : unauthorizedApi();
   }
 
+  // Enlaces directos (ADR-0046 §7): con sesión, el login devuelve al `next`
+  // validado (solo rutas de /interno/, `lib/auth/destino-tras-login.ts`).
   if (isLogin) {
     return validSession
-      ? NextResponse.redirect(new URL('/interno/dashboard', request.url))
+      ? NextResponse.redirect(new URL(destinoTrasLogin(request.nextUrl.searchParams.get('next')), request.url))
       : NextResponse.next();
   }
 
+  // Sin sesión, el retorno conserva los parámetros
+  // (`?vista=licencias&expediente=…`, `?radicadoId=…`), no solo la ruta.
   if (!validSession) {
     const loginUrl = new URL('/interno/login', request.url);
-    loginUrl.searchParams.set('next', pathname);
+    loginUrl.searchParams.set('next', `${pathname}${request.nextUrl.search}`);
     return NextResponse.redirect(loginUrl);
   }
 

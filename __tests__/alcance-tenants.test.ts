@@ -48,7 +48,8 @@ describe('Panel Op Nivel 1 — puedeVerTodosLosTenants', () => {
 
 describe('Panel Op Nivel 2 — acceso a vista Dependencias', () => {
   it('puedeVerDependencias delega en puedeVerTodosLosTenants', () => {
-    const dashboard = readFileSync('app/interno/dashboard/page.tsx', 'utf8');
+    // Desde ADR-0046 las reglas de interfaz viven en el contexto único.
+    const dashboard = readFileSync('lib/permisos/contexto-interno.ts', 'utf8');
     const fn = dashboard.slice(
       dashboard.indexOf('function puedeVerDependencias'),
       dashboard.indexOf('function puedeVerAnaliticaAvanzada'),

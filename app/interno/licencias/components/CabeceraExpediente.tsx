@@ -63,7 +63,7 @@ export function CabeceraExpediente({
           <span
             aria-hidden
             className="mt-0.5 hidden shrink-0 items-center justify-center rounded-2xl sm:flex"
-            style={{ width: 56, height: 56, background: '#E7F5EC', border: '1px solid #CDE9D6' }}
+            style={{ width: 56, height: 56, background: 'var(--tema-fondo-e7f5ec)', border: '1px solid var(--tema-borde-cde9d6)' }}
           >
             <IconoExpediente />
           </span>
@@ -71,14 +71,15 @@ export function CabeceraExpediente({
             <p className="text-[10px] font-bold uppercase tracking-widest" style={{ color: 'var(--text-secondary)' }}>
               Solicitante
             </p>
-            <h1 className="break-words font-headline text-2xl font-black leading-tight" style={{ color: 'var(--text-primary)', overflowWrap: 'anywhere' }}>
+            {/* h2: el título de pantalla (h1, «Licencias») es el del encabezado común del panel (ADR-0046 §7). */}
+            <h2 className="break-words font-headline text-2xl font-black leading-tight" style={{ color: 'var(--text-primary)', overflowWrap: 'anywhere' }}>
               {expediente.solicitanteNombre}
               {expediente.solicitanteDocumento && (
                 <span className="font-normal" style={{ color: 'var(--text-secondary)' }}>
                   {' — CC '}{expediente.solicitanteDocumento}
                 </span>
               )}
-            </h1>
+            </h2>
 
             <div className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-1 text-sm">
               {expediente.numeroExpediente?.numero && (
@@ -139,13 +140,13 @@ function TarjetaEstado({
         {onVer && <span aria-hidden style={{ color: texto }}>›</span>}
       </div>
       {descripcion && (
-        <p className="mt-1 text-xs leading-relaxed" style={{ color: texto, opacity: 0.85 }}>
+        <p className="mt-1 text-xs leading-relaxed" style={{ color: texto }}>
           {descripcion}
         </p>
       )}
     </>
   );
-  const estilo = { background: fondo, border: `1px solid ${dot}22` } as const;
+  const estilo = { background: fondo, border: `1px solid color-mix(in srgb, ${dot} 13.3%, transparent)` } as const;
   const clase = 'rounded-xl px-4 py-3 lg:w-64 lg:shrink-0 text-left';
   return onVer ? (
     <button type="button" onClick={onVer} className={`microtarjeta-clic ${clase}`} style={estilo}>
@@ -196,7 +197,7 @@ function PlazoLegal({
         </>
       ) : (
         /* La frase EXACTA del ADR-0034 — no un guion que obligue a interpretar. */
-        <p className="mt-1 text-sm font-bold" style={{ color: '#9A6206' }}>
+        <p className="mt-1 text-sm font-bold" style={{ color: 'var(--tema-texto-9a6206)' }}>
           Aún no ha empezado a correr
         </p>
       )}
@@ -248,9 +249,9 @@ function capitalizar(t: string): string {
 function IconoExpediente() {
   return (
     <svg width="28" height="28" viewBox="0 0 24 24" fill="none" aria-hidden>
-      <path d="M6 2.75h7.5L18.25 7.5V20A1.25 1.25 0 0 1 17 21.25H6A1.25 1.25 0 0 1 4.75 20V4A1.25 1.25 0 0 1 6 2.75Z" stroke="#14532D" strokeWidth="1.5" />
-      <path d="M13 3v5h5" stroke="#14532D" strokeWidth="1.5" />
-      <path d="M8 13.5l2 2 3.5-3.5" stroke="#16A34A" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" />
+      <path d="M6 2.75h7.5L18.25 7.5V20A1.25 1.25 0 0 1 17 21.25H6A1.25 1.25 0 0 1 4.75 20V4A1.25 1.25 0 0 1 6 2.75Z" stroke="#007049" strokeWidth="1.5" />
+      <path d="M13 3v5h5" stroke="#007049" strokeWidth="1.5" />
+      <path d="M8 13.5l2 2 3.5-3.5" stroke="#008F5A" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" />
     </svg>
   );
 }

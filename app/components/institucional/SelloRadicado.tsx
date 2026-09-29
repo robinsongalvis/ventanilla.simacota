@@ -52,6 +52,7 @@ export function SelloRadicado({ data, variant = 'card', className = '' }: Props)
   return (
     <section
       className={[
+        'isla-clara', // documento oficial: siempre en claro (ADR-0045)
         'sello-radicado overflow-hidden border border-slate-300 bg-white text-slate-950 shadow-sm',
         variant === 'compact' ? 'rounded-xl' : 'rounded-2xl',
         variant === 'print' ? 'print:shadow-none print:rounded-none' : '',

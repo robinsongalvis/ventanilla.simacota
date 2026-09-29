@@ -14,7 +14,7 @@ interface ApprovalFlowCardProps {
 }
 
 function StatusBadge({ estado }: { estado: ApprovalStatus }) {
-  const cls = APPROVAL_STATUS_COLOR[estado] ?? 'bg-gray-100 text-gray-600 border-gray-200';
+  const cls = APPROVAL_STATUS_COLOR[estado] ?? 'bg-gray-100 oscuro:bg-white/5 text-gray-600 oscuro:text-slate-400 border-gray-200 oscuro:border-white/10';
   return (
     <span className={`inline-flex px-2 py-0.5 rounded-full text-[10px] font-bold border ${cls}`}>
       {APPROVAL_STATUS_LABELS[estado] ?? estado}
@@ -55,11 +55,11 @@ export function ApprovalFlowCard({
   }
 
   return (
-    <div className="rounded-xl bg-white space-y-3 p-4" style={{ border: '1px solid #D9E2D9', boxShadow: '0 1px 3px rgba(20,83,45,0.06)' }}>
+    <div className="rounded-xl bg-[var(--tema-fondo-ffffff)] space-y-3 p-4" style={{ border: '1px solid var(--tema-borde-dce4ea)', boxShadow: '0 1px 3px rgba(0, 112, 73,0.06)' }}>
       {/* Header */}
       <div className="flex items-start justify-between gap-2 flex-wrap">
         <div>
-          <p className="text-[9px] font-bold uppercase tracking-widest mb-1" style={{ color: '#94A3B8' }}>Flujo de aprobación</p>
+          <p className="text-[9px] font-bold uppercase tracking-widest mb-1" style={{ color: 'var(--tema-texto-94a3b8)' }}>Flujo de aprobación</p>
           <StatusBadge estado={approval.estado} />
         </div>
         <LegalRiskBadge nivel={approval.nivelRiesgo} size="sm" />
@@ -67,10 +67,10 @@ export function ApprovalFlowCard({
 
       {/* Motivos */}
       {approval.motivoRevision?.length > 0 && (
-        <div className="rounded-lg p-2.5" style={{ background: '#F8FAF7', border: '1px solid #EEF4EE' }}>
-          <p className="text-[9px] font-bold uppercase tracking-widest mb-1" style={{ color: '#94A3B8' }}>Motivos</p>
+        <div className="rounded-lg p-2.5" style={{ background: 'var(--tema-fondo-f7f9fb)', border: '1px solid var(--tema-borde-f4f9f6)' }}>
+          <p className="text-[9px] font-bold uppercase tracking-widest mb-1" style={{ color: 'var(--tema-texto-94a3b8)' }}>Motivos</p>
           {approval.motivoRevision.map((m, i) => (
-            <p key={i} className="text-[11px]" style={{ color: '#667085' }}>• {m}</p>
+            <p key={i} className="text-[11px]" style={{ color: 'var(--tema-texto-64748b)' }}>• {m}</p>
           ))}
         </div>
       )}
@@ -78,15 +78,15 @@ export function ApprovalFlowCard({
       {/* Historial */}
       {approval.historial?.length > 0 && (
         <div>
-          <p className="text-[9px] font-bold uppercase tracking-widest mb-1.5" style={{ color: '#94A3B8' }}>Historial</p>
+          <p className="text-[9px] font-bold uppercase tracking-widest mb-1.5" style={{ color: 'var(--tema-texto-94a3b8)' }}>Historial</p>
           <div className="space-y-1.5">
             {approval.historial.map((h, i) => (
               <div key={i} className="flex items-start gap-2 text-[10px]">
-                <span className="shrink-0 w-1.5 h-1.5 rounded-full bg-[#14532D] mt-1" />
+                <span className="shrink-0 w-1.5 h-1.5 rounded-full bg-[var(--tema-fondo-007049)] mt-1" />
                 <div>
-                  <span className="font-semibold" style={{ color: '#1F2933' }}>{APPROVAL_STATUS_LABELS[h.estado as ApprovalStatus] ?? h.estado}</span>
-                  <span style={{ color: '#94A3B8' }}> · {h.rol} · {new Date(h.fecha).toLocaleDateString('es-CO')}</span>
-                  {h.observacion && <p className="italic" style={{ color: '#94A3B8' }}>{h.observacion}</p>}
+                  <span className="font-semibold" style={{ color: 'var(--tema-texto-172033)' }}>{APPROVAL_STATUS_LABELS[h.estado as ApprovalStatus] ?? h.estado}</span>
+                  <span style={{ color: 'var(--tema-texto-94a3b8)' }}> · {h.rol} · {new Date(h.fecha).toLocaleDateString('es-CO')}</span>
+                  {h.observacion && <p className="italic" style={{ color: 'var(--tema-texto-94a3b8)' }}>{h.observacion}</p>}
                 </div>
               </div>
             ))}
@@ -96,13 +96,13 @@ export function ApprovalFlowCard({
 
       {/* Acciones según rol */}
       {(puedeAprobar || puedeEscalar) && (
-        <div className="space-y-2 pt-2" style={{ borderTop: '1px solid #EEF4EE' }}>
+        <div className="space-y-2 pt-2" style={{ borderTop: '1px solid var(--tema-borde-f4f9f6)' }}>
           {puedeAprobar && (
             <button
               onClick={handleAprobar}
               disabled={loading}
               className="w-full py-2 rounded-lg text-white text-xs font-bold disabled:opacity-50"
-              style={{ background: '#14532D' }}>
+              style={{ background: 'var(--tema-fondo-007049)' }}>
               {loading ? 'Guardando...' : 'Aprobar respuesta'}
             </button>
           )}
@@ -111,7 +111,7 @@ export function ApprovalFlowCard({
               onClick={onEscalarJuridica}
               disabled={loading}
               className="w-full py-2 rounded-lg text-xs font-bold"
-              style={{ border: '1px solid #FECACA', background: '#FEF2F2', color: '#DC2626' }}>
+              style={{ border: '1px solid var(--tema-borde-fecaca)', background: 'var(--tema-fondo-fef2f2)', color: 'var(--tema-texto-d81e1e)' }}>
               Escalar a asesor jurídico
             </button>
           )}
@@ -119,7 +119,7 @@ export function ApprovalFlowCard({
             <button
               onClick={() => setShowDevolver(!showDevolver)}
               className="w-full py-1.5 rounded-lg text-xs"
-              style={{ border: '1px solid #D9E2D9', color: '#667085' }}>
+              style={{ border: '1px solid var(--tema-borde-dce4ea)', color: 'var(--tema-texto-64748b)' }}>
               Devolver para ajustes
             </button>
           )}
@@ -144,7 +144,7 @@ export function ApprovalFlowCard({
         </div>
       )}
 
-      <p className="text-[9px] italic" style={{ color: '#94A3B8' }}>
+      <p className="text-[9px] italic" style={{ color: 'var(--tema-texto-94a3b8)' }}>
         Ningún borrador puede enviarse sin aprobación humana registrada.
       </p>
     </div>

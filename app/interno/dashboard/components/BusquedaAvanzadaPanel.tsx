@@ -148,21 +148,21 @@ export function BusquedaAvanzadaPanel({
         aria-hidden="true"
       />
       <aside
-        className="fixed inset-y-0 right-0 z-50 w-full max-w-3xl bg-white flex flex-col shadow-2xl"
-        style={{ borderLeft: '1px solid #D9E2D9' }}
+        className="fixed inset-y-0 right-0 z-50 w-full max-w-3xl bg-[var(--tema-fondo-ffffff)] flex flex-col shadow-2xl"
+        style={{ borderLeft: '1px solid var(--tema-borde-dce4ea)' }}
         role="dialog"
         aria-label="Búsqueda histórica avanzada"
       >
-        <header className="flex items-center justify-between px-5 py-4 shrink-0" style={{ borderBottom: '1px solid #D9E2D9' }}>
+        <header className="flex items-center justify-between px-5 py-4 shrink-0" style={{ borderBottom: '1px solid var(--tema-borde-dce4ea)' }}>
           <div>
-            <p className="text-[10px] font-bold uppercase tracking-widest" style={{ color: '#667085' }}>Sprint 2</p>
-            <h2 className="text-lg font-black" style={{ color: '#1F2933' }}>Búsqueda histórica avanzada</h2>
+            <p className="text-[10px] font-bold uppercase tracking-widest" style={{ color: 'var(--text-secondary)' }}>Sprint 2</p>
+            <h2 className="text-lg font-black" style={{ color: 'var(--tema-texto-172033)' }}>Búsqueda histórica avanzada</h2>
           </div>
           <button
             type="button"
             onClick={onCerrar}
             className="text-sm px-3 py-1.5 rounded-lg border"
-            style={{ borderColor: '#D9E2D9', color: '#1F2933' }}
+            style={{ borderColor: 'var(--tema-borde-dce4ea)', color: 'var(--tema-texto-172033)' }}
             aria-label="Cerrar"
           >
             Cerrar
@@ -170,11 +170,11 @@ export function BusquedaAvanzadaPanel({
         </header>
 
         {/* Panel de filtros */}
-        <div className="overflow-y-auto px-5 py-4 space-y-4" style={{ background: '#F8FAF7' }}>
+        <div className="overflow-y-auto px-5 py-4 space-y-4" style={{ background: 'var(--tema-fondo-f7f9fb)' }}>
           <FiltrosGrid filtros={filtros} setFiltro={setFiltro} />
 
-          <div className="rounded-xl border bg-white p-3" style={{ borderColor: '#D9E2D9' }}>
-            <p className="text-[10px] font-bold uppercase tracking-widest mb-2" style={{ color: '#667085' }}>Rango de fechas</p>
+          <div className="rounded-xl border bg-[var(--tema-fondo-ffffff)] p-3" style={{ borderColor: 'var(--tema-borde-dce4ea)' }}>
+            <p className="text-[10px] font-bold uppercase tracking-widest mb-2" style={{ color: 'var(--text-secondary)' }}>Rango de fechas</p>
             <div className="flex flex-wrap gap-1.5 mb-2">
               {(['HOY', 'SEMANA', 'MES', 'MES_ANTERIOR', 'ANIO', 'PERSONALIZADO'] as PresetFecha[]).map((p) => (
                 <button
@@ -183,9 +183,9 @@ export function BusquedaAvanzadaPanel({
                   onClick={() => aplicarPreset(p)}
                   className="px-2 py-1 text-[11px] rounded-md border"
                   style={{
-                    borderColor: preset === p ? '#14532D' : '#D9E2D9',
-                    background: preset === p ? '#EEF4EE' : 'white',
-                    color: '#1F2933',
+                    borderColor: preset === p ? 'var(--tema-borde-007049)' : 'var(--tema-borde-dce4ea)',
+                    background: preset === p ? 'var(--tema-fondo-f4f9f6)' : 'var(--tema-fondo-ffffff)',
+                    color: 'var(--tema-texto-172033)',
                   }}
                 >
                   {labelPreset(p)}
@@ -199,7 +199,7 @@ export function BusquedaAvanzadaPanel({
                   value={filtros.fechaDesde ?? ''}
                   onChange={(e) => setFiltro('fechaDesde', e.target.value)}
                   className="w-full text-xs rounded-md border px-2 py-1.5"
-                  style={{ borderColor: '#D9E2D9' }}
+                  style={{ borderColor: 'var(--tema-borde-dce4ea)' }}
                 />
               </Field>
               <Field label="Hasta">
@@ -208,7 +208,7 @@ export function BusquedaAvanzadaPanel({
                   value={filtros.fechaHasta ?? ''}
                   onChange={(e) => setFiltro('fechaHasta', e.target.value)}
                   className="w-full text-xs rounded-md border px-2 py-1.5"
-                  style={{ borderColor: '#D9E2D9' }}
+                  style={{ borderColor: 'var(--tema-borde-dce4ea)' }}
                 />
               </Field>
             </div>
@@ -216,16 +216,16 @@ export function BusquedaAvanzadaPanel({
 
           {/* Chips de filtros activos */}
           {filtrosActivos.length > 0 && (
-            <div className="rounded-xl border bg-white p-3" style={{ borderColor: '#D9E2D9' }}>
+            <div className="rounded-xl border bg-[var(--tema-fondo-ffffff)] p-3" style={{ borderColor: 'var(--tema-borde-dce4ea)' }}>
               <div className="flex items-center justify-between mb-2">
-                <p className="text-[10px] font-bold uppercase tracking-widest" style={{ color: '#667085' }}>
+                <p className="text-[10px] font-bold uppercase tracking-widest" style={{ color: 'var(--text-secondary)' }}>
                   Filtros activos ({filtrosActivos.length})
                 </p>
                 <button
                   type="button"
                   onClick={limpiarTodos}
                   className="text-[11px] underline"
-                  style={{ color: '#DC2626' }}
+                  style={{ color: 'var(--tema-texto-d81e1e)' }}
                 >
                   Limpiar filtros
                 </button>
@@ -235,7 +235,7 @@ export function BusquedaAvanzadaPanel({
                   <span
                     key={k}
                     className="inline-flex items-center gap-1 px-2 py-1 rounded-full text-[11px]"
-                    style={{ background: '#EEF4EE', color: '#14532D', border: '1px solid #D9E2D9' }}
+                    style={{ background: 'var(--tema-fondo-f4f9f6)', color: 'var(--tema-texto-007049)', border: '1px solid var(--tema-borde-dce4ea)' }}
                   >
                     {labelChip(k as keyof FiltrosBusqueda, v)}
                     <button
@@ -254,13 +254,13 @@ export function BusquedaAvanzadaPanel({
 
           {/* Acciones */}
           <div className="flex flex-wrap items-center justify-between gap-2">
-            <div className="flex items-center gap-2 text-xs" style={{ color: '#667085' }}>
+            <div className="flex items-center gap-2 text-xs" style={{ color: 'var(--text-secondary)' }}>
               <label>Resultados por página</label>
               <select
                 value={pageSize}
                 onChange={(e) => { setPageSize(Number(e.target.value) as 25 | 50 | 100); setPage(1); }}
                 className="rounded-md border px-2 py-1"
-                style={{ borderColor: '#D9E2D9' }}
+                style={{ borderColor: 'var(--tema-borde-dce4ea)' }}
               >
                 {PAGE_SIZES.map((n) => <option key={n} value={n}>{n}</option>)}
               </select>
@@ -271,7 +271,7 @@ export function BusquedaAvanzadaPanel({
                   type="button"
                   onClick={() => onExportarExcel(filtros)}
                   className="text-xs px-3 py-2 rounded-lg border"
-                  style={{ borderColor: '#14532D', color: '#14532D', background: 'white' }}
+                  style={{ borderColor: 'var(--tema-borde-007049)', color: 'var(--tema-texto-007049)', background: 'var(--tema-fondo-ffffff)' }}
                   title="Exportar Excel MIPG con los filtros aplicados"
                 >
                   Exportar Excel filtrado
@@ -282,7 +282,7 @@ export function BusquedaAvanzadaPanel({
                 onClick={ejecutar}
                 disabled={cargando}
                 className="text-xs px-3 py-2 rounded-lg font-bold text-white"
-                style={{ background: '#14532D' }}
+                style={{ background: 'var(--tema-fondo-007049)' }}
               >
                 {cargando ? 'Buscando…' : 'Buscar'}
               </button>
@@ -290,21 +290,21 @@ export function BusquedaAvanzadaPanel({
           </div>
 
           {error && (
-            <p className="text-xs rounded-lg p-3" style={{ background: '#FEF2F2', color: '#991B1B', border: '1px solid #FECACA' }}>
+            <p className="text-xs rounded-lg p-3" style={{ background: 'var(--tema-fondo-fef2f2)', color: 'var(--tema-texto-991b1b)', border: '1px solid var(--tema-borde-fecaca)' }}>
               {error}
             </p>
           )}
         </div>
 
         {/* Resultados */}
-        <div className="flex-1 overflow-y-auto border-t bg-white" style={{ borderColor: '#D9E2D9' }}>
+        <div className="flex-1 overflow-y-auto border-t bg-[var(--tema-fondo-ffffff)]" style={{ borderColor: 'var(--tema-borde-dce4ea)' }}>
           {!resultado && !cargando && (
-            <p className="px-5 py-6 text-xs" style={{ color: '#667085' }}>Sin resultados aún. Aplica filtros y presiona Buscar.</p>
+            <p className="px-5 py-6 text-xs" style={{ color: 'var(--text-secondary)' }}>Sin resultados aún. Aplica filtros y presiona Buscar.</p>
           )}
           {resultado && (
             <>
-              <div className="px-5 py-3 sticky top-0 bg-white flex items-center justify-between text-xs" style={{ borderBottom: '1px solid #EEF4EE' }}>
-                <span style={{ color: '#667085' }}>
+              <div className="px-5 py-3 sticky top-0 bg-[var(--tema-fondo-ffffff)] flex items-center justify-between text-xs" style={{ borderBottom: '1px solid var(--tema-borde-f4f9f6)' }}>
+                <span style={{ color: 'var(--text-secondary)' }}>
                   {resultado.total} resultado{resultado.total !== 1 ? 's' : ''} ·
                   Página {resultado.page} de {resultado.totalPaginas}
                 </span>
@@ -314,7 +314,7 @@ export function BusquedaAvanzadaPanel({
                     onClick={() => setPage((p) => Math.max(1, p - 1))}
                     disabled={resultado.page <= 1}
                     className="px-2 py-1 rounded-md border disabled:opacity-50"
-                    style={{ borderColor: '#D9E2D9' }}
+                    style={{ borderColor: 'var(--tema-borde-dce4ea)' }}
                   >
                     Anterior
                   </button>
@@ -323,32 +323,32 @@ export function BusquedaAvanzadaPanel({
                     onClick={() => setPage((p) => Math.min(resultado.totalPaginas, p + 1))}
                     disabled={resultado.page >= resultado.totalPaginas}
                     className="px-2 py-1 rounded-md border disabled:opacity-50"
-                    style={{ borderColor: '#D9E2D9' }}
+                    style={{ borderColor: 'var(--tema-borde-dce4ea)' }}
                   >
                     Siguiente
                   </button>
                 </div>
               </div>
-              <ul className="divide-y" style={{ borderColor: '#EEF4EE' }}>
+              <ul className="divide-y" style={{ borderColor: 'var(--tema-borde-f4f9f6)' }}>
                 {resultado.items.map((r) => (
                   <li key={r.radicadoId}>
                     <button
                       type="button"
                       onClick={() => onSeleccionar?.(r)}
-                      className="w-full text-left px-5 py-3 hover:bg-[#F8FAF7] transition-colors"
+                      className="w-full text-left px-5 py-3 hover:bg-[var(--tema-fondo-f7f9fb)] transition-colors"
                     >
                       <div className="flex items-center justify-between gap-3">
                         <div className="min-w-0">
-                          <p className="text-xs font-bold" style={{ color: '#1F2933' }}>
+                          <p className="text-xs font-bold" style={{ color: 'var(--tema-texto-172033)' }}>
                             {r.radicadoId} · {r.detalle?.asunto?.slice(0, 80) || 'Sin asunto'}
                           </p>
-                          <p className="text-[11px]" style={{ color: '#667085' }}>
+                          <p className="text-[11px]" style={{ color: 'var(--text-secondary)' }}>
                             {r.solicitante?.nombreCompleto ? nombreSolicitanteVisible(r, r.solicitante.nombreCompleto) : '—'} ·{' '}
                             {NOMBRES_TENANT[r.clasificacion?.oficinaDestino] ?? r.clasificacion?.oficinaDestino} ·{' '}
                             {r.termino?.tipoSolicitudNombre}
                           </p>
                         </div>
-                        <span className="shrink-0 text-[11px]" style={{ color: '#94A3B8' }}>
+                        <span className="shrink-0 text-[11px]" style={{ color: 'var(--text-secondary)' }}>
                           {r.control?.fechaRadicado?.slice(0, 10)}
                         </span>
                       </div>
@@ -356,7 +356,7 @@ export function BusquedaAvanzadaPanel({
                   </li>
                 ))}
                 {resultado.items.length === 0 && (
-                  <li className="px-5 py-6 text-xs" style={{ color: '#667085' }}>
+                  <li className="px-5 py-6 text-xs" style={{ color: 'var(--text-secondary)' }}>
                     Sin radicados que coincidan con los filtros.
                   </li>
                 )}
@@ -419,7 +419,7 @@ function FiltrosGrid({
   setFiltro: <K extends keyof FiltrosBusqueda>(k: K, v: FiltrosBusqueda[K]) => void;
 }) {
   return (
-    <div className="rounded-xl border bg-white p-3 grid grid-cols-1 sm:grid-cols-2 gap-2" style={{ borderColor: '#D9E2D9' }}>
+    <div className="rounded-xl border bg-[var(--tema-fondo-ffffff)] p-3 grid grid-cols-1 sm:grid-cols-2 gap-2" style={{ borderColor: 'var(--tema-borde-dce4ea)' }}>
       <Field label="Búsqueda rápida">
         <input
           type="search"
@@ -427,7 +427,7 @@ function FiltrosGrid({
           value={filtros.q ?? ''}
           onChange={(e) => setFiltro('q', e.target.value)}
           className="w-full text-xs rounded-md border px-2 py-1.5"
-          style={{ borderColor: '#D9E2D9' }}
+          style={{ borderColor: 'var(--tema-borde-dce4ea)' }}
         />
       </Field>
       <Field label="Número de radicado (exacto)">
@@ -437,7 +437,7 @@ function FiltrosGrid({
           value={filtros.radicadoId ?? ''}
           onChange={(e) => setFiltro('radicadoId', e.target.value)}
           className="w-full text-xs rounded-md border px-2 py-1.5"
-          style={{ borderColor: '#D9E2D9' }}
+          style={{ borderColor: 'var(--tema-borde-dce4ea)' }}
         />
       </Field>
       <Field label="Solicitante">
@@ -446,7 +446,7 @@ function FiltrosGrid({
           value={filtros.nombre ?? ''}
           onChange={(e) => setFiltro('nombre', e.target.value)}
           className="w-full text-xs rounded-md border px-2 py-1.5"
-          style={{ borderColor: '#D9E2D9' }}
+          style={{ borderColor: 'var(--tema-borde-dce4ea)' }}
         />
       </Field>
       <Field label="Documento">
@@ -455,7 +455,7 @@ function FiltrosGrid({
           value={filtros.documento ?? ''}
           onChange={(e) => setFiltro('documento', e.target.value)}
           className="w-full text-xs rounded-md border px-2 py-1.5"
-          style={{ borderColor: '#D9E2D9' }}
+          style={{ borderColor: 'var(--tema-borde-dce4ea)' }}
         />
       </Field>
       <Field label="Correo">
@@ -464,7 +464,7 @@ function FiltrosGrid({
           value={filtros.correo ?? ''}
           onChange={(e) => setFiltro('correo', e.target.value)}
           className="w-full text-xs rounded-md border px-2 py-1.5"
-          style={{ borderColor: '#D9E2D9' }}
+          style={{ borderColor: 'var(--tema-borde-dce4ea)' }}
         />
       </Field>
       <Field label="Asunto">
@@ -473,15 +473,15 @@ function FiltrosGrid({
           value={filtros.asunto ?? ''}
           onChange={(e) => setFiltro('asunto', e.target.value)}
           className="w-full text-xs rounded-md border px-2 py-1.5"
-          style={{ borderColor: '#D9E2D9' }}
+          style={{ borderColor: 'var(--tema-borde-dce4ea)' }}
         />
       </Field>
       <Field label="Tipo de solicitud">
         <select
           value={filtros.tipoSolicitudId ?? ''}
           onChange={(e) => setFiltro('tipoSolicitudId', e.target.value || undefined)}
-          className="w-full text-xs rounded-md border px-2 py-1.5 bg-white"
-          style={{ borderColor: '#D9E2D9' }}
+          className="w-full text-xs rounded-md border px-2 py-1.5 bg-[var(--tema-fondo-ffffff)]"
+          style={{ borderColor: 'var(--tema-borde-dce4ea)' }}
         >
           <option value="">— Todos —</option>
           {CATALOGO_TIPOS_SOLICITUD.map((t) => (
@@ -493,8 +493,8 @@ function FiltrosGrid({
         <select
           value={filtros.categoria ?? ''}
           onChange={(e) => setFiltro('categoria', (e.target.value || undefined) as FiltrosBusqueda['categoria'])}
-          className="w-full text-xs rounded-md border px-2 py-1.5 bg-white"
-          style={{ borderColor: '#D9E2D9' }}
+          className="w-full text-xs rounded-md border px-2 py-1.5 bg-[var(--tema-fondo-ffffff)]"
+          style={{ borderColor: 'var(--tema-borde-dce4ea)' }}
         >
           <option value="">— Todas —</option>
           <option value="PQRSD">PQRSD</option>
@@ -507,8 +507,8 @@ function FiltrosGrid({
         <select
           value={filtros.dependencia ?? ''}
           onChange={(e) => setFiltro('dependencia', (e.target.value || undefined) as TenantId)}
-          className="w-full text-xs rounded-md border px-2 py-1.5 bg-white"
-          style={{ borderColor: '#D9E2D9' }}
+          className="w-full text-xs rounded-md border px-2 py-1.5 bg-[var(--tema-fondo-ffffff)]"
+          style={{ borderColor: 'var(--tema-borde-dce4ea)' }}
         >
           <option value="">— Todas —</option>
           {Object.entries(NOMBRES_TENANT).map(([id, nombre]) => (
@@ -522,15 +522,15 @@ function FiltrosGrid({
           value={filtros.responsable ?? ''}
           onChange={(e) => setFiltro('responsable', e.target.value)}
           className="w-full text-xs rounded-md border px-2 py-1.5"
-          style={{ borderColor: '#D9E2D9' }}
+          style={{ borderColor: 'var(--tema-borde-dce4ea)' }}
         />
       </Field>
       <Field label="Estado">
         <select
           value={filtros.estado ?? ''}
           onChange={(e) => setFiltro('estado', e.target.value || undefined)}
-          className="w-full text-xs rounded-md border px-2 py-1.5 bg-white"
-          style={{ borderColor: '#D9E2D9' }}
+          className="w-full text-xs rounded-md border px-2 py-1.5 bg-[var(--tema-fondo-ffffff)]"
+          style={{ borderColor: 'var(--tema-borde-dce4ea)' }}
         >
           <option value="">— Todos —</option>
           {ESTADOS.map((e) => <option key={e} value={e}>{e}</option>)}
@@ -540,8 +540,8 @@ function FiltrosGrid({
         <select
           value={filtros.canalRespuesta ?? ''}
           onChange={(e) => setFiltro('canalRespuesta', e.target.value || undefined)}
-          className="w-full text-xs rounded-md border px-2 py-1.5 bg-white"
-          style={{ borderColor: '#D9E2D9' }}
+          className="w-full text-xs rounded-md border px-2 py-1.5 bg-[var(--tema-fondo-ffffff)]"
+          style={{ borderColor: 'var(--tema-borde-dce4ea)' }}
         >
           <option value="">— Todos —</option>
           <option value="CORREO">Correo</option>
@@ -554,8 +554,8 @@ function FiltrosGrid({
         <select
           value={filtros.mes ?? ''}
           onChange={(e) => setFiltro('mes', e.target.value ? Number(e.target.value) : undefined)}
-          className="w-full text-xs rounded-md border px-2 py-1.5 bg-white"
-          style={{ borderColor: '#D9E2D9' }}
+          className="w-full text-xs rounded-md border px-2 py-1.5 bg-[var(--tema-fondo-ffffff)]"
+          style={{ borderColor: 'var(--tema-borde-dce4ea)' }}
         >
           <option value="">— Cualquier mes —</option>
           {Array.from({ length: 12 }, (_, i) => i + 1).map((m) => (
@@ -571,15 +571,15 @@ function FiltrosGrid({
           value={filtros.anio ?? ''}
           onChange={(e) => setFiltro('anio', e.target.value ? Number(e.target.value) : undefined)}
           className="w-full text-xs rounded-md border px-2 py-1.5"
-          style={{ borderColor: '#D9E2D9' }}
+          style={{ borderColor: 'var(--tema-borde-dce4ea)' }}
         />
       </Field>
       <Field label="Anónimo">
         <select
           value={filtros.anonimo === undefined ? '' : filtros.anonimo ? 'true' : 'false'}
           onChange={(e) => setFiltro('anonimo', e.target.value === '' ? undefined : e.target.value === 'true')}
-          className="w-full text-xs rounded-md border px-2 py-1.5 bg-white"
-          style={{ borderColor: '#D9E2D9' }}
+          className="w-full text-xs rounded-md border px-2 py-1.5 bg-[var(--tema-fondo-ffffff)]"
+          style={{ borderColor: 'var(--tema-borde-dce4ea)' }}
         >
           <option value="">— Indistinto —</option>
           <option value="true">Sí</option>
@@ -590,8 +590,8 @@ function FiltrosGrid({
         <select
           value={filtros.reservado === undefined ? '' : filtros.reservado ? 'true' : 'false'}
           onChange={(e) => setFiltro('reservado', e.target.value === '' ? undefined : e.target.value === 'true')}
-          className="w-full text-xs rounded-md border px-2 py-1.5 bg-white"
-          style={{ borderColor: '#D9E2D9' }}
+          className="w-full text-xs rounded-md border px-2 py-1.5 bg-[var(--tema-fondo-ffffff)]"
+          style={{ borderColor: 'var(--tema-borde-dce4ea)' }}
         >
           <option value="">— Indistinto —</option>
           <option value="true">Sí</option>
@@ -602,8 +602,8 @@ function FiltrosGrid({
         <select
           value={filtros.cumplioTermino === undefined || filtros.cumplioTermino === null ? '' : filtros.cumplioTermino ? 'true' : 'false'}
           onChange={(e) => setFiltro('cumplioTermino', e.target.value === '' ? undefined : e.target.value === 'true')}
-          className="w-full text-xs rounded-md border px-2 py-1.5 bg-white"
-          style={{ borderColor: '#D9E2D9' }}
+          className="w-full text-xs rounded-md border px-2 py-1.5 bg-[var(--tema-fondo-ffffff)]"
+          style={{ borderColor: 'var(--tema-borde-dce4ea)' }}
         >
           <option value="">— Indistinto —</option>
           <option value="true">Sí — en término</option>
@@ -614,8 +614,8 @@ function FiltrosGrid({
         <select
           value={filtros.conNotificacionFallida === undefined ? '' : 'true'}
           onChange={(e) => setFiltro('conNotificacionFallida', e.target.value === 'true' ? true : undefined)}
-          className="w-full text-xs rounded-md border px-2 py-1.5 bg-white"
-          style={{ borderColor: '#D9E2D9' }}
+          className="w-full text-xs rounded-md border px-2 py-1.5 bg-[var(--tema-fondo-ffffff)]"
+          style={{ borderColor: 'var(--tema-borde-dce4ea)' }}
         >
           <option value="">— Indistinto —</option>
           <option value="true">Solo radicados con notificación fallida</option>
@@ -625,8 +625,8 @@ function FiltrosGrid({
         <select
           value={filtros.conRespuestaOficial === undefined ? '' : 'true'}
           onChange={(e) => setFiltro('conRespuestaOficial', e.target.value === 'true' ? true : undefined)}
-          className="w-full text-xs rounded-md border px-2 py-1.5 bg-white"
-          style={{ borderColor: '#D9E2D9' }}
+          className="w-full text-xs rounded-md border px-2 py-1.5 bg-[var(--tema-fondo-ffffff)]"
+          style={{ borderColor: 'var(--tema-borde-dce4ea)' }}
         >
           <option value="">— Indistinto —</option>
           <option value="true">Solo radicados con respuesta oficial</option>
@@ -639,7 +639,7 @@ function FiltrosGrid({
 function Field({ label, children }: { label: string; children: React.ReactNode }) {
   return (
     <label className="block">
-      <span className="text-[10px] font-bold uppercase tracking-widest" style={{ color: '#667085' }}>{label}</span>
+      <span className="text-[10px] font-bold uppercase tracking-widest" style={{ color: 'var(--text-secondary)' }}>{label}</span>
       <div className="mt-1">{children}</div>
     </label>
   );

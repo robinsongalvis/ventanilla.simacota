@@ -144,7 +144,7 @@ export function PanelHechosCaso({ expedienteId, clavesContexto, contexto, soloLe
       <div className="px-5 py-4 flex flex-wrap items-start justify-between gap-3"
            style={{ borderBottom: '1px solid var(--color-border)' }}>
         <div className="min-w-0 flex-1">
-          <p className="text-[10px] font-bold uppercase tracking-widest" style={{ color: '#667085' }}>
+          <p className="text-[10px] font-bold uppercase tracking-widest" style={{ color: 'var(--text-secondary)' }}>
             Hechos del caso
           </p>
           <p className="mt-0.5 break-words font-headline text-lg font-black" style={{ color: 'var(--text-primary)', overflowWrap: 'anywhere' }}>
@@ -166,7 +166,7 @@ export function PanelHechosCaso({ expedienteId, clavesContexto, contexto, soloLe
                 key={c.nombre}
                 className="block h-1.5 w-7 rounded-full"
                 style={{
-                  background: Object.prototype.hasOwnProperty.call(contexto, c.nombre) ? '#14532D' : 'var(--bg-surface-2)',
+                  background: Object.prototype.hasOwnProperty.call(contexto, c.nombre) ? 'var(--tema-fondo-007049)' : 'var(--bg-surface-2)',
                 }}
               />
             ))}
@@ -212,8 +212,8 @@ export function PanelHechosCaso({ expedienteId, clavesContexto, contexto, soloLe
           className="text-xs font-bold px-3 py-1.5 rounded-lg"
           style={
             sinDefinir === 0
-              ? { background: '#116932', color: '#fff', boxShadow: '0 1px 3px rgba(20,83,45,0.25)' }
-              : { background: 'var(--bg-surface)', color: '#9A6206', border: '1px solid var(--color-border)' }
+              ? { background: '#116932', color: '#fff', boxShadow: '0 1px 3px rgba(0, 112, 73,0.25)' }
+              : { background: 'var(--bg-surface)', color: 'var(--tema-texto-9a6206)', border: '1px solid var(--color-border)' }
           }
         >
           {sinDefinir === 0
@@ -320,8 +320,8 @@ function FilaHecho({
             className="mt-0.5 shrink-0 flex h-5 w-5 items-center justify-center rounded-full text-[10px] font-black"
             style={
               definido
-                ? { background: '#14532D', color: '#fff' }
-                : { background: 'var(--bg-surface-2)', color: '#94A3B8', border: '1px solid var(--color-border)' }
+                ? { background: 'var(--tema-fondo-007049)', color: '#fff' }
+                : { background: 'var(--bg-surface-2)', color: 'var(--text-secondary)', border: '1px solid var(--color-border)' }
             }
           >
             {definido ? '✓' : indice}
@@ -342,7 +342,7 @@ function FilaHecho({
             {definido && opcionDeValor(valorActual) && (
               <span
                 className="inline-flex items-center mt-1.5 text-xs font-semibold px-2.5 py-1 rounded-md"
-                style={{ background: '#F1F5F3', color: '#116932' }}
+                style={{ background: 'var(--tema-fondo-f1f5f3)', color: 'var(--tema-texto-116932)' }}
               >
                 {/* El chip tiene TEXTO PROPIO, no la etiqueta más la
                     consecuencia pegadas: al decidir se puede ser más explícito
@@ -361,7 +361,7 @@ function FilaHecho({
                   aria-expanded={ayudaAbierta}
                   aria-controls={idAyuda}
                   className="mt-1.5 inline-flex items-center gap-1.5 text-xs font-bold transition-colors hover:underline focus-visible:outline-none focus-visible:ring-2 rounded"
-                  style={{ color: '#14532D' }}
+                  style={{ color: 'var(--tema-texto-007049)' }}
                 >
                   <span aria-hidden>ⓘ</span>
                   {/* Cada pregunta con SU enlace: cuatro «¿Cómo se clasifica?»
@@ -374,7 +374,7 @@ function FilaHecho({
                   id={idAyuda}
                   hidden={!ayudaAbierta}
                   className="text-xs leading-relaxed mt-2 px-3 py-2 rounded-lg"
-                  style={{ background: 'var(--bg-surface-2)', borderLeft: '3px solid #14532D', color: 'var(--text-secondary)' }}
+                  style={{ background: 'var(--bg-surface-2)', borderLeft: '3px solid var(--tema-borde-007049)', color: 'var(--text-secondary)' }}
                 >
                   {clave.ayuda}
                 </p>
@@ -422,7 +422,7 @@ function FilaHecho({
               {!definido && o.consecuencia && (
                 <span
                   className="block text-[11px] font-normal"
-                  style={{ color: elegida ? 'rgba(255,255,255,0.8)' : '#94A3B8' }}
+                  style={{ color: elegida ? 'rgba(255,255,255,0.8)' : 'var(--text-secondary)' }}
                 >
                   {o.consecuencia}
                 </span>

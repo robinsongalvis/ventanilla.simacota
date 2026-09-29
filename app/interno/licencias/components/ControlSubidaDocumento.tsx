@@ -77,7 +77,7 @@ export function ControlSubidaDocumento({
     <div className="flex min-w-0 flex-col gap-1.5">
       <label
           className="inline-flex w-fit max-w-full items-center gap-1.5 break-words rounded-lg px-3 py-1.5 text-xs font-semibold cursor-pointer transition-colors hover:brightness-95 focus-within:outline-none focus-within:ring-2"
-        style={{ border: '1px solid var(--color-border)', color: '#14532D' }}
+        style={{ border: '1px solid var(--color-border)', color: 'var(--tema-texto-007049)' }}
       >
         {subiendo ? etiquetaSubiendo : etiqueta}
         <input
@@ -106,7 +106,7 @@ export function ControlSubidaDocumento({
         <p
           role="alert"
           className="break-words rounded-lg px-3 py-2 text-xs"
-          style={{ background: '#FEF2F2', border: '1px solid #FECACA', color: '#991B1B' }}
+          style={{ background: 'var(--tema-fondo-fef2f2)', border: '1px solid var(--tema-borde-fecaca)', color: 'var(--tema-texto-991b1b)' }}
         >
           {error}
         </p>

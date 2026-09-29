@@ -106,7 +106,7 @@ export function RegistrarProrrogaModal({ expedienteId, onCerrar, onRegistrada }:
               className="rounded-lg px-3 py-2 text-sm"
               style={{ border: '1px solid var(--borde)' }}
             />
-            <span className="text-xs" style={{ color: '#94A3B8' }}>
+            <span className="text-xs" style={{ color: 'var(--text-secondary)' }}>
               La fecha de su escrito, no la de hoy.
             </span>
           </label>
@@ -124,7 +124,7 @@ export function RegistrarProrrogaModal({ expedienteId, onCerrar, onRegistrada }:
           </label>
 
           <label className="flex flex-col gap-1 text-sm">
-            <span style={{ fontWeight: 700 }}>Radicado u oficio de la solicitud <span style={{ fontWeight: 400, color: '#94A3B8' }}>(opcional)</span></span>
+            <span style={{ fontWeight: 700 }}>Radicado u oficio de la solicitud <span style={{ fontWeight: 400, color: 'var(--text-secondary)' }}>(opcional)</span></span>
             <input
               type="text"
               value={referencia}
@@ -137,7 +137,7 @@ export function RegistrarProrrogaModal({ expedienteId, onCerrar, onRegistrada }:
         </div>
 
         {error && (
-          <p role="alert" className="text-sm mt-3 rounded-lg px-3 py-2" style={{ background: '#FEF2F2', color: '#B42318' }}>
+          <p role="alert" className="text-sm mt-3 rounded-lg px-3 py-2" style={{ background: 'var(--tema-fondo-fef2f2)', color: 'var(--tema-texto-b42318)' }}>
             {error}
           </p>
         )}
@@ -152,7 +152,7 @@ export function RegistrarProrrogaModal({ expedienteId, onCerrar, onRegistrada }:
             onClick={enviar}
             disabled={enviando || !solicitadaEl}
             className="text-sm font-bold px-3 py-2 rounded-lg disabled:opacity-50"
-            style={{ background: '#14532D', color: 'white' }}
+            style={{ background: 'var(--tema-fondo-007049)', color: 'white' }}
           >
             {enviando ? 'Registrando…' : 'Registrar prórroga'}
           </button>

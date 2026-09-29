@@ -1,4 +1,4 @@
-import { DetalleLicenciaClient } from './DetalleLicenciaClient';
+import { RedireccionLicencias } from '../components/RedireccionLicencias';
 
 type ParamsPromise = Promise<{ expedienteId: string }>;
 
@@ -7,22 +7,12 @@ export const metadata = {
 };
 
 /**
- * Pantalla 02 · Detalle de Expediente — bloque "Integración UI y demo"
- * (ADR-0029). Cascarón Server Component: SOLO resuelve `params` (Next 16:
- * promesa — ver node_modules/next/dist/docs/01-app/03-api-reference/
- * 03-file-conventions/page.md) y lo pasa al Client Component real
- * (`DetalleLicenciaClient`, 'use client'), que hace el fetch por id + las
- * acciones (registrar acta/respuesta) contra el contrato real.
- *
- * El título ya no es dinámico por número de expediente (antes venía de
- * `detalleLicencia()` sobre fixtures locales, sin I/O): generar un título
- * dinámico real exigiría duplicar aquí la misma consulta a Firestore que
- * ya hace `GET /api/licencias/expedientes/{id}` — fuera de los límites de
- * este rol (no se reimplementan lecturas de Firestore en una página; se
- * consume el endpoint ya expuesto, que es justo lo que hace el Client
- * Component de abajo).
+ * Ruta antigua del detalle de un expediente (enlaces guardados, correos
+ * ya enviados). Redirige a su dirección canónica en el panel
+ * (`/interno/dashboard?vista=licencias&expediente={id}`, ADR-0046 §7).
+ * `params` es una promesa en Next 16.
  */
 export default async function DetalleLicenciaPage({ params }: { params: ParamsPromise }) {
   const { expedienteId } = await params;
-  return <DetalleLicenciaClient expedienteId={expedienteId} />;
+  return <RedireccionLicencias expedienteId={expedienteId} />;
 }

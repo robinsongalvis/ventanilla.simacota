@@ -182,14 +182,14 @@ export function RegistrarActuacionModal({ expedienteId, tipo, onCerrar, onRegist
       <button type="button" aria-label="Cerrar" onClick={onCerrar} className="absolute inset-0 bg-black/55" />
 
       <div
-        className="relative w-full max-w-lg bg-white rounded-2xl shadow-2xl overflow-hidden flex flex-col"
-        style={{ border: '1px solid #D9E2D9', maxHeight: 'calc(100dvh - 24px)' }}
+        className="relative w-full max-w-lg bg-[var(--tema-fondo-ffffff)] rounded-2xl shadow-2xl overflow-hidden flex flex-col"
+        style={{ border: '1px solid var(--tema-borde-dce4ea)', maxHeight: 'calc(100dvh - 24px)' }}
       >
-        <header className="px-5 py-4" style={{ borderBottom: '1px solid #D9E2D9' }}>
-          <h2 className="text-lg font-black leading-tight" style={{ color: '#12261A' }}>
+        <header className="px-5 py-4" style={{ borderBottom: '1px solid var(--tema-borde-dce4ea)' }}>
+          <h2 className="text-lg font-black leading-tight" style={{ color: 'var(--tema-texto-172033)' }}>
             {copia.titulo}
           </h2>
-          <p className="text-xs mt-1" style={{ color: '#5F6F64' }}>{copia.nota}</p>
+          <p className="text-xs mt-1" style={{ color: 'var(--tema-texto-5f6f64)' }}>{copia.nota}</p>
         </header>
 
         {resultadoActa ? (
@@ -201,7 +201,7 @@ export function RegistrarActuacionModal({ expedienteId, tipo, onCerrar, onRegist
               <p
                 role="status"
                 className="rounded-lg px-3 py-2.5 text-sm font-semibold"
-                style={{ background: '#ECFDF5', border: '1px solid #A7F3D0', color: '#065F46' }}
+                style={{ background: 'var(--tema-fondo-ecfdf5)', border: '1px solid var(--tema-borde-a7f3d0)', color: 'var(--tema-texto-065f46)' }}
               >
                 Aviso enviado al ciudadano ✓
               </p>
@@ -209,7 +209,7 @@ export function RegistrarActuacionModal({ expedienteId, tipo, onCerrar, onRegist
               <p
                 role="alert"
                 className="rounded-lg px-3 py-2.5 text-sm font-semibold"
-                style={{ background: '#FFFBEB', border: '1px solid #FDE68A', color: '#92400E' }}
+                style={{ background: 'var(--tema-fondo-fffbeb)', border: '1px solid var(--tema-borde-fde68a)', color: 'var(--tema-texto-92400e)' }}
               >
                 ⚠ Aviso NO enviado al ciudadano — el expediente no tiene un correo de contacto habilitado (sin radicado vinculado, correo no aportado, o trámite aún no habilitado para avisos por correo).
               </p>
@@ -219,7 +219,7 @@ export function RegistrarActuacionModal({ expedienteId, tipo, onCerrar, onRegist
                 type="button"
                 onClick={() => onRegistrada(resultadoActa.actuacion, resultadoActa.estadoJuridico)}
                 className="px-5 py-2 rounded-xl text-sm font-bold text-white"
-                style={{ background: '#14532D' }}
+                style={{ background: 'var(--tema-fondo-007049)' }}
               >
                 Continuar
               </button>
@@ -228,7 +228,7 @@ export function RegistrarActuacionModal({ expedienteId, tipo, onCerrar, onRegist
         ) : (
         <form onSubmit={(e) => { void handleSubmit(e); }} className="flex-1 min-h-0 overflow-y-auto px-5 py-4 space-y-4">
           <label>
-            <span className="mb-1 block text-[10px] font-bold uppercase tracking-widest" style={{ color: '#667085' }}>
+            <span className="mb-1 block text-[10px] font-bold uppercase tracking-widest" style={{ color: 'var(--text-secondary)' }}>
               {copia.etiquetaCampo}
             </span>
             <textarea
@@ -244,9 +244,9 @@ export function RegistrarActuacionModal({ expedienteId, tipo, onCerrar, onRegist
           {tipo === 'acta-observaciones' && (
             <div>
               <label>
-                <span className="mb-1 block text-[10px] font-bold uppercase tracking-widest" style={{ color: '#667085' }}>
+                <span className="mb-1 block text-[10px] font-bold uppercase tracking-widest" style={{ color: 'var(--text-secondary)' }}>
                   Fecha de comunicación del acta{' '}
-                  <span className="normal-case font-normal" style={{ color: '#94A3B8' }}>(opcional)</span>
+                  <span className="normal-case font-normal" style={{ color: 'var(--text-secondary)' }}>(opcional)</span>
                 </span>
                 <input
                   type="date"
@@ -256,7 +256,7 @@ export function RegistrarActuacionModal({ expedienteId, tipo, onCerrar, onRegist
                   aria-describedby="ayuda-fecha-comunicacion-acta"
                 />
               </label>
-              <p id="ayuda-fecha-comunicacion-acta" className="text-xs mt-1" style={{ color: '#667085' }}>
+              <p id="ayuda-fecha-comunicacion-acta" className="text-xs mt-1" style={{ color: 'var(--text-secondary)' }}>
                 Si la registra, el aviso al ciudadano incluirá la fecha límite de respuesta; el plazo corre desde la comunicación, no desde la expedición.
               </p>
             </div>
@@ -264,7 +264,7 @@ export function RegistrarActuacionModal({ expedienteId, tipo, onCerrar, onRegist
 
           {errorServidor && (
             <p role="alert" className="rounded-lg px-3 py-2 text-xs"
-               style={{ background: '#FEF2F2', border: '1px solid #FECACA', color: '#991B1B' }}>
+               style={{ background: 'var(--tema-fondo-fef2f2)', border: '1px solid var(--tema-borde-fecaca)', color: 'var(--tema-texto-991b1b)' }}>
               {errorServidor}
             </p>
           )}
@@ -272,12 +272,12 @@ export function RegistrarActuacionModal({ expedienteId, tipo, onCerrar, onRegist
           <footer className="flex items-center justify-end gap-2 pt-1">
             <button type="button" onClick={onCerrar}
               className="px-4 py-2 rounded-xl text-sm font-bold"
-              style={{ border: '1px solid #D9E2D9', color: '#475569' }}>
+              style={{ border: '1px solid var(--tema-borde-dce4ea)', color: 'var(--tema-texto-475569)' }}>
               Cancelar
             </button>
             <button type="submit" disabled={guardando}
               className="px-5 py-2 rounded-xl text-sm font-bold text-white disabled:opacity-60"
-              style={{ background: '#14532D' }}>
+              style={{ background: 'var(--tema-fondo-007049)' }}>
               {guardando ? 'Registrando…' : 'Registrar'}
             </button>
           </footer>

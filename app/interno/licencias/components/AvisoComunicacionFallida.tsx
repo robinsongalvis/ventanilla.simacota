@@ -37,9 +37,9 @@ export function AvisoComunicacionFallida({ marcas }: AvisoComunicacionFallidaPro
     <div
       role="alert"
       className="rounded-xl px-4 py-3 flex flex-col gap-3"
-      style={{ background: '#FEF2F2', border: '1px solid #FECACA' }}
+      style={{ background: 'var(--tema-fondo-fef2f2)', border: '1px solid var(--tema-borde-fecaca)' }}
     >
-      <p className="text-[10px] font-bold uppercase tracking-widest" style={{ color: '#991B1B' }}>
+      <p className="text-[10px] font-bold uppercase tracking-widest" style={{ color: 'var(--tema-texto-991b1b)' }}>
         Correo al ciudadano no entregado
       </p>
 
@@ -47,14 +47,14 @@ export function AvisoComunicacionFallida({ marcas }: AvisoComunicacionFallidaPro
         const fallo = marcas![clase]!;
         return (
           <div key={clase} className="flex flex-col gap-0.5">
-            <p className="text-sm font-bold" style={{ color: '#991B1B' }}>
+            <p className="text-sm font-bold" style={{ color: 'var(--tema-texto-991b1b)' }}>
               No salió el {NOMBRE_CLASE[clase]}
             </p>
-            <p className="text-xs" style={{ color: '#7F1D1D' }}>
+            <p className="text-xs" style={{ color: 'var(--tema-texto-7f1d1d)' }}>
               Se intentó enviar a <strong>{fallo.destinatario}</strong> el{' '}
               {formatFechaHoraColombia(fallo.fechaIso)}.
             </p>
-            <p className="text-xs" style={{ color: '#7F1D1D' }}>
+            <p className="text-xs" style={{ color: 'var(--tema-texto-7f1d1d)' }}>
               {QUE_HACER[clase]}
             </p>
           </div>

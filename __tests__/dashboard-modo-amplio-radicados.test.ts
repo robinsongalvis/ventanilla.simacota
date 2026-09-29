@@ -15,7 +15,7 @@ describe('Dashboard — vista amplia de radicados', () => {
     expect(dashboard).toContain('Minimizar paneles');
     expect(dashboard).toContain('Mostrar paneles');
     expect(dashboard).toContain('Minimizar paneles operativos y ampliar la lista de radicados');
-    expect(dashboard).toContain('Mostrar Bandeja Operativa y Siguiente Atención');
+    expect(dashboard).toContain('Mostrar Resumen de trámites y Seguimiento de gestión');
   });
 
   it('permite minimizar y mostrar cada tarjeta individualmente', () => {
