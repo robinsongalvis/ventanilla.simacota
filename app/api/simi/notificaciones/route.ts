@@ -4,32 +4,39 @@
  */
 
 import { NextResponse }        from 'next/server';
-import { cookies }             from 'next/headers';
-import { SESSION_COOKIE_NAME } from '@/lib/auth-cookie';
-import { getFirebaseAdminAuth, getFirebaseAdminDb } from '@/lib/firebase-admin';
-import { marcarLeida }         from '@/lib/simi-juridico/createNotification';
-import type { RolInterno }     from '@/lib/hooks/useAuth';
-import type { TenantId }       from '@/src/types/radicado';
+import { getFirebaseAdminDb } from '@/lib/firebase-admin';
+import { autenticarUsuarioInterno } from '@/lib/server/internal-auth-http';
+import type { InternalUserSession } from '@/lib/server/internal-auth';
 
 export const runtime = 'nodejs';
 
-async function verificarSesion() {
-  const cookieStore = await cookies();
-  const sc = cookieStore.get(SESSION_COOKIE_NAME)?.value;
-  if (!sc) return null;
-  try {
-    const decoded = await getFirebaseAdminAuth().verifySessionCookie(sc, true);
-    const snap = await getFirebaseAdminDb().doc(`users/${decoded.uid}`).get();
-    if (!snap.exists) return null;
-    const d = snap.data()!;
-    if (d.activo === false || d.archivado === true) return null;
-    return { uid: decoded.uid, rol: d.rol as RolInterno, tenantId: d.tenantId as TenantId };
-  } catch { return null; }
+// Los documentos y el JSON entrante son fronteras no confiables: se comprueba
+// cada campo antes de conceder acceso, sin aceptar un cast como autorización.
+function esDestinatario(usuario: InternalUserSession, documento: Record<string, unknown>): boolean {
+  return documento.tenantId === usuario.tenantId
+    && documento.destinatarioRol === usuario.rol
+    && (documento.destinatarioUid === undefined || documento.destinatarioUid === usuario.uid);
+}
+
+function idsValidos(body: unknown): body is { ids: string[] } {
+  if (typeof body !== 'object' || body === null || Array.isArray(body)) return false;
+  if (Object.keys(body).length !== 1 || !('ids' in body)) return false;
+  return Array.isArray(body.ids)
+    && body.ids.length > 0 && body.ids.length <= 100
+    && body.ids.every((id) => typeof id === 'string' && /^[A-Za-z0-9_-]{1,128}$/.test(id))
+    && new Set(body.ids).size === body.ids.length;
+}
+
+class NotificacionAccessError extends Error {
+  constructor(message: string, readonly status: 403 | 404) {
+    super(message);
+  }
 }
 
 export async function GET(request: Request): Promise<NextResponse> {
-  const usuario = await verificarSesion();
-  if (!usuario) return NextResponse.json({ error: 'No autorizado.' }, { status: 401 });
+  const autenticacion = await autenticarUsuarioInterno();
+  if (!autenticacion.ok) return autenticacion.respuesta;
+  const usuario = autenticacion.usuario;
 
   const url   = new URL(request.url);
   const soloNoLeidas = url.searchParams.get('noLeidas') === 'true';
@@ -52,7 +59,9 @@ export async function GET(request: Request): Promise<NextResponse> {
     }
 
     const snap = await q.get();
-    const notifs = snap.docs.map((d) => ({ id: d.id, ...d.data() }));
+    const notifs = snap.docs
+      .filter((d) => esDestinatario(usuario, d.data()))
+      .map((d) => ({ ...d.data(), id: d.id }));
     const sinLeer = notifs.filter((n: Record<string, unknown>) => !n.leida).length;
 
     return NextResponse.json({ ok: true, notificaciones: notifs, sinLeer });
@@ -63,14 +72,43 @@ export async function GET(request: Request): Promise<NextResponse> {
 }
 
 export async function PATCH(request: Request): Promise<NextResponse> {
-  const usuario = await verificarSesion();
-  if (!usuario) return NextResponse.json({ error: 'No autorizado.' }, { status: 401 });
+  const autenticacion = await autenticarUsuarioInterno();
+  if (!autenticacion.ok) return autenticacion.respuesta;
+  const usuario = autenticacion.usuario;
 
-  const { ids } = await request.json() as { ids: string[] };
-  if (!Array.isArray(ids) || ids.length === 0) {
-    return NextResponse.json({ error: 'Se requiere array de ids.' }, { status: 400 });
+  let body: unknown;
+  try {
+    body = await request.json();
+  } catch {
+    return NextResponse.json({ error: 'Payload inválido.' }, { status: 400 });
+  }
+  if (!idsValidos(body)) {
+    return NextResponse.json({ error: 'Se requieren entre 1 y 100 IDs de notificación válidos, únicos y sin campos adicionales.' }, { status: 400 });
   }
 
-  await Promise.all(ids.map(marcarLeida));
-  return NextResponse.json({ ok: true, marcadas: ids.length });
+  try {
+    const db = getFirebaseAdminDb();
+    const refs = body.ids.map((id) => db.collection('simi_notificaciones').doc(id));
+    await db.runTransaction(async (transaction) => {
+      const documentos = await transaction.getAll(...refs);
+      for (const documento of documentos) {
+        if (!documento.exists) {
+          throw new NotificacionAccessError('Una de las notificaciones no existe.', 404);
+        }
+        if (!esDestinatario(usuario, documento.data() ?? {})) {
+          throw new NotificacionAccessError('Sin permiso para marcar una de las notificaciones.', 403);
+        }
+      }
+      // Todas las lecturas y permisos se resuelven antes de la primera escritura.
+      // Firestore revalida las lecturas si el destinatario cambia concurrentemente.
+      for (const ref of refs) transaction.update(ref, { leida: true });
+    });
+    return NextResponse.json({ ok: true, marcadas: body.ids.length });
+  } catch (error) {
+    if (error instanceof NotificacionAccessError) {
+      return NextResponse.json({ error: error.message }, { status: error.status });
+    }
+    console.error('[api/notificaciones]', error);
+    return NextResponse.json({ error: 'No fue posible marcar las notificaciones. Intente de nuevo.' }, { status: 500 });
+  }
 }

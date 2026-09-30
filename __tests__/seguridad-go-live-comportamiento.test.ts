@@ -140,7 +140,15 @@ function fakeDb(usuarioObjetivo: Record<string, unknown>) {
     path,
     get: async (): Promise<Documento> =>
       path === 'users/admin-1'
-        ? { exists: true, data: () => ({ rol: 'ADMIN', activo: true, nombre: 'La admin' }) }
+        ? {
+            exists: true,
+            data: () => ({
+              rol: 'ADMIN',
+              activo: true,
+              nombre: 'La admin',
+              tenantId: 'VENTANILLA_UNICA',
+            }),
+          }
         : { exists: true, data: () => usuarioObjetivo },
     update: async (d: Record<string, unknown>) => { escrituras.push(d); },
   });

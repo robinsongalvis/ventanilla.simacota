@@ -1,43 +1,22 @@
 import { NextResponse } from 'next/server';
-import type { DecodedIdToken } from 'firebase-admin/auth';
-import { doc, getDoc, collection, getDocs } from 'firebase/firestore';
+import { collection, getDocs, query, where } from 'firebase/firestore';
 import { getDb } from '@/lib/firebase';
-import { SESSION_COOKIE_NAME } from '@/lib/auth-cookie';
-import { getFirebaseAdminAuth, getFirebaseAdminDb } from '@/lib/firebase-admin';
+import { autenticarUsuarioInterno } from '@/lib/server/internal-auth-http';
+import { canReadTenant } from '@/lib/server/internal-auth';
+import { getRadicadoOrFail, RadicadoActionError } from '@/lib/server/radicados-security';
 import { checkRateLimit, rateLimitHeaders } from '@/lib/ai/rate-limit';
 import { construirContextoAgente } from '@/lib/ai/context-engine';
 import { invocarCopilotoEspecializado } from '@/lib/ai/agents';
 import { registrarLogIA } from '@/lib/ai/telemetry';
 import type { TrazabilidadRadicado, VentanillaRadicado } from '@/src/types/ventanilla';
 
-async function verificarSesionInterna(request: Request): Promise<DecodedIdToken | null> {
-  const cookieHeader = request.headers.get('cookie') ?? '';
-  const cookies = cookieHeader.split(';').map((item) => item.trim());
-  const sessionCookie = cookies
-    .find((item) => item.startsWith(`${SESSION_COOKIE_NAME}=`))
-    ?.slice(SESSION_COOKIE_NAME.length + 1);
-
-  if (!sessionCookie) return null;
-
-  try {
-    const decoded = await getFirebaseAdminAuth().verifySessionCookie(sessionCookie, true);
-    const snap = await getFirebaseAdminDb().doc(`users/${decoded.uid}`).get();
-    const data = snap.data();
-    if (!snap.exists || data?.activo === false || data?.archivado === true) return null;
-    return decoded;
-  } catch {
-    return null;
-  }
-}
-
 export async function POST(request: Request) {
   const start = Date.now();
   const apiKey = process.env.GEMINI_API_KEY;
-  const sesion = await verificarSesionInterna(request);
+  const autenticacion = await autenticarUsuarioInterno();
 
-  if (!sesion) {
-    return NextResponse.json({ error: 'No autorizado.' }, { status: 401 });
-  }
+  if (!autenticacion.ok) return autenticacion.respuesta;
+  const sesion = autenticacion.usuario;
 
   const limite = { maxRequests: 20, windowMs: 60_000 };
   const bloqueado = checkRateLimit(`ai:copilot:${sesion.uid}`, limite);
@@ -55,38 +34,32 @@ export async function POST(request: Request) {
   try {
     const { radicadoId } = await request.json();
 
-    if (!radicadoId) {
+    if (typeof radicadoId !== 'string' || !radicadoId.trim() || radicadoId.includes('/')) {
       return NextResponse.json(
         { error: 'El parámetro radicadoId es requerido.' },
         { status: 400 }
       );
     }
 
-    const db = getDb();
-
-    // 1. Consultar el radicado específico en 'ventanilla_radicados'
-    const radDocRef = doc(db, 'ventanilla_radicados', radicadoId);
-    const radDocSnap = await getDoc(radDocRef);
-
-    if (!radDocSnap.exists()) {
-      return NextResponse.json(
-        { error: `El radicado con ID ${radicadoId} no existe en el sistema.` },
-        { status: 404 }
-      );
+    // Autorizar ANTES de recopilar contexto o invocar cualquier proveedor IA.
+    const radicadoData = await getRadicadoOrFail(radicadoId);
+    if (!canReadTenant(sesion, radicadoData.clasificacion.oficinaDestino)) {
+      return NextResponse.json({ error: 'Sin acceso a este radicado.' }, { status: 403 });
     }
-
-    const radicadoData = radDocSnap.data() as VentanillaRadicado;
+    const db = getDb();
     const trazSnap = await getDocs(collection(db, 'ventanilla_radicados', radicadoId, 'trazabilidad'));
     const trazabilidad = trazSnap.docs
       .map((d) => d.data() as TrazabilidadRadicado)
       .sort((a, b) => a.fecha.localeCompare(b.fecha));
 
     // 2. Consultar el resto de radicados para promedios históricos de dependencias
-    const querySnapshot = await getDocs(collection(db, 'ventanilla_radicados'));
+    const querySnapshot = await getDocs(query(collection(db, 'ventanilla_radicados'),
+      where('clasificacion.oficinaDestino', '==', radicadoData.clasificacion.oficinaDestino)));
     const todosLosRadicados = querySnapshot.docs.map((d) => d.data() as VentanillaRadicado);
 
     // 3. Consultar las auditorías acumuladas en 'ai_auditoria' para calcular fricción de overrides
-    const auditSnapshot = await getDocs(collection(db, 'ai_auditoria'));
+    const auditSnapshot = await getDocs(query(collection(db, 'ai_auditoria'),
+      where('radicadoId', '==', radicadoId)));
     const todosLosAudits = auditSnapshot.docs.map((d) => d.data());
 
     // 4. Construir el payload de contexto unificado del Radicado (AI Context Engine)
@@ -106,6 +79,9 @@ export async function POST(request: Request) {
 
     return NextResponse.json(recomendacion);
   } catch (error: unknown) {
+    if (error instanceof RadicadoActionError) {
+      return NextResponse.json({ error: error.message }, { status: error.status });
+    }
     const latenciaMs = Date.now() - start;
     const msg = error instanceof Error ? error.message : String(error);
     console.error('Error en /api/ai/copilot:', msg);
@@ -120,7 +96,7 @@ export async function POST(request: Request) {
     });
 
     return NextResponse.json(
-      { error: 'Error al procesar la sugerencia del Copiloto IA.', detalles: msg },
+      { error: 'Error al procesar la sugerencia del Copiloto IA.' },
       { status: 500 }
     );
   }

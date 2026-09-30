@@ -1,11 +1,10 @@
 import { NextResponse } from 'next/server';
-import { cookies } from 'next/headers';
-import { SESSION_COOKIE_NAME } from '@/lib/auth-cookie';
-import { getFirebaseAdminAuth, getFirebaseAdminDb } from '@/lib/firebase-admin';
+import { getFirebaseAdminDb } from '@/lib/firebase-admin';
+import { autenticarUsuarioInterno } from '@/lib/server/internal-auth-http';
+import type { InternalUserSession } from '@/lib/server/internal-auth';
 import { generateOfficialResponsePdf } from '@/lib/simi-juridico/generateOfficialResponsePdf';
 import { NOMBRES_TENANT } from '@/src/types/reglas-negocio';
 import type { RolInterno } from '@/lib/hooks/useAuth';
-import type { TenantId } from '@/src/types/radicado';
 import type { RespuestaFirma } from '@/src/types/simi-firma';
 import type { VentanillaRadicado } from '@/src/types/ventanilla';
 
@@ -13,38 +12,7 @@ export const runtime = 'nodejs';
 
 const ROLES_INTERNOS = new Set<RolInterno>(['ADMIN', 'CONTROL_INTERNO', 'JEFE_DEPENDENCIA', 'FUNCIONARIO']);
 
-interface UsuarioPdf {
-  uid: string;
-  nombre: string;
-  rol: RolInterno;
-  tenantId: TenantId;
-}
-
-async function verificarSesion(): Promise<UsuarioPdf | null> {
-  const cookieStore = await cookies();
-  const sc = cookieStore.get(SESSION_COOKIE_NAME)?.value;
-  if (!sc) return null;
-
-  try {
-    const decoded = await getFirebaseAdminAuth().verifySessionCookie(sc, true);
-    const snap = await getFirebaseAdminDb().doc(`users/${decoded.uid}`).get();
-    if (!snap.exists) return null;
-    const d = snap.data()!;
-    if (d.activo === false || d.archivado === true) return null;
-    const rol = d.rol as RolInterno;
-    if (!ROLES_INTERNOS.has(rol)) return null;
-    return {
-      uid: decoded.uid,
-      nombre: d.nombre as string ?? decoded.email ?? 'Usuario interno',
-      rol,
-      tenantId: d.tenantId as TenantId,
-    };
-  } catch {
-    return null;
-  }
-}
-
-function puedeAccederInterno(usuario: UsuarioPdf, firma: RespuestaFirma): boolean {
+function puedeAccederInterno(usuario: InternalUserSession, firma: RespuestaFirma): boolean {
   if (usuario.rol === 'ADMIN' || usuario.rol === 'CONTROL_INTERNO') return true;
   return firma.tenantId === usuario.tenantId;
 }
@@ -55,7 +23,7 @@ async function auditar(params: {
   tenantId: string;
   accion: 'PDF_GENERADO' | 'PDF_DESCARGADO';
   resultado: 'ok' | 'rechazado' | 'error';
-  usuario?: UsuarioPdf | null;
+  usuario?: InternalUserSession | null;
   actor: 'interno' | 'ciudadano';
 }) {
   await getFirebaseAdminDb().collection('simi_operational_auditoria').add({
@@ -72,6 +40,16 @@ export async function GET(
   { params }: { params: Promise<{ id: string }> },
 ): Promise<NextResponse> {
   const { id } = await params;
+  const autenticacion = await autenticarUsuarioInterno();
+  if (!autenticacion.ok) return autenticacion.respuesta;
+  const usuario = autenticacion.usuario;
+  if (!ROLES_INTERNOS.has(usuario.rol)) {
+    return NextResponse.json(
+      { error: 'No autorizado para descargar este documento.' },
+      { status: 403, headers: { 'Cache-Control': 'no-store' } },
+    );
+  }
+
   const db = getFirebaseAdminDb();
   const firmaSnap = await db.collection('simi_respuestas_firma').doc(id).get();
 
@@ -82,11 +60,9 @@ export async function GET(
   const firma = { id: firmaSnap.id, ...firmaSnap.data() } as RespuestaFirma;
   const radicadoSnap = await db.doc(`ventanilla_radicados/${firma.radicadoId}`).get();
   const radicado = radicadoSnap.exists ? radicadoSnap.data() as VentanillaRadicado : null;
-  const usuario = await verificarSesion();
-  const actor = usuario ? 'interno' : 'ciudadano';
   // H-03: los datos de verificación nunca viajan por query string. La descarga
   // pública se mantiene cerrada hasta contar con tickets efímeros de un solo uso.
-  const autorizado = usuario ? puedeAccederInterno(usuario, firma) : false;
+  const autorizado = puedeAccederInterno(usuario, firma);
 
   if (!autorizado) {
     await auditar({
@@ -96,11 +72,11 @@ export async function GET(
       accion: 'PDF_DESCARGADO',
       resultado: 'rechazado',
       usuario,
-      actor,
+      actor: 'interno',
     });
     return NextResponse.json(
       { error: 'No autorizado para descargar este documento.' },
-      { status: usuario ? 403 : 401, headers: { 'Cache-Control': 'no-store' } },
+      { status: 403, headers: { 'Cache-Control': 'no-store' } },
     );
   }
 
@@ -129,7 +105,7 @@ export async function GET(
       accion: firma.pdfGeneratedAt ? 'PDF_DESCARGADO' : 'PDF_GENERADO',
       resultado: 'ok',
       usuario,
-      actor,
+      actor: 'interno',
     });
 
     const body = new Uint8Array(pdf.buffer);
@@ -150,7 +126,7 @@ export async function GET(
       accion: 'PDF_GENERADO',
       resultado: 'error',
       usuario,
-      actor,
+      actor: 'interno',
     });
     const message = error instanceof Error ? error.message : 'No fue posible generar el PDF.';
     return NextResponse.json({ error: message }, { status: 500 });

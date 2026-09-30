@@ -8,9 +8,8 @@
  */
 
 import { NextResponse }           from 'next/server';
-import { cookies }                from 'next/headers';
-import { SESSION_COOKIE_NAME }    from '@/lib/auth-cookie';
-import { getFirebaseAdminAuth, getFirebaseAdminDb } from '@/lib/firebase-admin';
+import { getFirebaseAdminDb } from '@/lib/firebase-admin';
+import { autenticarUsuarioInterno } from '@/lib/server/internal-auth-http';
 import { checkRateLimit, getClientIp, rateLimitHeaders } from '@/lib/ai/rate-limit';
 import { callGeminiJuridico }        from '@/lib/simi-juridico/callGemini';
 import { esErrorDeCuota }            from '@/lib/ai/gemini-keys';
@@ -39,8 +38,6 @@ import type {
   SimiRevisionBorrador,
   SimiLenguajeClaro,
 } from '@/src/types/simi-juridico';
-import type { TenantId }          from '@/src/types/radicado';
-import type { RolInterno }        from '@/lib/hooks/useAuth';
 import { NOMBRES_TENANT }         from '@/src/types/reglas-negocio';
 import type { VentanillaRadicado } from '@/src/types/ventanilla';
 
@@ -162,31 +159,6 @@ function mockResultadoTest(modo: SimiModoJuridico, textoBase: string, datosRadic
 }
 
 /* ══════════════════════════════════════════════════════════════
-   VERIFICAR SESIÓN
-══════════════════════════════════════════════════════════════ */
-
-async function verificarSesion(): Promise<{
-  uid: string; nombre: string; rol: RolInterno; tenantId: TenantId;
-} | null> {
-  const cookieStore = await cookies();
-  const sc = cookieStore.get(SESSION_COOKIE_NAME)?.value;
-  if (!sc) return null;
-  try {
-    const decoded = await getFirebaseAdminAuth().verifySessionCookie(sc, true);
-    const snap = await getFirebaseAdminDb().doc(`users/${decoded.uid}`).get();
-    if (!snap.exists) return null;
-    const d = snap.data()!;
-    if (d.activo === false || d.archivado === true) return null;
-    return {
-      uid:      decoded.uid,
-      nombre:   (d.nombre as string) ?? 'Funcionario',
-      rol:      (d.rol as RolInterno) ?? 'FUNCIONARIO',
-      tenantId: (d.tenantId as TenantId) ?? 'VENTANILLA_UNICA',
-    };
-  } catch { return null; }
-}
-
-/* ══════════════════════════════════════════════════════════════
    OBTENER RADICADO
 ══════════════════════════════════════════════════════════════ */
 
@@ -232,13 +204,16 @@ export async function POST(request: Request): Promise<NextResponse> {
   }
 
   /* 2. Autenticación */
-  const usuario = await verificarSesion();
-  if (!usuario) {
-    return jsonError('UNAUTHORIZED', 'Sesión no válida o expirada.', 401);
+  const autenticacion = await autenticarUsuarioInterno();
+  if (!autenticacion.ok) {
+    const code: SimiApiErrorCode = autenticacion.status === 401
+      ? 'UNAUTHORIZED'
+      : autenticacion.status === 403
+        ? 'FORBIDDEN'
+        : 'INTERNAL_ERROR';
+    return jsonError(code, autenticacion.mensaje, autenticacion.status);
   }
-  if (!usuario.tenantId) {
-    return jsonError('TENANT_MISSING', 'No se encontró tenantId para el usuario actual.', 403);
-  }
+  const usuario = autenticacion.usuario;
 
   /* 3. Parsear payload */
   let payload: SimiJuridicoPayload;

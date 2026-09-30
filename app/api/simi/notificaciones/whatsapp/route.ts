@@ -1,12 +1,9 @@
 import { NextResponse } from 'next/server';
-import { cookies } from 'next/headers';
-import { SESSION_COOKIE_NAME } from '@/lib/auth-cookie';
-import { getFirebaseAdminAuth, getFirebaseAdminDb } from '@/lib/firebase-admin';
+import { autenticarUsuarioInterno } from '@/lib/server/internal-auth-http';
 import { sendCitizenWhatsAppNotification } from '@/lib/simi-juridico/sendCitizenWhatsAppNotification';
 import { isValidWhatsAppPhone, normalizePhone } from '@/lib/whatsapp/sendWhatsAppMessage';
 import { getRadicadoOrFail, RadicadoActionError } from '@/lib/server/radicados-security';
 import type { RolInterno } from '@/lib/hooks/useAuth';
-import type { TenantId } from '@/src/types/radicado';
 import type { WhatsAppEventType } from '@/src/types/simi-whatsapp';
 
 export const runtime = 'nodejs';
@@ -20,27 +17,6 @@ const EVENTOS_VALIDOS = new Set<WhatsAppEventType>([
 ]);
 const ROLES_AUTORIZADOS = new Set<RolInterno>(['ADMIN', 'RECEPCIONISTA', 'JEFE_DEPENDENCIA', 'FUNCIONARIO']);
 
-async function verificarSesion() {
-  const cookieStore = await cookies();
-  const sc = cookieStore.get(SESSION_COOKIE_NAME)?.value;
-  if (!sc) return null;
-  try {
-    const decoded = await getFirebaseAdminAuth().verifySessionCookie(sc, true);
-    const snap = await getFirebaseAdminDb().doc(`users/${decoded.uid}`).get();
-    if (!snap.exists) return null;
-    const d = snap.data()!;
-    if (d.activo === false || d.archivado === true) return null;
-    return {
-      uid: decoded.uid,
-      nombre: d.nombre as string ?? decoded.email ?? 'Usuario interno',
-      rol: d.rol as RolInterno,
-      tenantId: d.tenantId as TenantId,
-    };
-  } catch {
-    return null;
-  }
-}
-
 function jsonError(error: unknown) {
   if (error instanceof RadicadoActionError) {
     return NextResponse.json({ error: error.message }, { status: error.status });
@@ -49,8 +25,9 @@ function jsonError(error: unknown) {
 }
 
 export async function POST(request: Request): Promise<NextResponse> {
-  const usuario = await verificarSesion();
-  if (!usuario) return NextResponse.json({ error: 'No autorizado.' }, { status: 401 });
+  const autenticacion = await autenticarUsuarioInterno();
+  if (!autenticacion.ok) return autenticacion.respuesta;
+  const usuario = autenticacion.usuario;
   if (!ROLES_AUTORIZADOS.has(usuario.rol)) {
     return NextResponse.json({ error: 'Sin permiso para enviar notificaciones.' }, { status: 403 });
   }

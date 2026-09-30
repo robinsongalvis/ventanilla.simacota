@@ -6,33 +6,17 @@
  */
 
 import { NextResponse }         from 'next/server';
-import { cookies }              from 'next/headers';
-import { SESSION_COOKIE_NAME }  from '@/lib/auth-cookie';
-import { getFirebaseAdminAuth, getFirebaseAdminDb } from '@/lib/firebase-admin';
+import { getFirebaseAdminDb } from '@/lib/firebase-admin';
 import type { NormativeDocument } from '@/src/types/simi-normograma';
-import type { RolInterno }      from '@/lib/hooks/useAuth';
-import type { TenantId }        from '@/src/types/radicado';
+import { autenticarUsuarioInterno } from '@/lib/server/internal-auth-http';
 
 export const runtime = 'nodejs';
 
-async function verificarSesion() {
-  const cookieStore = await cookies();
-  const sc = cookieStore.get(SESSION_COOKIE_NAME)?.value;
-  if (!sc) return null;
-  try {
-    const decoded = await getFirebaseAdminAuth().verifySessionCookie(sc, true);
-    const snap = await getFirebaseAdminDb().doc(`users/${decoded.uid}`).get();
-    if (!snap.exists) return null;
-    const d = snap.data()!;
-    if (d.activo === false || d.archivado === true) return null;
-    return { uid: decoded.uid, nombre: d.nombre as string ?? '', rol: d.rol as RolInterno, tenantId: d.tenantId as TenantId };
-  } catch { return null; }
-}
-
 /* ── GET ── */
 export async function GET(request: Request): Promise<NextResponse> {
-  const usuario = await verificarSesion();
-  if (!usuario) return NextResponse.json({ error: 'No autorizado.' }, { status: 401 });
+  const autenticacion = await autenticarUsuarioInterno();
+  if (!autenticacion.ok) return autenticacion.respuesta;
+  const usuario = autenticacion.usuario;
 
   const url    = new URL(request.url);
   const coleccion = url.searchParams.get('coleccion') ?? 'normatividad_nacional';
@@ -51,9 +35,18 @@ export async function GET(request: Request): Promise<NextResponse> {
         .where('tenantId', '==', usuario.tenantId)
         .orderBy('createdAt', 'desc')
         .limit(limite);
+    } else if (coleccion === 'plantillas_respuesta') {
+      // El filtro simple mantiene el aislamiento sin exigir un índice nuevo.
+      // Como la ruta canónica de plantillas, limita el conjunto consultado.
+      q = db.collection(coleccion)
+        .where('tenantId', '==', usuario.tenantId)
+        .limit(limite);
     }
     const snap = await q.get();
-    const docs = snap.docs.map((d) => ({ id: d.id, ...d.data() }));
+    const docs: Array<Record<string, unknown>> = snap.docs.map((d) => ({ ...d.data(), id: d.id }));
+    if (coleccion === 'plantillas_respuesta') {
+      docs.sort((a, b) => String(b.createdAt ?? '').localeCompare(String(a.createdAt ?? '')));
+    }
     return NextResponse.json({ ok: true, docs, total: docs.length });
   } catch (err) {
     console.error('[api]', err);
@@ -63,8 +56,9 @@ export async function GET(request: Request): Promise<NextResponse> {
 
 /* ── POST ── */
 export async function POST(request: Request): Promise<NextResponse> {
-  const usuario = await verificarSesion();
-  if (!usuario) return NextResponse.json({ error: 'No autorizado.' }, { status: 401 });
+  const autenticacion = await autenticarUsuarioInterno();
+  if (!autenticacion.ok) return autenticacion.respuesta;
+  const usuario = autenticacion.usuario;
   if (usuario.rol !== 'ADMIN') {
     return NextResponse.json({ error: 'Solo el ADMIN puede cargar documentos normativos.' }, { status: 403 });
   }
