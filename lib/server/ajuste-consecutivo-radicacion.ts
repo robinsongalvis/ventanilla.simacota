@@ -1,4 +1,5 @@
 import { formatearRadicadoInstitucional } from '@/lib/radicado-institucional';
+import { atLocalNoon } from '@/lib/tiempos-radicado';
 
 /**
  * AJUSTE DEL CONSECUTIVO DE RADICACIÓN — relevo entre sistemas.
@@ -46,11 +47,37 @@ export interface EstadoConsecutivoRadicacion {
   proximoRadicado: string;
 }
 
+/** Documento nuevo por ajuste; se crea junto al contador, nunca se sobrescribe. */
+export interface AuditoriaAjusteConsecutivo {
+  accion: 'CONSECUTIVO_RADICACION_AJUSTADO';
+  actorUid: string;
+  actorNombre: string | null;
+  actorRol: string;
+  tenantId: string;
+  fecha: string;
+  metadata: {
+    serie: 'radicados';
+    anio: number;
+    anterior: number;
+    nuevo: number;
+    motivo: string;
+    proximoRadicado: string;
+  };
+}
+
+/** Valida también el valor persistido: un contador corrupto nunca se repara implícitamente. */
+export function esConsecutivoValido(valor: unknown): valor is number {
+  return typeof valor === 'number'
+    && Number.isSafeInteger(valor)
+    && valor >= 0
+    && valor <= MAXIMO_CONSECUTIVO_RAZONABLE;
+}
+
 export function describirEstado(anio: number, ultimo: number, fecha = new Date()): EstadoConsecutivoRadicacion {
   return {
     anio,
     ultimo,
-    proximoRadicado: formatearRadicadoInstitucional(ultimo + 1, fecha),
+    proximoRadicado: formatearRadicadoInstitucional(ultimo + 1, atLocalNoon(fecha)),
   };
 }
 
@@ -64,6 +91,9 @@ export function describirEstado(anio: number, ultimo: number, fecha = new Date()
  * @param nuevo  Último consecutivo del sistema ANTERIOR (el próximo radicado será `nuevo + 1`).
  */
 export function validarAjusteConsecutivo(actual: number, nuevo: unknown): ErrorAjusteConsecutivo | null {
+  if (!esConsecutivoValido(actual)) {
+    return { status: 409, mensaje: 'El contador actual es inválido. Se requiere revisión antes de ajustarlo.' };
+  }
   if (typeof nuevo !== 'number' || !Number.isFinite(nuevo)) {
     return { status: 400, mensaje: 'El consecutivo debe ser un número.' };
   }

@@ -16,6 +16,7 @@ import { describe, expect, it } from 'vitest';
 import {
   MAXIMO_CONSECUTIVO_RAZONABLE,
   describirEstado,
+  esConsecutivoValido,
   validarAjusteConsecutivo,
 } from '@/lib/server/ajuste-consecutivo-radicacion';
 
@@ -53,6 +54,14 @@ describe('validarAjusteConsecutivo — solo se avanza', () => {
   it('acepta 0 como punto de partida cuando aún no se ha emitido nada', () => {
     expect(validarAjusteConsecutivo(0, 1)).toBeNull();
   });
+
+  it.each([NaN, Infinity, -1, 1.5, MAXIMO_CONSECUTIVO_RAZONABLE + 1])('rechaza un contador persistido inválido: %s', (actual) => {
+    expect(validarAjusteConsecutivo(actual, 1779)?.status).toBe(409);
+  });
+
+  it.each(['27', null, undefined, {}, NaN])('no normaliza datos corruptos como contadores: %s', (actual) => {
+    expect(esConsecutivoValido(actual)).toBe(false);
+  });
 });
 
 describe('describirEstado — lo que se confirma antes de guardar', () => {
@@ -69,5 +78,14 @@ describe('describirEstado — lo que se confirma antes de guardar', () => {
   it('rellena a 8 dígitos — la forma canónica del sistema', () => {
     const fecha = new Date('2026-09-29T12:00:00-05:00');
     expect(describirEstado(2026, 0, fecha).proximoRadicado).toBe('1-110-202609-00000001');
+  });
+
+  it.each([
+    ['2026-10-01T04:59:59.999Z', 2026, '202609'],
+    ['2026-10-01T05:00:00.000Z', 2026, '202610'],
+    ['2027-01-01T04:59:59.999Z', 2026, '202612'],
+    ['2027-01-01T05:00:00.000Z', 2027, '202701'],
+  ])('respeta la frontera civil de Bogotá en %s', (iso, anio, prefijo) => {
+    expect(describirEstado(anio, 1744, new Date(iso)).proximoRadicado).toBe(`1-110-${prefijo}-00001745`);
   });
 });
