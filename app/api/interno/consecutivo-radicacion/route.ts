@@ -1,10 +1,12 @@
 import { NextResponse } from 'next/server';
-import { requireActiveInternalUser } from '@/lib/server/internal-auth';
+import { autenticarUsuarioInterno } from '@/lib/server/internal-auth-http';
 import { getFirebaseAdminDb } from '@/lib/firebase-admin';
-import { formatearRadicadoInstitucional } from '@/lib/radicado-institucional';
+import { atLocalNoon } from '@/lib/tiempos-radicado';
 import {
   describirEstado,
+  esConsecutivoValido,
   validarAjusteConsecutivo,
+  type AuditoriaAjusteConsecutivo,
 } from '@/lib/server/ajuste-consecutivo-radicacion';
 
 /* ══════════════════════════════════════════════════════════════
@@ -29,27 +31,29 @@ import {
 
 export const runtime = 'nodejs';
 
-/** Quién puede mover el consecutivo. Deliberadamente corto. */
-const ROLES_AUTORIZADOS = new Set<string>(['ADMIN', 'SUPER_ADMIN', 'DESARROLLADOR']);
-
 function refContador(db: FirebaseFirestore.Firestore, anio: number) {
   return db.collection('counters').doc(`radicados-${anio}`);
 }
 
 /** Estado actual: en cuánto va y qué radicado saldría ahora. */
 export async function GET(): Promise<NextResponse> {
+  const autenticacion = await autenticarUsuarioInterno();
+  if (!autenticacion.ok) return autenticacion.respuesta;
+  const usuario = autenticacion.usuario;
+  if (usuario.rol !== 'ADMIN') {
+    return NextResponse.json({ error: 'Su rol no puede consultar el consecutivo.' }, { status: 403 });
+  }
   try {
-    const usuario = await requireActiveInternalUser();
-    if (!ROLES_AUTORIZADOS.has(usuario.rol)) {
-      return NextResponse.json({ error: 'Su rol no puede consultar el consecutivo.' }, { status: 403 });
+    const db = getFirebaseAdminDb();
+    const ahora = new Date();
+    const anio = atLocalNoon(ahora).getFullYear();
+    const snap = await refContador(db, anio).get();
+    const ultimo: unknown = snap.exists ? snap.data()?.ultimo : 0;
+    if (!esConsecutivoValido(ultimo)) {
+      return NextResponse.json({ error: 'El contador actual es inválido. Se requiere revisión antes de ajustarlo.' }, { status: 409 });
     }
 
-    const db = getFirebaseAdminDb();
-    const anio = new Date().getFullYear();
-    const snap = await refContador(db, anio).get();
-    const ultimo = snap.exists ? Number(snap.data()?.ultimo ?? 0) : 0;
-
-    return NextResponse.json({ ok: true, ...describirEstado(anio, ultimo) });
+    return NextResponse.json({ ok: true, ...describirEstado(anio, ultimo, ahora) });
   } catch {
     return NextResponse.json({ error: 'No fue posible consultar el consecutivo.' }, { status: 500 });
   }
@@ -57,19 +61,20 @@ export async function GET(): Promise<NextResponse> {
 
 /** Declara el último consecutivo del sistema anterior. El próximo radicado será ese + 1. */
 export async function POST(request: Request): Promise<NextResponse> {
-  let usuario;
-  try {
-    usuario = await requireActiveInternalUser();
-  } catch {
-    return NextResponse.json({ error: 'No autorizado.' }, { status: 401 });
-  }
-  if (!ROLES_AUTORIZADOS.has(usuario.rol)) {
+  const autenticacion = await autenticarUsuarioInterno();
+  if (!autenticacion.ok) return autenticacion.respuesta;
+  const usuario = autenticacion.usuario;
+  if (usuario.rol !== 'ADMIN') {
     return NextResponse.json({ error: 'Su rol no puede ajustar el consecutivo.' }, { status: 403 });
   }
 
   let cuerpo: { ultimoDelSistemaAnterior?: unknown; motivo?: unknown };
   try {
-    cuerpo = await request.json();
+    const entrada: unknown = await request.json();
+    if (entrada === null || typeof entrada !== 'object' || Array.isArray(entrada)) {
+      return NextResponse.json({ error: 'Cuerpo inválido.' }, { status: 400 });
+    }
+    cuerpo = entrada;
   } catch {
     return NextResponse.json({ error: 'Cuerpo inválido.' }, { status: 400 });
   }
@@ -84,22 +89,27 @@ export async function POST(request: Request): Promise<NextResponse> {
     );
   }
 
-  const db = getFirebaseAdminDb();
-  const anio = new Date().getFullYear();
   const ahora = new Date();
+  const anio = atLocalNoon(ahora).getFullYear();
 
   try {
+    const db = getFirebaseAdminDb();
+    // Un id estable en los reintentos de la transacción, distinto para cada ajuste.
+    const auditoriaRef = db.collection('admin_auditoria').doc();
     const resultado = await db.runTransaction(async (tx) => {
       const ref = refContador(db, anio);
       const snap = await tx.get(ref);
-      const actual = snap.exists ? Number(snap.data()?.ultimo ?? 0) : 0;
+      const actual: unknown = snap.exists ? snap.data()?.ultimo : 0;
+      if (!esConsecutivoValido(actual)) {
+        return { error: { status: 409, mensaje: 'El contador actual es inválido. Se requiere revisión antes de ajustarlo.' } };
+      }
 
       const nuevo = cuerpo.ultimoDelSistemaAnterior;
       const error = validarAjusteConsecutivo(actual, nuevo);
       if (error) return { error };
 
-      const siguiente = (nuevo as number) + 1;
-      const idProximo = formatearRadicadoInstitucional(siguiente, ahora);
+      const estado = describirEstado(anio, nuevo as number, ahora);
+      const idProximo = estado.proximoRadicado;
 
       // Un radicado con ese id ya existente significaría que el número está
       // usado: emitirlo otra vez crearía dos trámites con la misma identidad.
@@ -126,7 +136,18 @@ export async function POST(request: Request): Promise<NextResponse> {
         },
       }, { merge: true });
 
-      return { ok: true as const, anterior: actual, ...describirEstado(anio, nuevo as number, ahora) };
+      const auditoria: AuditoriaAjusteConsecutivo = {
+        accion: 'CONSECUTIVO_RADICACION_AJUSTADO',
+        actorUid: usuario.uid,
+        actorNombre: usuario.nombre ?? null,
+        actorRol: usuario.rol,
+        tenantId: usuario.tenantId,
+        fecha: ahora.toISOString(),
+        metadata: { serie: 'radicados', anio, anterior: actual, nuevo: nuevo as number, motivo, proximoRadicado: idProximo },
+      };
+      tx.create(auditoriaRef, auditoria);
+
+      return { ok: true as const, anterior: actual, ...estado };
     });
 
     if ('error' in resultado && resultado.error) {
