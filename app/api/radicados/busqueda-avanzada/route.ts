@@ -50,10 +50,7 @@
 
 import { NextResponse } from 'next/server';
 import { getFirebaseAdminDb } from '@/lib/firebase-admin';
-import {
-  InternalAuthError,
-  requireActiveInternalUser,
-} from '@/lib/server/internal-auth';
+import { autenticarUsuarioInterno } from '@/lib/server/internal-auth-http';
 import {
   filtrarLote,
   priorizarCoincidenciaExacta,
@@ -99,15 +96,9 @@ function normalizarFiltros(input: Partial<FiltrosBusqueda> | undefined): Filtros
 }
 
 export async function POST(request: Request): Promise<NextResponse> {
-  let usuario;
-  try {
-    usuario = await requireActiveInternalUser();
-  } catch (err) {
-    if (err instanceof InternalAuthError) {
-      return NextResponse.json({ error: err.message }, { status: err.status });
-    }
-    return NextResponse.json({ error: 'No autorizado.' }, { status: 401 });
-  }
+  const autenticacion = await autenticarUsuarioInterno();
+  if (!autenticacion.ok) return autenticacion.respuesta;
+  const usuario = autenticacion.usuario;
 
   let payload: BusquedaPayload | null = null;
   try {

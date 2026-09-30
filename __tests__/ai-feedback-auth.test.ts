@@ -14,21 +14,47 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 let sesion: { uid: string; nombre: string; rol: string; tenantId: string } | null = null;
 
-vi.mock('@/lib/server/internal-auth', () => ({
-  InternalAuthError: class extends Error { status = 401; },
-  requireActiveInternalUser: vi.fn(async () => {
-    if (!sesion) throw new Error('sin sesión');
-    return sesion;
-  }),
+vi.mock('@/lib/server/internal-auth', async (importOriginal) => ({
+  ...await importOriginal<typeof import('@/lib/server/internal-auth')>(),
+  ...(() => {
+    class InternalAuthError extends Error {
+      constructor(
+        message: string,
+        public readonly status: 401 | 403 = 401,
+      ) {
+        super(message);
+      }
+    }
+    return {
+      InternalAuthError,
+      requireActiveInternalUser: vi.fn(async () => {
+        if (!sesion) throw new InternalAuthError('No autorizado.', 401);
+        return sesion;
+      }),
+    };
+  })(),
 }));
 
 const escrituras: { ruta: string; datos: Record<string, unknown> }[] = [];
+interface Referencia { ruta: string }
 vi.mock('@/lib/firebase-admin', () => ({
   getFirebaseAdminDb: () => ({
     doc: (ruta: string) => ({
-      set: async (datos: Record<string, unknown>) => { escrituras.push({ ruta, datos }); },
-      update: async (datos: Record<string, unknown>) => { escrituras.push({ ruta, datos }); },
+      ruta,
+      get: async () => ({
+        exists: true,
+        data: () => ({ clasificacion: { oficinaDestino: 'SEC_GOBIERNO' } }),
+      }),
     }),
+    collection: (ruta: string) => ({ doc: () => ({ id: 'id-auto', ruta: `${ruta}/id-auto` }) }),
+    batch: () => {
+      const pendientes: typeof escrituras = [];
+      return {
+        set: (ref: Referencia, datos: Record<string, unknown>) => { pendientes.push({ ruta: ref.ruta, datos }); },
+        update: (ref: Referencia, datos: Record<string, unknown>) => { pendientes.push({ ruta: ref.ruta, datos }); },
+        commit: async () => { escrituras.push(...pendientes); },
+      };
+    },
   }),
 }));
 

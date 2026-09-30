@@ -1,10 +1,6 @@
-import { NextResponse }          from 'next/server';
-import { cookies }               from 'next/headers';
-import { SESSION_COOKIE_NAME }   from '@/lib/auth-cookie';
-import {
-  getFirebaseAdminAuth,
-  getFirebaseAdminDb,
-} from '@/lib/firebase-admin';
+import { NextResponse } from 'next/server';
+import { getFirebaseAdminDb } from '@/lib/firebase-admin';
+import { autenticarUsuarioInterno } from '@/lib/server/internal-auth-http';
 import type { VentanillaRadicado, TrazabilidadRadicado } from '@/src/types/ventanilla';
 import type { TenantId } from '@/src/types/radicado';
 import type { RolInterno } from '@/lib/hooks/useAuth';
@@ -43,27 +39,6 @@ interface SimiPayload {
   respuestaBorrador?:  string;
   /** Texto previo de SIMI cuando la acción es CONTINUAR_RESPUESTA. */
   ultimaSalidaPrevia?: string;
-}
-
-async function verificarSesion(): Promise<{
-  uid: string; nombre: string; rol: RolInterno; tenantId: TenantId;
-} | null> {
-  const cookieStore = await cookies();
-  const sc = cookieStore.get(SESSION_COOKIE_NAME)?.value;
-  if (!sc) return null;
-  try {
-    const decoded = await getFirebaseAdminAuth().verifySessionCookie(sc, true);
-    const snap = await getFirebaseAdminDb().doc(`users/${decoded.uid}`).get();
-    if (!snap.exists) return null;
-    const d = snap.data()!;
-    if (d.activo === false || d.archivado === true) return null;
-    return {
-      uid:      decoded.uid,
-      nombre:   d.nombre as string ?? '',
-      rol:      d.rol as RolInterno ?? 'FUNCIONARIO',
-      tenantId: d.tenantId as TenantId ?? 'VENTANILLA_UNICA',
-    };
-  } catch { return null; }
 }
 
 function puedeAccederRadicado(
@@ -138,10 +113,9 @@ async function llamarGemini(
 
 export async function POST(request: Request): Promise<NextResponse> {
   const inicio = Date.now();
-  const usuario = await verificarSesion();
-  if (!usuario) {
-    return NextResponse.json({ error: 'No autorizado.' }, { status: 401 });
-  }
+  const autenticacion = await autenticarUsuarioInterno();
+  if (!autenticacion.ok) return autenticacion.respuesta;
+  const usuario = autenticacion.usuario;
 
   let payload: SimiPayload;
   try {

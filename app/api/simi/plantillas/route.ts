@@ -4,33 +4,17 @@
  */
 
 import { NextResponse }        from 'next/server';
-import { cookies }             from 'next/headers';
-import { SESSION_COOKIE_NAME } from '@/lib/auth-cookie';
-import { getFirebaseAdminAuth, getFirebaseAdminDb } from '@/lib/firebase-admin';
+import { getFirebaseAdminDb } from '@/lib/firebase-admin';
 import { seedBaseTemplates }   from '@/lib/simi-juridico/baseTemplates';
 import type { ResponseTemplate } from '@/src/types/simi-normograma';
-import type { RolInterno }     from '@/lib/hooks/useAuth';
-import type { TenantId }       from '@/src/types/radicado';
+import { autenticarUsuarioInterno } from '@/lib/server/internal-auth-http';
 
 export const runtime = 'nodejs';
 
-async function verificarSesion() {
-  const cookieStore = await cookies();
-  const sc = cookieStore.get(SESSION_COOKIE_NAME)?.value;
-  if (!sc) return null;
-  try {
-    const decoded = await getFirebaseAdminAuth().verifySessionCookie(sc, true);
-    const snap = await getFirebaseAdminDb().doc(`users/${decoded.uid}`).get();
-    if (!snap.exists) return null;
-    const d = snap.data()!;
-    if (d.activo === false || d.archivado === true) return null;
-    return { uid: decoded.uid, nombre: d.nombre as string ?? '', rol: d.rol as RolInterno, tenantId: d.tenantId as TenantId };
-  } catch { return null; }
-}
-
 export async function GET(request: Request): Promise<NextResponse> {
-  const usuario = await verificarSesion();
-  if (!usuario) return NextResponse.json({ error: 'No autorizado.' }, { status: 401 });
+  const autenticacion = await autenticarUsuarioInterno();
+  if (!autenticacion.ok) return autenticacion.respuesta;
+  const usuario = autenticacion.usuario;
 
   const url        = new URL(request.url);
   const modoSimi   = url.searchParams.get('modo') ?? undefined;
@@ -58,8 +42,9 @@ export async function GET(request: Request): Promise<NextResponse> {
 }
 
 export async function POST(request: Request): Promise<NextResponse> {
-  const usuario = await verificarSesion();
-  if (!usuario) return NextResponse.json({ error: 'No autorizado.' }, { status: 401 });
+  const autenticacion = await autenticarUsuarioInterno();
+  if (!autenticacion.ok) return autenticacion.respuesta;
+  const usuario = autenticacion.usuario;
   if (usuario.rol !== 'ADMIN') {
     return NextResponse.json({ error: 'Solo el ADMIN puede crear plantillas.' }, { status: 403 });
   }

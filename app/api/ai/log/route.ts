@@ -2,11 +2,8 @@ import { NextResponse } from 'next/server';
 import { getFirebaseAdminDb } from '@/lib/firebase-admin';
 import { checkRateLimit, rateLimitHeaders } from '@/lib/ai/rate-limit';
 import { removeUndefinedDeep } from '@/lib/firestore/removeUndefined';
-import {
-  InternalAuthError,
-  requireActiveInternalUser,
-  type InternalUserSession,
-} from '@/lib/server/internal-auth';
+import type { InternalUserSession } from '@/lib/server/internal-auth';
+import { autenticarUsuarioInterno } from '@/lib/server/internal-auth-http';
 import {
   construirAiLogSeguro,
   validarTamanoPayloadAiLog,
@@ -47,20 +44,28 @@ async function registrarIntentoAiLog(params: {
 }
 
 export async function POST(request: Request): Promise<NextResponse> {
-  let usuario: InternalUserSession;
-
-  try {
-    usuario = await requireActiveInternalUser();
-  } catch (error) {
-    const status = error instanceof InternalAuthError ? error.status : 401;
+  const autenticacion = await autenticarUsuarioInterno();
+  if (!autenticacion.ok) {
+    const { status } = autenticacion;
     await registrarIntentoAiLog({
-      motivo: status === 401 ? 'SESION_REQUERIDA' : 'USUARIO_NO_AUTORIZADO',
+      motivo: status === 401
+        ? 'SESION_REQUERIDA'
+        : status === 403
+          ? 'USUARIO_NO_AUTORIZADO'
+          : 'FALLO_INFRAESTRUCTURA_AUTENTICACION',
     });
     return jsonSeguro(
-      { error: status === 401 ? 'Debe iniciar sesión nuevamente.' : 'No tiene permiso para realizar esta acción.' },
+      {
+        error: status === 401
+          ? 'Debe iniciar sesión nuevamente.'
+          : status === 403
+            ? 'No tiene permiso para realizar esta acción.'
+            : autenticacion.mensaje,
+      },
       status,
     );
   }
+  const usuario = autenticacion.usuario;
 
   if (!ROLES_AUTORIZADOS.has(usuario.rol)) {
     await registrarIntentoAiLog({ usuario, motivo: 'ROL_NO_AUTORIZADO' });

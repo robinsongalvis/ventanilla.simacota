@@ -1,8 +1,10 @@
 import { cookies } from 'next/headers';
+import type { DecodedIdToken } from 'firebase-admin/auth';
 import { SESSION_COOKIE_NAME } from '@/lib/auth-cookie';
 import { getFirebaseAdminAuth, getFirebaseAdminDb } from '@/lib/firebase-admin';
 import type { RolInterno } from '@/lib/hooks/useAuth';
 import type { TenantId } from '@/src/types/radicado';
+import { DIRECTORIO_TENANTS } from '@/src/types/reglas-negocio';
 
 export interface InternalUserSession {
   uid: string;
@@ -11,6 +13,7 @@ export interface InternalUserSession {
   rol: RolInterno;
   tenantId: TenantId;
   activo: boolean;
+  cargo?: string;
 }
 
 const ROLES_VALIDOS = new Set<RolInterno>([
@@ -20,6 +23,24 @@ const ROLES_VALIDOS = new Set<RolInterno>([
   'JEFE_DEPENDENCIA',
   'CONTROL_INTERNO',
 ]);
+
+const CODIGOS_SESION_INVALIDA = new Set([
+  'auth/argument-error',
+  'auth/session-cookie-expired',
+  'auth/session-cookie-revoked',
+  'auth/user-disabled',
+  'auth/user-not-found',
+]);
+
+function esTenantId(value: unknown): value is TenantId {
+  return typeof value === 'string'
+    && Object.prototype.hasOwnProperty.call(DIRECTORIO_TENANTS, value);
+}
+
+function esErrorDeSesionInvalida(error: unknown): boolean {
+  if (typeof error !== 'object' || error === null || !('code' in error)) return false;
+  return typeof error.code === 'string' && CODIGOS_SESION_INVALIDA.has(error.code);
+}
 
 export class InternalAuthError extends Error {
   constructor(
@@ -38,38 +59,50 @@ export async function requireActiveInternalUser(): Promise<InternalUserSession> 
     throw new InternalAuthError('No autorizado.', 401);
   }
 
+  const auth = getFirebaseAdminAuth();
+  let decoded: DecodedIdToken;
   try {
-    const decoded = await getFirebaseAdminAuth().verifySessionCookie(sessionCookie, true);
-    const snap = await getFirebaseAdminDb().doc(`users/${decoded.uid}`).get();
-
-    if (!snap.exists) {
-      throw new InternalAuthError('Usuario interno no registrado.', 403);
-    }
-
-    const data = snap.data() ?? {};
-    const rol = data.rol as RolInterno;
-    const tenantId = data.tenantId as TenantId;
-
-    if (!ROLES_VALIDOS.has(rol) || typeof tenantId !== 'string') {
-      throw new InternalAuthError('Usuario interno sin permisos válidos.', 403);
-    }
-
-    if (data.activo === false || data.archivado === true) {
-      throw new InternalAuthError('Usuario inactivo o archivado.', 403);
-    }
-
-    return {
-      uid: decoded.uid,
-      email: typeof data.email === 'string' ? data.email : decoded.email ?? '',
-      nombre: typeof data.nombre === 'string' ? data.nombre : decoded.email ?? 'Usuario',
-      rol,
-      tenantId,
-      activo: true,
-    };
+    decoded = await auth.verifySessionCookie(sessionCookie, true);
   } catch (error) {
-    if (error instanceof InternalAuthError) throw error;
-    throw new InternalAuthError('Sesión inválida o expirada.', 401);
+    if (esErrorDeSesionInvalida(error)) {
+      throw new InternalAuthError('Sesión inválida o expirada.', 401);
+    }
+    throw error;
   }
+
+  // Esta lectura queda deliberadamente fuera del catch de credenciales: una
+  // caída de Firestore es infraestructura, no una supuesta sesión inválida.
+  const snap = await getFirebaseAdminDb().doc(`users/${decoded.uid}`).get();
+
+  if (!snap.exists) {
+    throw new InternalAuthError('Usuario interno no registrado.', 403);
+  }
+
+  const data = snap.data() ?? {};
+  const rol = data.rol;
+  const tenantId = data.tenantId;
+
+  if (typeof rol !== 'string' || !ROLES_VALIDOS.has(rol as RolInterno) || !esTenantId(tenantId)) {
+    throw new InternalAuthError('Usuario interno sin permisos válidos.', 403);
+  }
+
+  if (data.activo === false || data.archivado === true) {
+    throw new InternalAuthError('Usuario inactivo o archivado.', 403);
+  }
+
+  const cargo = typeof data.cargo === 'string' && data.cargo.trim().length > 0
+    ? data.cargo.trim()
+    : undefined;
+
+  return {
+    uid: decoded.uid,
+    email: typeof data.email === 'string' ? data.email : decoded.email ?? '',
+    nombre: typeof data.nombre === 'string' ? data.nombre : decoded.email ?? 'Usuario',
+    rol: rol as RolInterno,
+    tenantId,
+    activo: true,
+    ...(cargo ? { cargo } : {}),
+  };
 }
 
 export function canReadTenant(user: InternalUserSession, tenantId: TenantId): boolean {

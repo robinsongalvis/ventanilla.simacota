@@ -1,10 +1,9 @@
 import { NextResponse }         from 'next/server';
-import { cookies }              from 'next/headers';
-import { SESSION_COOKIE_NAME }  from '@/lib/auth-cookie';
 import {
   getFirebaseAdminAuth,
   getFirebaseAdminDb,
 } from '@/lib/firebase-admin';
+import { autenticarUsuarioInterno } from '@/lib/server/internal-auth-http';
 import { enviarEmail }          from '@/lib/email/mailer';
 import {
   buildResetPasswordHtml,
@@ -31,26 +30,6 @@ const TIPOS_USUARIO_VALIDOS = new Set(['INSTITUCIONAL', 'UAT', 'PRUEBA']);
    Helpers
 ══════════════════════════════════════════════════════════════ */
 
-async function verificarAdmin(): Promise<{ uid: string; nombre: string; rol: string } | null> {
-  const cookieStore = await cookies();
-  const sessionCookie = cookieStore.get(SESSION_COOKIE_NAME)?.value;
-  if (!sessionCookie) return null;
-
-  try {
-    // checkRevoked=false: la cookie httpOnly ya es suficiente garantía.
-    // El check de revocación causa falsos 401 tras revokeRefreshTokens en logout.
-    const decoded = await getFirebaseAdminAuth().verifySessionCookie(sessionCookie, true);
-    const userSnap = await getFirebaseAdminDb().doc(`users/${decoded.uid}`).get();
-    if (!userSnap.exists) return null;
-    const data = userSnap.data()!;
-    if (data.rol !== 'ADMIN' || data.activo === false || data.archivado === true) return null;
-    return { uid: decoded.uid, nombre: (data.nombre as string) ?? 'Admin', rol: 'ADMIN' };
-  } catch {
-    return null;
-  }
-}
-
-
 interface RouteContext {
   params: Promise<{ uid: string }>;
 }
@@ -73,9 +52,14 @@ interface PatchPayload {
 }
 
 export async function PATCH(request: Request, context: RouteContext): Promise<NextResponse> {
-  const admin = await verificarAdmin();
-  if (!admin) {
-    return NextResponse.json({ error: 'No autorizado.' }, { status: 401 });
+  const autenticacion = await autenticarUsuarioInterno();
+  if (!autenticacion.ok) return autenticacion.respuesta;
+  const admin = autenticacion.usuario;
+  if (admin.rol !== 'ADMIN') {
+    return NextResponse.json(
+      { error: 'Solo el ADMIN puede administrar usuarios.' },
+      { status: 403 },
+    );
   }
 
   const { uid: targetUid } = await context.params;
@@ -242,9 +226,14 @@ export async function PATCH(request: Request, context: RouteContext): Promise<Ne
 ══════════════════════════════════════════════════════════════ */
 
 export async function POST(request: Request, context: RouteContext): Promise<NextResponse> {
-  const admin = await verificarAdmin();
-  if (!admin) {
-    return NextResponse.json({ error: 'No autorizado.' }, { status: 401 });
+  const autenticacion = await autenticarUsuarioInterno();
+  if (!autenticacion.ok) return autenticacion.respuesta;
+  const admin = autenticacion.usuario;
+  if (admin.rol !== 'ADMIN') {
+    return NextResponse.json(
+      { error: 'Solo el ADMIN puede administrar usuarios.' },
+      { status: 403 },
+    );
   }
 
   const { uid: targetUid } = await context.params;

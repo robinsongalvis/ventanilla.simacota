@@ -4,52 +4,43 @@
  */
 
 import { NextResponse }        from 'next/server';
-import { cookies }             from 'next/headers';
-import { SESSION_COOKIE_NAME } from '@/lib/auth-cookie';
-import { getFirebaseAdminAuth, getFirebaseAdminDb } from '@/lib/firebase-admin';
+import { autenticarUsuarioInterno } from '@/lib/server/internal-auth-http';
+import { canReadTenant } from '@/lib/server/internal-auth';
+import { getFirebaseAdminDb } from '@/lib/firebase-admin';
+import { getRadicadoOrFail, RadicadoActionError } from '@/lib/server/radicados-security';
 import {
   guardarVersionBorrador,
   getVersionesBorrador,
 } from '@/lib/simi-juridico/borradorVersiones';
-import type { RolInterno }     from '@/lib/hooks/useAuth';
-import type { TenantId }       from '@/src/types/radicado';
 
 export const runtime = 'nodejs';
 
-async function verificarSesion() {
-  const cookieStore = await cookies();
-  const sc = cookieStore.get(SESSION_COOKIE_NAME)?.value;
-  if (!sc) return null;
-  try {
-    const decoded = await getFirebaseAdminAuth().verifySessionCookie(sc, true);
-    const snap = await getFirebaseAdminDb().doc(`users/${decoded.uid}`).get();
-    if (!snap.exists) return null;
-    const d = snap.data()!;
-    if (d.activo === false || d.archivado === true) return null;
-    return {
-      uid:      decoded.uid,
-      nombre:   d.nombre as string ?? '',
-      rol:      d.rol as RolInterno,
-      tenantId: d.tenantId as TenantId,
-    };
-  } catch { return null; }
-}
-
 export async function GET(request: Request): Promise<NextResponse> {
-  const usuario = await verificarSesion();
-  if (!usuario) return NextResponse.json({ error: 'No autorizado.' }, { status: 401 });
+  const autenticacion = await autenticarUsuarioInterno();
+  if (!autenticacion.ok) return autenticacion.respuesta;
 
   const url = new URL(request.url);
   const radicadoId = url.searchParams.get('radicadoId');
-  if (!radicadoId) return NextResponse.json({ error: 'Se requiere radicadoId.' }, { status: 400 });
+  if (!radicadoId?.trim() || radicadoId.includes('/')) {
+    return NextResponse.json({ error: 'Se requiere un radicadoId válido.' }, { status: 400 });
+  }
 
-  const versiones = await getVersionesBorrador(radicadoId);
-  return NextResponse.json({ ok: true, versiones, total: versiones.length });
+  try {
+    const radicado = await getRadicadoOrFail(radicadoId);
+    if (!canReadTenant(autenticacion.usuario, radicado.clasificacion.oficinaDestino)) {
+      return NextResponse.json({ error: 'Sin acceso a este radicado.' }, { status: 403 });
+    }
+    const versiones = await getVersionesBorrador(radicadoId);
+    return NextResponse.json({ ok: true, versiones, total: versiones.length });
+  } catch (error) {
+    return responderError(error);
+  }
 }
 
 export async function POST(request: Request): Promise<NextResponse> {
-  const usuario = await verificarSesion();
-  if (!usuario) return NextResponse.json({ error: 'No autorizado.' }, { status: 401 });
+  const autenticacion = await autenticarUsuarioInterno();
+  if (!autenticacion.ok) return autenticacion.respuesta;
+  const usuario = autenticacion.usuario;
 
   let body: {
     radicadoId:      string;
@@ -64,25 +55,55 @@ export async function POST(request: Request): Promise<NextResponse> {
   try { body = await request.json(); }
   catch { return NextResponse.json({ error: 'Payload inválido.' }, { status: 400 }); }
 
-  if (!body.radicadoId || !body.contenido) {
+  if (!body || typeof body.radicadoId !== 'string' || !body.radicadoId.trim()
+    || body.radicadoId.includes('/') || typeof body.contenido !== 'string' || !body.contenido.trim()
+    || (body.approvalId !== undefined && (typeof body.approvalId !== 'string'
+      || !body.approvalId.trim() || body.approvalId.includes('/')))) {
     return NextResponse.json({ error: 'Campos requeridos: radicadoId, contenido.' }, { status: 400 });
   }
 
-  const result = await guardarVersionBorrador({
-    radicadoId:      body.radicadoId,
-    approvalId:      body.approvalId,
-    tenantId:        usuario.tenantId,
-    contenido:       body.contenido,
-    generadoPorSimi: body.generadoPorSimi ?? false,
-    editadoPorHumano: !body.generadoPorSimi,
-    usuarioId:       usuario.uid,
-    usuarioNombre:   usuario.nombre,
-    usuarioRol:      usuario.rol,
-    modoSimi:        body.modoSimi,
-    motivoCambio:    body.motivoCambio,
-    estadoAprobacion: body.estadoAprobacion,
-    fuentesUsadas:   body.fuentesUsadas,
-  });
+  try {
+    const radicado = await getRadicadoOrFail(body.radicadoId);
+    const tenantId = radicado.clasificacion.oficinaDestino;
+    if (!canReadTenant(usuario, tenantId)) {
+      return NextResponse.json({ error: 'Sin acceso a este radicado.' }, { status: 403 });
+    }
+    if (body.approvalId) {
+      const aprobacion = await getFirebaseAdminDb().collection('simi_aprobaciones_respuesta')
+        .doc(body.approvalId).get();
+      if (!aprobacion.exists) {
+        return NextResponse.json({ error: 'Aprobación no encontrada.' }, { status: 404 });
+      }
+      if (aprobacion.data()?.radicadoId !== body.radicadoId) {
+        return NextResponse.json({ error: 'La aprobación no corresponde al radicado.' }, { status: 403 });
+      }
+    }
+    const result = await guardarVersionBorrador({
+      radicadoId:      body.radicadoId,
+      approvalId:      body.approvalId,
+      tenantId,
+      contenido:       body.contenido,
+      generadoPorSimi: body.generadoPorSimi ?? false,
+      editadoPorHumano: !body.generadoPorSimi,
+      usuarioId:       usuario.uid,
+      usuarioNombre:   usuario.nombre,
+      usuarioRol:      usuario.rol,
+      modoSimi:        body.modoSimi,
+      motivoCambio:    body.motivoCambio,
+      estadoAprobacion: body.estadoAprobacion,
+      fuentesUsadas:   body.fuentesUsadas,
+    });
 
-  return NextResponse.json({ ok: true, ...result, mensaje: `Versión ${result.numeroVersion} guardada.` });
+    return NextResponse.json({ ok: true, ...result, mensaje: `Versión ${result.numeroVersion} guardada.` });
+  } catch (error) {
+    return responderError(error);
+  }
+}
+
+function responderError(error: unknown): NextResponse {
+  if (error instanceof RadicadoActionError) {
+    return NextResponse.json({ error: error.message }, { status: error.status });
+  }
+  console.error('[simi/borradores]', error);
+  return NextResponse.json({ error: 'No fue posible procesar el borrador.' }, { status: 500 });
 }

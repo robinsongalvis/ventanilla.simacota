@@ -7,11 +7,8 @@ import {
 } from '@/lib/email/templates/respuesta-ciudadano';
 import { logError } from '@/lib/logger';
 import { removeUndefinedDeep } from '@/lib/firestore/removeUndefined';
-import {
-  InternalAuthError,
-  requireActiveInternalUser,
-  type InternalUserSession,
-} from '@/lib/server/internal-auth';
+import type { InternalUserSession } from '@/lib/server/internal-auth';
+import { autenticarUsuarioInterno } from '@/lib/server/internal-auth-http';
 import {
   autorizarNotificacionCiudadano,
   normalizarPayloadNotificacionCiudadano,
@@ -135,19 +132,20 @@ function obtenerNotaRespuesta(radicado: VentanillaRadicado): string | null {
 }
 
 export async function POST(request: Request): Promise<NextResponse> {
-  let usuario: InternalUserSession;
-
-  try {
-    usuario = await requireActiveInternalUser();
-  } catch (error) {
-    if (error instanceof InternalAuthError) {
-      return jsonSeguro(
-        { error: error.status === 401 ? 'Debe iniciar sesión nuevamente.' : 'No tiene permiso para realizar esta acción.' },
-        error.status,
-      );
-    }
-    return jsonSeguro({ error: 'Debe iniciar sesión nuevamente.' }, 401);
+  const autenticacion = await autenticarUsuarioInterno();
+  if (!autenticacion.ok) {
+    return jsonSeguro(
+      {
+        error: autenticacion.status === 401
+          ? 'Debe iniciar sesión nuevamente.'
+          : autenticacion.status === 403
+            ? 'No tiene permiso para realizar esta acción.'
+            : autenticacion.mensaje,
+      },
+      autenticacion.status,
+    );
   }
+  const usuario = autenticacion.usuario;
 
   let payload: unknown;
   try {

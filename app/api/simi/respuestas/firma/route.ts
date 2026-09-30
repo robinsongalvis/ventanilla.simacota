@@ -4,41 +4,24 @@
  */
 
 import { NextResponse }         from 'next/server';
-import { cookies }              from 'next/headers';
-import { SESSION_COOKIE_NAME }  from '@/lib/auth-cookie';
-import { getFirebaseAdminAuth, getFirebaseAdminDb } from '@/lib/firebase-admin';
-import { createFinalSignature } from '@/lib/simi-juridico/createFinalSignature';
+import { autenticarUsuarioInterno } from '@/lib/server/internal-auth-http';
+import { createFinalSignature, FirmaValidationError } from '@/lib/simi-juridico/createFinalSignature';
 import type { RolInterno }      from '@/lib/hooks/useAuth';
-import type { TenantId }        from '@/src/types/radicado';
 import type { CanalEnvio }      from '@/src/types/simi-firma';
 
 export const runtime = 'nodejs';
 
 const PUEDE_FIRMAR = new Set<RolInterno>(['ADMIN', 'JEFE_DEPENDENCIA']);
 
-async function verificarSesion() {
-  const cookieStore = await cookies();
-  const sc = cookieStore.get(SESSION_COOKIE_NAME)?.value;
-  if (!sc) return null;
-  try {
-    const decoded = await getFirebaseAdminAuth().verifySessionCookie(sc, true);
-    const snap = await getFirebaseAdminDb().doc(`users/${decoded.uid}`).get();
-    if (!snap.exists) return null;
-    const d = snap.data()!;
-    if (d.activo === false || d.archivado === true) return null;
-    return {
-      uid:      decoded.uid,
-      nombre:   d.nombre as string ?? '',
-      cargo:    d.cargo  as string ?? '',
-      rol:      d.rol    as RolInterno,
-      tenantId: d.tenantId as TenantId,
-    };
-  } catch { return null; }
+function esIdValido(valor: unknown): valor is string {
+  return typeof valor === 'string' && valor.trim().length > 0 && valor.length <= 1500
+    && !valor.includes('/') && valor !== '.' && valor !== '..';
 }
 
 export async function POST(request: Request): Promise<NextResponse> {
-  const usuario = await verificarSesion();
-  if (!usuario) return NextResponse.json({ error: 'No autorizado.' }, { status: 401 });
+  const autenticacion = await autenticarUsuarioInterno();
+  if (!autenticacion.ok) return autenticacion.respuesta;
+  const usuario = autenticacion.usuario;
   if (!PUEDE_FIRMAR.has(usuario.rol)) {
     return NextResponse.json({ error: 'Su rol no tiene permiso para firmar respuestas.' }, { status: 403 });
   }
@@ -55,7 +38,12 @@ export async function POST(request: Request): Promise<NextResponse> {
   try { body = await request.json(); }
   catch { return NextResponse.json({ error: 'Payload inválido.' }, { status: 400 }); }
 
-  if (!body.radicadoId || !body.aprobacionId) {
+  if (!body || typeof body !== 'object' || Array.isArray(body)
+    || !esIdValido(body.radicadoId) || !esIdValido(body.aprobacionId)
+    || (body.borradorVersionId !== undefined && !esIdValido(body.borradorVersionId))
+    || (body.textoRespuestaFinal !== undefined && typeof body.textoRespuestaFinal !== 'string')
+    || (body.emailCiudadano !== undefined && typeof body.emailCiudadano !== 'string')
+    || (body.canalEnvio !== undefined && !['email', 'fisico', 'whatsapp', 'portal', 'otro'].includes(body.canalEnvio))) {
     return NextResponse.json({ error: 'Campos requeridos: radicadoId, aprobacionId.' }, { status: 400 });
   }
 
@@ -65,8 +53,11 @@ export async function POST(request: Request): Promise<NextResponse> {
       aprobacionId:        body.aprobacionId,
       firmadoPor:          usuario.nombre,
       firmadoPorCargo:     usuario.cargo || undefined,
-      dependencia:         body.dependencia ?? usuario.tenantId,
+      // Estos campos se conservan por compatibilidad del helper servidor;
+      // la dependencia efectiva se deriva del radicado dentro de la transacción.
+      dependencia:         usuario.tenantId,
       tenantId:            usuario.tenantId,
+      actor:               usuario,
       textoRespuestaFinal: body.textoRespuestaFinal,
       canalEnvio:          body.canalEnvio,
       emailCiudadano:      body.emailCiudadano,
@@ -75,7 +66,10 @@ export async function POST(request: Request): Promise<NextResponse> {
 
     return NextResponse.json({ ok: true, ...result });
   } catch (err) {
-    const msg = err instanceof Error ? err.message : String(err);
-    return NextResponse.json({ error: msg }, { status: 422 });
+    if (err instanceof FirmaValidationError) {
+      return NextResponse.json({ error: err.message }, { status: err.status });
+    }
+    console.error('[simi/firma]', err);
+    return NextResponse.json({ error: 'No fue posible registrar la firma. Intente de nuevo.' }, { status: 500 });
   }
 }

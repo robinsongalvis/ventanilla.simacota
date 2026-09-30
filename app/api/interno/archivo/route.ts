@@ -17,10 +17,8 @@
 
 import { createHash } from 'node:crypto';
 import { NextResponse } from 'next/server';
-import {
-  InternalAuthError,
-  requireActiveInternalUser,
-} from '@/lib/server/internal-auth';
+import { autenticarUsuarioInterno } from '@/lib/server/internal-auth-http';
+import type { InternalUserSession } from '@/lib/server/internal-auth';
 import { getFirebaseAdminDb, getFirebaseAdminStorage } from '@/lib/firebase-admin';
 import {
   aRadicadoParaDescarga,
@@ -55,18 +53,16 @@ function denegado(status: 400 | 401 | 403 | 404 | 500, mensaje: string): NextRes
 
 export async function GET(request: Request): Promise<NextResponse> {
   // 1. Sesión interna activa (middleware ya verifica; reforzamos en handler).
-  let usuario;
-  try {
-    usuario = await requireActiveInternalUser();
-  } catch (err) {
-    if (err instanceof InternalAuthError) {
-      const mensaje = err.status === 403
+  const autenticacion = await autenticarUsuarioInterno();
+  if (!autenticacion.ok) {
+    const mensaje = autenticacion.status === 401
+      ? 'Debe iniciar sesión nuevamente.'
+      : autenticacion.status === 403
         ? 'Su usuario no tiene acceso al panel interno.'
-        : 'Debe iniciar sesión nuevamente.';
-      return denegado(err.status, mensaje);
-    }
-    return denegado(401, 'Debe iniciar sesión nuevamente.');
+        : autenticacion.mensaje;
+    return denegado(autenticacion.status, mensaje);
   }
+  const usuario = autenticacion.usuario;
 
   const path = new URL(request.url).searchParams.get('path');
 
@@ -217,7 +213,7 @@ export async function GET(request: Request): Promise<NextResponse> {
 ══════════════════════════════════════════════════════════════ */
 async function manejarDescargaDocumentoExpediente(
   request: Request,
-  usuario: Awaited<ReturnType<typeof requireActiveInternalUser>>,
+  usuario: InternalUserSession,
   path: string,
 ): Promise<NextResponse> {
   const parsed = parsearPathDocumentoExpediente(path);

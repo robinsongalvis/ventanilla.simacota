@@ -4,11 +4,8 @@
  */
 
 import { NextResponse }        from 'next/server';
-import { cookies }             from 'next/headers';
-import { SESSION_COOKIE_NAME } from '@/lib/auth-cookie';
-import { getFirebaseAdminAuth, getFirebaseAdminDb } from '@/lib/firebase-admin';
-import type { RolInterno }     from '@/lib/hooks/useAuth';
-import type { TenantId }       from '@/src/types/radicado';
+import { getFirebaseAdminDb } from '@/lib/firebase-admin';
+import { autenticarUsuarioInterno } from '@/lib/server/internal-auth-http';
 import type { NormativeDocument } from '@/src/types/simi-normograma';
 
 export const runtime = 'nodejs';
@@ -44,29 +41,20 @@ const CAMPOS_EDITABLES = [
   'fuente', 'url_fuente', 'palabras_clave', 'nivel_confianza',
 ] as const satisfies readonly (keyof NormativeDocument)[];
 
-async function verificarAdmin() {
-  const cookieStore = await cookies();
-  const sc = cookieStore.get(SESSION_COOKIE_NAME)?.value;
-  if (!sc) return null;
-  try {
-    const decoded = await getFirebaseAdminAuth().verifySessionCookie(sc, true);
-    const snap = await getFirebaseAdminDb().doc(`users/${decoded.uid}`).get();
-    if (!snap.exists) return null;
-    const d = snap.data()!;
-    if (d.activo === false || d.archivado === true) return null;
-    const rol = d.rol as RolInterno;
-    if (rol !== 'ADMIN') return null;
-    return { uid: decoded.uid, nombre: d.nombre as string ?? '', tenantId: d.tenantId as TenantId };
-  } catch { return null; }
-}
-
 export async function PATCH(
   request: Request,
   { params }: { params: Promise<{ id: string }> },
 ): Promise<NextResponse> {
   const { id } = await params;
-  const admin = await verificarAdmin();
-  if (!admin) return NextResponse.json({ error: 'Solo el ADMIN puede modificar documentos normativos.' }, { status: 403 });
+  const autenticacion = await autenticarUsuarioInterno();
+  if (!autenticacion.ok) return autenticacion.respuesta;
+  const admin = autenticacion.usuario;
+  if (admin.rol !== 'ADMIN') {
+    return NextResponse.json(
+      { error: 'Solo el ADMIN puede modificar documentos normativos.' },
+      { status: 403 },
+    );
+  }
 
   const url = new URL(request.url);
   const coleccion = url.searchParams.get('coleccion') ?? 'normatividad_nacional';
@@ -114,8 +102,14 @@ export async function DELETE(
   const url = new URL(_request.url);
   const coleccion = url.searchParams.get('coleccion') ?? 'normatividad_nacional';
 
-  const admin = await verificarAdmin();
-  if (!admin) return NextResponse.json({ error: 'Solo el ADMIN puede eliminar documentos.' }, { status: 403 });
+  const autenticacion = await autenticarUsuarioInterno();
+  if (!autenticacion.ok) return autenticacion.respuesta;
+  if (autenticacion.usuario.rol !== 'ADMIN') {
+    return NextResponse.json(
+      { error: 'Solo el ADMIN puede eliminar documentos.' },
+      { status: 403 },
+    );
+  }
 
   // Un DELETE con la colección tomada del query string borraba documentos de
   // cualquier colección de Firestore. Misma lista blanca que el PATCH.

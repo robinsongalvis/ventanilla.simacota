@@ -28,6 +28,9 @@ describe('ruta pública heredada', () => {
     const source = readFileSync('app/api/simi/respuestas/firma/[id]/pdf/route.ts', 'utf8');
     expect(source).not.toContain("searchParams.get('verificacion')");
     expect(source).not.toContain("searchParams.get('token')");
-    expect(source).toContain('const autorizado = usuario ? puedeAccederInterno(usuario, firma) : false');
+    expect(source).toContain('const autorizado = puedeAccederInterno(usuario, firma)');
+    expect(source.indexOf('await autenticarUsuarioInterno()')).toBeLessThan(
+      source.indexOf("collection('simi_respuestas_firma')"),
+    );
   });
 });

@@ -9,12 +9,10 @@
  */
 
 import { NextResponse }        from 'next/server';
-import { cookies }             from 'next/headers';
-import { SESSION_COOKIE_NAME } from '@/lib/auth-cookie';
-import { getFirebaseAdminAuth, getFirebaseAdminDb } from '@/lib/firebase-admin';
+import { getFirebaseAdminDb } from '@/lib/firebase-admin';
+import { autenticarUsuarioInterno } from '@/lib/server/internal-auth-http';
 import type { ApprovalFlow }   from '@/src/types/simi-approval';
 import type { RolInterno }     from '@/lib/hooks/useAuth';
-import type { TenantId }       from '@/src/types/radicado';
 import { NOMBRES_TENANT }      from '@/src/types/reglas-negocio';
 import type { VentanillaRadicado } from '@/src/types/ventanilla';
 import { diasRestantesHabiles } from '@/lib/tiempos-radicado';
@@ -22,20 +20,6 @@ import { diasRestantesHabiles } from '@/lib/tiempos-radicado';
 export const runtime = 'nodejs';
 
 const ROLES_REPORTE = new Set<RolInterno>(['ADMIN', 'CONTROL_INTERNO', 'JEFE_DEPENDENCIA']);
-
-async function verificarSesion() {
-  const cookieStore = await cookies();
-  const sc = cookieStore.get(SESSION_COOKIE_NAME)?.value;
-  if (!sc) return null;
-  try {
-    const decoded = await getFirebaseAdminAuth().verifySessionCookie(sc, true);
-    const snap = await getFirebaseAdminDb().doc(`users/${decoded.uid}`).get();
-    if (!snap.exists) return null;
-    const d = snap.data()!;
-    if (d.activo === false || d.archivado === true) return null;
-    return { uid: decoded.uid, rol: d.rol as RolInterno, tenantId: d.tenantId as TenantId };
-  } catch { return null; }
-}
 
 /* ── Helpers CSV ── */
 function esc(v: unknown): string {
@@ -65,8 +49,9 @@ function csvResponse(csv: string, filename: string): NextResponse {
 ══════════════════════════════════════════════════════════════ */
 
 export async function GET(request: Request): Promise<NextResponse> {
-  const usuario = await verificarSesion();
-  if (!usuario) return NextResponse.json({ error: 'No autorizado.' }, { status: 401 });
+  const autenticacion = await autenticarUsuarioInterno();
+  if (!autenticacion.ok) return autenticacion.respuesta;
+  const usuario = autenticacion.usuario;
   if (!ROLES_REPORTE.has(usuario.rol)) {
     return NextResponse.json({ error: 'Sin permiso para exportar reportes.' }, { status: 403 });
   }
