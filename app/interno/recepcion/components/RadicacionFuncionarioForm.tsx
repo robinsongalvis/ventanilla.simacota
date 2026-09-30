@@ -14,6 +14,11 @@ import {
   componerDescripcionAnexos,
   toggleMedio,
 } from '@/lib/recepcion/medios-anexos';
+import {
+  normalizarConsecutivo,
+  partirIdentificador,
+  planearRelevo,
+} from '@/lib/recepcion/consecutivo-relevo';
 import { sugerirDependencia } from '@/lib/recepcion/sugerir-dependencia';
 import { agruparDestinosPorDependencia, areasParaDependencia } from '@/lib/catalogos/areas';
 import { labelSerieDocumental, sugerirSerieDocumental } from '@/lib/catalogos/series-documentales';
@@ -130,8 +135,90 @@ const TIPO_PERSONA_OPCIONES: [TipoPersona, string][] = [
   ['NO_IDENTIFICADO',            'No identificado'],
 ];
 
+/**
+ * Campo del número de radicado con el consecutivo EDITABLE.
+ *
+ * Existe para el relevo del software anterior: el día del corte, quien radica
+ * tiene el libro delante y sabe en qué número quedó el sistema que se retira.
+ * El prefijo (`1-110-AAAAMM-`) NO se toca — lo fija la oficina radicadora y el
+ * mes — así que solo se edita lo que de verdad varía: el consecutivo.
+ *
+ * Se muestra a ADMIN y ventanilla. Para el resto el número sigue siendo
+ * automático: si cualquiera pudiera teclearlo, el consecutivo dejaría de ser
+ * una garantía y pasaría a depender de que nadie se equivoque cada día.
+ *
+ * Quien decide de verdad es el SERVIDOR: aquí solo se ayuda a verlo venir.
+ */
+function CampoConsecutivoEditable({
+  proximoOriginal, consecutivo, onChange,
+}: { proximoOriginal: string; consecutivo: string; onChange: (v: string) => void }) {
+  /* El veredicto negativo espera a que suelte el campo. Con el número puesto
+     (`00000030`) y el libro en 1780, escribir dígito a dígito pasa por 1, 17 y
+     178 —todos «ya usados»— y el aviso rojo parpadearía tres veces antes de
+     acertar. Se valida al salir, como cualquier formulario; y de todas formas
+     el envío lo vuelve a comprobar, así que nada se cuela por aquí. */
+  const [enFoco, setEnFoco] = useState(false);
+
+  const partes = partirIdentificador(proximoOriginal);
+  if (!partes) return <ReadOnlyField label="Número radicado" value={proximoOriginal} />;
+
+  const plan = planearRelevo(proximoOriginal, consecutivo);
+  const sinEmitir = !enFoco && plan.accion === 'rechazar' ? plan.mensaje : null;
+  const avanza = plan.accion === 'ajustar';
+
+  return (
+    <label className="flex flex-col gap-1">
+      <span className="text-[11px] font-bold uppercase tracking-wider" style={{ color: 'var(--tema-texto-64748b)' }}>
+        Número radicado
+      </span>
+      <div
+        className="flex items-center rounded-xl px-3 py-2 font-mono text-sm"
+        style={{
+          background: 'var(--tema-fondo-ffffff)',
+          border: `1px solid var(${sinEmitir ? '--tema-borde-fecaca' : '--tema-borde-dce4ea'})`,
+        }}
+      >
+        <span className="shrink-0 select-none" style={{ color: 'var(--tema-texto-64748b)' }}>{partes.prefijo}</span>
+        <input
+          type="text"
+          inputMode="numeric"
+          value={consecutivo}
+          onChange={(e) => onChange(normalizarConsecutivo(e.target.value))}
+          /* Al entrar se selecciona todo: el número viene puesto y lo que ella
+             quiere es teclear el del libro encima, no borrar ocho ceros. */
+          onFocus={(e) => { setEnFoco(true); e.currentTarget.select(); }}
+          onBlur={() => setEnFoco(false)}
+          aria-label="Consecutivo del radicado"
+          aria-invalid={sinEmitir ? true : undefined}
+          className="w-full min-w-0 bg-transparent font-mono font-bold outline-none"
+          style={{ color: 'var(--tema-texto-172033)' }}
+        />
+      </div>
+      {sinEmitir ? (
+        <span role="alert" className="text-[10px] font-semibold" style={{ color: 'var(--tema-texto-d81e1e)' }}>
+          {sinEmitir}
+        </span>
+      ) : avanza ? (
+        /* Un salto deja un hueco en la serie, y eso hay que verlo ANTES de
+           radicar: después el número ya es la identidad legal del trámite. */
+        <span className="text-[10px] font-semibold" style={{ color: 'var(--tema-texto-007049)' }}>
+          Continuará desde este número. El anterior queda como {plan.ultimoDelSistemaAnterior}.
+        </span>
+      ) : (
+        <span className="text-[10px]" style={{ color: 'var(--tema-texto-64748b)' }}>
+          Solo si releva otro sistema: escriba el número que sigue al del libro.
+        </span>
+      )}
+    </label>
+  );
+}
+
 interface Props {
   radicadoPreview: string;
+  /** Presentes solo cuando el rol puede fijar el consecutivo (ADMIN y ventanilla).
+   *  El texto vive en el contenedor porque es él quien lo envía al radicar. */
+  consecutivoEditado?: string;
+  onConsecutivoChange?: (consecutivo: string) => void;
   onSubmit?: (payload: FormState & { archivos: File[]; fechaVencimiento: string }) => Promise<void> | void;
   /** Sprint UI Radicación Rápida: id del <form> para disparar submit desde un botón externo (footer modal). */
   formId?: string;
@@ -198,7 +285,7 @@ const sectionStyle = { border: '1px solid var(--tema-borde-dce4ea)', boxShadow: 
 const labelCls = 'mb-1 block text-[10px] font-bold uppercase tracking-widest';
 const labelStyle = { color: 'var(--tema-texto-64748b)' };
 
-export function RadicacionFuncionarioForm({ radicadoPreview, onSubmit, formId, hideSubmitButton = false, radicados = SIN_RADICADOS }: Props) {
+export function RadicacionFuncionarioForm({ radicadoPreview, consecutivoEditado, onConsecutivoChange, onSubmit, formId, hideSubmitButton = false, radicados = SIN_RADICADOS }: Props) {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [form, setForm] = useState<FormState>(INITIAL_FORM);
   // Sprint Solicitante frecuente — autocompletar con confirmación humana.
@@ -340,7 +427,17 @@ export function RadicacionFuncionarioForm({ radicadoPreview, onSubmit, formId, h
       <section className={sectionCls} style={sectionStyle}>
         <SectionTitle eyebrow="Radicado" title="Datos de recepción" />
         <div className="grid gap-4 grid-cols-1 md:grid-cols-2 xl:grid-cols-4">
-          <ReadOnlyField label="Número radicado" value={radicadoPreview} />
+          {/* El número es automático salvo para quien puede relevar otro
+              sistema; ahí el prefijo sigue fijo y solo se edita el consecutivo. */}
+          {onConsecutivoChange && consecutivoEditado !== undefined ? (
+            <CampoConsecutivoEditable
+              proximoOriginal={radicadoPreview}
+              consecutivo={consecutivoEditado}
+              onChange={onConsecutivoChange}
+            />
+          ) : (
+            <ReadOnlyField label="Número radicado" value={radicadoPreview} />
+          )}
           <ReadOnlyField label="Fecha y hora"    value={formatDateTime(fechaRadicado)} />
           <SelectField
             label="Medio de recepción"

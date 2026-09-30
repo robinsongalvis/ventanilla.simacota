@@ -1,4 +1,5 @@
 import { NextResponse } from 'next/server';
+import { puedeMoverConsecutivoRadicacion } from '@/lib/permisos/consecutivo-radicacion';
 import { autenticarUsuarioInterno } from '@/lib/server/internal-auth-http';
 import { getFirebaseAdminDb } from '@/lib/firebase-admin';
 import { atLocalNoon } from '@/lib/tiempos-radicado';
@@ -14,12 +15,13 @@ import {
 
    Sirve al cambio de software de la Alcaldía: el sistema anterior sigue
    emitiendo hasta el día del corte, y cuál fue su último radicado solo se sabe
-   ese día, mirando el libro de ventanilla. Esta ruta permite que una persona
-   con rol de administración lo declare, para que la numeración continúe sin
-   huecos y sin repetir.
+   ese día, mirando el libro de ventanilla. Esta ruta permite que quien lo
+   tiene delante —administración o la propia ventanilla— lo declare, para que la
+   numeración continúe sin huecos y sin repetir.
 
    GUARDAS, en orden:
-    1. Sesión interna activa y rol autorizado — un consecutivo mal movido
+    1. Sesión interna activa y rol autorizado — administración y ventanilla,
+       según `puedeMoverConsecutivoRadicacion`: un consecutivo mal movido
        falsea el registro público del municipio.
     2. Solo AVANZA (`validarAjusteConsecutivo`): retroceder reemitiría números
        que ya están en manos de ciudadanos.
@@ -40,7 +42,7 @@ export async function GET(): Promise<NextResponse> {
   const autenticacion = await autenticarUsuarioInterno();
   if (!autenticacion.ok) return autenticacion.respuesta;
   const usuario = autenticacion.usuario;
-  if (usuario.rol !== 'ADMIN') {
+  if (!puedeMoverConsecutivoRadicacion(usuario.rol)) {
     return NextResponse.json({ error: 'Su rol no puede consultar el consecutivo.' }, { status: 403 });
   }
   try {
@@ -64,7 +66,7 @@ export async function POST(request: Request): Promise<NextResponse> {
   const autenticacion = await autenticarUsuarioInterno();
   if (!autenticacion.ok) return autenticacion.respuesta;
   const usuario = autenticacion.usuario;
-  if (usuario.rol !== 'ADMIN') {
+  if (!puedeMoverConsecutivoRadicacion(usuario.rol)) {
     return NextResponse.json({ error: 'Su rol no puede ajustar el consecutivo.' }, { status: 403 });
   }
 

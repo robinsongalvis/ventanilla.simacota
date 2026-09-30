@@ -50,6 +50,8 @@ import { NOMBRES_TENANT, DIRECTORIO_TENANTS } from '@/src/types/reglas-negocio';
 import { diasRestantesHabiles, resolverTipoSolicitud } from '@/lib/tiempos-radicado';
 import { RadicacionFuncionarioForm }       from '@/app/interno/recepcion/components/RadicacionFuncionarioForm';
 import { radicarSegunFlag }                from '@/lib/recepcion/radicar-segun-flag';
+import { partirIdentificador, planearRelevo } from '@/lib/recepcion/consecutivo-relevo';
+import { puedeMoverConsecutivoRadicacion }    from '@/lib/permisos/consecutivo-radicacion';
 import { ComprobanteRadicado }             from '@/app/interno/dashboard/components/ComprobanteRadicado';
 import { SelloRecibido }                   from '@/app/interno/dashboard/components/SelloRecibido';
 import { CompletarDatosSolicitante }       from '@/app/interno/dashboard/components/CompletarDatosSolicitante';
@@ -3464,6 +3466,41 @@ function DrawerNuevoRadicado({
   const [vistaExito, setVistaExito] = useState<'constancia' | 'sello'>('constancia');
   const FORM_ID = 'rad-rapida-form';
 
+  /* ── Relevo del software anterior ────────────────────────────────────────
+     El municipio viene de otro sistema que sigue emitiendo radicados hasta el
+     día del corte, y cuál fue el último solo se sabe ese día, en el libro que
+     tiene la funcionaria delante. Por eso el número que saldría se consulta al
+     servidor y se muestra EDITABLE a quien radica en ventanilla, en lugar de
+     configurarse semanas antes por alguien técnico.
+
+     Si la consulta falla, el campo cae al texto de siempre y la radicación
+     funciona igual: un relevo pendiente nunca puede impedir radicar. */
+  const puedeFijarConsecutivo = puedeMoverConsecutivoRadicacion(usuario.rol);
+  const [proximoRadicado,    setProximoRadicado]    = useState<string | null>(null);
+  const [consecutivoEditado, setConsecutivoEditado] = useState<string | undefined>(undefined);
+
+  useEffect(() => {
+    if (!puedeFijarConsecutivo) return;
+    let vigente = true;
+    void (async () => {
+      try {
+        const res = await fetch('/api/interno/consecutivo-radicacion', { credentials: 'include' });
+        if (!res.ok) return;
+        const cuerpo: { proximoRadicado?: unknown } = await res.json();
+        const proximo = cuerpo?.proximoRadicado;
+        if (typeof proximo !== 'string') return;
+        const partes = partirIdentificador(proximo);
+        // `vigente` evita escribir estado si el modal se cerró mientras respondía.
+        if (!vigente || !partes) return;
+        setProximoRadicado(proximo);
+        setConsecutivoEditado(partes.consecutivo);
+      } catch {
+        /* Sin número previo se radica igual: el servidor emite el que toque. */
+      }
+    })();
+    return () => { vigente = false; };
+  }, [puedeFijarConsecutivo]);
+
   async function handleEnviarConstancia(): Promise<void> {
     if (!radicadoGenerado) return;
     setEstadoEnvioConstancia('enviando');
@@ -3508,6 +3545,44 @@ function DrawerNuevoRadicado({
     setProgresoPct(5);
 
     try {
+      /* Relevo: si el número se cambió, primero se fija el contador y SOLO
+         entonces se radica. El orden no es indiferente — radicar antes dejaría
+         este radicado con el número viejo y el contador movido para el
+         siguiente, que es justo el hueco que se quiere evitar.
+
+         La emisión del consecutivo no se toca: sigue saliendo de su transacción
+         de siempre (defecto H3 — consecutivos fantasma, guard D9, ADR-0029).
+         Aquí solo se deja el contador en su sitio. */
+      if (proximoRadicado && consecutivoEditado !== undefined) {
+        const plan = planearRelevo(proximoRadicado, consecutivoEditado);
+        if (plan.accion === 'rechazar') {
+          setErrorGuardado(plan.mensaje);
+          setProgreso('');
+          setProgresoPct(0);
+          return;
+        }
+        if (plan.accion === 'ajustar') {
+          setProgreso('Fijando el número del radicado…');
+          const res = await fetch('/api/interno/consecutivo-radicacion', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            credentials: 'include',
+            body: JSON.stringify({
+              ultimoDelSistemaAnterior: plan.ultimoDelSistemaAnterior,
+              motivo: plan.motivo,
+            }),
+          });
+          if (!res.ok) {
+            const cuerpo: { error?: string } = await res.json().catch(() => ({}));
+            // No se radica nada: mejor un reintento que un número equivocado.
+            setErrorGuardado(cuerpo.error ?? 'No fue posible fijar el número del radicado. No se radicó nada.');
+            setProgreso('');
+            setProgresoPct(0);
+            return;
+          }
+        }
+      }
+
       const ahora = new Date();
       // Pieza angular (P2.1) — Fase 3: bifurcación por
       // Camino ÚNICO por el servidor desde el cutover PT-1 (24-ago-2026):
@@ -3731,7 +3806,9 @@ function DrawerNuevoRadicado({
 
           {!radicadoGenerado && (
             <RadicacionFuncionarioForm
-              radicadoPreview="Se generará al radicar"
+              radicadoPreview={proximoRadicado ?? 'Se generará al radicar'}
+              consecutivoEditado={consecutivoEditado}
+              onConsecutivoChange={puedeFijarConsecutivo ? setConsecutivoEditado : undefined}
               onSubmit={handleSubmit}
               formId={FORM_ID}
               hideSubmitButton

@@ -82,7 +82,7 @@ beforeEach(() => {
 
 afterEach(() => vi.useRealTimers());
 
-describe('consecutivo-radicacion: autenticación antes de leer o escribir', () => {
+describe('consecutivo-radicacion: autenticación y rol antes de leer o escribir', () => {
   it.each([401, 403, 500])('conserva la respuesta %s del guard en GET y POST', async (status) => {
     mocks.autenticar.mockImplementation(async () => ({
       ok: false, status, mensaje: 'Acceso rechazado',
@@ -93,11 +93,34 @@ describe('consecutivo-radicacion: autenticación antes de leer o escribir', () =
     expect(mocks.obtenerDb).not.toHaveBeenCalled();
   });
 
-  it.each(['RECEPCIONISTA', 'SECRETARIO', 'JEFE', 'CONTRATISTA', 'SUPER_ADMIN', 'DESARROLLADOR'])('rechaza el rol %s', async (rol) => {
+  it.each(['FUNCIONARIO', 'JEFE_DEPENDENCIA', 'CONTROL_INTERNO', 'SECRETARIO', 'JEFE', 'CONTRATISTA', 'SUPER_ADMIN', 'DESARROLLADOR'])('rechaza el rol %s', async (rol) => {
     mocks.autenticar.mockResolvedValue({ ok: true, usuario: { ...usuario, rol } });
     expect((await GET()).status).toBe(403);
     expect((await POST(solicitud())).status).toBe(403);
     expect(mocks.obtenerDb).not.toHaveBeenCalled();
+  });
+
+  /* RECEPCIONISTA entró después, y no por relajar la guarda: el último número
+     del sistema anterior está en el libro físico de ventanilla y quien lo mira
+     es la funcionaria que radica. Obligarla a pedirle el ajuste a un
+     administrador el día del corte, con ciudadanos en el mostrador, garantiza
+     que el relevo acabe anotado a mano en una hoja — lo que este sistema
+     reemplaza. El riesgo sigue acotado por lo de siempre: el contador solo
+     avanza, exige motivo y queda en `admin_auditoria` con nombre y fecha.
+     Ver `lib/permisos/consecutivo-radicacion.ts`. */
+  it.each(['ADMIN', 'RECEPCIONISTA'])('admite el rol %s — administración y ventanilla', async (rol) => {
+    mocks.autenticar.mockResolvedValue({ ok: true, usuario: { ...usuario, rol } });
+    expect((await GET()).status).toBe(200);
+    expect((await POST(solicitud())).status).toBe(200);
+  });
+
+  it('el ajuste queda auditado con el rol de quien lo hizo, no con un ADMIN genérico', async () => {
+    /* Si la auditoría no distinguiera el rol, un relevo hecho en ventanilla
+       sería indistinguible de uno hecho por administración — y es justo lo que
+       hay que poder reconstruir si el libro y el sistema no cuadran. */
+    mocks.autenticar.mockResolvedValue({ ok: true, usuario: { ...usuario, rol: 'RECEPCIONISTA' } });
+    expect((await POST(solicitud())).status).toBe(200);
+    expect(documentos.get('admin_auditoria/auditoria-1')).toMatchObject({ actorRol: 'RECEPCIONISTA' });
   });
 });
 
