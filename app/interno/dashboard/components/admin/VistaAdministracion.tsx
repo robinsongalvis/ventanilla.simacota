@@ -9,6 +9,7 @@
  */
 
 import { useCallback, useEffect, useState }  from 'react';
+import { AjusteConsecutivoRadicacion }       from './AjusteConsecutivoRadicacion';
 import { DIRECTORIO_TENANTS, NOMBRES_TENANT } from '@/src/types/reglas-negocio';
 import type { TenantId }                      from '@/src/types/radicado';
 import type { RolInterno }                    from '@/lib/hooks/useAuth';
@@ -496,6 +497,13 @@ export function VistaAdministracion() {
             </table>
           </div>
         )}
+
+        {/* Consecutivo de radicación — se usa el día del relevo del software
+            anterior. Vive en Administración porque mueve la numeración oficial
+            del municipio: no es una preferencia, es el registro público. */}
+        <div className="mt-5">
+          <AjusteConsecutivoRadicacion />
+        </div>
       </div>
 
       {/* Modal Crear Usuario */}
