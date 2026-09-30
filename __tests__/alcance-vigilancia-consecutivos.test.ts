@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import { SERIES_CONSECUTIVO } from '@/lib/server/consecutivo-legal';
 import { elementosNoDeclarados, elementosFantasma } from '@/lib/server/alcance-vigilancia';
-import { ALCANCE_BARRIDA_CONTINUIDAD } from '@/app/api/cron/auditoria-consecutivos/route';
+import { ALCANCE_BARRIDA_CONTINUIDAD } from '@/lib/server/auditoria-consecutivos';
 import { COLECCION_POR_SERIE } from '@/scripts/laboratorio/detectar-consecutivos-fantasma.mjs';
 
 /**

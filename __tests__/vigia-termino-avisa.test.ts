@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { esLunes } from '@/app/api/cron/vencimientos-licencias/route';
+import { esLunes } from '@/lib/server/vigilancia-termino';
 import {
   buildNovedadesVigilanciaHtml,
   buildNovedadesVigilanciaSubject,
