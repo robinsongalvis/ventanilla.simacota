@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { clasificarFrenteAlTermino } from '@/app/api/cron/vencimientos-licencias/route';
+import { clasificarFrenteAlTermino } from '@/lib/motor-expedientes/semaforo-termino';
 
 /** Un expediente que sí ancló su término, venciendo en `vence`. */
 const conTermino = (estado: string, vence: string) => ({

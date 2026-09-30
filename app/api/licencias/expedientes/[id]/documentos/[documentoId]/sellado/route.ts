@@ -56,14 +56,12 @@ import { formatFechaHoraColombia } from '@/lib/fecha-colombia';
 import { cargarEscudo } from '@/lib/sello/cargar-logo';
 import { numeroDeEntrada } from '@/lib/motor-expedientes/numeros-del-expediente';
 import { logError } from '@/lib/logger';
+import { PREFIJO_SELLADOS } from '@/lib/sello/rutas-sellado';
 
 export const runtime = 'nodejs';
 
 const MIME_SELLABLE = 'application/pdf';
 const URL_EXPIRA_MS = 10 * 60 * 1000;
-
-/** Prefijo de las copias selladas. EXCLUIDO del respaldo: derivado regenerable. */
-export const PREFIJO_SELLADOS = 'sellados/expedientes';
 
 export async function GET(
   _request: Request,

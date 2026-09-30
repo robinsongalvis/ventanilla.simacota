@@ -47,13 +47,11 @@ import { cargarEscudo, cargarLogo } from '@/lib/sello/cargar-logo';
 import { numeroDeEntrada } from '@/lib/motor-expedientes/numeros-del-expediente';
 import { VERSION_RENDER_SELLO } from '@/lib/sello/generar-sello-pdf';
 import { logError } from '@/lib/logger';
+import { PREFIJO_SELLADOS } from '@/lib/sello/rutas-sellado';
 
 export const runtime = 'nodejs';
 
 const URL_EXPIRA_MS = 10 * 60 * 1000;
-/** Mismo árbol que el sello por documento: derivado regenerable, sin respaldo. */
-const PREFIJO_PAQUETES = 'sellados/expedientes';
-
 export async function GET(
   request: Request,
   { params }: { params: Promise<{ id: string }> },
@@ -143,7 +141,7 @@ export async function GET(
       huella.update(`${d.id}:${d.versionVigente?.hashSha256 ?? 'sin-version'};`);
     }
     const clave = huella.digest('hex');
-    const archivoPaquete = bucket.file(`${PREFIJO_PAQUETES}/${id}/paquete/${clave}.pdf`);
+    const archivoPaquete = bucket.file(`${PREFIJO_SELLADOS}/${id}/paquete/${clave}.pdf`);
 
     const [yaExistia] = await archivoPaquete.exists();
     if (!yaExistia) {
