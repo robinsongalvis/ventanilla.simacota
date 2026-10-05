@@ -1,0 +1,168 @@
+name: Validacion aislada contingencia - Linux Node 24
+
+on:
+  push:
+    branches:
+      - validation/contingencia-node24-linux-20261005
+
+permissions:
+  contents: read
+
+concurrency:
+  group: contingencia-node24-linux-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  validate:
+    name: Candidato exacto en Ubuntu y Node 24
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+    env:
+      CANDIDATE_SHA: 8a67862016bfb6cd177db5dcba618dc0028245c2
+
+    steps:
+      - name: Checkout exacto del candidato
+        uses: actions/checkout@v7
+        with:
+          ref: 8a67862016bfb6cd177db5dcba618dc0028245c2
+          fetch-depth: 1
+          persist-credentials: false
+
+      - name: Verificar identidad e integridad del checkout
+        id: checkout
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = "$CANDIDATE_SHA"
+          test -z "$(git status --porcelain)"
+          echo "sha=$(git rev-parse HEAD)" >> "$GITHUB_OUTPUT"
+
+      - name: Configurar Node 24
+        uses: actions/setup-node@v7
+        with:
+          node-version: 24.x
+          cache: npm
+
+      - name: Configurar Java para el emulador Firestore
+        uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: '21'
+
+      - name: Verificar runtime (prohibe Node 22)
+        id: runtime
+        shell: bash
+        run: |
+          set -euo pipefail
+          node -e "const major = Number(process.versions.node.split('.')[0]); if (major !== 24) { throw new Error('Se exige Node 24 y se obtuvo ' + process.versions.node); }"
+          echo "node=$(node --version)" >> "$GITHUB_OUTPUT"
+          echo "npm=$(npm --version)" >> "$GITHUB_OUTPUT"
+
+      - name: Instalar dependencias reproducibles
+        id: install
+        run: npm ci
+
+      - name: Verificar arbol Firebase Admin sin override gRPC
+        id: admin_tree
+        if: ${{ !cancelled() }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          node -e "const p=require('./package.json'); if(p.dependencies['firebase-admin']!=='14.4.0') throw new Error('firebase-admin distinto de 14.4.0'); if(p.overrides?.['@grpc/grpc-js']) throw new Error('Override de @grpc/grpc-js no autorizado');"
+          npm ls firebase-admin @google-cloud/firestore @grpc/grpc-js firebase @firebase/firestore --all
+
+      - name: NPM audit (sin excepciones)
+        id: audit
+        if: ${{ !cancelled() }}
+        run: npm audit --audit-level=high
+
+      - name: TypeScript estricto
+        id: typescript
+        if: ${{ !cancelled() }}
+        run: npx tsc --noEmit
+
+      - name: Lint
+        id: lint
+        if: ${{ !cancelled() }}
+        run: npm run lint
+
+      - name: Suite completa serializada
+        id: tests
+        if: ${{ !cancelled() }}
+        run: npm test -- --testTimeout=30000 --maxWorkers=1 --no-file-parallelism
+
+      - name: Rules y transacciones en emulador Firestore
+        id: rules
+        if: ${{ !cancelled() }}
+        run: npx --yes firebase-tools@15.19.0 emulators:exec --only firestore --project demo-ventanilla-lab "npm run test:rules"
+
+      - name: Pruebas focalizadas de contingencia
+        id: contingency
+        if: ${{ !cancelled() }}
+        run: >-
+          npm exec -- vitest run
+          __tests__/consecutivo-apertura-dinamica.test.ts
+          __tests__/consecutivo-radicacion-handler.test.ts
+          __tests__/contingencia-cuarentena.test.ts
+          __tests__/contingencia-emisores-cerrados.test.ts
+          __tests__/contingencia-fecha-apertura.test.ts
+          __tests__/contingencia-storage-radicacion.test.ts
+          __tests__/contingencia-storage-regularizacion.test.ts
+          __tests__/contingencia-ui.test.tsx
+          --testTimeout=30000 --maxWorkers=1 --no-file-parallelism
+
+      - name: Pruebas focalizadas de Firebase Admin
+        id: firebase_admin
+        if: ${{ !cancelled() }}
+        run: >-
+          npm exec -- vitest run
+          __tests__/regresion-esm-require-firebase-admin.test.ts
+          __tests__/internal-auth.test.ts
+          __tests__/consecutivo-apertura-dinamica.test.ts
+          __tests__/consecutivo-radicacion-handler.test.ts
+          __tests__/consecutivo-legal.test.ts
+          __tests__/contingencia-storage-regularizacion.test.ts
+          --testTimeout=30000 --maxWorkers=1 --no-file-parallelism
+
+      - name: Build Webpack
+        id: build
+        if: ${{ !cancelled() }}
+        run: npm run build -- --webpack
+
+      - name: Resumen verificable
+        if: ${{ always() }}
+        shell: bash
+        env:
+          CHECKOUT_OUTCOME: ${{ steps.checkout.outcome }}
+          INSTALL_OUTCOME: ${{ steps.install.outcome }}
+          ADMIN_TREE_OUTCOME: ${{ steps.admin_tree.outcome }}
+          AUDIT_OUTCOME: ${{ steps.audit.outcome }}
+          TYPESCRIPT_OUTCOME: ${{ steps.typescript.outcome }}
+          LINT_OUTCOME: ${{ steps.lint.outcome }}
+          TESTS_OUTCOME: ${{ steps.tests.outcome }}
+          RULES_OUTCOME: ${{ steps.rules.outcome }}
+          CONTINGENCY_OUTCOME: ${{ steps.contingency.outcome }}
+          FIREBASE_ADMIN_OUTCOME: ${{ steps.firebase_admin.outcome }}
+          BUILD_OUTCOME: ${{ steps.build.outcome }}
+          NODE_VERSION: ${{ steps.runtime.outputs.node }}
+          NPM_VERSION: ${{ steps.runtime.outputs.npm }}
+        run: |
+          {
+            echo "## Evidencia Linux + Node 24"
+            echo
+            echo "- Workflow commit: \`${GITHUB_SHA}\`"
+            echo "- Candidate checkout: \`${CANDIDATE_SHA}\`"
+            echo "- Node: \`${NODE_VERSION}\`"
+            echo "- npm: \`${NPM_VERSION}\`"
+            echo "- checkout: \`${CHECKOUT_OUTCOME}\`"
+            echo "- npm ci: \`${INSTALL_OUTCOME}\`"
+            echo "- Firebase Admin tree: \`${ADMIN_TREE_OUTCOME}\`"
+            echo "- npm audit: \`${AUDIT_OUTCOME}\`"
+            echo "- TypeScript: \`${TYPESCRIPT_OUTCOME}\`"
+            echo "- lint: \`${LINT_OUTCOME}\`"
+            echo "- suite completa: \`${TESTS_OUTCOME}\`"
+            echo "- Rules/emulador: \`${RULES_OUTCOME}\`"
+            echo "- contingencia: \`${CONTINGENCY_OUTCOME}\`"
+            echo "- Firebase Admin: \`${FIREBASE_ADMIN_OUTCOME}\`"
+            echo "- build Webpack: \`${BUILD_OUTCOME}\`"
+          } >> "$GITHUB_STEP_SUMMARY"
