@@ -1,6 +1,6 @@
 {
   "_documentacion": {
-    "proposito": "Allowlist GOBERNADA del gate de auditoría (ADR-0028). La consume scripts/ci/audit-gate.mjs. Arranca VACÍA: el Hito 1 (#147) remedió las 5 advisories vigentes; NO se allowlista deuda existente. Solo se añade una entrada cuando una advisory high/critical proviene de una transitiva SIN fix upstream y NO es alcanzable, para romper el hard-deadlock del branch protection sin desactivar el gate.",
+    "proposito": "Allowlist GOBERNADA del gate de auditoría (ADR-0028). La consume scripts/ci/audit-gate.mjs. Se creó VACÍA porque el Hito 1 (#147) remedió las 5 advisories entonces vigentes; cada alta posterior exige aceptación formal, id exacto, responsable y caducidad. Solo se añade una entrada cuando una advisory high/critical proviene de una transitiva sin remediación compatible y la evaluación de alcanzabilidad justifica romper el hard-deadlock del branch protection sin desactivar el gate.",
     "invariantes_de_seguridad": [
       "El gate FALLA ante cualquier advisory high/critical que NO esté aquí por su id EXACTO.",
       "Cada entrada EXIGE los 7 campos de 'esquema_entrada'. Una entrada mal formada FALLA el gate.",
@@ -27,5 +27,24 @@
       "responsable": "seguridad — Nombre Apellido"
     }
   },
-  "exceptions": []
+  "exceptions": [
+    {
+      "advisory": "GHSA-m9gg-hp2v-232j",
+      "paquete": "@grpc/grpc-js",
+      "justificacion": "Riesgo upstream aceptado temporalmente: Firebase 12.18.0 fija @firebase/firestore 4.17.1, que declara @grpc/grpc-js ~1.9.0. La primera versión corregida (1.13.6) queda fuera de ese rango; no se aplicará un override fuera de semver. Firebase Admin ya resuelve 1.14.5.",
+      "alcanzabilidad": "No se identificó código de la aplicación que cree o exponga un servidor gRPC, use getAuthContext ni valide certificados de clientes. La instancia 1.9.16 se consume indirectamente por Firestore como cliente saliente; queda riesgo residual de cadena de suministro hasta una actualización upstream.",
+      "fechaAlta": "2026-10-05",
+      "caducidad": "2026-10-26",
+      "responsable": "seguridad — Robinson Galvis (propietario)"
+    },
+    {
+      "advisory": "GHSA-vfj7-8cjw-p6xm",
+      "paquete": "braces",
+      "justificacion": "Hallazgo sin versión corregida compatible en la cadena eslint-config-next 16.3.3 → @next/eslint-plugin-next 16.3.3 → fast-glob 3.3.1 → micromatch 4.0.8 → braces 3.0.3. Degradar Next.js 16.3.6 o forzar overrides introduce mayor riesgo; se mantiene seguimiento pasivo temporal.",
+      "alcanzabilidad": "La cadena completa está marcada dev=true en package-lock.json y se utiliza en lint/tooling de CI; no forma parte del runtime de Production ni procesa patrones aportados por ciudadanos. El riesgo residual es agotamiento de recursos del runner durante tooling.",
+      "fechaAlta": "2026-10-05",
+      "caducidad": "2026-10-26",
+      "responsable": "seguridad — Robinson Galvis (propietario)"
+    }
+  ]
 }
