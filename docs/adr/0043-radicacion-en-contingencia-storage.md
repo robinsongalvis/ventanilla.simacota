@@ -2,6 +2,10 @@
 
 Fecha: 2026-09-29. Estado: implementación autorizada; apertura y despliegue Production pendientes de revisión.
 
+Actualización 2026-09-30: el punto fijo 1745 descrito originalmente queda
+reemplazado por la apertura única configurable y bloqueada del ADR 0048. El
+valor 1745 continúa como sugerencia, no como constante de ejecución.
+
 ## Contexto e impacto (nivel 3)
 
 Firebase Storage Production está bloqueado por Billing. Firestore permite el registro
@@ -54,12 +58,13 @@ no resuelve Billing, backups, dominio, SMTP, Sentry ni capacidad.
 
 ## Validación y límites de autorización
 
-Pruebas locales completas y revisión cruzada, seguidas de **una** radicación
-sintética en Stage con sesión legítima y datos sintéticos. Nunca una prueba en
-Production. El contador Production debe permanecer en 27; se propone 1744 para
-que el primer real sea 1745. El libro externo está congelado por instrucción
-del propietario. Si cambia el mes antes de abrir, no se falsea la fecha: se
-solicita revisar el consecutivo previsto.
+Pruebas locales completas y revisión cruzada, seguidas de validaciones
+sintéticas exclusivamente en Stage con sesión legítima. Nunca una prueba en
+Production. El contador Production debe permanecer en 27 hasta que un ADMIN
+confirme una sola vez el primer número real. El valor sugerido es 1745, pero el
+ADMIN puede escoger otro número válido; el contador queda en `N-1` sin consumir
+`N`. El libro externo está congelado por instrucción del propietario. Si cambia
+el período antes de abrir, el número conserva la fecha real de `America/Bogota`.
 
 No se abre ni se despliega Production en esta fase. Evidencia y autorización
 administrativa en el acta de apertura y el runbook de esta entrega.

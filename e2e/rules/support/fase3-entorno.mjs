@@ -68,9 +68,19 @@ function pluginFronterasMock(contingencia) {
  * credenciales). No es una tercera frontera mockeada: `getFirebaseAdminApp`/
  * `getFirebaseAdminDb` siguen siendo el código real, sin un solo cambio.
  */
-function asegurarCredencialFalsa() {
-  if (process.env.FIREBASE_SERVICE_ACCOUNT) return;
-  const proyecto = process.env.GCLOUD_PROJECT ?? 'demo-ventanilla-lab';
+function asegurarCredencialFalsa(proyectoAdminEmulado) {
+  if (process.env.FIREBASE_SERVICE_ACCOUNT) {
+    if (proyectoAdminEmulado) {
+      throw new Error(
+        '⛔ El proyecto Admin emulado exige iniciar sin FIREBASE_SERVICE_ACCOUNT; ' +
+          'no se sustituye ni se reutiliza una credencial preexistente.',
+      );
+    }
+    return;
+  }
+  const proyecto = proyectoAdminEmulado
+    ?? process.env.GCLOUD_PROJECT
+    ?? 'demo-ventanilla-lab';
   const { privateKey } = generateKeyPairSync('rsa', {
     modulusLength: 2048,
     privateKeyEncoding: { type: 'pkcs8', format: 'pem' },
@@ -90,7 +100,10 @@ let servidorVite = null;
  * este arnés SOLO corre dentro de `firebase emulators:exec` (igual que
  * `e2e/rules/setup.mjs`); nunca contra Firestore real.
  */
-export async function iniciarEntorno({ contingencia = false } = {}) {
+export async function iniciarEntorno({
+  contingencia = false,
+  proyectoAdminEmulado,
+} = {}) {
   if (!process.env.FIRESTORE_EMULATOR_HOST) {
     throw new Error(
       '⛔ fase3-entorno.mjs solo corre contra el emulador de Firestore ' +
@@ -103,7 +116,18 @@ export async function iniciarEntorno({ contingencia = false } = {}) {
     );
   }
 
-  asegurarCredencialFalsa();
+  if (proyectoAdminEmulado !== undefined && (
+    contingencia !== true
+    || proyectoAdminEmulado !== 'ventanilla-simacota-stage'
+    || !/^(127\.0\.0\.1|localhost):\d+$/.test(process.env.FIRESTORE_EMULATOR_HOST)
+  )) {
+    throw new Error(
+      '⛔ El proyecto Admin emulado solo admite ventanilla-simacota-stage ' +
+        'en la prueba de contingencia contra un emulador Firestore local.',
+    );
+  }
+
+  asegurarCredencialFalsa(proyectoAdminEmulado);
   process.env.FIREBASE_STORAGE_BUCKET ??= 'fase3-bucket-simulado';
 
   servidorVite = await createServer({
@@ -126,12 +150,18 @@ export async function iniciarEntorno({ contingencia = false } = {}) {
     servidorVite.ssrLoadModule(RUTA_STORAGE_STUB),
   ]);
 
+  const proyectoAdmin = storageMod.getFirebaseAdminApp().options.projectId;
+  if (proyectoAdminEmulado && proyectoAdmin !== proyectoAdminEmulado) {
+    throw new Error('⛔ El Admin SDK del ensayo no quedó aislado en el proyecto Stage esperado.');
+  }
+
   return {
     /** Handler POST REAL de app/api/radicacion/interna/route.ts, sin reimplementar. */
     POST: routeMod.POST,
     setSession: authMod.__setSession,
     clearSession: authMod.__clearSession,
     getFirebaseAdminDb: storageMod.getFirebaseAdminDb,
+    getFirebaseAdminProjectId: () => proyectoAdmin,
     inspeccionarAlmacenFalso: storageMod.__inspeccionarAlmacenFalso,
     limpiarAlmacenFalso: storageMod.__limpiarAlmacenFalso,
     /**

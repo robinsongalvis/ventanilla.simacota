@@ -9,23 +9,66 @@ let db;
 let anio;
 let tipoSolicitudId;
 let reservaColision;
+let contadorOriginal;
+let auditoriaAperturaId;
+const radicadosCreados = [];
+const PRIMER_NUMERO_SINTETICO = 41;
 const actor = { uid: 'contingencia-emulador', nombre: 'Recepción sintética local', email: 'test@example.invalid', rol: 'RECEPCIONISTA', tenantId: 'VENTANILLA_UNICA', activo: true };
 
 before(async () => {
   assert.match(process.env.FIRESTORE_EMULATOR_HOST ?? '', /^(127\.0\.0\.1|localhost):\d+$/);
   assert.equal(process.env.GCLOUD_PROJECT, 'demo-ventanilla-lab');
   assert.equal(Boolean(process.env.FIREBASE_SERVICE_ACCOUNT), false, 'No se aceptan credenciales reales');
-  entorno = await iniciarEntorno({ contingencia: true });
+  entorno = await iniciarEntorno({
+    contingencia: true,
+    proyectoAdminEmulado: 'ventanilla-simacota-stage',
+  });
+  assert.equal(entorno.getFirebaseAdminProjectId(), 'ventanilla-simacota-stage');
   db = entorno.getFirebaseAdminDb();
   const fechas = await entorno.cargarModulo('@/lib/fecha-colombia');
-  anio = fechas.periodoColombia(new Date()).anio;
+  const fechaApertura = new Date();
+  anio = fechas.periodoColombia(fechaApertura).anio;
   const catalogo = await entorno.cargarModulo('@/lib/catalogos/tipos-solicitud');
   tipoSolicitudId = catalogo.TIPOS_SOLICITUD_INTERNOS_IDS[0];
+  const counterRef = db.doc(`counters/radicados-${anio}`);
+  const counterSnap = await counterRef.get();
+  contadorOriginal = counterSnap.exists ? counterSnap.data() : null;
+  await counterRef.set({ ultimo: PRIMER_NUMERO_SINTETICO - 1, anio });
+
+  const { abrirSerieRadicadosUnaVez } = await entorno.cargarModulo('@/lib/server/apertura-series');
+  const apertura = await abrirSerieRadicadosUnaVez({
+    db,
+    primerNumero: PRIMER_NUMERO_SINTETICO,
+    actor: {
+      uid: 'admin-apertura-emulador',
+      nombre: 'Administración sintética local',
+      rol: 'ADMIN',
+      tenantId: 'VENTANILLA_UNICA',
+    },
+    fecha: fechaApertura,
+  });
+  assert.equal(apertura.ultimo, PRIMER_NUMERO_SINTETICO - 1);
+  assert.equal(apertura.apertura.primerNumero, PRIMER_NUMERO_SINTETICO);
+  auditoriaAperturaId = apertura.apertura.auditoriaId;
 });
 after(async () => {
-  // Solo el documento artificial de colisión del emulador local. No dejar
-  // bloqueado el siguiente caso de la batería; no existe credencial real.
-  if (reservaColision) await reservaColision.delete();
+  if (db) {
+    // Solo datos sintéticos del emulador local; no existe credencial real.
+    if (reservaColision) await reservaColision.delete().catch(() => {});
+    for (const id of radicadosCreados) {
+      const trazas = await db.collection(`ventanilla_radicados/${id}/trazabilidad`).get();
+      await Promise.all(trazas.docs.map((doc) => doc.ref.delete()));
+      await db.doc(`ventanilla_radicados/${id}`).delete().catch(() => {});
+      await db.doc(`unicidad_radicados/${id}`).delete().catch(() => {});
+    }
+    if (auditoriaAperturaId) {
+      await db.doc(`admin_auditoria/${auditoriaAperturaId}`).delete().catch(() => {});
+    }
+    const counterRef = db.doc(`counters/radicados-${anio}`);
+    if (contadorOriginal) await counterRef.set(contadorOriginal);
+    else await counterRef.delete().catch(() => {});
+    entorno.limpiarAlmacenFalso();
+  }
   await detenerEntorno();
 });
 
@@ -65,6 +108,7 @@ test('concurrencia real de contingencia: dos registros, dos reservas y trazas at
   assert.deepEqual(respuestas.map((r) => r.status), [200, 200]);
   assert.deepEqual(datos.map((d) => d.consecutivo).sort((a, b) => a - b), [antes + 1, antes + 2]);
   for (const resultado of datos) {
+    radicadosCreados.push(resultado.radicadoId);
     assert.equal(resultado.estadoAdjuntos, 'PENDIENTE_STORAGE');
     const ref = db.doc(`ventanilla_radicados/${resultado.radicadoId}`);
     const radicado = (await ref.get()).data();

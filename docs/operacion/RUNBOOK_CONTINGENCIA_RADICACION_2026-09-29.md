@@ -1,8 +1,8 @@
 # Runbook de radicación en contingencia
 
 Estado: entrega en validación; **Production no abierta ni desplegada**.
-Base: `54256f54cf1ad0cd1b3c61e59fc3c1424889e3f9`.
-Rama: `contingency/radicacion-2026-09-29`. Decisión: ADR0043.
+Candidato integrado: SHA pendiente de fijar después de todos los gates.
+Rama aislada: `release/hardening-prod-2026-09-30`. Decisiones: ADR0043 y ADR0048.
 
 ## Invariantes
 
@@ -21,6 +21,10 @@ Rama: `contingency/radicacion-2026-09-29`. Decisión: ADR0043.
   `PENDIENTE_STORAGE` es un estado de soportes, no suspende plazos del trámite.
 - No afirmar que hay archivo digital guardado ni borrar originales pendientes.
 - Test históricos excluidos de operación; evidencia preservada para auditoría.
+- Solo ADMIN abre la serie y elige el primer número una vez. La apertura queda
+  bloqueada; RECEPCIONISTA no puede abrirla ni modificarla.
+- Abrir deja el contador en `N-1`, sin crear radicado ni reserva. El primer
+  número se consume únicamente con el primer trámite real en Production.
 
 ## Validación antes de pedir apertura
 
@@ -63,18 +67,21 @@ No alterar protecciones para obtener la prueba. Hasta disponer del entorno
 correcto y ejecutar la prueba, Stage permanece pendiente y no se habilita
 la apertura ni el despliegue Production.
 
-## Dry-run oficial (sin escritura)
+## Preflight oficial (sin escritura)
 
 Con credencial Production cargada únicamente en memoria mediante el mecanismo
 seguro del operador, sin imprimirla ni escribirla en archivos nuevos:
 
 ```sh
-node scripts/operacion/abrir-series.mjs --proyecto ventanilla-unica-f31b1 --propuesta-contingencia-solo-lectura
+Consultar la pantalla autenticada **Apertura de serie** sin confirmar ninguna
+acción y contrastar su lectura con Firestore por el procedimiento autorizado.
 ```
 
-No usar `CONFIRMO_APERTURA`. Esta modalidad rechaza ejecución y no guarda la
-propuesta en Firestore. Debe mostrar contador27/propuesta1744/primer1745/OK y
-cero colisiones de documentos y reservas de1745/1746. Fallo = detener apertura.
+Debe mostrar el contador vigente, ausencia de apertura previa y sugerencia 1745.
+El ADMIN puede reemplazar la sugerencia por otro entero válido. Antes de
+confirmar se comprueban históricos y reservas; cualquier discrepancia detiene
+la apertura. El script anterior con propuesta fija queda solo como evidencia
+histórica y no debe usarse para abrir esta contingencia.
 
 ## Apertura futura — NO ejecutar en esta fase
 
@@ -91,27 +98,24 @@ libro externo. **No abrir el contador antes de cerrar todos los emisores.**
    ese aislamiento, **no abrir la serie**. Toda medida adicional sobre acceso,
    deployments, configuración o credenciales requiere su propia autorización;
    este runbook no autoriza revocaciones ni cambios automáticos.
-3. Repetir el dry-run oficial. Solo después realizar la apertura transaccional
-   autorizada: releer contador 27 y verificar otra vez ausencia de 1745/1746 y
-   sus reservas; registrar autoridad, referencia, fecha, `veniaDe: 27` y
-   `abiertoEn: 1745`, avanzando a 1744 sin alterar históricos ni otras series.
+3. Repetir el preflight. El ADMIN escribe el **primer número** `N` y confirma
+   una sola vez. La transacción relee el contador 27, comprueba ausencia de una
+   apertura previa, históricos y reservas incompatibles, registra autoridad,
+   referencia, fecha, `veniaDe: 27` y `abiertoEn: N`, y deja el contador en
+   `N-1` sin alterar históricos ni otras series.
 4. Verificar por lectura la apertura y la persistencia del cierre de los demás
    emisores. Habilitar operativamente recepción únicamente entonces. El primer
-   trámite **real** consume 1745; el siguiente real, 1746. No probarlos.
+   trámite **real** consume `N`; el siguiente real, `N+1`. No probarlos.
 
 El script legado de apertura general hace escrituras secuenciales: **no usarlo
 a ciegas como apertura de contingencia**. La futura ejecución debe contar con
 una operación transaccional acotada, auditable y revisada. No simular la apertura
 para poner en verde el expediente técnico.
 
-La barrera del endpoint interno impide emitir antes de la apertura declarada.
-También comprueba el primer número: si el próximo consecutivo es 1745, debe
-resultar exactamente `1-110-202609-00001745` usando `America/Bogota`. Si el mes
-colombiano ya no es septiembre de 2026, rechaza la emisión antes de confirmar
-contador, reserva o radicado. Se requiere una nueva autorización para revisar
-el período inicial; nunca cambiar el reloj, retrofechar ni retirar el guard para
-forzar el número autorizado. El dry-run debe repetirse inmediatamente antes
-de cualquier apertura futura.
+La barrera del endpoint interno impide emitir antes de una apertura bloqueada y
+válida. La máscara usa el período real de `America/Bogota`; nunca se cambia el
+reloj ni se retrofecha para forzar el identificador mostrado como ejemplo. El
+preflight debe repetirse inmediatamente antes de cualquier apertura futura.
 
 ## Operación cotidiana
 

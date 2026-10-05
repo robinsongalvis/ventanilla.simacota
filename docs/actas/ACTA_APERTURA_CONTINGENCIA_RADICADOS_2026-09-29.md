@@ -23,12 +23,14 @@ con `isTest=true` y `excludeFromMetrics=true`. No se borran ni reescriben.
 | Proyecto | `ventanilla-unica-f31b1` |
 | Documento de contador | `counters/radicados-2026` |
 | Valor actual observado | 27 |
-| Valor propuesto | 1744 |
-| Primer radicado real | `1-110-202609-00001745` |
-| Siguiente radicado real | `1-110-202609-00001746` |
+| Primer consecutivo sugerido | 1745 |
+| Primer consecutivo definitivo | Lo elige un ADMIN autorizado una sola vez |
+| Valor que recibirá el contador | `N-1` |
+| Primer radicado real | Se construye con período Bogotá vigente y consecutivo `N` |
+| Siguiente radicado real | Mismo período institucional y consecutivo `N+1` |
 
-No se emiten 28–1744; no se reutiliza ningún histórico. Los números 1745 y1746
-se reservan exclusivamente para operación real. No se consumen para pruebas.
+No se reutiliza ningún histórico. El número elegido y el siguiente se reservan
+exclusivamente para operación real. No se consumen para pruebas.
 
 ## Evidencia del dry-run de esta entrega
 
@@ -47,10 +49,11 @@ PRODUCTION_WRITES=false
 SERIES_DRY_RUN_OK=true
 ```
 
-La evidencia corresponde a una lectura puntual, no a una reserva anticipada.
-Debe repetirse bajo ventana de apertura antes de una futura escritura, con
-relectura transaccional del contador y comprobación de colisiones. Si el período
-Bogotá cambia a octubre, se debe revisar la autorización; nunca antedatar.
+Esta evidencia corresponde a la propuesta inicial 1745 y queda conservada como
+lectura histórica, no como reserva ni como obligación de escoger ese número.
+Debe repetirse bajo ventana de apertura antes de cualquier escritura, con
+relectura transaccional del contador y comprobación de colisiones. El período
+del radicado siempre será el vigente en `America/Bogota`; nunca se antedata.
 
 ## Puerta de revisión
 

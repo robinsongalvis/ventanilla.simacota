@@ -12,6 +12,46 @@ let cola: Promise<void>;
 const storageSpy = vi.fn();
 const txSpy = vi.fn();
 const contadorPath = 'counters/radicados-2026';
+const auditoriaPath = 'admin_auditoria/audit-apertura-contingencia';
+const FECHA_APERTURA = '2026-09-29T15:00:00.000Z';
+const aperturaSintetica = {
+  version: 1,
+  estado: 'BLOQUEADA',
+  serie: 'radicados',
+  anio: 2026,
+  veniaDe: 40,
+  abiertoEn: 41,
+  primerNumero: 41,
+  ultimoInicial: 40,
+  fecha: FECHA_APERTURA,
+  fechaHoraBogota: '2026-09-29T10:00:00.000-05:00',
+  autorizadoPor: 'Autorización sintética local',
+  referencia: 'acta-sintetica.md',
+  auditoriaId: 'audit-apertura-contingencia',
+  actorUid: 'admin-apertura-sintetica',
+  actorNombre: 'Administración sintética',
+  actorRol: 'ADMIN',
+  tenantId: 'VENTANILLA_UNICA',
+} as const;
+const auditoriaAperturaSintetica = {
+  accion: 'APERTURA_SERIE_RADICADOS_CONFIRMADA',
+  actorUid: aperturaSintetica.actorUid,
+  actorNombre: aperturaSintetica.actorNombre,
+  actorRol: aperturaSintetica.actorRol,
+  tenantId: aperturaSintetica.tenantId,
+  fecha: aperturaSintetica.fecha,
+  fechaHoraBogota: aperturaSintetica.fechaHoraBogota,
+  referencia: aperturaSintetica.referencia,
+  metadata: {
+    serie: 'radicados',
+    anio: 2026,
+    anterior: 40,
+    primerNumero: 41,
+    nuevoUltimo: 40,
+    estado: 'BLOQUEADA',
+    proximoRadicado: '1-110-202609-00000041',
+  },
+} as const;
 const soportes: SoportesPendientesInput = {
   descripcion: 'Solicitud y soporte sintéticos bajo custodia.', cantidad: 2,
   custodiaTipo: 'FISICA_EN_VENTANILLA', custodiaReferencia: 'Archivador sintético de pruebas A', confirmacionCustodia: true,
@@ -50,7 +90,22 @@ vi.mock('@/lib/firebase-admin', () => ({
             if (fallaEvento && path.endsWith('_ADJUNTOS_PENDIENTES_STORAGE')) throw new Error('Falla de trazabilidad');
             copia.set(path, data);
           },
-          set: ({ path }: { path: string }, data: unknown) => copia.set(path, data),
+          set: (
+            { path }: { path: string },
+            data: unknown,
+            options?: { merge?: boolean },
+          ) => {
+            const actual = copia.get(path);
+            if (
+              options?.merge === true
+              && actual !== null && typeof actual === 'object' && !Array.isArray(actual)
+              && data !== null && typeof data === 'object' && !Array.isArray(data)
+            ) {
+              copia.set(path, { ...actual, ...data });
+              return;
+            }
+            copia.set(path, data);
+          },
         };
         const resultado = await cb(tx);
         persistidos = copia;
@@ -75,10 +130,17 @@ function formulario(): FormData {
 }
 function llamar(f = formulario()) { return POST(new Request('http://local/api/radicacion/interna', { method: 'POST', body: f })); }
 
+function estadoSerieAbierta(): Map<string, unknown> {
+  return new Map<string, unknown>([
+    [contadorPath, { ultimo: 40, apertura: aperturaSintetica }],
+    [auditoriaPath, auditoriaAperturaSintetica],
+  ]);
+}
+
 beforeEach(() => {
   vi.useFakeTimers(); vi.setSystemTime(new Date('2026-09-29T15:00:00Z'));
-  rol = 'RECEPCIONISTA'; proyecto = 'proyecto-local-ficticio'; fallaEvento = false; cola = Promise.resolve();
-  persistidos = new Map([[contadorPath, { ultimo: 40 }]]);
+  rol = 'RECEPCIONISTA'; proyecto = 'ventanilla-simacota-stage'; fallaEvento = false; cola = Promise.resolve();
+  persistidos = estadoSerieAbierta();
   vi.clearAllMocks();
 });
 afterEach(() => vi.useRealTimers());
@@ -110,7 +172,7 @@ describe('contingencia activa: autenticación, custodia y transacción sin Stora
     const res = await llamar(f);
     expect(res.status).toBe(400); expect((await res.json()).error).toContain('No se consumió');
     expect(txSpy).not.toHaveBeenCalled(); expect(storageSpy).not.toHaveBeenCalled();
-    expect(persistidos.get(contadorPath)).toEqual({ ultimo: 40 });
+    expect(persistidos.get(contadorPath)).toEqual({ ultimo: 40, apertura: aperturaSintetica });
   });
   it.each([
     '', '[]', '{}', JSON.stringify({ ...soportes, cantidad: 0 }),
@@ -123,27 +185,30 @@ describe('contingencia activa: autenticación, custodia y transacción sin Stora
   });
   it('fallo del evento pendiente revierte contador, reserva y radicado', async () => {
     fallaEvento = true;
+    const antes = [...persistidos.entries()];
     expect((await llamar()).status).toBe(500);
-    expect([...persistidos.entries()]).toEqual([[contadorPath, { ultimo: 40 }]]);
+    expect([...persistidos.entries()]).toEqual(antes);
   });
   it('Production sin apertura formal devuelve503, no emite28 (SDK simulado)', async () => {
-    proyecto = 'ventanilla-unica-f31b1'; persistidos.set(contadorPath, { ultimo: 27 });
+    proyecto = 'ventanilla-unica-f31b1'; persistidos = new Map([[contadorPath, { ultimo: 27 }]]);
     expect((await llamar()).status).toBe(503);
     expect([...persistidos.entries()]).toEqual([[contadorPath, { ultimo: 27 }]]);
   });
   it('proyecto Admin sin identidad verificable falla cerrado antes de cualquier tx', async () => {
     proyecto = '';
-    expect((await llamar()).status).toBe(503); expect(txSpy).not.toHaveBeenCalled();
-    expect([...persistidos.entries()]).toEqual([[contadorPath, { ultimo: 40 }]]);
-  });
-  it('primera emisión fuera de septiembre se detiene sin antedatar ni consumir1745 (SDK simulado)', async () => {
-    proyecto = 'ventanilla-unica-f31b1';
-    vi.setSystemTime(new Date('2026-10-01T05:00:00Z'));
-    persistidos.set(contadorPath, { ultimo: 1744, apertura: { abiertoEn: 1745, autorizadoPor: 'Autorización sintética local', referencia: 'acta-sintetica.md' } });
     const antes = [...persistidos.entries()];
+    expect((await llamar()).status).toBe(503); expect(txSpy).not.toHaveBeenCalled();
+    expect([...persistidos.entries()]).toEqual(antes);
+  });
+  it('frontera mensual usa America/Bogota sin antedatar ni consumir un número real', async () => {
+    vi.setSystemTime(new Date('2026-10-01T05:00:00Z'));
     const res = await llamar();
-    expect(res.status).toBe(503); expect((await res.json()).error).toContain('Cambió el período');
-    expect([...persistidos.entries()]).toEqual(antes); expect(storageSpy).not.toHaveBeenCalled();
+    const body = await res.json();
+    expect(res.status).toBe(200);
+    expect(body.consecutivo).toBe(41);
+    expect(body.radicadoId).toBe('1-110-202610-00000041');
+    expect(persistidos.get(contadorPath)).toMatchObject({ ultimo: 41, apertura: aperturaSintetica });
+    expect(storageSpy).not.toHaveBeenCalled();
   });
   it('concurrencia no duplica número ni eventos (solo memoria local)', async () => {
     const respuestas = await Promise.all([llamar(), llamar()]);

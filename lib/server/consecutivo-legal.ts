@@ -5,6 +5,11 @@ import type {
 } from 'firebase-admin/firestore';
 import type { OrigenActuacion } from '@/lib/motor-expedientes/tipos';
 import { periodoColombia } from '@/lib/fecha-colombia';
+import {
+  auditoriaCoincideConApertura,
+  leerAperturaUnicaRadicados,
+  type AperturaUnicaRadicados,
+} from '@/lib/server/apertura-series';
 
 /**
  * Helper transaccional de consecutivos legales — Bloque 2, corrección de H3.
@@ -136,6 +141,13 @@ export interface SolicitudSerie {
   exigeAperturaExplicita?: boolean;
   /** Contingencia: apertura formal requerida; no permite emitir antes de abrir. */
   aperturaMinima?: number;
+  /**
+   * Contingencia operativa: exige una apertura única, dinámica, bloqueada y
+   * respaldada por su documento de auditoría. A diferencia de
+   * `aperturaMinima`, no fija un número en código: acepta el primer número que
+   * el ADMIN confirmó una sola vez para el año institucional.
+   */
+  exigeAperturaUnicaRadicados?: boolean;
   /**
    * Datos adicionales que el caller quiere ver EN la reserva de unicidad.
    *
@@ -295,6 +307,23 @@ export async function leerConsecutivosLegales(
   const refs = solicitudes.map((s) => db.doc(`counters/${s.serie}-${anioDeSerie(s.serie, fecha)}`));
   const snaps = await Promise.all(refs.map((ref) => tx.get(ref)));
 
+  // La apertura dinámica incluye un `auditoriaId`. Se valida el documento al
+  // que apunta DENTRO de la misma transacción y antes de cualquier escritura
+  // del caller. Una forma válida sin auditoría persistida sigue siendo una
+  // apertura corrupta y se bloquea.
+  const aperturasUnicas = await Promise.all(solicitudes.map(async (s, i): Promise<AperturaUnicaRadicados | undefined> => {
+    if (!s.exigeAperturaUnicaRadicados) return undefined;
+    if (s.serie !== 'radicados') throw new AperturaContingenciaPendienteError();
+    const anio = anioDeSerie(s.serie, fecha);
+    const apertura = leerAperturaUnicaRadicados(snaps[i].data()?.apertura, anio);
+    if (!apertura) throw new AperturaContingenciaPendienteError();
+    const auditoria = await tx.get(db.doc(`admin_auditoria/${apertura.auditoriaId}`));
+    if (!auditoria.exists || !auditoriaCoincideConApertura(auditoria.data(), apertura)) {
+      throw new AperturaContingenciaPendienteError();
+    }
+    return apertura;
+  }));
+
   const pendientes: ConsecutivoPendiente[] = solicitudes.map((s, i) => {
     // Fail-closed para las series con libro previo: sin documento de
     // contador no se inventa el punto de partida (ver `exigeAperturaExplicita`).
@@ -302,6 +331,12 @@ export async function leerConsecutivosLegales(
       throw new SerieNoAbiertaError(s.serie, anioDeSerie(s.serie, fecha));
     }
     const ultimoActual = Number(snaps[i].data()?.ultimo ?? 0);
+    const aperturaUnica = aperturasUnicas[i];
+    if (s.exigeAperturaUnicaRadicados && (
+      !aperturaUnica
+      || !Number.isSafeInteger(ultimoActual)
+      || ultimoActual < aperturaUnica.ultimoInicial
+    )) throw new AperturaContingenciaPendienteError();
     if (s.aperturaMinima !== undefined && (
       !Number.isSafeInteger(s.aperturaMinima) || s.aperturaMinima < 1 ||
       snaps[i].data()?.apertura?.abiertoEn !== s.aperturaMinima ||

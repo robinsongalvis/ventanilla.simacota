@@ -170,6 +170,10 @@ const TENANT_DEFAULT: TenantId = 'VENTANILLA_UNICA';
  *  evidencia operativa. Clave por `uid` de sesión (no IP/XFF, ver hallazgo
  *  de memoria dev-backend sobre bypass de rate-limit por X-Forwarded-For). */
 const RATE_LIMIT = { maxRequests: 30, windowMs: 60_000 };
+const PROYECTOS_CONTINGENCIA_PERMITIDOS = new Set([
+  'ventanilla-unica-f31b1',
+  'ventanilla-simacota-stage',
+]);
 
 function badRequest(
   error: string,
@@ -481,8 +485,10 @@ export async function POST(request: Request): Promise<NextResponse> {
     //    subida no crea radicado ni gasta número.
     const db = getFirebaseAdminDb();
     const proyectoAdmin = CONTINGENCIA_STORAGE_ACTIVA ? getFirebaseAdminApp().options.projectId : undefined;
-    if (CONTINGENCIA_STORAGE_ACTIVA && !proyectoAdmin) {
-      return NextResponse.json({ error: 'No fue posible verificar el proyecto servidor. La radicación permanece bloqueada y no se reservó consecutivo.' }, { status: 503 });
+    if (CONTINGENCIA_STORAGE_ACTIVA && (
+      !proyectoAdmin || !PROYECTOS_CONTINGENCIA_PERMITIDOS.has(proyectoAdmin)
+    )) {
+      return NextResponse.json({ error: 'El proyecto servidor no está autorizado para la contingencia. La radicación permanece bloqueada y no se reservó consecutivo.' }, { status: 503 });
     }
     const requestId = randomUUID();
     const preparados = files.map((file, index) => ({
@@ -507,19 +513,13 @@ export async function POST(request: Request): Promise<NextResponse> {
         {
           serie: 'radicados',
           formatear: formatearRadicadoInstitucional,
-          ...(CONTINGENCIA_STORAGE_ACTIVA && proyectoAdmin === 'ventanilla-unica-f31b1'
-            ? { aperturaMinima: 1745 } : {}),
+          ...(CONTINGENCIA_STORAGE_ACTIVA
+            ? { exigeAperturaUnicaRadicados: true } : {}),
         },
       ]);
       const [consecRadicado] = pendientesRadicado;
       const radicadoId = consecRadicado.documentoId;
       const consecutivo = consecRadicado.consecutivo;
-      if (CONTINGENCIA_STORAGE_ACTIVA && proyectoAdmin === 'ventanilla-unica-f31b1'
-        && consecutivo === 1745 && radicadoId !== '1-110-202609-00001745') {
-        const errorPeriodo = new AperturaContingenciaPendienteError();
-        errorPeriodo.message = 'Cambió el período de la primera emisión autorizada. Se requiere revisar la apertura; no se antedató ni se consumió ningún consecutivo.';
-        throw errorPeriodo;
-      }
       const archivos: ArchivoRadicado[] = preparados.map((p) => ({
         nombre: p.file.name,
         url: '',
