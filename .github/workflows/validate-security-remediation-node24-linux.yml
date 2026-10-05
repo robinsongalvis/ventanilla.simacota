@@ -1,0 +1,204 @@
+name: Validacion aislada de seguridad - Linux Node 24
+
+on:
+  push:
+    tags:
+      - ci/security-remediation-node24-20261005-v1
+
+permissions:
+  contents: read
+
+concurrency:
+  group: security-remediation-node24-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  validate:
+    name: Candidato exacto en Ubuntu y Node 24.21.0
+    runs-on: ubuntu-latest
+    timeout-minutes: 120
+    env:
+      CANDIDATE_SHA: 7adb21043001434b7ee6d814aab7844a6665a34e
+
+    steps:
+      - name: Checkout exacto del candidato
+        uses: actions/checkout@v7
+        with:
+          ref: 7adb21043001434b7ee6d814aab7844a6665a34e
+          fetch-depth: 1
+          persist-credentials: false
+
+      - name: Verificar identidad e integridad del checkout
+        id: checkout
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = "$CANDIDATE_SHA"
+          test -z "$(git status --porcelain)"
+          echo "sha=$(git rev-parse HEAD)" >> "$GITHUB_OUTPUT"
+
+      - name: Configurar Node 24.21.0
+        uses: actions/setup-node@v7
+        with:
+          node-version: 24.21.0
+          cache: npm
+
+      - name: Configurar Java para el emulador Firestore
+        uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: '21'
+
+      - name: Verificar runtime exacto
+        id: runtime
+        shell: bash
+        run: |
+          set -euo pipefail
+          node -e "if (process.versions.node !== '24.21.0') { throw new Error('Se exige Node 24.21.0 y se obtuvo ' + process.versions.node); }"
+          echo "node=$(node --version)" >> "$GITHUB_OUTPUT"
+          echo "npm=$(npm --version)" >> "$GITHUB_OUTPUT"
+
+      - name: Instalar dependencias reproducibles
+        id: install
+        run: npm ci
+
+      - name: Verificar remediacion y arbol Firebase
+        id: dependency_tree
+        if: ${{ !cancelled() }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          node -e "const p=require('./package.json'); const l=require('./package-lock.json'); if(l.packages['node_modules/@fastify/busboy']?.version!=='3.2.2') throw new Error('Busboy distinto de 3.2.2'); if(p.dependencies['firebase-admin']!=='14.4.0') throw new Error('firebase-admin distinto de 14.4.0'); if(p.overrides?.['@fastify/busboy']) throw new Error('Override de Busboy no autorizado'); if(p.overrides?.['@grpc/grpc-js']) throw new Error('Override gRPC no autorizado');"
+          npm ls @fastify/busboy firebase-admin @google-cloud/firestore @grpc/grpc-js firebase @firebase/firestore --all
+
+      - name: Medir vulnerabilidades sin ocultarlas
+        id: audit_counts
+        if: ${{ !cancelled() }}
+        shell: bash
+        run: |
+          set -uo pipefail
+          TOTAL_JSON="$RUNNER_TEMP/npm-audit-total.json"
+          PROD_JSON="$RUNNER_TEMP/npm-audit-production.json"
+          npm audit --json > "$TOTAL_JSON" || true
+          npm audit --omit=dev --json > "$PROD_JSON" || true
+          node - "$TOTAL_JSON" "$PROD_JSON" "$GITHUB_OUTPUT" <<'NODE'
+          const fs = require('node:fs');
+          const [totalPath, productionPath, outputPath] = process.argv.slice(2);
+          const total = JSON.parse(fs.readFileSync(totalPath, 'utf8'));
+          const production = JSON.parse(fs.readFileSync(productionPath, 'utf8'));
+          const totalHigh = total.metadata?.vulnerabilities?.high ?? -1;
+          const productionHigh = production.metadata?.vulnerabilities?.high ?? -1;
+          const totalCritical = total.metadata?.vulnerabilities?.critical ?? -1;
+          const busboy = total.vulnerabilities?.['@fastify/busboy'];
+          if (busboy?.severity === 'high' || busboy?.severity === 'critical') {
+            throw new Error('El advisory de @fastify/busboy sigue presente');
+          }
+          fs.appendFileSync(outputPath, `high_total=${totalHigh}\n`);
+          fs.appendFileSync(outputPath, `high_production=${productionHigh}\n`);
+          fs.appendFileSync(outputPath, `critical_total=${totalCritical}\n`);
+          NODE
+
+      - name: NPM audit crudo
+        id: audit
+        if: ${{ !cancelled() }}
+        run: npm audit --audit-level=high
+
+      - name: TypeScript estricto
+        id: typescript
+        if: ${{ !cancelled() }}
+        run: npx tsc --noEmit
+
+      - name: Lint
+        id: lint
+        if: ${{ !cancelled() }}
+        run: npm run lint
+
+      - name: Build Webpack
+        id: build
+        if: ${{ !cancelled() }}
+        run: npm run build -- --webpack
+
+      - name: Suite completa serializada
+        id: tests
+        if: ${{ !cancelled() }}
+        run: npm test -- --testTimeout=30000 --maxWorkers=1 --no-file-parallelism
+
+      - name: Rules y transacciones en emulador Firestore
+        id: rules
+        if: ${{ !cancelled() }}
+        run: npx --yes firebase-tools@15.19.0 emulators:exec --only firestore --project demo-ventanilla-lab "npm run test:rules"
+
+      - name: Pruebas focalizadas de contingencia
+        id: contingency
+        if: ${{ !cancelled() }}
+        run: >-
+          npm exec -- vitest run
+          __tests__/consecutivo-apertura-dinamica.test.ts
+          __tests__/consecutivo-radicacion-handler.test.ts
+          __tests__/contingencia-cuarentena.test.ts
+          __tests__/contingencia-emisores-cerrados.test.ts
+          __tests__/contingencia-fecha-apertura.test.ts
+          __tests__/contingencia-storage-radicacion.test.ts
+          __tests__/contingencia-storage-regularizacion.test.ts
+          __tests__/contingencia-ui.test.tsx
+          --testTimeout=30000 --maxWorkers=1 --no-file-parallelism
+
+      - name: Pruebas focalizadas de Firebase Admin
+        id: firebase_admin
+        if: ${{ !cancelled() }}
+        run: >-
+          npm exec -- vitest run
+          __tests__/regresion-esm-require-firebase-admin.test.ts
+          __tests__/internal-auth.test.ts
+          __tests__/consecutivo-apertura-dinamica.test.ts
+          __tests__/consecutivo-radicacion-handler.test.ts
+          __tests__/consecutivo-legal.test.ts
+          __tests__/contingencia-storage-regularizacion.test.ts
+          --testTimeout=30000 --maxWorkers=1 --no-file-parallelism
+
+      - name: Resumen verificable
+        if: ${{ always() }}
+        shell: bash
+        env:
+          CHECKOUT_OUTCOME: ${{ steps.checkout.outcome }}
+          INSTALL_OUTCOME: ${{ steps.install.outcome }}
+          TREE_OUTCOME: ${{ steps.dependency_tree.outcome }}
+          AUDIT_COUNTS_OUTCOME: ${{ steps.audit_counts.outcome }}
+          AUDIT_OUTCOME: ${{ steps.audit.outcome }}
+          TYPESCRIPT_OUTCOME: ${{ steps.typescript.outcome }}
+          LINT_OUTCOME: ${{ steps.lint.outcome }}
+          BUILD_OUTCOME: ${{ steps.build.outcome }}
+          TESTS_OUTCOME: ${{ steps.tests.outcome }}
+          RULES_OUTCOME: ${{ steps.rules.outcome }}
+          CONTINGENCY_OUTCOME: ${{ steps.contingency.outcome }}
+          FIREBASE_ADMIN_OUTCOME: ${{ steps.firebase_admin.outcome }}
+          NODE_VERSION: ${{ steps.runtime.outputs.node }}
+          NPM_VERSION: ${{ steps.runtime.outputs.npm }}
+          HIGH_TOTAL: ${{ steps.audit_counts.outputs.high_total }}
+          HIGH_PRODUCTION: ${{ steps.audit_counts.outputs.high_production }}
+          CRITICAL_TOTAL: ${{ steps.audit_counts.outputs.critical_total }}
+        run: |
+          echo "::notice title=Evidencia Linux Node 24::CANDIDATE_SHA=${CANDIDATE_SHA}; WORKFLOW_SHA=${GITHUB_SHA}; NODE_VERSION=${NODE_VERSION}; NPM_VERSION=${NPM_VERSION}; HIGH_TOTAL=${HIGH_TOTAL}; HIGH_PRODUCTION=${HIGH_PRODUCTION}; CRITICAL_TOTAL=${CRITICAL_TOTAL}; CHECKOUT=${CHECKOUT_OUTCOME}; NPM_CI=${INSTALL_OUTCOME}; DEPENDENCY_TREE=${TREE_OUTCOME}; AUDIT_COUNTS=${AUDIT_COUNTS_OUTCOME}; NPM_AUDIT=${AUDIT_OUTCOME}; TYPESCRIPT=${TYPESCRIPT_OUTCOME}; LINT=${LINT_OUTCOME}; BUILD=${BUILD_OUTCOME}; TESTS=${TESTS_OUTCOME}; RULES_EMULATOR=${RULES_OUTCOME}; CONTINGENCY_TESTS=${CONTINGENCY_OUTCOME}; FIREBASE_ADMIN_TESTS=${FIREBASE_ADMIN_OUTCOME}"
+          {
+            echo "## Evidencia de remediacion de seguridad"
+            echo
+            echo "- Workflow commit: \`${GITHUB_SHA}\`"
+            echo "- Candidate checkout: \`${CANDIDATE_SHA}\`"
+            echo "- Node: \`${NODE_VERSION}\`"
+            echo "- npm: \`${NPM_VERSION}\`"
+            echo "- HIGH total: \`${HIGH_TOTAL}\`"
+            echo "- HIGH Production: \`${HIGH_PRODUCTION}\`"
+            echo "- CRITICAL total: \`${CRITICAL_TOTAL}\`"
+            echo "- checkout: \`${CHECKOUT_OUTCOME}\`"
+            echo "- npm ci: \`${INSTALL_OUTCOME}\`"
+            echo "- arbol de dependencias: \`${TREE_OUTCOME}\`"
+            echo "- medicion audit: \`${AUDIT_COUNTS_OUTCOME}\`"
+            echo "- npm audit crudo: \`${AUDIT_OUTCOME}\`"
+            echo "- TypeScript: \`${TYPESCRIPT_OUTCOME}\`"
+            echo "- lint: \`${LINT_OUTCOME}\`"
+            echo "- build Webpack: \`${BUILD_OUTCOME}\`"
+            echo "- suite completa: \`${TESTS_OUTCOME}\`"
+            echo "- Rules/emulador: \`${RULES_OUTCOME}\`"
+            echo "- contingencia: \`${CONTINGENCY_OUTCOME}\`"
+            echo "- Firebase Admin: \`${FIREBASE_ADMIN_OUTCOME}\`"
+          } >> "$GITHUB_STEP_SUMMARY"
