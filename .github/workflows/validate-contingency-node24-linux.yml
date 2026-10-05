@@ -147,6 +147,7 @@ jobs:
           NODE_VERSION: ${{ steps.runtime.outputs.node }}
           NPM_VERSION: ${{ steps.runtime.outputs.npm }}
         run: |
+          echo "::notice file=.github/workflows/validate-contingency-node24-linux.yml,line=1,title=Evidencia Linux Node 24::CANDIDATE_SHA=${CANDIDATE_SHA}; WORKFLOW_SHA=${GITHUB_SHA}; NODE_VERSION=${NODE_VERSION}; NPM_VERSION=${NPM_VERSION}; CHECKOUT=${CHECKOUT_OUTCOME}; NPM_CI=${INSTALL_OUTCOME}; ADMIN_TREE=${ADMIN_TREE_OUTCOME}; NPM_AUDIT=${AUDIT_OUTCOME}; TYPESCRIPT=${TYPESCRIPT_OUTCOME}; LINT=${LINT_OUTCOME}; TESTS=${TESTS_OUTCOME}; RULES_EMULATOR=${RULES_OUTCOME}; CONTINGENCY_TESTS=${CONTINGENCY_OUTCOME}; FIREBASE_ADMIN_TESTS=${FIREBASE_ADMIN_OUTCOME}; BUILD=${BUILD_OUTCOME}"
           {
             echo "## Evidencia Linux + Node 24"
             echo
