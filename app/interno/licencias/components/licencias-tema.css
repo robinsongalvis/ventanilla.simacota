@@ -32,3 +32,92 @@
   --radio-control: 10px;
   --radio-modal: 16px;
 }
+
+/* ══════════════════════════════════════════════════════════════
+   Animaciones, sombras y microinteracciones — modal «Recibir solicitud».
+
+   Regla: movimiento sutil + respuesta inmediata + profundidad elegante. Nada
+   comercial. Todo respeta `prefers-reduced-motion` al final del archivo.
+   Clases con prefijo `tl-` (globales al importarse el CSS, sin colisiones).
+══════════════════════════════════════════════════════════════ */
+
+/* 14.1 / 14.2 — apertura y sombra del modal */
+@keyframes tl-overlay-in { from { opacity: 0; } to { opacity: 1; } }
+@keyframes tl-modal-in {
+  from { opacity: 0; transform: translateY(8px) scale(0.985); }
+  to   { opacity: 1; transform: translateY(0) scale(1); }
+}
+.tl-overlay { animation: tl-overlay-in 220ms ease both; }
+.tl-modal {
+  animation: tl-modal-in 240ms cubic-bezier(0.22, 0.61, 0.36, 1) both;
+  /* Sombra profunda pero DIFUSA, con tinte institucional — ni negra dura ni glow. */
+  box-shadow: 0 24px 60px rgba(15, 40, 25, 0.24), 0 8px 24px rgba(15, 40, 25, 0.12);
+}
+
+/* 14.11 — el header gana profundidad al hacer scroll */
+.tl-header { transition: box-shadow 200ms ease, border-color 200ms ease; }
+.tl-header--scrolled { box-shadow: 0 6px 16px rgba(15, 40, 25, 0.06); }
+
+/* 14.12 — footer pegado, integrado al modal (no barra flotante) */
+.tl-footer {
+  position: sticky;
+  bottom: 0;
+  box-shadow: 0 -6px 16px rgba(15, 40, 25, 0.05);
+}
+
+/* 14.4 / 14.5 — tarjetas de actuación: clicables, elevación al hover, feedback al pulsar */
+.tl-card {
+  transition:
+    transform 160ms ease,
+    box-shadow 160ms ease,
+    border-color 160ms ease,
+    background-color 160ms ease;
+}
+.tl-card:hover { transform: translateY(-1px); box-shadow: 0 4px 12px rgba(15, 40, 25, 0.08); }
+.tl-card:active { transform: scale(0.985); }
+
+/* 14.7 / 14.8 — botones */
+.tl-btn {
+  transition:
+    transform 150ms ease,
+    box-shadow 150ms ease,
+    background-color 150ms ease,
+    border-color 150ms ease;
+}
+.tl-btn-primary { box-shadow: 0 2px 6px rgba(20, 68, 47, 0.25); }
+.tl-btn-primary:hover:not(:disabled) { transform: translateY(-1px); box-shadow: 0 7px 18px rgba(20, 68, 47, 0.30); }
+.tl-btn-primary:active:not(:disabled) { transform: scale(0.98); box-shadow: 0 2px 6px rgba(20, 68, 47, 0.25); }
+.tl-btn-secondary:hover { background: var(--superficie-tinte); border-color: var(--verde-institucional); }
+.tl-btn-secondary:active { transform: scale(0.98); }
+
+/* 14.7 — spinner del estado de carga (elegante, sin cambiar la lógica) */
+@keyframes tl-spin { to { transform: rotate(360deg); } }
+.tl-spinner {
+  display: inline-block;
+  width: 14px; height: 14px;
+  border: 2px solid rgba(255, 255, 255, 0.45);
+  border-top-color: #fff;
+  border-radius: 50%;
+  animation: tl-spin 700ms linear infinite;
+}
+
+/* 14.15 — error: aparece cerca del elemento, breve, sin sacudir el modal */
+@keyframes tl-error-in { from { opacity: 0; transform: translateY(-3px); } to { opacity: 1; transform: translateY(0); } }
+.tl-error-in { animation: tl-error-in 180ms ease both; }
+
+/* 14.16 — éxito: transición elegante, institucional, sin confeti */
+@keyframes tl-success-in { from { opacity: 0; transform: scale(0.98); } to { opacity: 1; transform: scale(1); } }
+.tl-success-in { animation: tl-success-in 280ms cubic-bezier(0.22, 0.61, 0.36, 1) both; }
+
+/* 14.17 — accesibilidad: se respeta la reducción de movimiento.
+   Se conservan las transiciones esenciales de color/borde; se eliminan
+   desplazamientos y escalados. El spinner (feedback de carga) se conserva. */
+@media (prefers-reduced-motion: reduce) {
+  .tl-overlay, .tl-modal, .tl-error-in, .tl-success-in { animation: none !important; }
+  .tl-card, .tl-btn {
+    transition: background-color 120ms ease, border-color 120ms ease, box-shadow 120ms ease !important;
+  }
+  .tl-card:hover, .tl-card:active,
+  .tl-btn-primary:hover:not(:disabled), .tl-btn-primary:active:not(:disabled),
+  .tl-btn-secondary:active { transform: none !important; }
+}
