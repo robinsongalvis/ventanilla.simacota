@@ -1,0 +1,157 @@
+# Revisión gobernada de la deuda upstream Firebase/Firestore/gRPC.
+# No actualiza dependencias ni despliega: únicamente abre o actualiza una
+# incidencia cuando vence la aceptación temporal o aparece una release estable.
+name: Revisión upstream Firebase/gRPC
+
+on:
+  schedule:
+    # Lunes 12:00 UTC = 07:00 America/Bogota.
+    - cron: '0 12 * * 1'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  issues: write
+
+concurrency:
+  group: revision-firebase-upstream
+  cancel-in-progress: false
+
+jobs:
+  revisar:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+
+      - name: Revisar releases y mantener una incidencia única
+        uses: actions/github-script@v9
+        env:
+          FECHA_REVISION: '2026-10-26'
+          TITULO_ISSUE: '[Seguridad] Revisar actualización upstream Firebase/gRPC'
+        with:
+          script: |
+            const fs = require('node:fs');
+
+            const lock = JSON.parse(fs.readFileSync('package-lock.json', 'utf8'));
+            const allowlist = JSON.parse(fs.readFileSync('audit-allowlist.json', 'utf8'));
+            const riesgoSigueActivo = allowlist.exceptions?.some(
+              (entrada) => entrada.advisory?.toUpperCase() === 'GHSA-M9GG-HP2V-232J',
+            );
+            if (!riesgoSigueActivo) {
+              core.info('La excepción Firebase/gRPC ya no está activa; el workflow no abrirá ni reabrirá incidencias.');
+              await core.summary
+                .addHeading('Revisión upstream Firebase/gRPC')
+                .addRaw('Sin acción: la excepción GHSA-m9gg-hp2v-232j fue retirada.')
+                .write();
+              return;
+            }
+
+            const fijadas = {
+              firebase: lock.packages?.['node_modules/firebase']?.version,
+              '@firebase/firestore': lock.packages?.['node_modules/@firebase/firestore']?.version,
+            };
+
+            for (const [paquete, version] of Object.entries(fijadas)) {
+              if (!/^\d+\.\d+\.\d+(?:[-+].+)?$/.test(version || '')) {
+                throw new Error(`No se pudo resolver la versión fijada de ${paquete} desde package-lock.json.`);
+              }
+            }
+
+            async function versionLatest(paquete) {
+              const url = `https://registry.npmjs.org/${encodeURIComponent(paquete)}/latest`;
+              const respuesta = await fetch(url, { signal: AbortSignal.timeout(15_000) });
+              if (!respuesta.ok) {
+                throw new Error(`npm registry respondió HTTP ${respuesta.status} para ${paquete}.`);
+              }
+              const json = await respuesta.json();
+              if (!/^\d+\.\d+\.\d+(?:[-+].+)?$/.test(json.version || '')) {
+                throw new Error(`npm registry no devolvió una versión válida para ${paquete}.`);
+              }
+              return json.version;
+            }
+
+            const latest = {
+              firebase: await versionLatest('firebase'),
+              '@firebase/firestore': await versionLatest('@firebase/firestore'),
+            };
+            const hoy = new Date().toISOString().slice(0, 10);
+            const fechaRevision = process.env.FECHA_REVISION;
+            const vencimientoAlcanzado = hoy >= fechaRevision;
+            const releasesNuevas = Object.entries(fijadas)
+              .filter(([paquete, version]) => latest[paquete] !== version)
+              .map(([paquete, version]) => `${paquete}: ${version} → ${latest[paquete]}`);
+
+            if (!vencimientoAlcanzado && releasesNuevas.length === 0) {
+              core.info(`Sin release nueva y revisión no vencida (${fechaRevision}).`);
+              await core.summary
+                .addHeading('Revisión upstream Firebase/gRPC')
+                .addRaw(`Sin cambios. Próxima revisión obligatoria: ${fechaRevision}.`)
+                .write();
+              return;
+            }
+
+            const motivos = [];
+            if (vencimientoAlcanzado) motivos.push(`se alcanzó la fecha obligatoria ${fechaRevision}`);
+            if (releasesNuevas.length) motivos.push(`hay release(s) estable(s) nueva(s): ${releasesNuevas.join('; ')}`);
+
+            const marcador = '<!-- revision-firebase-grpc-upstream -->';
+            const cuerpo = [
+              marcador,
+              '# Revisión upstream Firebase/Firestore/gRPC',
+              '',
+              `**Motivo:** ${motivos.join(' y ')}.`,
+              `**Fecha de comprobación:** ${hoy}.`,
+              '',
+              '| Paquete | Fijada | Latest estable |',
+              '|---|---:|---:|',
+              `| firebase | ${fijadas.firebase} | ${latest.firebase} |`,
+              `| @firebase/firestore | ${fijadas['@firebase/firestore']} | ${latest['@firebase/firestore']} |`,
+              '',
+              'Riesgo temporal asociado: `GHSA-m9gg-hp2v-232j` y `GHSA-f596-whhp-79r4` en `@grpc/grpc-js@1.9.16`.',
+              '',
+              '## Comprobación requerida',
+              '',
+              '- [ ] Revisar el árbol transitivo y el rango declarado por Firestore.',
+              '- [ ] Confirmar si `@grpc/grpc-js` ya resuelve `>=1.13.6` sin override.',
+              '- [ ] Ejecutar audit, tests Firestore/Firebase Admin, transacciones, Rules/emulador, build y Node 24.',
+              '- [ ] Retirar las excepciones o renovar formalmente la aceptación antes de su caducidad.',
+              '',
+              'Documento: `docs/operacion/ACEPTACION_RIESGO_DEPENDENCIAS_2026-10-05.md`.',
+            ].join('\n');
+
+            const titulo = process.env.TITULO_ISSUE;
+            const issues = await github.paginate(github.rest.issues.listForRepo, {
+              ...context.repo,
+              state: 'all',
+              per_page: 100,
+            });
+            const existente = issues.find((issue) => !issue.pull_request && issue.title === titulo);
+
+            if (existente) {
+              if (existente.body !== cuerpo || existente.state !== 'open') {
+                await github.rest.issues.update({
+                  ...context.repo,
+                  issue_number: existente.number,
+                  body: cuerpo,
+                  state: 'open',
+                });
+                core.info(`Incidencia #${existente.number} actualizada/reabierta.`);
+              } else {
+                core.info(`Incidencia #${existente.number} ya está actualizada; no se genera ruido.`);
+              }
+            } else {
+              const creada = await github.rest.issues.create({
+                ...context.repo,
+                title: titulo,
+                body: cuerpo,
+              });
+              core.info(`Incidencia #${creada.data.number} creada.`);
+            }
+
+            await core.summary
+              .addHeading('Revisión upstream Firebase/gRPC requerida')
+              .addList(motivos)
+              .write();
