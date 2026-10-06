@@ -84,7 +84,11 @@ const DIRS_ESCANEO = ['app', 'lib'];
  * el nombre literal. Sumar una tercera colección en el futuro es agregar un
  * string aquí, no duplicar el mecanismo.
  */
-const COLECCIONES_VIGILADAS = ['ventanilla_radicados', 'expedientes'];
+const COLECCIONES_VIGILADAS = [
+  'ventanilla_radicados',
+  'unicidad_radicados',
+  'expedientes',
+];
 const VENTANA_LINEAS = 20; // líneas alrededor del ref donde buscar la cota
 
 /** Presupuesto (derivado de la línea base + 2A — ver encabezado). */
@@ -197,6 +201,20 @@ const REGISTRO = [
     cotaRegex: /const LIMITE_BANDEJA\s*=\s*(\d+)/,
     cotaMax: 500,
     ref: 'ADR-0011 · endurecimiento pre-reunión (hallazgo QA)',
+  },
+  {
+    archivo: 'lib/server/apertura-series.ts',
+    estado: 'ACOTADA',
+    clase: 'BATCH',
+    descripcion: 'Verificación histórica previa a la apertura única de la serie. Lee '
+      + '`ventanilla_radicados` y `unicidad_radicados` en la misma transacción con '
+      + 'proyección mínima y techo duro de 1000 por colección. Es una operación única, '
+      + 'administrativa y hoy el volumen es bajo, pero ambas colecciones crecen con el '
+      + 'histórico: alcanzar exactamente el techo falla cerrado antes de evaluar o escribir '
+      + 'y obliga a revisar la estrategia de verificación.',
+    cotaRegex: /const TECHO_LECTURA_APERTURA\s*=\s*(\d+)/,
+    cotaMax: 1000,
+    ref: 'Contingencia 2026 · apertura única, atómica y fail-closed',
   },
   {
     archivo: 'app/api/reportes/mipg/excel/route.ts',

@@ -8,10 +8,17 @@ type Referencia = {
   id: string;
   get: () => Promise<Snapshot>;
 };
-type Consulta = { tipo: 'consulta'; path: string };
+type Consulta = {
+  tipo: 'consulta';
+  path: string;
+  campos: string[];
+  limite: number | null;
+  select: (...campos: string[]) => Consulta;
+  limit: (limite: number) => Consulta;
+};
 type Snapshot = { exists: boolean; data: () => Documento | undefined };
 type DocumentoConsulta = { id: string; data: () => Documento };
-type SnapshotConsulta = { docs: DocumentoConsulta[] };
+type SnapshotConsulta = { docs: DocumentoConsulta[]; size: number };
 type Lectura = Referencia | Consulta;
 type Escritura =
   | { tipo: 'set'; ref: Referencia; valor: Documento; merge: boolean }
@@ -26,6 +33,7 @@ const mocks = vi.hoisted(() => ({
   autenticar: vi.fn(),
   obtenerDb: vi.fn(),
   get: vi.fn(),
+  queryGet: vi.fn(),
   set: vi.fn(),
   create: vi.fn(),
   runTransaction: vi.fn(),
@@ -68,12 +76,26 @@ function snapshot(path: string): Snapshot {
   return { exists: documentos.has(path), data: () => documentos.get(path) };
 }
 
-function snapshotConsulta(path: string): SnapshotConsulta {
+function snapshotConsulta(path: string, limite: number | null): SnapshotConsulta {
   const prefijo = `${path}/`;
+  const docs = [...documentos.entries()]
+    .filter(([key]) => key.startsWith(prefijo) && !key.slice(prefijo.length).includes('/'))
+    .slice(0, limite ?? undefined)
+    .map(([key, data]) => ({ id: key.slice(prefijo.length), data: () => data }));
   return {
-    docs: [...documentos.entries()]
-      .filter(([key]) => key.startsWith(prefijo) && !key.slice(prefijo.length).includes('/'))
-      .map(([key, data]) => ({ id: key.slice(prefijo.length), data: () => data })),
+    docs,
+    size: docs.length,
+  };
+}
+
+function consulta(path: string, campos: string[] = [], limite: number | null = null): Consulta {
+  return {
+    tipo: 'consulta',
+    path,
+    campos,
+    limite,
+    select: (...siguientesCampos) => consulta(path, siguientesCampos, limite),
+    limit: (siguienteLimite) => consulta(path, campos, siguienteLimite),
   };
 }
 
@@ -81,8 +103,7 @@ function crearDb() {
   return {
     doc: (path: string) => referencia(path),
     collection: (path: string) => ({
-      tipo: 'consulta' as const,
-      path,
+      ...consulta(path),
       doc: (id = `auditoria-${++secuenciaAuditoria}`) => referencia(`${path}/${id}`),
     }),
     runTransaction: mocks.runTransaction,
@@ -108,9 +129,15 @@ beforeEach(() => {
       const tx: Transaccion = {
         get: async (entrada) => {
           mocks.get(entrada.path);
-          return entrada.tipo === 'consulta'
-            ? snapshotConsulta(entrada.path)
-            : snapshot(entrada.path);
+          if (entrada.tipo === 'consulta') {
+            mocks.queryGet({
+              path: entrada.path,
+              campos: entrada.campos,
+              limite: entrada.limite,
+            });
+            return snapshotConsulta(entrada.path, entrada.limite);
+          }
+          return snapshot(entrada.path);
         },
         set: (ref, valor, opciones) => {
           mocks.set(ref.path, valor, opciones);
@@ -221,17 +248,41 @@ describe('apertura única: integridad, bloqueo y auditoría atómica', () => {
     expect([...documentos.keys()].filter((k) => k.startsWith('admin_auditoria/'))).toHaveLength(1);
     expect([...documentos.keys()].some((k) => k.startsWith('ventanilla_radicados/'))).toBe(false);
     expect([...documentos.keys()].some((k) => k.startsWith('unicidad_radicados/'))).toBe(false);
+    expect(mocks.queryGet.mock.calls.map(([consultaLeida]) => consultaLeida)).toEqual([
+      {
+        path: 'ventanilla_radicados',
+        campos: [
+          'consecutivo',
+          'control.consecutivo',
+          'control.fechaRadicado',
+          'control.radicadoId',
+        ],
+        limite: 1000,
+      },
+      {
+        path: 'unicidad_radicados',
+        campos: [
+          'consecutivo',
+          'control.consecutivo',
+          'control.fechaRadicado',
+          'control.radicadoId',
+        ],
+        limite: 1000,
+      },
+    ]);
   });
 
   it('repetir exactamente N es idempotente y no crea segunda escritura ni auditoría', async () => {
     expect((await POST(solicitud(1745))).status).toBe(200);
     const setDespuesPrimera = mocks.set.mock.calls.length;
     const createDespuesPrimera = mocks.create.mock.calls.length;
+    const consultasDespuesPrimera = mocks.queryGet.mock.calls.length;
     const segunda = await POST(solicitud(1745));
     expect(segunda.status).toBe(200);
     expect(await segunda.json()).toMatchObject({ idempotente: true, ultimo: 1744 });
     expect(mocks.set).toHaveBeenCalledTimes(setDespuesPrimera);
     expect(mocks.create).toHaveBeenCalledTimes(createDespuesPrimera);
+    expect(mocks.queryGet).toHaveBeenCalledTimes(consultasDespuesPrimera);
     expect([...documentos.keys()].filter((k) => k.startsWith('admin_auditoria/'))).toHaveLength(1);
   });
 
@@ -289,6 +340,36 @@ describe('apertura única: integridad, bloqueo y auditoría atómica', () => {
     expect(documentos.get('counters/radicados-2026')?.ultimo).toBe(27);
     expect(mocks.set).not.toHaveBeenCalled();
   });
+
+  it.each(['ventanilla_radicados', 'unicidad_radicados'])(
+    'falla cerrado sin escribir cuando %s alcanza exactamente el techo',
+    async (coleccion) => {
+      for (let numero = 1; numero <= 1000; numero += 1) {
+        const id = `1-110-202501-${String(numero).padStart(8, '0')}`;
+        documentos.set(`${coleccion}/${id}`, {
+          consecutivo: numero,
+          control: {
+            consecutivo: numero,
+            fechaRadicado: '2025-01-02T15:00:00.000Z',
+            radicadoId: id,
+          },
+        });
+      }
+
+      const respuesta = await POST(solicitud());
+      expect(respuesta.status).toBe(409);
+      expect(await respuesta.json()).toMatchObject({
+        error: expect.stringContaining('alcanzó su techo de lectura'),
+      });
+      expect(documentos.get('counters/radicados-2026')).toEqual({
+        ultimo: 27,
+        historico: 'conservar',
+      });
+      expect(mocks.set).not.toHaveBeenCalled();
+      expect(mocks.create).not.toHaveBeenCalled();
+      expect([...documentos.keys()].filter((key) => key.startsWith('admin_auditoria/'))).toHaveLength(0);
+    },
+  );
 
   it('una ocupación de otro año no bloquea la serie anual actual', async () => {
     documentos.set('unicidad_radicados/1-110-202509-00001760', { consecutivo: 1760 });

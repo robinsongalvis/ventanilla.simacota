@@ -159,6 +159,24 @@ export const AUTORIZADO_POR_APERTURA_CONTINGENCIA =
 export const REFERENCIA_APERTURA_CONTINGENCIA =
   'docs/actas/ACTA_APERTURA_CONTINGENCIA_RADICADOS_2026-09-29.md';
 
+/**
+ * Tope defensivo de la verificación histórica previa a la apertura.
+ *
+ * La apertura es un acto administrativo único y el volumen actual está muy
+ * por debajo de esta cota. Aun así, ambas colecciones crecen con el histórico:
+ * alcanzar el techo significa que la barrida dejó de poder demostrar que está
+ * viendo el universo completo. En ese caso se falla cerrado y se exige revisar
+ * la estrategia (índice/migración o paginación) antes de abrir la serie.
+ */
+export const TECHO_LECTURA_APERTURA = 1000;
+
+const CAMPOS_CONTROL_APERTURA = [
+  'consecutivo',
+  'control.consecutivo',
+  'control.fechaRadicado',
+  'control.radicadoId',
+] as const;
+
 export interface ActorAperturaSerie {
   uid: string;
   nombre: string | null;
@@ -499,13 +517,33 @@ export async function abrirSerieRadicadosUnaVez({
     }
 
     // Una apertura ocurre una sola vez y hoy el universo es pequeño. La
-    // barrida completa dentro de la MISMA transacción también cubre registros
+    // verificación dentro de la MISMA transacción también cubre registros
     // históricos con máscaras antiguas o campos incompletos: ante ambigüedad
-    // se bloquea, nunca se supone que un número está libre.
+    // se bloquea, nunca se supone que un número está libre. La proyección trae
+    // solo los campos necesarios (el id siempre forma parte del snapshot) y el
+    // techo impide convertir este acto único en una lectura O(N) silenciosa.
     const [radicadosSnap, reservasSnap] = await Promise.all([
-      tx.get(db.collection('ventanilla_radicados')),
-      tx.get(db.collection('unicidad_radicados')),
+      tx.get(
+        db.collection('ventanilla_radicados')
+          .select(...CAMPOS_CONTROL_APERTURA)
+          .limit(TECHO_LECTURA_APERTURA),
+      ),
+      tx.get(
+        db.collection('unicidad_radicados')
+          .select(...CAMPOS_CONTROL_APERTURA)
+          .limit(TECHO_LECTURA_APERTURA),
+      ),
     ]);
+    if (
+      radicadosSnap.size === TECHO_LECTURA_APERTURA
+      || reservasSnap.size === TECHO_LECTURA_APERTURA
+    ) {
+      throw new AperturaSerieRadicadosError(
+        409,
+        'La verificación histórica alcanzó su techo de lectura y no puede demostrar que la serie esté libre. '
+          + 'La serie permanece bloqueada hasta revisar el histórico.',
+      );
+    }
     const colisionDocumento = buscarColisionDesde(
       radicadosSnap.docs,
       anio,
