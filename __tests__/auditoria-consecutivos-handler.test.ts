@@ -52,7 +52,8 @@ vi.mock('@/lib/observabilidad/eventos-negocio', () => ({
   registrarEventoNegocio: mockRegistrarEventoNegocio,
 }));
 
-import { GET, auditarCounterExpedientes } from '@/app/api/cron/auditoria-consecutivos/route';
+import { GET } from '@/app/api/cron/auditoria-consecutivos/route';
+import { auditarCounterExpedientes } from '@/lib/server/auditoria-consecutivos';
 /* Los nombres de colección salen del MISMO registro que recorre el cron. Si
    alguien renombra una colección, el fixture la sigue; escritos a mano, el mock
    dejaría de coincidir en silencio, la barrida leería una colección vacía y las

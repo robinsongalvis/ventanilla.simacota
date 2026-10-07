@@ -86,25 +86,25 @@ export function EstadoTramiteLicencia({ radicadoId }: EstadoTramiteLicenciaProps
   return (
     <section
       aria-labelledby="estado-tramite-licencia"
-      className="rounded-xl bg-white p-4 flex flex-col gap-3"
-      style={{ border: '1px solid #D9E2D9' }}
+      className="rounded-xl bg-[var(--tema-fondo-ffffff)] p-4 flex flex-col gap-3"
+      style={{ border: '1px solid var(--tema-borde-dce4ea)' }}
     >
       <div className="flex flex-wrap items-baseline justify-between gap-x-3 gap-y-1">
-        <h3 id="estado-tramite-licencia" className={etiqueta} style={{ color: '#14532D' }}>
+        <h3 id="estado-tramite-licencia" className={etiqueta} style={{ color: 'var(--tema-texto-007049)' }}>
           Estado del trámite de licencia
         </h3>
         {/* Rotulado (ADR-0041): en el mostrador este número aparece junto al
             radicado que la funcionaria ya tiene en pantalla. Sin rótulo, tiene
             que adivinar cuál le está leyendo al ciudadano. */}
         {p.numeroExpediente && (
-          <span className="text-xs" style={{ color: '#667085' }}>
+          <span className="text-xs" style={{ color: 'var(--tema-texto-64748b)' }}>
             Expediente <span className="font-mono">{p.numeroExpediente}</span>
           </span>
         )}
       </div>
 
       {/* 1 · En qué va */}
-      <p className="text-sm font-bold" style={{ color: '#1F2933' }}>
+      <p className="text-sm font-bold" style={{ color: 'var(--tema-texto-172033)' }}>
         {p.estadoLegible}
       </p>
 
@@ -116,19 +116,19 @@ export function EstadoTramiteLicencia({ radicadoId }: EstadoTramiteLicenciaProps
         /* «Nadie lo ha revisado» NO es «no falta nada». Confundirlos haría que
            ventanilla le dijera al ciudadano que su solicitud está completa
            cuando nadie la miró. */
-        <p className="text-sm" style={{ color: '#667085' }}>
+        <p className="text-sm" style={{ color: 'var(--tema-texto-64748b)' }}>
           Los documentos todavía no han sido revisados.
         </p>
       ) : p.faltantes.length === 0 ? (
-        <p className="text-sm" style={{ color: '#667085' }}>
+        <p className="text-sm" style={{ color: 'var(--tema-texto-64748b)' }}>
           No falta ningún documento.
         </p>
       ) : (
         <div>
-          <p className={etiqueta + ' mb-1'} style={{ color: '#94A3B8' }}>
+          <p className={etiqueta + ' mb-1'} style={{ color: 'var(--tema-texto-94a3b8)' }}>
             Documentos que faltan ({p.faltantes.length})
           </p>
-          <ul className="list-disc pl-5 text-sm flex flex-col gap-0.5" style={{ color: '#667085' }}>
+          <ul className="list-disc pl-5 text-sm flex flex-col gap-0.5" style={{ color: 'var(--tema-texto-64748b)' }}>
             {p.faltantes.map((f) => (
               <li key={f}>{f}</li>
             ))}
@@ -136,7 +136,7 @@ export function EstadoTramiteLicencia({ radicadoId }: EstadoTramiteLicenciaProps
         </div>
       )}
 
-      <p className="text-[11px]" style={{ color: '#94A3B8' }}>
+      <p className="text-[11px]" style={{ color: 'var(--tema-texto-94a3b8)' }}>
         Para el detalle del expediente —documentos aportados, actuaciones y
         observaciones— el ciudadano debe dirigirse a la Secretaría de Planeación.
       </p>
@@ -160,7 +160,7 @@ function LecturaDelReloj({ proyeccion }: { proyeccion: ProyeccionVentanilla }) {
     /* La frase la escribe el servidor, con las palabras exactas del ADR-0034 §4:
        la funcionaria tiene que poder leérsela al ciudadano tal cual. */
     return (
-      <p className="text-sm" style={{ color: '#667085' }}>
+      <p className="text-sm" style={{ color: 'var(--tema-texto-64748b)' }}>
         {proyeccion.avisoPlazo ?? 'El plazo aún no ha empezado a correr.'}
       </p>
     );
@@ -168,7 +168,7 @@ function LecturaDelReloj({ proyeccion }: { proyeccion: ProyeccionVentanilla }) {
 
   if (lectura.situacion === 'RESUELTO') {
     return (
-      <p className="text-sm" style={{ color: '#667085' }}>
+      <p className="text-sm" style={{ color: 'var(--tema-texto-64748b)' }}>
         La Secretaría ya decidió sobre esta solicitud: el término dejó de correr.
       </p>
     );
@@ -180,15 +180,15 @@ function LecturaDelReloj({ proyeccion }: { proyeccion: ProyeccionVentanilla }) {
        fundamento va literal para que la funcionaria pueda citarlo — es la
        NORMA, no el contenido del acta, que sigue fuera de esta pantalla. */
     return (
-      <div className="rounded-lg px-3 py-2 flex flex-col gap-1" style={{ background: '#F1F5F9' }}>
-        <p className="text-sm font-bold" style={{ color: '#334155' }}>
+      <div className="rounded-lg px-3 py-2 flex flex-col gap-1" style={{ background: 'var(--tema-fondo-f1f5f9)' }}>
+        <p className="text-sm font-bold" style={{ color: 'var(--tema-texto-334155)' }}>
           Reloj detenido — el término no está corriendo.
         </p>
-        <p className="text-sm" style={{ color: '#475569' }}>
+        <p className="text-sm" style={{ color: 'var(--tema-texto-475569)' }}>
           El turno es del ciudadano. Nada corre contra la Secretaría mientras tanto.
         </p>
         {lectura.fundamento && (
-          <p className="text-[11px]" style={{ color: '#64748B' }}>{lectura.fundamento}</p>
+          <p className="text-[11px]" style={{ color: 'var(--tema-texto-64748b)' }}>{lectura.fundamento}</p>
         )}
       </div>
     );
@@ -199,14 +199,14 @@ function LecturaDelReloj({ proyeccion }: { proyeccion: ProyeccionVentanilla }) {
   if (vencido) {
     const dias = Math.abs(restantes);
     return (
-      <div className="rounded-lg px-3 py-2 flex flex-col gap-0.5" style={{ background: '#FEF2F2' }}>
-        <p className="text-sm font-bold" style={{ color: '#B42318' }}>
+      <div className="rounded-lg px-3 py-2 flex flex-col gap-0.5" style={{ background: 'var(--tema-fondo-fef2f2)' }}>
+        <p className="text-sm font-bold" style={{ color: 'var(--tema-texto-b42318)' }}>
           El término venció hace {dias} día{dias === 1 ? '' : 's'} hábil{dias === 1 ? '' : 'es'}.
         </p>
         {/* NI UNA PALABRA SOBRE SILENCIO ADMINISTRATIVO. Planeación sí lo lee
             —es su riesgo y su decisión—; desde el mostrador sería una
             conclusión jurídica dicha por quien no la toma (ADR-0034 §3). */}
-        <p className="text-sm" style={{ color: '#667085' }}>
+        <p className="text-sm" style={{ color: 'var(--tema-texto-64748b)' }}>
           Venció el <strong>{formatFechaColombia(lectura.venceIso)}</strong>. Para saber en qué
           estado va la decisión, el ciudadano debe dirigirse a la Secretaría de Planeación.
         </p>
@@ -217,11 +217,11 @@ function LecturaDelReloj({ proyeccion }: { proyeccion: ProyeccionVentanilla }) {
   return (
     <div className="flex flex-col gap-0.5">
       {/* EL NÚMERO QUE EL CIUDADANO PREGUNTA, en grande y primero. */}
-      <p className="text-sm font-bold" style={{ color: '#14532D' }}>
+      <p className="text-sm font-bold" style={{ color: 'var(--tema-texto-007049)' }}>
         Quedan {restantes} día{restantes === 1 ? '' : 's'} hábil{restantes === 1 ? '' : 'es'}
-        <span style={{ color: '#667085', fontWeight: 400 }}> · día {diaTranscurrido} de {totalDias}</span>
+        <span style={{ color: 'var(--tema-texto-64748b)', fontWeight: 400 }}> · día {diaTranscurrido} de {totalDias}</span>
       </p>
-      <p className="text-sm" style={{ color: '#667085' }}>
+      <p className="text-sm" style={{ color: 'var(--tema-texto-64748b)' }}>
         Vence el <strong>{formatFechaColombia(lectura.venceIso)}</strong>
         {lectura.desdeIso && <> · corre desde el <strong>{formatFechaColombia(lectura.desdeIso)}</strong></>}.
       </p>

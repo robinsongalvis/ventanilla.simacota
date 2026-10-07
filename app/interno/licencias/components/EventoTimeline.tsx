@@ -123,7 +123,7 @@ function FilaEvento({
         {evento.estadoVisual === 'completed' && (
           <span className="text-white leading-none" style={{ fontSize: '8px' }} aria-hidden>✓</span>
         )}
-        {evento.esActual && <span className="rounded-full bg-white" style={{ width: 5, height: 5 }} aria-hidden />}
+        {evento.esActual && <span className="rounded-full bg-[var(--tema-fondo-ffffff)]" style={{ width: 5, height: 5 }} aria-hidden />}
         {evento.estadoVisual === 'warning' && (
           <span className="text-white font-black leading-none" style={{ fontSize: '9px' }} aria-hidden>!</span>
         )}
@@ -177,7 +177,7 @@ function FilaEvento({
               aria-expanded={tecnicoAbierto}
               aria-controls={idTecnico}
               className="mt-1.5 inline-flex items-center gap-1 text-[11px] font-bold transition-colors hover:underline focus-visible:outline-none focus-visible:ring-2 rounded"
-              style={{ color: '#667085' }}
+              style={{ color: 'var(--text-secondary)' }}
             >
               <span aria-hidden>ⓘ</span>
               {tecnicoAbierto ? 'Ocultar detalle técnico' : 'Detalle técnico'}

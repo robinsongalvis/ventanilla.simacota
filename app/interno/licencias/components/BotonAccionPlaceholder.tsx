@@ -37,9 +37,9 @@ export function BotonAccionPlaceholder({
     'inline-flex items-center gap-2 rounded-[10px] px-4 py-2.5 text-sm font-bold transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-1';
 
   const estiloDorado: React.CSSProperties = {
-    background: '#D4A017',
-    color: '#14532D',
-    boxShadow: '0 2px 8px rgba(212,160,23,0.25)',
+    background: '#E5A31A',
+    color: 'var(--tema-texto-03402a)',
+    boxShadow: '0 2px 8px rgba(229, 163, 26,0.25)',
   };
   const estiloOutline: React.CSSProperties = {
     background: 'transparent',
@@ -68,7 +68,7 @@ export function BotonAccionPlaceholder({
         <p
           id={`${label.replace(/\s+/g, '-').toLowerCase()}-nota`}
           className="text-xs"
-          style={{ color: '#9A6206' }}
+          style={{ color: 'var(--tema-texto-9a6206)' }}
         >
           {notaDeshabilitado}
         </p>

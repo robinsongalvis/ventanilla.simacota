@@ -4,7 +4,7 @@ import {
   requireActiveInternalUser,
 } from '@/lib/server/internal-auth';
 import { getFirebaseAdminDb } from '@/lib/firebase-admin';
-import { obtenerPendientesDeReparto } from '@/lib/server/planillas-security';
+import { filtrarPlanillasOperativas, obtenerPendientesDeReparto } from '@/lib/server/planillas-security';
 import type { PlanillaReparto } from '@/src/types/planilla';
 import { logError } from '@/lib/logger';
 
@@ -21,7 +21,7 @@ export const runtime = 'nodejs';
 
 const ROLES_LECTURA = new Set(['ADMIN', 'RECEPCIONISTA', 'CONTROL_INTERNO']);
 
-export async function GET(): Promise<NextResponse> {
+export async function GET(request: Request): Promise<NextResponse> {
   try {
     const usuario = await requireActiveInternalUser();
     if (!ROLES_LECTURA.has(usuario.rol)) {
@@ -41,7 +41,11 @@ export async function GET(): Promise<NextResponse> {
         .get(),
     ]);
 
-    const planillas = snapRecientes.docs.map((d) => d.data() as PlanillaReparto);
+    const recientes = snapRecientes.docs.map((d) => d.data() as PlanillaReparto);
+    // Acceso histórico explícito y solo lectura para los mismos roles autorizados.
+    // La vista operativa por defecto nunca mezcla los ensayos con el reparto real.
+    const incluirHistorial = new URL(request.url).searchParams.get('historial') === 'true';
+    const planillas = incluirHistorial ? recientes : await filtrarPlanillasOperativas(db, recientes);
 
     // La vista solo necesita lo que imprime la planilla: nada de
     // teléfonos, correos ni descripciones en la respuesta.

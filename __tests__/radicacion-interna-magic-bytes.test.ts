@@ -32,6 +32,11 @@ vi.mock('@/lib/server/internal-auth', () => {
   };
 });
 
+// Contrato previo fuera de contingencia. La suite contingencia-storage cubre el modo activo.
+vi.mock('@/lib/recepcion/contingencia-storage', async (importOriginal) => ({
+  ...await importOriginal<typeof import('@/lib/recepcion/contingencia-storage')>(),
+  CONTINGENCIA_STORAGE_ACTIVA: false,
+}));
 vi.mock('@/lib/logger', () => ({ logError: () => {} }));
 
 let subidaInvocada = false;

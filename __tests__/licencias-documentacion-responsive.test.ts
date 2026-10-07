@@ -15,7 +15,9 @@ const requisitoItem = readFileSync(join(raiz, 'app/interno/licencias/components/
 const checklist = readFileSync(join(raiz, 'app/interno/licencias/components/ChecklistRequisitos.tsx'), 'utf8');
 const otrosDocumentos = readFileSync(join(raiz, 'app/interno/licencias/components/OtrosDocumentos.tsx'), 'utf8');
 const resumenDocumentos = readFileSync(join(raiz, 'app/interno/licencias/components/ResumenDocumentos.tsx'), 'utf8');
-const layout = readFileSync(join(raiz, 'app/interno/licencias/layout.tsx'), 'utf8');
+// Desde el armazón único (ADR-0046 §7) Licencias vive en la columna del
+// panel: esa es la cadena de contenedores que debe dejar contraerse a los hijos.
+const layout = readFileSync(join(raiz, 'app/interno/dashboard/page.tsx'), 'utf8');
 
 describe('Documentación de Licencias — contratos contra overflow horizontal móvil', () => {
   it('apila cada requisito en una sola columna en móvil y reserva la grilla de columnas para md+', () => {

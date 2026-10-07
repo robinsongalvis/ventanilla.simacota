@@ -9,12 +9,19 @@
  */
 
 import { useCallback, useEffect, useState }  from 'react';
+import { AjusteConsecutivoRadicacion }       from './AjusteConsecutivoRadicacion';
 import { DIRECTORIO_TENANTS, NOMBRES_TENANT } from '@/src/types/reglas-negocio';
 import type { TenantId }                      from '@/src/types/radicado';
 import type { RolInterno }                    from '@/lib/hooks/useAuth';
 import { SectionHeader } from '@/app/components/design-system/SectionHeader';
 import { StatusBadge } from '@/app/components/design-system/StatusBadge';
 import { EmptyState } from '@/app/components/design-system/EmptyState';
+import { BotonAccion } from '@/app/components/design-system/BotonAccion';
+import { BarraTrabajo } from '@/app/components/design-system/BarraTrabajo';
+import type { IndicadorEstaticoProps } from '@/app/components/design-system/Indicador';
+import { FilaTarjetas, TarjetaIndicador } from '@/app/components/design-system/TarjetaIndicador';
+import { CabeceraTablaSticky } from '@/app/components/design-system/SuperficieTabla';
+import { Archive, Building2, FlaskConical, Plus, UserCheck, UserX } from 'lucide-react';
 
 /* ══════════════════════════════════════════════════════════════
    TIPOS
@@ -240,115 +247,100 @@ export function VistaAdministracion() {
   const totalArchivados = usuarios.filter((u) => u.archivado).length;
   const totalInstitucionales = usuarios.filter((u) => u.tipoUsuario === 'INSTITUCIONAL' && !u.archivado).length;
   const totalPruebas = usuarios.filter((u) => u.tipoUsuario !== 'INSTITUCIONAL' && !u.archivado).length;
+  /* Ola 3 (ADR-0046): mismos cinco conteos con el Indicador del Tablero. */
+  const resumen: IndicadorEstaticoProps[] = [
+    { etiqueta: 'Activos',         valor: totalActivos,         tono: 'verde', Icono: UserCheck },
+    { etiqueta: 'Institucionales', valor: totalInstitucionales, tono: 'verde', Icono: Building2 },
+    { etiqueta: 'Prueba/UAT',      valor: totalPruebas,         tono: 'azul',  Icono: FlaskConical },
+    { etiqueta: 'Inactivos',       valor: totalInactivos,       tono: 'gris',  Icono: UserX },
+    { etiqueta: 'Archivados',      valor: totalArchivados,      tono: 'ambar', Icono: Archive },
+  ];
 
   return (
-    <div className="flex h-full min-h-0 flex-1 flex-col overflow-hidden" style={{ background: '#F8FAF7' }}>
+    <div className="flex h-full min-h-0 flex-1 flex-col overflow-hidden" style={{ background: 'var(--tema-fondo-f7f9fb)' }}>
       {/* Header */}
       <SectionHeader
         titulo="Usuarios Internos"
         subtitulo={`${totalActivos} activo${totalActivos !== 1 ? 's' : ''}${totalInactivos > 0 ? ` · ${totalInactivos} inactivo${totalInactivos !== 1 ? 's' : ''}` : ''}${totalArchivados > 0 ? ` · ${totalArchivados} archivado${totalArchivados !== 1 ? 's' : ''}` : ''}`}
-        indicador={<span className="text-[10px] font-bold uppercase tracking-widest" style={{ color: '#14532D' }}>Administración</span>}
+        indicador={<span className="text-[10px] font-bold uppercase tracking-widest" style={{ color: 'var(--tema-texto-007049)' }}>Administración</span>}
         acciones={
-          <button
-            type="button"
-            onClick={() => setShowModal(true)}
-            className="flex items-center gap-2 px-4 py-2.5 rounded-xl text-white text-sm font-bold micro-btn-primary"
-            style={{ background: '#14532D' }}
-          >
-            <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
-              <path strokeLinecap="round" strokeLinejoin="round" d="M12 4.5v15m7.5-7.5h-15" />
-            </svg>
-            Crear usuario
-          </button>
+          <BotonAccion variante="primaria" Icono={Plus} onClick={() => setShowModal(true)}>Crear usuario</BotonAccion>
         }
       />
 
-      <div className="shrink-0 px-4 sm:px-6 py-4 bg-white" style={{ borderBottom: '1px solid #D9E2D9' }}>
-        <div className="grid grid-cols-2 lg:grid-cols-5 gap-2">
-          {[
-            ['Activos', totalActivos, '#DCFCE7', '#166534'],
-            ['Institucionales', totalInstitucionales, '#ECFDF5', '#047857'],
-            ['Prueba/UAT', totalPruebas, '#EEF2FF', '#4338CA'],
-            ['Inactivos', totalInactivos, '#F1F5F9', '#475569'],
-            ['Archivados', totalArchivados, '#FEF3C7', '#92400E'],
-          ].map(([label, valor, bg, color]) => (
-            <div key={String(label)} className="rounded-xl px-3 py-2" style={{ background: String(bg), border: '1px solid rgba(15,23,42,0.08)' }}>
-              <p className="text-[10px] uppercase tracking-widest font-bold" style={{ color: String(color) }}>{label}</p>
-              <p className="text-lg font-black" style={{ color: String(color) }}>{valor}</p>
-            </div>
-          ))}
-        </div>
+      {/* Indicadores, barra de trabajo y acciones masivas (lenguaje del Tablero) */}
+      <div className="shrink-0">
+        <FilaTarjetas etiqueta="Resumen de usuarios" className="px-3 sm:px-4 lg:px-6">
+          {resumen.map((i) => <TarjetaIndicador key={i.etiqueta} {...i} />)}
+        </FilaTarjetas>
 
-        {/* Buscador + filtros */}
-        <div className="mt-4 grid grid-cols-1 md:grid-cols-5 gap-2">
-          <input
-            type="text"
-            value={busqueda}
-            onChange={(e) => setBusqueda(e.target.value)}
-            placeholder="Buscar por nombre, email, cargo o dependencia..."
-            className="w-full md:col-span-2 rounded-xl px-4 py-2.5 text-sm outline-none transition-all"
-            style={{ background: '#F8FAF7', border: '1px solid #D9E2D9', color: '#1F2933' }}
-            onFocus={(e) => { e.currentTarget.style.borderColor = '#14532D'; e.currentTarget.style.boxShadow = '0 0 0 3px rgba(20,83,45,0.15)'; }}
-            onBlur={(e)  => { e.currentTarget.style.borderColor = '#D9E2D9'; e.currentTarget.style.boxShadow = 'none'; }}
-          />
-          <select value={filtroTipo} onChange={(e) => setFiltroTipo(e.target.value as FiltroTipo)} className="select-internal rounded-xl px-3 py-2.5">
+        <BarraTrabajo
+          busqueda={busqueda}
+          onBusquedaChange={setBusqueda}
+          placeholder="Buscar por nombre, email, cargo o dependencia..."
+          ariaLabel="Buscar usuarios internos"
+          contador={`${filtrados.length} usuario${filtrados.length !== 1 ? 's' : ''}`}
+          limpiable
+        >
+          <select value={filtroTipo} onChange={(e) => setFiltroTipo(e.target.value as FiltroTipo)} aria-label="Filtrar por tipo de usuario" className="select-internal text-xs">
             <option value="TODOS">Tipo: todos</option>
             {TIPOS_USUARIO.map((t) => <option key={t.value} value={t.value}>{t.label}</option>)}
           </select>
-          <select value={filtroEstado} onChange={(e) => setFiltroEstado(e.target.value as FiltroEstado)} className="select-internal rounded-xl px-3 py-2.5">
+          <select value={filtroEstado} onChange={(e) => setFiltroEstado(e.target.value as FiltroEstado)} aria-label="Filtrar por estado" className="select-internal text-xs">
             <option value="TODOS">Estado: normal</option>
             <option value="ACTIVOS">Activos</option>
             <option value="INACTIVOS">Inactivos</option>
             <option value="ARCHIVADOS">Archivados</option>
           </select>
-          <select value={filtroRol} onChange={(e) => setFiltroRol(e.target.value as 'TODOS' | RolInterno)} className="select-internal rounded-xl px-3 py-2.5">
+          <select value={filtroRol} onChange={(e) => setFiltroRol(e.target.value as 'TODOS' | RolInterno)} aria-label="Filtrar por rol" className="select-internal text-xs">
             <option value="TODOS">Rol: todos</option>
             {ROLES.map((r) => <option key={r.value} value={r.value}>{r.label}</option>)}
           </select>
-          <select value={filtroTenant} onChange={(e) => setFiltroTenant(e.target.value as 'TODOS' | TenantId)} className="select-internal rounded-xl px-3 py-2.5 md:col-span-2">
+          <select value={filtroTenant} onChange={(e) => setFiltroTenant(e.target.value as 'TODOS' | TenantId)} aria-label="Filtrar por dependencia" className="select-internal text-xs">
             <option value="TODOS">Dependencia: todas</option>
             {TENANTS.map((t) => <option key={t.value} value={t.value}>{t.label}</option>)}
           </select>
-          <div className="md:col-span-3 flex flex-wrap gap-2">
-            <button type="button" disabled={seleccionados.length === 0} onClick={() => aplicarMasivo('MARCAR_PRUEBA')}
-              className="px-3 py-2 rounded-xl text-xs font-bold disabled:opacity-40" style={{ background: '#EEF2FF', color: '#4338CA' }}>
-              Marcar prueba ({seleccionados.length})
-            </button>
-            <button type="button" disabled={seleccionados.length === 0} onClick={() => aplicarMasivo('DESACTIVAR')}
-              className="px-3 py-2 rounded-xl text-xs font-bold disabled:opacity-40" style={{ background: '#F1F5F9', color: '#475569' }}>
-              Desactivar
-            </button>
-            <button type="button" disabled={seleccionados.length === 0} onClick={() => aplicarMasivo('ARCHIVAR')}
-              className="px-3 py-2 rounded-xl text-xs font-bold disabled:opacity-40" style={{ background: '#FEF3C7', color: '#92400E' }}>
-              Archivar
-            </button>
-          </div>
+        </BarraTrabajo>
+
+        <div className="flex flex-wrap gap-2 px-3 pt-2 sm:px-4 lg:px-6" role="group" aria-label="Acciones sobre los usuarios seleccionados">
+          <button type="button" disabled={seleccionados.length === 0} onClick={() => aplicarMasivo('MARCAR_PRUEBA')}
+            className="px-3 py-2 rounded-lg text-xs font-bold disabled:opacity-40" style={{ background: 'var(--tema-fondo-eef2ff)', color: 'var(--tema-texto-4338ca)' }}>
+            Marcar prueba ({seleccionados.length})
+          </button>
+          <button type="button" disabled={seleccionados.length === 0} onClick={() => aplicarMasivo('DESACTIVAR')}
+            className="px-3 py-2 rounded-lg text-xs font-bold disabled:opacity-40" style={{ background: 'var(--tema-fondo-f1f5f9)', color: 'var(--tema-texto-475569)' }}>
+            Desactivar
+          </button>
+          <button type="button" disabled={seleccionados.length === 0} onClick={() => aplicarMasivo('ARCHIVAR')}
+            className="px-3 py-2 rounded-lg text-xs font-bold disabled:opacity-40" style={{ background: 'var(--tema-fondo-fef3c7)', color: 'var(--tema-texto-92400e)' }}>
+            Archivar
+          </button>
         </div>
       </div>
 
       {/* Mensajes globales */}
       {error && (
-        <div className="mx-4 sm:mx-6 mt-4 shrink-0 px-4 py-3 rounded-lg text-sm" style={{ background: '#FEF2F2', border: '1px solid #FECACA', color: '#DC2626' }}>
+        <div role="alert" className="mx-3 mt-2 shrink-0 px-4 py-3 rounded-lg text-sm sm:mx-4 lg:mx-6" style={{ background: 'var(--tema-fondo-fef2f2)', border: '1px solid var(--tema-borde-fecaca)', color: 'var(--tema-texto-991b1b)' }}>
           {error}
         </div>
       )}
       {msgGlobal && (
-        <div className="mx-4 sm:mx-6 mt-4 shrink-0 px-4 py-3 rounded-lg text-sm flex items-center justify-between"
+        <div role={msgGlobal.tipo === 'ok' ? 'status' : 'alert'} className="mx-3 mt-2 shrink-0 px-4 py-3 rounded-lg text-sm flex items-center justify-between sm:mx-4 lg:mx-6"
              style={msgGlobal.tipo === 'ok'
-               ? { background: '#F0FDF4', border: '1px solid #BBF7D0', color: '#166534' }
-               : { background: '#FEF2F2', border: '1px solid #FECACA', color: '#DC2626' }}>
+               ? { background: 'var(--tema-fondo-f0fdf4)', border: '1px solid var(--tema-borde-bbf7d0)', color: 'var(--tema-texto-006b45)' }
+               : { background: 'var(--tema-fondo-fef2f2)', border: '1px solid var(--tema-borde-fecaca)', color: 'var(--tema-texto-d81e1e)' }}>
           <span>{msgGlobal.texto}</span>
-          <button onClick={() => setMsgGlobal(null)} className="ml-3 shrink-0" style={{ color: '#94A3B8' }}>
+          <button type="button" onClick={() => setMsgGlobal(null)} aria-label="Cerrar mensaje" className="ml-3 shrink-0" style={{ color: 'var(--tema-texto-64748b)' }}>
             <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" /></svg>
           </button>
         </div>
       )}
 
       {/* Tabla */}
-      <div className="min-h-0 flex-1 overflow-y-auto px-4 sm:px-6 py-4">
+      <div className="min-h-0 flex-1 overflow-y-auto px-3 py-3 sm:px-4 lg:px-6">
         {cargando ? (
-          <div className="flex items-center justify-center gap-3 py-16" style={{ color: '#667085' }}>
-            <span className="w-5 h-5 border-2 rounded-full animate-spin" style={{ borderColor: '#D9E2D9', borderTopColor: '#14532D' }} />
+          <div role="status" className="flex items-center justify-center gap-3 py-16" style={{ color: 'var(--tema-texto-64748b)' }}>
+            <span className="w-5 h-5 border-2 rounded-full animate-spin" style={{ borderColor: 'var(--tema-borde-dce4ea)', borderTopColor: 'var(--tema-borde-007049)' }} />
             <span className="text-sm">Cargando usuarios...</span>
           </div>
         ) : filtrados.length === 0 ? (
@@ -359,24 +351,17 @@ export function VistaAdministracion() {
               : 'Crea el primer usuario con el botón "Crear usuario".'}
           />
         ) : (
-          <div className="overflow-x-auto rounded-xl bg-white" style={{ border: '1px solid #D9E2D9', boxShadow: '0 1px 3px rgba(20,83,45,0.06)' }}>
+          <div className="overflow-x-auto rounded-xl bg-[var(--tema-fondo-ffffff)]">
             <table className="w-full text-left">
-              <thead className="sticky top-0 z-10">
-                <tr style={{ background: '#EEF4EE', borderBottom: '1px solid #D9E2D9' }}>
-                  {['', 'Nombre', 'Email', 'Cargo', 'Rol', 'Dependencia', 'Tipo', 'Último acceso', 'Estado', 'Acciones'].map((h) => (
-                    <th key={h} className="px-4 py-3 text-[10px] font-bold uppercase tracking-widest" style={{ color: '#14532D' }}>
-                      {h}
-                    </th>
-                  ))}
-                </tr>
-              </thead>
+              <CabeceraTablaSticky
+                control={<span className="sr-only">Selección</span>}
+                columnas={['Nombre', 'Email', 'Cargo', 'Rol', 'Dependencia', 'Tipo', 'Último acceso', 'Estado', 'Acciones']}
+              />
               <tbody>
                 {filtrados.map((u) => (
-                  <tr key={u.uid} className="transition-colors"
-                      style={{ borderBottom: '1px solid #EEF4EE' }}
-                      onMouseEnter={(e) => { (e.currentTarget as HTMLElement).style.background = '#F8FAF7'; }}
-                      onMouseLeave={(e) => { (e.currentTarget as HTMLElement).style.background = ''; }}>
-                    <td className="px-4 py-3">
+                  <tr key={u.uid} className="micro-row"
+                      style={{ borderBottom: '1px solid var(--tema-borde-f4f9f6)' }}>
+                    <td className="px-2 py-2">
                       <input
                         type="checkbox"
                         checked={seleccionados.includes(u.uid)}
@@ -388,34 +373,34 @@ export function VistaAdministracion() {
                         aria-label={`Seleccionar ${u.nombre}`}
                       />
                     </td>
-                    <td className="px-4 py-3">
-                      <p className="text-sm font-medium" style={{ color: '#1F2933' }}>{u.nombre}</p>
+                    <td className="px-2 py-2">
+                      <p className="text-sm font-medium" style={{ color: 'var(--tema-texto-172033)' }}>{u.nombre}</p>
                     </td>
-                    <td className="px-4 py-3">
-                      <p className="text-xs font-mono" style={{ color: '#667085' }}>{u.email}</p>
+                    <td className="px-2 py-2">
+                      <p className="text-xs font-mono" style={{ color: 'var(--tema-texto-64748b)' }}>{u.email}</p>
                     </td>
-                    <td className="px-4 py-3">
-                      <p className="text-xs" style={{ color: '#667085' }}>{u.cargo || '—'}</p>
+                    <td className="px-2 py-2">
+                      <p className="text-xs" style={{ color: 'var(--tema-texto-64748b)' }}>{u.cargo || '—'}</p>
                     </td>
-                    <td className="px-4 py-3">
+                    <td className="px-2 py-2">
                       <StatusBadge tono={rolTono[u.rol] ?? 'neutral'} tamano="sm">
                         {LABEL_ROL[u.rol] ?? u.rol}
                       </StatusBadge>
                     </td>
-                    <td className="px-4 py-3">
-                      <p className="text-xs" style={{ color: '#667085' }}>{NOMBRES_TENANT[u.tenantId] ?? u.tenantId}</p>
+                    <td className="px-2 py-2">
+                      <p className="text-xs" style={{ color: 'var(--tema-texto-64748b)' }}>{NOMBRES_TENANT[u.tenantId] ?? u.tenantId}</p>
                     </td>
-                    <td className="px-4 py-3">
+                    <td className="px-2 py-2">
                       <StatusBadge tono={tipoTono[u.tipoUsuario] ?? 'neutral'} tamano="sm">
                         {u.tipoUsuario}
                       </StatusBadge>
                     </td>
-                    <td className="px-4 py-3">
-                      <p className="text-xs" style={{ color: '#667085' }}>
+                    <td className="px-2 py-2">
+                      <p className="text-xs" style={{ color: 'var(--tema-texto-64748b)' }}>
                         {u.ultimoAcceso ? new Date(u.ultimoAcceso).toLocaleDateString('es-CO') : '—'}
                       </p>
                     </td>
-                    <td className="px-4 py-3">
+                    <td className="px-2 py-2">
                       <StatusBadge
                         tono={u.archivado ? 'warning' : u.activo ? 'success' : 'neutral'}
                         conPunto
@@ -425,15 +410,17 @@ export function VistaAdministracion() {
                       </StatusBadge>
                     </td>
                     {/* Acciones */}
-                    <td className="px-4 py-3">
+                    <td className="px-2 py-2">
                       <div className="flex items-center gap-1">
                         <button
                           onClick={() => setEditando(u)}
+                          type="button"
                           title="Editar usuario"
+                          aria-label="Editar usuario"
                           className="p-1.5 rounded-lg transition-all"
-                          style={{ color: '#94A3B8' }}
-                          onMouseEnter={(e) => { (e.currentTarget as HTMLElement).style.color = '#14532D'; (e.currentTarget as HTMLElement).style.background = '#EEF4EE'; }}
-                          onMouseLeave={(e) => { (e.currentTarget as HTMLElement).style.color = '#94A3B8'; (e.currentTarget as HTMLElement).style.background = ''; }}
+                          style={{ color: 'var(--tema-texto-64748b)' }}
+                          onMouseEnter={(e) => { (e.currentTarget as HTMLElement).style.color = 'var(--tema-texto-007049)'; (e.currentTarget as HTMLElement).style.background = 'var(--tema-fondo-f4f9f6)'; }}
+                          onMouseLeave={(e) => { (e.currentTarget as HTMLElement).style.color = 'var(--tema-texto-64748b)'; (e.currentTarget as HTMLElement).style.background = ''; }}
                         >
                           <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
                             <path strokeLinecap="round" strokeLinejoin="round" d="M16.862 4.487l1.687-1.688a1.875 1.875 0 112.652 2.652L10.582 16.07a4.5 4.5 0 01-1.897 1.13L6 18l.8-2.685a4.5 4.5 0 011.13-1.897l8.932-8.931zm0 0L19.5 7.125M18 14v4.75A2.25 2.25 0 0115.75 21H5.25A2.25 2.25 0 013 18.75V8.25A2.25 2.25 0 015.25 6H10" />
@@ -441,11 +428,13 @@ export function VistaAdministracion() {
                         </button>
                         <button
                           onClick={() => toggleActivo(u)}
+                          type="button"
                           title={u.activo && !u.archivado ? 'Desactivar' : 'Activar'}
+                          aria-label={u.activo && !u.archivado ? 'Desactivar' : 'Activar'}
                           className="p-1.5 rounded-lg transition-all"
-                          style={{ color: '#94A3B8' }}
-                          onMouseEnter={(e) => { (e.currentTarget as HTMLElement).style.color = u.activo && !u.archivado ? '#DC2626' : '#16A34A'; (e.currentTarget as HTMLElement).style.background = u.activo && !u.archivado ? '#FEF2F2' : '#F0FDF4'; }}
-                          onMouseLeave={(e) => { (e.currentTarget as HTMLElement).style.color = '#94A3B8'; (e.currentTarget as HTMLElement).style.background = ''; }}
+                          style={{ color: 'var(--tema-texto-64748b)' }}
+                          onMouseEnter={(e) => { (e.currentTarget as HTMLElement).style.color = u.activo && !u.archivado ? 'var(--tema-texto-d81e1e)' : 'var(--tema-texto-008f5a)'; (e.currentTarget as HTMLElement).style.background = u.activo && !u.archivado ? 'var(--tema-fondo-fef2f2)' : 'var(--tema-fondo-f0fdf4)'; }}
+                          onMouseLeave={(e) => { (e.currentTarget as HTMLElement).style.color = 'var(--tema-texto-64748b)'; (e.currentTarget as HTMLElement).style.background = ''; }}
                         >
                           {u.activo && !u.archivado ? (
                             <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
@@ -459,11 +448,13 @@ export function VistaAdministracion() {
                         </button>
                         <button
                           onClick={() => resetPassword(u)}
+                          type="button"
                           title="Restablecer contraseña"
+                          aria-label="Restablecer contraseña"
                           className="p-1.5 rounded-lg transition-all"
-                          style={{ color: '#94A3B8' }}
-                          onMouseEnter={(e) => { (e.currentTarget as HTMLElement).style.color = '#D97706'; (e.currentTarget as HTMLElement).style.background = '#FFFBEB'; }}
-                          onMouseLeave={(e) => { (e.currentTarget as HTMLElement).style.color = '#94A3B8'; (e.currentTarget as HTMLElement).style.background = ''; }}
+                          style={{ color: 'var(--tema-texto-64748b)' }}
+                          onMouseEnter={(e) => { (e.currentTarget as HTMLElement).style.color = 'var(--tema-texto-d97706)'; (e.currentTarget as HTMLElement).style.background = 'var(--tema-fondo-fffbeb)'; }}
+                          onMouseLeave={(e) => { (e.currentTarget as HTMLElement).style.color = 'var(--tema-texto-64748b)'; (e.currentTarget as HTMLElement).style.background = ''; }}
                         >
                           <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
                             <path strokeLinecap="round" strokeLinejoin="round" d="M15.75 5.25a3 3 0 013 3m3 0a6 6 0 01-7.029 5.912c-.563-.097-1.159.026-1.563.43L10.5 17.25H8.25v2.25H6v2.25H2.25v-2.818c0-.597.237-1.17.659-1.591l6.499-6.499c.404-.404.527-1 .43-1.563A6 6 0 1121.75 8.25z" />
@@ -471,11 +462,13 @@ export function VistaAdministracion() {
                         </button>
                         <button
                           onClick={() => cambiarTipo(u, u.tipoUsuario === 'INSTITUCIONAL' ? 'PRUEBA' : 'INSTITUCIONAL')}
+                          type="button"
                           title={u.tipoUsuario === 'INSTITUCIONAL' ? 'Marcar como prueba' : 'Marcar como institucional'}
+                          aria-label={u.tipoUsuario === 'INSTITUCIONAL' ? 'Marcar como prueba' : 'Marcar como institucional'}
                           className="p-1.5 rounded-lg transition-all"
-                          style={{ color: '#94A3B8' }}
-                          onMouseEnter={(e) => { (e.currentTarget as HTMLElement).style.color = '#4338CA'; (e.currentTarget as HTMLElement).style.background = '#EEF2FF'; }}
-                          onMouseLeave={(e) => { (e.currentTarget as HTMLElement).style.color = '#94A3B8'; (e.currentTarget as HTMLElement).style.background = ''; }}
+                          style={{ color: 'var(--tema-texto-64748b)' }}
+                          onMouseEnter={(e) => { (e.currentTarget as HTMLElement).style.color = 'var(--tema-texto-4338ca)'; (e.currentTarget as HTMLElement).style.background = 'var(--tema-fondo-eef2ff)'; }}
+                          onMouseLeave={(e) => { (e.currentTarget as HTMLElement).style.color = 'var(--tema-texto-64748b)'; (e.currentTarget as HTMLElement).style.background = ''; }}
                         >
                           <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
                             <path strokeLinecap="round" strokeLinejoin="round" d="M9.568 3H5.25A2.25 2.25 0 003 5.25v4.318c0 .597.237 1.17.659 1.591l9.581 9.581a2.25 2.25 0 003.182 0l4.318-4.318a2.25 2.25 0 000-3.182L11.16 3.66A2.25 2.25 0 009.568 3z" />
@@ -484,11 +477,13 @@ export function VistaAdministracion() {
                         </button>
                         <button
                           onClick={() => archivarUsuario(u)}
+                          type="button"
                           title="Archivar usuario"
+                          aria-label="Archivar usuario"
                           className="p-1.5 rounded-lg transition-all"
-                          style={{ color: '#94A3B8' }}
-                          onMouseEnter={(e) => { (e.currentTarget as HTMLElement).style.color = '#92400E'; (e.currentTarget as HTMLElement).style.background = '#FEF3C7'; }}
-                          onMouseLeave={(e) => { (e.currentTarget as HTMLElement).style.color = '#94A3B8'; (e.currentTarget as HTMLElement).style.background = ''; }}
+                          style={{ color: 'var(--tema-texto-64748b)' }}
+                          onMouseEnter={(e) => { (e.currentTarget as HTMLElement).style.color = 'var(--tema-texto-92400e)'; (e.currentTarget as HTMLElement).style.background = 'var(--tema-fondo-fef3c7)'; }}
+                          onMouseLeave={(e) => { (e.currentTarget as HTMLElement).style.color = 'var(--tema-texto-64748b)'; (e.currentTarget as HTMLElement).style.background = ''; }}
                         >
                           <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
                             <path strokeLinecap="round" strokeLinejoin="round" d="M20.25 7.5l-.625 10.632A2.25 2.25 0 0117.379 20.25H6.621a2.25 2.25 0 01-2.246-2.118L3.75 7.5M10 11.25h4M3.375 7.5h17.25c.621 0 1.125-.504 1.125-1.125v-1.5c0-.621-.504-1.125-1.125-1.125H3.375c-.621 0-1.125.504-1.125 1.125v1.5c0 .621.504 1.125 1.125 1.125z" />
@@ -502,6 +497,13 @@ export function VistaAdministracion() {
             </table>
           </div>
         )}
+
+        {/* Consecutivo de radicación — se usa el día del relevo del software
+            anterior. Vive en Administración porque mueve la numeración oficial
+            del municipio: no es una preferencia, es el registro público. */}
+        <div className="mt-5">
+          <AjusteConsecutivoRadicacion />
+        </div>
       </div>
 
       {/* Modal Crear Usuario */}
@@ -604,18 +606,18 @@ function ModalCrearUsuario({
       <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={onClose} />
 
       {/* Modal */}
-      <div className="relative w-full sm:max-w-lg rounded-t-2xl sm:rounded-2xl p-5 sm:p-6 shadow-2xl max-h-[92dvh] overflow-y-auto bg-white"
-           style={{ border: '1px solid #D9E2D9' }}>
+      <div className="relative w-full sm:max-w-lg rounded-t-2xl sm:rounded-2xl p-5 sm:p-6 shadow-2xl max-h-[92dvh] overflow-y-auto bg-[var(--tema-fondo-ffffff)]"
+           style={{ border: '1px solid var(--tema-borde-dce4ea)' }}>
         <div className="flex items-center justify-between mb-6">
           <div>
-            <p className="text-[10px] font-bold uppercase tracking-widest mb-0.5" style={{ color: '#14532D' }}>
+            <p className="text-[10px] font-bold uppercase tracking-widest mb-0.5" style={{ color: 'var(--tema-texto-007049)' }}>
               Administración
             </p>
-            <h2 className="text-lg font-black" style={{ color: '#1F2933' }}>Crear usuario interno</h2>
+            <h2 className="text-lg font-black" style={{ color: 'var(--tema-texto-172033)' }}>Crear usuario interno</h2>
           </div>
-          <button onClick={onClose} className="p-1.5 rounded-lg transition-all" style={{ color: '#94A3B8' }}
-            onMouseEnter={(e) => { (e.currentTarget as HTMLElement).style.color = '#1F2933'; (e.currentTarget as HTMLElement).style.background = '#EEF4EE'; }}
-            onMouseLeave={(e) => { (e.currentTarget as HTMLElement).style.color = '#94A3B8'; (e.currentTarget as HTMLElement).style.background = ''; }}>
+          <button onClick={onClose} className="p-1.5 rounded-lg transition-all" style={{ color: 'var(--tema-texto-94a3b8)' }}
+            onMouseEnter={(e) => { (e.currentTarget as HTMLElement).style.color = 'var(--tema-texto-172033)'; (e.currentTarget as HTMLElement).style.background = 'var(--tema-fondo-f4f9f6)'; }}
+            onMouseLeave={(e) => { (e.currentTarget as HTMLElement).style.color = 'var(--tema-texto-64748b)'; (e.currentTarget as HTMLElement).style.background = ''; }}>
             <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
               <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
             </svg>
@@ -625,7 +627,7 @@ function ModalCrearUsuario({
         <form onSubmit={handleCrear} className="space-y-4">
           {/* Nombre */}
           <div>
-            <label className="block text-[10px] font-bold uppercase tracking-widest mb-1.5" style={{ color: '#667085' }}>
+            <label className="block text-[10px] font-bold uppercase tracking-widest mb-1.5" style={{ color: 'var(--tema-texto-64748b)' }}>
               Nombre completo *
             </label>
             <input type="text" value={nombre} onChange={(e) => setNombre(e.target.value)} required
@@ -634,13 +636,13 @@ function ModalCrearUsuario({
 
           {/* Email */}
           <div>
-            <label className="block text-[10px] font-bold uppercase tracking-widest mb-1.5" style={{ color: '#667085' }}>
+            <label className="block text-[10px] font-bold uppercase tracking-widest mb-1.5" style={{ color: 'var(--tema-texto-64748b)' }}>
               Correo institucional *
             </label>
             <input type="email" value={email} onChange={(e) => setEmail(e.target.value)} required
               placeholder="jperez@simacota-santander.gov.co" className="input-obsidian" />
             {email.trim() && !emailInstitucional && (
-              <p className="text-[11px] mt-1" style={{ color: '#B45309' }}>
+              <p className="text-[11px] mt-1" style={{ color: 'var(--tema-texto-b45309)' }}>
                 Este correo no parece institucional. Confirme si desea continuar.
               </p>
             )}
@@ -648,7 +650,7 @@ function ModalCrearUsuario({
 
           {/* Cargo */}
           <div>
-            <label className="block text-[10px] font-bold uppercase tracking-widest mb-1.5" style={{ color: '#667085' }}>
+            <label className="block text-[10px] font-bold uppercase tracking-widest mb-1.5" style={{ color: 'var(--tema-texto-64748b)' }}>
               Cargo
             </label>
             <input type="text" value={cargo} onChange={(e) => setCargo(e.target.value)}
@@ -658,7 +660,7 @@ function ModalCrearUsuario({
           {/* Rol + Dependencia en grid */}
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div>
-              <label className="block text-[10px] font-bold uppercase tracking-widest mb-1.5" style={{ color: '#667085' }}>
+              <label className="block text-[10px] font-bold uppercase tracking-widest mb-1.5" style={{ color: 'var(--tema-texto-64748b)' }}>
                 Rol *
               </label>
               <select value={rol} onChange={(e) => setRol(e.target.value as RolInterno)} className="select-internal w-full rounded-xl px-3 py-2.5">
@@ -666,7 +668,7 @@ function ModalCrearUsuario({
               </select>
             </div>
             <div>
-              <label className="block text-[10px] font-bold uppercase tracking-widest mb-1.5" style={{ color: '#667085' }}>
+              <label className="block text-[10px] font-bold uppercase tracking-widest mb-1.5" style={{ color: 'var(--tema-texto-64748b)' }}>
                 Dependencia *
               </label>
               <select value={tenantId} onChange={(e) => setTenantId(e.target.value as TenantId)} className="select-internal w-full rounded-xl px-3 py-2.5">
@@ -676,7 +678,7 @@ function ModalCrearUsuario({
           </div>
 
           <div>
-            <label className="block text-[10px] font-bold uppercase tracking-widest mb-1.5" style={{ color: '#667085' }}>
+            <label className="block text-[10px] font-bold uppercase tracking-widest mb-1.5" style={{ color: 'var(--tema-texto-64748b)' }}>
               Tipo de usuario *
             </label>
             <select value={tipoUsuario} onChange={(e) => setTipoUsuario(e.target.value as TipoUsuario)} className="select-internal w-full rounded-xl px-3 py-2.5">
@@ -684,16 +686,16 @@ function ModalCrearUsuario({
             </select>
           </div>
 
-          <label className="flex items-center gap-2 text-sm font-semibold" style={{ color: '#1F2933' }}>
+          <label className="flex items-center gap-2 text-sm font-semibold" style={{ color: 'var(--tema-texto-172033)' }}>
             <input type="checkbox" checked={activo} onChange={(e) => setActivo(e.target.checked)} />
             Crear usuario activo
           </label>
 
           {/* Contraseña temporal */}
           <div>
-            <label className="block text-[10px] font-bold uppercase tracking-widest mb-1.5" style={{ color: '#667085' }}>
+            <label className="block text-[10px] font-bold uppercase tracking-widest mb-1.5" style={{ color: 'var(--tema-texto-64748b)' }}>
               Contraseña temporal *{' '}
-              <span className="normal-case font-normal" style={{ color: '#94A3B8' }}>(min. 8 caracteres)</span>
+              <span className="normal-case font-normal" style={{ color: 'var(--tema-texto-94a3b8)' }}>(min. 8 caracteres)</span>
             </label>
             <input type="password" value={password} onChange={(e) => setPassword(e.target.value)}
               required minLength={8} placeholder="••••••••" className="input-obsidian" />
@@ -701,12 +703,12 @@ function ModalCrearUsuario({
 
           {/* Error / Éxito */}
           {error && (
-            <div className="px-4 py-2.5 rounded-lg text-xs" style={{ background: '#FEF2F2', border: '1px solid #FECACA', color: '#DC2626' }}>
+            <div className="px-4 py-2.5 rounded-lg text-xs" style={{ background: 'var(--tema-fondo-fef2f2)', border: '1px solid var(--tema-borde-fecaca)', color: 'var(--tema-texto-d81e1e)' }}>
               {error}
             </div>
           )}
           {exito && (
-            <div className="px-4 py-2.5 rounded-lg text-xs" style={{ background: '#F0FDF4', border: '1px solid #BBF7D0', color: '#166534' }}>
+            <div className="px-4 py-2.5 rounded-lg text-xs" style={{ background: 'var(--tema-fondo-f0fdf4)', border: '1px solid var(--tema-borde-bbf7d0)', color: 'var(--tema-texto-006b45)' }}>
               {exito}
             </div>
           )}
@@ -714,17 +716,17 @@ function ModalCrearUsuario({
           {/* Botones */}
           <div className="flex justify-end gap-3 pt-2">
             <button type="button" onClick={onClose} disabled={guardando}
-              className="px-4 py-2.5 rounded-xl text-sm font-medium transition-all" style={{ color: '#667085' }}
-              onMouseEnter={(e) => { (e.currentTarget as HTMLElement).style.background = '#EEF4EE'; (e.currentTarget as HTMLElement).style.color = '#1F2933'; }}
-              onMouseLeave={(e) => { (e.currentTarget as HTMLElement).style.background = ''; (e.currentTarget as HTMLElement).style.color = '#667085'; }}
+              className="px-4 py-2.5 rounded-xl text-sm font-medium transition-all" style={{ color: 'var(--tema-texto-64748b)' }}
+              onMouseEnter={(e) => { (e.currentTarget as HTMLElement).style.background = 'var(--tema-fondo-f4f9f6)'; (e.currentTarget as HTMLElement).style.color = 'var(--tema-texto-172033)'; }}
+              onMouseLeave={(e) => { (e.currentTarget as HTMLElement).style.background = ''; (e.currentTarget as HTMLElement).style.color = 'var(--tema-texto-64748b)'; }}
             >
               Cancelar
             </button>
             <button type="submit" disabled={guardando}
               className="flex items-center gap-2 px-5 py-2.5 rounded-xl text-sm font-bold transition-all disabled:opacity-50 active:scale-[0.97]"
-              style={{ background: '#14532D', color: '#ffffff' }}
-              onMouseEnter={(e) => { (e.currentTarget as HTMLElement).style.background = '#166534'; }}
-              onMouseLeave={(e) => { (e.currentTarget as HTMLElement).style.background = '#14532D'; }}>
+              style={{ background: 'var(--tema-fondo-007049)', color: '#ffffff' }}
+              onMouseEnter={(e) => { (e.currentTarget as HTMLElement).style.background = '#006B45'; }}
+              onMouseLeave={(e) => { (e.currentTarget as HTMLElement).style.background = 'var(--tema-fondo-007049)'; }}>
               {guardando && <span className="w-4 h-4 border-2 rounded-full animate-spin" style={{ borderColor: 'rgba(255,255,255,0.3)', borderTopColor: '#fff' }} />}
               {guardando ? 'Creando...' : 'Crear usuario'}
             </button>
@@ -797,19 +799,19 @@ function ModalEditarUsuario({
   return (
     <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-0 sm:p-4">
       <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={onClose} />
-      <div className="relative w-full sm:max-w-lg rounded-t-2xl sm:rounded-2xl p-5 sm:p-6 shadow-2xl max-h-[92dvh] overflow-y-auto bg-white"
-           style={{ border: '1px solid #D9E2D9' }}>
+      <div className="relative w-full sm:max-w-lg rounded-t-2xl sm:rounded-2xl p-5 sm:p-6 shadow-2xl max-h-[92dvh] overflow-y-auto bg-[var(--tema-fondo-ffffff)]"
+           style={{ border: '1px solid var(--tema-borde-dce4ea)' }}>
         <div className="flex items-center justify-between mb-6">
           <div>
-            <p className="text-[10px] font-bold uppercase tracking-widest mb-0.5" style={{ color: '#D4A017' }}>
+            <p className="text-[10px] font-bold uppercase tracking-widest mb-0.5" style={{ color: 'var(--tema-texto-e5a31a)' }}>
               Editar usuario
             </p>
-            <h2 className="text-lg font-black" style={{ color: '#1F2933' }}>{usuario.nombre}</h2>
-            <p className="text-xs font-mono mt-0.5" style={{ color: '#94A3B8' }}>{usuario.email}</p>
+            <h2 className="text-lg font-black" style={{ color: 'var(--tema-texto-172033)' }}>{usuario.nombre}</h2>
+            <p className="text-xs font-mono mt-0.5" style={{ color: 'var(--tema-texto-94a3b8)' }}>{usuario.email}</p>
           </div>
-          <button onClick={onClose} className="p-1.5 rounded-lg transition-all" style={{ color: '#94A3B8' }}
-            onMouseEnter={(e) => { (e.currentTarget as HTMLElement).style.color = '#1F2933'; (e.currentTarget as HTMLElement).style.background = '#EEF4EE'; }}
-            onMouseLeave={(e) => { (e.currentTarget as HTMLElement).style.color = '#94A3B8'; (e.currentTarget as HTMLElement).style.background = ''; }}>
+          <button onClick={onClose} className="p-1.5 rounded-lg transition-all" style={{ color: 'var(--tema-texto-94a3b8)' }}
+            onMouseEnter={(e) => { (e.currentTarget as HTMLElement).style.color = 'var(--tema-texto-172033)'; (e.currentTarget as HTMLElement).style.background = 'var(--tema-fondo-f4f9f6)'; }}
+            onMouseLeave={(e) => { (e.currentTarget as HTMLElement).style.color = 'var(--tema-texto-64748b)'; (e.currentTarget as HTMLElement).style.background = ''; }}>
             <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
               <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
             </svg>
@@ -818,22 +820,22 @@ function ModalEditarUsuario({
 
         <form onSubmit={handleGuardar} className="space-y-4">
           <div>
-            <label className="block text-[10px] font-bold uppercase tracking-widest mb-1.5" style={{ color: '#667085' }}>Nombre completo</label>
+            <label className="block text-[10px] font-bold uppercase tracking-widest mb-1.5" style={{ color: 'var(--tema-texto-64748b)' }}>Nombre completo</label>
             <input type="text" value={nombre} onChange={(e) => setNombre(e.target.value)} required className="input-obsidian" />
           </div>
           <div>
-            <label className="block text-[10px] font-bold uppercase tracking-widest mb-1.5" style={{ color: '#667085' }}>Cargo</label>
+            <label className="block text-[10px] font-bold uppercase tracking-widest mb-1.5" style={{ color: 'var(--tema-texto-64748b)' }}>Cargo</label>
             <input type="text" value={cargo} onChange={(e) => setCargo(e.target.value)} className="input-obsidian" />
           </div>
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div>
-              <label className="block text-[10px] font-bold uppercase tracking-widest mb-1.5" style={{ color: '#667085' }}>Rol</label>
+              <label className="block text-[10px] font-bold uppercase tracking-widest mb-1.5" style={{ color: 'var(--tema-texto-64748b)' }}>Rol</label>
               <select value={rol} onChange={(e) => setRol(e.target.value as RolInterno)} className="select-internal w-full rounded-xl px-3 py-2.5">
                 {ROLES.map((r) => <option key={r.value} value={r.value}>{r.label}</option>)}
               </select>
             </div>
             <div>
-              <label className="block text-[10px] font-bold uppercase tracking-widest mb-1.5" style={{ color: '#667085' }}>Dependencia</label>
+              <label className="block text-[10px] font-bold uppercase tracking-widest mb-1.5" style={{ color: 'var(--tema-texto-64748b)' }}>Dependencia</label>
               <select value={tenantId} onChange={(e) => setTenantId(e.target.value as TenantId)} className="select-internal w-full rounded-xl px-3 py-2.5">
                 {TENANTS.map((t) => <option key={t.value} value={t.value}>{t.label}</option>)}
               </select>
@@ -841,28 +843,28 @@ function ModalEditarUsuario({
           </div>
 
           <div>
-            <label className="block text-[10px] font-bold uppercase tracking-widest mb-1.5" style={{ color: '#667085' }}>Tipo de usuario</label>
+            <label className="block text-[10px] font-bold uppercase tracking-widest mb-1.5" style={{ color: 'var(--tema-texto-64748b)' }}>Tipo de usuario</label>
             <select value={tipoUsuario} onChange={(e) => setTipoUsuario(e.target.value as TipoUsuario)} className="select-internal w-full rounded-xl px-3 py-2.5">
               {TIPOS_USUARIO.map((t) => <option key={t.value} value={t.value}>{t.label}</option>)}
             </select>
           </div>
 
-          {error && <div className="px-4 py-2.5 rounded-lg text-xs" style={{ background: '#FEF2F2', border: '1px solid #FECACA', color: '#DC2626' }}>{error}</div>}
-          {exito && <div className="px-4 py-2.5 rounded-lg text-xs" style={{ background: '#F0FDF4', border: '1px solid #BBF7D0', color: '#166534' }}>{exito}</div>}
+          {error && <div className="px-4 py-2.5 rounded-lg text-xs" style={{ background: 'var(--tema-fondo-fef2f2)', border: '1px solid var(--tema-borde-fecaca)', color: 'var(--tema-texto-d81e1e)' }}>{error}</div>}
+          {exito && <div className="px-4 py-2.5 rounded-lg text-xs" style={{ background: 'var(--tema-fondo-f0fdf4)', border: '1px solid var(--tema-borde-bbf7d0)', color: 'var(--tema-texto-006b45)' }}>{exito}</div>}
 
           <div className="flex justify-end gap-3 pt-2">
             <button type="button" onClick={onClose} disabled={guardando}
-              className="px-4 py-2.5 rounded-xl text-sm font-medium transition-all" style={{ color: '#667085' }}
-              onMouseEnter={(e) => { (e.currentTarget as HTMLElement).style.background = '#EEF4EE'; }}
+              className="px-4 py-2.5 rounded-xl text-sm font-medium transition-all" style={{ color: 'var(--tema-texto-64748b)' }}
+              onMouseEnter={(e) => { (e.currentTarget as HTMLElement).style.background = 'var(--tema-fondo-f4f9f6)'; }}
               onMouseLeave={(e) => { (e.currentTarget as HTMLElement).style.background = ''; }}>
               Cancelar
             </button>
             <button type="submit" disabled={guardando}
               className="flex items-center gap-2 px-5 py-2.5 rounded-xl text-white text-sm font-bold transition-all disabled:opacity-50 active:scale-[0.97]"
-              style={{ background: '#D4A017', color: '#14532D' }}
-              onMouseEnter={(e) => { (e.currentTarget as HTMLElement).style.background = '#B8860B'; }}
-              onMouseLeave={(e) => { (e.currentTarget as HTMLElement).style.background = '#D4A017'; }}>
-              {guardando && <span className="w-4 h-4 border-2 rounded-full animate-spin" style={{ borderColor: 'rgba(20,83,45,0.3)', borderTopColor: '#14532D' }} />}
+              style={{ background: '#E5A31A', color: '#03402A' }}
+              onMouseEnter={(e) => { (e.currentTarget as HTMLElement).style.background = '#C98A0F'; }}
+              onMouseLeave={(e) => { (e.currentTarget as HTMLElement).style.background = '#E5A31A'; }}>
+              {guardando && <span className="w-4 h-4 border-2 rounded-full animate-spin" style={{ borderColor: 'rgba(0, 112, 73,0.3)', borderTopColor: 'var(--tema-borde-007049)' }} />}
               {guardando ? 'Guardando...' : 'Guardar cambios'}
             </button>
           </div>

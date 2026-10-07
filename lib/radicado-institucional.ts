@@ -1,5 +1,7 @@
 import { doc, runTransaction } from 'firebase/firestore';
 import { getDb } from './firebase';
+import { periodoColombia } from './fecha-colombia';
+import { CONTINGENCIA_STORAGE_ACTIVA } from './recepcion/contingencia-storage';
 
 /**
  * Sprint Número con oficina radicadora — decisión del usuario con la
@@ -28,7 +30,7 @@ import { getDb } from './firebase';
  * solo informativo en el id, no reinicia la numeración. El contador
  * (`counters/radicados-{año}`) y el helper transaccional
  * (`lib/server/consecutivo-legal.ts`) no cambian: siguen indexando por año
- * puro, calculado con la misma lógica (`fecha.getFullYear()`) de siempre.
+ * puro, calculado en America/Bogota (ADR-0043), igual que la máscara.
  * Los ids anteriores a este cambio (`1-110-{AAAA}-…`) siguen existiendo tal
  * cual — nunca se reescriben — y todo consumidor que los lea debe seguir
  * aceptándolos (ver `lib/seguridad/consulta-publica-radicado.ts` y
@@ -40,16 +42,18 @@ export function formatearRadicadoInstitucional(
   consecutivo: number,
   fecha = new Date(),
 ): string {
-  const year = fecha.getFullYear();
-  const mes = String(fecha.getMonth() + 1).padStart(2, '0');
+  const { anio: year, mes } = periodoColombia(fecha);
   return `1-${CODIGO_OFICINA_RADICADORA}-${year}${mes}-${String(consecutivo).padStart(8, '0')}`;
 }
 
 export async function generarRadicadoInstitucional(
   fecha = new Date(),
 ): Promise<{ consecutivo: number; radicadoId: string }> {
+  if (CONTINGENCIA_STORAGE_ACTIVA) {
+    throw new Error('En contingencia solo la radicación interna autenticada puede emitir un consecutivo.');
+  }
   const db = getDb();
-  const year = fecha.getFullYear();
+  const { anio: year } = periodoColombia(fecha);
   const counterRef = doc(db, 'counters', `radicados-${year}`);
 
   return runTransaction(db, async (transaction) => {

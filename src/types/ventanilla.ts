@@ -9,6 +9,7 @@ import type {
 import type { TipoSolicitudId, UnidadTermino } from '@/lib/tiempos-radicado';
 // type-only import — erased en runtime, seguro desde shared types
 import type { RolInterno } from '@/lib/hooks/useAuth';
+import type { GestionAdjuntosRadicado } from '@/lib/recepcion/contingencia-storage';
 
 export type TipoPersona =
   | 'NATURAL'
@@ -337,6 +338,8 @@ export interface VentanillaRadicado {
     observacionesAnexos?: string | null;
   };
   archivos: ArchivoRadicado[];
+  /** Contingencia: no equivale al estado administrativo ni modifica históricos. */
+  gestionAdjuntos?: GestionAdjuntosRadicado;
   analisisIa?:       AnalisisIA;
   feedbackIa?:       FeedbackIA;
   respuestaOficial?: RespuestaOficial | null;

@@ -19,7 +19,7 @@ import { SelloDespacho } from './SelloDespacho';
    oficio impreso junto a la referencia del radicado de entrada.
 ══════════════════════════════════════════════════════════════ */
 
-const VERDE_INST = '#14532D';
+const VERDE_INST = '#007049';
 
 const MEDIOS: [MedioEnvioSalida, string][] = [
   ['CORREO',     'Correo electrónico'],
@@ -100,7 +100,7 @@ export function RegistrarSalidaModal({ usuario, entrada, onCerrar }: RegistrarSa
   }
 
   const labelCls = 'mb-1 block text-[10px] font-bold uppercase tracking-widest';
-  const labelStyle = { color: '#667085' };
+  const labelStyle = { color: 'var(--tema-texto-64748b)' };
 
   return (
     <div
@@ -118,18 +118,18 @@ export function RegistrarSalidaModal({ usuario, entrada, onCerrar }: RegistrarSa
       />
 
       <div
-        className="relative w-full max-w-xl bg-white rounded-2xl shadow-2xl overflow-hidden flex flex-col"
-        style={{ border: '1px solid #D9E2D9', maxHeight: 'calc(100dvh - 24px)' }}
+        className="relative w-full max-w-xl bg-[var(--tema-fondo-ffffff)] rounded-2xl shadow-2xl overflow-hidden flex flex-col"
+        style={{ border: '1px solid var(--tema-borde-dce4ea)', maxHeight: 'calc(100dvh - 24px)' }}
       >
-        <header className="px-5 py-4" style={{ borderBottom: '1px solid #D9E2D9' }}>
-          <p className="text-[10px] font-bold uppercase tracking-[0.12em]" style={{ color: '#8A6A12' }}>
+        <header className="px-5 py-4" style={{ borderBottom: '1px solid var(--tema-borde-dce4ea)' }}>
+          <p className="text-[10px] font-bold uppercase tracking-[0.12em]" style={{ color: 'var(--tema-texto-8a6a12)' }}>
             Correspondencia de salida
           </p>
-          <h2 className="text-lg font-black leading-tight" style={{ color: '#12261A' }}>
+          <h2 className="text-lg font-black leading-tight" style={{ color: 'var(--tema-texto-172033)' }}>
             {esRespuesta ? 'Registrar salida de respuesta' : 'Registrar oficio de salida'}
           </h2>
           {esRespuesta && entrada && (
-            <p className="text-xs mt-1" style={{ color: '#5F6F64' }}>
+            <p className="text-xs mt-1" style={{ color: 'var(--tema-texto-5f6f64)' }}>
               Amarrada al radicado <span className="font-mono font-bold">{entrada.radicadoId}</span>
             </p>
           )}
@@ -137,13 +137,13 @@ export function RegistrarSalidaModal({ usuario, entrada, onCerrar }: RegistrarSa
 
         {salidaGenerada ? (
           <div className="flex-1 min-h-0 overflow-y-auto flex flex-col items-center gap-4 px-6 py-6 text-center">
-            <p className="text-xs font-bold uppercase tracking-widest" style={{ color: '#16A34A' }}>
+            <p className="text-xs font-bold uppercase tracking-widest" style={{ color: 'var(--tema-texto-008f5a)' }}>
               Salida registrada
             </p>
             <p className="text-2xl font-black font-mono" style={{ color: VERDE_INST }}>
               {salidaGenerada.salidaId}
             </p>
-            <p className="text-xs max-w-sm" style={{ color: '#667085' }}>
+            <p className="text-xs max-w-sm" style={{ color: 'var(--tema-texto-64748b)' }}>
               Escriba este número en el oficio que se despacha
               {esRespuesta && entrada
                 ? ` junto a la referencia del radicado ${entrada.radicadoId}. El despacho ya quedó en la trazabilidad.`
@@ -235,28 +235,28 @@ export function RegistrarSalidaModal({ usuario, entrada, onCerrar }: RegistrarSa
               {/* Fase B — el oficio que se despacha, para el archivo digital. */}
               <div className="md:col-span-2">
                 <span className={labelCls} style={labelStyle}>
-                  Oficio firmado <span className="normal-case font-normal" style={{ color: '#94A3B8' }}>(PDF, opcional)</span>
+                  Oficio firmado <span className="normal-case font-normal" style={{ color: 'var(--tema-texto-94a3b8)' }}>(PDF, opcional)</span>
                 </span>
                 {archivoPdf ? (
                   <div className="flex items-center justify-between gap-2 px-3 py-2 rounded-lg"
-                       style={{ background: '#F0FDF4', border: '1px solid #BBF7D0' }}>
-                    <span className="text-xs text-green-700 truncate min-w-0">{archivoPdf.name}</span>
+                       style={{ background: 'var(--tema-fondo-f0fdf4)', border: '1px solid var(--tema-borde-bbf7d0)' }}>
+                    <span className="text-xs text-green-700 oscuro:text-green-300 truncate min-w-0">{archivoPdf.name}</span>
                     <button
                       type="button"
                       onClick={() => setArchivoPdf(null)}
                       className="shrink-0 text-[10px]"
-                      style={{ color: '#94A3B8' }}
+                      style={{ color: 'var(--tema-texto-94a3b8)' }}
                     >
                       Quitar
                     </button>
                   </div>
                 ) : (
                   <label className="flex items-center gap-2 px-3 py-2.5 rounded-lg border border-dashed cursor-pointer"
-                         style={{ borderColor: '#D9E2D9' }}>
-                    <svg className="w-4 h-4 shrink-0" style={{ color: '#94A3B8' }} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
+                         style={{ borderColor: 'var(--tema-borde-dce4ea)' }}>
+                    <svg className="w-4 h-4 shrink-0" style={{ color: 'var(--tema-texto-94a3b8)' }} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
                       <path strokeLinecap="round" strokeLinejoin="round" d="M18.375 12.739l-7.693 7.693a4.5 4.5 0 01-6.364-6.364l10.94-10.94A3 3 0 1119.5 7.372L8.552 18.32m.009-.01l-.01.01m5.699-9.941l-7.81 7.81a1.5 1.5 0 002.112 2.13" />
                     </svg>
-                    <span className="text-xs" style={{ color: '#667085' }}>Adjuntar el oficio despachado (PDF, máx. 10 MB)</span>
+                    <span className="text-xs" style={{ color: 'var(--tema-texto-64748b)' }}>Adjuntar el oficio despachado (PDF, máx. 10 MB)</span>
                     <input
                       type="file"
                       accept="application/pdf"
@@ -276,7 +276,7 @@ export function RegistrarSalidaModal({ usuario, entrada, onCerrar }: RegistrarSa
 
             {errorLocal && (
               <p role="alert" className="rounded-lg px-3 py-2 text-xs"
-                 style={{ background: '#FEF2F2', border: '1px solid #FECACA', color: '#991B1B' }}>
+                 style={{ background: 'var(--tema-fondo-fef2f2)', border: '1px solid var(--tema-borde-fecaca)', color: 'var(--tema-texto-991b1b)' }}>
                 {errorLocal}
               </p>
             )}
@@ -286,7 +286,7 @@ export function RegistrarSalidaModal({ usuario, entrada, onCerrar }: RegistrarSa
                 type="button"
                 onClick={onCerrar}
                 className="px-4 py-2 rounded-xl text-sm font-bold"
-                style={{ border: '1px solid #D9E2D9', color: '#475569' }}
+                style={{ border: '1px solid var(--tema-borde-dce4ea)', color: 'var(--tema-texto-475569)' }}
               >
                 Cancelar
               </button>

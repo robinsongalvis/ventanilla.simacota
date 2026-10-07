@@ -138,7 +138,8 @@ export function SelloDespacho({ salida, variante = 'completa' }: SelloDespachoPr
   );
 
   return (
-    <div className="w-full max-w-[460px] space-y-3">
+    /* `isla-clara`: documento oficial, siempre en claro aunque el panel esté en oscuro (ADR-0045). */
+    <div className="isla-clara w-full max-w-[460px] space-y-3">
       <div className="flex flex-col items-center gap-2">
         <button
           type="button"

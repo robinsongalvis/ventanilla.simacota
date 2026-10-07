@@ -88,9 +88,9 @@ describe('plantilla del acto de desistimiento', () => {
    algo NO está escrito, y para eso leer el archivo es la herramienta correcta. */
 describe('cableado del cron — lectura del FUENTE, no ejecución', () => {
   const s = readFileSync('app/api/cron/desistimiento-tacito/route.ts', 'utf8');
-  it('el fuente NOMBRA autorizarCron e isTest (solo eso: no prueba que filtren)', () => {
+  it('el fuente NOMBRA autorizarCron y el criterio canónico de prueba (solo presencia)', () => {
     expect(s).toContain('autorizarCron');
-    expect(s).toContain('isTest');
+    expect(s).toContain('esDatoDePrueba');
   });
   it('usa la función pura y NO escribe estado DESISTIDO', () => {
     expect(s).toContain('debeProponerDesistimiento');

@@ -47,13 +47,13 @@ export function PestanasExpediente({ activa, onCambiar, documentos, hechos }: Pe
             onClick={() => onCambiar(p.id)}
             className="inline-flex items-center gap-2 rounded-t-lg px-3 py-2.5 text-sm transition-colors duration-150 hover:bg-black/[0.03] active:bg-black/[0.05] focus-visible:outline-none focus-visible:ring-2"
             style={{
-              color: esActiva ? '#14532D' : 'var(--text-secondary)',
+              color: esActiva ? 'var(--tema-texto-007049)' : 'var(--text-secondary)',
               fontWeight: esActiva ? 800 : 600,
-              borderBottom: esActiva ? '2px solid #14532D' : '2px solid transparent',
+              borderBottom: esActiva ? '2px solid var(--tema-borde-007049)' : '2px solid transparent',
               marginBottom: '-1px',
             }}
           >
-            <span aria-hidden style={{ color: esActiva ? '#14532D' : 'var(--text-secondary)' }}>{p.icono}</span>
+            <span aria-hidden style={{ color: esActiva ? 'var(--tema-texto-007049)' : 'var(--text-secondary)' }}>{p.icono}</span>
             {p.texto}
             {p.contador && (
               <span
@@ -64,8 +64,8 @@ export function PestanasExpediente({ activa, onCambiar, documentos, hechos }: Pe
                    (completo) se veía como si faltara trabajo. */
                 style={
                   p.completo
-                    ? { background: '#E7F5EC', color: '#117937' }
-                    : { background: '#FDF1DC', color: '#8E5C06' }
+                    ? { background: 'var(--tema-fondo-e7f5ec)', color: 'var(--tema-texto-007a4d)' }
+                    : { background: 'var(--tema-fondo-fdf1dc)', color: 'var(--tema-texto-8e5c06)' }
                 }
               >
                 {p.contador}

@@ -4,7 +4,7 @@ import {
   InternalAuthError,
   requireActiveInternalUser,
 } from '@/lib/server/internal-auth';
-import { getFirebaseAdminDb, getFirebaseAdminStorage } from '@/lib/firebase-admin';
+import { getFirebaseAdminApp, getFirebaseAdminDb, getFirebaseAdminStorage } from '@/lib/firebase-admin';
 import { sanitizeFirestoreData } from '@/lib/firestore/removeUndefined';
 import { sanitizeFilename } from '@/lib/server/radicados-security';
 import { checkRateLimit } from '@/lib/ai/rate-limit';
@@ -31,9 +31,17 @@ import {
   type RespuestaRadicacionInternaOk,
 } from '@/lib/recepcion/contrato-radicacion-interna';
 import {
+  AperturaContingenciaPendienteError,
   confirmarConsecutivosLegales,
   leerConsecutivosLegales,
 } from '@/lib/server/consecutivo-legal';
+import {
+  CONTINGENCIA_STORAGE_ACTIVA,
+  MENSAJE_SOPORTES_PENDIENTES,
+  validarSoportesPendientes,
+  type GestionAdjuntosRadicado,
+  type SoportesPendientesInput,
+} from '@/lib/recepcion/contingencia-storage';
 import { DIRECTORIO_TENANTS } from '@/src/types/reglas-negocio';
 import { logError } from '@/lib/logger';
 import { registrarEventoNegocio } from '@/lib/observabilidad/eventos-negocio';
@@ -162,6 +170,10 @@ const TENANT_DEFAULT: TenantId = 'VENTANILLA_UNICA';
  *  evidencia operativa. Clave por `uid` de sesión (no IP/XFF, ver hallazgo
  *  de memoria dev-backend sobre bypass de rate-limit por X-Forwarded-For). */
 const RATE_LIMIT = { maxRequests: 30, windowMs: 60_000 };
+const PROYECTOS_CONTINGENCIA_PERMITIDOS = new Set([
+  'ventanilla-unica-f31b1',
+  'ventanilla-simacota-stage',
+]);
 
 function badRequest(
   error: string,
@@ -304,6 +316,17 @@ export async function POST(request: Request): Promise<NextResponse> {
     // identidadReservada. Todos se derivan server-side. `tipoPresentacion`
     // SÍ es entrada legítima (recepción elige ANONIMA/RESERVADA).
     const formData = await request.formData();
+    let soportesPendientes: SoportesPendientesInput | undefined;
+    if (CONTINGENCIA_STORAGE_ACTIVA) {
+      // Rechazar TODOS los blobs: incluye vacíos o con nombres de campo forjados.
+      // Todavía no se tocó Storage, contador, reserva ni documento.
+      if (Array.from(formData.values()).some((valor) => typeof valor !== 'string')) {
+        return badRequest('Storage no disponible. No adjuntes archivos: registra los soportes pendientes y su custodia. No se consumió ningún consecutivo.');
+      }
+      const validacion = validarSoportesPendientes(campo(formData, CAMPOS_RADICACION_INTERNA.soportesPendientes));
+      if (!validacion.ok) return badRequest(validacion.error);
+      soportesPendientes = validacion.soportes;
+    }
 
     const tipoSolicitudIdRaw = campo(formData, CAMPOS_RADICACION_INTERNA.tipoSolicitudId);
     if (!isTipoSolicitud(tipoSolicitudIdRaw)) {
@@ -449,11 +472,24 @@ export async function POST(request: Request): Promise<NextResponse> {
       minute: '2-digit',
       timeZone: 'America/Bogota',
     });
+    const gestionAdjuntos: GestionAdjuntosRadicado | undefined = soportesPendientes ? {
+      version: 1,
+      estado: 'PENDIENTE_STORAGE',
+      soportesPendientes,
+      registradoPor: { uid: usuario.uid, nombre: usuario.nombre },
+      registradoEn: ahora.toISOString(),
+    } : undefined;
 
     // H3 (Bloque 2): staging → transacción → finalize.
     // 1) Adjuntos a STAGING antes de consumir el consecutivo: un fallo de
     //    subida no crea radicado ni gasta número.
     const db = getFirebaseAdminDb();
+    const proyectoAdmin = CONTINGENCIA_STORAGE_ACTIVA ? getFirebaseAdminApp().options.projectId : undefined;
+    if (CONTINGENCIA_STORAGE_ACTIVA && (
+      !proyectoAdmin || !PROYECTOS_CONTINGENCIA_PERMITIDOS.has(proyectoAdmin)
+    )) {
+      return NextResponse.json({ error: 'El proyecto servidor no está autorizado para la contingencia. La radicación permanece bloqueada y no se reservó consecutivo.' }, { status: 503 });
+    }
     const requestId = randomUUID();
     const preparados = files.map((file, index) => ({
       file,
@@ -474,7 +510,12 @@ export async function POST(request: Request): Promise<NextResponse> {
       // fallar la transacción con 500 (P0 ya vivido en api/radicacion y
       // salidas/registrar).
       const pendientesRadicado = await leerConsecutivosLegales(tx, db, ahora, [
-        { serie: 'radicados', formatear: formatearRadicadoInstitucional },
+        {
+          serie: 'radicados',
+          formatear: formatearRadicadoInstitucional,
+          ...(CONTINGENCIA_STORAGE_ACTIVA
+            ? { exigeAperturaUnicaRadicados: true } : {}),
+        },
       ]);
       const [consecRadicado] = pendientesRadicado;
       const radicadoId = consecRadicado.documentoId;
@@ -541,6 +582,7 @@ export async function POST(request: Request): Promise<NextResponse> {
           archivos,
         }) as unknown as Record<string, unknown>,
       ) as unknown as VentanillaRadicado;
+      if (gestionAdjuntos) radicado.gestionAdjuntos = gestionAdjuntos;
 
       const eventoRadicacion: TrazabilidadRadicado = {
         eventoId: `ev_${radicadoId}_RADICACION`,
@@ -564,6 +606,22 @@ export async function POST(request: Request): Promise<NextResponse> {
         db.doc(`ventanilla_radicados/${radicadoId}/trazabilidad/ev_${radicadoId}_RADICACION`),
         sanitizeFirestoreData(eventoRadicacion as unknown as Record<string, unknown>),
       );
+      if (gestionAdjuntos) {
+        const eventoPendientes: TrazabilidadRadicado = {
+          eventoId: `ev_${radicadoId}_ADJUNTOS_PENDIENTES_STORAGE`,
+          fecha: ahora.toISOString(),
+          accion: 'ADJUNTOS_PENDIENTES_STORAGE',
+          actorUid: usuario.uid,
+          actorNombre: usuario.nombre,
+          oficinaDestino,
+          nota: MENSAJE_SOPORTES_PENDIENTES,
+          metadata: { gestionAdjuntos },
+        };
+        tx.create(
+          db.doc(`ventanilla_radicados/${radicadoId}/trazabilidad/${eventoPendientes.eventoId}`),
+          eventoPendientes,
+        );
+      }
 
       if (hayNoAportados) {
         const eventoNoAportados: TrazabilidadRadicado = {
@@ -620,9 +678,18 @@ export async function POST(request: Request): Promise<NextResponse> {
       radicadoId,
       consecutivo,
       archivosSubidos: archivos.length,
+      ...(gestionAdjuntos ? {
+        estadoAdjuntos: gestionAdjuntos.estado,
+        mensajeAdjuntos: MENSAJE_SOPORTES_PENDIENTES,
+      } : {}),
+      fechaRadicado: ahora.toISOString(),
+      horaRadicado,
     };
     return NextResponse.json(respuestaOk);
   } catch (error) {
+    if (error instanceof AperturaContingenciaPendienteError) {
+      return NextResponse.json({ error: error.message }, { status: 503 });
+    }
     if (error instanceof InternalAuthError) {
       return jsonAuthError(error);
     }

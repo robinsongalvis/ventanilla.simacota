@@ -42,6 +42,19 @@
 export type NivelVigilancia = 'AVISO' | 'CRITICO' | 'VENCIDO' | 'ESPERA_EXCESIVA';
 
 /**
+ * Indica si una fecha corresponde a lunes en la zona horaria de Bogotá.
+ *
+ * El resumen semanal se decide en la fecha civil de Colombia, no en UTC.
+ */
+export function esLunes(ahora: Date): boolean {
+  const enBogota = new Intl.DateTimeFormat('en-US', {
+    timeZone: 'America/Bogota',
+    weekday: 'short',
+  }).format(ahora);
+  return enBogota === 'Mon';
+}
+
+/**
  * Escalera de gravedad. `ESPERA_EXCESIVA` está DELIBERADAMENTE fuera: no es
  * más ni menos grave que un vencimiento, es otro eje.
  */

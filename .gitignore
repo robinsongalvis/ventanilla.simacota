@@ -61,3 +61,6 @@ next-env.d.ts
 
 # Detalle local de inventarios/importaciones con PII — jamás al repositorio
 *.local.json
+
+# Log de depuración de Firebase CLI — ruido local, nunca se versiona.
+firebase-debug.log

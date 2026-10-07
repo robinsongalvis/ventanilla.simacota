@@ -99,8 +99,8 @@ describe('Panel Op Fase 2 — BarraKpisOperativos', () => {
     );
     const pastilla = screen.getByRole('button', { name: /KPI operativo: Correo fallido/i });
     expect(pastilla.style.opacity).toBe('0.55');
-    // jsdom normaliza el hex a rgb() al leer style.borderColor.
-    expect(pastilla.style.borderColor).toBe('rgb(217, 226, 217)');
+    // Borde gris neutro vía token de tema (ADR-0045): en claro vale #DCE4EA.
+    expect(pastilla.style.borderColor).toBe('var(--tema-borde-dce4ea)');
   });
 
   /* 6 · Sprint tablero-jerarquia — banda única de estado: chipsExtra se

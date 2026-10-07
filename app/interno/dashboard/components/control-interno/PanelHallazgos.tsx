@@ -15,6 +15,9 @@ import {
 import type { TenantId } from '@/src/types/radicado';
 import { NOMBRES_TENANT, DIRECTORIO_TENANTS } from '@/src/types/reglas-negocio';
 import { Aviso, Cargando, EstadoVacio } from './PanoramaGeneralPanel';
+import { CabeceraTablaSticky } from '@/app/components/design-system/SuperficieTabla';
+import { BotonAccion } from '@/app/components/design-system/BotonAccion';
+import { Plus, X } from 'lucide-react';
 
 const NIVELES: NivelRiesgo[] = ['BAJO', 'MEDIO', 'ALTO', 'CRITICO'];
 const TIPOS: TipoHallazgo[] = [
@@ -138,30 +141,25 @@ export function PanelHallazgos() {
     <div className="space-y-4">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
-          <p className="text-[10px] font-bold uppercase tracking-widest" style={{ color: '#14532D' }}>Hallazgos</p>
-          <p className="text-sm" style={{ color: '#667085' }}>
+          <p className="text-[10px] font-bold uppercase tracking-widest" style={{ color: 'var(--tema-texto-007049)' }}>Hallazgos</p>
+          <p className="text-sm" style={{ color: 'var(--tema-texto-64748b)' }}>
             Registre las situaciones que requieren seguimiento por parte de Control Interno.
           </p>
         </div>
-        <button
-          type="button"
-          onClick={() => setCrear((v) => !v)}
-          className="px-3 py-2 rounded-lg text-xs font-bold text-white"
-          style={{ background: crear ? '#94A3B8' : '#14532D' }}
-        >
+        <BotonAccion variante={crear ? 'secundaria' : 'primaria'} Icono={crear ? X : Plus} onClick={() => setCrear((v) => !v)}>
           {crear ? 'Cancelar' : 'Crear hallazgo'}
-        </button>
+        </BotonAccion>
       </div>
 
       {exito && <Aviso tipo="info" mensaje={exito} />}
 
       {crear && (
-        <form onSubmit={guardar} className="rounded-xl bg-white p-4 space-y-3" style={{ border: '1px solid #D9E2D9' }}>
-          <p className="text-xs" style={{ color: '#667085' }}>
+        <form onSubmit={guardar} className="rounded-xl bg-[var(--tema-fondo-ffffff)] p-4 space-y-3" style={{ border: '1px solid var(--tema-borde-dce4ea)' }}>
+          <p className="text-xs" style={{ color: 'var(--tema-texto-64748b)' }}>
             Complete los datos para dejar constancia. Después podrá agregar observaciones o solicitar un plan de mejora.
           </p>
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-            <label className="flex flex-col text-[10px] font-bold uppercase tracking-widest" style={{ color: '#94A3B8' }}>
+            <label className="flex flex-col text-[10px] font-bold uppercase tracking-widest" style={{ color: 'var(--tema-texto-64748b)' }}>
               Dependencia relacionada
               <select className="select-internal mt-1 text-xs" value={fTenant} onChange={(e) => setFTenant(e.target.value as TenantId)}>
                 {(Object.keys(DIRECTORIO_TENANTS) as TenantId[]).map((t) => (
@@ -169,24 +167,24 @@ export function PanelHallazgos() {
                 ))}
               </select>
             </label>
-            <label className="flex flex-col text-[10px] font-bold uppercase tracking-widest" style={{ color: '#94A3B8' }}>
+            <label className="flex flex-col text-[10px] font-bold uppercase tracking-widest" style={{ color: 'var(--tema-texto-64748b)' }}>
               Radicado relacionado (opcional)
               <input className="input-internal mt-1 text-xs" value={fRadicado} onChange={(e) => setFRadicado(e.target.value)} placeholder="Ej: 2025-00000123" />
             </label>
-            <label className="flex flex-col text-[10px] font-bold uppercase tracking-widest" style={{ color: '#94A3B8' }}>
+            <label className="flex flex-col text-[10px] font-bold uppercase tracking-widest" style={{ color: 'var(--tema-texto-64748b)' }}>
               Tipo de hallazgo
               <select className="select-internal mt-1 text-xs" value={fTipo} onChange={(e) => setFTipo(e.target.value as TipoHallazgo)}>
                 {TIPOS.map((t) => <option key={t} value={t}>{LABEL_TIPO_HALLAZGO[t]}</option>)}
               </select>
             </label>
-            <label className="flex flex-col text-[10px] font-bold uppercase tracking-widest" style={{ color: '#94A3B8' }}>
+            <label className="flex flex-col text-[10px] font-bold uppercase tracking-widest" style={{ color: 'var(--tema-texto-64748b)' }}>
               Nivel de importancia
               <select className="select-internal mt-1 text-xs" value={fNivel} onChange={(e) => setFNivel(e.target.value as NivelRiesgo)}>
                 {NIVELES.map((n) => <option key={n} value={n}>{LABEL_NIVEL_RIESGO[n]}</option>)}
               </select>
             </label>
           </div>
-          <label className="flex flex-col text-[10px] font-bold uppercase tracking-widest" style={{ color: '#94A3B8' }}>
+          <label className="flex flex-col text-[10px] font-bold uppercase tracking-widest" style={{ color: 'var(--tema-texto-64748b)' }}>
             Descripción del hallazgo
             <textarea
               required rows={3}
@@ -195,9 +193,9 @@ export function PanelHallazgos() {
               onChange={(e) => setFDesc(e.target.value)}
               placeholder="Describa qué situación encontró y por qué requiere seguimiento."
             />
-            <span className="mt-1 text-[10px]" style={{ color: '#94A3B8' }}>Mínimo 10 caracteres.</span>
+            <span className="mt-1 text-[10px]" style={{ color: 'var(--tema-texto-64748b)' }}>Mínimo 10 caracteres.</span>
           </label>
-          <label className="flex flex-col text-[10px] font-bold uppercase tracking-widest" style={{ color: '#94A3B8' }}>
+          <label className="flex flex-col text-[10px] font-bold uppercase tracking-widest" style={{ color: 'var(--tema-texto-64748b)' }}>
             Evidencia o soporte
             <input
               className="input-internal mt-1 text-xs"
@@ -205,10 +203,10 @@ export function PanelHallazgos() {
               onChange={(e) => setFEvidencia(e.target.value)}
               placeholder="Oficio, número de radicado, observación, enlace…"
             />
-            <span className="mt-1 text-[10px]" style={{ color: '#94A3B8' }}>Opcional. Ayuda a sustentar el hallazgo.</span>
+            <span className="mt-1 text-[10px]" style={{ color: 'var(--tema-texto-64748b)' }}>Opcional. Ayuda a sustentar el hallazgo.</span>
           </label>
           <div className="grid grid-cols-1 sm:grid-cols-[minmax(0,1fr)_13rem] gap-3">
-            <label className="flex flex-col text-[10px] font-bold uppercase tracking-widest" style={{ color: '#94A3B8' }}>
+            <label className="flex flex-col text-[10px] font-bold uppercase tracking-widest" style={{ color: 'var(--tema-texto-64748b)' }}>
               Acción recomendada
               <input
                 className="input-internal mt-1 text-xs"
@@ -217,7 +215,7 @@ export function PanelHallazgos() {
                 placeholder="Qué recomienda hacer para corregir o prevenir la situación"
               />
             </label>
-            <label className="flex flex-col text-[10px] font-bold uppercase tracking-widest" style={{ color: '#94A3B8' }}>
+            <label className="flex flex-col text-[10px] font-bold uppercase tracking-widest" style={{ color: 'var(--tema-texto-64748b)' }}>
               Fecha de seguimiento
               <input
                 type="date"
@@ -229,9 +227,9 @@ export function PanelHallazgos() {
           </div>
           {errorForm && <Aviso tipo="error" mensaje={errorForm} />}
           <div className="flex justify-end">
-            <button type="submit" disabled={enviando} className="px-3 py-2 rounded-lg text-xs font-bold text-white disabled:opacity-60" style={{ background: '#14532D' }}>
+            <BotonAccion type="submit" variante="primaria" disabled={enviando}>
               {enviando ? 'Guardando…' : 'Crear hallazgo'}
-            </button>
+            </BotonAccion>
           </div>
         </form>
       )}
@@ -242,46 +240,33 @@ export function PanelHallazgos() {
             titulo="Aún no se han registrado hallazgos."
             mensaje="Puede crear uno cuando identifique una situación que requiera seguimiento."
             accion={(
-              <button
-                type="button"
-                onClick={() => setCrear(true)}
-                className="px-3 py-2 rounded-lg text-xs font-bold text-white"
-                style={{ background: '#14532D' }}
-              >
-                Crear primer hallazgo
-              </button>
+              <BotonAccion variante="primaria" Icono={Plus} onClick={() => setCrear(true)}>Crear primer hallazgo</BotonAccion>
             )}
           />
         ) : (
-          <div className="rounded-xl bg-white overflow-hidden" style={{ border: '1px solid #D9E2D9' }}>
+          <div className="rounded-xl bg-[var(--tema-fondo-ffffff)] overflow-hidden">
             <div className="overflow-x-auto">
               <table className="w-full text-xs">
-                <thead style={{ background: '#F8FAF7' }}>
-                  <tr>
-                    {['Estado', 'Tipo', 'Nivel', 'Dependencia', 'Radicado', 'Descripción', 'Plan', 'Acciones'].map((h) => (
-                      <th key={h} className="px-3 py-2 text-left text-[10px] font-bold uppercase tracking-widest" style={{ color: '#667085' }}>{h}</th>
-                    ))}
-                  </tr>
-                </thead>
+                <CabeceraTablaSticky columnas={['Estado', 'Tipo', 'Nivel', 'Dependencia', 'Radicado', 'Descripción', 'Plan', 'Acciones']} />
                 <tbody>
                   {hallazgos.map((h) => {
                     const estados = ESTADOS;
                     void estados;
                     return (
-                      <tr key={h.id} style={{ borderTop: '1px solid #EEF4EE' }}>
-                        <td className="px-3 py-2 font-bold" style={{ color: h.estado === 'CERRADO' ? '#14532D' : h.estado === 'EN_GESTION' ? '#9A3412' : '#991B1B' }}>
+                      <tr key={h.id} style={{ borderTop: '1px solid var(--tema-borde-f4f9f6)' }}>
+                        <td className="px-2 py-2 font-bold" style={{ color: h.estado === 'CERRADO' ? 'var(--tema-texto-007049)' : h.estado === 'EN_GESTION' ? 'var(--tema-texto-9a3412)' : 'var(--tema-texto-991b1b)' }}>
                           {LABEL_ESTADO_HALLAZGO[h.estado]}
                         </td>
-                        <td className="px-3 py-2" style={{ color: '#1F2933' }}>{LABEL_TIPO_HALLAZGO[h.tipo]}</td>
-                        <td className="px-3 py-2" style={{ color: '#667085' }}>{LABEL_NIVEL_RIESGO[h.nivel]}</td>
-                        <td className="px-3 py-2" style={{ color: '#667085' }}>{NOMBRES_TENANT[h.tenantId] ?? h.tenantId}</td>
-                        <td className="px-3 py-2 font-mono" style={{ color: '#14532D' }}>{h.radicadoId ?? '—'}</td>
-                        <td className="px-3 py-2" style={{ color: '#667085', maxWidth: 340 }}>{h.descripcion}</td>
-                        <td className="px-3 py-2" style={{ color: '#94A3B8' }}>{h.planMejoraId ? '✓' : '—'}</td>
-                        <td className="px-3 py-2 whitespace-nowrap">
-                          <button type="button" className="px-2 py-1 rounded-md text-[10px] font-bold mr-1" style={{ background: '#EEF4EE', color: '#14532D', border: '1px solid #D9E2D9' }} onClick={() => agregarObservacion(h)}>Observar</button>
+                        <td className="px-2 py-2" style={{ color: 'var(--tema-texto-172033)' }}>{LABEL_TIPO_HALLAZGO[h.tipo]}</td>
+                        <td className="px-2 py-2" style={{ color: 'var(--tema-texto-64748b)' }}>{LABEL_NIVEL_RIESGO[h.nivel]}</td>
+                        <td className="px-2 py-2" style={{ color: 'var(--tema-texto-64748b)' }}>{NOMBRES_TENANT[h.tenantId] ?? h.tenantId}</td>
+                        <td className="px-2 py-2 font-mono" style={{ color: 'var(--tema-texto-007049)' }}>{h.radicadoId ?? '—'}</td>
+                        <td className="px-2 py-2" style={{ color: 'var(--tema-texto-64748b)', maxWidth: 340 }}>{h.descripcion}</td>
+                        <td className="px-2 py-2" style={{ color: 'var(--tema-texto-64748b)' }}>{h.planMejoraId ? '✓' : '—'}</td>
+                        <td className="px-2 py-2 whitespace-nowrap">
+                          <button type="button" className="px-2 py-1 rounded-md text-[10px] font-bold mr-1" style={{ background: 'var(--tema-fondo-f4f9f6)', color: 'var(--tema-texto-007049)', border: '1px solid var(--tema-borde-dce4ea)' }} onClick={() => agregarObservacion(h)}>Observar</button>
                           {h.estado !== 'CERRADO' && (
-                            <button type="button" className="px-2 py-1 rounded-md text-[10px] font-bold" style={{ background: '#FEF2F2', color: '#991B1B', border: '1px solid #FECACA' }} onClick={() => cerrar(h)}>Cerrar</button>
+                            <button type="button" className="px-2 py-1 rounded-md text-[10px] font-bold" style={{ background: 'var(--tema-fondo-fef2f2)', color: 'var(--tema-texto-991b1b)', border: '1px solid var(--tema-borde-fecaca)' }} onClick={() => cerrar(h)}>Cerrar</button>
                           )}
                         </td>
                       </tr>

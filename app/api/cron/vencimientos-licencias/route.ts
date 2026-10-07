@@ -3,18 +3,7 @@ import { getFirebaseAdminDb } from '@/lib/firebase-admin';
 import { autorizarCron }      from '@/lib/seguridad/autorizar-cron';
 import { logError }           from '@/lib/logger';
 import { soloOperacionReal }  from '@/lib/radicados/dato-de-prueba';
-import { diasHabilesTranscurridos, diasRestantesHabiles, sumarDiasHabiles } from '@/lib/tiempos-radicado';
-/* EL CRITERIO VIVE FUERA, y la ruta lo consume igual que la pantalla del
-   expediente. Antes estaba aquí dentro; moverlo fue la única forma de que el
-   correo y la pantalla no pudieran divergir. Se reexporta porque las pruebas
-   del vigía lo importan desde esta ruta —y son justo el testigo de que el
-   traslado no cambió nada—. */
-import {
-  clasificarFrenteAlTermino,
-  type FilaVigia,
-} from '@/lib/motor-expedientes/semaforo-termino';
-export { clasificarFrenteAlTermino };
-import { terminoResolucionSigueCorriendo } from '@/lib/motor-expedientes/estados-licencia';
+import { clasificarFrenteAlTermino } from '@/lib/motor-expedientes/semaforo-termino';
 import type { ExpedienteLicenciaDoc } from '@/lib/server/expedientes-licencias';
 import type { TenantId } from '@/src/types/radicado';
 import { registrarEventoNegocio } from '@/lib/observabilidad/eventos-negocio';
@@ -98,6 +87,7 @@ async function leerEdadMaximaSinAnclar(
 import {
   calcularTransiciones,
   componerResumen,
+  esLunes,
   type EstadoVigilado,
   type NivelVigilancia,
   type Transiciones,
@@ -125,21 +115,6 @@ const COLECCION_CORRIDAS = 'vigilancia_termino_corridas';
 
 /** Tenant dueño de los expedientes de licencias — el mismo del resto del módulo. */
 const TENANT_LICENCIAS: TenantId = 'SEC_PLANEACION';
-
-/**
- * ¿Toca el resumen semanal?
- *
- * LUNES, día fijo, decidido en hora de Bogotá y no en UTC: el cron corre a las
- * 12:30 UTC, que es 07:30 en Colombia — mismo día civil, pero razonarlo en UTC
- * es la clase de suposición que rompe el día que cambie el horario del cron.
- */
-export function esLunes(ahora: Date): boolean {
-  const enBogota = new Intl.DateTimeFormat('en-US', {
-    timeZone: 'America/Bogota',
-    weekday: 'short',
-  }).format(ahora);
-  return enBogota === 'Mon';
-}
 
 interface ResultadoAviso {
   /** Cuántos correos HABÍA que mandar. Cero significa «no había nada que avisar». */

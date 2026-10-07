@@ -65,7 +65,7 @@ export function PanelDesistimientoSemicontrolado({ plazoSubsanacion, borrador }:
     <div
       role="alert"
       className="rounded-xl p-4 flex flex-col gap-3"
-      style={{ background: '#FCEBEB', border: '1px solid rgba(220,38,38,0.35)' }}
+      style={{ background: 'var(--tema-fondo-fcebeb)', border: '1px solid rgba(220,38,38,0.35)' }}
     >
       <div className="flex flex-wrap items-center gap-2">
         <span
@@ -74,14 +74,14 @@ export function PanelDesistimientoSemicontrolado({ plazoSubsanacion, borrador }:
         >
           Por archivar
         </span>
-        <p className="text-sm font-semibold" style={{ color: '#911111' }}>
+        <p className="text-sm font-semibold" style={{ color: 'var(--tema-texto-911111)' }}>
           El plazo de subsanación venció
           {plazoSubsanacion.fechaVencimientoPlazo && <> el {formatFechaColombia(plazoSubsanacion.fechaVencimientoPlazo)}</>}
           {diasTranscurridos !== null && <> — hace {diasTranscurridos} días hábiles</>}.
         </p>
       </div>
 
-      <p className="text-[13px] leading-relaxed" style={{ color: '#911111' }}>
+      <p className="text-[13px] leading-relaxed" style={{ color: 'var(--tema-texto-911111)' }}>
         <strong>El sistema NO archivó nada.</strong> Lo que sigue es un PROYECTO de acto administrativo: debe
         revisarlo, completarlo con los datos que falten y <strong>firmarlo</strong>. Nada ocurre hasta su firma.
       </p>
@@ -105,7 +105,7 @@ export function PanelDesistimientoSemicontrolado({ plazoSubsanacion, borrador }:
               type="button"
               onClick={copiarBorrador}
               className="inline-flex items-center gap-2 rounded-[10px] px-3 py-2 text-xs font-bold transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-1 hover:brightness-95 active:scale-[0.98]"
-              style={{ background: 'transparent', color: '#14532D', border: '1px solid #14532D' }}
+              style={{ background: 'transparent', color: 'var(--tema-texto-007049)', border: '1px solid var(--tema-borde-007049)' }}
             >
               {copiado ? '✓ Copiado' : 'Copiar texto'}
             </button>
@@ -113,7 +113,7 @@ export function PanelDesistimientoSemicontrolado({ plazoSubsanacion, borrador }:
               type="button"
               onClick={() => window.print()}
               className="inline-flex items-center gap-2 rounded-[10px] px-3 py-2 text-xs font-bold transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-1 hover:brightness-95 active:scale-[0.98]"
-              style={{ background: 'transparent', color: '#14532D', border: '1px solid #14532D' }}
+              style={{ background: 'transparent', color: 'var(--tema-texto-007049)', border: '1px solid var(--tema-borde-007049)' }}
             >
               Imprimir
             </button>

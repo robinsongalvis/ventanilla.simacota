@@ -33,7 +33,7 @@ export type EstadoVisualRequisito = 'APORTADO' | 'PENDIENTE' | 'NO_APLICA' | 'IN
  */
 export const ESTILOS_ESTADO_REQUISITO: Record<EstadoVisualRequisito, EstiloChipEstado> = {
   APORTADO: {
-    dot: '#16A34A',
+    dot: '#008F5A',
     texto: '#116932',
     fondo: '#E7F6EC',
     label: 'Aportado',
@@ -57,7 +57,7 @@ export const ESTILOS_ESTADO_REQUISITO: Record<EstadoVisualRequisito, EstiloChipE
     label: 'Falta definir',
   },
   DUPLICADO: {
-    dot: '#DC2626',
+    dot: '#D81E1E',
     texto: '#911111',
     fondo: '#FCEBEB',
     label: 'Aportes duplicados',

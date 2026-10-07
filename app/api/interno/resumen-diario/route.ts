@@ -1,7 +1,8 @@
 import { NextResponse } from 'next/server';
 import type { Query } from 'firebase-admin/firestore';
 import { getFirebaseAdminDb } from '@/lib/firebase-admin';
-import { requireActiveInternalUser, InternalAuthError, type InternalUserSession } from '@/lib/server/internal-auth';
+import type { InternalUserSession } from '@/lib/server/internal-auth';
+import { autenticarUsuarioInterno } from '@/lib/server/internal-auth-http';
 import { diasRestantesHabiles } from '@/lib/tiempos-radicado';
 import { nowColombia, TIMEZONE_COLOMBIA } from '@/lib/fecha-colombia';
 import type { VentanillaRadicado } from '@/src/types/ventanilla';
@@ -283,18 +284,20 @@ function sumarTotales(totales: TotalesResumen): number {
 }
 
 export async function GET(): Promise<NextResponse> {
-  let session: InternalUserSession;
-  try {
-    session = await requireActiveInternalUser();
-  } catch (err) {
-    if (err instanceof InternalAuthError) {
-      return jsonSeguro(
-        { error: err.status === 401 ? 'Debe iniciar sesión nuevamente.' : 'No tiene permiso para realizar esta acción.' },
-        err.status,
-      );
-    }
-    return jsonSeguro({ error: 'Debe iniciar sesión nuevamente.' }, 401);
+  const autenticacion = await autenticarUsuarioInterno();
+  if (!autenticacion.ok) {
+    return jsonSeguro(
+      {
+        error: autenticacion.status === 401
+          ? 'Debe iniciar sesión nuevamente.'
+          : autenticacion.status === 403
+            ? 'No tiene permiso para realizar esta acción.'
+            : autenticacion.mensaje,
+      },
+      autenticacion.status,
+    );
   }
+  const session = autenticacion.usuario;
 
   try {
     const db = getFirebaseAdminDb();

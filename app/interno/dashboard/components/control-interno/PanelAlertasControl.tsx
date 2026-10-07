@@ -9,6 +9,7 @@ import { LABEL_NIVEL_RIESGO, LABEL_TIPO_ALERTA } from '@/src/types/control-inter
 import { NOMBRES_TENANT, DIRECTORIO_TENANTS } from '@/src/types/reglas-negocio';
 import type { TenantId } from '@/src/types/radicado';
 import { Aviso, Cargando, EstadoVacio } from './PanoramaGeneralPanel';
+import { CabeceraTablaSticky } from '@/app/components/design-system/SuperficieTabla';
 
 const NIVELES: NivelRiesgo[] = ['CRITICO', 'ALTO', 'MEDIO', 'BAJO'];
 
@@ -21,10 +22,10 @@ interface AlertasResponse {
 }
 
 function colorBadgeNivel(n: NivelRiesgo): { bg: string; bd: string; fg: string } {
-  if (n === 'CRITICO') return { bg: '#FEF2F2', bd: '#FECACA', fg: '#991B1B' };
-  if (n === 'ALTO')    return { bg: '#FFF7ED', bd: '#FED7AA', fg: '#9A3412' };
-  if (n === 'MEDIO')   return { bg: '#FFFBEB', bd: '#FDE68A', fg: '#92400E' };
-  return                       { bg: '#F0FDF4', bd: '#BBF7D0', fg: '#14532D' };
+  if (n === 'CRITICO') return { bg: 'var(--tema-fondo-fef2f2)', bd: 'var(--tema-borde-fecaca)', fg: 'var(--tema-texto-991b1b)' };
+  if (n === 'ALTO')    return { bg: 'var(--tema-fondo-fff7ed)', bd: 'var(--tema-borde-fed7aa)', fg: 'var(--tema-texto-9a3412)' };
+  if (n === 'MEDIO')   return { bg: 'var(--tema-fondo-fffbeb)', bd: 'var(--tema-borde-fde68a)', fg: 'var(--tema-texto-92400e)' };
+  return                       { bg: 'var(--tema-fondo-f0fdf4)', bd: 'var(--tema-borde-bbf7d0)', fg: 'var(--tema-texto-007049)' };
 }
 
 export function PanelAlertasControl() {
@@ -81,8 +82,8 @@ export function PanelAlertasControl() {
 
   return (
     <div className="space-y-4">
-      <div className="flex flex-wrap items-end gap-3 rounded-xl bg-white p-4" style={{ border: '1px solid #D9E2D9' }}>
-        <label className="flex flex-col text-[10px] font-bold uppercase tracking-widest" style={{ color: '#94A3B8' }}>
+      <div className="flex flex-wrap items-end gap-3 rounded-xl bg-[var(--tema-fondo-ffffff)] p-4" style={{ border: '1px solid var(--tema-borde-dce4ea)' }}>
+        <label className="flex flex-col text-[10px] font-bold uppercase tracking-widest" style={{ color: 'var(--tema-texto-64748b)' }}>
           Dependencia
           <select className="select-internal mt-1 text-xs" value={tenantFiltro}
             onChange={(e) => setTenantFiltro(e.target.value as TenantId | 'TODOS')}>
@@ -92,7 +93,7 @@ export function PanelAlertasControl() {
             ))}
           </select>
         </label>
-        <label className="flex flex-col text-[10px] font-bold uppercase tracking-widest" style={{ color: '#94A3B8' }}>
+        <label className="flex flex-col text-[10px] font-bold uppercase tracking-widest" style={{ color: 'var(--tema-texto-64748b)' }}>
           Nivel
           <select className="select-internal mt-1 text-xs" value={nivelFiltro}
             onChange={(e) => setNivelFiltro(e.target.value as NivelRiesgo | 'TODOS')}>
@@ -103,7 +104,7 @@ export function PanelAlertasControl() {
         {data?.resumen && (() => {
           const resumen = data.resumen;
           return (
-            <div className="ml-auto flex items-center gap-2 text-[10px] font-bold uppercase tracking-widest" style={{ color: '#667085' }}>
+            <div className="ml-auto flex items-center gap-2 text-[10px] font-bold uppercase tracking-widest" style={{ color: 'var(--tema-texto-64748b)' }}>
               {NIVELES.map((n) => (
                 <span key={n} className="px-2 py-1 rounded-md" style={{
                   background: colorBadgeNivel(n).bg, color: colorBadgeNivel(n).fg, border: `1px solid ${colorBadgeNivel(n).bd}`,
@@ -123,46 +124,40 @@ export function PanelAlertasControl() {
             mensaje="No se detectan situaciones que requieran su atención con los filtros aplicados."
           />
         ) : (
-          <div className="rounded-xl bg-white overflow-hidden" style={{ border: '1px solid #D9E2D9' }}>
+          <div className="rounded-xl bg-[var(--tema-fondo-ffffff)] overflow-hidden">
             <div className="overflow-x-auto">
               <table className="w-full text-xs">
-                <thead style={{ background: '#F8FAF7' }}>
-                  <tr>
-                    {['Nivel', 'Tipo', 'Radicado', 'Dependencia', 'Responsable', 'Motivo', 'Acción sugerida', 'Acciones'].map((h) => (
-                      <th key={h} className="px-3 py-2 text-left text-[10px] font-bold uppercase tracking-widest" style={{ color: '#667085' }}>{h}</th>
-                    ))}
-                  </tr>
-                </thead>
+                <CabeceraTablaSticky columnas={['Nivel', 'Tipo', 'Radicado', 'Dependencia', 'Responsable', 'Motivo', 'Acción sugerida', 'Acciones']} />
                 <tbody>
                   {alertasOrdenadas.map((a, i) => {
                     const c = colorBadgeNivel(a.nivel);
                     return (
-                      <tr key={`${a.id ?? i}-${a.radicadoId ?? 'g'}`} style={{ borderTop: '1px solid #EEF4EE' }}>
-                        <td className="px-3 py-2">
+                      <tr key={`${a.id ?? i}-${a.radicadoId ?? 'g'}`} style={{ borderTop: '1px solid var(--tema-borde-f4f9f6)' }}>
+                        <td className="px-2 py-2">
                           <span className="px-2 py-0.5 rounded-md text-[10px] font-bold uppercase" style={{
                             background: c.bg, color: c.fg, border: `1px solid ${c.bd}`,
                           }}>
                             {LABEL_NIVEL_RIESGO[a.nivel]}
                           </span>
                         </td>
-                        <td className="px-3 py-2 font-medium" style={{ color: '#1F2933' }}>{LABEL_TIPO_ALERTA[a.tipo]}</td>
-                        <td className="px-3 py-2 font-mono" style={{ color: '#14532D' }}>{a.radicadoId ?? '—'}</td>
-                        <td className="px-3 py-2" style={{ color: '#667085' }}>{a.tenantId ? NOMBRES_TENANT[a.tenantId] : '—'}</td>
-                        <td className="px-3 py-2" style={{ color: '#667085' }}>{a.responsableNombre ?? '—'}</td>
-                        <td className="px-3 py-2" style={{ color: '#667085' }}>{a.motivo}</td>
-                        <td className="px-3 py-2" style={{ color: '#667085' }}>{a.accionSugerida}</td>
-                        <td className="px-3 py-2 whitespace-nowrap">
+                        <td className="px-2 py-2 font-medium" style={{ color: 'var(--tema-texto-172033)' }}>{LABEL_TIPO_ALERTA[a.tipo]}</td>
+                        <td className="px-2 py-2 font-mono" style={{ color: 'var(--tema-texto-007049)' }}>{a.radicadoId ?? '—'}</td>
+                        <td className="px-2 py-2" style={{ color: 'var(--tema-texto-64748b)' }}>{a.tenantId ? NOMBRES_TENANT[a.tenantId] : '—'}</td>
+                        <td className="px-2 py-2" style={{ color: 'var(--tema-texto-64748b)' }}>{a.responsableNombre ?? '—'}</td>
+                        <td className="px-2 py-2" style={{ color: 'var(--tema-texto-64748b)' }}>{a.motivo}</td>
+                        <td className="px-2 py-2" style={{ color: 'var(--tema-texto-64748b)' }}>{a.accionSugerida}</td>
+                        <td className="px-2 py-2 whitespace-nowrap">
                           <button
                             type="button"
                             className="px-2 py-1 rounded-md text-[10px] font-bold mr-1"
-                            style={{ background: '#EEF4EE', color: '#14532D', border: '1px solid #D9E2D9' }}
+                            style={{ background: 'var(--tema-fondo-f4f9f6)', color: 'var(--tema-texto-007049)', border: '1px solid var(--tema-borde-dce4ea)' }}
                             onClick={() => handleRevisar(a, 'GESTIONADA')}
                             disabled={!a.id}
                           >Marcar revisada</button>
                           <button
                             type="button"
                             className="px-2 py-1 rounded-md text-[10px] font-bold"
-                            style={{ background: '#FEF2F2', color: '#991B1B', border: '1px solid #FECACA' }}
+                            style={{ background: 'var(--tema-fondo-fef2f2)', color: 'var(--tema-texto-991b1b)', border: '1px solid var(--tema-borde-fecaca)' }}
                             onClick={() => handleRevisar(a, 'DESCARTADA')}
                             disabled={!a.id}
                           >Descartar</button>

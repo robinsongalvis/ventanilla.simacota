@@ -45,6 +45,14 @@ function pluginFronterasMock() {
       if (id === '@/lib/firebase-admin') return RUTA_STORAGE_STUB;
       return null;
     },
+    // Estos ensayos históricos validan el modo normal, no el bloqueo de
+    // contingencia (cubierto en pruebas específicas con el flag real activo).
+    transform(code, id) {
+      if (id.endsWith('/lib/recepcion/contingencia-storage.ts')) {
+        return code.replace('export const CONTINGENCIA_STORAGE_ACTIVA = true;', 'export const CONTINGENCIA_STORAGE_ACTIVA = false;');
+      }
+      return null;
+    },
   };
 }
 

@@ -54,6 +54,7 @@ import { PanelQueSigue } from '../components/PanelQueSigue';
 import { derivarQueSigue } from '../que-sigue';
 import { PASOS, situacionDePaso } from '../camino-del-tramite';
 import { ResumenDocumentos } from '../components/ResumenDocumentos';
+import { urlLicencias } from '../rutas-licencias';
 
 type EstadoCarga = 'cargando' | 'error' | 'no-encontrado' | 'listo';
 
@@ -80,12 +81,10 @@ export interface DetalleLicenciaClientProps {
   /**
    * Bloque B ("la ventanita") — cuando el Detalle se monta EMBEBIDO dentro
    * de `VistaLicencias` (`app/interno/dashboard/components/licencias/
-   * VistaLicencias.tsx`), "← Bandeja de Licencias" es un cambio de estado
-   * local del panel (volver a `expedienteSeleccionado = null`), no una
-   * navegación de ruta. Si se recibe, `VolverBandeja` renderiza un botón
-   * que llama esto en vez de `<Link href="/interno/licencias">`. Sin esta
-   * prop (ruta standalone `/interno/licencias/{id}`) el comportamiento es
-   * exactamente el de antes: `<Link>`.
+   * VistaLicencias.tsx`), "← Bandeja de Licencias" lo decide el panel
+   * (en el armazón único escribe la dirección de la Bandeja, ADR-0046 §7).
+   * Si se recibe, `VolverBandeja` renderiza un botón que llama esto; sin
+   * esta prop es un `<Link>` a la dirección canónica de la Bandeja.
    */
   onVolver?: () => void;
 }
@@ -315,7 +314,7 @@ export function DetalleLicenciaClient({ expedienteId, onVolver }: DetalleLicenci
     return (
       <div className="mx-auto flex w-full min-w-0 max-w-[720px] flex-col items-start gap-3 p-4 md:p-6">
         <VolverBandeja onVolver={onVolver} />
-        <p role="alert" className="rounded-lg px-3 py-2 text-sm w-full" style={{ background: '#FEF2F2', border: '1px solid #FECACA', color: '#991B1B' }}>
+        <p role="alert" className="rounded-lg px-3 py-2 text-sm w-full" style={{ background: 'var(--tema-fondo-fef2f2)', border: '1px solid var(--tema-borde-fecaca)', color: 'var(--tema-texto-991b1b)' }}>
           {errorMsg ?? 'No fue posible cargar el expediente.'}
         </p>
       </div>
@@ -415,16 +414,16 @@ export function DetalleLicenciaClient({ expedienteId, onVolver }: DetalleLicenci
         <div
           role="status"
           className="rounded-xl px-4 py-3 flex items-start gap-3"
-          style={{ background: '#FDF6E3', border: '1px solid #D4A017' }}
+          style={{ background: 'var(--tema-fondo-fdf6e3)', border: '1px solid #E5A31A' }}
         >
-          <span aria-hidden className="text-lg leading-none" style={{ color: '#7A4F0A' }}>✉</span>
+          <span aria-hidden className="text-lg leading-none" style={{ color: 'var(--tema-texto-7a4f0a)' }}>✉</span>
           <div className="min-w-0">
-            <p className="text-sm font-bold" style={{ color: '#7A4F0A' }}>
+            <p className="text-sm font-bold" style={{ color: 'var(--tema-texto-7a4f0a)' }}>
               {destinatario.origen === 'DECLARADO_SIN_CORREO'
                 ? 'Este ciudadano no recibirá avisos automáticos'
                 : 'Este expediente no tiene a quién avisarle'}
             </p>
-            <p className="text-xs mt-0.5 leading-relaxed" style={{ color: '#7A4F0A' }}>
+            <p className="text-xs mt-0.5 leading-relaxed" style={{ color: 'var(--tema-texto-7a4f0a)' }}>
               {destinatario.motivo}
             </p>
           </div>
@@ -554,12 +553,12 @@ export function DetalleLicenciaClient({ expedienteId, onVolver }: DetalleLicenci
                     onClick={() => setModalRadicar(true)}
                     aria-describedby={!debidaForma.procede ? 'radicar-nota' : undefined}
                     className="inline-flex items-center gap-2 rounded-[10px] px-4 py-2.5 text-sm font-bold transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-1 disabled:opacity-50 disabled:cursor-not-allowed hover:brightness-95 active:scale-[0.98]"
-                    style={{ background: '#14532D', color: '#fff', boxShadow: '0 2px 8px rgba(20,83,45,0.25)' }}
+                    style={{ background: 'var(--tema-fondo-007049)', color: '#fff', boxShadow: '0 2px 8px rgba(0, 112, 73,0.25)' }}
                   >
                     Radicar en legal y debida forma
                   </button>
                   {!debidaForma.procede && debidaForma.motivo && (
-                    <p id="radicar-nota" className="text-xs max-w-xs" style={{ color: '#9A6206' }}>
+                    <p id="radicar-nota" className="text-xs max-w-xs" style={{ color: 'var(--tema-texto-9a6206)' }}>
                       {debidaForma.motivo}
                     </p>
                   )}
@@ -666,13 +665,13 @@ export function DetalleLicenciaClient({ expedienteId, onVolver }: DetalleLicenci
           botones, sin el resto de paneles del detalle. */}
       {borradorActoDesistimiento && (
         <div className="hidden print:block">
-          <p className="text-xs uppercase tracking-widest font-bold" style={{ color: '#0f172a' }}>
+          <p className="text-xs uppercase tracking-widest font-bold" style={{ color: 'var(--tema-texto-0f172a)' }}>
             Expediente {numero}
           </p>
-          <h1 className="font-headline text-xl mt-1 mb-4" style={{ color: '#0f172a' }}>
+          <h1 className="font-headline text-xl mt-1 mb-4" style={{ color: 'var(--tema-texto-0f172a)' }}>
             {borradorActoDesistimiento.titulo}
           </h1>
-          <div className="text-sm whitespace-pre-wrap" style={{ color: '#0f172a', lineHeight: 1.6 }}>
+          <div className="text-sm whitespace-pre-wrap" style={{ color: 'var(--tema-texto-0f172a)', lineHeight: 1.6 }}>
             {borradorActoDesistimiento.cuerpo}
           </div>
         </div>
@@ -716,13 +715,13 @@ function VolverBandeja({ onVolver }: { onVolver?: () => void }) {
   );
   if (onVolver) {
     return (
-      <button type="button" onClick={onVolver} className={className} style={{ color: '#14532D' }}>
+      <button type="button" onClick={onVolver} className={className} style={{ color: 'var(--tema-texto-007049)' }}>
         {contenido}
       </button>
     );
   }
   return (
-    <Link href="/interno/licencias" className={className} style={{ color: '#14532D' }}>
+    <Link href={urlLicencias()} className={className} style={{ color: 'var(--tema-texto-007049)' }}>
       {contenido}
     </Link>
   );

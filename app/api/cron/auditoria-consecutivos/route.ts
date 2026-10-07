@@ -1,9 +1,11 @@
 import {
   describirIncoherenciaApertura,
-  SERIES_CONSECUTIVO,
   type SerieConsecutivo,
 } from '@/lib/server/consecutivo-legal';
-import { elementosNoDeclarados, type AlcanceVigilancia } from '@/lib/server/alcance-vigilancia';
+import {
+  auditarCounterExpedientes,
+  type ReporteSerieExpedientes,
+} from '@/lib/server/auditoria-consecutivos';
 import { NextResponse }          from 'next/server';
 import { FieldPath } from 'firebase-admin/firestore';
 import { getFirebaseAdminDb }    from '@/lib/firebase-admin';
@@ -26,39 +28,6 @@ import {
 
 export const runtime = 'nodejs';
 
-/**
- * ALCANCE DECLARADO DE ESTE VIGILANTE (regla operativa del ADR-0033 §4.6).
- *
- * Este cron recorría `COLECCION_POR_SERIE` —tres series— y nadie había escrito
- * en ninguna parte que la cuarta quedaba fuera. `expedientes` es justamente la
- * única con un libro de papel detrás y la única que exige apertura explícita:
- * el vigilante no sabía qué no estaba mirando, y su silencio se leyó como
- * conformidad.
- *
- * Ahora la exclusión es una decisión escrita, y
- * `__tests__/alcance-vigilancia-consecutivos.test.ts` comprueba que entre
- * cubiertos y excluidos no quede ninguna serie huérfana. Añadir una serie al
- * dominio sin decidir qué hace este cron con ella rompe esa prueba.
- */
-export const ALCANCE_BARRIDA_CONTINUIDAD: AlcanceVigilancia<SerieConsecutivo> = {
-  cubiertos: ['radicados', 'salidas', 'planillas'],
-  excluidos: {
-    expedientes:
-      'No tiene colección de documentos asignada mientras Fase 1 no la defina, así que no hay serie de ids que barrer por continuidad. NO queda sin vigilancia: se audita en su propia rama (estado del contador y coherencia con su apertura) más abajo en este mismo cron.',
-    /* Las seis series de ACTOS (14-sep-2026). Ningún documento lleva todavía
-       el número de la resolución en su id —la emisión no está construida— así
-       que no hay serie de ids que barrer. Se excluyen de la BARRIDA, no de la
-       vigilancia: su contador y su coherencia con la apertura se auditan en la
-       misma rama que `expedientes`. El día que el acto se emita y su número
-       viva en un documento, estas líneas se mueven a `cubiertos`. */
-    'actos-lsr': 'El acto todavía no se emite: no hay documentos cuyo id lleve el consecutivo. Se audita con `expedientes`, por contador y apertura.',
-    'actos-lc': 'El acto todavía no se emite: no hay documentos cuyo id lleve el consecutivo. Se audita con `expedientes`, por contador y apertura.',
-    'actos-lsu': 'El acto todavía no se emite: no hay documentos cuyo id lleve el consecutivo. Se audita con `expedientes`, por contador y apertura.',
-    'actos-ph': 'El acto todavía no se emite: no hay documentos cuyo id lleve el consecutivo. Se audita con `expedientes`, por contador y apertura.',
-    'actos-lr': 'El acto todavía no se emite: no hay documentos cuyo id lleve el consecutivo. Se audita con `expedientes`, por contador y apertura.',
-    'actos-lu': 'El acto todavía no se emite: no hay documentos cuyo id lleve el consecutivo. Se audita con `expedientes`, por contador y apertura.',
-  },
-};
 // Techo del plan (Vercel Hobby/Pro: 300s en funciones cron) — mismo estándar
 // que los demás crons de plazo legal (Roadmap P1.4).
 export const maxDuration = 300;
@@ -105,64 +74,6 @@ interface ReporteSerie {
   distintos:  number;
   huecos:     number[];
   duplicados: number[];
-}
-
-/**
- * Rama propia para la serie `expedientes` (PASO 6, Fase 2 arranque) —
- * DELIBERADAMENTE fuera de `COLECCION_POR_SERIE`/`huecosDe`/`duplicadosDe`:
- * esa maquinaria asume el formato `1-110-{AAAA}-{NNNNNNNN}` de las 3 series
- * legadas (`perteneceAlAnio` con regex de año de 4 dígitos;
- * `consecutivoDeId` toma el ÚLTIMO segmento tras `-`). El número de
- * expediente (`68745-0-26-0020`) tiene AÑO DE 2 DÍGITOS en el PENÚLTIMO
- * segmento — reutilizar esas funciones tal cual produciría 19 "huecos"
- * falsos (`perteneceAlAnio` nunca matchearía `-26-`) y `consecutivoDeId`
- * devolvería el consecutivo real por casualidad de posición, no por diseño.
- * Ampliar esa maquinaria para dos formatos de id es tarea de Fase 1, cuando
- * exista la colección real de expedientes (deuda #12, ADR-0026 §A2) — aquí
- * NO se inventa un nombre de colección que todavía no existe.
- *
- * Por eso esta serie solo reporta el ESTADO del contador, sin auditoría de
- * continuidad/unicidad contra documentos (no hay colección que barrer):
- * - `SIN_ABRIR`: el counter `counters/expedientes-{año}` no existe — cero
- *   ruido, es el estado normal antes de que Fase 1/2 emita el primer
- *   expediente.
- * - `PARCIAL`: el counter existe y tiene forma válida (`ultimo` entero >=
- *   0) — se reporta su valor, pero la auditoría de continuidad real queda
- *   pendiente de que exista la colección.
- * - `CORRUPTO`: el counter existe pero `ultimo` NO es un entero >= 0 — esto
- *   SÍ es un hallazgo real (dato corrupto), y es el único caso de esta
- *   rama que dispara el correo de alerta.
- */
-interface ReporteSerieExpedientes {
-  estado: 'SIN_ABRIR' | 'PARCIAL' | 'CORRUPTO';
-  ultimo?: number;
-  motivo?: string;
-}
-
-/**
- * Lógica PURA de la rama `expedientes` — testeable sin Firestore: recibe el
- * dato ya leído de `counters/expedientes-{año}` (`undefined` si el
- * documento no existe) y decide el estado. No hace I/O.
- */
-export function auditarCounterExpedientes(
-  data: Record<string, unknown> | undefined,
-): ReporteSerieExpedientes {
-  if (data === undefined) {
-    return { estado: 'SIN_ABRIR' };
-  }
-  const ultimoRaw = data.ultimo;
-  const ultimo = Number(ultimoRaw);
-  if (!Number.isInteger(ultimo) || ultimo < 0) {
-    return {
-      estado: 'CORRUPTO',
-      motivo: `counters/expedientes-{año}.ultimo inválido (${JSON.stringify(ultimoRaw)}): debe ser un entero >= 0.`,
-    };
-  }
-  return {
-    estado: 'PARCIAL',
-    ultimo,
-    motivo: 'auditoría de continuidad pendiente de colección (Fase 1)',
-  };
 }
 
 /**
@@ -284,8 +195,8 @@ export async function GET(request: Request): Promise<NextResponse> {
 
     // Rama propia de 'expedientes' (PASO 6) — SIEMPRE se agrega al reporte,
     // sin importar el estado, para que el reporte nunca "olvide" la serie
-    // mientras Fase 1 no le asigna colección (ver JSDoc de
-    // ReporteSerieExpedientes / auditarCounterExpedientes arriba).
+    // mientras Fase 1 no le asigna colección (ver la justificación en
+    // `lib/server/auditoria-consecutivos.ts`).
     const counterExpedientesSnap = await db.doc(`counters/expedientes-${anio}`).get();
     const reporteExpedientes = auditarCounterExpedientes(counterExpedientesSnap.data());
 

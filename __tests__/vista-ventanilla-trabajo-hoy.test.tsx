@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { cleanup, render, screen, fireEvent } from '@testing-library/react';
+import { cleanup, render, screen, fireEvent, within } from '@testing-library/react';
 import { VistaVentanilla } from '@/app/interno/dashboard/components/ventanilla/VistaVentanilla';
 import type { VentanillaRadicado } from '@/src/types/ventanilla';
 
@@ -114,7 +114,11 @@ describe('Mostrador — Trabajo de hoy', () => {
     render(<VistaVentanilla {...props({ radicados: [hoyConSello, deAyer] })} />);
     expect(screen.getByText('Trabajo de hoy')).toBeTruthy();
     expect(screen.getByText('1-WEB-2026-00000010')).toBeTruthy();
-    expect(screen.getByText('PDF sin sellar')).toBeTruthy();
+    // El pendiente aparece en la fila (y como chip de filtro, desde la Ola 3
+    // con la etiqueta en su propio nodo de texto).
+    const fila = screen.getByRole('button', { name: /Abrir radicado 1-WEB-2026-00000010/ });
+    expect(within(fila).getByText('PDF sin sellar')).toBeTruthy();
+    expect(screen.getByRole('button', { name: 'Filtrar trabajo de hoy: PDF sin sellar (1)' })).toBeTruthy();
     expect(screen.queryByText('1-WEB-2026-00000009')).toBeNull();
   });
 

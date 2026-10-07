@@ -23,12 +23,12 @@ type TonoVisual = 'success' | 'warning' | 'danger' | 'info' | 'neutral' | 'accen
 type Tamano = 'sm' | 'md' | 'lg';
 
 const ESTILOS_TONO: Record<TonoVisual, { bg: string; text: string; dot?: string }> = {
-  success: { bg: '#DCFCE7', text: '#117937', dot: '#16A34A' },
-  warning: { bg: '#FEF3C7', text: '#8E5C06', dot: '#F59E0B' },
-  danger:  { bg: '#FEE2E2', text: '#B91C1C', dot: '#DC2626' },
-  info:    { bg: '#DBEAFE', text: '#1E40AF', dot: '#2563EB' },
-  neutral: { bg: '#F1F5F9', text: '#475569', dot: '#94A3B8' },
-  accent:  { bg: '#FEF9C3', text: '#854D0E', dot: '#D4A017' },
+  success: { bg: 'var(--tema-fondo-dcfce7)', text: 'var(--tema-texto-007a4d)', dot: 'var(--tema-texto-008f5a)' },
+  warning: { bg: 'var(--tema-fondo-fef3c7)', text: 'var(--tema-texto-8e5c06)', dot: 'var(--tema-texto-f59e0b)' },
+  danger:  { bg: 'var(--tema-fondo-fee2e2)', text: 'var(--tema-texto-b91c1c)', dot: 'var(--tema-texto-d81e1e)' },
+  info:    { bg: 'var(--tema-fondo-dbeafe)', text: 'var(--tema-texto-1e40af)', dot: 'var(--tema-texto-2563eb)' },
+  neutral: { bg: 'var(--tema-fondo-f1f5f9)', text: 'var(--tema-texto-475569)', dot: 'var(--tema-texto-94a3b8)' },
+  accent:  { bg: 'var(--tema-fondo-fef9c3)', text: 'var(--tema-texto-854d0e)', dot: 'var(--tema-texto-e5a31a)' },
 };
 
 const ESTILOS_TAMANO: Record<Tamano, { text: string; px: string; py: string; gap: string; dotSize: string }> = {

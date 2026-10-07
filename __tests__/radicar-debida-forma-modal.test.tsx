@@ -2,6 +2,9 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 import { cleanup, render, screen, fireEvent, waitFor } from '@testing-library/react';
 import { RadicarDebidaFormaModal, type VistaPreviaDebidaForma } from '@/app/interno/licencias/components/RadicarDebidaFormaModal';
 
+// Cobertura ordinaria conservada; contingencia-ui prueba la bandera real activa.
+vi.mock('@/lib/recepcion/contingencia-storage', () => ({ CONTINGENCIA_STORAGE_ACTIVA: false }));
+
 /**
  * EL LLAMADOR QUE FALTABA.
  *

@@ -20,6 +20,8 @@
    si hay un correo válido.
 ══════════════════════════════════════════════════════════════ */
 
+import { esDatoDePrueba, type MarcasDePrueba } from '@/lib/radicados/dato-de-prueba';
+
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
 /** Direcciones que nunca deben recibir correo aunque queden persistidas. */
@@ -35,7 +37,7 @@ const EMAIL_PLACEHOLDERS = new Set<string>([
  * Sub-tipo mínimo necesario para decidir si notificar. Acepta un
  * `VentanillaRadicado` completo o un payload aplastado equivalente.
  */
-export interface CriterioNotificacion {
+export interface CriterioNotificacion extends MarcasDePrueba {
   esAnonimo?: boolean;
   tipoPresentacion?: 'IDENTIFICADA' | 'ANONIMA' | 'RESERVADA';
   solicitante?: {
@@ -44,6 +46,7 @@ export interface CriterioNotificacion {
 }
 
 export function debeNotificarCiudadano(radicado: CriterioNotificacion): boolean {
+  if (esDatoDePrueba(radicado)) return false;
   if (radicado.esAnonimo === true) return false;
   if (radicado.tipoPresentacion === 'ANONIMA') return false;
 

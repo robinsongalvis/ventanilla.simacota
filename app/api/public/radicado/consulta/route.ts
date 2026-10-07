@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import { getFirebaseAdminDb } from '@/lib/firebase-admin';
+import { esDatoDePrueba } from '@/lib/radicados/dato-de-prueba';
 import type { EstadoJuridicoLicencia } from '@/lib/motor-expedientes/estados-licencia';
 import { aLicenciaPublica } from '@/lib/seguridad/consulta-publica-licencia';
 import {
@@ -152,6 +153,17 @@ export async function POST(request: Request): Promise<NextResponse> {
     }
 
     const radicado = snap.data() as VentanillaRadicado;
+    if (esDatoDePrueba(radicado)) {
+      await registrarFalloSeguro(db, radicadoHash);
+      await auditarSinBloquear({
+        evento: 'CONSULTA_PUBLICA_DENEGADA',
+        motivo: 'DATO_NO_OPERATIVO',
+        ipHash,
+        radicadoHash,
+        userAgentHash,
+      });
+      return denegado();
+    }
     const verificacion = verificarDatoConsulta(radicado, datoVerificacion);
     if (!verificacion.autorizado) {
       await registrarFalloSeguro(db, radicadoHash);

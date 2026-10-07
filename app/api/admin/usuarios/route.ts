@@ -1,10 +1,9 @@
 import { NextResponse }         from 'next/server';
-import { cookies }              from 'next/headers';
-import { SESSION_COOKIE_NAME }  from '@/lib/auth-cookie';
 import {
   getFirebaseAdminAuth,
   getFirebaseAdminDb,
 } from '@/lib/firebase-admin';
+import { autenticarUsuarioInterno } from '@/lib/server/internal-auth-http';
 import { DIRECTORIO_TENANTS }   from '@/src/types/reglas-negocio';
 import type { TenantId }        from '@/src/types/radicado';
 import type { RolInterno }      from '@/lib/hooks/useAuth';
@@ -29,41 +28,19 @@ const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
    Helpers
 ══════════════════════════════════════════════════════════════ */
 
-/** Verifica sesión + rol ADMIN. Retorna uid/nombre del admin o null. */
-async function verificarAdmin(): Promise<{ uid: string; nombre: string; rol: string } | null> {
-  const cookieStore = await cookies();
-  const sessionCookie = cookieStore.get(SESSION_COOKIE_NAME)?.value;
-  if (!sessionCookie) return null;
-
-  try {
-    // checkRevoked=false: la cookie httpOnly ya es suficiente garantía.
-    // El check de revocación causa falsos 401 tras revokeRefreshTokens en logout.
-    const decoded = await getFirebaseAdminAuth().verifySessionCookie(sessionCookie, true);
-    const uid = decoded.uid;
-
-    const userSnap = await getFirebaseAdminDb().doc(`users/${uid}`).get();
-    if (!userSnap.exists) return null;
-
-    const data = userSnap.data()!;
-    if (data.rol !== 'ADMIN' || data.activo === false || data.archivado === true) return null;
-
-    return { uid, nombre: (data.nombre as string) ?? 'Admin', rol: data.rol as string };
-  } catch (err) {
-    console.error('[verificarAdmin]', err instanceof Error ? err.message : String(err));
-    return null;
-  }
-}
-
-
 /* ══════════════════════════════════════════════════════════════
    GET /api/admin/usuarios — Listar usuarios internos
    Solo ADMIN.
 ══════════════════════════════════════════════════════════════ */
 
 export async function GET(request: Request): Promise<NextResponse> {
-  const admin = await verificarAdmin();
-  if (!admin) {
-    return NextResponse.json({ error: 'No autorizado.' }, { status: 401 });
+  const autenticacion = await autenticarUsuarioInterno();
+  if (!autenticacion.ok) return autenticacion.respuesta;
+  if (autenticacion.usuario.rol !== 'ADMIN') {
+    return NextResponse.json(
+      { error: 'Solo el ADMIN puede administrar usuarios.' },
+      { status: 403 },
+    );
   }
 
   try {
@@ -114,9 +91,14 @@ interface CrearUsuarioPayload {
 }
 
 export async function POST(request: Request): Promise<NextResponse> {
-  const admin = await verificarAdmin();
-  if (!admin) {
-    return NextResponse.json({ error: 'No autorizado.' }, { status: 401 });
+  const autenticacion = await autenticarUsuarioInterno();
+  if (!autenticacion.ok) return autenticacion.respuesta;
+  const admin = autenticacion.usuario;
+  if (admin.rol !== 'ADMIN') {
+    return NextResponse.json(
+      { error: 'Solo el ADMIN puede administrar usuarios.' },
+      { status: 403 },
+    );
   }
 
   // Parsear payload

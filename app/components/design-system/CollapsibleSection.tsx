@@ -38,11 +38,11 @@ export function CollapsibleSection({
   const [abierto, setAbierto] = useState(abiertoPorDefecto);
 
   return (
-    <div className={`rounded-xl overflow-hidden ${className}`} style={{ border: '1px solid #E5E7EB' }}>
+    <div className={`rounded-xl overflow-hidden ${className}`} style={{ border: '1px solid var(--tema-borde-e5e7eb)' }}>
       <button
         type="button"
         onClick={() => setAbierto((v) => !v)}
-        className="w-full flex items-center justify-between gap-2 px-3 py-2 text-left transition-colors hover:bg-[#F8FAF7]"
+        className="w-full flex items-center justify-between gap-2 px-3 py-2 text-left transition-colors hover:bg-[var(--tema-fondo-f7f9fb)]"
         aria-expanded={abierto}
       >
         <div className="flex items-center gap-2 min-w-0">
@@ -52,15 +52,15 @@ export function CollapsibleSection({
             fill="none"
             stroke="currentColor"
             strokeWidth={2.5}
-            style={{ color: '#94A3B8' }}
+            style={{ color: 'var(--tema-texto-94a3b8)' }}
           >
             <path strokeLinecap="round" strokeLinejoin="round" d="M9 5l7 7-7 7" />
           </svg>
-          <span className="text-xs font-bold uppercase tracking-wider" style={{ color: '#475569' }}>
+          <span className="text-xs font-bold uppercase tracking-wider" style={{ color: 'var(--tema-texto-475569)' }}>
             {titulo}
           </span>
           {contador !== undefined && (
-            <span className="text-[10px] font-semibold px-1.5 py-0.5 rounded-full" style={{ background: '#F1F5F9', color: '#64748B' }}>
+            <span className="text-[10px] font-semibold px-1.5 py-0.5 rounded-full" style={{ background: 'var(--tema-fondo-f1f5f9)', color: 'var(--tema-texto-64748b)' }}>
               {contador}
             </span>
           )}
@@ -69,7 +69,7 @@ export function CollapsibleSection({
       </button>
 
       {abierto && (
-        <div className="px-3 pb-3" style={{ borderTop: '1px solid #F1F5F9' }}>
+        <div className="px-3 pb-3" style={{ borderTop: '1px solid var(--tema-borde-f1f5f9)' }}>
           {children}
         </div>
       )}

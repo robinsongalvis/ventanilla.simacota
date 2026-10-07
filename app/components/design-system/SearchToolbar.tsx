@@ -37,8 +37,8 @@ export function SearchToolbar({
 }: SearchToolbarProps) {
   return (
     <div
-      className={`flex items-center gap-2 px-3 sm:px-4 py-2 shrink-0 bg-white ${className}`}
-      style={{ borderBottom: '1px solid #E5E7EB' }}
+      className={`flex items-center gap-2 px-3 sm:px-4 py-2 shrink-0 bg-[var(--tema-fondo-ffffff)] ${className}`}
+      style={{ borderBottom: '1px solid var(--tema-borde-e5e7eb)' }}
     >
       {/* Input de búsqueda */}
       <div className="relative flex-1 min-w-0">
@@ -48,7 +48,7 @@ export function SearchToolbar({
           fill="none"
           stroke="currentColor"
           strokeWidth={2}
-          style={{ color: '#94A3B8' }}
+          style={{ color: 'var(--tema-texto-94a3b8)' }}
         >
           <path strokeLinecap="round" strokeLinejoin="round" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
         </svg>
@@ -58,17 +58,17 @@ export function SearchToolbar({
           onChange={(e) => onChange(e.target.value)}
           placeholder={placeholder}
           className="w-full pl-9 pr-3 py-2 rounded-lg border text-sm focus:outline-none focus:ring-2 focus:ring-emerald-700/20 transition-all"
-          style={{ borderColor: '#D9E2D9', background: '#F8FAF7' }}
+          style={{ borderColor: 'var(--tema-borde-dce4ea)', background: 'var(--tema-fondo-f7f9fb)' }}
           aria-label={placeholder}
         />
         {valor && (
           <button
             type="button"
             onClick={() => onChange('')}
-            className="absolute right-2 top-1/2 -translate-y-1/2 w-5 h-5 flex items-center justify-center rounded-full hover:bg-gray-200 transition-colors"
+            className="absolute right-2 top-1/2 -translate-y-1/2 w-5 h-5 flex items-center justify-center rounded-full hover:bg-gray-200 oscuro:hover:bg-white/10 transition-colors"
             aria-label="Limpiar búsqueda"
           >
-            <svg className="w-3 h-3" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2.5} style={{ color: '#94A3B8' }}>
+            <svg className="w-3 h-3" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2.5} style={{ color: 'var(--tema-texto-94a3b8)' }}>
               <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
             </svg>
           </button>
@@ -77,7 +77,7 @@ export function SearchToolbar({
 
       {/* Contador de resultados */}
       {resultados !== undefined && (
-        <span className="shrink-0 text-[10px] font-semibold" style={{ color: '#94A3B8' }}>
+        <span className="shrink-0 text-[10px] font-semibold" style={{ color: 'var(--tema-texto-94a3b8)' }}>
           {resultados} resultado{resultados !== 1 ? 's' : ''}
         </span>
       )}
@@ -87,7 +87,7 @@ export function SearchToolbar({
 
       {/* Separador */}
       {accionPrincipal && (
-        <span className="w-px h-5 shrink-0" style={{ background: '#E5E7EB' }} aria-hidden="true" />
+        <span className="w-px h-5 shrink-0" style={{ background: 'var(--tema-fondo-e5e7eb)' }} aria-hidden="true" />
       )}
 
       {/* Acción principal */}

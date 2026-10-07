@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 import { getFirebaseAdminDb } from '@/lib/firebase-admin';
-import { requireActiveInternalUser, InternalAuthError } from '@/lib/server/internal-auth';
+import { autenticarUsuarioInterno } from '@/lib/server/internal-auth-http';
 import { nowColombia, TIMEZONE_COLOMBIA } from '@/lib/fecha-colombia';
 
 export const runtime = 'nodejs';
@@ -25,18 +25,20 @@ interface VistoPayload {
 }
 
 export async function POST(request: Request): Promise<NextResponse> {
-  let session;
-  try {
-    session = await requireActiveInternalUser();
-  } catch (err) {
-    if (err instanceof InternalAuthError) {
-      return jsonSeguro(
-        { error: err.status === 401 ? 'Debe iniciar sesión nuevamente.' : 'No tiene permiso para realizar esta acción.' },
-        err.status,
-      );
-    }
-    return jsonSeguro({ error: 'Debe iniciar sesión nuevamente.' }, 401);
+  const autenticacion = await autenticarUsuarioInterno();
+  if (!autenticacion.ok) {
+    return jsonSeguro(
+      {
+        error: autenticacion.status === 401
+          ? 'Debe iniciar sesión nuevamente.'
+          : autenticacion.status === 403
+            ? 'No tiene permiso para realizar esta acción.'
+            : autenticacion.mensaje,
+      },
+      autenticacion.status,
+    );
   }
+  const session = autenticacion.usuario;
 
   let body: VistoPayload;
   try {

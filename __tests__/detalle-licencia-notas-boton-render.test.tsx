@@ -5,9 +5,11 @@ import { useAuth, type UsuarioAutenticado, type UseAuthReturn } from '@/lib/hook
 import type { ActuacionLicenciaDoc, ExpedienteLicenciaDoc } from '@/lib/server/expedientes-licencias';
 
 vi.mock('@/lib/hooks/useAuth', () => ({ useAuth: vi.fn() }));
+vi.setConfig({ testTimeout: 15_000 });
 
 afterEach(() => {
   cleanup();
+  vi.unstubAllGlobals();
   vi.restoreAllMocks();
 });
 

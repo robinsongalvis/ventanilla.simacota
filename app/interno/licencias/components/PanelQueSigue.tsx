@@ -41,7 +41,7 @@ export function PanelQueSigue({ queSigue, pasoActual, onAccion, papel = [] }: Pa
       style={{ background: 'var(--bg-surface)', border: '1px solid var(--color-border)' }}
     >
       <div className="px-4 pt-4 pb-3">
-        <p className="text-[10px] font-bold uppercase tracking-widest" style={{ color: '#667085' }}>
+        <p className="text-[10px] font-bold uppercase tracking-widest" style={{ color: 'var(--text-secondary)' }}>
           Qué sigue en este expediente
         </p>
       </div>
@@ -53,10 +53,10 @@ export function PanelQueSigue({ queSigue, pasoActual, onAccion, papel = [] }: Pa
         <div className="px-4 pb-4">
           <div
             className="rounded-xl p-4"
-            style={{ background: '#F1F8F3', border: '1px solid rgba(20,83,45,.22)' }}
+            style={{ background: 'var(--tema-fondo-f1f8f3)', border: '1px solid rgba(0, 112, 73,.22)' }}
           >
             {pasoActual && (
-              <p className="text-[10px] font-bold uppercase tracking-widest mb-1" style={{ color: '#3F6B4E' }}>
+              <p className="text-[10px] font-bold uppercase tracking-widest mb-1" style={{ color: 'var(--tema-texto-3f6b4e)' }}>
                 Paso {pasoActual.numero} del camino · le toca a la Secretaría
               </p>
             )}
@@ -67,7 +67,7 @@ export function PanelQueSigue({ queSigue, pasoActual, onAccion, papel = [] }: Pa
               type="button"
               onClick={() => onAccion(principal.tipo)}
               className="w-full sm:w-auto inline-flex flex-col items-center rounded-[10px] px-5 py-3 transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-1 hover:brightness-95 active:scale-[0.98]"
-              style={{ background: '#14532D', color: '#fff', boxShadow: '0 2px 10px rgba(20,83,45,.28)' }}
+              style={{ background: 'var(--tema-fondo-007049)', color: '#fff', boxShadow: '0 2px 10px rgba(0, 112, 73,.28)' }}
             >
               <span className="text-sm font-bold">{principal.etiqueta}</span>
               {principal.nota && (
@@ -89,7 +89,7 @@ export function PanelQueSigue({ queSigue, pasoActual, onAccion, papel = [] }: Pa
               type="button"
               onClick={() => onAccion(a.tipo)}
               className="inline-flex flex-col items-start rounded-[10px] px-4 py-2.5 text-left transition-colors focus-visible:outline-none focus-visible:ring-2 hover:brightness-95"
-              style={{ background: 'transparent', color: '#14532D', border: '1px solid #14532D' }}
+              style={{ background: 'transparent', color: 'var(--tema-texto-007049)', border: '1px solid var(--tema-borde-007049)' }}
             >
               <span className="text-sm font-bold">{a.etiqueta}</span>
               {a.nota && (
@@ -121,11 +121,11 @@ export function PanelQueSigue({ queSigue, pasoActual, onAccion, papel = [] }: Pa
               disabled
               aria-describedby={idNota}
               className="w-full text-left rounded-[10px] px-4 py-2.5 text-sm font-bold cursor-not-allowed"
-              style={{ background: 'var(--bg-surface-2)', color: '#94A3B8', border: '1px dashed var(--color-border)' }}
+              style={{ background: 'var(--bg-surface-2)', color: 'var(--text-secondary)', border: '1px dashed var(--color-border)' }}
             >
               {e.etiqueta}
             </button>
-            <p id={idNota} className="text-xs px-1" style={{ color: '#9A6206' }}>{e.porque}</p>
+            <p id={idNota} className="text-xs px-1" style={{ color: 'var(--tema-texto-9a6206)' }}>{e.porque}</p>
           </div>
         );
       })}
@@ -147,7 +147,7 @@ export function PanelQueSigue({ queSigue, pasoActual, onAccion, papel = [] }: Pa
                       target="_blank"
                       rel="noopener noreferrer"
                       className="text-xs font-bold px-2 py-1 rounded-lg focus-visible:outline-none focus-visible:ring-2"
-                      style={{ border: '1px solid var(--color-border)', color: '#14532D' }}
+                      style={{ border: '1px solid var(--color-border)', color: 'var(--tema-texto-007049)' }}
                       title={`${p.etiqueta} — marca en ${o.etiqueta}`}
                     >
                       {o.etiqueta}
@@ -165,7 +165,7 @@ export function PanelQueSigue({ queSigue, pasoActual, onAccion, papel = [] }: Pa
                 style={{ color: 'var(--text-primary)' }}
               >
                 <span>{p.etiqueta}</span>
-                <span className="text-xs font-bold" style={{ color: '#14532D' }}>Abrir →</span>
+                <span className="text-xs font-bold" style={{ color: 'var(--tema-texto-007049)' }}>Abrir →</span>
               </a>
             )
           ))}
@@ -186,7 +186,7 @@ export function PanelQueSigue({ queSigue, pasoActual, onAccion, papel = [] }: Pa
               type="button"
               onClick={() => onAccion(a.tipo)}
               className="text-left text-xs underline underline-offset-2 focus-visible:outline-none focus-visible:ring-2 rounded"
-              style={{ color: '#667085' }}
+              style={{ color: 'var(--text-secondary)' }}
             >
               {a.etiqueta}
             </button>

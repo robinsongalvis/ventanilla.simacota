@@ -5,6 +5,7 @@ import { useRouter, useSearchParams } from 'next/navigation';
 import { signInWithEmailAndPassword } from 'firebase/auth';
 import { getFirebaseAuth } from '@/lib/firebase';
 import { createInternalSession } from '@/lib/auth-session';
+import { destinoTrasLogin } from '@/lib/auth/destino-tras-login';
 
 export function LoginForm() {
   const router = useRouter();
@@ -15,12 +16,8 @@ export function LoginForm() {
   const [loading, setLoading] = useState(false);
   const [status, setStatus] = useState('');
 
-  const nextUrl = useMemo(() => {
-    const value = searchParams.get('next');
-    return value?.startsWith('/interno/') && value !== '/interno/login'
-      ? value
-      : '/interno/dashboard';
-  }, [searchParams]);
+  // Misma regla que el layout interno (`lib/auth/destino-tras-login.ts`).
+  const nextUrl = useMemo(() => destinoTrasLogin(searchParams.get('next')), [searchParams]);
 
   const logLogin = (step: string, details?: Record<string, unknown>) => {
     if (process.env.NODE_ENV !== 'development') return;

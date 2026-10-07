@@ -1,4 +1,5 @@
 import { NextResponse } from 'next/server';
+import { CONTINGENCIA_STORAGE_ACTIVA } from '@/lib/recepcion/contingencia-storage';
 import { checkRateLimit } from '@/lib/ai/rate-limit';
 import { verificarMagicBytes } from '@/lib/seguridad/magic-bytes';
 import { getFirebaseAdminDb, getFirebaseAdminStorage } from '@/lib/firebase-admin';
@@ -228,6 +229,12 @@ function parseAnalisisIa(value: string): AnalisisIA | undefined {
 }
 
 export async function POST(request: Request) {
+  if (CONTINGENCIA_STORAGE_ACTIVA) {
+    return NextResponse.json({
+      exito: false,
+      error: 'La radicación web está temporalmente suspendida. Durante la contingencia, la recepción se realiza por la ventanilla interna autorizada.',
+    }, { status: 503 });
+  }
   const inicioOperacion = Date.now();
   let radicadoIdActual: string | null = null;
   try {

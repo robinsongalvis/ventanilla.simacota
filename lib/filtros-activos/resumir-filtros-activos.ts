@@ -55,6 +55,14 @@ const LABEL_MIPG: Record<Exclude<FiltroMIPG, 'TODOS'>, string> = {
   RESUELTOS_FUERA_TERMINO:'Resueltos fuera de término',
 };
 
+/**
+ * Nombre legible de la vista que produce un FiltroMIPG, para rotular la
+ * "vista actual" del tablero. `TODOS` no filtra: devuelve "Todos".
+ */
+export function etiquetaFiltroMIPG(filtro: FiltroMIPG): string {
+  return filtro === 'TODOS' ? 'Todos' : LABEL_MIPG[filtro];
+}
+
 /** Etiqueta humana de cada filtro operativo (excepto NINGUNO). */
 const LABEL_OPERATIVO: Record<Exclude<FiltroKpiOperativo, 'NINGUNO'>, string> = {
   HOY:            'Hoy',

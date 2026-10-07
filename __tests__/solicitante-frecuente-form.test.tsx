@@ -100,7 +100,7 @@ describe('Solicitante frecuente — autocompletar en el formulario', () => {
     expect((screen.getByLabelText('Identificación') as HTMLInputElement).value).toBe('1101321226');
     expect((screen.getByLabelText('Correo electrónico') as HTMLInputElement).value).toBe('robinson@example.com');
     expect((screen.getByLabelText('Teléfono móvil') as HTMLInputElement).value).toBe('3203452716');
-    expect(screen.getByRole('status').textContent).toMatch(/verifícalos con el ciudadano/i);
+    expect(screen.getByRole('status', { name: 'Verificación de datos precargados' }).textContent).toMatch(/verifícalos con el ciudadano/i);
     // El dropdown se cierra tras seleccionar.
     expect(screen.queryByRole('listbox')).toBeNull();
   });
@@ -110,12 +110,12 @@ describe('Solicitante frecuente — autocompletar en el formulario', () => {
     const { nombre } = renderConPool();
     fireEvent.change(nombre, { target: { value: 'robinson' } });
     fireEvent.mouseDown(screen.getByRole('option', { name: /Usar datos de Robinson/i }));
-    expect(screen.getByRole('status')).toBeTruthy();
+    expect(screen.getByRole('status', { name: 'Verificación de datos precargados' })).toBeTruthy();
 
     fireEvent.change(screen.getByLabelText('Correo electrónico'), {
       target: { value: 'otro@example.com' },
     });
-    expect(screen.queryByRole('status')).toBeNull();
+    expect(screen.queryByRole('status', { name: 'Verificación de datos precargados' })).toBeNull();
   });
 
   /* 5 · Escape cierra el dropdown */

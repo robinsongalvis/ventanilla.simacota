@@ -8,6 +8,7 @@ import {
 import type { VentanillaRadicado } from '@/src/types/ventanilla';
 import type { PlanillaReparto } from '@/src/types/planilla';
 import { radicadosPendientesDeReparto } from '@/lib/planillas/construir-planilla';
+import { esDatoDePrueba, type MarcasDePrueba } from '@/lib/radicados/dato-de-prueba';
 
 /**
  * Sprint Planilla de reparto — capa server (Admin SDK).
@@ -66,7 +67,40 @@ export async function obtenerPlanillasAbiertas(db: Firestore): Promise<PlanillaR
     .collection('ventanilla_planillas')
     .where('estado', '==', 'POR_ENTREGAR')
     .get();
+  // Una planilla mixta puede quedar oculta en la vista operativa, pero sus
+  // filas reales siguen reservadas: filtrarla aquí permitiría doble reparto.
   return snap.docs.map((d) => d.data() as PlanillaReparto);
+}
+
+/**
+ * Proyección operativa, sin reescribir planillas históricas. Una fila de prueba
+ * o sin radicado vigente impide operar la planilla completa: no se presenta
+ * una versión parcialmente recortada del documento firmado.
+ */
+export async function filtrarPlanillasOperativas(
+  db: Firestore,
+  planillas: readonly PlanillaReparto[],
+): Promise<PlanillaReparto[]> {
+  const ids = [...new Set(planillas.flatMap((planilla) => planilla.filas.map((fila) => fila.radicadoId)))];
+  const radicados = new Map<string, MarcasDePrueba>();
+  // Lecturas agrupadas y acotadas; no se consulta la colección completa.
+  for (let i = 0; i < ids.length; i += 100) {
+    const documentos = await db.getAll(...ids.slice(i, i + 100).map((id) => db.doc(`ventanilla_radicados/${id}`)));
+    for (const documento of documentos) {
+      if (documento.exists) radicados.set(documento.id, documento.data() as MarcasDePrueba);
+    }
+  }
+  return planillas.filter((planilla) => planilla.filas.length > 0 && planilla.filas.every((fila) => {
+    const radicado = radicados.get(fila.radicadoId);
+    return radicado !== undefined && !esDatoDePrueba(radicado);
+  }));
+}
+
+/** Rechaza cualquier mutación de una planilla vinculada a históricos de prueba. */
+export async function assertPlanillaOperativa(db: Firestore, planilla: PlanillaReparto): Promise<void> {
+  if ((await filtrarPlanillasOperativas(db, [planilla])).length !== 1) {
+    throw new RadicadoActionError('La planilla contiene históricos de prueba o radicados no disponibles. Se conserva solo para consulta de auditoría.', 409);
+  }
 }
 
 /**

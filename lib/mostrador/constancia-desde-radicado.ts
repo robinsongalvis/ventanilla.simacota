@@ -1,4 +1,5 @@
 import type { VentanillaRadicado } from '@/src/types/ventanilla';
+import type { EstadoAdjuntos } from '@/lib/recepcion/contingencia-storage';
 
 /**
  * Sprint Cierre del mostrador — reconstruir los datos de la constancia
@@ -14,6 +15,7 @@ import type { VentanillaRadicado } from '@/src/types/ventanilla';
  */
 
 export interface DatosConstancia {
+  estadoAdjuntos?: EstadoAdjuntos;
   radicadoId:          string;
   solicitanteNombre:   string;
   numeroDocumento:     string;
@@ -40,6 +42,7 @@ export function datosConstanciaDesdeRadicado(r: VentanillaRadicado): DatosConsta
   const marcas = r.solicitante.datosNoAportados;
 
   return {
+    ...(r.gestionAdjuntos ? { estadoAdjuntos: r.gestionAdjuntos.estado } : {}),
     radicadoId:        r.radicadoId,
     solicitanteNombre: r.solicitante.nombreCompleto,
     numeroDocumento:   r.solicitante.numeroDocumento,

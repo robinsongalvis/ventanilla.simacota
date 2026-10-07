@@ -7,6 +7,9 @@ import { formatFechaCortaColombia } from '@/lib/fecha-colombia';
 import { SelloDespacho } from './SelloDespacho';
 import { SectionHeader } from '@/app/components/design-system/SectionHeader';
 import { EmptyState } from '@/app/components/design-system/EmptyState';
+import { BarraTrabajo } from '@/app/components/design-system/BarraTrabajo';
+import { BotonAccion } from '@/app/components/design-system/BotonAccion';
+import { ArrowRight, FileDown, Send } from 'lucide-react';
 
 /* ══════════════════════════════════════════════════════════════
    Sprint Radicación de salida — libro de correspondencia despachada.
@@ -17,7 +20,7 @@ import { EmptyState } from '@/app/components/design-system/EmptyState';
    entrada correspondiente.
 ══════════════════════════════════════════════════════════════ */
 
-const VERDE_INST = '#14532D';
+const VERDE_INST = 'var(--tema-texto-007049)';
 
 const MEDIO_LABEL: Record<string, string> = {
   CORREO:     'Correo electrónico',
@@ -35,7 +38,12 @@ export interface VistaSalidasProps {
   cargando:       boolean;
   error:          string | null;
   onAbrirEntrada: (radicadoId: string) => void;
-  onNuevaSalida:  () => void;
+  /**
+   * Ola 3 (ADR-0046) — presente solo si el rol registra salidas
+   * (`permisos.registrarSalida`). CONTROL_INTERNO lee el libro, pero antes
+   * veía un botón «Registrar salida» que no hacía nada: sin acción no hay botón.
+   */
+  onNuevaSalida?: () => void;
 }
 
 export function VistaSalidas({
@@ -61,46 +69,35 @@ export function VistaSalidas({
   }, [salidas, busqueda]);
 
   return (
-    <div className="flex-1 overflow-y-auto px-4 sm:px-6 py-6" style={{ background: '#F8FAF7' }}>
+    <div className="flex-1 overflow-y-auto pb-4" style={{ background: 'var(--tema-fondo-f7f9fb)' }}>
       <SectionHeader
         titulo="Libro de salidas"
         subtitulo="Correspondencia despachada"
         indicador={<span className="w-1.5 h-1.5 rounded-full shrink-0" style={{ background: '#8A6A12' }} />}
-        acciones={
-          <button
-            type="button"
-            onClick={onNuevaSalida}
-            className="inline-flex items-center gap-1.5 text-[13px] font-bold px-4 py-2.5 rounded-[10px] transition-opacity hover:opacity-90"
-            style={{ background: '#D4A017', color: '#3D2C00', border: '1px solid #B8890F' }}
-          >
-            <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2.5}>
-              <path strokeLinecap="round" strokeLinejoin="round" d="M12 5v14M5 12h14" />
-            </svg>
-            Registrar salida
-          </button>
-        }
+        acciones={onNuevaSalida && (
+          <BotonAccion variante="primaria" Icono={Send} onClick={onNuevaSalida}>Registrar salida</BotonAccion>
+        )}
       />
 
-      <div className="mb-4">
-        <input
-          type="text"
-          value={busqueda}
-          onChange={(e) => setBusqueda(e.target.value)}
-          placeholder="Buscar por número de salida, destinatario, asunto o radicado de entrada…"
-          aria-label="Buscar en el libro de salidas"
-          className="input-internal w-full max-w-xl"
-        />
-      </div>
+      <BarraTrabajo
+        busqueda={busqueda}
+        onBusquedaChange={setBusqueda}
+        placeholder="Buscar por número de salida, destinatario, asunto o radicado de entrada…"
+        ariaLabel="Buscar en el libro de salidas"
+        contador={`${visibles.length} salida${visibles.length !== 1 ? 's' : ''}`}
+        limpiable
+      />
 
+      <div className="mt-2 px-3 sm:px-4 lg:px-6">
       {error && (
-        <p role="alert" className="rounded-lg px-3 py-2 mb-4 text-xs"
-           style={{ background: '#FEF2F2', border: '1px solid #FECACA', color: '#991B1B' }}>
+        <p role="alert" className="rounded-lg px-3 py-2 mb-2 text-xs"
+           style={{ background: 'var(--tema-fondo-fef2f2)', border: '1px solid var(--tema-borde-fecaca)', color: 'var(--tema-texto-991b1b)' }}>
           {error}
         </p>
       )}
 
       {cargando && salidas.length === 0 ? (
-        <p className="text-xs" style={{ color: '#7A8B7F' }}>Cargando libro de salidas…</p>
+        <p role="status" className="py-3 text-xs" style={{ color: 'var(--tema-texto-64748b)' }}>Cargando libro de salidas…</p>
       ) : visibles.length === 0 ? (
         <EmptyState
           titulo={salidas.length === 0 ? 'Sin salidas registradas' : 'Sin resultados'}
@@ -109,36 +106,36 @@ export function VistaSalidas({
             : 'Ninguna salida coincide con la búsqueda.'}
         />
       ) : (
-        <div className="rounded-xl bg-white overflow-hidden" style={{ border: '1px solid #E3EAE3' }}>
+        <div className="rounded-xl bg-[var(--tema-fondo-ffffff)] overflow-hidden">
           {visibles.map((s, i) => (
             <div
               key={s.salidaId}
-              className="flex items-center gap-3 px-4 py-3 flex-wrap"
-              style={i > 0 ? { borderTop: '1px solid #EEF2EE' } : undefined}
+              className="flex items-center gap-2 px-3 py-2.5 flex-wrap"
+              style={i > 0 ? { borderTop: '1px solid var(--tema-borde-eef2ee)' } : undefined}
             >
-              <div className="min-w-0 flex-1">
+              <div className="min-w-0 flex-[1_1_16rem]">
                 <div className="flex items-center gap-2 flex-wrap">
-                  <span className="font-mono text-[13px] font-bold" style={{ color: '#12261A' }}>
+                  <span className="font-mono text-[13px] font-bold" style={{ color: 'var(--tema-texto-172033)' }}>
                     {s.salidaId}
                   </span>
                   <span
                     className="text-[10.5px] font-semibold px-2 py-0.5 rounded-full"
                     style={s.tipoSalida === 'RESPUESTA'
-                      ? { background: '#E6F1FB', color: '#185FA5' }
-                      : { background: '#EEF2F5', color: '#3A4551' }}
+                      ? { background: 'var(--tema-fondo-e6f1fb)', color: 'var(--tema-texto-185fa5)' }
+                      : { background: 'var(--tema-fondo-eef2f5)', color: 'var(--tema-texto-3a4551)' }}
                   >
                     {s.tipoSalida === 'RESPUESTA' ? 'Respuesta' : 'Oficio independiente'}
                   </span>
-                  <span className="text-[11px]" style={{ color: '#7A8B7F' }}>
+                  <span className="text-[11px]" style={{ color: 'var(--tema-texto-64748b)' }}>
                     {formatFechaCortaColombia(s.fechaSalida)} · {MEDIO_LABEL[s.medioEnvio] ?? s.medioEnvio}
                   </span>
                 </div>
-                <p className="text-[12px] mt-0.5 truncate" style={{ color: '#3A4551' }}>
+                <p className="text-[12px] mt-0.5 truncate" style={{ color: 'var(--tema-texto-3a4551)' }}>
                   Para: <span className="font-semibold">{s.destinatario.nombre}</span>
                   {s.destinatario.entidad ? ` (${s.destinatario.entidad})` : ''}
                   {' · '}{s.asunto}
                 </p>
-                <p className="text-[11px] mt-0.5" style={{ color: '#7A8B7F' }}>
+                <p className="text-[11px] mt-0.5" style={{ color: 'var(--tema-texto-64748b)' }}>
                   Despacha: {NOMBRES_TENANT[s.dependenciaOrigen] ?? s.dependenciaOrigen} · Firma: {s.firmante.nombre}
                 </p>
               </div>
@@ -152,11 +149,9 @@ export function VistaSalidas({
                   aria-label={`Ver oficio despachado de ${s.salidaId}`}
                   title={s.archivoNombre ?? 'Oficio despachado (PDF)'}
                   className="inline-flex items-center gap-1 text-[11.5px] font-semibold shrink-0 px-2.5 py-1 rounded-lg"
-                  style={{ border: '1px solid #14532D', color: VERDE_INST, background: 'white' }}
+                  style={{ border: '1px solid var(--tema-borde-007049)', color: VERDE_INST, background: 'var(--tema-fondo-ffffff)' }}
                 >
-                  <svg className="w-3 h-3" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2}>
-                    <path strokeLinecap="round" strokeLinejoin="round" d="M19.5 14.25v-2.625a3.375 3.375 0 00-3.375-3.375h-1.5A1.125 1.125 0 0113.5 7.125v-1.5a3.375 3.375 0 00-3.375-3.375H8.25m6.75 12l-3 3m0 0l-3-3m3 3v-6m-1.5-9H5.625c-.621 0-1.125.504-1.125 1.125v17.25c0 .621.504 1.125 1.125 1.125h12.75c.621 0 1.125-.504 1.125-1.125V11.25a9 9 0 00-9-9z" />
-                  </svg>
+                  <FileDown className="h-3 w-3" strokeWidth={2} aria-hidden="true" />
                   Ver oficio
                 </a>
               )}
@@ -165,7 +160,7 @@ export function VistaSalidas({
                 onClick={() => setConstanciaDe(s)}
                 aria-label={`Imprimir constancia de despacho de ${s.salidaId}`}
                 className="text-[11.5px] font-semibold shrink-0 px-2.5 py-1 rounded-lg"
-                style={{ border: '1px solid #D9E2D9', color: '#475569', background: 'white' }}
+                style={{ border: '1px solid var(--tema-borde-dce4ea)', color: 'var(--tema-texto-475569)', background: 'var(--tema-fondo-ffffff)' }}
               >
                 Constancia
               </button>
@@ -178,9 +173,7 @@ export function VistaSalidas({
                   style={{ color: VERDE_INST }}
                 >
                   Entrada {s.radicadoEntradaId}
-                  <svg className="w-3 h-3" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2.5}>
-                    <path strokeLinecap="round" strokeLinejoin="round" d="M5 12h14M13 6l6 6-6 6" />
-                  </svg>
+                  <ArrowRight className="h-3 w-3" strokeWidth={2.5} aria-hidden="true" />
                 </button>
               )}
             </div>
@@ -188,10 +181,11 @@ export function VistaSalidas({
         </div>
       )}
 
-      <p className="mt-3 text-[11px]" style={{ color: '#7A8B7F' }}>
+      <p className="mt-2 text-[11px]" style={{ color: 'var(--tema-texto-64748b)' }}>
         {visibles.length} salida{visibles.length !== 1 ? 's' : ''} · el libro es inmutable:
         una corrección se registra como salida nueva.
       </p>
+      </div>
 
       {/* Fase B — modal ligero de la constancia de despacho. */}
       {constanciaDe && (
@@ -209,11 +203,11 @@ export function VistaSalidas({
             className="absolute inset-0 bg-black/55"
           />
           <div
-            className="relative w-full max-w-lg bg-white rounded-2xl shadow-2xl overflow-y-auto flex flex-col items-center gap-4 px-6 py-6"
-            style={{ border: '1px solid #D9E2D9', maxHeight: 'calc(100dvh - 24px)' }}
+            className="relative w-full max-w-lg bg-[var(--tema-fondo-ffffff)] rounded-2xl shadow-2xl overflow-y-auto flex flex-col items-center gap-4 px-6 py-6"
+            style={{ border: '1px solid var(--tema-borde-dce4ea)', maxHeight: 'calc(100dvh - 24px)' }}
           >
             <div className="text-center">
-              <p className="text-[10px] font-bold uppercase tracking-[0.12em]" style={{ color: '#8A6A12' }}>
+              <p className="text-[10px] font-bold uppercase tracking-[0.12em]" style={{ color: 'var(--tema-texto-8a6a12)' }}>
                 Constancia de despacho
               </p>
               <p className="text-lg font-black font-mono" style={{ color: VERDE_INST }}>
@@ -225,7 +219,7 @@ export function VistaSalidas({
               type="button"
               onClick={() => setConstanciaDe(null)}
               className="px-5 py-2 rounded-xl text-sm font-bold"
-              style={{ border: '1px solid #D9E2D9', color: '#475569' }}
+              style={{ border: '1px solid var(--tema-borde-dce4ea)', color: 'var(--tema-texto-475569)' }}
             >
               Cerrar
             </button>

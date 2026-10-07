@@ -9,6 +9,11 @@ import type {
 } from '@/src/types/control-interno';
 import { LABEL_NIVEL_RIESGO } from '@/src/types/control-interno';
 import { describirNivelRiesgo, type RecomendacionDia, type SeveridadRecomendacion } from '@/lib/control-interno/recomendaciones';
+import { BotonAccion } from '@/app/components/design-system/BotonAccion';
+import { EmptyState } from '@/app/components/design-system/EmptyState';
+import type { TonoIndicador } from '@/app/components/design-system/Indicador';
+import { FilaTarjetas, TarjetaIndicador } from '@/app/components/design-system/TarjetaIndicador';
+import { AlertCircle, AlertOctagon, AlertTriangle, CheckCircle2, Info, RefreshCw, ShieldCheck, type LucideIcon } from 'lucide-react';
 
 interface PanoramaResponse {
   ok?:           boolean;
@@ -32,23 +37,24 @@ interface ResumenDiaResponse {
 }
 
 function colorSemaforo(s: SemaforoKpi): { bg: string; bd: string; fg: string } {
-  if (s === 'VERDE')    return { bg: '#F0FDF4', bd: '#BBF7D0', fg: '#14532D' };
-  if (s === 'AMARILLO') return { bg: '#FFFBEB', bd: '#FDE68A', fg: '#92400E' };
-  return                       { bg: '#FEF2F2', bd: '#FECACA', fg: '#991B1B' };
+  if (s === 'VERDE')    return { bg: 'var(--tema-fondo-f0fdf4)', bd: 'var(--tema-borde-bbf7d0)', fg: 'var(--tema-texto-007049)' };
+  if (s === 'AMARILLO') return { bg: 'var(--tema-fondo-fffbeb)', bd: 'var(--tema-borde-fde68a)', fg: 'var(--tema-texto-92400e)' };
+  return                       { bg: 'var(--tema-fondo-fef2f2)', bd: 'var(--tema-borde-fecaca)', fg: 'var(--tema-texto-991b1b)' };
 }
 
-function colorNivel(n: NivelRiesgo): string {
-  if (n === 'CRITICO') return '#DC2626';
-  if (n === 'ALTO')    return '#D97706';
-  if (n === 'MEDIO')   return '#CA8A04';
-  return                       '#14532D';
-}
+/* Ola 3 (ADR-0046): los niveles de riesgo usan el Indicador del Tablero. */
+const INDICADOR_NIVEL: Record<NivelRiesgo, { tono: TonoIndicador; Icono: LucideIcon }> = {
+  CRITICO: { tono: 'rojo',  Icono: AlertOctagon },
+  ALTO:    { tono: 'ambar', Icono: AlertTriangle },
+  MEDIO:   { tono: 'ambar', Icono: AlertCircle },
+  BAJO:    { tono: 'verde', Icono: ShieldCheck },
+};
 
-function colorRecomendacion(s: SeveridadRecomendacion): { bg: string; bd: string; fg: string; icon: string } {
-  if (s === 'URGENTE')     return { bg: '#FEF2F2', bd: '#FECACA', fg: '#991B1B', icon: '⚠️' };
-  if (s === 'ATENCION')    return { bg: '#FFFBEB', bd: '#FDE68A', fg: '#92400E', icon: '!' };
-  if (s === 'INFORMATIVO') return { bg: '#F0F9FF', bd: '#BAE6FD', fg: '#075985', icon: 'i' };
-  return                          { bg: '#F0FDF4', bd: '#BBF7D0', fg: '#14532D', icon: '✓' };
+function colorRecomendacion(s: SeveridadRecomendacion): { bg: string; bd: string; fg: string; Icono: LucideIcon } {
+  if (s === 'URGENTE')     return { bg: 'var(--tema-fondo-fef2f2)', bd: 'var(--tema-borde-fecaca)', fg: 'var(--tema-texto-991b1b)', Icono: AlertTriangle };
+  if (s === 'ATENCION')    return { bg: 'var(--tema-fondo-fffbeb)', bd: 'var(--tema-borde-fde68a)', fg: 'var(--tema-texto-92400e)', Icono: AlertCircle };
+  if (s === 'INFORMATIVO') return { bg: 'var(--tema-fondo-f0f9ff)', bd: 'var(--tema-borde-bae6fd)', fg: 'var(--tema-texto-075985)', Icono: Info };
+  return                          { bg: 'var(--tema-fondo-f0fdf4)', bd: 'var(--tema-borde-bbf7d0)', fg: 'var(--tema-texto-007049)', Icono: CheckCircle2 };
 }
 
 const LABEL_SEMAFORO: Record<SemaforoKpi, string> = {
@@ -96,43 +102,41 @@ export function PanoramaGeneralPanel() {
   return (
     <div className="space-y-4">
       {/* Bloque "Qué debo revisar hoy" */}
-      <section className="rounded-2xl bg-white p-5" style={{ border: '1px solid #D9E2D9', boxShadow: '0 1px 3px rgba(20,83,45,0.06)' }}>
+      <section className="rounded-xl bg-[var(--tema-fondo-ffffff)] p-4">
         <div className="flex items-baseline justify-between gap-3">
           <div>
-            <p className="text-[10px] font-bold uppercase tracking-widest" style={{ color: '#14532D' }}>Acciones del día</p>
-            <h2 className="mt-1 text-base sm:text-lg font-black" style={{ color: '#1F2933', fontFamily: 'var(--font-manrope)' }}>
+            <p className="text-[10px] font-bold uppercase tracking-widest" style={{ color: 'var(--tema-texto-007049)' }}>Acciones del día</p>
+            <h2 className="mt-1 text-base sm:text-lg font-black" style={{ color: 'var(--tema-texto-172033)', fontFamily: 'var(--font-manrope)' }}>
               Qué debo revisar hoy
             </h2>
           </div>
-          <button type="button" onClick={cargar} className="text-[10px] font-bold uppercase tracking-widest px-2 py-1 rounded-md" style={{ color: '#14532D', border: '1px solid #D9E2D9' }}>
-            Actualizar
-          </button>
+          <BotonAccion Icono={RefreshCw} onClick={cargar}>Actualizar</BotonAccion>
         </div>
         <ul className="mt-3 space-y-2">
           {(resumen?.recomendaciones ?? []).map((r, i) => {
             const c = colorRecomendacion(r.severidad);
             return (
               <li key={i} className="flex items-start gap-3 rounded-xl p-3" style={{ background: c.bg, border: `1px solid ${c.bd}` }}>
-                <span className="shrink-0 w-6 h-6 rounded-full flex items-center justify-center text-xs font-black" style={{ color: c.fg, background: 'white', border: `1px solid ${c.bd}` }} aria-hidden>
-                  {c.icon}
+                <span className="shrink-0 w-6 h-6 rounded-full flex items-center justify-center" style={{ color: c.fg, background: 'var(--tema-fondo-ffffff)', border: `1px solid ${c.bd}` }} aria-hidden>
+                  <c.Icono className="h-3.5 w-3.5" strokeWidth={2.2} />
                 </span>
                 <div className="min-w-0">
                   <p className="text-sm font-bold" style={{ color: c.fg }}>{r.titulo}</p>
-                  {r.detalle && <p className="text-xs mt-0.5" style={{ color: '#1F2933' }}>{r.detalle}</p>}
+                  {r.detalle && <p className="text-xs mt-0.5" style={{ color: 'var(--tema-texto-172033)' }}>{r.detalle}</p>}
                 </div>
               </li>
             );
           })}
           {(!resumen?.recomendaciones || resumen.recomendaciones.length === 0) && (
-            <li className="text-xs" style={{ color: '#667085' }}>Sin recomendaciones por mostrar en este momento.</li>
+            <li className="text-xs" style={{ color: 'var(--tema-texto-64748b)' }}>Sin recomendaciones por mostrar en este momento.</li>
           )}
         </ul>
       </section>
 
       {/* Cómo usar este módulo */}
-      <section className="rounded-2xl bg-white p-5" style={{ border: '1px solid #D9E2D9' }}>
-        <p className="text-[10px] font-bold uppercase tracking-widest" style={{ color: '#14532D' }}>Cómo usar este módulo</p>
-        <ol className="mt-2 text-xs space-y-1 list-decimal pl-4" style={{ color: '#1F2933' }}>
+      <section className="rounded-xl bg-[var(--tema-fondo-ffffff)] p-4">
+        <p className="text-[10px] font-bold uppercase tracking-widest" style={{ color: 'var(--tema-texto-007049)' }}>Cómo usar este módulo</p>
+        <ol className="mt-2 text-xs space-y-1 list-decimal pl-4" style={{ color: 'var(--tema-texto-172033)' }}>
           <li>Revise las alertas del día.</li>
           <li>Verifique los radicados vencidos o por vencer.</li>
           <li>Cree un hallazgo cuando encuentre una situación que requiera seguimiento.</li>
@@ -142,41 +146,38 @@ export function PanoramaGeneralPanel() {
       </section>
 
       {/* Filtros + leyenda semáforo */}
-      <div className="flex flex-wrap items-end gap-3 rounded-xl bg-white p-4" style={{ border: '1px solid #D9E2D9' }}>
+      <div className="flex flex-wrap items-end gap-3 rounded-xl bg-[var(--tema-fondo-ffffff)] p-4" style={{ border: '1px solid var(--tema-borde-dce4ea)' }}>
         <div className="flex-1 min-w-[220px]">
-          <p className="text-[10px] font-bold uppercase tracking-widest" style={{ color: '#14532D' }}>Período</p>
-          <p className="text-sm font-medium" style={{ color: '#1F2933' }}>
+          <p className="text-[10px] font-bold uppercase tracking-widest" style={{ color: 'var(--tema-texto-007049)' }}>Período</p>
+          <p className="text-sm font-medium" style={{ color: 'var(--tema-texto-172033)' }}>
             {data.panorama.periodo.desde} → {data.panorama.periodo.hasta}
           </p>
         </div>
-        <label className="flex flex-col text-[10px] font-bold uppercase tracking-widest" style={{ color: '#94A3B8' }}>
+        <label className="flex flex-col text-[10px] font-bold uppercase tracking-widest" style={{ color: 'var(--tema-texto-64748b)' }}>
           Desde
           <input type="date" value={desde} onChange={(e) => setDesde(e.target.value)} className="input-internal mt-1 text-xs" />
         </label>
-        <label className="flex flex-col text-[10px] font-bold uppercase tracking-widest" style={{ color: '#94A3B8' }}>
+        <label className="flex flex-col text-[10px] font-bold uppercase tracking-widest" style={{ color: 'var(--tema-texto-64748b)' }}>
           Hasta
           <input type="date" value={hasta} onChange={(e) => setHasta(e.target.value)} className="input-internal mt-1 text-xs" />
         </label>
-        <button onClick={cargar} className="px-3 py-2 rounded-lg text-xs font-bold text-white" style={{ background: '#14532D' }}>
-          Filtrar
-        </button>
+        <BotonAccion variante="primaria" onClick={cargar}>Filtrar</BotonAccion>
       </div>
 
       {/* Resumen niveles */}
       {data.resumenRiesgo && (
-        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+        <FilaTarjetas etiqueta="Dependencias por nivel de riesgo">
           {(['CRITICO', 'ALTO', 'MEDIO', 'BAJO'] as NivelRiesgo[]).map((nivel) => (
-            <div key={nivel} className="rounded-xl bg-white p-4" style={{ border: '1px solid #D9E2D9' }} title={describirNivelRiesgo(nivel)}>
-              <p className="text-2xl font-black tabular-nums" style={{ color: colorNivel(nivel), fontFamily: 'var(--font-manrope)' }}>
-                {data.resumenRiesgo?.[nivel] ?? 0}
-              </p>
-              <p className="text-[10px] font-bold uppercase tracking-widest mt-1" style={{ color: '#94A3B8' }}>
-                Riesgo {LABEL_NIVEL_RIESGO[nivel]}
-              </p>
-              <p className="text-[10px] mt-1" style={{ color: '#667085' }}>{describirNivelRiesgo(nivel)}</p>
-            </div>
+            <TarjetaIndicador
+              key={nivel}
+              etiqueta={`Riesgo ${LABEL_NIVEL_RIESGO[nivel]}`}
+              valor={data.resumenRiesgo?.[nivel] ?? 0}
+              descripcion={describirNivelRiesgo(nivel)}
+              descripcionVisible
+              {...INDICADOR_NIVEL[nivel]}
+            />
           ))}
-        </div>
+        </FilaTarjetas>
       )}
 
       {/* KPIs */}
@@ -193,8 +194,8 @@ export function PanoramaGeneralPanel() {
                   {LABEL_SEMAFORO[k.semaforo]}
                 </span>
               </div>
-              <p className="text-xs font-bold mt-1" style={{ color: '#1F2933' }}>{k.label}</p>
-              <p className="text-[10px] mt-1" style={{ color: '#667085' }}>{k.descripcion}</p>
+              <p className="text-xs font-bold mt-1" style={{ color: 'var(--tema-texto-172033)' }}>{k.label}</p>
+              <p className="text-[10px] mt-1" style={{ color: 'var(--tema-texto-475569)' }}>{k.descripcion}</p>
               {k.accion && (
                 <p className="text-[10px] mt-2 italic" style={{ color: c.fg }}>→ {k.accion}</p>
               )}
@@ -204,12 +205,12 @@ export function PanoramaGeneralPanel() {
       </div>
 
       {/* Leyenda del semáforo */}
-      <div className="rounded-xl bg-white p-4" style={{ border: '1px solid #D9E2D9' }}>
-        <p className="text-[10px] font-bold uppercase tracking-widest" style={{ color: '#14532D' }}>Cómo leer los colores</p>
+      <div className="rounded-xl bg-[var(--tema-fondo-ffffff)] p-4" style={{ border: '1px solid var(--tema-borde-dce4ea)' }}>
+        <p className="text-[10px] font-bold uppercase tracking-widest" style={{ color: 'var(--tema-texto-007049)' }}>Cómo leer los colores</p>
         <div className="mt-2 grid grid-cols-1 sm:grid-cols-3 gap-2 text-xs">
-          <LeyendaItem color="#14532D" titulo="Verde — Bien" texto="Cumplimiento dentro de lo esperado." />
-          <LeyendaItem color="#D97706" titulo="Amarillo — Atención" texto="Conviene revisar pronto." />
-          <LeyendaItem color="#DC2626" titulo="Rojo — Urgente" texto="Requiere acción inmediata." />
+          <LeyendaItem color="var(--tema-texto-007049)" titulo="Verde — Bien" texto="Cumplimiento dentro de lo esperado." />
+          <LeyendaItem color="var(--tema-texto-d97706)" titulo="Amarillo — Atención" texto="Conviene revisar pronto." />
+          <LeyendaItem color="var(--tema-texto-d81e1e)" titulo="Rojo — Urgente" texto="Requiere acción inmediata." />
         </div>
       </div>
 
@@ -217,17 +218,17 @@ export function PanoramaGeneralPanel() {
       {(data.panorama.peorDependencia || data.panorama.mejorDependencia) && (
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
           {data.panorama.peorDependencia && (
-            <div className="rounded-xl bg-white p-4" style={{ border: '1px solid #FECACA' }}>
-              <p className="text-[10px] font-bold uppercase tracking-widest" style={{ color: '#991B1B' }}>Dependencia con más vencidos</p>
-              <p className="text-lg font-black mt-1" style={{ color: '#1F2933', fontFamily: 'var(--font-manrope)' }}>{data.panorama.peorDependencia.nombre}</p>
-              <p className="text-sm" style={{ color: '#991B1B' }}>{data.panorama.peorDependencia.vencidos} vencidos</p>
+            <div className="rounded-xl bg-[var(--tema-fondo-ffffff)] p-4" style={{ border: '1px solid var(--tema-borde-fecaca)' }}>
+              <p className="text-[10px] font-bold uppercase tracking-widest" style={{ color: 'var(--tema-texto-991b1b)' }}>Dependencia con más vencidos</p>
+              <p className="text-lg font-black mt-1" style={{ color: 'var(--tema-texto-172033)', fontFamily: 'var(--font-manrope)' }}>{data.panorama.peorDependencia.nombre}</p>
+              <p className="text-sm" style={{ color: 'var(--tema-texto-991b1b)' }}>{data.panorama.peorDependencia.vencidos} vencidos</p>
             </div>
           )}
           {data.panorama.mejorDependencia && (
-            <div className="rounded-xl bg-white p-4" style={{ border: '1px solid #BBF7D0' }}>
-              <p className="text-[10px] font-bold uppercase tracking-widest" style={{ color: '#14532D' }}>Dependencia con mejor cumplimiento</p>
-              <p className="text-lg font-black mt-1" style={{ color: '#1F2933', fontFamily: 'var(--font-manrope)' }}>{data.panorama.mejorDependencia.nombre}</p>
-              <p className="text-sm" style={{ color: '#14532D' }}>{data.panorama.mejorDependencia.cumplimiento}% resueltos</p>
+            <div className="rounded-xl bg-[var(--tema-fondo-ffffff)] p-4" style={{ border: '1px solid var(--tema-borde-bbf7d0)' }}>
+              <p className="text-[10px] font-bold uppercase tracking-widest" style={{ color: 'var(--tema-texto-007049)' }}>Dependencia con mejor cumplimiento</p>
+              <p className="text-lg font-black mt-1" style={{ color: 'var(--tema-texto-172033)', fontFamily: 'var(--font-manrope)' }}>{data.panorama.mejorDependencia.nombre}</p>
+              <p className="text-sm" style={{ color: 'var(--tema-texto-007049)' }}>{data.panorama.mejorDependencia.cumplimiento}% resueltos</p>
             </div>
           )}
         </div>
@@ -241,8 +242,8 @@ function LeyendaItem({ color, titulo, texto }: { color: string; titulo: string; 
     <div className="flex items-start gap-2">
       <span className="w-3 h-3 rounded-sm shrink-0 mt-0.5" style={{ background: color }} />
       <div>
-        <p className="font-bold" style={{ color: '#1F2933' }}>{titulo}</p>
-        <p style={{ color: '#667085' }}>{texto}</p>
+        <p className="font-bold" style={{ color: 'var(--tema-texto-172033)' }}>{titulo}</p>
+        <p style={{ color: 'var(--tema-texto-64748b)' }}>{texto}</p>
       </div>
     </div>
   );
@@ -252,8 +253,8 @@ function LeyendaItem({ color, titulo, texto }: { color: string; titulo: string; 
 
 export function Cargando({ label }: { label: string }) {
   return (
-    <div className="flex items-center justify-center py-12 gap-3" style={{ color: '#94A3B8' }}>
-      <span className="w-5 h-5 border-2 rounded-full animate-spin" style={{ borderColor: '#D9E2D9', borderTopColor: '#14532D' }} />
+    <div role="status" className="flex items-center justify-center py-12 gap-3" style={{ color: 'var(--tema-texto-64748b)' }}>
+      <span className="w-5 h-5 border-2 rounded-full animate-spin" style={{ borderColor: 'var(--tema-borde-dce4ea)', borderTopColor: 'var(--tema-borde-007049)' }} aria-hidden="true" />
       <span className="text-sm">{label}</span>
     </div>
   );
@@ -261,22 +262,23 @@ export function Cargando({ label }: { label: string }) {
 
 export function Aviso({ tipo, mensaje }: { tipo: 'error' | 'info'; mensaje: string }) {
   const palette = tipo === 'error'
-    ? { bg: '#FEF2F2', bd: '#FECACA', fg: '#991B1B' }
-    : { bg: '#EEF4EE', bd: '#D9E2D9', fg: '#14532D' };
+    ? { bg: 'var(--tema-fondo-fef2f2)', bd: 'var(--tema-borde-fecaca)', fg: 'var(--tema-texto-991b1b)' }
+    : { bg: 'var(--tema-fondo-f4f9f6)', bd: 'var(--tema-borde-dce4ea)', fg: 'var(--tema-texto-007049)' };
   return (
-    <div className="rounded-xl p-4 text-sm" style={{ background: palette.bg, border: `1px solid ${palette.bd}`, color: palette.fg }}>
+    <div role={tipo === 'error' ? 'alert' : 'status'} className="rounded-xl p-4 text-sm" style={{ background: palette.bg, border: `1px solid ${palette.bd}`, color: palette.fg }}>
       {mensaje}
     </div>
   );
 }
 
-/** Estado vacío profesional reusable. */
+/**
+ * Estado vacío del módulo. Ola 3 (ADR-0046): delega en `EmptyState` del
+ * sistema de diseño; conserva su API para no tocar los paneles que lo usan.
+ */
 export function EstadoVacio({ titulo, mensaje, accion }: { titulo: string; mensaje: string; accion?: React.ReactNode }) {
   return (
-    <div className="rounded-xl bg-white p-6 text-center" style={{ border: '1px dashed #D9E2D9' }}>
-      <p className="text-sm font-bold" style={{ color: '#14532D' }}>{titulo}</p>
-      <p className="text-xs mt-2" style={{ color: '#667085' }}>{mensaje}</p>
-      {accion && <div className="mt-3 inline-flex">{accion}</div>}
+    <div className="rounded-xl bg-[var(--tema-fondo-ffffff)]">
+      <EmptyState titulo={titulo} descripcion={mensaje} accion={accion} />
     </div>
   );
 }

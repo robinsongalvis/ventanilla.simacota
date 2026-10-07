@@ -14,11 +14,10 @@ import { cleanup, render, screen } from '@testing-library/react';
 import type { VentanillaRadicado } from '@/src/types/ventanilla';
 import { VistaAlertas } from '@/app/interno/dashboard/components/analytics/VistaAlertas';
 
-// `useAnalytics` calcula "vencido"/"días sin movimiento" contra `new Date()`
-// en tiempo real (no acepta una fecha inyectable) — se fija el reloj del
+// Las alertas calculan "vencido"/"días sin movimiento" contra `new Date()`
+// en tiempo real (no aceptan una fecha inyectable) — se fija el reloj del
 // sistema para que el radicado de prueba (radicado hace 5 días, vencido
-// hace 3) caiga siempre dentro de la ventana de período (30 días) y
-// siempre resulte CRÍTICO, sin importar cuándo corra la suite.
+// hace 3) siempre resulte CRÍTICO, sin importar cuándo corra la suite.
 const HOY = new Date('2026-07-11T12:00:00.000Z');
 
 function haceDias(dias: number): string {
@@ -89,7 +88,7 @@ describe('VistaAlertas — enmascaramiento de identidad reservada (H2)', () => {
     render(
       <VistaAlertas
         radicados={[radicadoBase()]}
-        esAdmin={true}
+        alcanceMunicipal={true}
         tenantIdUsuario="SEC_GOBIERNO"
         onVerRadicado={() => {}}
       />,
@@ -102,7 +101,7 @@ describe('VistaAlertas — enmascaramiento de identidad reservada (H2)', () => {
     render(
       <VistaAlertas
         radicados={[reservado]}
-        esAdmin={true}
+        alcanceMunicipal={true}
         tenantIdUsuario="SEC_GOBIERNO"
         onVerRadicado={() => {}}
       />,
@@ -116,7 +115,7 @@ describe('VistaAlertas — enmascaramiento de identidad reservada (H2)', () => {
     render(
       <VistaAlertas
         radicados={[anonimo]}
-        esAdmin={true}
+        alcanceMunicipal={true}
         tenantIdUsuario="SEC_GOBIERNO"
         onVerRadicado={() => {}}
       />,

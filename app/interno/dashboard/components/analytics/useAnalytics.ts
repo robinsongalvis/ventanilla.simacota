@@ -193,6 +193,42 @@ function promedio(arr: number[]): number {
   return Math.round(arr.reduce((s, v) => s + v, 0) / arr.length);
 }
 
+/**
+ * Alertas predictivas: radicados ACTIVOS del alcance, con su nivel y
+ * severidad. Única definición de «alerta» del panel: la usan la vista
+ * Alertas y el contador del menú (`contarAlertasActivas`), así que ambos
+ * cuentan exactamente lo mismo.
+ *
+ * `tenantIdUsuario = 'TODOS'` para los roles de alcance municipal; si no,
+ * solo su dependencia. Crítico = vencido; Urgente = vence en ≤ 2 días
+ * hábiles; Atención = vence en ≤ 5 días hábiles.
+ */
+export function calcularAlertasPredictivas(
+  radicados: VentanillaRadicado[],
+  tenantIdUsuario: TenantId | 'TODOS',
+): AlertaPredictiva[] {
+  const activos = radicados.filter(estaActivo);
+  const activosFiltrados = tenantIdUsuario === 'TODOS'
+    ? activos
+    : activos.filter((r) => r.clasificacion.oficinaDestino === tenantIdUsuario);
+
+  return activosFiltrados
+    .map((r) => {
+      const diasRestantes   = diasRestantesHabiles(r.termino.fechaVencimiento);
+      const sinMov          = diasSinMovimiento(r);
+      const severityScore   = calcSeverityScore(diasRestantes, sinMov, r.prioridad);
+
+      let nivel: AlertaPredictiva['nivel'];
+      if (diasRestantes < 0)          nivel = 'CRITICO';
+      else if (diasRestantes <= 2)    nivel = 'URGENTE';
+      else                            nivel = 'ATENCION';
+
+      return { nivel, radicado: r, diasRestantes, diasSinMovimiento: sinMov, severityScore };
+    })
+    .filter((a) => a.nivel !== 'ATENCION' || a.diasRestantes <= 5)
+    .sort((a, b) => b.severityScore - a.severityScore);
+}
+
 /* ══════════════════════════════════════════════════════════════
    HOOK PRINCIPAL
 ══════════════════════════════════════════════════════════════ */
@@ -303,27 +339,8 @@ export function useAnalytics(
       }))
       .sort((a, b) => b.recibidos - a.recibidos);
 
-    /* ── Alertas predictivas con severityScore ─────────────── */
-    // Filtro por rol: ADMIN ve todo, demás solo su tenantId
-    const activosFiltrados = tenantIdUsuario === 'TODOS'
-      ? activos
-      : activos.filter((r) => r.clasificacion.oficinaDestino === tenantIdUsuario);
-
-    const alertas: AlertaPredictiva[] = activosFiltrados
-      .map((r) => {
-        const diasRestantes   = diasRestantesHabiles(r.termino.fechaVencimiento);
-        const sinMov          = diasSinMovimiento(r);
-        const severityScore   = calcSeverityScore(diasRestantes, sinMov, r.prioridad);
-
-        let nivel: AlertaPredictiva['nivel'];
-        if (diasRestantes < 0)          nivel = 'CRITICO';
-        else if (diasRestantes <= 2)    nivel = 'URGENTE';
-        else                            nivel = 'ATENCION';
-
-        return { nivel, radicado: r, diasRestantes, diasSinMovimiento: sinMov, severityScore };
-      })
-      .filter((a) => a.nivel !== 'ATENCION' || a.diasRestantes <= 5)
-      .sort((a, b) => b.severityScore - a.severityScore);
+    /* ── Alertas predictivas (misma definición que la vista Alertas) ── */
+    const alertas = calcularAlertasPredictivas(radicados, tenantIdUsuario);
 
     /* ── Tipos de solicitud frecuentes ────────────────────── */
     const conteoTipo: Record<string, number> = {};

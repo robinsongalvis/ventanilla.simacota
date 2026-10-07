@@ -37,6 +37,11 @@ vi.mock('@/lib/server/internal-auth', () => {
 });
 
 const logErrorSpy = vi.fn();
+// Contrato previo fuera de contingencia. El modo activo rechaza todo archivo.
+vi.mock('@/lib/recepcion/contingencia-storage', async (importOriginal) => ({
+  ...await importOriginal<typeof import('@/lib/recepcion/contingencia-storage')>(),
+  CONTINGENCIA_STORAGE_ACTIVA: false,
+}));
 vi.mock('@/lib/logger', () => ({ logError: (args: unknown) => logErrorSpy(args) }));
 
 const YEAR = new Date().getFullYear();

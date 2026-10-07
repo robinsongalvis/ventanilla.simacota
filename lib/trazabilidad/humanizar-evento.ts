@@ -94,6 +94,12 @@ function humanizar(e: TrazabilidadRadicado): Omit<EventoHumano, 'correos'> {
     case 'RADICACION':
       return { ...base, titulo: 'Radicado en la Ventanilla Única', detalle: nota, tono: 'VERDE' };
 
+    case 'ADJUNTOS_PENDIENTES_STORAGE':
+      return { ...base, titulo: 'Soportes bajo custodia, pendientes de digitalización', detalle: nota, tono: 'AMBAR' };
+
+    case 'ADJUNTOS_REGULARIZADOS_STORAGE':
+      return { ...base, titulo: 'Soportes digitalizados y verificados', detalle: nota, tono: 'VERDE' };
+
     case 'ASIGNACION':
     case 'TRASLADO': {
       const meta = e.metadata ?? {};

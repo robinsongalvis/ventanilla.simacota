@@ -35,10 +35,10 @@ const LABEL_ESTADO: Record<string, string> = {
 };
 
 const COLOR_URGENCIA: Record<UrgenciaAccion, { bg: string; text: string; border: string }> = {
-  critica: { bg: '#FEF2F2', text: '#B91C1C', border: '#FECACA' },
-  alta:    { bg: '#FEF3C7', text: '#92400E', border: '#FBBF24' },
-  media:   { bg: '#EEF4EE', text: '#14532D', border: '#D9E2D9' },
-  ninguna: { bg: '#F8FAF7', text: '#667085', border: '#E5E7EB' },
+  critica: { bg: 'var(--tema-fondo-fef2f2)', text: 'var(--tema-texto-b91c1c)', border: 'var(--tema-borde-fecaca)' },
+  alta:    { bg: 'var(--tema-fondo-fef3c7)', text: 'var(--tema-texto-92400e)', border: 'var(--tema-borde-fbbf24)' },
+  media:   { bg: 'var(--tema-fondo-f4f9f6)', text: 'var(--tema-texto-007049)', border: 'var(--tema-borde-dce4ea)' },
+  ninguna: { bg: 'var(--tema-fondo-f7f9fb)', text: 'var(--text-secondary)', border: 'var(--tema-borde-e5e7eb)' },
 };
 
 export interface ResumenEjecutivoRadicadoProps {
@@ -69,30 +69,47 @@ export function ResumenEjecutivoRadicado({
 
   return (
     <section
-      className="rounded-xl bg-white p-4 space-y-3"
-      style={{ border: '1px solid #D9E2D9' }}
+      className="rounded-xl bg-[var(--tema-fondo-ffffff)] p-4 space-y-3"
+      style={{ border: '1px solid var(--tema-borde-dce4ea)' }}
       aria-label="Resumen ejecutivo del radicado"
     >
       {/* Título + estado + semáforo */}
       <div className="flex items-start justify-between gap-3">
         <div className="min-w-0">
-          <p className="text-[10px] font-bold uppercase tracking-widest" style={{ color: '#14532D' }}>
+          <p className="text-[10px] font-bold uppercase tracking-widest" style={{ color: 'var(--tema-texto-007049)' }}>
             Resumen ejecutivo
           </p>
-          <p className="mt-0.5 font-mono text-sm font-bold truncate" style={{ color: '#1F2933' }}>
+          <p className="mt-0.5 font-mono text-sm font-bold truncate" style={{ color: 'var(--tema-texto-172033)' }}>
             {radicado.radicadoId}
           </p>
         </div>
         <div className="shrink-0 flex flex-col items-end gap-1">
           <span
             className="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wide border"
-            style={{ background: '#F8FAF7', color: '#1F2933', borderColor: '#D9E2D9' }}
+            style={{ background: 'var(--tema-fondo-f7f9fb)', color: 'var(--tema-texto-172033)', borderColor: 'var(--tema-borde-dce4ea)' }}
           >
             {LABEL_ESTADO[radicado.estadoActual] ?? radicado.estadoActual}
           </span>
           <span className={`text-[11px] tabular-nums ${semaforo.textoClass}`}>{semaforo.label}</span>
         </div>
       </div>
+
+      {radicado.gestionAdjuntos?.estado === 'PENDIENTE_STORAGE' && (
+        <div role="status" className="space-y-1 rounded-lg border border-amber-300 bg-amber-50 p-3 text-xs text-amber-950">
+          <p className="font-bold">Pendiente de adjunto / Storage no disponible</p>
+          <p>Soportes pendientes de digitalización: {radicado.gestionAdjuntos.soportesPendientes.cantidad}.</p>
+          <p className="whitespace-pre-wrap">Inventario: {radicado.gestionAdjuntos.soportesPendientes.descripcion}</p>
+          <p>Custodia: {radicado.gestionAdjuntos.soportesPendientes.custodiaTipo === 'FISICA_EN_VENTANILLA' ? 'Física en ventanilla' : 'Correo institucional'}.</p>
+          <p className="break-words">Referencia: {radicado.gestionAdjuntos.soportesPendientes.custodiaReferencia}</p>
+          <p>Registró la custodia: {radicado.gestionAdjuntos.registradoPor.nombre}.</p>
+          <p>No hay carga digital acreditada. Conserve los originales hasta completar la regularización autenticada y verificada cuando Storage vuelva a estar operativo.</p>
+        </div>
+      )}
+      {radicado.gestionAdjuntos?.estado === 'COMPLETO' && (
+        <p className="rounded-lg border border-green-200 bg-green-50 p-2 text-xs text-green-950">
+          Soportes digitalizados: carga verificada y regularización registrada.
+        </p>
+      )}
 
       {/* Grid de datos claves — 2 columnas */}
       <div className="grid grid-cols-2 gap-x-4 gap-y-2 text-xs">
@@ -108,51 +125,51 @@ export function ResumenEjecutivoRadicado({
       <div className="flex flex-wrap gap-1.5">
         <Chip
           text={`${anexosCount} ${anexosCount === 1 ? 'anexo' : 'anexos'}`}
-          bg="#EEF4EE" color="#14532D" border="#D9E2D9"
+          bg="var(--tema-fondo-f4f9f6)" color="var(--tema-texto-007049)" border="var(--tema-borde-dce4ea)"
         />
         {selladosCount > 0 && (
           <Chip
             text={`${selladosCount} sellado${selladosCount === 1 ? '' : 's'}`}
-            bg="#F0FDF4" color="#166534" border="#BBF7D0"
+            bg="var(--tema-fondo-f0fdf4)" color="var(--tema-texto-006b45)" border="var(--tema-borde-bbf7d0)"
           />
         )}
         {tieneRespuesta && (
           <Chip
             text="Respuesta oficial"
-            bg="#EFF6FF" color="#1D4ED8" border="#BFDBFE"
+            bg="var(--tema-fondo-eff6ff)" color="var(--tema-texto-1d4ed8)" border="var(--tema-borde-bfdbfe)"
           />
         )}
         {radicado.alertaNotificacionFallida === true && (
           <Chip
             text="Correo institucional falló"
-            bg="#FEF2F2" color="#B91C1C" border="#FECACA"
+            bg="var(--tema-fondo-fef2f2)" color="var(--tema-texto-b91c1c)" border="var(--tema-borde-fecaca)"
           />
         )}
         {datosIncompletos && (
           <Chip
             text="Datos incompletos"
-            bg="#FEF3C7" color="#92400E" border="#FBBF24"
+            bg="var(--tema-fondo-fef3c7)" color="var(--tema-texto-92400e)" border="var(--tema-borde-fbbf24)"
           />
         )}
       </div>
 
       {/* Última actuación + próxima acción */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 pt-1" style={{ borderTop: '1px dashed #D9E2D9' }}>
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 pt-1" style={{ borderTop: '1px dashed var(--tema-borde-dce4ea)' }}>
         <div className="pt-2">
-          <p className="text-[10px] font-bold uppercase tracking-widest" style={{ color: '#667085' }}>
+          <p className="text-[10px] font-bold uppercase tracking-widest" style={{ color: 'var(--text-secondary)' }}>
             Última actuación
           </p>
           {ultima ? (
-            <p className="mt-0.5 text-xs" style={{ color: '#1F2933' }}>
+            <p className="mt-0.5 text-xs" style={{ color: 'var(--tema-texto-172033)' }}>
               <span className="font-semibold">{ultima.label}</span>
-              <span className="ml-1.5 text-[11px]" style={{ color: '#94A3B8' }}>· {ultima.fechaRelativa}</span>
+              <span className="ml-1.5 text-[11px]" style={{ color: 'var(--text-secondary)' }}>· {ultima.fechaRelativa}</span>
             </p>
           ) : (
-            <p className="mt-0.5 text-xs" style={{ color: '#94A3B8' }}>—</p>
+            <p className="mt-0.5 text-xs" style={{ color: 'var(--text-secondary)' }}>—</p>
           )}
         </div>
         <div className="pt-2">
-          <p className="text-[10px] font-bold uppercase tracking-widest" style={{ color: '#667085' }}>
+          <p className="text-[10px] font-bold uppercase tracking-widest" style={{ color: 'var(--text-secondary)' }}>
             Próxima acción
           </p>
           <div
@@ -187,12 +204,12 @@ function ResumenFila({
 }) {
   return (
     <div>
-      <p className="text-[10px] font-bold uppercase tracking-widest" style={{ color: '#94A3B8' }}>
+      <p className="text-[10px] font-bold uppercase tracking-widest" style={{ color: 'var(--text-secondary)' }}>
         {label}
       </p>
       <p
         className="mt-0.5 truncate"
-        style={{ color: muted ? '#94A3B8' : '#1F2933', fontStyle: muted ? 'italic' : 'normal' }}
+        style={{ color: muted ? 'var(--text-secondary)' : 'var(--tema-texto-172033)', fontStyle: muted ? 'italic' : 'normal' }}
         title={value}
       >
         {value}

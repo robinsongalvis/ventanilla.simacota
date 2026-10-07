@@ -37,10 +37,9 @@
    Bloque C: el botón "Exportar libro consecutivo ↓" del pie YA NO es
    `BotonAccionPlaceholder` — el Libro Consecutivo real existe
    (`LibroConsecutivoClient`, con su propio export CSV). Este botón solo
-   LLEVA hasta esa pantalla (misma decisión que `onAbrirExpediente`): en
-   ruta standalone es un `<Link>` a `/interno/licencias/libro-consecutivo`;
-   embebido en `VistaLicencias` (Bloque B), `onIrALibroConsecutivo` cambia
-   de sub-pestaña local sin navegar.
+   LLEVA hasta esa pantalla (misma decisión que `onAbrirExpediente`): en el
+   panel, `onIrALibroConsecutivo` cambia de pestaña; sin él es un `<Link>` a
+   la dirección canónica del libro (`rutas-licencias.ts`, ADR-0046 §7).
 ══════════════════════════════════════════════════════════════ */
 
 import { useCallback, useEffect, useMemo, useState } from 'react';
@@ -59,11 +58,15 @@ import {
 import { ChipEstadoJuridico } from './ChipEstadoJuridico';
 import { ChipPrueba } from './ChipPrueba';
 import { NumeroLegal } from './NumeroLegal';
-import { TarjetaKPI } from './TarjetaKPI';
+import { CheckCircle2, FileWarning, FolderOpen } from 'lucide-react';
+import { FilaTarjetas, TarjetaIndicador } from '@/app/components/design-system/TarjetaIndicador';
+import { BotonAccion } from '@/app/components/design-system/BotonAccion';
 import { PanelVigilanciaTermino } from './PanelVigilanciaTermino';
 import { RadicarSolicitudModal } from './RadicarSolicitudModal';
 import { CrearDesdeRadicadoModal } from './CrearDesdeRadicadoModal';
 import { BuscadorRapidoLibro } from './BuscadorRapidoLibro';
+import { urlLicencias } from '../rutas-licencias';
+import { SectionHeader } from '@/app/components/design-system/SectionHeader';
 
 const ID_TABLA_BANDEJA_LICENCIAS = 'tabla-bandeja-licencias';
 
@@ -92,18 +95,16 @@ export interface BandejaLicenciasClientProps {
    * de `VistaLicencias` (`app/interno/dashboard/components/licencias/
    * VistaLicencias.tsx`, `VistaActual === 'LICENCIAS'`), abrir un
    * expediente es un cambio de estado local del panel, no una navegación
-   * de ruta. Si se recibe, las filas/enlaces a un expediente llaman esto
-   * EN VEZ de `<Link href="/interno/licencias/{id}">`. Sin esta prop
-   * (ruta standalone `/interno/licencias`, deep-links) el comportamiento
-   * es exactamente el de antes: `<Link>`.
+   * de ruta. Si se recibe, las filas/enlaces a un expediente llaman esto.
+   * Sin esta prop son un `<Link>` a la dirección canónica del expediente
+   * (`urlLicencias`, ADR-0046 §7).
    */
   onAbrirExpediente?: (expedienteId: string) => void;
   /**
    * Bloque C — mismo principio que `onAbrirExpediente`: si se recibe, el
    * botón "Exportar libro consecutivo ↓" del pie cambia de sub-pestaña
    * LOCAL en `VistaLicencias` en vez de navegar de ruta. Sin esta prop
-   * (ruta standalone), navega con `<Link>` a `/interno/licencias/
-   * libro-consecutivo`.
+   * navega con `<Link>` a la dirección canónica del libro.
    */
   onIrALibroConsecutivo?: () => void;
 }
@@ -134,7 +135,7 @@ function EnlaceExpediente({
     );
   }
   return (
-    <Link href={`/interno/licencias/${id}`} className={className}>
+    <Link href={urlLicencias({ expedienteId: id })} className={className}>
       {children}
     </Link>
   );
@@ -216,42 +217,30 @@ export function BandejaLicenciasClient({ onAbrirExpediente, onIrALibroConsecutiv
   }, [expedientes, busqueda, terminoBusqueda]);
 
   return (
-    <div className="p-4 md:p-6 flex flex-col gap-5 max-w-[1400px] mx-auto">
-      {/* ── Encabezado ── */}
-      <div className="flex flex-col md:flex-row md:items-end md:justify-between gap-4">
-        <div>
-          <p className="text-[10.5px] font-bold uppercase tracking-widest" style={{ color: 'var(--text-secondary)' }}>
-            Secretaría de Planeación · Licencias Urbanísticas
-          </p>
-          <h1 className="font-headline text-2xl md:text-[28px] mt-1" style={{ color: 'var(--text-primary)' }}>
-            Bandeja de Licencias
-          </h1>
-          <p className="text-sm mt-1" style={{ color: 'var(--text-secondary)' }}>
-            Estado jurídico del ciclo (D.1077/2015) · el término legal (45 días hábiles) se proyecta en el detalle de cada expediente.
-          </p>
-        </div>
-        <div className="shrink-0 flex flex-wrap items-center justify-end gap-2">
-          <button
-            type="button"
-            onClick={() => setModalDesdeRadicadoAbierto(true)}
-            className="inline-flex items-center gap-2 rounded-[10px] px-4 py-2.5 text-sm font-bold transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-1 hover:brightness-95 active:scale-[0.98]"
-            style={{ background: 'transparent', color: '#14532D', border: '1px solid #14532D' }}
-          >
-            Crear desde radicado
-          </button>
-          <button
-            type="button"
-            onClick={() => setModalAbierto(true)}
-            className="inline-flex items-center gap-2 rounded-[10px] px-4 py-2.5 text-sm font-bold transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-1 hover:brightness-95 active:scale-[0.98]"
-            style={{ background: '#D4A017', color: '#14532D', boxShadow: '0 2px 8px rgba(212,160,23,0.25)' }}
-          >
-            Recibir solicitud →
-          </button>
-        </div>
-      </div>
+    <>
+      {/* ── Encabezado: el subencabezado del panel (armazón único, ADR-0046
+          §7). El título de pantalla («Licencias») ya está en el encabezado
+          común. «Recibir solicitud» es la recepción del ciudadano en
+          Planeación: superficie dorada, como «Nueva radicación». ── */}
+      <SectionHeader
+        titulo="Bandeja de Licencias"
+        subtitulo="Secretaría de Planeación · Licencias Urbanísticas"
+        nota="Estado jurídico del ciclo (D.1077/2015) · el término legal (45 días hábiles) se proyecta en el detalle de cada expediente."
+        acciones={
+          <>
+            <BotonAccion onClick={() => setModalDesdeRadicadoAbierto(true)}>
+              Crear desde radicado
+            </BotonAccion>
+            <BotonAccion variante="destacada" onClick={() => setModalAbierto(true)}>
+              Recibir solicitud →
+            </BotonAccion>
+          </>
+        }
+      />
+    <div className="px-4 pb-6 lg:px-6 flex flex-col gap-5">
 
       {error && (
-        <p role="alert" className="rounded-lg px-3 py-2 text-sm" style={{ background: '#FEF2F2', border: '1px solid #FECACA', color: '#991B1B' }}>
+        <p role="alert" className="rounded-lg px-3 py-2 text-sm" style={{ background: 'var(--tema-fondo-fef2f2)', border: '1px solid var(--tema-borde-fecaca)', color: 'var(--tema-texto-991b1b)' }}>
           {error}
         </p>
       )}
@@ -259,42 +248,52 @@ export function BandejaLicenciasClient({ onAbrirExpediente, onIrALibroConsecutiv
       {/* ── Vigía del término: el agregado del cron, no un cálculo de pantalla ── */}
       <PanelVigilanciaTermino />
 
-      {/* ── KPIs ── */}
-      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-        <TarjetaKPI
-          overline="Con acta de observaciones"
+      {/* ── KPIs: tarjetas de la referencia visual (Ola 3). Mismos baldes y
+          conteos; «Con acta» sigue en ámbar (pide atención sin afirmar una
+          urgencia que el sistema no puede verificar) y conserva el enlace
+          al que espera respuesta hace más tiempo. ── */}
+      <FilaTarjetas etiqueta="Resumen de la bandeja de licencias">
+        <TarjetaIndicador
+          etiqueta="Con acta de observaciones"
           valor={kpis.conActa.length}
-          tono="advertencia"
-          detalle={
-            kpis.esperandoHaceMas ? (
-              <div className="flex flex-col gap-0.5">
-                <EnlaceExpediente
-                  id={kpis.esperandoHaceMas.id}
-                  onAbrirExpediente={onAbrirExpediente}
-                  className="focus-visible:outline-none focus-visible:ring-2 rounded w-fit"
-                >
-                  <NumeroLegal value={kpis.esperandoHaceMas.numeroExpediente?.numero ?? kpis.esperandoHaceMas.id} variant="expediente" size="sm" />
-                </EnlaceExpediente>
-                <span>esperando respuesta hace más tiempo</span>
-              </div>
-            ) : (
-              'Ninguno esperando respuesta'
-            )
+          tono="ambar"
+          Icono={FileWarning}
+          pie={
+            <span className="mt-1 flex flex-col gap-0.5 text-[10px] leading-tight" style={{ color: 'var(--tema-texto-475569)' }}>
+              {kpis.esperandoHaceMas ? (
+                <>
+                  <EnlaceExpediente
+                    id={kpis.esperandoHaceMas.id}
+                    onAbrirExpediente={onAbrirExpediente}
+                    className="focus-visible:outline-none focus-visible:ring-2 rounded w-fit"
+                  >
+                    <NumeroLegal value={kpis.esperandoHaceMas.numeroExpediente?.numero ?? kpis.esperandoHaceMas.id} variant="expediente" size="sm" />
+                  </EnlaceExpediente>
+                  <span>esperando respuesta hace más tiempo</span>
+                </>
+              ) : (
+                'Ninguno esperando respuesta'
+              )}
+            </span>
           }
         />
-        <TarjetaKPI
-          overline="En trámite"
+        <TarjetaIndicador
+          etiqueta="En trámite"
           valor={kpis.enTramite.length}
-          tono="normal"
-          detalle={<span>Solicitudes abiertas: presentadas, radicadas, en revisión o en viabilidad — sin acta pendiente</span>}
+          tono="azul"
+          Icono={FolderOpen}
+          descripcion="Solicitudes abiertas: presentadas, radicadas, en revisión o en viabilidad — sin acta pendiente"
+          descripcionVisible
         />
-        <TarjetaKPI
-          overline="Resueltos"
+        <TarjetaIndicador
+          etiqueta="Resueltos"
           valor={kpis.resueltos.length}
-          tono="exito"
-          detalle={<span>Concedidos, negados, desistidos, notificados o en firme</span>}
+          tono="verde"
+          Icono={CheckCircle2}
+          descripcion="Concedidos, negados, desistidos, notificados o en firme"
+          descripcionVisible
         />
-      </div>
+      </FilaTarjetas>
 
       {/* ── Buscador rápido ── */}
       <BuscadorRapidoLibro
@@ -343,7 +342,7 @@ export function BandejaLicenciasClient({ onAbrirExpediente, onIrALibroConsecutiv
                       type="button"
                       onClick={() => setModalAbierto(true)}
                       className="mt-3 inline-flex items-center gap-2 rounded-[10px] px-4 py-2 text-sm font-bold focus-visible:outline-none focus-visible:ring-2"
-                      style={{ background: '#D4A017', color: '#14532D' }}
+                      style={{ background: '#E5A31A', color: '#03402A' }}
                     >
                       Recibir solicitud →
                     </button>
@@ -359,7 +358,7 @@ export function BandejaLicenciasClient({ onAbrirExpediente, onIrALibroConsecutiv
                         type="button"
                         onClick={() => setBusqueda('')}
                         className="text-xs font-bold underline focus-visible:outline-none focus-visible:ring-2 rounded"
-                        style={{ color: 'var(--color-primary)' }}
+                        style={{ color: 'var(--tema-texto-007049)' }}
                       >
                         Limpiar búsqueda
                       </button>
@@ -394,7 +393,8 @@ export function BandejaLicenciasClient({ onAbrirExpediente, onIrALibroConsecutiv
                           <span
                             key={codigo}
                             className="text-[11px] font-semibold px-2 py-0.5 rounded-full"
-                            style={{ background: 'var(--bg-surface-2)', color: 'var(--text-secondary)' }}
+                            /* #475569: el gris secundario sobre la superficie tintada quedaba en 4,47:1. */
+                            style={{ background: 'var(--bg-surface-2)', color: 'var(--tema-texto-475569)' }}
                           >
                             {nombreSubtipo(codigo)}
                           </span>
@@ -435,6 +435,7 @@ export function BandejaLicenciasClient({ onAbrirExpediente, onIrALibroConsecutiv
         <CrearDesdeRadicadoModal onCerrar={() => setModalDesdeRadicadoAbierto(false)} onCreado={() => void cargar()} />
       )}
     </div>
+    </>
   );
 }
 
@@ -551,7 +552,7 @@ function BotonIrALibroConsecutivo({ onIrALibroConsecutivo }: { onIrALibroConsecu
     );
   }
   return (
-    <Link href="/interno/licencias/libro-consecutivo" className={claseBase} style={estiloOutline}>
+    <Link href={urlLicencias({ seccion: 'LIBRO_CONSECUTIVO' })} className={claseBase} style={estiloOutline}>
       Exportar libro consecutivo ↓
     </Link>
   );

@@ -7,9 +7,8 @@
  */
 
 import { NextResponse }          from 'next/server';
-import { cookies }               from 'next/headers';
-import { SESSION_COOKIE_NAME }   from '@/lib/auth-cookie';
-import { getFirebaseAdminAuth, getFirebaseAdminDb } from '@/lib/firebase-admin';
+import { getFirebaseAdminDb } from '@/lib/firebase-admin';
+import { autenticarUsuarioInterno } from '@/lib/server/internal-auth-http';
 import { updateApprovalFlow }         from '@/lib/simi-juridico/createApprovalFlow';
 import { notificarCambioAprobacion }  from '@/lib/simi-juridico/createNotification';
 import {
@@ -21,7 +20,6 @@ import { validateReadyToSend }       from '@/lib/simi-juridico/validateReadyToSe
 import type { ApprovalStatus }   from '@/src/types/simi-approval';
 import type { ApprovalFlow }     from '@/src/types/simi-approval';
 import type { RolInterno }       from '@/lib/hooks/useAuth';
-import type { TenantId }         from '@/src/types/radicado';
 
 export const runtime = 'nodejs';
 
@@ -37,28 +35,15 @@ const ESTADO_POR_ACCION: Record<Accion, ApprovalStatus> = {
 /** Roles que pueden aprobar borradores */
 const PUEDE_APROBAR = new Set<RolInterno>(['ADMIN', 'JEFE_DEPENDENCIA']);
 
-async function verificarSesion() {
-  const cookieStore = await cookies();
-  const sc = cookieStore.get(SESSION_COOKIE_NAME)?.value;
-  if (!sc) return null;
-  try {
-    const decoded = await getFirebaseAdminAuth().verifySessionCookie(sc, true);
-    const snap = await getFirebaseAdminDb().doc(`users/${decoded.uid}`).get();
-    if (!snap.exists) return null;
-    const d = snap.data()!;
-    if (d.activo === false || d.archivado === true) return null;
-    return { uid: decoded.uid, nombre: d.nombre as string ?? '', rol: d.rol as RolInterno, tenantId: d.tenantId as TenantId };
-  } catch { return null; }
-}
-
 export async function PATCH(
   request: Request,
   { params }: { params: Promise<{ id: string }> },
 ): Promise<NextResponse> {
   const { id } = await params;
 
-  const usuario = await verificarSesion();
-  if (!usuario) return NextResponse.json({ error: 'No autorizado.' }, { status: 401 });
+  const autenticacion = await autenticarUsuarioInterno();
+  if (!autenticacion.ok) return autenticacion.respuesta;
+  const usuario = autenticacion.usuario;
   if (!PUEDE_APROBAR.has(usuario.rol)) {
     return NextResponse.json({ error: 'Su rol no tiene permiso para gestionar aprobaciones.' }, { status: 403 });
   }

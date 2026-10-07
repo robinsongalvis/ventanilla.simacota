@@ -71,7 +71,21 @@ export function useSalidas(activo: boolean): UseSalidasReturn {
     const unsubscribe = onSnapshot(
       q,
       (snap) => {
-        setSalidas(snap.docs.map((d) => d.data() as SalidaOficial));
+        /* Se excluyen los ENSAYOS, igual que hace `useVentanillaRadicados` con
+           los radicados. Hasta el 29-sep-2026 este hook no lo hacía, y el
+           desajuste tenía consecuencias visibles: una salida de prueba marcada
+           seguía figurando en el libro, y su enlace apuntaba a un radicado que
+           sí estaba oculto —la funcionaria pulsaba y recibía «no fue posible
+           abrir el radicado» sin explicación posible.
+
+           Marcar un dato como prueba solo sirve si TODAS las vistas leen la
+           marca; una sola que no la lea deja el libro oficial de
+           correspondencia despachada mostrando envíos que nunca existieron. */
+        setSalidas(
+          snap.docs
+            .map((d) => d.data() as SalidaOficial & { isTest?: boolean; excludeFromMetrics?: boolean })
+            .filter((s) => !s.isTest && !s.excludeFromMetrics),
+        );
         setCargando(false);
       },
       () => {

@@ -7,14 +7,14 @@ import type { EstadoLicenciaUI } from './tipos';
  * DECISIÓN DE MAPEO DE TOKENS (ver respuesta de la tarea): en vez de crear
  * una paleta rose/amber/emerald nueva en `app/globals.css`, este módulo
  * REUTILIZA los matices semánticos que YA existen en el sistema de diseño:
- *  - EN_TERMINO  → verde institucional (`VERDE_INST` = '#14532D', el mismo
+ *  - EN_TERMINO  → verde institucional (`VERDE_INST` = '#007049', el mismo
  *    que usa `construirTarjetasMIPG` en el dashboard para su fila "En
  *    término" — misma semántica, mismo color).
  *  - POR_VENCER / VENCIDO → los mismos pares riel/chipBg/chipTexto que
  *    `lib/kpis-mipg/tokens-estado-kpi.ts` ya define para 'POR_VENCER' y
  *    'VENCIDAS' (copiados literalmente, no reinventados).
  *  - ASIGNADO → dorado institucional (`--color-accent` / `--color-inst-gold`
- *    '#D4A017', fondo `--color-accent-soft` '#F5E8B7', ambos YA definidos en
+ *    '#E5A31A', fondo `--color-accent-soft` '#FBEFD2', ambos YA definidos en
  *    `app/globals.css`).
  *  - TERMINADO → gris neutro, mismo trío que 'RADICADAS' en
  *    `tokens-estado-kpi.ts` (un estado "sin urgencia", no un color nuevo).
@@ -37,9 +37,9 @@ export interface EstiloChipEstado {
 
 export const ESTILOS_CHIP_ESTADO: Record<EstadoLicenciaUI, EstiloChipEstado> = {
   EN_TERMINO: {
-    dot: '#14532D',
-    texto: '#14532D',
-    fondo: '#EEF4EE',
+    dot: '#007049',
+    texto: '#007049',
+    fondo: '#F4F9F6',
     label: 'En término',
   },
   POR_VENCER: {
@@ -49,15 +49,15 @@ export const ESTILOS_CHIP_ESTADO: Record<EstadoLicenciaUI, EstiloChipEstado> = {
     label: 'Por vencer',
   },
   VENCIDO: {
-    dot: '#DC2626',
+    dot: '#D81E1E',
     texto: '#911111',
     fondo: '#FCEBEB',
     label: 'Vencido',
   },
   ASIGNADO: {
-    dot: '#D4A017',
+    dot: '#E5A31A',
     texto: '#7D5A12',
-    fondo: '#F5E8B7',
+    fondo: '#FBEFD2',
     label: 'Asignado',
   },
   TERMINADO: {

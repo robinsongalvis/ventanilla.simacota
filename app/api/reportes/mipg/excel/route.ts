@@ -1,8 +1,5 @@
 import { NextResponse } from 'next/server';
-import {
-  InternalAuthError,
-  requireActiveInternalUser,
-} from '@/lib/server/internal-auth';
+import { autenticarUsuarioInterno } from '@/lib/server/internal-auth-http';
 import { getFirebaseAdminDb } from '@/lib/firebase-admin';
 import { generarReporteExcelMipg, type SimiAuditoriaRecord, type SimiFeedbackRecord } from '@/lib/reportes-mipg/excel';
 import { radicadosVisiblesParaRol } from '@/lib/reportes-mipg/sanitizar';
@@ -30,15 +27,9 @@ export const runtime = 'nodejs';
 ══════════════════════════════════════════════════════════════ */
 
 export async function POST(request: Request): Promise<NextResponse> {
-  let usuario;
-  try {
-    usuario = await requireActiveInternalUser();
-  } catch (err) {
-    if (err instanceof InternalAuthError) {
-      return NextResponse.json({ error: err.message }, { status: err.status });
-    }
-    return NextResponse.json({ error: 'No autorizado.' }, { status: 401 });
-  }
+  const autenticacion = await autenticarUsuarioInterno();
+  if (!autenticacion.ok) return autenticacion.respuesta;
+  const usuario = autenticacion.usuario;
 
   // Sprint 2: el body puede contener `filtros` para exportar resultados de la
   // búsqueda histórica. Se ignora silenciosamente si el cuerpo está vacío.

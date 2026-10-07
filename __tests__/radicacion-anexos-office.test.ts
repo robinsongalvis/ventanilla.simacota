@@ -22,6 +22,9 @@
  */
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 
+// Allowlist fuera de contingencia; en contingencia se rechaza antes del parser.
+vi.mock('@/lib/recepcion/contingencia-storage', () => ({ CONTINGENCIA_STORAGE_ACTIVA: false }));
+
 const YEAR = new Date().getFullYear();
 const COUNTER = `counters/radicados-${YEAR}`;
 

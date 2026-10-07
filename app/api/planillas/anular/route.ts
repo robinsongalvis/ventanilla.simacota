@@ -9,6 +9,7 @@ import { removeUndefinedDeep } from '@/lib/firestore/removeUndefined';
 import { anularPlanilla } from '@/lib/planillas/entregas';
 import type { PlanillaReparto } from '@/src/types/planilla';
 import { logError } from '@/lib/logger';
+import { assertPlanillaOperativa } from '@/lib/server/planillas-security';
 
 /* ══════════════════════════════════════════════════════════════
    Planilla de reparto — POST /api/planillas/anular
@@ -44,8 +45,10 @@ export async function POST(request: Request): Promise<NextResponse> {
       return NextResponse.json({ error: 'La planilla no existe.' }, { status: 404 });
     }
 
+    const planilla = snap.data() as PlanillaReparto;
+    await assertPlanillaOperativa(db, planilla);
     const anulada = anularPlanilla(
-      snap.data() as PlanillaReparto,
+      planilla,
       motivo,
       new Date(),
       { uid: usuario.uid, nombre: usuario.nombre },

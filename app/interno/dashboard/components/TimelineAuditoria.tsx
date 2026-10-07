@@ -77,7 +77,7 @@ export function TimelineAuditoria({ entradas }: Props) {
 
   if (ordenadas.length === 0) {
     return (
-      <p className="text-sm text-slate-600 italic">Sin entradas de auditoría.</p>
+      <p className="text-sm text-slate-600 oscuro:text-slate-400 italic">Sin entradas de auditoría.</p>
     );
   }
 
@@ -121,21 +121,21 @@ export function TimelineAuditoria({ entradas }: Props) {
                 <span className="text-sm font-semibold text-slate-200">{label}</span>
                 <time
                   dateTime={entrada.fecha}
-                  className="shrink-0 text-xs text-slate-500 font-mono tabular-nums"
+                  className="shrink-0 text-xs text-slate-500 oscuro:text-slate-400 font-mono tabular-nums"
                 >
                   {formatearFechaHora(entrada.fecha)}
                 </time>
               </div>
 
               <p className="text-sm text-slate-400 leading-relaxed">
-                <span className="text-slate-500">{entrada.actor}</span>
+                <span className="text-slate-500 oscuro:text-slate-400">{entrada.actor}</span>
                 {' — '}
                 {entrada.nota}
               </p>
 
               {/* State transition metadata */}
               {meta?.estadoAnterior && meta?.estadoNuevo && (
-                <p className="mt-1 text-xs text-slate-600 font-mono">
+                <p className="mt-1 text-xs text-slate-600 oscuro:text-slate-400 font-mono">
                   {meta.estadoAnterior} → {meta.estadoNuevo}
                 </p>
               )}
@@ -147,13 +147,13 @@ export function TimelineAuditoria({ entradas }: Props) {
                 // Backwards-compat: eventos viejos guardaban solo el nombre como string.
                 if (typeof adj === 'string') {
                   return (
-                    <p className="mt-1 text-xs text-slate-600">
+                    <p className="mt-1 text-xs text-slate-600 oscuro:text-slate-400">
                       Oficio anexado: <span className="font-mono">{adj}</span>
                     </p>
                   );
                 }
                 return (
-                  <p className="mt-1 text-xs text-slate-600 inline-flex items-center gap-2">
+                  <p className="mt-1 text-xs text-slate-600 oscuro:text-slate-400 inline-flex items-center gap-2">
                     Oficio anexado: <span className="font-mono">{adj.nombre}</span>
                     <a
                       href={`/api/interno/archivo?path=${encodeURIComponent(adj.path)}`}

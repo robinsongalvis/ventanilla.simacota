@@ -4,6 +4,12 @@ import type {
   Transaction,
 } from 'firebase-admin/firestore';
 import type { OrigenActuacion } from '@/lib/motor-expedientes/tipos';
+import { periodoColombia } from '@/lib/fecha-colombia';
+import {
+  auditoriaCoincideConApertura,
+  leerAperturaUnicaRadicados,
+  type AperturaUnicaRadicados,
+} from '@/lib/server/apertura-series';
 
 /**
  * Helper transaccional de consecutivos legales — Bloque 2, corrección de H3.
@@ -133,6 +139,15 @@ export interface SolicitudSerie {
    * Convierte un duplicado silencioso en un fallo ruidoso — fail-closed.
    */
   exigeAperturaExplicita?: boolean;
+  /** Contingencia: apertura formal requerida; no permite emitir antes de abrir. */
+  aperturaMinima?: number;
+  /**
+   * Contingencia operativa: exige una apertura única, dinámica, bloqueada y
+   * respaldada por su documento de auditoría. A diferencia de
+   * `aperturaMinima`, no fija un número en código: acepta el primer número que
+   * el ADMIN confirmó una sola vez para el año institucional.
+   */
+  exigeAperturaUnicaRadicados?: boolean;
   /**
    * Datos adicionales que el caller quiere ver EN la reserva de unicidad.
    *
@@ -165,6 +180,18 @@ export class SerieNoAbiertaError extends Error {
     this.serie = serie;
     this.anio = anio;
   }
+}
+
+export class AperturaContingenciaPendienteError extends Error {
+  constructor() {
+    super('La serie de contingencia aún no tiene la apertura formal autorizada. No se consumió ningún consecutivo.');
+    this.name = 'AperturaContingenciaPendienteError';
+  }
+}
+
+/** Solo radicados cambia de calendario: las demás series conservan su contrato. */
+function anioDeSerie(serie: SerieConsecutivo, fecha: Date): number {
+  return serie === 'radicados' ? periodoColombia(fecha).anio : fecha.getFullYear();
 }
 
 /** Consecutivo leído (aún no confirmado) para una serie. */
@@ -277,17 +304,46 @@ export async function leerConsecutivosLegales(
   fecha: Date,
   solicitudes: SolicitudSerie[],
 ): Promise<ConsecutivoPendiente[]> {
-  const anio = fecha.getFullYear();
-  const refs = solicitudes.map((s) => db.doc(`counters/${s.serie}-${anio}`));
+  const refs = solicitudes.map((s) => db.doc(`counters/${s.serie}-${anioDeSerie(s.serie, fecha)}`));
   const snaps = await Promise.all(refs.map((ref) => tx.get(ref)));
+
+  // La apertura dinámica incluye un `auditoriaId`. Se valida el documento al
+  // que apunta DENTRO de la misma transacción y antes de cualquier escritura
+  // del caller. Una forma válida sin auditoría persistida sigue siendo una
+  // apertura corrupta y se bloquea.
+  const aperturasUnicas = await Promise.all(solicitudes.map(async (s, i): Promise<AperturaUnicaRadicados | undefined> => {
+    if (!s.exigeAperturaUnicaRadicados) return undefined;
+    if (s.serie !== 'radicados') throw new AperturaContingenciaPendienteError();
+    const anio = anioDeSerie(s.serie, fecha);
+    const apertura = leerAperturaUnicaRadicados(snaps[i].data()?.apertura, anio);
+    if (!apertura) throw new AperturaContingenciaPendienteError();
+    const auditoria = await tx.get(db.doc(`admin_auditoria/${apertura.auditoriaId}`));
+    if (!auditoria.exists || !auditoriaCoincideConApertura(auditoria.data(), apertura)) {
+      throw new AperturaContingenciaPendienteError();
+    }
+    return apertura;
+  }));
 
   const pendientes: ConsecutivoPendiente[] = solicitudes.map((s, i) => {
     // Fail-closed para las series con libro previo: sin documento de
     // contador no se inventa el punto de partida (ver `exigeAperturaExplicita`).
     if (s.exigeAperturaExplicita && !snaps[i].exists) {
-      throw new SerieNoAbiertaError(s.serie, anio);
+      throw new SerieNoAbiertaError(s.serie, anioDeSerie(s.serie, fecha));
     }
     const ultimoActual = Number(snaps[i].data()?.ultimo ?? 0);
+    const aperturaUnica = aperturasUnicas[i];
+    if (s.exigeAperturaUnicaRadicados && (
+      !aperturaUnica
+      || !Number.isSafeInteger(ultimoActual)
+      || ultimoActual < aperturaUnica.ultimoInicial
+    )) throw new AperturaContingenciaPendienteError();
+    if (s.aperturaMinima !== undefined && (
+      !Number.isSafeInteger(s.aperturaMinima) || s.aperturaMinima < 1 ||
+      snaps[i].data()?.apertura?.abiertoEn !== s.aperturaMinima ||
+      !snaps[i].data()?.apertura?.autorizadoPor?.trim() ||
+      !snaps[i].data()?.apertura?.referencia?.trim() ||
+      ultimoActual < s.aperturaMinima - 1
+    )) throw new AperturaContingenciaPendienteError();
     // Coherencia con la propia historia del contador — ANTES de calcular nada.
     verificarCoherenciaConApertura(s.serie, ultimoActual, snaps[i].data()?.apertura);
     const consecutivo = ultimoActual + 1;
@@ -350,8 +406,8 @@ export function confirmarConsecutivosLegales(
     });
   }
 
-  const marca = { anio: fecha.getFullYear(), actualizadoEn: fecha.toISOString() };
   for (const p of pendientes) {
+    const marca = { anio: anioDeSerie(p.serie, fecha), actualizadoEn: fecha.toISOString() };
     /* RESERVA DE UNICIDAD — hace IMPOSIBLE el duplicado, no solo detectable.
 
        El guard D9 de arriba impide que el contador RETROCEDA al emitir, pero no

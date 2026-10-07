@@ -40,6 +40,7 @@ vi.mock('@/lib/server/internal-auth', () => {
 });
 
 vi.mock('@/lib/firebase-admin', () => ({
+  getFirebaseAdminApp: () => ({ options: { projectId: 'proyecto-local-ficticio' } }),
   getFirebaseAdminDb: () => ({
     doc: (path: string) => ({ path, id: path.split('/').pop() }),
     runTransaction: async () => { throw new Error('la tx no debe alcanzarse en 401/403'); },

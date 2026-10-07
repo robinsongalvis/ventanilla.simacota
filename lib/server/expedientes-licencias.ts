@@ -19,6 +19,7 @@ import {
 } from '@/lib/motor-expedientes/modalidad-construccion';
 import { puedeTransicionar, type EstadoJuridicoLicencia, type RevisionHistoricaLicencia } from '@/lib/motor-expedientes/estados-licencia';
 import { esEstadoCerrado } from '@/lib/radicado-estados';
+import { esDatoDePrueba, type MarcasDePrueba } from '@/lib/radicados/dato-de-prueba';
 import { DEFINICION_LICENCIA_CONSTRUCCION_PARCIAL } from '@/lib/motor-expedientes/definiciones/licencia-construccion-parcial';
 import { sumarDiasHabiles, diasRestantesHabiles, atLocalNoon } from '@/lib/tiempos-radicado';
 import { debeNotificarCiudadano, type CriterioNotificacion } from '@/lib/email/debe-notificar-ciudadano';
@@ -1033,7 +1034,7 @@ export function planActualizarContexto(
 ────────────────────────────────────────────── */
 
 /** Subconjunto mínimo de `VentanillaRadicado` que necesita el handoff — evita acoplar este módulo al tipo completo de ventanilla. */
-export interface RadicadoParaHandoff {
+export interface RadicadoParaHandoff extends MarcasDePrueba {
   radicadoId: string;
   estadoActual: string;
   clasificacion: { oficinaDestino: string };
@@ -1099,6 +1100,9 @@ export interface PlanCrearExpedienteDesdeRadicado {
  * una propiedad del sistema y pasaría a depender de por dónde se entró.
  */
 export function verificarRadicadoVinculable(radicado: RadicadoParaHandoff): ErrorExpediente | null {
+  if (esDatoDePrueba(radicado)) {
+    return { status: 409, mensaje: 'El radicado es un histórico de prueba y no admite operaciones ni vinculaciones.' };
+  }
   if (radicado.clasificacion.oficinaDestino !== 'SEC_PLANEACION') {
     return {
       status: 400,

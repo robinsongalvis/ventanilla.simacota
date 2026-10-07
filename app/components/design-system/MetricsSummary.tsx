@@ -116,7 +116,7 @@ export function MetricsSummary({
             type="button"
             onClick={() => setExpandido((v) => !v)}
             className="text-[10px] font-bold uppercase tracking-wider px-2 py-1 rounded-md transition-colors shrink-0"
-            style={{ color: '#667085', background: expandido ? '#F1F5F9' : 'transparent' }}
+            style={{ color: '#64748B', background: expandido ? '#F1F5F9' : 'transparent' }}
             aria-expanded={expandido}
           >
             {expandido ? 'Ocultar' : labelExpandir}

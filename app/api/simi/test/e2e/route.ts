@@ -176,6 +176,22 @@ async function countOperationalAudit(testRunId: string): Promise<number> {
 }
 
 export async function POST(request: Request): Promise<NextResponse> {
+  /* CERRADO EN PRODUCCIÓN (§6 del checklist de arranque).
+     Este banco de pruebas no lee: ESCRIBE contra la base real — crea radicados,
+     flujos de aprobación, firmas y PDFs, y dispara envíos al ciudadano. El guard
+     de rol de abajo impide que entre un extraño, pero no impide que un ADMIN
+     legítimo lo ejecute por error sobre el expediente de un ciudadano real.
+
+     Se cierra por VERCEL_ENV y no por NODE_ENV a propósito: NODE_ENV vale
+     'production' también en los despliegues de Preview, y ahí el banco SÍ debe
+     seguir disponible — es donde se ensaya. Solo se bloquea la producción real.
+
+     404 y no 403: a un endpoint que no debe existir en producción no se le
+     confirma la existencia. */
+  if (process.env.VERCEL_ENV === 'production') {
+    return NextResponse.json({ error: 'No encontrado.' }, { status: 404 });
+  }
+
   const usuario = await verificarSesion();
   if (!usuario) return NextResponse.json({ error: 'No autorizado.' }, { status: 401 });
 

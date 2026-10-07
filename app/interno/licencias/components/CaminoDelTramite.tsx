@@ -25,7 +25,7 @@ export function CaminoDelTramite({
       className="microtarjeta rounded-xl p-4"
       style={{ background: 'var(--bg-surface)', border: '1px solid var(--color-border)' }}
     >
-      <p className="text-[10px] font-bold uppercase tracking-widest mb-3" style={{ color: '#667085' }}>
+      <p className="text-[10px] font-bold uppercase tracking-widest mb-3" style={{ color: 'var(--text-secondary)' }}>
         Camino del trámite
       </p>
 
@@ -47,22 +47,22 @@ export function CaminoDelTramite({
                     ? { background: ESTADOS_VISUALES.completed.color, color: '#fff' }
                     : actual
                       ? { background: ESTADOS_VISUALES.in_progress.color, color: '#fff', boxShadow: `0 0 0 3px ${FONDO_EVENTO_ACTUAL.replace('0.06', '0.20')}` }
-                      : { background: 'var(--bg-surface-2)', color: '#94A3B8', border: '1px solid var(--color-border)' }
+                      : { background: 'var(--bg-surface-2)', color: 'var(--text-secondary)', border: '1px solid var(--color-border)' }
                 }
               >
-                {cumplido ? '✓' : actual ? <span className="rounded-full bg-white" style={{ width: 6, height: 6 }} /> : paso.numero}
+                {cumplido ? '✓' : actual ? <span className="rounded-full bg-[var(--tema-fondo-ffffff)]" style={{ width: 6, height: 6 }} /> : paso.numero}
               </span>
               <span className="min-w-0">
                 <span
                   className="block text-sm"
                   style={{
-                    color: actual || cumplido ? 'var(--text-primary)' : '#94A3B8',
+                    color: actual || cumplido ? 'var(--text-primary)' : 'var(--text-secondary)',
                     fontWeight: actual ? 800 : 600,
                   }}
                 >
                   {paso.titulo}
                 </span>
-                <span className="block text-xs" style={{ color: '#94A3B8' }}>
+                <span className="block text-xs" style={{ color: 'var(--text-secondary)' }}>
                   {paso.subtexto(situacion)}
                 </span>
               </span>

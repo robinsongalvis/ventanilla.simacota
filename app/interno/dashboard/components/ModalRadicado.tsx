@@ -42,7 +42,7 @@ const DOT_PRIORIDAD: Record<string, string> = {
 function Seccion({ titulo, children }: { titulo: string; children: React.ReactNode }) {
   return (
     <div className="bg-slate-800/30 border border-white/5 rounded-xl p-4">
-      <p className="text-xs font-label text-slate-500 uppercase tracking-widest mb-3">{titulo}</p>
+      <p className="text-xs font-label text-slate-500 oscuro:text-slate-400 uppercase tracking-widest mb-3">{titulo}</p>
       {children}
     </div>
   );
@@ -191,7 +191,7 @@ export function ModalRadicado({ radicado, usuario, onCerrar }: Props) {
                   >
                     {radicado.ciudadano.nombre}
                   </h2>
-                  <p className="text-xs font-mono text-slate-500 mt-0.5">{radicado.radicadoId}</p>
+                  <p className="text-xs font-mono text-slate-500 oscuro:text-slate-400 mt-0.5">{radicado.radicadoId}</p>
                 </div>
                 <span className={`
                   shrink-0 px-2.5 py-1 rounded-full text-xs font-semibold border
@@ -232,7 +232,7 @@ export function ModalRadicado({ radicado, usuario, onCerrar }: Props) {
               <Seccion titulo="Detalle del caso">
                 <div className="flex flex-col gap-3">
                   <div>
-                    <p className="text-xs text-slate-500 mb-0.5">Resumen IA</p>
+                    <p className="text-xs text-slate-500 oscuro:text-slate-400 mb-0.5">Resumen IA</p>
                     <p className="text-sm text-slate-300 leading-relaxed">{ia.resumenCaso}</p>
                   </div>
                   <MensajeExpandible texto={ia.mensajeOriginal} />
@@ -251,13 +251,13 @@ export function ModalRadicado({ radicado, usuario, onCerrar }: Props) {
             {/* ── Archivos adjuntos ── */}
             <Seccion titulo="Archivos adjuntos">
               {radicado.archivos.length === 0 ? (
-                <p className="text-sm text-slate-600 italic">Sin archivos adjuntos.</p>
+                <p className="text-sm text-slate-600 oscuro:text-slate-400 italic">Sin archivos adjuntos.</p>
               ) : (
                 <ul className="flex flex-col gap-2">
                   {radicado.archivos.map((arch, i) => (
                     <li key={i} className="flex items-center justify-between gap-3 py-1.5 border-b border-white/5 last:border-0">
                       <span className="flex items-center gap-2 text-sm text-slate-300 min-w-0">
-                        <span className="text-slate-500 text-base">📎</span>
+                        <span className="text-slate-500 oscuro:text-slate-400 text-base">📎</span>
                         <span className="truncate">{arch.nombre}</span>
                       </span>
                       {arch.path ? (
@@ -270,7 +270,7 @@ export function ModalRadicado({ radicado, usuario, onCerrar }: Props) {
                           Ver
                         </a>
                       ) : (
-                        <span className="shrink-0 text-xs text-slate-600">Sin archivo</span>
+                        <span className="shrink-0 text-xs text-slate-600 oscuro:text-slate-400">Sin archivo</span>
                       )}
                     </li>
                   ))}
@@ -313,7 +313,7 @@ function InfoRow({ icon, label, valor }: { icon: string; label: string; valor: s
     <div className="flex items-start gap-2">
       <span className="text-base leading-tight mt-0.5" role="img" aria-hidden>{icon}</span>
       <div className="min-w-0">
-        <p className="text-xs text-slate-500 leading-none mb-0.5">{label}</p>
+        <p className="text-xs text-slate-500 oscuro:text-slate-400 leading-none mb-0.5">{label}</p>
         <p className="text-sm text-slate-200 break-words">{valor}</p>
       </div>
     </div>
@@ -326,7 +326,7 @@ function MensajeExpandible({ texto }: { texto: string }) {
 
   return (
     <div>
-      <p className="text-xs text-slate-500 mb-0.5">Mensaje original</p>
+      <p className="text-xs text-slate-500 oscuro:text-slate-400 mb-0.5">Mensaje original</p>
       <p className={`text-sm text-slate-400 leading-relaxed ${!expandido && corto ? 'line-clamp-3' : ''}`}>
         {texto}
       </p>

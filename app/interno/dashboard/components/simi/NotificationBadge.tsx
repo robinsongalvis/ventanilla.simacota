@@ -28,9 +28,9 @@ export function SimiNotifBadge({ onOpen }: SimiNotifBadgeProps) {
     <button
       onClick={onOpen}
       className="relative p-1.5 rounded-lg transition-colors"
-      style={{ color: '#94A3B8' }}
-      onMouseEnter={(e) => { (e.currentTarget as HTMLElement).style.color = '#14532D'; (e.currentTarget as HTMLElement).style.background = '#EEF4EE'; }}
-      onMouseLeave={(e) => { (e.currentTarget as HTMLElement).style.color = '#94A3B8'; (e.currentTarget as HTMLElement).style.background = ''; }}
+      style={{ color: 'var(--tema-texto-94a3b8)' }}
+      onMouseEnter={(e) => { (e.currentTarget as HTMLElement).style.color = 'var(--tema-texto-007049)'; (e.currentTarget as HTMLElement).style.background = 'var(--tema-fondo-f4f9f6)'; }}
+      onMouseLeave={(e) => { (e.currentTarget as HTMLElement).style.color = 'var(--tema-texto-94a3b8)'; (e.currentTarget as HTMLElement).style.background = ''; }}
       title={`${sinLeer} notificación(es) sin leer`}
     >
       <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
@@ -38,7 +38,7 @@ export function SimiNotifBadge({ onOpen }: SimiNotifBadgeProps) {
       </svg>
       {sinLeer > 0 && (
         <span className="absolute -top-0.5 -right-0.5 flex h-4 w-4 items-center justify-center rounded-full text-[9px] font-black text-white animate-pulse"
-              style={{ background: '#DC2626' }}>
+              style={{ background: '#D81E1E' }}>
           {sinLeer > 9 ? '9+' : sinLeer}
         </span>
       )}
@@ -83,30 +83,30 @@ export function SimiNotifPanel({ onClose, onVerRadicado }: NotifPanelProps) {
   }
 
   return (
-    <div className="absolute right-0 top-10 w-80 rounded-2xl bg-white shadow-xl z-50"
-         style={{ border: '1px solid #D9E2D9', boxShadow: '0 8px 24px rgba(20,83,45,0.12)' }}>
-      <div className="flex items-center justify-between px-4 py-3" style={{ borderBottom: '1px solid #D9E2D9' }}>
-        <p className="text-xs font-bold" style={{ color: '#14532D' }}>⚖️ Notificaciones SIMI</p>
+    <div className="absolute right-0 top-10 w-80 rounded-2xl bg-[var(--tema-fondo-ffffff)] shadow-xl z-50"
+         style={{ border: '1px solid var(--tema-borde-dce4ea)', boxShadow: '0 8px 24px rgba(0, 112, 73,0.12)' }}>
+      <div className="flex items-center justify-between px-4 py-3" style={{ borderBottom: '1px solid var(--tema-borde-dce4ea)' }}>
+        <p className="text-xs font-bold" style={{ color: 'var(--tema-texto-007049)' }}>⚖️ Notificaciones SIMI</p>
         <div className="flex gap-2">
-          <button onClick={marcarTodasLeidas} className="text-[10px]" style={{ color: '#94A3B8' }}>Marcar leídas</button>
-          <button onClick={onClose} className="text-[10px] font-bold" style={{ color: '#667085' }}>✕</button>
+          <button onClick={marcarTodasLeidas} className="text-[10px]" style={{ color: 'var(--tema-texto-94a3b8)' }}>Marcar leídas</button>
+          <button onClick={onClose} className="text-[10px] font-bold" style={{ color: 'var(--tema-texto-64748b)' }}>✕</button>
         </div>
       </div>
-      <div className="max-h-72 overflow-y-auto divide-y" style={{ borderColor: '#EEF4EE' }}>
+      <div className="max-h-72 overflow-y-auto divide-y" style={{ borderColor: 'var(--tema-borde-f4f9f6)' }}>
         {cargando ? (
-          <div className="p-4 text-center text-xs" style={{ color: '#94A3B8' }}>Cargando...</div>
+          <div className="p-4 text-center text-xs" style={{ color: 'var(--tema-texto-94a3b8)' }}>Cargando...</div>
         ) : notifs.length === 0 ? (
           <div className="p-6 text-center">
-            <p className="text-sm" style={{ color: '#667085' }}>Sin notificaciones pendientes</p>
+            <p className="text-sm" style={{ color: 'var(--tema-texto-64748b)' }}>Sin notificaciones pendientes</p>
           </div>
         ) : notifs.map((n) => (
           <div key={n.id}
                className="px-4 py-3 cursor-pointer transition-colors"
-               style={{ background: n.leida ? 'transparent' : '#EEF4EE' }}
+               style={{ background: n.leida ? 'transparent' : 'var(--tema-fondo-f4f9f6)' }}
                onClick={() => { if (n.radicadoId && onVerRadicado) onVerRadicado(n.radicadoId); }}>
-            <p className="text-xs font-bold" style={{ color: '#1F2933' }}>{n.titulo}</p>
-            <p className="text-[10px] leading-snug mt-0.5" style={{ color: '#667085' }}>{n.mensaje}</p>
-            <p className="text-[9px] mt-1" style={{ color: '#94A3B8' }}>
+            <p className="text-xs font-bold" style={{ color: 'var(--tema-texto-172033)' }}>{n.titulo}</p>
+            <p className="text-[10px] leading-snug mt-0.5" style={{ color: 'var(--tema-texto-64748b)' }}>{n.mensaje}</p>
+            <p className="text-[9px] mt-1" style={{ color: 'var(--tema-texto-94a3b8)' }}>
               {new Date(n.createdAt).toLocaleString('es-CO', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' })}
             </p>
           </div>

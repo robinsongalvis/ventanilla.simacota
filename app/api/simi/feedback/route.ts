@@ -1,12 +1,9 @@
 import { NextResponse } from 'next/server';
-import { cookies }      from 'next/headers';
-import { SESSION_COOKIE_NAME } from '@/lib/auth-cookie';
-import {
-  getFirebaseAdminAuth,
-  getFirebaseAdminDb,
-} from '@/lib/firebase-admin';
-import type { TenantId } from '@/src/types/radicado';
-import type { RolInterno } from '@/lib/hooks/useAuth';
+import { getFirebaseAdminDb } from '@/lib/firebase-admin';
+import { autenticarUsuarioInterno } from '@/lib/server/internal-auth-http';
+import { canReadTenant } from '@/lib/server/internal-auth';
+import { getRadicadoOrFail, RadicadoActionError } from '@/lib/server/radicados-security';
+import { logError } from '@/lib/logger';
 
 export const runtime = 'nodejs';
 
@@ -31,52 +28,35 @@ const MOTIVOS_VALIDOS = new Set([
   'OTRO',
 ]);
 
-interface FeedbackPayload {
-  radicadoId:   string;
-  accion:       string;
-  auditoriaId?: string;
-  util:         boolean;
-  motivo?:      string;
-  comentario?:  string;
-}
-
-async function verificarSesion(): Promise<{
-  uid: string; nombre: string; rol: RolInterno; tenantId: TenantId;
-} | null> {
-  const cookieStore = await cookies();
-  const sc = cookieStore.get(SESSION_COOKIE_NAME)?.value;
-  if (!sc) return null;
-  try {
-    const decoded = await getFirebaseAdminAuth().verifySessionCookie(sc, true);
-    const snap    = await getFirebaseAdminDb().doc(`users/${decoded.uid}`).get();
-    if (!snap.exists) return null;
-    const d = snap.data()!;
-    if (d.activo === false || d.archivado === true) return null;
-    return {
-      uid:      decoded.uid,
-      nombre:   d.nombre as string ?? '',
-      rol:      d.rol as RolInterno ?? 'FUNCIONARIO',
-      tenantId: d.tenantId as TenantId ?? 'VENTANILLA_UNICA',
-    };
-  } catch { return null; }
-}
-
 export async function POST(request: Request): Promise<NextResponse> {
-  const usuario = await verificarSesion();
-  if (!usuario) {
-    return NextResponse.json({ error: 'No autorizado.' }, { status: 401 });
-  }
+  const autenticacion = await autenticarUsuarioInterno();
+  if (!autenticacion.ok) return autenticacion.respuesta;
+  const usuario = autenticacion.usuario;
 
-  let payload: FeedbackPayload;
+  // La entrada HTTP requiere validación antes de formar referencias Firestore.
+  let payload: unknown;
   try {
-    payload = await request.json() as FeedbackPayload;
+    payload = await request.json();
   } catch {
     return NextResponse.json({ error: 'Payload inválido.' }, { status: 400 });
   }
 
-  const { radicadoId, accion, util, motivo, comentario, auditoriaId } = payload;
+  if (!payload || typeof payload !== 'object' || Array.isArray(payload)) {
+    return NextResponse.json({ error: 'Payload inválido.' }, { status: 400 });
+  }
+  const { radicadoId, accion, util, motivo, comentario, auditoriaId } = payload as Record<string, unknown>;
 
-  if (!radicadoId || !accion || typeof util !== 'boolean') {
+  if (
+    typeof radicadoId !== 'string' || !radicadoId.trim() || radicadoId.includes('/')
+    || radicadoId === '.' || radicadoId === '..' || Buffer.byteLength(radicadoId) > 1500
+    || typeof accion !== 'string' || !accion.trim() || typeof util !== 'boolean'
+    || (motivo !== undefined && typeof motivo !== 'string')
+    || (comentario !== undefined && typeof comentario !== 'string')
+    || (auditoriaId !== undefined && (
+      typeof auditoriaId !== 'string' || !auditoriaId.trim() || auditoriaId.includes('/')
+      || auditoriaId === '.' || auditoriaId === '..' || Buffer.byteLength(auditoriaId) > 1500
+    ))
+  ) {
     return NextResponse.json(
       { error: 'Campos requeridos: radicadoId, accion, util (boolean).' },
       { status: 400 },
@@ -91,13 +71,27 @@ export async function POST(request: Request): Promise<NextResponse> {
   }
 
   try {
+    const radicado = await getRadicadoOrFail(radicadoId);
+    const tenantId = radicado.clasificacion.oficinaDestino;
+    if (!canReadTenant(usuario, tenantId)) {
+      return NextResponse.json({ error: 'No tiene permiso para evaluar este radicado.' }, { status: 403 });
+    }
     const db = getFirebaseAdminDb();
+    if (auditoriaId) {
+      const auditoria = await db.doc(`simi_auditoria/${auditoriaId}`).get();
+      if (!auditoria.exists) {
+        return NextResponse.json({ error: 'Auditoría no encontrada.' }, { status: 404 });
+      }
+      if (auditoria.data()?.radicadoId !== radicadoId) {
+        return NextResponse.json({ error: 'La auditoría no corresponde al radicado indicado.' }, { status: 403 });
+      }
+    }
     const doc: Record<string, unknown> = {
       radicadoId,
       accion,
       usuarioUid: usuario.uid,
       rol:        usuario.rol,
-      tenantId:   usuario.tenantId,
+      tenantId,
       util,
       fecha: new Date().toISOString(),
     };
@@ -108,7 +102,10 @@ export async function POST(request: Request): Promise<NextResponse> {
     const ref = await db.collection('simi_feedback').add(doc);
     return NextResponse.json({ ok: true, feedbackId: ref.id });
   } catch (err) {
-    console.error('[simi/feedback]', err);
+    if (err instanceof RadicadoActionError) {
+      return NextResponse.json({ error: err.message }, { status: err.status });
+    }
+    logError({ radicadoId, modulo: 'simi/feedback', error: err });
     return NextResponse.json(
       { error: 'No se pudo guardar el feedback.' },
       { status: 500 },

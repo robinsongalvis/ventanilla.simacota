@@ -42,6 +42,7 @@
    ABORTADO. Todo lo derivado sale como VALOR DE RETORNO de `runTransaction`.
 ══════════════════════════════════════════════════════════════ */
 import { NextResponse } from 'next/server';
+import { CONTINGENCIA_STORAGE_ACTIVA } from '@/lib/recepcion/contingencia-storage';
 import { FieldValue } from 'firebase-admin/firestore';
 import { getFirebaseAdminDb } from '@/lib/firebase-admin';
 import { canOperateTenant, InternalAuthError, requireActiveInternalUser } from '@/lib/server/internal-auth';
@@ -145,6 +146,12 @@ export async function POST(req: Request, ctx: { params: Promise<{ id: string }> 
     const usuario = await requireActiveInternalUser();
     if (!canOperateTenant(usuario, TENANT_LICENCIAS)) {
       return NextResponse.json({ error: 'Tu rol no permite operar expedientes de licencias.' }, { status: 403 });
+    }
+
+    if (CONTINGENCIA_STORAGE_ACTIVA) {
+      return NextResponse.json({
+        error: 'La reserva de radicados desde licencias está suspendida durante la contingencia. Solo la radicación interna autorizada puede emitir la serie.',
+      }, { status: 503 });
     }
 
     const body = (await req.json().catch(() => null)) as BodyRadicar | null;

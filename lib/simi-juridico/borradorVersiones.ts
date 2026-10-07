@@ -43,8 +43,7 @@ export async function guardarVersionBorrador(
     .where('radicadoId', '==', params.radicadoId)
     .orderBy('version', 'desc')
     .limit(1)
-    .get()
-    .catch(() => ({ docs: [] as FirebaseFirestore.QueryDocumentSnapshot[], empty: true }));
+    .get();
 
   const ultimaVersion = countSnap.empty ? 0 : (countSnap.docs[0].data().version as number ?? 0);
   const nuevaVersion = ultimaVersion + 1;
@@ -62,18 +61,14 @@ export async function guardarVersionBorrador(
  * Obtener el historial de versiones de un radicado.
  */
 export async function getVersionesBorrador(radicadoId: string): Promise<BorradorVersion[]> {
-  try {
-    const snap = await getFirebaseAdminDb()
-      .collection('simi_borrador_versiones')
-      .where('radicadoId', '==', radicadoId)
-      .orderBy('version', 'desc')
-      .limit(20)
-      .get();
+  const snap = await getFirebaseAdminDb()
+    .collection('simi_borrador_versiones')
+    .where('radicadoId', '==', radicadoId)
+    .orderBy('version', 'desc')
+    .limit(20)
+    .get();
 
-    return snap.docs.map((d) => ({ id: d.id, ...d.data() } as BorradorVersion));
-  } catch {
-    return [];
-  }
+  return snap.docs.map((d) => ({ id: d.id, ...d.data() } as BorradorVersion));
 }
 
 /**

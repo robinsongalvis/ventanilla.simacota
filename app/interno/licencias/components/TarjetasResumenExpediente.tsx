@@ -38,14 +38,14 @@ export function TarjetasResumenExpediente({
   const esReal = (origen ?? 'REAL') === 'REAL';
   return (
     <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-4">
-      <Tarjeta icono={<IconoPersona />} tinte="#E7F5EC" trazo="#16A34A" label="Solicitante">
+      <Tarjeta icono={<IconoPersona />} tinte="var(--tema-fondo-e7f5ec)" trazo="#008F5A" label="Solicitante">
         <p className="text-sm font-bold" style={{ color: 'var(--text-primary)' }}>{solicitanteNombre}</p>
         {solicitanteDocumento && (
           <p className="text-xs" style={{ color: 'var(--text-secondary)' }}>CC {solicitanteDocumento}</p>
         )}
       </Tarjeta>
 
-      <Tarjeta icono={<IconoRadicado />} tinte="#E6EEFE" trazo="#2563EB" label="Radicado de origen (Ventanilla)">
+      <Tarjeta icono={<IconoRadicado />} tinte="var(--tema-fondo-e6eefe)" trazo="#2563EB" label="Radicado de origen (Ventanilla)">
         {radicadoId ? (
           <>
             <NumeroLegal value={radicadoId} variant="radicado" size="sm" />
@@ -62,7 +62,7 @@ export function TarjetasResumenExpediente({
               type="button"
               onClick={onVincular}
               className="mt-1 text-xs font-bold underline focus-visible:outline-none focus-visible:ring-2 rounded"
-              style={{ color: 'var(--color-primary)' }}
+              style={{ color: 'var(--tema-texto-007049)' }}
             >
               Vincular radicado de Ventanilla
             </button>
@@ -70,9 +70,9 @@ export function TarjetasResumenExpediente({
         )}
       </Tarjeta>
 
-      <Tarjeta icono={<IconoOrigen />} tinte="#F1E9FE" trazo="#7C3AED" label="Origen">
+      <Tarjeta icono={<IconoOrigen />} tinte="var(--tema-fondo-f1e9fe)" trazo="#7C3AED" label="Origen">
         <p className="text-sm font-bold" style={{ color: 'var(--text-primary)' }}>{origen ?? 'REAL'}</p>
-        <p className="mt-0.5 inline-flex items-center gap-1 text-xs" style={{ color: esReal ? '#117937' : 'var(--text-secondary)' }}>
+        <p className="mt-0.5 inline-flex items-center gap-1 text-xs" style={{ color: esReal ? 'var(--tema-texto-007a4d)' : 'var(--text-secondary)' }}>
           {esReal ? (
             <><IconoCheck /> Información verificada</>
           ) : (
@@ -81,7 +81,7 @@ export function TarjetasResumenExpediente({
         </p>
       </Tarjeta>
 
-      <Tarjeta icono={<IconoCalendario />} tinte="#FDF1DC" trazo="#D97706" label="Creado">
+      <Tarjeta icono={<IconoCalendario />} tinte="var(--tema-fondo-fdf1dc)" trazo="#D97706" label="Creado">
         <p className="text-sm font-bold" style={{ color: 'var(--text-primary)' }}>{formatFechaColombia(creadoEn)}</p>
       </Tarjeta>
     </div>

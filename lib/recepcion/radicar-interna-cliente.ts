@@ -76,6 +76,9 @@ export function construirFormDataRadicacionInterna(datos: DatosRadicacionInstitu
   agregarCampo(formData, C.noAportaCorreo, datos.noAportaCorreo);
   agregarCampo(formData, C.noAportaTelefono, datos.noAportaTelefono);
   agregarCampo(formData, C.noAportaDireccion, datos.noAportaDireccion);
+  if (datos.soportesPendientes) {
+    formData.append(C.soportesPendientes, JSON.stringify(datos.soportesPendientes));
+  }
   datos.archivos.forEach((archivo) => formData.append(C.archivos, archivo));
 
   return formData;
@@ -127,6 +130,13 @@ export async function radicarInternaCliente(
     throw new Error(MENSAJE_ERROR_GENERICO);
   }
 
-  onProgress('Radicado guardado.', 90);
-  return { radicadoId: cuerpo.radicadoId, consecutivo: cuerpo.consecutivo };
+  onProgress(cuerpo.mensajeAdjuntos ?? 'Radicado guardado.', 90);
+  return {
+    radicadoId: cuerpo.radicadoId,
+    consecutivo: cuerpo.consecutivo,
+    ...(cuerpo.estadoAdjuntos ? { estadoAdjuntos: cuerpo.estadoAdjuntos } : {}),
+    ...(cuerpo.mensajeAdjuntos ? { mensajeAdjuntos: cuerpo.mensajeAdjuntos } : {}),
+    ...(cuerpo.fechaRadicado ? { fechaRadicado: cuerpo.fechaRadicado } : {}),
+    ...(cuerpo.horaRadicado ? { horaRadicado: cuerpo.horaRadicado } : {}),
+  };
 }

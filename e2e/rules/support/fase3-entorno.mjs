@@ -34,13 +34,21 @@ const RUTA_ROUTE = path.join(REPO_ROOT, 'app', 'api', 'radicacion', 'interna', '
 const RUTA_AUTH_STUB = path.join(__dirname, 'fase3-stub-internal-auth.mjs');
 const RUTA_STORAGE_STUB = path.join(__dirname, 'fase3-stub-firebase-admin.mjs');
 
-function pluginFronterasMock() {
+function pluginFronterasMock(contingencia) {
   return {
     name: 'fase3-fronteras-mock',
     enforce: 'pre',
     resolveId(id) {
       if (id === '@/lib/server/internal-auth') return RUTA_AUTH_STUB;
       if (id === '@/lib/firebase-admin') return RUTA_STORAGE_STUB;
+      return null;
+    },
+    // Pruebas históricas de Storage siguen ensayando el modo normal; los
+    // casos de contingencia solicitan el flag REAL sin transformación.
+    transform(code, id) {
+      if (!contingencia && id.endsWith('/lib/recepcion/contingencia-storage.ts')) {
+        return code.replace('export const CONTINGENCIA_STORAGE_ACTIVA = true;', 'export const CONTINGENCIA_STORAGE_ACTIVA = false;');
+      }
       return null;
     },
   };
@@ -60,9 +68,19 @@ function pluginFronterasMock() {
  * credenciales). No es una tercera frontera mockeada: `getFirebaseAdminApp`/
  * `getFirebaseAdminDb` siguen siendo el código real, sin un solo cambio.
  */
-function asegurarCredencialFalsa() {
-  if (process.env.FIREBASE_SERVICE_ACCOUNT) return;
-  const proyecto = process.env.GCLOUD_PROJECT ?? 'demo-ventanilla-lab';
+function asegurarCredencialFalsa(proyectoAdminEmulado) {
+  if (process.env.FIREBASE_SERVICE_ACCOUNT) {
+    if (proyectoAdminEmulado) {
+      throw new Error(
+        '⛔ El proyecto Admin emulado exige iniciar sin FIREBASE_SERVICE_ACCOUNT; ' +
+          'no se sustituye ni se reutiliza una credencial preexistente.',
+      );
+    }
+    return;
+  }
+  const proyecto = proyectoAdminEmulado
+    ?? process.env.GCLOUD_PROJECT
+    ?? 'demo-ventanilla-lab';
   const { privateKey } = generateKeyPairSync('rsa', {
     modulusLength: 2048,
     privateKeyEncoding: { type: 'pkcs8', format: 'pem' },
@@ -82,7 +100,10 @@ let servidorVite = null;
  * este arnés SOLO corre dentro de `firebase emulators:exec` (igual que
  * `e2e/rules/setup.mjs`); nunca contra Firestore real.
  */
-export async function iniciarEntorno() {
+export async function iniciarEntorno({
+  contingencia = false,
+  proyectoAdminEmulado,
+} = {}) {
   if (!process.env.FIRESTORE_EMULATOR_HOST) {
     throw new Error(
       '⛔ fase3-entorno.mjs solo corre contra el emulador de Firestore ' +
@@ -95,14 +116,25 @@ export async function iniciarEntorno() {
     );
   }
 
-  asegurarCredencialFalsa();
+  if (proyectoAdminEmulado !== undefined && (
+    contingencia !== true
+    || proyectoAdminEmulado !== 'ventanilla-simacota-stage'
+    || !/^(127\.0\.0\.1|localhost):\d+$/.test(process.env.FIRESTORE_EMULATOR_HOST)
+  )) {
+    throw new Error(
+      '⛔ El proyecto Admin emulado solo admite ventanilla-simacota-stage ' +
+        'en la prueba de contingencia contra un emulador Firestore local.',
+    );
+  }
+
+  asegurarCredencialFalsa(proyectoAdminEmulado);
   process.env.FIREBASE_STORAGE_BUCKET ??= 'fase3-bucket-simulado';
 
   servidorVite = await createServer({
     configFile: false,
     root: REPO_ROOT,
     resolve: { tsconfigPaths: true },
-    plugins: [pluginFronterasMock()],
+    plugins: [pluginFronterasMock(contingencia)],
     logLevel: 'warn',
     optimizeDeps: { noDiscovery: true },
   });
@@ -118,12 +150,18 @@ export async function iniciarEntorno() {
     servidorVite.ssrLoadModule(RUTA_STORAGE_STUB),
   ]);
 
+  const proyectoAdmin = storageMod.getFirebaseAdminApp().options.projectId;
+  if (proyectoAdminEmulado && proyectoAdmin !== proyectoAdminEmulado) {
+    throw new Error('⛔ El Admin SDK del ensayo no quedó aislado en el proyecto Stage esperado.');
+  }
+
   return {
     /** Handler POST REAL de app/api/radicacion/interna/route.ts, sin reimplementar. */
     POST: routeMod.POST,
     setSession: authMod.__setSession,
     clearSession: authMod.__clearSession,
     getFirebaseAdminDb: storageMod.getFirebaseAdminDb,
+    getFirebaseAdminProjectId: () => proyectoAdmin,
     inspeccionarAlmacenFalso: storageMod.__inspeccionarAlmacenFalso,
     limpiarAlmacenFalso: storageMod.__limpiarAlmacenFalso,
     /**

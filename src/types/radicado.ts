@@ -39,6 +39,8 @@ export type TenantId =
 
 export type AccionAuditoria =
   | 'RADICACION'
+  | 'ADJUNTOS_PENDIENTES_STORAGE'
+  | 'ADJUNTOS_REGULARIZADOS_STORAGE'
   | 'CLASIFICACION_IA'
   | 'ASIGNACION'
   | 'CAMBIO_ESTADO'

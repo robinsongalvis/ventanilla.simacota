@@ -4,20 +4,40 @@ export const dynamic = 'force-dynamic';
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
+import Link from 'next/link';
 import {
   AlertTriangle,
+  Bell,
   ArrowRight,
+  ArrowLeft,
+  CalendarClock,
   CheckCircle2,
+  Check,
+  ClipboardPenLine,
   CircleX,
   Clock3,
   Eye,
   FileText,
+  History,
+  Info,
+  MessageSquareText,
   MoreVertical,
+  Paperclip,
+  PanelLeftOpen,
+  PanelRightClose,
+  PanelRightOpen,
+  Pin,
+  PinOff,
   Plus,
+  Save,
   Search,
+  Send,
   SlidersHorizontal,
+  Sparkles,
+  UploadCloud,
   UserRoundX,
   UsersRound,
+  X,
   type LucideIcon,
 } from 'lucide-react';
 import { collection, getDocs, limit, orderBy, query } from 'firebase/firestore';
@@ -30,26 +50,16 @@ import { NOMBRES_TENANT, DIRECTORIO_TENANTS } from '@/src/types/reglas-negocio';
 import { diasRestantesHabiles, resolverTipoSolicitud } from '@/lib/tiempos-radicado';
 import { RadicacionFuncionarioForm }       from '@/app/interno/recepcion/components/RadicacionFuncionarioForm';
 import { radicarSegunFlag }                from '@/lib/recepcion/radicar-segun-flag';
-import { asignarRadicado, asignarMasivo }  from '@/lib/actions/asignarRadicado';
 import { ComprobanteRadicado }             from '@/app/interno/dashboard/components/ComprobanteRadicado';
+import type { EstadoAdjuntos } from '@/lib/recepcion/contingencia-storage';
 import { SelloRecibido }                   from '@/app/interno/dashboard/components/SelloRecibido';
 import { CompletarDatosSolicitante }       from '@/app/interno/dashboard/components/CompletarDatosSolicitante';
 import { datosConstanciaDesdeRadicado }    from '@/lib/mostrador/constancia-desde-radicado';
 import {
-  ETIQUETA_PRESET,
-  filtrarPorPreset,
-  indicadoresDeReporte,
-  resumenPorDependencia,
-  type PresetReporte,
-} from '@/lib/reportes/filtrar-por-preset';
-import { INSTITUCION } from '@/lib/institucion';
-import {
   documentoSolicitanteVisible,
   identidadProtegida,
   nombreSolicitanteVisible,
-  numeroDocumentoVisible,
 } from '@/lib/seguridad/identidad-protegida';
-import { puedeVerReportes } from '@/lib/permisos/acceso-reportes';
 import { coincideTextoRadicado, normalizarTextoBusqueda } from '@/lib/busqueda/coincidencia-texto-radicado';
 import { agruparDestinosPorDependencia, areasParaDependencia, getNombreArea } from '@/lib/catalogos/areas';
 import { RegistroExpresModal } from '@/app/interno/dashboard/components/RegistroExpresModal';
@@ -58,13 +68,20 @@ import { PanelReparto }                    from '@/app/interno/dashboard/compone
 import { VistaSalidas }                    from '@/app/interno/dashboard/components/salidas/VistaSalidas';
 import { VistaMiGestion }                  from '@/app/interno/dashboard/components/mi-gestion/VistaMiGestion';
 import { useSalidas }                      from '@/lib/hooks/useSalidas';
-import { filtrarSalidasPorPreset, resumenSalidas } from '@/lib/salidas/reporte-salidas';
 import { construirHistoria, type FiltroHistoria, type TonoEvento } from '@/lib/trazabilidad/humanizar-evento';
 import { resumirCambio } from '@/lib/traslado/resumir-cambio';
-import type { SalidaOficial }              from '@/src/types/salida';
 import { BusquedaAvanzadaPanel }           from '@/app/interno/dashboard/components/BusquedaAvanzadaPanel';
-import { VistaVentanilla }                 from '@/app/interno/dashboard/components/ventanilla/VistaVentanilla';
+import { VistaVentanilla, type DestinoTableroVentanilla }                 from '@/app/interno/dashboard/components/ventanilla/VistaVentanilla';
 import { useIndicadoresModo }              from '@/lib/hooks/useIndicadoresModo';
+import { useTemaInterno, type TemaInterno } from '@/lib/hooks/useTemaInterno';
+import { BotonTema } from '@/app/components/design-system/BotonTema';
+import type { IndicadorInteractivoProps } from '@/app/components/design-system/Indicador';
+import { ChipFiltro } from '@/app/components/design-system/ChipFiltro';
+import { PanelIndicadoresColapsable } from '@/app/components/design-system/PanelIndicadoresColapsable';
+import { FilaTarjetas, TarjetaIndicador } from '@/app/components/design-system/TarjetaIndicador';
+import { BarraTrabajo } from '@/app/components/design-system/BarraTrabajo';
+import { CabeceraTablaSticky, SuperficieTabla } from '@/app/components/design-system/SuperficieTabla';
+import { PanelPestana, Pestanas } from '@/app/components/design-system/Pestanas';
 import {
   formatFechaColombia,
   formatFechaCortaColombia,
@@ -72,17 +89,21 @@ import {
   formatHoraColombia,
 } from '@/lib/fecha-colombia';
 import { PanelCargaDependencias }          from '@/app/interno/dashboard/components/dependencias/PanelCargaDependencias';
+import { BandejaAsignacion } from '@/app/interno/dashboard/components/bandeja/BandejaAsignacion';
+import { VistaReportes } from '@/app/interno/dashboard/components/reportes/VistaReportes';
+import { descargarExcelMipg } from '@/app/interno/dashboard/components/reportes/exportaciones-mipg';
 import { VistaAnalytics }                  from '@/app/interno/dashboard/components/analytics/VistaAnalytics';
 import { VistaAlertas, contarAlertasActivas } from '@/app/interno/dashboard/components/analytics/VistaAlertas';
 import { VistaSupervisionIA }              from '@/app/interno/dashboard/components/analytics/VistaSupervisionIA';
 import { VistaAnticipacionOperativa }      from '@/app/interno/dashboard/components/analytics/VistaAnticipacionOperativa';
 import { VistaLicencias }                  from '@/app/interno/dashboard/components/licencias/VistaLicencias';
+import { leerDestinoLicencias, urlLicencias, PARAMETROS_LICENCIAS } from '@/app/interno/licencias/rutas-licencias';
 import type {
   FiltroMIPG,
   VistaActual,
 }                                         from '@/lib/store/ventanillaStore';
 import type { TenantId }                  from '@/src/types/radicado';
-import { SemaforoTermino, calcularSemaforo } from '@/app/interno/dashboard/components/mipg/SemaforoTermino';
+import { calcularSemaforo } from '@/app/interno/dashboard/components/mipg/SemaforoTermino';
 import { VistaAdministracion }                from '@/app/interno/dashboard/components/admin/VistaAdministracion';
 import { PanelSimi }                         from '@/app/interno/dashboard/components/simi/PanelSimi';
 import { PqrsdDeadlineDashboard }            from '@/app/interno/dashboard/components/simi/PqrsdDeadlineDashboard';
@@ -103,9 +124,14 @@ import {
   filtrarPorKpiOperativo,
   type FiltroKpiOperativo,
 } from '@/lib/kpis-operativos/filtrar-por-kpi-operativo';
-import { puedeVerTodosLosTenants } from '@/lib/permisos/alcance-tenants';
+import {
+  construirContextoInterno,
+  puedeAccederVista,
+  puedeRadicar,
+} from '@/lib/permisos/contexto-interno';
 import { BarraFiltrosActivos } from '@/app/interno/dashboard/components/BarraFiltrosActivos';
 import type { EstadoFiltros, DimensionFiltro } from '@/lib/filtros-activos/resumir-filtros-activos';
+import { etiquetaFiltroMIPG } from '@/lib/filtros-activos/resumir-filtros-activos';
 import { PriorityBanner } from '@/app/components/design-system/PriorityBanner';
 import { useFuncionariosTenant }              from '@/lib/hooks/useFuncionariosTenant';
 import type { FuncionarioTenant }             from '@/lib/hooks/useFuncionariosTenant';
@@ -148,18 +174,21 @@ const LABELS_ESTADO: Record<string, string> = {
 /* Sprint Ventanilla Operativa 1 — Labels operativos */
 
 
+/* Las variantes `oscuro:` solo aplican dentro de `[data-tema="oscuro"]`
+   (ADR-0043); en claro las clases base no cambian. */
 const BADGE_ESTADO: Record<string, string> = {
-  PENDIENTE:   'bg-yellow-50  text-yellow-800 border-yellow-200',
-  EN_REVISION: 'bg-blue-50    text-blue-800   border-blue-200',
-  EN_PROCESO:  'bg-sky-50     text-sky-800    border-sky-200',
-  ASIGNADO:    'bg-[#F5E8B7]  text-[#14532D]  border-[#D4A017]/40',
-  RESUELTO:    'bg-green-50   text-green-800  border-green-200',
-  DEVUELTO:    'bg-rose-50    text-rose-800   border-rose-200',
-  RECHAZADO:   'bg-gray-100   text-gray-600   border-gray-200',
-  POR_VENCER:  'bg-orange-50  text-orange-800 border-orange-200',
-  VENCIDO:     'bg-red-50     text-red-800    border-red-200',
-  PRORROGA:    'bg-amber-50   text-amber-800  border-amber-200',
+  PENDIENTE:   'bg-yellow-50  text-yellow-800 border-yellow-200 oscuro:bg-yellow-500/15 oscuro:text-yellow-300 oscuro:border-yellow-500/30',
+  EN_REVISION: 'bg-blue-50    text-blue-800   border-blue-200   oscuro:bg-blue-500/15   oscuro:text-blue-300   oscuro:border-blue-500/30',
+  EN_PROCESO:  'bg-sky-50     text-sky-800    border-sky-200    oscuro:bg-sky-500/15    oscuro:text-sky-300    oscuro:border-sky-500/30',
+  ASIGNADO:    'bg-[var(--tema-fondo-fbefd2)]  text-[var(--tema-texto-007049)]  border-[#E5A31A]/40 oscuro:bg-[#E5A31A]/15 oscuro:text-[#FBEFD2]',
+  RESUELTO:    'bg-green-50   text-green-800  border-green-200  oscuro:bg-green-500/15  oscuro:text-green-300  oscuro:border-green-500/30',
+  DEVUELTO:    'bg-rose-50    text-rose-800   border-rose-200   oscuro:bg-rose-500/15   oscuro:text-rose-300   oscuro:border-rose-500/30',
+  RECHAZADO:   'bg-gray-100   text-gray-600   border-gray-200   oscuro:bg-gray-500/15   oscuro:text-gray-300   oscuro:border-gray-500/30',
+  POR_VENCER:  'bg-orange-50  text-orange-800 border-orange-200 oscuro:bg-orange-500/15 oscuro:text-orange-300 oscuro:border-orange-500/30',
+  VENCIDO:     'bg-red-50     text-red-800    border-red-200    oscuro:bg-red-500/15    oscuro:text-red-300    oscuro:border-red-500/30',
+  PRORROGA:    'bg-amber-50   text-amber-800  border-amber-200  oscuro:bg-amber-500/15  oscuro:text-amber-300  oscuro:border-amber-500/30',
 };
+const BADGE_ESTADO_NEUTRO = 'bg-gray-100 text-gray-600 border-gray-200 oscuro:bg-gray-500/15 oscuro:text-gray-300 oscuro:border-gray-500/30';
 
 /* ══════════════════════════════════════════════════════════════
    UTILIDADES
@@ -289,69 +318,6 @@ function calcularResumenBandeja(radicados: VentanillaRadicado[]): ResumenBandeja
   };
 }
 
-function puedeRadicar(usuario: UsuarioAutenticado): boolean {
-  return usuario.rol === 'ADMIN' || usuario.rol === 'RECEPCIONISTA';
-}
-
-function puedeUsarBandejaAsignacion(usuario: UsuarioAutenticado): boolean {
-  return usuario.rol === 'ADMIN' || usuario.rol === 'RECEPCIONISTA';
-}
-
-function puedeVerDependencias(usuario: UsuarioAutenticado): boolean {
-  // Panel Op Nivel 2 — misma política que el alcance de datos: si el rol
-  // ve todos los tenants (ADMIN, CONTROL_INTERNO, RECEPCIONISTA), puede
-  // ver el panorama por dependencias. La Ventanilla responde consultas
-  // de todo el municipio y necesita esta vista.
-  return puedeVerTodosLosTenants(usuario.rol);
-}
-
-function puedeVerAnaliticaAvanzada(usuario: UsuarioAutenticado): boolean {
-  return usuario.rol === 'ADMIN'
-    || usuario.rol === 'CONTROL_INTERNO'
-    || usuario.rol === 'JEFE_DEPENDENCIA';
-}
-
-/**
- * Licencias urbanísticas (Secretaría de Planeación) — micro-bloque "acceso
- * solo Planeación" (encargo del propietario, ago-2026). Mismos roles que
- * `GuardModuloPlaneacion` (`app/interno/licencias/components/
- * GuardModuloPlaneacion.tsx`), que sigue siendo la autoridad real para la
- * ruta standalone `/interno/licencias` (deep-links, sigue viva). Bloque B
- * ("la ventanita") integró Licencias como pestaña REAL de `VistaActual`
- * (`'LICENCIAS'`, `lib/store/ventanillaStore.tsx`): este helper decide si
- * la entrada de navegación aparece en el Tablero Y gatea el acceso a esa
- * vista (`puedeAccederVista` de abajo), mismo patrón que ya usan
- * Analítica/Alertas — la puerta que dejaba abierta el JSDoc anterior de
- * `LicenciasSidebar` ya está cruzada.
- */
-function puedeVerLicencias(usuario: UsuarioAutenticado): boolean {
-  return usuario.rol === 'ADMIN'
-    || (usuario.rol === 'FUNCIONARIO' && usuario.tenantId === 'SEC_PLANEACION');
-}
-
-function puedeAccederVista(usuario: UsuarioAutenticado, vista: VistaActual): boolean {
-  if (vista === 'ADMINISTRACION') return usuario.rol === 'ADMIN';
-  if (vista === 'APROBACIONES') return usuario.rol === 'ADMIN' || usuario.rol === 'JEFE_DEPENDENCIA' || usuario.rol === 'CONTROL_INTERNO';
-  if (vista === 'CONTROL_INTERNO') return usuario.rol === 'ADMIN' || usuario.rol === 'CONTROL_INTERNO';
-  if (vista === 'BANDEJA' || vista === 'VENTANILLA') return puedeUsarBandejaAsignacion(usuario);
-  if (vista === 'DEPENDENCIAS') return puedeVerDependencias(usuario);
-  if (vista === 'SUPERVISION_IA' || vista === 'ANTICIPACION_OPERATIVA') {
-    return usuario.rol === 'ADMIN' || usuario.rol === 'CONTROL_INTERNO';
-  }
-  if (vista === 'LICENCIAS') return puedeVerLicencias(usuario);
-  if (vista === 'ANALYTICS') return puedeVerAnaliticaAvanzada(usuario);
-  // Sprint 3C — Reportes se abre también a RECEPCIONISTA: ella responde
-  // "¿qué llegó este mes?" con los mismos datos que ya ve en el Tablero.
-  if (vista === 'REPORTES') return puedeVerReportes(usuario.rol);
-  // Sprint Radicación de salida — el libro completo lo ven quienes por
-  // reglas leen todas las salidas (registro: solo Admin/Recepción).
-  if (vista === 'SALIDAS') {
-    return usuario.rol === 'ADMIN' || usuario.rol === 'RECEPCIONISTA'
-      || usuario.rol === 'CONTROL_INTERNO';
-  }
-  return true;
-}
-
 function fmtFecha(iso: string): string {
   return formatFechaCortaColombia(iso);
 }
@@ -366,10 +332,10 @@ function fmtFechaLarga(iso: string): string {
 
 function CargandoSesion() {
   return (
-    <div className="h-screen bg-[#0A0A0B] flex items-center justify-center">
+    <div className="h-screen bg-[var(--tema-fondo-0a0a0b)] flex items-center justify-center">
       <div className="flex flex-col items-center gap-3">
         <span className="w-8 h-8 border-2 border-indigo-500/30 border-t-indigo-500 rounded-full animate-spin" />
-        <span className="text-sm text-slate-500">Verificando sesión…</span>
+        <span className="text-sm text-slate-500 oscuro:text-slate-400">Verificando sesión…</span>
       </div>
     </div>
   );
@@ -541,6 +507,68 @@ const NAV_ITEMS: { vista: VistaActual; label: string; icono: React.ReactNode }[]
   },
 ];
 
+/* Vistas que el menú agrega según el rol, en el orden de siempre. La
+   visibilidad la decide `puedeAccederVista` (lib/permisos/contexto-interno,
+   ADR-0046) — la misma regla que protege la vista —, no condiciones
+   repetidas aquí. */
+const NAV_ITEMS_POR_ROL: typeof NAV_ITEMS = [
+  {
+    vista: 'ANTICIPACION_OPERATIVA' as const,
+    label: 'Anticipación Operativa',
+    icono: (
+      <svg className="w-[18px] h-[18px]" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.8}>
+        <path strokeLinecap="round" strokeLinejoin="round" d="M2.25 18L9 11.25l4.306 4.307a11.95 11.95 0 015.814-5.519l2.74-1.22m0 0l-5.94-2.28m5.94 2.28l-2.28 5.941" />
+      </svg>
+    ),
+  },
+  {
+    vista: 'SUPERVISION_IA' as const,
+    label: 'Supervisión IA',
+    icono: (
+      <svg className="w-[18px] h-[18px]" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.8}>
+        <path strokeLinecap="round" strokeLinejoin="round" d="M9.594 3.94c.09-.542.56-.94 1.11-.94h2.593c.55 0 1.02.398 1.11.94l.213 1.281c.063.374.313.686.645.87.074.04.147.083.22.127.324.196.72.257 1.075.124l1.217-.456a1.125 1.125 0 011.37.49l1.296 2.247a1.125 1.125 0 01-.26 1.43l-1.003.828c-.293.241-.438.613-.43.992a7.723 7.723 0 010 .255c-.008.378.137.75.43.991l1.004.827c.424.35.534.954.26 1.43l-1.298 2.247a1.125 1.125 0 01-1.369.491l-1.217-.456c-.355-.133-.75-.072-1.076.124a6.47 6.47 0 01-.22.128c-.331.183-.581.495-.644.869l-.213 1.281c-.09.543-.56.94-1.11.94h-2.594c-.55 0-1.019-.398-1.11-.94l-.213-1.281c-.062-.374-.312-.686-.644-.87a6.52 6.52 0 01-.22-.127c-.325-.196-.72-.257-1.076-.124l-1.217.456a1.125 1.125 0 01-1.369-.49l-1.297-2.247a1.125 1.125 0 01.26-1.43l1.004-.827c.292-.24.437-.613.43-.991a6.932 6.932 0 010-.255c.007-.38-.138-.751-.43-.992l-1.004-.827a1.125 1.125 0 01-.26-1.43l1.297-2.247a1.125 1.125 0 011.37-.491l1.216.456c.356.133.751.072 1.076-.124.072-.044.146-.086.22-.128.332-.183.582-.495.644-.869l.214-1.28Z" />
+        <path strokeLinecap="round" strokeLinejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0Z" />
+      </svg>
+    ),
+  },
+  {
+    vista: 'CONTROL_INTERNO' as const,
+    label: 'Control Interno',
+    icono: (
+      <svg className="w-[18px] h-[18px]" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.8}>
+        <path strokeLinecap="round" strokeLinejoin="round" d="M9 12h3.75M9 15h3.75M9 18h3.75m3 .75H18a2.25 2.25 0 002.25-2.25V6.108c0-1.135-.845-2.098-1.976-2.192a48.424 48.424 0 00-1.123-.08m-5.801 0c-.065.21-.1.433-.1.664 0 .414.336.75.75.75h4.5a.75.75 0 00.75-.75 2.25 2.25 0 00-.1-.664m-5.8 0A2.251 2.251 0 0113.5 2.25H15c1.012 0 1.867.668 2.15 1.586m-5.8 0c-.376.023-.75.05-1.124.08C9.095 4.01 8.25 4.973 8.25 6.108V8.25m0 0H4.875c-.621 0-1.125.504-1.125 1.125v11.25c0 .621.504 1.125 1.125 1.125h9.75c.621 0 1.125-.504 1.125-1.125V9.375c0-.621-.504-1.125-1.125-1.125H8.25zM6.75 12h.008v.008H6.75V12zm0 3h.008v.008H6.75V15zm0 3h.008v.008H6.75V18z" />
+      </svg>
+    ),
+  },
+  {
+    vista: 'APROBACIONES' as const,
+    label: 'Aprobaciones',
+    icono: (
+      <svg className="w-[18px] h-[18px]" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.8}>
+        <path strokeLinecap="round" strokeLinejoin="round" d="M9 12.75L11.25 15 15 9.75m-3-7.036A11.959 11.959 0 013.598 6 11.99 11.99 0 003 9.749c0 5.592 3.824 10.29 9 11.623 5.176-1.332 9-6.03 9-11.622 0-1.31-.21-2.571-.598-3.751h-.152c-3.196 0-6.1-1.248-8.25-3.285z" />
+      </svg>
+    ),
+  },
+  {
+    vista: 'ADMINISTRACION' as const,
+    label: 'Administración',
+    icono: (
+      <svg className="w-[18px] h-[18px]" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.8}>
+        <path strokeLinecap="round" strokeLinejoin="round" d="M15 19.128a9.38 9.38 0 002.625.372 9.337 9.337 0 004.121-.952 4.125 4.125 0 00-7.533-2.493M15 19.128v-.003c0-1.113-.285-2.16-.786-3.07M15 19.128v.106A12.318 12.318 0 018.624 21c-2.331 0-4.512-.645-6.374-1.766l-.001-.109a6.375 6.375 0 0111.964-3.07M12 6.375a3.375 3.375 0 11-6.75 0 3.375 3.375 0 016.75 0zm8.25 2.25a2.625 2.625 0 11-5.25 0 2.625 2.625 0 015.25 0z" />
+      </svg>
+    ),
+  },
+  {
+    vista: 'LICENCIAS' as const,
+    label: 'Licencias',
+    icono: (
+      <svg className="w-[18px] h-[18px]" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.8}>
+        <path strokeLinecap="round" strokeLinejoin="round" d="M3.75 21h16.5M4.5 3h15M5.25 3v18m13.5-18v18M9 6.75h1.5m-1.5 3h1.5m-1.5 3h1.5m3-6H15m-1.5 3H15m-1.5 3H15M9 21v-3.375c0-.621.504-1.125 1.125-1.125h3.75c.621 0 1.125.504 1.125 1.125V21" />
+      </svg>
+    ),
+  },
+];
+
 function SidebarNav({
   vistaActual,
   onVistaChange,
@@ -554,6 +582,9 @@ function SidebarNav({
   pendientesNotificacionFallida,
   onVerCorreosFallidos,
   onAbrirResumen,
+  menuFijado = false,
+  onToggleMenuFijado,
+  mostrarControlMenu = false,
   className = '',
 }: {
   vistaActual: VistaActual;
@@ -570,6 +601,10 @@ function SidebarNav({
   pendientesNotificacionFallida: number;
   onVerCorreosFallidos: () => void;
   onAbrirResumen: () => void;
+  /** Preferencia visual disponible solo durante la gestión de un radicado. */
+  menuFijado?: boolean;
+  onToggleMenuFijado?: () => void;
+  mostrarControlMenu?: boolean;
   className?: string;
 }) {
   const LABEL_ROL: Record<string, string> = {
@@ -581,90 +616,11 @@ function SidebarNav({
   };
   const nombreRol = LABEL_ROL[usuario.rol] ?? 'Funcionario';
 
-  const items = NAV_ITEMS.filter((item) => puedeAccederVista(usuario, item.vista));
-  // Control Interno tiene visibilidad total equivalente a Admin.
-  if (usuario.rol === 'ADMIN' || usuario.rol === 'CONTROL_INTERNO') {
-    items.push({
-      vista: 'ANTICIPACION_OPERATIVA' as const,
-      label: 'Anticipación Operativa',
-      icono: (
-        <svg className="w-[18px] h-[18px]" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.8}>
-          <path strokeLinecap="round" strokeLinejoin="round" d="M2.25 18L9 11.25l4.306 4.307a11.95 11.95 0 015.814-5.519l2.74-1.22m0 0l-5.94-2.28m5.94 2.28l-2.28 5.941" />
-        </svg>
-      ),
-    });
-    items.push({
-      vista: 'SUPERVISION_IA' as const,
-      label: 'Supervisión IA',
-      icono: (
-        <svg className="w-[18px] h-[18px]" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.8}>
-          <path strokeLinecap="round" strokeLinejoin="round" d="M9.594 3.94c.09-.542.56-.94 1.11-.94h2.593c.55 0 1.02.398 1.11.94l.213 1.281c.063.374.313.686.645.87.074.04.147.083.22.127.324.196.72.257 1.075.124l1.217-.456a1.125 1.125 0 011.37.49l1.296 2.247a1.125 1.125 0 01-.26 1.43l-1.003.828c-.293.241-.438.613-.43.992a7.723 7.723 0 010 .255c-.008.378.137.75.43.991l1.004.827c.424.35.534.954.26 1.43l-1.298 2.247a1.125 1.125 0 01-1.369.491l-1.217-.456c-.355-.133-.75-.072-1.076.124a6.47 6.47 0 01-.22.128c-.331.183-.581.495-.644.869l-.213 1.281c-.09.543-.56.94-1.11.94h-2.594c-.55 0-1.019-.398-1.11-.94l-.213-1.281c-.062-.374-.312-.686-.644-.87a6.52 6.52 0 01-.22-.127c-.325-.196-.72-.257-1.076-.124l-1.217.456a1.125 1.125 0 01-1.369-.49l-1.297-2.247a1.125 1.125 0 01.26-1.43l1.004-.827c.292-.24.437-.613.43-.991a6.932 6.932 0 010-.255c.007-.38-.138-.751-.43-.992l-1.004-.827a1.125 1.125 0 01-.26-1.43l1.297-2.247a1.125 1.125 0 011.37-.491l1.216.456c.356.133.751.072 1.076-.124.072-.044.146-.086.22-.128.332-.183.582-.495.644-.869l.214-1.28Z" />
-          <path strokeLinecap="round" strokeLinejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0Z" />
-        </svg>
-      ),
-    });
-  }
-
-  // Control Interno — ADMIN y CONTROL_INTERNO
-  if (['ADMIN', 'CONTROL_INTERNO'].includes(usuario.rol)) {
-    items.push({
-      vista: 'CONTROL_INTERNO' as const,
-      label: 'Control Interno',
-      icono: (
-        <svg className="w-[18px] h-[18px]" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.8}>
-          <path strokeLinecap="round" strokeLinejoin="round" d="M9 12h3.75M9 15h3.75M9 18h3.75m3 .75H18a2.25 2.25 0 002.25-2.25V6.108c0-1.135-.845-2.098-1.976-2.192a48.424 48.424 0 00-1.123-.08m-5.801 0c-.065.21-.1.433-.1.664 0 .414.336.75.75.75h4.5a.75.75 0 00.75-.75 2.25 2.25 0 00-.1-.664m-5.8 0A2.251 2.251 0 0113.5 2.25H15c1.012 0 1.867.668 2.15 1.586m-5.8 0c-.376.023-.75.05-1.124.08C9.095 4.01 8.25 4.973 8.25 6.108V8.25m0 0H4.875c-.621 0-1.125.504-1.125 1.125v11.25c0 .621.504 1.125 1.125 1.125h9.75c.621 0 1.125-.504 1.125-1.125V9.375c0-.621-.504-1.125-1.125-1.125H8.25zM6.75 12h.008v.008H6.75V12zm0 3h.008v.008H6.75V15zm0 3h.008v.008H6.75V18z" />
-        </svg>
-      ),
-    });
-  }
-
-  // Cola de aprobaciones — Jefe, Control Interno y Admin
-  if (['ADMIN', 'JEFE_DEPENDENCIA', 'CONTROL_INTERNO'].includes(usuario.rol)) {
-    items.push({
-      vista: 'APROBACIONES' as const,
-      label: 'Aprobaciones',
-      icono: (
-        <svg className="w-[18px] h-[18px]" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.8}>
-          <path strokeLinecap="round" strokeLinejoin="round" d="M9 12.75L11.25 15 15 9.75m-3-7.036A11.959 11.959 0 013.598 6 11.99 11.99 0 003 9.749c0 5.592 3.824 10.29 9 11.623 5.176-1.332 9-6.03 9-11.622 0-1.31-.21-2.571-.598-3.751h-.152c-3.196 0-6.1-1.248-8.25-3.285z" />
-        </svg>
-      ),
-    });
-  }
-
-  // Administración — solo ADMIN real (no CONTROL_INTERNO)
-  if (usuario.rol === 'ADMIN') {
-    items.push({
-      vista: 'ADMINISTRACION' as const,
-      label: 'Administración',
-      icono: (
-        <svg className="w-[18px] h-[18px]" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.8}>
-          <path strokeLinecap="round" strokeLinejoin="round" d="M15 19.128a9.38 9.38 0 002.625.372 9.337 9.337 0 004.121-.952 4.125 4.125 0 00-7.533-2.493M15 19.128v-.003c0-1.113-.285-2.16-.786-3.07M15 19.128v.106A12.318 12.318 0 018.624 21c-2.331 0-4.512-.645-6.374-1.766l-.001-.109a6.375 6.375 0 0111.964-3.07M12 6.375a3.375 3.375 0 11-6.75 0 3.375 3.375 0 016.75 0zm8.25 2.25a2.625 2.625 0 11-5.25 0 2.625 2.625 0 015.25 0z" />
-        </svg>
-      ),
-    });
-  }
-
-  // Licencias urbanísticas — Bloque B ("la ventanita"): pestaña REAL del
-  // panel interno (ya no un link de página completa a `/interno/licencias`,
-  // ver JSDoc de `puedeVerLicencias`). Mismo patrón de push condicional que
-  // Anticipación Operativa / Supervisión IA arriba — no vive en `NAV_ITEMS`
-  // porque su visibilidad no es un simple filtro por `puedeAccederVista`
-  // sobre la lista fija, sino un helper de dominio propio (Planeación).
-  if (puedeVerLicencias(usuario)) {
-    items.push({
-      vista: 'LICENCIAS' as const,
-      label: 'Licencias',
-      icono: (
-        <svg className="w-[18px] h-[18px]" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.8}>
-          <path strokeLinecap="round" strokeLinejoin="round" d="M3.75 21h16.5M4.5 3h15M5.25 3v18m13.5-18v18M9 6.75h1.5m-1.5 3h1.5m-1.5 3h1.5m3-6H15m-1.5 3H15m-1.5 3H15M9 21v-3.375c0-.621.504-1.125 1.125-1.125h3.75c.621 0 1.125.504 1.125 1.125V21" />
-        </svg>
-      ),
-    });
-  }
+  const items = [...NAV_ITEMS, ...NAV_ITEMS_POR_ROL].filter((item) => puedeAccederVista(usuario, item.vista));
 
   return (
-    <aside className={`h-full flex flex-col shrink-0 w-[250px] overflow-hidden ${className}`}
-           style={{ background: '#14532D' }}>
+    <aside className={`h-full flex flex-col shrink-0 w-[224px] overflow-hidden ${className}`}
+           style={{ background: '#03402A' }}>
       {/* Bloque institucional */}
       <div className="px-4 py-4 w-full overflow-hidden" style={{ borderBottom: '1px solid rgba(255,255,255,0.10)' }}>
         <InstitucionalHeader variant="sidebar" subtitle="Ventanilla Única Digital" />
@@ -676,9 +632,9 @@ function SidebarNav({
           <button
             onClick={onNuevoRadicado}
             className="w-full flex items-center gap-2 px-3 py-2.5 rounded-xl text-xs font-bold focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-1"
-            style={{ background: '#D4A017', color: '#14532D', transition: 'filter 0.15s ease-out, transform 0.15s ease-out, box-shadow 0.15s ease-out', boxShadow: '0 2px 8px rgba(212,160,23,0.30)' }}
-            onMouseEnter={(e) => { (e.currentTarget as HTMLElement).style.filter = 'brightness(0.93)'; (e.currentTarget as HTMLElement).style.transform = 'translateY(-1px)'; (e.currentTarget as HTMLElement).style.boxShadow = '0 5px 14px rgba(212,160,23,0.40)'; }}
-            onMouseLeave={(e) => { (e.currentTarget as HTMLElement).style.filter = ''; (e.currentTarget as HTMLElement).style.transform = ''; (e.currentTarget as HTMLElement).style.boxShadow = '0 2px 8px rgba(212,160,23,0.30)'; }}
+            style={{ background: '#E5A31A', color: '#03402A', transition: 'filter 0.15s ease-out, transform 0.15s ease-out, box-shadow 0.15s ease-out', boxShadow: '0 2px 8px rgba(229, 163, 26,0.30)' }}
+            onMouseEnter={(e) => { (e.currentTarget as HTMLElement).style.filter = 'brightness(0.93)'; (e.currentTarget as HTMLElement).style.transform = 'translateY(-1px)'; (e.currentTarget as HTMLElement).style.boxShadow = '0 5px 14px rgba(229, 163, 26,0.40)'; }}
+            onMouseLeave={(e) => { (e.currentTarget as HTMLElement).style.filter = ''; (e.currentTarget as HTMLElement).style.transform = ''; (e.currentTarget as HTMLElement).style.boxShadow = '0 2px 8px rgba(229, 163, 26,0.30)'; }}
             onMouseDown={(e) => { (e.currentTarget as HTMLElement).style.transform = 'scale(0.97)'; }}
             onMouseUp={(e) => { (e.currentTarget as HTMLElement).style.transform = ''; }}
           >
@@ -735,7 +691,7 @@ function SidebarNav({
 
       {/* Navegación */}
       <nav className="flex-1 px-3 py-2 flex flex-col gap-0.5 overflow-y-auto">
-        <p className="text-[10px] font-bold uppercase tracking-widest px-2 py-1.5" style={{ color: 'rgba(255,255,255,0.40)' }}>
+        <p className="text-[10px] font-bold uppercase tracking-widest px-2 py-1.5" style={{ color: 'rgba(255,255,255,0.60)' }}>
           Módulos
         </p>
         {items.map(({ vista, label, icono }) => {
@@ -746,22 +702,22 @@ function SidebarNav({
               onClick={() => onVistaChange(vista)}
               className="micro-sidebar-item w-full flex items-center gap-2.5 px-3 py-2.5 rounded-xl text-left group focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset"
               style={activo ? {
-                background: '#D4A017',
-                color: '#14532D',
-                boxShadow: '0 2px 8px rgba(212,160,23,0.30)',
+                background: '#E5A31A',
+                color: '#03402A',
+                boxShadow: '0 2px 8px rgba(229, 163, 26,0.30)',
               } : {
                 color: 'rgba(255,255,255,0.75)',
               }}
               onMouseEnter={(e) => { if (!activo) { (e.currentTarget as HTMLElement).style.background = 'rgba(255,255,255,0.10)'; (e.currentTarget as HTMLElement).style.color = '#ffffff'; } }}
               onMouseLeave={(e) => { if (!activo) { (e.currentTarget as HTMLElement).style.background = 'transparent'; (e.currentTarget as HTMLElement).style.color = 'rgba(255,255,255,0.75)'; } }}
             >
-              <span style={activo ? { color: '#14532D' } : { color: 'rgba(255,255,255,0.55)' }}>
+              <span style={activo ? { color: '#03402A' } : { color: 'rgba(255,255,255,0.55)' }}>
                 {icono}
               </span>
               <span className="text-xs font-medium flex-1">{label}</span>
               {vista === 'BANDEJA' && pendientesBandeja > 0 && (
                 <span className="shrink-0 min-w-[18px] h-[18px] rounded-full text-white text-[9px] font-black flex items-center justify-center px-1"
-                      style={{ background: '#166534' }}>
+                      style={{ background: '#006B45' }}>
                   {pendientesBandeja > 99 ? '99+' : pendientesBandeja}
                 </span>
               )}
@@ -776,8 +732,8 @@ function SidebarNav({
                 <span
                   className={`shrink-0 min-w-[18px] h-[18px] rounded-full text-white text-[9px] font-black flex items-center justify-center px-1${miCarga.nivel === 'ROJO' ? ' animate-pulse' : ''}`}
                   style={{
-                    background: miCarga.nivel === 'ROJO' ? '#DC2626'
-                      : miCarga.nivel === 'AMBAR' ? '#D97706' : '#166534',
+                    background: miCarga.nivel === 'ROJO' ? '#D81E1E'
+                      : miCarga.nivel === 'AMBAR' ? '#D97706' : '#006B45',
                   }}
                 >
                   {miCarga.activos > 99 ? '99+' : miCarga.activos}
@@ -786,12 +742,13 @@ function SidebarNav({
               {/* Licencias urbanísticas — Bloque B: badge "Planeación" que
                   antes vivía en el link de página completa (mismo texto,
                   ahora dentro del ítem de navegación normal). Contraste
-                  distinto activo/inactivo: sobre dorado (#D4A017) el texto
+                  distinto activo/inactivo: sobre dorado (#E5A31A) el texto
                   claro perdía legibilidad. */}
               {vista === 'LICENCIAS' && (
                 <span
                   className="text-[9px] font-bold uppercase tracking-wide shrink-0"
-                  style={{ color: activo ? 'rgba(20,83,45,0.65)' : 'rgba(255,255,255,0.40)' }}
+                  /* AA: #03402A sobre el dorado activo (5,4:1); blanco al 60 % sobre el menú (5,3:1). */
+                  style={{ color: activo ? '#03402A' : 'rgba(255,255,255,0.60)' }}
                 >
                   Planeación
                 </span>
@@ -800,6 +757,26 @@ function SidebarNav({
           );
         })}
       </nav>
+
+      {mostrarControlMenu && onToggleMenuFijado && (
+        <div className="px-3 pb-2 pt-1">
+          <button
+            type="button"
+            onClick={onToggleMenuFijado}
+            aria-pressed={menuFijado}
+            className="w-full flex items-center gap-2 rounded-xl border px-3 py-2 text-xs font-semibold transition-all duration-200 ease-out hover:-translate-y-0.5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-200"
+            style={{
+              background: menuFijado ? 'rgba(229, 163, 26,0.16)' : 'rgba(255,255,255,0.06)',
+              borderColor: menuFijado ? 'rgba(229, 163, 26,0.48)' : 'rgba(255,255,255,0.14)',
+              color: menuFijado ? '#FBEFD2' : 'rgba(255,255,255,0.82)',
+            }}
+            title={menuFijado ? 'Desfijar menú lateral' : 'Fijar menú lateral'}
+          >
+            {menuFijado ? <PinOff className="h-4 w-4 shrink-0" aria-hidden="true" /> : <Pin className="h-4 w-4 shrink-0" aria-hidden="true" />}
+            <span className="flex-1 text-left">{menuFijado ? 'Desfijar menú' : 'Fijar menú'}</span>
+          </button>
+        </div>
+      )}
 
       {/* Resumen del Día */}
       <div className="px-3 pt-1 pb-2">
@@ -823,7 +800,7 @@ function SidebarNav({
           </div>
           <div className="flex items-center justify-between">
             <span className="text-[10px] px-2 py-0.5 rounded-full font-bold uppercase tracking-wide border"
-                  style={{ background: 'rgba(255,255,255,0.10)', color: '#F5E8B7', borderColor: 'rgba(255,255,255,0.20)' }}>
+                  style={{ background: 'rgba(255,255,255,0.10)', color: '#FBEFD2', borderColor: 'rgba(255,255,255,0.20)' }}>
               {nombreRol}
             </span>
             <button
@@ -845,26 +822,89 @@ function SidebarNav({
   );
 }
 
+/** Nombre legible de la vista actual; lo comparten la barra móvil y el encabezado de escritorio. */
+function etiquetaDeVista(vistaActual: VistaActual): string {
+  if (vistaActual === 'TABLERO') return 'Bandeja de trámites';
+  return [...NAV_ITEMS, ...NAV_ITEMS_POR_ROL].find((item) => item.vista === vistaActual)?.label
+    ?? 'Panel interno';
+}
+
+const CLASE_BOTON_ENCABEZADO = 'tablero-interactivo flex h-9 w-9 items-center justify-center rounded-xl border transition-shadow hover:shadow-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-700/30';
+const ESTILO_BOTON_ENCABEZADO = { background: 'var(--tema-fondo-ffffff)', borderColor: 'var(--tema-borde-dce4ea)', color: 'var(--text-secondary)' } as const;
+
+/**
+ * Encabezado de escritorio COMÚN a todas las pantallas del panel interno
+ * (ADR-0045): mismo antetítulo, tipografía y acciones para todos los roles.
+ * La lupa y la campana abren funciones que ya existían (búsqueda avanzada y
+ * Resumen del día).
+ */
+function EncabezadoPantalla({
+  antetitulo,
+  titulo,
+  complemento,
+  fecha,
+  onBuscar,
+  onResumen,
+  botonTema,
+}: {
+  antetitulo: string;
+  titulo: string;
+  /** Elemento junto al título (p. ej. el chip de activos del Tablero). */
+  complemento?: React.ReactNode;
+  fecha: string;
+  onBuscar: () => void;
+  onResumen: () => void;
+  botonTema?: React.ReactNode;
+}) {
+  return (
+    <header data-armazon="pantalla" className="hidden xl:flex min-w-0 items-center justify-between gap-3 px-4 pb-1 pt-3 lg:px-6 shrink-0">
+      <div className="flex min-w-0 items-center gap-2.5">
+        <div className="min-w-0">
+          <div className="flex items-center gap-2">
+            <span className="text-[10px] font-bold uppercase tracking-[0.12em]" style={{ color: 'var(--tema-texto-007049)' }}>
+              {antetitulo}
+            </span>
+            <span className="w-1.5 h-1.5 rounded-full" style={{ background: '#3B9E5F' }} />
+            <span className="text-[10px]" style={{ color: 'var(--text-secondary)' }}>tiempo real</span>
+          </div>
+          <h1 className="mt-0.5 break-words text-lg font-black leading-tight lg:text-xl" style={{ color: 'var(--tema-texto-172033)' }}>
+            {titulo}
+          </h1>
+        </div>
+        {complemento}
+      </div>
+      <div className="flex shrink-0 items-center gap-2">
+        <span className="mr-1 text-xs" style={{ color: 'var(--text-secondary)' }}>{fecha}</span>
+        <button type="button" onClick={onBuscar} className={CLASE_BOTON_ENCABEZADO} style={ESTILO_BOTON_ENCABEZADO}
+                aria-label="Búsqueda avanzada de radicados" title="Búsqueda avanzada de radicados">
+          <Search size={17} strokeWidth={1.9} aria-hidden="true" />
+        </button>
+        <button type="button" onClick={onResumen} className={CLASE_BOTON_ENCABEZADO} style={ESTILO_BOTON_ENCABEZADO}
+                aria-label="Ver resumen del día" title="Ver resumen del día">
+          <Bell size={17} strokeWidth={1.9} aria-hidden="true" />
+        </button>
+        {botonTema}
+      </div>
+    </header>
+  );
+}
+
 function MobileTopBar({
   usuario,
   vistaActual,
   onAbrirMenu,
   onAbrirResumen,
+  tema,
+  onAlternarTema,
 }: {
   usuario: UsuarioAutenticado;
   vistaActual: VistaActual;
   onAbrirMenu: () => void;
   onAbrirResumen: () => void;
+  tema: TemaInterno;
+  onAlternarTema: () => void;
 }) {
-  const vista = NAV_ITEMS.find((item) => item.vista === vistaActual)?.label
-    ?? (vistaActual === 'SUPERVISION_IA'
-      ? 'Supervisión IA'
-      : vistaActual === 'ANTICIPACION_OPERATIVA'
-        ? 'Anticipación'
-        : vistaActual === 'LICENCIAS'
-          ? 'Licencias'
-          : 'Panel interno');
-  const etiquetaVista = vistaActual === 'TABLERO' ? 'Bandeja de trámites' : vista;
+  const etiquetaVista = etiquetaDeVista(vistaActual);
   const rolCompacto: Record<string, string> = {
     ADMIN: 'Admin',
     RECEPCIONISTA: 'Recepción',
@@ -874,13 +914,13 @@ function MobileTopBar({
   };
 
   return (
-    <header className="md:hidden w-full min-w-0 shrink-0 bg-white px-3 py-2.5" style={{ borderBottom: '1px solid #D9E2D9' }}>
+    <header data-armazon="pantalla" className="xl:hidden w-full min-w-0 shrink-0 bg-[var(--tema-fondo-ffffff)] px-3 py-2.5" style={{ borderBottom: '1px solid var(--tema-borde-dce4ea)' }}>
       <div className="flex min-w-0 items-center gap-2.5">
         <button
           type="button"
           onClick={onAbrirMenu}
           className="shrink-0 flex h-9 w-9 items-center justify-center rounded-xl active:scale-95 focus-visible:outline-none focus-visible:ring-2"
-          style={{ border: '1px solid #D9E2D9', color: '#14532D', background: '#EEF4EE' }}
+          style={{ border: '1px solid var(--tema-borde-dce4ea)', color: 'var(--tema-texto-007049)', background: 'var(--tema-fondo-f4f9f6)' }}
           aria-label="Abrir menú"
         >
           <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
@@ -888,21 +928,27 @@ function MobileTopBar({
           </svg>
         </button>
         <div className="min-w-0 flex-1">
-          <p className="text-[9px] font-bold uppercase tracking-widest truncate" style={{ color: '#667085' }}>
+          <p className="text-[9px] font-bold uppercase tracking-widest truncate" style={{ color: 'var(--text-secondary)' }}>
             Alcaldía de Simacota
           </p>
-          <p className="truncate text-sm font-black leading-tight" style={{ color: '#1F2933' }}>
+          {/* h1 de la pantalla por debajo de 1280 px: el encabezado de escritorio
+              (con su h1) está oculto ahí, así que siempre hay uno solo. */}
+          <h1 className="truncate text-sm font-black leading-tight" style={{ color: 'var(--tema-texto-172033)' }}>
             {etiquetaVista}
-          </p>
+          </h1>
         </div>
         <span className="hidden shrink-0 rounded-full border px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider min-[360px]:inline"
-              style={{ background: '#EEF4EE', color: '#14532D', borderColor: '#D9E2D9' }}>
+              style={{ background: 'var(--tema-fondo-f4f9f6)', color: 'var(--tema-texto-007049)', borderColor: 'var(--tema-borde-dce4ea)' }}>
           {rolCompacto[usuario.rol] ?? 'Func.'}
         </span>
+        <BotonTema tema={tema} onAlternar={onAlternarTema} />
         <button
           type="button"
           onClick={onAbrirResumen}
-          className="shrink-0 flex h-9 w-9 items-center justify-center rounded-xl border border-emerald-500/30 bg-emerald-500/15 text-emerald-200 active:scale-95 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500/50"
+          /* Mismo botón que el encabezado de escritorio (el verde claro de antes
+             quedaba en 1,1:1 en modo claro). */
+          className={`shrink-0 ${CLASE_BOTON_ENCABEZADO}`}
+          style={ESTILO_BOTON_ENCABEZADO}
           title="Ver resumen del día"
           aria-label="Ver resumen del día"
         >
@@ -944,7 +990,7 @@ function construirTarjetasMIPG(metricas: MetricasMIPGData): TarjetaMIPGItem[] {
       label:      'Radicadas',
       valor:      metricas.radicadas,
       rielColor:  '#475569', // gris neutro institucional (totales)
-      textoColor: '#1F2933',
+      textoColor: '#172033',
     },
     {
       filtro:     'PRIORIDAD_MIPG',
@@ -969,8 +1015,8 @@ function construirTarjetasMIPG(metricas: MetricasMIPGData): TarjetaMIPGItem[] {
       filtro:     'EN_TERMINO',
       label:      'En término',
       valor:      metricas.enTermino,
-      rielColor:  '#14532D', // verde institucional
-      textoColor: '#14532D',
+      rielColor:  '#007049', // verde institucional
+      textoColor: '#007049',
     },
     {
       filtro:     'POR_VENCER',
@@ -983,7 +1029,7 @@ function construirTarjetasMIPG(metricas: MetricasMIPGData): TarjetaMIPGItem[] {
       filtro:     'VENCIDAS',
       label:      'Vencidas',
       valor:      metricas.vencidas,
-      rielColor:  '#DC2626', // rojo vencido
+      rielColor:  '#D81E1E', // rojo vencido
       textoColor: '#B91C1C',
     },
     {
@@ -1003,64 +1049,10 @@ function construirTarjetasMIPG(metricas: MetricasMIPGData): TarjetaMIPGItem[] {
   ];
 }
 
-function TarjetaResumenTablero({
-  etiqueta,
-  valor,
-  descripcion,
-  tono,
-  Icono,
-  activo,
-  onClick,
-}: {
-  etiqueta: string;
-  valor: number;
-  descripcion: string;
-  tono: 'rojo' | 'ambar' | 'azul' | 'verde' | 'gris';
-  Icono: LucideIcon;
-  activo: boolean;
-  onClick: () => void;
-}) {
-  const tonos = {
-    rojo: { fondo: '#FEF2F2', borde: '#FECACA', texto: '#B91C1C' },
-    ambar: { fondo: '#FFFBEB', borde: '#FDE68A', texto: '#B45309' },
-    azul: { fondo: '#EFF6FF', borde: '#BFDBFE', texto: '#1D4ED8' },
-    verde: { fondo: '#F0FDF4', borde: '#BBF7D0', texto: '#166534' },
-    gris: { fondo: '#F8FAFC', borde: '#E2E8F0', texto: '#334155' },
-  } as const;
-  const tonoActual = tonos[tono];
+const AYUDA_RESUMEN = 'Cada indicador es un filtro: la tabla inferior muestra únicamente los radicados del filtro activo.';
 
-  return (
-    <button
-      type="button"
-      onClick={onClick}
-      aria-pressed={activo}
-      aria-label={`${etiqueta}: ${valor}`}
-      className="tablero-interactivo min-w-0 rounded-xl border px-2.5 py-2 text-left transition-[transform,box-shadow,border-color,background-color] duration-200 ease-out hover:-translate-y-0.5 hover:shadow-md active:translate-y-0 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-700/30"
-      style={{
-        background: activo ? '#FFFFFF' : tonoActual.fondo,
-        borderColor: activo ? tonoActual.texto : tonoActual.borde,
-        boxShadow: activo ? `0 0 0 2px ${tonoActual.texto}22` : undefined,
-      }}
-    >
-      <div className="flex min-w-0 items-start gap-1.5">
-        <span
-          aria-hidden="true"
-          className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg text-sm font-black"
-          style={{ background: '#FFFFFFAA', color: tonoActual.texto }}
-        >
-          <Icono size={16} strokeWidth={1.9} />
-        </span>
-        <div className="min-w-0">
-          <p className="text-xl font-black leading-none tabular-nums" style={{ color: tonoActual.texto }}>{valor}</p>
-          <p className="mt-0.5 break-words text-[11px] font-bold leading-tight" style={{ color: tonoActual.texto }}>{etiqueta}</p>
-          <p className="mt-px break-words text-[9px] leading-tight" style={{ color: '#667085' }}>{descripcion}</p>
-        </div>
-      </div>
-    </button>
-  );
-}
-
-function TarjetasMIPG({
+/** Tarjetas del Resumen y del Seguimiento: mismos valores, filtros y handlers de siempre. */
+function construirIndicadoresTablero({
   metricas,
   filtroActivo,
   onFiltroChange,
@@ -1068,16 +1060,6 @@ function TarjetasMIPG({
   filtroOperativo,
   onFiltroOperativoChange,
   porVencerHoy,
-  misAsignados,
-  soloMios,
-  onToggleSoloMios,
-  veTodosTenants,
-  tenantFiltro,
-  onTenantChange,
-  modoCompacto = false,
-  onToggleCompacto,
-  soloDatosIncompletos = false,
-  onToggleDatosIncompletos,
 }: {
   metricas:       MetricasMIPGData;
   filtroActivo:   FiltroMIPG;
@@ -1086,132 +1068,211 @@ function TarjetasMIPG({
   filtroOperativo: FiltroKpiOperativo;
   onFiltroOperativoChange: (f: FiltroKpiOperativo) => void;
   porVencerHoy: number;
-  misAsignados: number;
-  soloMios: boolean;
-  onToggleSoloMios: () => void;
-  /** Panel Op Nivel 1 — gatea el selector de dependencia. ADMIN,
-   *  CONTROL_INTERNO y RECEPCIONISTA lo ven; los demás no. */
-  veTodosTenants: boolean;
-  tenantFiltro:   TenantId | 'TODOS';
-  onTenantChange: (t: TenantId | 'TODOS') => void;
-  modoCompacto?:  boolean;
-  onToggleCompacto?: () => void;
-  soloDatosIncompletos?: boolean;
-  onToggleDatosIncompletos?: () => void;
-}) {
+}): { resumen: IndicadorInteractivoProps[]; seguimiento: IndicadorInteractivoProps[] } {
   const tarjetas: TarjetaMIPGItem[] = construirTarjetasMIPG(metricas);
   const porFiltro = new Map(tarjetas.map((t) => [t.filtro, t]));
-
-  const controlesTop = (
-    <>
-      {onToggleCompacto && (
-        <button
-          type="button"
-          onClick={onToggleCompacto}
-          className="tablero-interactivo shrink-0 rounded-lg border px-2.5 py-1.5 text-[10px] font-bold uppercase tracking-widest transition-[transform,box-shadow,background-color] duration-200 ease-out hover:-translate-y-px hover:shadow-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-700/30"
-          style={{
-            background: modoCompacto ? '#14532D' : 'white',
-            color: modoCompacto ? 'white' : '#14532D',
-            borderColor: '#14532D',
-          }}
-          title={modoCompacto ? 'Mostrar Bandeja Operativa y Siguiente Atención' : 'Minimizar paneles operativos y ampliar la lista de radicados'}
-          aria-pressed={modoCompacto}
-        >
-          {modoCompacto ? 'Mostrar paneles' : 'Minimizar paneles'}
-        </button>
-      )}
-      {onToggleDatosIncompletos && (
-        <button
-          type="button"
-          onClick={onToggleDatosIncompletos}
-          className="tablero-interactivo shrink-0 rounded-lg border px-2.5 py-1.5 text-[10px] font-bold uppercase tracking-widest transition-[transform,box-shadow,background-color] duration-200 ease-out hover:-translate-y-px hover:shadow-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-500/30"
-          style={{
-            background: soloDatosIncompletos ? '#FBBF24' : 'white',
-            color:      soloDatosIncompletos ? '#78350F' : '#B45309',
-            borderColor: '#FBBF24',
-          }}
-          title="Mostrar solo radicados con datos no aportados por el solicitante"
-          aria-pressed={soloDatosIncompletos}
-        >
-          {soloDatosIncompletos ? '✓ Datos incompletos' : 'Datos incompletos'}
-        </button>
-      )}
-      <button
-        type="button"
-        onClick={onToggleSoloMios}
-        aria-pressed={soloMios}
-        className="tablero-interactivo shrink-0 rounded-lg border px-2.5 py-1.5 text-[10px] font-bold uppercase tracking-widest transition-[transform,box-shadow,background-color] duration-200 ease-out hover:-translate-y-px hover:shadow-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-700/30"
-        style={soloMios
-          ? { background: '#14532D', color: '#FFFFFF', borderColor: '#14532D' }
-          : { background: '#FFFFFF', color: '#14532D', borderColor: '#97C459' }}
-      >
-        {misAsignados} solo los míos
-      </button>
-      {veTodosTenants && (
-        <div className="shrink-0 flex items-center ml-auto">
-          <select
-            value={tenantFiltro}
-            onChange={(e) => onTenantChange(e.target.value as TenantId | 'TODOS')}
-            className="select-internal text-xs"
-            aria-label="Filtrar por dependencia"
-          >
-            <option value="TODOS">Todas las dependencias</option>
-            {(Object.keys(DIRECTORIO_TENANTS) as TenantId[]).map((id) => (
-              <option key={id} value={id}>{NOMBRES_TENANT[id]}</option>
-            ))}
-          </select>
-        </div>
-      )}
-    </>
-  );
-
   const principal = (filtro: FiltroMIPG) => porFiltro.get(filtro)!;
   const enTermino = principal('EN_TERMINO');
 
+  const resumen: IndicadorInteractivoProps[] = ([
+    ['VENCIDAS', 'Vencidos', 'Requieren atención', 'rojo', AlertTriangle],
+    ['POR_VENCER', 'Por vencer', 'Próximos a vencer', 'ambar', Clock3],
+    ['RADICADAS', 'Radicados', 'Pendientes de gestión', 'gris', FileText],
+    ['ASIGNADAS', 'Asignados', 'En gestión', 'azul', UsersRound],
+  ] as const).map(([filtro, etiqueta, descripcion, tono, Icono]) => ({
+    etiqueta,
+    valor: principal(filtro).valor,
+    descripcion,
+    tono,
+    Icono,
+    activo: filtroActivo === filtro,
+    onClick: () => onFiltroChange(filtro),
+  }));
+
+  const seguimiento: IndicadorInteractivoProps[] = [
+    { etiqueta: 'En término', valor: enTermino.valor, descripcion: 'Dentro del plazo', tono: 'verde', Icono: CheckCircle2, activo: filtroActivo === 'EN_TERMINO', onClick: () => onFiltroChange('EN_TERMINO') },
+    { etiqueta: 'Sin asignar', valor: kpisOperativos.sinAsignar, descripcion: 'Pendientes de asignación', tono: 'ambar', Icono: UserRoundX, activo: filtroOperativo === 'SIN_ASIGNAR', onClick: () => onFiltroOperativoChange(filtroOperativo === 'SIN_ASIGNAR' ? 'NINGUNO' : 'SIN_ASIGNAR') },
+    { etiqueta: 'Por vencer hoy', valor: porVencerHoy, descripcion: 'Vencen durante el día', tono: 'gris', Icono: Clock3, activo: filtroActivo === 'POR_VENCER_HOY', onClick: () => onFiltroChange(filtroActivo === 'POR_VENCER_HOY' ? 'TODOS' : 'POR_VENCER_HOY') },
+    { etiqueta: 'Con errores', valor: kpisOperativos.correoFallido, descripcion: 'Notificaciones fallidas', tono: 'rojo', Icono: CircleX, activo: filtroActivo === 'CORREOS_FALLIDOS', onClick: () => onFiltroChange(filtroActivo === 'CORREOS_FALLIDOS' ? 'TODOS' : 'CORREOS_FALLIDOS') },
+  ];
+
+  return { resumen, seguimiento };
+}
+
+type IndicadoresTableroProps = Parameters<typeof construirIndicadoresTablero>[0];
+
+/**
+ * Filtros rápidos de la bandeja, en chips. SOLO filtros que ya existen, con
+ * el mismo contador y handler que sus tarjetas: al pulsar un chip, el número
+ * de filas coincide con el del chip (ADR-0044).
+ */
+function FiltrosRapidos({
+  indicadores,
+  filtroActivo,
+  onFiltroChange,
+  misAsignados,
+  soloMios,
+  onToggleSoloMios,
+  soloDatosIncompletos = false,
+  onToggleDatosIncompletos,
+}: {
+  indicadores: IndicadoresTableroProps;
+  filtroActivo: FiltroMIPG;
+  onFiltroChange: (f: FiltroMIPG) => void;
+  misAsignados: number;
+  soloMios: boolean;
+  onToggleSoloMios: () => void;
+  soloDatosIncompletos?: boolean;
+  onToggleDatosIncompletos?: () => void;
+}) {
+  const { resumen, seguimiento } = construirIndicadoresTablero(indicadores);
+  const [vencidos, porVencer, radicados, asignados] = resumen;
+  const sinAsignar = seguimiento[1];
+
   return (
-    <section className="shrink-0 bg-[#F8FAF7] px-3 py-2 sm:px-4 lg:px-6" aria-label="Resumen operativo de trámites">
-      <div className="mb-2 flex min-w-0 flex-wrap items-center justify-between gap-1.5">
-        <div className="min-w-0">
-          <h2 className="text-sm font-black" style={{ color: '#12261A' }}>Resumen de trámites</h2>
-          <p className="text-[10px]" style={{ color: '#667085' }}>Indicadores actualizados en tiempo real</p>
-        </div>
-        <div className="flex min-w-0 flex-wrap items-center gap-1.5">{controlesTop}</div>
-      </div>
-
-      {!modoCompacto && (
-        <>
-          <div className="grid min-w-0 grid-cols-1 gap-1.5 min-[440px]:grid-cols-2 xl:grid-cols-4">
-            {([
-              ['VENCIDAS', 'Vencidos', 'Requieren atención', 'rojo', AlertTriangle],
-              ['POR_VENCER', 'Por vencer', 'Próximos a vencer', 'ambar', Clock3],
-              ['RADICADAS', 'Radicados', 'Pendientes de gestión', 'gris', FileText],
-              ['ASIGNADAS', 'Asignados', 'En gestión', 'azul', UsersRound],
-            ] as const).map(([filtro, etiqueta, descripcion, tono, Icono]) => (
-              <TarjetaResumenTablero
-                key={filtro}
-                etiqueta={etiqueta}
-                valor={principal(filtro).valor}
-                descripcion={descripcion}
-                tono={tono}
-                Icono={Icono}
-                activo={filtroActivo === filtro}
-                onClick={() => onFiltroChange(filtro)}
-              />
-            ))}
-          </div>
-
-          <div className="mt-2.5 flex min-w-0 items-center gap-2">
-            <h2 className="text-sm font-black" style={{ color: '#12261A' }}>Seguimiento</h2>
-            <span className="h-px min-w-0 flex-1" style={{ background: '#D9E2D9' }} />
-          </div>
-          <div className="mt-1.5 grid min-w-0 grid-cols-1 gap-1.5 min-[440px]:grid-cols-2 xl:grid-cols-4">
-            <TarjetaResumenTablero etiqueta="En término" valor={enTermino.valor} descripcion="Dentro del plazo" tono="verde" Icono={CheckCircle2} activo={filtroActivo === 'EN_TERMINO'} onClick={() => onFiltroChange('EN_TERMINO')} />
-            <TarjetaResumenTablero etiqueta="Sin asignar" valor={kpisOperativos.sinAsignar} descripcion="Pendientes de asignación" tono="ambar" Icono={UserRoundX} activo={filtroOperativo === 'SIN_ASIGNAR'} onClick={() => onFiltroOperativoChange(filtroOperativo === 'SIN_ASIGNAR' ? 'NINGUNO' : 'SIN_ASIGNAR')} />
-            <TarjetaResumenTablero etiqueta="Por vencer hoy" valor={porVencerHoy} descripcion="Vencen durante el día" tono="gris" Icono={Clock3} activo={filtroActivo === 'POR_VENCER_HOY'} onClick={() => onFiltroChange(filtroActivo === 'POR_VENCER_HOY' ? 'TODOS' : 'POR_VENCER_HOY')} />
-            <TarjetaResumenTablero etiqueta="Con errores" valor={kpisOperativos.correoFallido} descripcion="Notificaciones fallidas" tono="rojo" Icono={CircleX} activo={filtroActivo === 'CORREOS_FALLIDOS'} onClick={() => onFiltroChange(filtroActivo === 'CORREOS_FALLIDOS' ? 'TODOS' : 'CORREOS_FALLIDOS')} />
-          </div>
-        </>
+    <div className="flex min-w-0 flex-wrap items-center gap-1.5 px-3 pt-2 sm:px-4 lg:px-6" role="group" aria-label="Filtros rápidos de la bandeja">
+      <ChipFiltro etiqueta="Todos" activo={filtroActivo === 'TODOS'} onClick={() => onFiltroChange('TODOS')} />
+      {[vencidos, porVencer, sinAsignar, radicados, asignados].map((ind) => (
+        <ChipFiltro key={ind.etiqueta} etiqueta={ind.etiqueta} valor={ind.valor} tono={ind.tono} activo={ind.activo} onClick={ind.onClick} titulo={ind.descripcion} />
+      ))}
+      <span className="mx-1 hidden h-5 w-px sm:inline-block" style={{ background: 'var(--tema-borde-dce4ea)' }} aria-hidden="true" />
+      {onToggleDatosIncompletos && (
+        <ChipFiltro
+          etiqueta={soloDatosIncompletos ? '✓ Datos incompletos' : 'Datos incompletos'}
+          activo={soloDatosIncompletos}
+          onClick={onToggleDatosIncompletos}
+          titulo="Mostrar solo radicados con datos no aportados por el solicitante"
+        />
       )}
+      <ChipFiltro etiqueta="Solo los míos" valor={misAsignados} activo={soloMios} onClick={onToggleSoloMios} />
+    </div>
+  );
+}
+
+/**
+ * Resumen visual de la bandeja (referencia visual oficial del propietario,
+ * 23-sep-2026): las MISMAS cifras que los chips (misma fuente,
+ * `construirIndicadoresTablero`), en tarjetas compactas de solo lectura.
+ * Las tarjetas muestran el estado; los chips filtran.
+ */
+function ResumenTablero({ indicadores }: { indicadores: IndicadoresTableroProps }) {
+  const { resumen, seguimiento } = construirIndicadoresTablero(indicadores);
+  const [vencidos, porVencer, radicados, asignados] = resumen;
+  const sinAsignar = seguimiento[1];
+  return (
+    <div className="px-3 pt-2 shrink-0 sm:px-4 lg:px-6">
+      <FilaTarjetas etiqueta="Resumen de la bandeja">
+        {[vencidos, porVencer, sinAsignar, radicados, asignados].map(({ etiqueta, valor, descripcion, tono, Icono }) => (
+          <TarjetaIndicador key={etiqueta} etiqueta={etiqueta} valor={valor} descripcion={descripcion} tono={tono} Icono={Icono} />
+        ))}
+      </FilaTarjetas>
+    </div>
+  );
+}
+
+/** Selector de dependencia (ADMIN, CONTROL_INTERNO y RECEPCIONISTA). */
+function SelectorDependencia({
+  tenantFiltro,
+  onTenantChange,
+}: {
+  tenantFiltro: TenantId | 'TODOS';
+  onTenantChange: (t: TenantId | 'TODOS') => void;
+}) {
+  return (
+    <select
+      value={tenantFiltro}
+      onChange={(e) => onTenantChange(e.target.value as TenantId | 'TODOS')}
+      className="select-internal !w-auto shrink-0 text-xs"
+      aria-label="Filtrar por dependencia"
+    >
+      <option value="TODOS">Todas las dependencias</option>
+      {(Object.keys(DIRECTORIO_TENANTS) as TenantId[]).map((id) => (
+        <option key={id} value={id}>{NOMBRES_TENANT[id]}</option>
+      ))}
+    </select>
+  );
+}
+
+/**
+ * Métricas de contexto bajo la tabla: Resumen de trámites y Seguimiento de
+ * gestión, colapsables. Funcionalmente completos: al abrirse muestran las
+ * mismas tarjetas, valores y filtros de siempre.
+ */
+function TarjetasMIPG({
+  indicadores,
+  filtroActivo,
+  modoCompacto = false,
+  onToggleCompacto,
+  enPanelDetalle = false,
+}: {
+  indicadores: IndicadoresTableroProps;
+  filtroActivo: FiltroMIPG;
+  modoCompacto?: boolean;
+  onToggleCompacto?: () => void;
+  /** Al abrir el detalle, conserva las métricas legibles en una cuadrícula 2×2. */
+  enPanelDetalle?: boolean;
+}) {
+  const { resumen, seguimiento } = construirIndicadoresTablero(indicadores);
+  const [resumenAbierto, setResumenAbierto] = useState(false);
+  const [seguimientoAbierto, setSeguimientoAbierto] = useState(false);
+  const clasesGridMetricas = enPanelDetalle
+    ? 'grid-cols-2'
+    : 'grid-cols-1 min-[440px]:grid-cols-2 xl:grid-cols-4';
+
+  return (
+    <section className="mx-3 mb-3 shrink-0 rounded-xl bg-[var(--tema-fondo-ffffff)] px-3 py-1.5 sm:mx-4 lg:mx-6" aria-label="Resumen operativo de trámites">
+      <div className="flex min-w-0 items-start gap-2">
+        <div className="min-w-0 flex-1 space-y-0.5">
+          {modoCompacto ? (
+            <p className="px-1 py-1 text-[11px]" style={{ color: 'var(--text-secondary)' }}>
+              Resumen de trámites y Seguimiento de gestión minimizados.
+            </p>
+          ) : (
+            <>
+              <PanelIndicadoresColapsable
+                id="resumen-tramites-indicadores"
+                titulo="Resumen de trámites"
+                subtitulo="Indicadores por categoría"
+                ayuda={AYUDA_RESUMEN}
+                accesorio={(
+                  /* La vista actual es el filtro MIPG que gobierna la tabla. */
+                  <span
+                    className="inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-semibold"
+                    style={{ background: 'var(--tema-fondo-f4f9f6)', color: 'var(--tema-texto-007049)' }}
+                  >
+                    Vista actual: <span className="font-black">{etiquetaFiltroMIPG(filtroActivo)}</span>
+                  </span>
+                )}
+                indicadores={resumen}
+                abierto={resumenAbierto}
+                onAlternar={() => setResumenAbierto((v) => !v)}
+                clasesGrid={clasesGridMetricas}
+              />
+              <PanelIndicadoresColapsable
+                id="seguimiento-gestion-indicadores"
+                titulo="Seguimiento de gestión"
+                subtitulo="Detalle de la vista actual"
+                indicadores={seguimiento}
+                abierto={seguimientoAbierto}
+                onAlternar={() => setSeguimientoAbierto((v) => !v)}
+                clasesGrid={clasesGridMetricas}
+              />
+            </>
+          )}
+        </div>
+        {onToggleCompacto && (
+          <button
+            type="button"
+            onClick={onToggleCompacto}
+            className="tablero-interactivo mt-0.5 shrink-0 rounded-lg px-2 py-1 text-[10px] font-bold uppercase tracking-widest transition-colors hover:bg-[var(--tema-fondo-f7f9fb)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-700/30"
+            style={{ color: 'var(--tema-texto-007049)' }}
+            title={modoCompacto ? 'Mostrar Resumen de trámites y Seguimiento de gestión' : 'Minimizar paneles operativos y ampliar la lista de radicados'}
+            aria-pressed={modoCompacto}
+          >
+            {modoCompacto ? 'Mostrar paneles' : 'Minimizar paneles'}
+          </button>
+        )}
+      </div>
     </section>
   );
 }
@@ -1239,7 +1300,7 @@ function EstadoVisualRadicado(radicado: VentanillaRadicado) {
   }
   return {
     etiqueta: LABELS_ESTADO[radicado.estadoActual] ?? radicado.estadoActual,
-    clase: BADGE_ESTADO[radicado.estadoActual] ?? 'bg-gray-100 text-gray-600 border-gray-200',
+    clase: BADGE_ESTADO[radicado.estadoActual] ?? BADGE_ESTADO_NEUTRO,
     semaforo,
   };
 }
@@ -1256,8 +1317,8 @@ function AccionesRadicado({
       <button
         type="button"
         onClick={() => onSeleccionar(radicado)}
-        className="tablero-interactivo group inline-flex items-center gap-1 rounded-lg border px-2 py-1.5 text-[11px] font-bold transition-[transform,box-shadow,background-color] duration-200 ease-out hover:-translate-y-px hover:bg-[#EEF4EE] hover:shadow-sm active:translate-y-0 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-700/30"
-        style={{ color: '#14532D', borderColor: '#B7D8C0', background: '#FFFFFF' }}
+        className="tablero-interactivo group inline-flex items-center gap-1 rounded-lg border px-2 py-1.5 text-[11px] font-bold transition-[transform,box-shadow,background-color] duration-200 ease-out hover:-translate-y-px hover:bg-[var(--tema-fondo-f4f9f6)] hover:shadow-sm active:translate-y-0 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-700/30"
+        style={{ color: 'var(--tema-texto-007049)', borderColor: 'var(--tema-borde-b7d8c0)', background: 'var(--tema-fondo-ffffff)' }}
       >
         <Eye className="tablero-icono-movil transition-transform duration-150 group-hover:translate-x-px" size={15} strokeWidth={1.9} aria-hidden="true" />
         Ver
@@ -1265,17 +1326,17 @@ function AccionesRadicado({
       <details className="relative">
         <summary
           aria-label={`Más acciones para ${radicado.radicadoId}`}
-          className="tablero-interactivo flex h-8 w-8 cursor-pointer list-none items-center justify-center rounded-lg border text-sm font-black transition-[transform,box-shadow,background-color] duration-200 ease-out hover:-translate-y-px hover:bg-[#F8FAF7] hover:shadow-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-700/30"
-          style={{ color: '#667085', borderColor: '#D9E2D9', background: '#FFFFFF' }}
+          className="tablero-interactivo flex h-8 w-8 cursor-pointer list-none items-center justify-center rounded-lg border text-sm font-black transition-[transform,box-shadow,background-color] duration-200 ease-out hover:-translate-y-px hover:bg-[var(--tema-fondo-f7f9fb)] hover:shadow-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-700/30"
+          style={{ color: 'var(--text-secondary)', borderColor: 'var(--tema-borde-dce4ea)', background: 'var(--tema-fondo-ffffff)' }}
         >
           <MoreVertical size={17} strokeWidth={1.9} aria-hidden="true" />
         </summary>
-        <div className="absolute right-0 z-30 mt-1 w-40 rounded-lg border p-1 shadow-lg" style={{ background: '#FFFFFF', borderColor: '#D9E2D9' }}>
+        <div className="absolute right-0 z-30 mt-1 w-40 rounded-lg border p-1 shadow-lg" style={{ background: 'var(--tema-fondo-ffffff)', borderColor: 'var(--tema-borde-dce4ea)' }}>
           <button
             type="button"
             onClick={() => onSeleccionar(radicado)}
-            className="w-full rounded-md px-2 py-1.5 text-left text-xs font-semibold transition-colors duration-150 hover:bg-[#EEF4EE]"
-            style={{ color: '#14532D' }}
+            className="w-full rounded-md px-2 py-1.5 text-left text-xs font-semibold transition-colors duration-150 hover:bg-[var(--tema-fondo-f4f9f6)]"
+            style={{ color: 'var(--tema-texto-007049)' }}
           >
             Abrir detalle
           </button>
@@ -1284,6 +1345,46 @@ function AccionesRadicado({
     </div>
   );
 }
+
+/**
+ * Señal de que este radicado YA dio origen a un expediente de licencias
+ * (handoff radicado⇄expediente, Bloque A·A4 / ADR-0026).
+ *
+ * POR QUÉ EXISTE: el mismo caso vive legítimamente en las DOS bandejas —la
+ * ventanilla vigila el término de respuesta al ciudadano y Licencias el ciclo
+ * jurídico (D.1077/2015)—, pero el tablero no mostraba ese vínculo por ningún
+ * lado. La funcionaria veía un radicado «sin clasificar» sin forma de saber
+ * que ya estaba siendo gestionado como expediente, ni por dónde llegar a él:
+ * el dato existía en `vinculoExpediente` y no se usaba en toda la pantalla.
+ *
+ * Es SOLO presentación: no reevalúa nada, no decide nada y no altera el
+ * handoff. Ausente el vínculo, no pinta nada (un radicado sin expediente es
+ * el caso normal, no una anomalía que haya que señalar).
+ */
+function ChipExpedienteVinculado({ vinculo }: { vinculo: VentanillaRadicado['vinculoExpediente'] }) {
+  if (!vinculo) return null;
+  return (
+    <Link
+      href={urlLicencias({ expedienteId: vinculo.expedienteId })}
+      /* La fila/tarjeta entera selecciona el radicado al hacer clic; este
+         enlace navega a OTRA pantalla, así que detiene la propagación para
+         que no ocurran las dos cosas a la vez. */
+      onClick={(e) => e.stopPropagation()}
+      className="mt-1 inline-flex max-w-full items-center gap-1 rounded px-1.5 py-[1px] text-[9px] font-semibold uppercase tracking-wide transition-colors hover:brightness-95 focus-visible:outline-none focus-visible:ring-2"
+      style={{ background: 'var(--tema-fondo-f4f9f6)', color: 'var(--tema-texto-007049)', border: '1px solid var(--tema-borde-007049)' }}
+      title={`Expediente de licencias vinculado: ${vinculo.numeroExpediente} — abrir`}
+    >
+      <svg width="9" height="9" viewBox="0 0 24 24" fill="none" aria-hidden>
+        <path d="M4 10.5 12 4l8 6.5M6 9.5V19h12V9.5" stroke="currentColor" strokeWidth="2.2" strokeLinejoin="round" />
+      </svg>
+      <span className="break-all">{vinculo.numeroExpediente}</span>
+      <span aria-hidden>→</span>
+    </Link>
+  );
+}
+
+/** Columnas de la bandeja de radicados; ninguna se elimina (ADR-0044). */
+const COLUMNAS_TABLA_RADICADOS = ['Radicado', 'Solicitante', 'Tipo de trámite', 'Dependencia', 'Estado', 'Vencimiento', 'Tiempo', 'Acciones'] as const;
 
 function TablaRadicados({
   radicados,
@@ -1297,6 +1398,9 @@ function TablaRadicados({
   puedeRadicar,
   onAbrirBusquedaAvanzada,
   forzarTarjetas,
+  desplazamientoExterno = false,
+  selectorDependencia,
+  entreBarraYTabla,
 }: {
   radicados:              VentanillaRadicado[];
   cargando:               boolean;
@@ -1310,73 +1414,77 @@ function TablaRadicados({
   onAbrirBusquedaAvanzada?: () => void;
   /** Mantiene legibles los datos cuando el panel de detalle reduce el área central. */
   forzarTarjetas:         boolean;
+  /** Con el detalle abierto, el scroll pertenece a toda la columna de bandeja. */
+  desplazamientoExterno?: boolean;
+  /** Selector de dependencia, dentro de la barra de trabajo. */
+  selectorDependencia?: React.ReactNode;
+  /** Filtros rápidos y alertas: entre la barra de trabajo y la tabla. */
+  entreBarraYTabla?: React.ReactNode;
 }) {
   return (
-    <div className="flex-1 flex flex-col overflow-hidden min-h-0">
-      {/* Toolbar */}
-      <div className="flex flex-wrap items-center gap-2 sm:gap-3 px-3 sm:px-4 py-2 sm:py-2.5 shrink-0 bg-white" style={{ borderBottom: '1px solid #D9E2D9' }}>
-        <div className="relative min-w-0 flex-[1_1_15rem] max-w-xl">
-          <Search className="absolute left-3 top-1/2 h-3.5 w-3.5 -translate-y-1/2" style={{ color: '#94A3B8' }} strokeWidth={1.9} aria-hidden="true" />
-          <input
-            type="search"
-            value={busqueda}
-            onChange={(e) => onBusquedaChange(e.target.value)}
-            placeholder="Buscar por radicado, expediente, nombre, documento, asunto o dependencia…"
-            className="micro-input w-full rounded-lg pl-9 pr-3 py-2 text-sm outline-none"
-            style={{
-              background: '#F8FAF7',
-              border: '1px solid #D9E2D9',
-              color: '#1F2933',
-            }}
-          />
-        </div>
-        <span className="text-xs shrink-0" style={{ color: '#94A3B8' }}>{radicados.length} resultado{radicados.length !== 1 ? 's' : ''}</span>
+    /* Sin detalle abierto, la bandeja ocupa todo el alto restante y desplaza
+       sus filas internamente (cabecera sticky). El mínimo evita que, en
+       pantallas bajas, los indicadores superiores la dejen sin altura. */
+    <div className={`${desplazamientoExterno ? 'shrink-0' : 'flex-1 min-h-[18rem] overflow-hidden'} flex flex-col`}>
+      {/* Barra de trabajo: búsqueda, filtros, dependencia y nuevo radicado. */}
+      <BarraTrabajo
+        busqueda={busqueda}
+        onBusquedaChange={onBusquedaChange}
+        placeholder="Buscar por radicado, expediente, nombre, documento, asunto o dependencia…"
+        contador={`${radicados.length} resultado${radicados.length !== 1 ? 's' : ''}`}
+      >
         {onAbrirBusquedaAvanzada && (
           <button
             onClick={onAbrirBusquedaAvanzada}
             type="button"
-            className="group shrink-0 flex items-center gap-1.5 rounded-lg border px-3 py-2 text-xs font-bold transition-[transform,box-shadow,background-color] duration-200 ease-out hover:-translate-y-px hover:bg-[#EEF4EE] hover:shadow-sm focus-visible:outline-none"
-            style={{ background: 'white', color: '#14532D', borderColor: '#14532D' }}
-            title="Búsqueda histórica avanzada (Sprint 2)"
+            className="group shrink-0 flex items-center gap-1.5 rounded-lg border px-3 py-2 text-xs font-bold transition-[transform,box-shadow,background-color] duration-200 ease-out hover:-translate-y-px hover:bg-[var(--tema-fondo-f4f9f6)] hover:shadow-sm focus-visible:outline-none"
+            style={{ background: 'var(--tema-fondo-ffffff)', color: 'var(--tema-texto-007049)', borderColor: 'var(--tema-borde-007049)' }}
+            title="Búsqueda histórica y filtros avanzados"
           >
             <SlidersHorizontal className="tablero-icono-movil transition-transform duration-150 group-hover:rotate-[-8deg]" size={15} strokeWidth={1.9} aria-hidden="true" />
-            Filtros avanzados
+            Filtros
           </button>
         )}
+        {selectorDependencia}
         {puedeRadicar && (
           <button
             onClick={onNuevoRadicado}
             className="micro-btn-primary shrink-0 flex items-center gap-1.5 px-3 py-2 rounded-lg text-white text-xs font-bold focus-visible:outline-none"
-            style={{ background: '#14532D' }}
+            style={{ background: 'var(--tema-fondo-007049)' }}
           >
             <Plus size={15} strokeWidth={2} aria-hidden="true" />
-            Nuevo
+            Nuevo radicado
           </button>
         )}
-      </div>
+      </BarraTrabajo>
+
+      {entreBarraYTabla}
+
+      {/* La tabla es el panel protagonista: ocupa el alto restante. */}
+      <SuperficieTabla integrada={desplazamientoExterno}>
 
       {/* Error Firestore */}
       {error && (
-        <div className="mx-4 mt-3 p-3 rounded-xl text-xs shrink-0" style={{ background: '#FEF2F2', border: '1px solid #FECACA', color: '#DC2626' }}>
+        <div className="mx-4 mt-3 p-3 rounded-xl text-xs shrink-0" style={{ background: 'var(--tema-fondo-fef2f2)', border: '1px solid var(--tema-borde-fecaca)', color: 'var(--tema-texto-d81e1e)' }}>
           <p className="font-semibold mb-1">Error de conexión</p>
-          <p className="text-rose-500">{error}</p>
+          <p className="text-rose-500 oscuro:text-rose-300">{error}</p>
         </div>
       )}
 
       {/* Tarjetas — tablet y móvil. Evitan comprimir ocho columnas en anchos no disponibles. */}
-      <div className={`${forzarTarjetas ? '' : 'xl:hidden'} flex-1 min-h-0 overflow-y-auto bg-[#F8FAF7] p-3 sm:p-4`} style={{ borderTop: '1px solid #EEF4EE' }}>
+      <div className={`${forzarTarjetas ? '' : 'xl:hidden'} ${desplazamientoExterno ? '' : 'flex-1 min-h-0 overflow-y-auto'} bg-[var(--tema-fondo-f7f9fb)] p-3 sm:p-4`} style={{ borderTop: '1px solid var(--tema-borde-f4f9f6)' }}>
         {cargando && !error && (
           Array.from({ length: 5 }).map((_, i) => (
-            <div key={i} className="mb-2 rounded-xl bg-white px-4 py-3 animate-pulse space-y-2" style={{ border: '1px solid #D9E2D9' }}>
-              <div className="h-3 rounded w-2/3" style={{ background: '#EEF4EE' }} />
-              <div className="h-2.5 rounded w-1/2" style={{ background: '#F8FAF7' }} />
+            <div key={i} className="mb-2 rounded-xl bg-[var(--tema-fondo-ffffff)] px-4 py-3 animate-pulse space-y-2" style={{ border: '1px solid var(--tema-borde-dce4ea)' }}>
+              <div className="h-3 rounded w-2/3" style={{ background: 'var(--tema-fondo-f4f9f6)' }} />
+              <div className="h-2.5 rounded w-1/2" style={{ background: 'var(--tema-fondo-f7f9fb)' }} />
             </div>
           ))
         )}
         {!cargando && !error && radicados.length === 0 && (
-          <div className="rounded-xl bg-white px-4 py-16 text-center" style={{ border: '1px solid #D9E2D9' }}>
-            <p className="font-medium mb-1" style={{ color: '#667085' }}>Sin radicados</p>
-            <p className="text-xs" style={{ color: '#94A3B8' }}>No hay resultados para los filtros aplicados.</p>
+          <div className="rounded-xl bg-[var(--tema-fondo-ffffff)] px-4 py-16 text-center" style={{ border: '1px solid var(--tema-borde-dce4ea)' }}>
+            <p className="font-medium mb-1" style={{ color: 'var(--text-secondary)' }}>Sin radicados</p>
+            <p className="text-xs" style={{ color: 'var(--text-secondary)' }}>No hay resultados para los filtros aplicados.</p>
           </div>
         )}
         {!cargando && radicados.map((r) => {
@@ -1385,38 +1493,43 @@ function TablaRadicados({
           return (
             <article
               key={r.radicadoId}
-              className="micro-row tablero-interactivo mb-2 min-w-0 rounded-xl bg-white p-3 text-left transition-[transform,box-shadow,background-color] duration-200 ease-out hover:-translate-y-px hover:shadow-sm sm:p-4"
+              className="micro-row tablero-interactivo mb-2 min-w-0 rounded-xl bg-[var(--tema-fondo-ffffff)] p-3 text-left transition-[transform,box-shadow,background-color] duration-200 ease-out hover:-translate-y-px hover:shadow-sm"
               aria-current={seleccionado ? 'true' : undefined}
               style={{
-                border: '1px solid #D9E2D9',
-                borderLeft: seleccionado ? '4px solid #14532D' : '4px solid transparent',
-                background: seleccionado ? '#EEF4EE' : undefined,
+                border: '1px solid var(--tema-borde-dce4ea)',
+                borderLeft: seleccionado ? '4px solid var(--tema-borde-007049)' : '4px solid transparent',
+                background: seleccionado ? 'var(--tema-fondo-f4f9f6)' : undefined,
               }}
             >
               <div className="flex min-w-0 flex-wrap items-start justify-between gap-2">
                 <div className="min-w-0">
-                  <p className="break-all font-mono text-[13px] font-extrabold tracking-tight" style={{ color: '#14532D' }}>{r.radicadoId}</p>
-                  <p className="mt-0.5 text-[10px]" style={{ color: '#94A3B8' }}>{fmtFecha(r.control.fechaRadicado)}</p>
+                  <p className="break-all font-mono text-[13px] font-extrabold tracking-tight" style={{ color: 'var(--tema-texto-007049)' }}>{r.radicadoId}</p>
+                  <p className="mt-0.5 text-[10px]" style={{ color: 'var(--text-secondary)' }}>{fmtFecha(r.control.fechaRadicado)}</p>
+                  <ChipExpedienteVinculado vinculo={r.vinculoExpediente} />
                 </div>
                 <span className={`inline-flex max-w-full items-center rounded-full border px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide ${estadoVisual.clase}`}>
                   {estadoVisual.etiqueta}
                 </span>
               </div>
-              <p className="mt-3 break-words text-sm font-bold" style={{ color: '#1F2933' }}>{nombreSolicitanteVisible(r, r.solicitante.nombreCompleto)}</p>
-              <p className="mt-1 break-words text-xs" style={{ color: '#667085' }}>{r.termino.tipoSolicitudNombre}</p>
-              <p className="mt-1 break-words text-[11px]" style={{ color: '#94A3B8' }}>{NOMBRES_TENANT[r.clasificacion.oficinaDestino]}</p>
-              <div className="mt-3 grid min-w-0 grid-cols-1 gap-2 min-[440px]:grid-cols-2">
-                <div className="min-w-0">
-                  <p className="text-[9px] font-bold uppercase tracking-wider" style={{ color: '#94A3B8' }}>Vencimiento</p>
-                  <p className="break-words text-xs" style={{ color: '#667085' }}>{fmtFecha(r.termino.fechaVencimiento)}</p>
-                </div>
-                <div className="min-w-0">
-                  <p className="text-[9px] font-bold uppercase tracking-wider" style={{ color: '#94A3B8' }}>Tiempo</p>
-                  <p className={`break-words text-xs font-bold ${estadoVisual.semaforo.textoClass}`}>{estadoVisual.semaforo.label}</p>
-                </div>
+              <div className="mt-2 min-w-0">
+                <p className="break-words text-sm font-bold" style={{ color: 'var(--tema-texto-172033)' }}>{nombreSolicitanteVisible(r, r.solicitante.nombreCompleto)}</p>
+                <p className="mt-0.5 break-words text-xs" style={{ color: 'var(--text-secondary)' }}>{r.termino.tipoSolicitudNombre}</p>
+                <p className="mt-0.5 break-words text-[11px]" style={{ color: 'var(--text-secondary)' }}>{NOMBRES_TENANT[r.clasificacion.oficinaDestino]}</p>
               </div>
-              <div className="mt-3 border-t pt-3" style={{ borderColor: '#EEF4EE' }}>
-                <AccionesRadicado radicado={r} onSeleccionar={onSeleccionar} />
+              <div className="mt-2 flex min-w-0 flex-wrap items-end justify-between gap-x-3 gap-y-2 border-t pt-2" style={{ borderColor: 'var(--tema-borde-f4f9f6)' }}>
+                <div className="grid min-w-0 flex-1 grid-cols-2 gap-x-4">
+                  <div className="min-w-0">
+                    <p className="text-[9px] font-bold uppercase tracking-wider" style={{ color: 'var(--text-secondary)' }}>Vencimiento</p>
+                    <p className="break-words text-xs" style={{ color: 'var(--text-secondary)' }}>{fmtFecha(r.termino.fechaVencimiento)}</p>
+                  </div>
+                  <div className="min-w-0">
+                    <p className="text-[9px] font-bold uppercase tracking-wider" style={{ color: 'var(--text-secondary)' }}>Tiempo</p>
+                    <p className={`break-words text-xs font-bold ${estadoVisual.semaforo.textoClass}`}>{estadoVisual.semaforo.label}</p>
+                  </div>
+                </div>
+                <div className="shrink-0">
+                  <AccionesRadicado radicado={r} onSeleccionar={onSeleccionar} />
+                </div>
               </div>
             </article>
           );
@@ -1425,7 +1538,7 @@ function TablaRadicados({
 
       {/* Tabla — solo en escritorio amplio. Su ancho siempre es el del contenedor,
           no una medida mínima que pueda desbordar el cuerpo central. */}
-      <div className={`${forzarTarjetas ? 'hidden' : 'hidden xl:block'} flex-1 min-h-0 overflow-y-auto bg-white`}>
+      <div className={`${forzarTarjetas ? 'hidden' : 'hidden xl:block'} ${desplazamientoExterno ? '' : 'flex-1 min-h-0 overflow-y-auto'} bg-[var(--tema-fondo-ffffff)]`}>
         <table className="w-full table-fixed text-sm">
           <colgroup>
             <col className="w-[17%]" />
@@ -1437,24 +1550,7 @@ function TablaRadicados({
             <col className="w-[12%]" />
             <col className="w-[8%]" />
           </colgroup>
-          <thead className="sticky top-0 z-20">
-            <tr style={{ borderBottom: '1px solid #D9E2D9' }}>
-              {['Radicado', 'Solicitante', 'Tipo de trámite', 'Dependencia', 'Estado', 'Vencimiento', 'Tiempo', 'Acciones'].map((h) => (
-                <th
-                  key={h}
-                  className="whitespace-nowrap px-2 py-2 text-left text-[9px] font-bold uppercase tracking-wider leading-tight"
-                  style={{
-                    color: '#14532D',
-                    background: '#EEF4EE',
-                    borderBottom: '1px solid #D9E2D9',
-                    boxShadow: '0 1px 0 rgba(20,83,45,0.08)',
-                  }}
-                >
-                  {h}
-                </th>
-              ))}
-            </tr>
-          </thead>
+          <CabeceraTablaSticky columnas={COLUMNAS_TABLA_RADICADOS} />
           <tbody>
             {cargando && !error && (
               Array.from({ length: 6 }).map((_, i) => <SkeletonFila key={i} />)
@@ -1463,8 +1559,8 @@ function TablaRadicados({
             {!cargando && !error && radicados.length === 0 && (
               <tr>
                 <td colSpan={8} className="px-4 py-16 text-center">
-                  <p className="font-medium mb-1" style={{ color: '#667085' }}>Sin radicados</p>
-                  <p className="text-xs" style={{ color: '#94A3B8' }}>No hay resultados para los filtros aplicados.</p>
+                  <p className="font-medium mb-1" style={{ color: 'var(--text-secondary)' }}>Sin radicados</p>
+                  <p className="text-xs" style={{ color: 'var(--text-secondary)' }}>No hay resultados para los filtros aplicados.</p>
                 </td>
               </tr>
             )}
@@ -1477,42 +1573,43 @@ function TablaRadicados({
               // Rediseño 3B.2 — riel de color por estado del término,
               // siempre visible. La selección lo intensifica a verde.
               const rielEstado = semaforoData.estado === 'VENCIDO'
-                ? '#DC2626'
+                ? '#D81E1E'
                 : semaforoData.estado === 'POR_VENCER'
                   ? '#D97706'
                   : semaforoData.estado === 'RESUELTO'
-                    ? '#CBD5D1'
-                    : '#14532D';
+                    ? 'var(--tema-borde-cbd5d1)'
+                    : 'var(--tema-borde-007049)';
 
               return (
                 <tr
                   key={r.radicadoId}
                   onClick={() => onSeleccionar(r)}
-                  className={`micro-row cursor-pointer transition-colors duration-200 hover:bg-[#F8FAF7] ${seleccionado ? 'is-selected' : ''}`}
+                  className={`micro-row cursor-pointer transition-colors duration-200 hover:bg-[var(--tema-fondo-f7f9fb)] ${seleccionado ? 'is-selected' : ''}`}
                   aria-selected={seleccionado}
                   style={{
-                    borderBottom: '1px solid #EEF4EE',
-                    background: seleccionado ? '#EEF4EE' : undefined,
-                    borderLeft: seleccionado ? '4px solid #14532D' : `3px solid ${rielEstado}`,
-                    boxShadow: seleccionado ? 'inset 0 0 0 1px rgba(20,83,45,0.08)' : undefined,
+                    borderBottom: '1px solid var(--tema-borde-f4f9f6)',
+                    background: seleccionado ? 'var(--tema-fondo-f4f9f6)' : undefined,
+                    borderLeft: seleccionado ? '4px solid var(--tema-borde-007049)' : `3px solid ${rielEstado}`,
+                    boxShadow: seleccionado ? 'inset 0 0 0 1px rgba(0, 112, 73,0.08)' : undefined,
                   }}
                 >
                   <td className="min-w-0 break-words px-2 py-2 align-top">
                     <div className="min-w-0">
-                      <span className="break-all font-mono text-[12px] font-extrabold tracking-tight" style={{ color: '#14532D' }}>{r.radicadoId}</span>
+                      <span className="break-all font-mono text-[12px] font-extrabold tracking-tight" style={{ color: 'var(--tema-texto-007049)' }}>{r.radicadoId}</span>
                     </div>
-                    <p className="text-[10px] mt-0.5" style={{ color: '#94A3B8' }}>{fmtFecha(r.control.fechaRadicado)}</p>
+                    <p className="text-[10px] mt-0.5" style={{ color: 'var(--text-secondary)' }}>{fmtFecha(r.control.fechaRadicado)}</p>
+                    <ChipExpedienteVinculado vinculo={r.vinculoExpediente} />
                   </td>
                   <td className="min-w-0 break-words px-2 py-2 align-top">
-                    <p className="break-words font-medium" style={{ color: '#1F2933' }}>{nombreSolicitanteVisible(r, r.solicitante.nombreCompleto)}</p>
-                    <p className="break-all text-[10px] font-mono" style={{ color: '#94A3B8' }}>
+                    <p className="break-words font-medium" style={{ color: 'var(--tema-texto-172033)' }}>{nombreSolicitanteVisible(r, r.solicitante.nombreCompleto)}</p>
+                    <p className="break-all text-[10px] font-mono" style={{ color: 'var(--text-secondary)' }}>
                       {documentoSolicitanteVisible(r, r.solicitante.tipoDocumento, r.solicitante.numeroDocumento)}
                     </p>
                     {/* Sprint Ventanilla Operativa 1 — chip de tipo de entrada / origen */}
                     <div className="mt-1 flex gap-1 flex-wrap">
                       <span
                         className="inline-flex items-center px-1.5 py-[1px] rounded text-[9px] font-semibold uppercase tracking-wide"
-                        style={{ background: '#EEF4EE', color: '#14532D', border: '1px solid #D9E2D9' }}
+                        style={{ background: 'var(--tema-fondo-f4f9f6)', color: 'var(--tema-texto-007049)', border: '1px solid var(--tema-borde-dce4ea)' }}
                         title={`Origen: ${LABEL_ORIGEN_INGRESO[r.control.origenIngreso ?? SIN_CLASIFICAR]}`}
                       >
                         {LABEL_TIPO_ENTRADA[r.control.tipoEntrada ?? SIN_CLASIFICAR]}
@@ -1520,7 +1617,7 @@ function TablaRadicados({
                       {tieneDatosNoAportados(r.solicitante.datosNoAportados) && (
                         <span
                           className="inline-flex items-center px-1.5 py-[1px] rounded text-[9px] font-semibold uppercase tracking-wide"
-                          style={{ background: '#FEF3C7', color: '#92400E', border: '1px solid #FBBF24' }}
+                          style={{ background: 'var(--tema-fondo-fef3c7)', color: 'var(--tema-texto-92400e)', border: '1px solid var(--tema-borde-fbbf24)' }}
                           title="El solicitante no aportó todos sus datos"
                         >
                           Datos incompletos
@@ -1529,11 +1626,11 @@ function TablaRadicados({
                     </div>
                   </td>
                   <td className="min-w-0 break-words px-2 py-2 align-top">
-                    <p className="break-words text-xs" style={{ color: '#667085' }}>{r.termino.tipoSolicitudNombre}</p>
-                    <p className="text-[10px]" style={{ color: '#94A3B8' }}>{r.termino.diasRespuesta}d {r.termino.unidad.toLowerCase()}</p>
+                    <p className="break-words text-xs" style={{ color: 'var(--text-secondary)' }}>{r.termino.tipoSolicitudNombre}</p>
+                    <p className="text-[10px]" style={{ color: 'var(--text-secondary)' }}>{r.termino.diasRespuesta}d {r.termino.unidad.toLowerCase()}</p>
                   </td>
                   <td className="min-w-0 break-words px-2 py-2 align-top">
-                    <p className="break-words text-xs" style={{ color: '#667085' }}>{NOMBRES_TENANT[r.clasificacion.oficinaDestino]}</p>
+                    <p className="break-words text-xs" style={{ color: 'var(--text-secondary)' }}>{NOMBRES_TENANT[r.clasificacion.oficinaDestino]}</p>
                   </td>
                   <td className="min-w-0 break-words px-2 py-2 align-top">
                     <span className={`inline-flex max-w-full items-center rounded-full border px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide ${estadoVisual.clase}`}>
@@ -1541,7 +1638,7 @@ function TablaRadicados({
                     </span>
                   </td>
                   <td className="min-w-0 break-words px-2 py-2 align-top">
-                    <p className="text-xs" style={{ color: '#667085' }}>{fmtFecha(r.termino.fechaVencimiento)}</p>
+                    <p className="text-xs" style={{ color: 'var(--text-secondary)' }}>{fmtFecha(r.termino.fechaVencimiento)}</p>
                   </td>
                   <td className="min-w-0 break-words px-2 py-2 align-top">
                     <span className={`whitespace-nowrap text-sm font-semibold tabular-nums ${diasColor}`}>{semaforoData.label}</span>
@@ -1555,6 +1652,7 @@ function TablaRadicados({
           </tbody>
         </table>
       </div>
+      </SuperficieTabla>
     </div>
   );
 }
@@ -1569,23 +1667,23 @@ type TabPanelId = 'info' | 'responder' | 'trazabilidad' | 'traslado' | 'prorroga
    prórroga: es LA acción del día a día y merece su propio lugar,
    resaltado. La trazabilidad pasa a llamarse "Historia" (mismo id
    interno para no tocar efectos ni carga). */
-const TABS_PANEL: { id: TabPanelId; label: string }[] = [
-  { id: 'info',         label: 'Información' },
-  { id: 'responder',    label: 'Responder' },
-  { id: 'trazabilidad', label: 'Historia' },
-  { id: 'traslado',     label: 'Traslado' },
-  { id: 'prorroga',     label: 'Prórroga' },
-  { id: 'copiloto',     label: 'SIMI ✦' },
+const TABS_PANEL: { id: TabPanelId; label: string; Icono: LucideIcon }[] = [
+  { id: 'info',         label: 'Información', Icono: FileText },
+  { id: 'responder',    label: 'Responder',   Icono: MessageSquareText },
+  { id: 'trazabilidad', label: 'Historia',    Icono: History },
+  { id: 'traslado',     label: 'Traslado',    Icono: ArrowRight },
+  { id: 'prorroga',     label: 'Prórroga',    Icono: CalendarClock },
+  { id: 'copiloto',     label: 'SIMI',        Icono: Sparkles },
 ];
 
 /* Sprint Panel claro — paleta e íconos de la Historia por tono. */
 const TONO_HISTORIA: Record<TonoEvento, { bg: string; fg: string }> = {
-  VERDE:  { bg: '#EAF3DE', fg: '#3B6D11' },
-  AZUL:   { bg: '#E6F1FB', fg: '#185FA5' },
-  AMBAR:  { bg: '#FAEEDA', fg: '#854F0B' },
-  ROJO:   { bg: '#FCEBEB', fg: '#A32D2D' },
-  GRIS:   { bg: '#EEF2F5', fg: '#5F6F64' },
-  DORADO: { bg: '#F7EFD8', fg: '#8A6A12' },
+  VERDE:  { bg: 'var(--tema-fondo-eaf3de)', fg: 'var(--tema-texto-3b6d11)' },
+  AZUL:   { bg: 'var(--tema-fondo-e6f1fb)', fg: 'var(--tema-texto-185fa5)' },
+  AMBAR:  { bg: 'var(--tema-fondo-faeeda)', fg: 'var(--tema-texto-854f0b)' },
+  ROJO:   { bg: 'var(--tema-fondo-fcebeb)', fg: 'var(--tema-texto-a32d2d)' },
+  GRIS:   { bg: 'var(--tema-fondo-eef2f5)', fg: 'var(--tema-texto-5f6f64)' },
+  DORADO: { bg: 'var(--tema-fondo-f7efd8)', fg: 'var(--tema-texto-8a6a12)' },
 };
 
 const ICONO_HISTORIA: Record<TonoEvento, string> = {
@@ -1603,8 +1701,8 @@ const ICONO_HISTORIA: Record<TonoEvento, string> = {
 function FilaInfo({ label, value }: { label: string; value: string }) {
   return (
     <div>
-      <p className="text-[10px] font-bold uppercase tracking-widest" style={{ color: '#94A3B8' }}>{label}</p>
-      <p className="text-sm mt-0.5 break-words" style={{ color: '#1F2933' }}>{value}</p>
+      <p className="text-[10px] font-bold uppercase tracking-widest" style={{ color: 'var(--text-secondary)' }}>{label}</p>
+      <p className="text-sm mt-0.5 break-words" style={{ color: 'var(--tema-texto-172033)' }}>{value}</p>
     </div>
   );
 }
@@ -1666,9 +1764,9 @@ function FilaArchivoConSello({
   }
 
   return (
-    <li className="py-2 last:border-0" style={{ borderBottom: '1px solid #EEF4EE' }}>
+    <li className="py-2 last:border-0" style={{ borderBottom: '1px solid var(--tema-borde-f4f9f6)' }}>
       <div className="flex items-center justify-between gap-3">
-        <span className="text-xs truncate min-w-0" style={{ color: '#1F2933' }}>
+        <span className="text-xs truncate min-w-0" style={{ color: 'var(--tema-texto-172033)' }}>
           {archivo.nombre}
         </span>
         <div className="shrink-0 flex items-center gap-3">
@@ -1678,7 +1776,7 @@ function FilaArchivoConSello({
               target="_blank"
               rel="noopener noreferrer"
               className="text-xs underline underline-offset-2 font-semibold"
-              style={{ color: '#14532D' }}
+              style={{ color: 'var(--tema-texto-007049)' }}
             >
               Ver
             </a>
@@ -1689,7 +1787,7 @@ function FilaArchivoConSello({
               target="_blank"
               rel="noopener noreferrer"
               className="text-xs underline underline-offset-2 font-semibold"
-              style={{ color: '#166534' }}
+              style={{ color: 'var(--tema-texto-006b45)' }}
               title="Ver copia sellada"
             >
               Copia sellada
@@ -1702,9 +1800,9 @@ function FilaArchivoConSello({
               disabled={estado === 'sellando' || estado === 'sellado'}
               className="text-[10px] font-bold uppercase tracking-widest px-2 py-1 rounded-md border transition-all disabled:cursor-not-allowed disabled:opacity-60"
               style={{
-                borderColor: estado === 'sellado' ? '#166534' : '#14532D',
-                color:       estado === 'sellado' ? '#166534' : '#14532D',
-                background:  estado === 'sellado' ? '#F0FDF4' : 'white',
+                borderColor: estado === 'sellado' ? '#006B45' : 'var(--tema-borde-007049)',
+                color:       estado === 'sellado' ? 'var(--tema-texto-006b45)' : 'var(--tema-texto-007049)',
+                background:  estado === 'sellado' ? 'var(--tema-fondo-f0fdf4)' : 'var(--tema-fondo-ffffff)',
               }}
               title={
                 estado === 'sellado'
@@ -1723,7 +1821,7 @@ function FilaArchivoConSello({
         <p
           role="alert"
           className="mt-1.5 text-[11px]"
-          style={{ color: '#B91C1C' }}
+          style={{ color: 'var(--tema-texto-b91c1c)' }}
         >
           {mensajeError}
         </p>
@@ -1750,7 +1848,9 @@ function PanelDerecho({
   /** Toggle del modo amplio/normal — persiste en localStorage. */
   onToggleModo?: () => void;
 }) {
-  const [tab,              setTab]              = useState<TabPanelId>('info');
+  // Responder es la acción principal de la bandeja; Información sigue accesible
+  // como pestaña secundaria sin cambiar su contenido ni permisos.
+  const [tab,              setTab]              = useState<TabPanelId>('responder');
   // Sprint Panel claro — Responder se abre con espacio: el panel entra
   // a modo amplio solo y vuelve al ancho normal al salir (a menos que
   // la persona lo haya ajustado a mano mientras tanto).
@@ -1815,6 +1915,44 @@ function PanelDerecho({
   const [gestionandoNotif,     setGestionandoNotif]     = useState(false);
   // Vista previa institucional de la respuesta oficial
   const [vistaPreviaActiva,    setVistaPreviaActiva]    = useState(false);
+  const contenidoPanelRef = useRef<HTMLDivElement>(null);
+
+  const claveBorradorRespuesta = `ventanilla:respuesta-borrador:${radicado.radicadoId}`;
+
+  /* El borrador es deliberadamente local a esta sesión: no altera el estado
+     administrativo ni crea un nuevo contrato Firestore. La respuesta oficial
+     solo se registra por el flujo existente de resolver. */
+  useEffect(() => {
+    try {
+      const borradorGuardado = window.sessionStorage.getItem(claveBorradorRespuesta);
+      setRespuesta(borradorGuardado ?? '');
+    } catch {
+      // El panel continúa funcionando si el navegador bloquea sessionStorage.
+      setRespuesta('');
+    }
+    setArchivoPdf(null);
+    setVistaPreviaActiva(false);
+  }, [claveBorradorRespuesta]);
+
+  // Cada caso y pestaña inicia desde su encabezado: evita que la respuesta
+  // aparezca a media pantalla por el scroll retenido del contenido anterior.
+  useEffect(() => {
+    contenidoPanelRef.current?.scrollTo({ top: 0 });
+  }, [radicado.radicadoId, tab]);
+
+  function guardarBorradorRespuesta() {
+    if (!respuesta.trim()) {
+      setErrorLocal('Escribe una respuesta antes de guardar el borrador.');
+      return;
+    }
+    try {
+      window.sessionStorage.setItem(claveBorradorRespuesta, respuesta);
+      setMensajeOk('Borrador guardado en este navegador. El oficio se adjunta al enviar la respuesta.');
+      setErrorLocal(null);
+    } catch {
+      setErrorLocal('No fue posible guardar el borrador en este navegador.');
+    }
+  }
 
   /** Sprint Cierre del mostrador — reenviar la constancia por correo
    *  desde el detalle (mismo endpoint de la pantalla de éxito). */
@@ -2117,6 +2255,7 @@ function PanelDerecho({
       setMensajeOk('Operación guardada correctamente.');
       setRespuesta('');
       setArchivoPdf(null);
+      try { window.sessionStorage.removeItem(claveBorradorRespuesta); } catch { /* noop */ }
       // Fase B — el ciclo cierra aquí mismo: resolver y despachar.
       if (puedeDespachar) setOfrecerDespacho(true);
     } catch (error) {
@@ -2127,26 +2266,39 @@ function PanelDerecho({
   }
 
   const esRojo = radicado.prioridad === 'ROJO';
+  const semaforo = calcularSemaforo(radicado);
+  const terminoVencido = semaforo.estado === 'VENCIDO';
 
   return (
-    <div className="h-full flex flex-col bg-white" style={{ borderLeft: '1px solid #D9E2D9' }}>
-      {/* Header */}
-      <div className={`px-4 py-3 shrink-0 bg-white ${esRojo ? 'border-l-4 border-l-red-500' : ''}`}
-           style={{ borderBottom: '1px solid #D9E2D9' }}>
-        <div className="flex items-start justify-between gap-3">
-          <div className="min-w-0">
-            <div className="flex items-center gap-2 mb-0.5">
-              {esRojo && <span className="w-2 h-2 rounded-full bg-red-500 animate-pulse shrink-0" />}
-              <p className="font-mono text-xs font-bold truncate" style={{ color: '#14532D' }}>{radicado.radicadoId}</p>
-            </div>
-            <p className="text-sm font-semibold truncate" style={{ color: '#1F2933' }}>{nombreSolicitanteVisible(radicado, radicado.solicitante.nombreCompleto)}</p>
-            <div className="flex items-center gap-2 mt-1 flex-wrap">
-              <span className={`text-[10px] font-bold uppercase px-2 py-0.5 rounded-full border ${
-                BADGE_ESTADO[radicado.estadoActual] ?? 'bg-gray-100 text-gray-600 border-gray-200'
+    <div className="h-full min-w-0 flex flex-col bg-[var(--tema-fondo-f7f9fb)]" style={{ borderLeft: '1px solid var(--tema-borde-dce4ea)' }}>
+      {/* Encabezado del caso: identidad, estado y término en un solo vistazo. */}
+      <div className={`shrink-0 bg-[var(--tema-fondo-ffffff)] px-4 py-3.5 sm:px-5 ${esRojo ? 'border-l-4 border-l-red-500' : ''}`}
+           style={{ borderBottom: '1px solid var(--tema-borde-dce4ea)', boxShadow: '0 1px 2px rgba(15, 42, 28, 0.03)' }}>
+        <div className="flex min-w-0 items-start gap-3">
+          <button
+            type="button"
+            onClick={onCerrar}
+            className="tablero-interactivo mt-0.5 inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-xl border bg-[var(--tema-fondo-ffffff)] text-[var(--tema-texto-007049)] transition-[transform,box-shadow,background-color] duration-150 hover:-translate-y-px hover:bg-[var(--tema-fondo-f4f9f6)] hover:shadow-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-700/30"
+            style={{ borderColor: 'var(--tema-borde-dce4ea)' }}
+            aria-label="Regresar a la bandeja de trámites"
+            title="Regresar a la bandeja"
+          >
+            <ArrowLeft size={17} strokeWidth={2} aria-hidden="true" />
+          </button>
+          <div className="min-w-0 flex-1">
+            <p className="text-[10px] font-bold uppercase tracking-[0.12em]" style={{ color: 'var(--text-secondary)' }}>Radicado</p>
+            <p className="mt-0.5 truncate font-mono text-sm font-black sm:text-base" style={{ color: 'var(--tema-texto-007049)' }}>{radicado.radicadoId}</p>
+            <p className="truncate text-base font-black leading-tight sm:text-lg" style={{ color: 'var(--tema-texto-172033)' }}>{nombreSolicitanteVisible(radicado, radicado.solicitante.nombreCompleto)}</p>
+            <div className="mt-2 flex min-w-0 flex-wrap items-center gap-2">
+              <span className={`rounded-full border px-2.5 py-1 text-[10px] font-bold uppercase tracking-wide ${
+                BADGE_ESTADO[radicado.estadoActual] ?? BADGE_ESTADO_NEUTRO
               }`}>
                 {LABELS_ESTADO[radicado.estadoActual] ?? radicado.estadoActual}
               </span>
-              <SemaforoTermino radicado={radicado} variante="compact" />
+              <span className="inline-flex min-w-0 items-center gap-1.5 text-xs font-bold" style={{ color: terminoVencido ? 'var(--tema-texto-d81e1e)' : semaforo.textoClass.includes('green') ? 'var(--tema-texto-006b45)' : 'var(--tema-texto-b45309)' }}>
+                <span className="h-2 w-2 shrink-0 rounded-full" style={{ background: terminoVencido ? '#FB7185' : semaforo.textoClass.includes('green') ? '#22C55E' : '#F59E0B' }} />
+                <span className="truncate">{semaforo.label}</span>
+              </span>
             </div>
           </div>
           <div className="shrink-0 flex items-center gap-1">
@@ -2154,32 +2306,23 @@ function PanelDerecho({
               <button
                 type="button"
                 onClick={onToggleModo}
-                className="hidden md:inline-flex p-1.5 rounded-lg active:scale-90 transition-all duration-150"
-                style={{ color: modoAmplio ? '#14532D' : '#94A3B8', background: modoAmplio ? '#EEF4EE' : 'transparent' }}
+                className="tablero-interactivo hidden h-9 w-9 items-center justify-center rounded-xl border transition-[transform,box-shadow,background-color] duration-150 hover:-translate-y-px hover:shadow-sm md:inline-flex"
+                style={{ color: modoAmplio ? 'var(--tema-texto-007049)' : 'var(--text-secondary)', background: modoAmplio ? 'var(--tema-fondo-f4f9f6)' : 'var(--tema-fondo-ffffff)', borderColor: 'var(--tema-borde-dce4ea)' }}
                 title={modoAmplio ? 'Volver a panel normal' : 'Expandir panel para redacción larga'}
                 aria-label={modoAmplio ? 'Volver a panel normal' : 'Expandir panel'}
-                onMouseEnter={(e) => { if (!modoAmplio) { (e.currentTarget as HTMLElement).style.color = '#14532D'; (e.currentTarget as HTMLElement).style.background = '#EEF4EE'; } }}
-                onMouseLeave={(e) => { if (!modoAmplio) { (e.currentTarget as HTMLElement).style.color = '#94A3B8'; (e.currentTarget as HTMLElement).style.background = 'transparent'; } }}
+                onMouseEnter={(e) => { if (!modoAmplio) { (e.currentTarget as HTMLElement).style.color = 'var(--tema-texto-007049)'; (e.currentTarget as HTMLElement).style.background = 'var(--tema-fondo-f4f9f6)'; } }}
+                onMouseLeave={(e) => { if (!modoAmplio) { (e.currentTarget as HTMLElement).style.color = 'var(--text-secondary)'; (e.currentTarget as HTMLElement).style.background = 'transparent'; } }}
               >
-                {modoAmplio ? (
-                  <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                    <path strokeLinecap="round" strokeLinejoin="round" d="M9 15l-3 3m0 0l-3-3m3 3V3m6 6l3-3m0 0l3 3m-3-3v18" />
-                  </svg>
-                ) : (
-                  <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                    <path strokeLinecap="round" strokeLinejoin="round" d="M4 8V4m0 0h4M4 4l5 5m11-5h-4m4 0v4m0-4l-5 5M4 16v4m0 0h4m-4 0l5-5m11 5l-5-5m5 5v-4m0 4h-4" />
-                  </svg>
-                )}
+                {modoAmplio
+                  ? <PanelRightClose size={17} strokeWidth={1.9} aria-hidden="true" />
+                  : <PanelRightOpen size={17} strokeWidth={1.9} aria-hidden="true" />}
               </button>
             )}
             <button onClick={onCerrar}
-              className="p-1.5 rounded-lg active:scale-90 transition-all duration-150"
-              style={{ color: '#94A3B8' }}
-              onMouseEnter={(e) => { (e.currentTarget as HTMLElement).style.color = '#1F2933'; (e.currentTarget as HTMLElement).style.background = '#EEF4EE'; }}
-              onMouseLeave={(e) => { (e.currentTarget as HTMLElement).style.color = '#94A3B8'; (e.currentTarget as HTMLElement).style.background = ''; }}>
-              <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
-              </svg>
+              className="tablero-interactivo inline-flex h-9 w-9 items-center justify-center rounded-xl border bg-[var(--tema-fondo-ffffff)] text-[var(--text-secondary)] transition-[transform,box-shadow,background-color] duration-150 hover:-translate-y-px hover:bg-[var(--tema-fondo-f4f9f6)] hover:text-[var(--tema-texto-172033)] hover:shadow-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-700/30"
+              style={{ borderColor: 'var(--tema-borde-dce4ea)' }}
+              aria-label="Cerrar detalle del trámite">
+              <X size={18} strokeWidth={1.9} aria-hidden="true" />
             </button>
           </div>
         </div>
@@ -2189,17 +2332,17 @@ function PanelDerecho({
       {radicado.alertaNotificacionFallida === true && (
         <div
           className="shrink-0 px-4 py-2.5"
-          style={{ background: '#FEF2F2', borderBottom: '1px solid #FCA5A5' }}
+          style={{ background: 'var(--tema-fondo-fef2f2)', borderBottom: '1px solid var(--tema-borde-fca5a5)' }}
         >
           <div className="flex items-start gap-2">
             <svg className="w-4 h-4 shrink-0 mt-0.5" fill="none" viewBox="0 0 24 24" stroke="#B91C1C" strokeWidth={2}>
               <path strokeLinecap="round" strokeLinejoin="round" d="M12 9v3.75m-9.303 3.376c-.866 1.5.217 3.374 1.948 3.374h14.71c1.73 0 2.813-1.874 1.948-3.374L13.949 3.378c-.866-1.5-3.032-1.5-3.898 0L2.697 16.126zM12 15.75h.007v.008H12v-.008z" />
             </svg>
             <div className="flex-1 min-w-0">
-              <p className="text-[11px] font-bold uppercase tracking-wide" style={{ color: '#B91C1C' }}>
+              <p className="text-[11px] font-bold uppercase tracking-wide" style={{ color: 'var(--tema-texto-b91c1c)' }}>
                 Correo fallido
               </p>
-              <p className="text-xs mt-0.5" style={{ color: '#7F1D1D' }}>
+              <p className="text-xs mt-0.5" style={{ color: 'var(--tema-texto-7f1d1d)' }}>
                 Una notificación oficial a <span className="font-semibold">{radicado.solicitante.email ?? 'el ciudadano'}</span> no pudo entregarse.
                 Contacta al ciudadano por canal alternativo y registra la gestión.
               </p>
@@ -2219,7 +2362,7 @@ function PanelDerecho({
                     onChange={(e) => setMotivoGestion(e.target.value)}
                     placeholder="¿Cómo se notificó al ciudadano? (Ej: llamada telefónica al 312-xxx-xxxx el 2026-06-14)"
                     className="w-full text-xs rounded-lg px-2.5 py-2 border focus-visible:outline-none focus-visible:ring-2"
-                    style={{ borderColor: '#FCA5A5', minHeight: 60 }}
+                    style={{ borderColor: 'var(--tema-borde-fca5a5)', minHeight: 60 }}
                     disabled={gestionandoNotif}
                   />
                   <div className="flex gap-2">
@@ -2235,7 +2378,7 @@ function PanelDerecho({
                       onClick={() => { setMostrarGestionNotif(false); setMotivoGestion(''); }}
                       disabled={gestionandoNotif}
                       className="text-[11px] font-bold px-3 py-1.5 rounded-lg active:scale-95 transition"
-                      style={{ background: 'transparent', color: '#7F1D1D', border: '1px solid #FCA5A5' }}
+                      style={{ background: 'transparent', color: 'var(--tema-texto-7f1d1d)', border: '1px solid var(--tema-borde-fca5a5)' }}
                     >
                       Cancelar
                     </button>
@@ -2249,48 +2392,59 @@ function PanelDerecho({
 
       {/* Tabs — se envuelven en pantallas estrechas para conservar cada acción visible. */}
       <div
-        className="flex min-w-0 shrink-0 flex-wrap gap-1 bg-white px-2 py-1.5"
-        style={{ borderBottom: '1px solid #D9E2D9' }}
+        className="flex min-w-0 shrink-0 flex-wrap gap-1 bg-[var(--tema-fondo-ffffff)] px-2 py-1.5"
+        style={{ borderBottom: '1px solid var(--tema-borde-dce4ea)' }}
         role="tablist"
       >
         {TABS_PANEL.map((t) => {
           const activo = tab === t.id;
+          const Icono = t.Icono;
+          const esAccionSecundaria = t.id === 'traslado' || t.id === 'prorroga' || t.id === 'copiloto';
           return (
             <button key={t.id}
               role="tab"
               aria-selected={activo}
               onClick={() => cambiarTab(t.id)}
-              className="px-3 py-1.5 rounded-lg text-[11px] font-bold uppercase tracking-wider focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-700/30 transition-all duration-150"
+              className={`tablero-interactivo inline-flex min-w-0 items-center gap-1.5 rounded-xl px-3 py-2 uppercase tracking-wider focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-700/30 transition-[transform,box-shadow,background-color,border-color] duration-150 hover:-translate-y-px hover:shadow-sm ${esAccionSecundaria ? 'text-[10px] font-semibold' : 'text-[11px] font-bold'}`}
               style={activo
                 ? {
                     color: '#FFFFFF',
-                    background: '#14532D',
-                    border: '1px solid #14532D',
-                    boxShadow: '0 1px 3px rgba(20,83,45,0.30)',
+                    background: 'var(--tema-fondo-007049)',
+                    border: '1px solid var(--tema-borde-007049)',
+                    boxShadow: '0 1px 3px rgba(0, 112, 73,0.30)',
                   }
                 : t.id === 'responder'
                 ? {
                     // Panel claro — la acción principal salta a la vista.
-                    color: '#14532D',
-                    background: '#EAF3DE',
-                    border: '1px solid #97C459',
+                    color: 'var(--tema-texto-007049)',
+                    background: 'var(--tema-fondo-eaf3de)',
+                    border: '1px solid var(--tema-borde-97c459)',
+                  }
+                : esAccionSecundaria
+                ? {
+                    color: 'var(--text-secondary)',
+                    background: 'var(--tema-fondo-ffffff)',
+                    border: '1px solid var(--tema-borde-e2e8e3)',
                   }
                 : {
-                    color: '#475569',
-                    background: '#F8FAF7',
-                    border: '1px solid #D9E2D9',
+                    color: 'var(--tema-texto-475569)',
+                    background: 'var(--tema-fondo-f7f9fb)',
+                    border: '1px solid var(--tema-borde-dce4ea)',
                   }}
-              onMouseEnter={(e) => { if (!activo) { (e.currentTarget as HTMLElement).style.color = '#14532D'; (e.currentTarget as HTMLElement).style.background = '#EEF4EE'; (e.currentTarget as HTMLElement).style.borderColor = '#14532D'; } }}
+              onMouseEnter={(e) => { if (!activo) { (e.currentTarget as HTMLElement).style.color = 'var(--tema-texto-007049)'; (e.currentTarget as HTMLElement).style.background = 'var(--tema-fondo-f4f9f6)'; (e.currentTarget as HTMLElement).style.borderColor = 'var(--tema-borde-007049)'; } }}
               onMouseLeave={(e) => {
                 if (activo) return;
                 const el = e.currentTarget as HTMLElement;
                 if (t.id === 'responder') {
-                  el.style.color = '#14532D'; el.style.background = '#EAF3DE'; el.style.borderColor = '#97C459';
+                  el.style.color = 'var(--tema-texto-007049)'; el.style.background = 'var(--tema-fondo-eaf3de)'; el.style.borderColor = 'var(--tema-borde-97c459)';
+                } else if (esAccionSecundaria) {
+                  el.style.color = 'var(--text-secondary)'; el.style.background = 'var(--tema-fondo-ffffff)'; el.style.borderColor = 'var(--tema-borde-e2e8e3)';
                 } else {
-                  el.style.color = '#475569'; el.style.background = '#F8FAF7'; el.style.borderColor = '#D9E2D9';
+                  el.style.color = 'var(--tema-texto-475569)'; el.style.background = 'var(--tema-fondo-f7f9fb)'; el.style.borderColor = 'var(--tema-borde-dce4ea)';
                 }
               }}>
-              {t.label}
+              <Icono size={15} strokeWidth={1.9} aria-hidden="true" />
+              <span>{t.label}</span>
             </button>
           );
         })}
@@ -2300,8 +2454,8 @@ function PanelDerecho({
       {(mensajeOk || errorLocal) && (
         <div className="mx-4 mt-3 px-3 py-2 rounded-lg text-xs shrink-0"
              style={mensajeOk
-               ? { background: '#F0FDF4', border: '1px solid #BBF7D0', color: '#166534' }
-               : { background: '#FEF2F2', border: '1px solid #FECACA', color: '#DC2626' }}>
+               ? { background: 'var(--tema-fondo-f0fdf4)', border: '1px solid var(--tema-borde-bbf7d0)', color: 'var(--tema-texto-006b45)' }
+               : { background: 'var(--tema-fondo-fef2f2)', border: '1px solid var(--tema-borde-fecaca)', color: 'var(--tema-texto-d81e1e)' }}>
           {mensajeOk ?? errorLocal}
           {/* Fase B — despacho al resolver: la respuesta que sale recibe
               su 2-SAL sin cambiar de pantalla. Solo roles que por reglas
@@ -2311,7 +2465,7 @@ function PanelDerecho({
               type="button"
               onClick={() => { setSalidaDetalleAbierta(true); setOfrecerDespacho(false); }}
               className="block mt-1.5 text-xs font-bold underline underline-offset-2"
-              style={{ color: '#14532D' }}
+              style={{ color: 'var(--tema-texto-007049)' }}
             >
               Registrar la salida 2-SAL de esta respuesta ahora
             </button>
@@ -2320,7 +2474,7 @@ function PanelDerecho({
       )}
 
       {/* Contenido con scroll */}
-      <div className="flex-1 overflow-y-auto px-4 py-4 space-y-4" style={{ background: '#F8FAF7' }}>
+      <div ref={contenidoPanelRef} className="flex-1 overflow-y-auto px-4 py-4 pb-28 space-y-4 sm:pb-24" style={{ background: 'var(--tema-fondo-f7f9fb)' }}>
 
         {/* ── TAB 1: Información ── */}
         {tab === 'info' && (
@@ -2360,16 +2514,16 @@ function PanelDerecho({
                 ciudadano que vuelve otro día por su constancia ya tiene
                 botón. Misma pieza de la pantalla de éxito, armada desde
                 el documento. */}
-            <div className="rounded-xl bg-white p-4" style={{ border: '1px solid #D9E2D9' }}>
+            <div className="rounded-xl bg-[var(--tema-fondo-ffffff)] p-4" style={{ border: '1px solid var(--tema-borde-dce4ea)' }}>
               <div className="flex items-center justify-between gap-2 flex-wrap">
-                <p className="text-[10px] font-bold uppercase tracking-widest" style={{ color: '#14532D' }}>
+                <p className="text-[10px] font-bold uppercase tracking-widest" style={{ color: 'var(--tema-texto-007049)' }}>
                   Constancia de radicación
                 </p>
                 <button
                   type="button"
                   onClick={() => setMostrarConstancia((v) => !v)}
                   className="text-xs font-bold px-3 py-1.5 rounded-lg transition-all active:scale-95"
-                  style={{ border: '1px solid #14532D', color: '#14532D', background: 'white' }}
+                  style={{ border: '1px solid var(--tema-borde-007049)', color: 'var(--tema-texto-007049)', background: 'var(--tema-fondo-ffffff)' }}
                 >
                   {mostrarConstancia ? 'Ocultar constancia' : 'Ver constancia'}
                 </button>
@@ -2390,13 +2544,13 @@ function PanelDerecho({
             {/* Sprint Radicación de salida — despachar respuesta con
                 número 2-SAL amarrado a esta entrada. */}
             {!soloLectura && (usuario.rol === 'ADMIN' || usuario.rol === 'RECEPCIONISTA') && (
-              <div className="rounded-xl bg-white p-4" style={{ border: '1px solid #D9E2D9' }}>
+              <div className="rounded-xl bg-[var(--tema-fondo-ffffff)] p-4" style={{ border: '1px solid var(--tema-borde-dce4ea)' }}>
                 <div className="flex items-center justify-between gap-2 flex-wrap">
                   <div>
-                    <p className="text-[10px] font-bold uppercase tracking-widest" style={{ color: '#8A6A12' }}>
+                    <p className="text-[10px] font-bold uppercase tracking-widest" style={{ color: 'var(--tema-texto-8a6a12)' }}>
                       Correspondencia de salida
                     </p>
-                    <p className="text-xs mt-0.5" style={{ color: '#667085' }}>
+                    <p className="text-xs mt-0.5" style={{ color: 'var(--text-secondary)' }}>
                       El oficio que se despacha recibe su número 2-SAL y queda en la trazabilidad.
                     </p>
                   </div>
@@ -2404,15 +2558,15 @@ function PanelDerecho({
                     type="button"
                     onClick={() => setSalidaDetalleAbierta(true)}
                     className="text-xs font-bold px-3 py-1.5 rounded-lg transition-all active:scale-95"
-                    style={{ border: '1px solid #14532D', color: '#14532D', background: 'white' }}
+                    style={{ border: '1px solid var(--tema-borde-007049)', color: 'var(--tema-texto-007049)', background: 'var(--tema-fondo-ffffff)' }}
                   >
                     Registrar salida
                   </button>
                 </div>
               </div>
             )}
-            <div className="rounded-xl bg-white p-4" style={{ border: '1px solid #D9E2D9' }}>
-              <p className="text-[10px] font-bold uppercase tracking-widest mb-3" style={{ color: '#14532D' }}>Solicitante</p>
+            <div className="rounded-xl bg-[var(--tema-fondo-ffffff)] p-4" style={{ border: '1px solid var(--tema-borde-dce4ea)' }}>
+              <p className="text-[10px] font-bold uppercase tracking-widest mb-3" style={{ color: 'var(--tema-texto-007049)' }}>Solicitante</p>
               <div className="grid grid-cols-2 gap-x-4 gap-y-3">
                 <FilaInfo label="Tipo persona"    value={radicado.solicitante.tipoPersona} />
                 <FilaInfo label="Documento"       value={documentoSolicitanteVisible(radicado, radicado.solicitante.tipoDocumento, radicado.solicitante.numeroDocumento)} />
@@ -2431,13 +2585,13 @@ function PanelDerecho({
               </div>
             </div>
 
-            <div className="rounded-xl bg-white p-4" style={{ border: '1px solid #D9E2D9' }}>
-              <p className="text-[10px] font-bold uppercase tracking-widest mb-3" style={{ color: '#14532D' }}>Detalle del caso</p>
+            <div className="rounded-xl bg-[var(--tema-fondo-ffffff)] p-4" style={{ border: '1px solid var(--tema-borde-dce4ea)' }}>
+              <p className="text-[10px] font-bold uppercase tracking-widest mb-3" style={{ color: 'var(--tema-texto-007049)' }}>Detalle del caso</p>
               <div className="space-y-3">
                 <FilaInfo label="Asunto"      value={radicado.detalle.asunto} />
                 <div>
-                  <p className="text-[10px] font-bold uppercase tracking-widest" style={{ color: '#94A3B8' }}>Descripción</p>
-                  <p className="text-sm mt-0.5 leading-relaxed whitespace-pre-wrap" style={{ color: '#1F2933' }}>{radicado.detalle.descripcion}</p>
+                  <p className="text-[10px] font-bold uppercase tracking-widest" style={{ color: 'var(--text-secondary)' }}>Descripción</p>
+                  <p className="text-sm mt-0.5 leading-relaxed whitespace-pre-wrap" style={{ color: 'var(--tema-texto-172033)' }}>{radicado.detalle.descripcion}</p>
                 </div>
                 <FilaInfo label="Número de folios" value={String(radicado.detalle.numeroFolios)} />
                 {radicado.detalle.anexosDescripcion && (
@@ -2446,8 +2600,8 @@ function PanelDerecho({
               </div>
             </div>
 
-            <div className="rounded-xl bg-white p-4" style={{ border: '1px solid #D9E2D9' }}>
-              <p className="text-[10px] font-bold uppercase tracking-widest mb-3" style={{ color: '#14532D' }}>
+            <div className="rounded-xl bg-[var(--tema-fondo-ffffff)] p-4" style={{ border: '1px solid var(--tema-borde-dce4ea)' }}>
+              <p className="text-[10px] font-bold uppercase tracking-widest mb-3" style={{ color: 'var(--tema-texto-007049)' }}>
                 Control de radicación
               </p>
               <div className="grid grid-cols-2 gap-x-4 gap-y-3">
@@ -2460,8 +2614,8 @@ function PanelDerecho({
             </div>
 
             {/* Sprint Ventanilla Operativa 1: Origen y datos de ingreso */}
-            <div className="rounded-xl bg-white p-4" style={{ border: '1px solid #D9E2D9' }}>
-              <p className="text-[10px] font-bold uppercase tracking-widest mb-3" style={{ color: '#14532D' }}>
+            <div className="rounded-xl bg-[var(--tema-fondo-ffffff)] p-4" style={{ border: '1px solid var(--tema-borde-dce4ea)' }}>
+              <p className="text-[10px] font-bold uppercase tracking-widest mb-3" style={{ color: 'var(--tema-texto-007049)' }}>
                 Origen y datos de ingreso
               </p>
               <div className="grid grid-cols-2 gap-x-4 gap-y-3">
@@ -2489,18 +2643,18 @@ function PanelDerecho({
             <CompletarDatosSolicitante radicado={radicado} />
 
             {/* ── MIPG-2: Responsable funcional ── */}
-            <div className="rounded-xl bg-white p-4" style={{ border: '1px solid #D9E2D9' }}>
-              <p className="text-[10px] font-bold uppercase tracking-widest mb-3" style={{ color: '#14532D' }}>
+            <div className="rounded-xl bg-[var(--tema-fondo-ffffff)] p-4" style={{ border: '1px solid var(--tema-borde-dce4ea)' }}>
+              <p className="text-[10px] font-bold uppercase tracking-widest mb-3" style={{ color: 'var(--tema-texto-007049)' }}>
                 MIPG · Responsable funcional asignado
               </p>
               {radicado.clasificacion.funcionarioResponsableNombre ? (
-                <div className="rounded-lg p-3 space-y-2" style={{ background: '#EEF4EE', border: '1px solid #D9E2D9' }}>
+                <div className="rounded-lg p-3 space-y-2" style={{ background: 'var(--tema-fondo-f4f9f6)', border: '1px solid var(--tema-borde-dce4ea)' }}>
                   <div className="flex items-center gap-2">
                     <span className="w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold text-white"
-                          style={{ background: '#14532D' }}>
+                          style={{ background: 'var(--tema-fondo-007049)' }}>
                       {radicado.clasificacion.funcionarioResponsableNombre.charAt(0).toUpperCase()}
                     </span>
-                    <p className="text-sm font-semibold" style={{ color: '#1F2933' }}>
+                    <p className="text-sm font-semibold" style={{ color: 'var(--tema-texto-172033)' }}>
                       {radicado.clasificacion.funcionarioResponsableNombre}
                     </p>
                   </div>
@@ -2527,21 +2681,21 @@ function PanelDerecho({
                   </div>
                 </div>
               ) : radicado.clasificacion.funcionarioResponsableUid ? (
-                <div className="rounded-lg p-3" style={{ background: '#F8FAF7', border: '1px solid #D9E2D9' }}>
-                  <p className="text-xs" style={{ color: '#667085' }}>
-                    <span className="font-mono" style={{ color: '#94A3B8' }}>{radicado.clasificacion.funcionarioResponsableUid}</span>
+                <div className="rounded-lg p-3" style={{ background: 'var(--tema-fondo-f7f9fb)', border: '1px solid var(--tema-borde-dce4ea)' }}>
+                  <p className="text-xs" style={{ color: 'var(--text-secondary)' }}>
+                    <span className="font-mono" style={{ color: 'var(--text-secondary)' }}>{radicado.clasificacion.funcionarioResponsableUid}</span>
                     <br />
-                    <span style={{ color: '#94A3B8' }}>Radicado anterior — nombre no registrado. Ver trazabilidad para detalle.</span>
+                    <span style={{ color: 'var(--text-secondary)' }}>Radicado anterior — nombre no registrado. Ver trazabilidad para detalle.</span>
                   </p>
                 </div>
               ) : (
-                <p className="text-xs italic" style={{ color: '#94A3B8' }}>Sin responsable asignado</p>
+                <p className="text-xs italic" style={{ color: 'var(--text-secondary)' }}>Sin responsable asignado</p>
               )}
             </div>
 
             {radicado.archivos.length > 0 && (
-              <div className="rounded-xl bg-white p-4" style={{ border: '1px solid #D9E2D9' }}>
-                <p className="text-[10px] font-bold uppercase tracking-widest mb-3" style={{ color: '#14532D' }}>
+              <div className="rounded-xl bg-[var(--tema-fondo-ffffff)] p-4" style={{ border: '1px solid var(--tema-borde-dce4ea)' }}>
+                <p className="text-[10px] font-bold uppercase tracking-widest mb-3" style={{ color: 'var(--tema-texto-007049)' }}>
                   Archivos adjuntos ({radicado.archivos.length})
                 </p>
                 <ul className="space-y-2">
@@ -2574,14 +2728,14 @@ function PanelDerecho({
                       <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-indigo-500 opacity-75"></span>
                       <span className="relative inline-flex rounded-full h-2 w-2 bg-indigo-600"></span>
                     </span>
-                    <span className="text-[10px] font-bold uppercase tracking-widest text-indigo-700">Análisis Asistido IA</span>
+                    <span className="text-[10px] font-bold uppercase tracking-widest text-indigo-700 oscuro:text-indigo-300">Análisis Asistido IA</span>
                   </div>
-                  <span className="text-[10px] text-indigo-700 font-semibold bg-indigo-50 px-2 py-0.5 rounded-md border border-indigo-200">
+                  <span className="text-[10px] text-indigo-700 oscuro:text-indigo-300 font-semibold bg-indigo-50 oscuro:bg-indigo-500/15 px-2 py-0.5 rounded-md border border-indigo-200 oscuro:border-indigo-500/30">
                     Confianza: {(radicado.analisisIa.confianzaClasificacion * 100).toFixed(0)}%
                   </span>
                 </div>
 
-                <div className="space-y-3 bg-white p-4 rounded-xl" style={{ border: '1px solid var(--color-border)' }}>
+                <div className="space-y-3 bg-[var(--tema-fondo-ffffff)] p-4 rounded-xl" style={{ border: '1px solid var(--color-border)' }}>
                   <div>
                     <span className="text-[9px] font-bold uppercase tracking-widest block mb-1" style={{ color: 'var(--text-secondary)' }}>Resumen Ejecutivo IA</span>
                     <p className="text-xs italic leading-relaxed" style={{ color: 'var(--text-primary)' }}>
@@ -2594,7 +2748,7 @@ function PanelDerecho({
                       {radicado.analisisIa.etiquetasSemanticas.map((tag) => (
                         <span
                           key={tag}
-                          className="inline-flex items-center rounded-md bg-indigo-50 px-2 py-0.5 text-[9px] font-medium text-indigo-700 border border-indigo-200"
+                          className="inline-flex items-center rounded-md bg-indigo-50 oscuro:bg-indigo-500/15 px-2 py-0.5 text-[9px] font-medium text-indigo-700 oscuro:text-indigo-300 border border-indigo-200 oscuro:border-indigo-500/30"
                         >
                           #{tag}
                         </span>
@@ -2610,10 +2764,10 @@ function PanelDerecho({
                       <span
                         className={`text-[10px] font-bold uppercase px-2 py-0.5 rounded-md border ${
                           radicado.feedbackIa.puntuacion === 'POSITIVO'
-                            ? 'bg-emerald-50 border-emerald-200'
+                            ? 'bg-emerald-50 oscuro:bg-emerald-500/15 border-emerald-200 oscuro:border-emerald-500/30'
                             : radicado.feedbackIa.puntuacion === 'CORREGIDO'
-                              ? 'bg-amber-50 border-amber-200'
-                              : 'bg-rose-50 border-rose-200'
+                              ? 'bg-amber-50 oscuro:bg-amber-500/15 border-amber-200 oscuro:border-amber-500/30'
+                              : 'bg-rose-50 oscuro:bg-rose-500/15 border-rose-200 oscuro:border-rose-500/30'
                         }`}
                         style={{
                           color:
@@ -2630,14 +2784,14 @@ function PanelDerecho({
                       <div className="flex items-center gap-2">
                         <button
                           onClick={() => enviarFeedbackIA('POSITIVO')}
-                          className="px-2.5 py-1 rounded-md bg-white hover:bg-emerald-50 text-xs font-medium transition-colors cursor-pointer"
+                          className="px-2.5 py-1 rounded-md bg-[var(--tema-fondo-ffffff)] hover:bg-emerald-50 oscuro:hover:bg-emerald-500/15 text-xs font-medium transition-colors cursor-pointer"
                           style={{ border: '1px solid var(--color-border)', color: 'var(--text-primary)' }}
                         >
                           👍 Sí
                         </button>
                         <button
                           onClick={() => enviarFeedbackIA('NEGATIVO')}
-                          className="px-2.5 py-1 rounded-md bg-white hover:bg-rose-50 text-xs font-medium transition-colors cursor-pointer"
+                          className="px-2.5 py-1 rounded-md bg-[var(--tema-fondo-ffffff)] hover:bg-rose-50 oscuro:hover:bg-rose-500/15 text-xs font-medium transition-colors cursor-pointer"
                           style={{ border: '1px solid var(--color-border)', color: 'var(--text-primary)' }}
                         >
                           ❌ No
@@ -2652,8 +2806,8 @@ function PanelDerecho({
             {/* Documento de respuesta / Oficio anexado — visible en el
                 expediente cuando el radicado ya fue respondido con oficio. */}
             {radicado.respuestaOficial?.archivoPath && (
-              <div className="rounded-xl bg-white p-4" style={{ border: '1px solid #D9E2D9' }}>
-                <p className="text-[10px] font-bold uppercase tracking-widest mb-3" style={{ color: '#14532D' }}>
+              <div className="rounded-xl bg-[var(--tema-fondo-ffffff)] p-4" style={{ border: '1px solid var(--tema-borde-dce4ea)' }}>
+                <p className="text-[10px] font-bold uppercase tracking-widest mb-3" style={{ color: 'var(--tema-texto-007049)' }}>
                   Documento de respuesta / Oficio anexado
                 </p>
                 <div className="grid grid-cols-2 gap-x-4 gap-y-3">
@@ -2672,7 +2826,7 @@ function PanelDerecho({
                     target="_blank"
                     rel="noopener noreferrer"
                     className="text-xs font-semibold underline underline-offset-2"
-                    style={{ color: '#14532D' }}
+                    style={{ color: 'var(--tema-texto-007049)' }}
                   >
                     Descargar documento
                   </a>
@@ -2707,27 +2861,27 @@ function PanelDerecho({
             && !respActualUid
             && !soloLectura;
           const cajaEstilo = resumen.tono === 'AMBAR'
-            ? { caja: { background: '#FAEEDA', border: '1px solid #FAC775' }, titulo: '#854F0B', texto: '#633806' }
-            : { caja: { background: '#EAF3DE', border: '1px solid #C0DD97' }, titulo: '#27500A', texto: '#3B6D11' };
+            ? { caja: { background: 'var(--tema-fondo-faeeda)', border: '1px solid var(--tema-borde-fac775)' }, titulo: 'var(--tema-texto-854f0b)', texto: 'var(--tema-texto-633806)' }
+            : { caja: { background: 'var(--tema-fondo-eaf3de)', border: '1px solid var(--tema-borde-c0dd97)' }, titulo: 'var(--tema-texto-27500a)', texto: 'var(--tema-texto-3b6d11)' };
           return (
           <div className="space-y-4">
             {/* ── El caso hoy: dónde está y quién lo tiene ── */}
-            <div className="rounded-xl p-3.5 flex items-center gap-3" style={{ background: '#FFFFFF', border: '1px solid #D9E2D9' }}>
-              <span className="shrink-0 w-9 h-9 rounded-full flex items-center justify-center" style={{ background: '#EAF3DE' }} aria-hidden="true">
+            <div className="rounded-xl p-3.5 flex items-center gap-3" style={{ background: 'var(--tema-fondo-ffffff)', border: '1px solid var(--tema-borde-dce4ea)' }}>
+              <span className="shrink-0 w-9 h-9 rounded-full flex items-center justify-center" style={{ background: 'var(--tema-fondo-eaf3de)' }} aria-hidden="true">
                 <svg className="w-[18px] h-[18px]" fill="none" viewBox="0 0 24 24" stroke="#3B6D11" strokeWidth={1.8}>
                   <path strokeLinecap="round" strokeLinejoin="round" d="M15 10.5a3 3 0 11-6 0 3 3 0 016 0z" />
                   <path strokeLinecap="round" strokeLinejoin="round" d="M19.5 10.5c0 7.142-7.5 11.25-7.5 11.25S4.5 17.642 4.5 10.5a7.5 7.5 0 1115 0z" />
                 </svg>
               </span>
               <div className="min-w-0">
-                <p className="text-[10px] font-bold uppercase tracking-widest" style={{ color: '#5F8A6E' }}>El caso está hoy en</p>
-                <p className="text-sm font-semibold mt-0.5" style={{ color: '#12261A' }}>
+                <p className="text-[10px] font-bold uppercase tracking-widest" style={{ color: 'var(--tema-texto-007049)' }}>El caso está hoy en</p>
+                <p className="text-sm font-semibold mt-0.5" style={{ color: 'var(--tema-texto-172033)' }}>
                   {NOMBRES_TENANT[radicado.clasificacion.oficinaDestino]}
                   {radicado.clasificacion.funcionarioResponsableNombre
                     ? ` · responsable: ${radicado.clasificacion.funcionarioResponsableNombre}`
                     : ' · sin persona asignada'}
                 </p>
-                <p className="text-[11px] mt-0.5" style={{ color: '#7A8B7F' }}>
+                <p className="text-[11px] mt-0.5" style={{ color: 'var(--text-secondary)' }}>
                   {areaActualId ? `Área: ${getNombreArea(areaActualId)}` : ''}
                   {areaActualId && radicado.clasificacion.fechaAsignacionResponsable ? ' · ' : ''}
                   {radicado.clasificacion.fechaAsignacionResponsable
@@ -2739,13 +2893,13 @@ function PanelDerecho({
 
             {/* ── Tomar este caso: el gesto del funcionario ── */}
             {puedeTomarCaso && (
-              <div className="rounded-xl px-3.5 py-3 flex items-center justify-between gap-3 flex-wrap" style={{ background: '#EAF3DE', border: '1px solid #C0DD97' }}>
-                <p className="text-xs" style={{ color: '#3B6D11' }}>
+              <div className="rounded-xl px-3.5 py-3 flex items-center justify-between gap-3 flex-wrap" style={{ background: 'var(--tema-fondo-eaf3de)', border: '1px solid var(--tema-borde-c0dd97)' }}>
+                <p className="text-xs" style={{ color: 'var(--tema-texto-3b6d11)' }}>
                   Este caso es de tu dependencia y no tiene persona asignada.
                 </p>
                 <button type="button" onClick={tomarCaso} disabled={guardando}
                   className="shrink-0 text-xs font-bold px-4 py-2 rounded-lg transition-all active:scale-95 disabled:opacity-60"
-                  style={{ border: '1px solid #14532D', color: '#14532D', background: 'white' }}>
+                  style={{ border: '1px solid var(--tema-borde-007049)', color: 'var(--tema-texto-007049)', background: 'var(--tema-fondo-ffffff)' }}>
                   Tomar este caso
                 </button>
               </div>
@@ -2753,7 +2907,7 @@ function PanelDerecho({
 
             {/* ── Mover o asignar ── */}
             <div>
-              <p className="text-[10px] font-bold uppercase tracking-widest mb-1.5" style={{ color: '#667085' }}>Dependencia</p>
+              <p className="text-[10px] font-bold uppercase tracking-widest mb-1.5" style={{ color: 'var(--text-secondary)' }}>Dependencia</p>
               <select
                 value={tenantDestino}
                 onChange={(e) => {
@@ -2779,12 +2933,12 @@ function PanelDerecho({
 
             {/* Selector MIPG-2 — persona responsable */}
             <div>
-              <p className="text-[10px] font-bold uppercase tracking-widest mb-1.5" style={{ color: '#667085' }}>
-                Persona responsable <span className="normal-case font-normal" style={{ color: '#94A3B8' }}>(opcional)</span>
+              <p className="text-[10px] font-bold uppercase tracking-widest mb-1.5" style={{ color: 'var(--text-secondary)' }}>
+                Persona responsable <span className="normal-case font-normal" style={{ color: 'var(--text-secondary)' }}>(opcional)</span>
               </p>
               {cargandoFuncionarios ? (
-                <div className="flex items-center gap-2 text-xs py-2" style={{ color: '#94A3B8' }}>
-                  <span className="w-3 h-3 border-2 rounded-full animate-spin" style={{ borderColor: '#D9E2D9', borderTopColor: '#14532D' }} />
+                <div className="flex items-center gap-2 text-xs py-2" style={{ color: 'var(--text-secondary)' }}>
+                  <span className="w-3 h-3 border-2 rounded-full animate-spin" style={{ borderColor: 'var(--tema-borde-dce4ea)', borderTopColor: 'var(--tema-borde-007049)' }} />
                   Cargando funcionarios…
                 </div>
               ) : funcionariosTenant.length > 0 ? (
@@ -2814,11 +2968,11 @@ function PanelDerecho({
                   value={funcionarioUid}
                   onChange={(e) => { setFuncionarioUid(e.target.value); setResponsableSelec(null); }}
                   placeholder="UID del funcionario (no hay usuarios registrados en esta dependencia)"
-                  className="input-internal text-slate-500"
+                  className="input-internal text-slate-500 oscuro:text-slate-400"
                 />
               )}
               {responsableSelec && (
-                <p className="text-[10px] mt-1.5" style={{ color: '#94A3B8' }}>
+                <p className="text-[10px] mt-1.5" style={{ color: 'var(--text-secondary)' }}>
                   📧 {responsableSelec.email}
                 </p>
               )}
@@ -2827,8 +2981,8 @@ function PanelDerecho({
             {/* Fase 2 · Áreas — nivel 2 del modelo: propias del destino
                 + transversales (Almacén y Archivo, Sistemas). */}
             <div>
-              <p className="text-[10px] font-bold uppercase tracking-widest mb-1.5" style={{ color: '#667085' }}>
-                Área <span className="normal-case font-normal" style={{ color: '#94A3B8' }}>(opcional)</span>
+              <p className="text-[10px] font-bold uppercase tracking-widest mb-1.5" style={{ color: 'var(--text-secondary)' }}>
+                Área <span className="normal-case font-normal" style={{ color: 'var(--text-secondary)' }}>(opcional)</span>
               </p>
               <select
                 value={areaSeleccionada}
@@ -2863,9 +3017,9 @@ function PanelDerecho({
               disabled={guardando || soloLectura || !resumen.puedeConfirmar}
               title={soloLectura ? 'Tu rol no permite realizar acciones sobre radicados.' : undefined}
               className="w-full py-2.5 rounded-lg text-white text-sm font-bold transition-all duration-150 disabled:opacity-60 flex items-center justify-center gap-2"
-              style={{ background: resumen.puedeConfirmar ? '#14532D' : '#94A3B8' }}
-              onMouseEnter={(e) => { if (!guardando && !soloLectura && resumen.puedeConfirmar) (e.currentTarget as HTMLElement).style.background = '#166534'; }}
-              onMouseLeave={(e) => { (e.currentTarget as HTMLElement).style.background = resumen.puedeConfirmar ? '#14532D' : '#94A3B8'; }}>
+              style={{ background: resumen.puedeConfirmar ? 'var(--tema-fondo-007049)' : 'var(--tema-fondo-94a3b8)' }}
+              onMouseEnter={(e) => { if (!guardando && !soloLectura && resumen.puedeConfirmar) (e.currentTarget as HTMLElement).style.background = '#006B45'; }}
+              onMouseLeave={(e) => { (e.currentTarget as HTMLElement).style.background = resumen.puedeConfirmar ? 'var(--tema-fondo-007049)' : 'var(--tema-fondo-94a3b8)'; }}>
               {guardando && <span className="w-3.5 h-3.5 border-2 border-white/30 border-t-white rounded-full animate-spin" />}
               {resumen.botonLabel}
             </button>
@@ -2880,13 +3034,13 @@ function PanelDerecho({
         {tab === 'trazabilidad' && (
           <div>
             {cargandoTrazabilidad ? (
-              <div className="flex items-center gap-2 text-sm" style={{ color: '#94A3B8' }}>
+              <div className="flex items-center gap-2 text-sm" style={{ color: 'var(--text-secondary)' }}>
                 <span className="w-4 h-4 border-2 rounded-full animate-spin"
-                      style={{ borderColor: '#D9E2D9', borderTopColor: '#14532D' }} />
+                      style={{ borderColor: 'var(--tema-borde-dce4ea)', borderTopColor: 'var(--tema-borde-007049)' }} />
                 Cargando la historia…
               </div>
             ) : trazabilidad.length === 0 ? (
-              <p className="text-sm italic" style={{ color: '#94A3B8' }}>Este radicado aún no tiene historia registrada.</p>
+              <p className="text-sm italic" style={{ color: 'var(--text-secondary)' }}>Este radicado aún no tiene historia registrada.</p>
             ) : (
               <div className="space-y-4">
                 <div className="flex gap-1.5 flex-wrap">
@@ -2898,8 +3052,8 @@ function PanelDerecho({
                       aria-pressed={filtroHistoria === id}
                       className="text-[11px] font-semibold px-3 py-1 rounded-full transition-colors"
                       style={filtroHistoria === id
-                        ? { background: '#14532D', color: '#FFFFFF', border: '1px solid #14532D' }
-                        : { background: '#FFFFFF', color: '#475569', border: '1px solid #D9E2D9' }}
+                        ? { background: 'var(--tema-fondo-007049)', color: '#FFFFFF', border: '1px solid var(--tema-borde-007049)' }
+                        : { background: 'var(--tema-fondo-ffffff)', color: 'var(--tema-texto-475569)', border: '1px solid var(--tema-borde-dce4ea)' }}
                     >
                       {etiqueta}
                     </button>
@@ -2907,19 +3061,19 @@ function PanelDerecho({
                 </div>
 
                 {historia.length === 0 && (
-                  <p className="text-xs italic" style={{ color: '#94A3B8' }}>Nada que mostrar con este filtro.</p>
+                  <p className="text-xs italic" style={{ color: 'var(--text-secondary)' }}>Nada que mostrar con este filtro.</p>
                 )}
 
                 {historia.map((dia) => (
                   <div key={dia.ymd}>
-                    <p className="text-[10px] font-bold uppercase tracking-widest mb-2" style={{ color: '#7A8B7F' }}>
+                    <p className="text-[10px] font-bold uppercase tracking-widest mb-2" style={{ color: 'var(--text-secondary)' }}>
                       {dia.etiqueta}
                     </p>
                     <div className="space-y-2">
                       {dia.eventos.map((e) => {
                         const tono = TONO_HISTORIA[e.tono];
                         return (
-                          <div key={e.id} className="flex gap-2.5 rounded-xl bg-white px-3 py-2.5" style={{ border: '1px solid #E3EAE3' }}>
+                          <div key={e.id} className="flex gap-2.5 rounded-xl bg-[var(--tema-fondo-ffffff)] px-3 py-2.5" style={{ border: '1px solid var(--tema-borde-e4ebf0)' }}>
                             <span
                               className="shrink-0 w-[30px] h-[30px] rounded-full flex items-center justify-center"
                               style={{ background: tono.bg }}
@@ -2931,17 +3085,17 @@ function PanelDerecho({
                             </span>
                             <div className="flex-1 min-w-0">
                               <div className="flex items-baseline justify-between gap-2">
-                                <p className="text-[12.5px] font-semibold leading-snug" style={{ color: '#12261A' }}>{e.titulo}</p>
-                                <time className="shrink-0 text-[10px]" style={{ color: '#94A3B8' }}>{e.hora}</time>
+                                <p className="text-[12.5px] font-semibold leading-snug" style={{ color: 'var(--tema-texto-172033)' }}>{e.titulo}</p>
+                                <time className="shrink-0 text-[10px]" style={{ color: 'var(--text-secondary)' }}>{e.hora}</time>
                               </div>
                               {e.actor && (
-                                <p className="text-[11px] mt-0.5" style={{ color: '#667085' }}>Por {e.actor}</p>
+                                <p className="text-[11px] mt-0.5" style={{ color: 'var(--text-secondary)' }}>Por {e.actor}</p>
                               )}
                               {e.detalle && (
-                                <p className="text-[11.5px] mt-0.5 leading-relaxed" style={{ color: '#5F6F64' }}>{e.detalle}</p>
+                                <p className="text-[11.5px] mt-0.5 leading-relaxed" style={{ color: 'var(--tema-texto-5f6f64)' }}>{e.detalle}</p>
                               )}
                               {e.correos.map((c, i) => (
-                                <p key={i} className="text-[10.5px] mt-1 flex items-center gap-1" style={{ color: '#94A3B8' }}>
+                                <p key={i} className="text-[10.5px] mt-1 flex items-center gap-1" style={{ color: 'var(--text-secondary)' }}>
                                   <svg className="w-3 h-3 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.8}>
                                     <path strokeLinecap="round" strokeLinejoin="round" d={ICONO_HISTORIA.GRIS} />
                                   </svg>
@@ -2965,34 +3119,34 @@ function PanelDerecho({
         {tab === 'prorroga' && (
           <div className="space-y-4">
             {/* Devolver */}
-            <div className="rounded-xl p-4 space-y-3" style={{ background: '#FEF2F2', border: '1px solid #FECACA' }}>
-              <p className="text-xs font-bold uppercase tracking-widest text-red-700">Devolver al ciudadano</p>
+            <div className="rounded-xl p-4 space-y-3" style={{ background: 'var(--tema-fondo-fef2f2)', border: '1px solid var(--tema-borde-fecaca)' }}>
+              <p className="text-xs font-bold uppercase tracking-widest text-red-700 oscuro:text-red-300">Devolver al ciudadano</p>
               <div>
-                <p className="text-[10px] font-bold uppercase tracking-widest mb-1.5" style={{ color: '#667085' }}>Motivo</p>
+                <p className="text-[10px] font-bold uppercase tracking-widest mb-1.5" style={{ color: 'var(--text-secondary)' }}>Motivo</p>
                 <textarea value={motivo} onChange={(e) => setMotivo(e.target.value)} rows={3}
                   placeholder="Indica la razón de la devolución…" className="input-internal resize-none" />
               </div>
               <button type="button" onClick={devolver} disabled={guardando || soloLectura}
                 title={soloLectura ? 'Tu rol no permite realizar acciones sobre radicados.' : undefined}
                 className="w-full py-2 rounded-lg text-sm font-bold transition-all disabled:opacity-60 active:scale-[0.98]"
-                style={{ border: '1px solid #FECACA', color: '#DC2626', background: 'transparent' }}
-                onMouseEnter={(e) => { (e.currentTarget as HTMLElement).style.background = '#FEE2E2'; }}
+                style={{ border: '1px solid var(--tema-borde-fecaca)', color: 'var(--tema-texto-d81e1e)', background: 'transparent' }}
+                onMouseEnter={(e) => { (e.currentTarget as HTMLElement).style.background = 'var(--tema-fondo-fee2e2)'; }}
                 onMouseLeave={(e) => { (e.currentTarget as HTMLElement).style.background = 'transparent'; }}>
                 Devolver
               </button>
             </div>
 
             {/* Prórroga */}
-            <div className="rounded-xl p-4 space-y-3" style={{ background: '#FFFBEB', border: '1px solid #FDE68A' }}>
-              <p className="text-xs font-bold uppercase tracking-widest text-amber-700">Aplicar prórroga legal</p>
+            <div className="rounded-xl p-4 space-y-3" style={{ background: 'var(--tema-fondo-fffbeb)', border: '1px solid var(--tema-borde-fde68a)' }}>
+              <p className="text-xs font-bold uppercase tracking-widest text-amber-700 oscuro:text-amber-300">Aplicar prórroga legal</p>
               <div className="flex gap-3">
                 <div className="flex-1">
-                  <p className="text-[10px] font-bold uppercase tracking-widest mb-1.5" style={{ color: '#667085' }}>Motivo</p>
+                  <p className="text-[10px] font-bold uppercase tracking-widest mb-1.5" style={{ color: 'var(--text-secondary)' }}>Motivo</p>
                   <input value={motivo} onChange={(e) => setMotivo(e.target.value)}
                     placeholder="Fundamento legal de la prórroga" className="input-internal" />
                 </div>
                 <div className="w-24">
-                  <p className="text-[10px] font-bold uppercase tracking-widest mb-1.5" style={{ color: '#667085' }}>Días</p>
+                  <p className="text-[10px] font-bold uppercase tracking-widest mb-1.5" style={{ color: 'var(--text-secondary)' }}>Días</p>
                   <input type="number" min={1} max={30} value={diasProrroga}
                     onChange={(e) => setDiasProrroga(Math.max(1, Number(e.target.value)))}
                     className="input-internal text-center" />
@@ -3001,17 +3155,17 @@ function PanelDerecho({
               <button type="button" onClick={aplicarProrroga} disabled={guardando || soloLectura}
                 title={soloLectura ? 'Tu rol no permite realizar acciones sobre radicados.' : undefined}
                 className="w-full py-2 rounded-lg text-sm font-bold transition-all disabled:opacity-60 active:scale-[0.98]"
-                style={{ border: '1px solid #FDE68A', color: '#B45309', background: 'transparent' }}
-                onMouseEnter={(e) => { (e.currentTarget as HTMLElement).style.background = '#FEF3C7'; }}
+                style={{ border: '1px solid var(--tema-borde-fde68a)', color: 'var(--tema-texto-b45309)', background: 'transparent' }}
+                onMouseEnter={(e) => { (e.currentTarget as HTMLElement).style.background = 'var(--tema-fondo-fef3c7)'; }}
                 onMouseLeave={(e) => { (e.currentTarget as HTMLElement).style.background = 'transparent'; }}>
                 Aplicar prórroga (+{diasProrroga} días)
               </button>
             </div>
 
             {guardando && (
-              <div className="flex items-center justify-center gap-2 text-xs" style={{ color: '#94A3B8' }}>
+              <div className="flex items-center justify-center gap-2 text-xs" style={{ color: 'var(--text-secondary)' }}>
                 <span className="w-3.5 h-3.5 border-2 rounded-full animate-spin"
-                      style={{ borderColor: '#D9E2D9', borderTopColor: '#14532D' }} />
+                      style={{ borderColor: 'var(--tema-borde-dce4ea)', borderTopColor: 'var(--tema-borde-007049)' }} />
                 Guardando en Firestore…
               </div>
             )}
@@ -3020,41 +3174,44 @@ function PanelDerecho({
 
         {/* ── TAB: Responder — la acción del día a día, guiada en 3 pasos ── */}
         {tab === 'responder' && (
-          <div className="space-y-4">
-            {/* Los 3 pasos, siempre visibles: orientan sin estorbar. */}
+          <div className="space-y-4 pb-2">
+            {/* Los tres pasos conservan el flujo actual y hacen visible el siguiente movimiento. */}
             {radicado.estadoActual !== 'RESUELTO' && (
-              <div className="flex items-center gap-3 flex-wrap px-1">
+              <ol className="flex min-w-0 items-center gap-2 px-1" aria-label="Proceso para responder el trámite">
                 {([['1', 'Escribe'], ['2', 'Adjunta (opcional)'], ['3', 'Marca resuelto']] as const).map(([n, texto], i) => (
-                  <div key={n} className="flex items-center gap-1.5">
-                    <span
-                      className="w-5 h-5 rounded-full text-[11px] font-bold flex items-center justify-center shrink-0"
-                      style={i === 0
-                        ? { background: '#14532D', color: '#FFFFFF' }
-                        : { background: '#FFFFFF', border: '1.5px solid #97C459', color: '#3B6D11' }}
-                    >
-                      {n}
-                    </span>
-                    <span className="text-xs" style={{ color: i === 0 ? '#12261A' : '#5F6F64', fontWeight: i === 0 ? 600 : 400 }}>
-                      {texto}
-                    </span>
-                  </div>
+                  <li key={n} className="contents">
+                    <div className="flex min-w-0 shrink items-center gap-1.5">
+                      <span
+                        className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-xs font-bold"
+                        style={i === 0
+                          ? { background: 'var(--tema-fondo-007049)', color: '#FFFFFF' }
+                          : { background: 'var(--tema-fondo-ffffff)', border: '1.5px solid var(--tema-borde-97c459)', color: 'var(--tema-texto-3b6d11)' }}
+                      >
+                        {n}
+                      </span>
+                      <span className="min-w-0 text-[11px] leading-tight sm:text-xs" style={{ color: i === 0 ? 'var(--tema-texto-172033)' : 'var(--tema-texto-5f6f64)', fontWeight: i === 0 ? 700 : 500 }}>
+                        {texto}
+                      </span>
+                    </div>
+                    {i < 2 && <span className="h-px min-w-2 flex-1 bg-[var(--tema-fondo-c9d8cd)]" aria-hidden="true" />}
+                  </li>
                 ))}
-              </div>
+              </ol>
             )}
 
-            <div className="rounded-xl p-4 space-y-3" style={{ background: '#F0FDF4', border: '1px solid #BBF7D0' }}>
+            <section className="rounded-2xl bg-[var(--tema-fondo-ffffff)] p-4 shadow-sm sm:p-5" style={{ border: '1px solid var(--tema-borde-a7f3d0)', boxShadow: '0 8px 24px rgba(0, 112, 73,0.05)' }}>
               {radicado.respuestaOficial && (
-                <div className="rounded-lg p-3 space-y-1 bg-white" style={{ border: '1px solid #D9E2D9' }}>
-                  <p className="text-[10px] font-bold uppercase tracking-widest" style={{ color: '#667085' }}>
+                <div className="rounded-lg p-3 space-y-1 bg-[var(--tema-fondo-ffffff)]" style={{ border: '1px solid var(--tema-borde-dce4ea)' }}>
+                  <p className="text-[10px] font-bold uppercase tracking-widest" style={{ color: 'var(--text-secondary)' }}>
                     {radicado.respuestaOficial.archivoPath ? 'Oficio de respuesta archivado' : 'Respuesta registrada (sin oficio adjunto)'}
                   </p>
-                  <p className="text-xs leading-relaxed" style={{ color: '#1F2933' }}>{radicado.respuestaOficial.nota}</p>
+                  <p className="text-xs leading-relaxed" style={{ color: 'var(--tema-texto-172033)' }}>{radicado.respuestaOficial.nota}</p>
                   {radicado.respuestaOficial.archivoPath && (
                     <div className="flex items-center justify-between pt-1">
-                      <span className="text-[10px] font-mono truncate" style={{ color: '#94A3B8' }}>{radicado.respuestaOficial.archivoNombre}</span>
+                      <span className="text-[10px] font-mono truncate" style={{ color: 'var(--text-secondary)' }}>{radicado.respuestaOficial.archivoNombre}</span>
                       <a href={`/api/interno/archivo?path=${encodeURIComponent(radicado.respuestaOficial.archivoPath)}`}
                         target="_blank" rel="noopener noreferrer"
-                        className="shrink-0 text-xs underline underline-offset-2 ml-3 font-semibold" style={{ color: '#14532D' }}>
+                        className="shrink-0 text-xs underline underline-offset-2 ml-3 font-semibold" style={{ color: 'var(--tema-texto-007049)' }}>
                         Descargar oficio
                       </a>
                     </div>
@@ -3062,94 +3219,97 @@ function PanelDerecho({
                 </div>
               )}
 
-              <div>
-                <div className="flex items-center justify-between mb-1.5 gap-2">
-                  <p className="text-[10px] font-bold uppercase tracking-widest" style={{ color: '#667085' }}>
+              <div className="min-w-0">
+                <div className="mb-2 flex min-w-0 flex-wrap items-start justify-between gap-2">
+                  <p className="pt-1 text-[11px] font-bold uppercase tracking-[0.11em]" style={{ color: 'var(--tema-texto-475569)' }}>
                     1 · La respuesta que recibirá el ciudadano
                   </p>
                   {radicado.estadoActual !== 'RESUELTO' && !soloLectura && (
-                    <div className="flex items-center gap-1.5">
+                    <div className="flex min-w-0 flex-wrap items-center gap-1.5">
                       <button
                         type="button"
                         onClick={generarPlantillaOficio}
                         disabled={guardando}
                         title="Inserta una plantilla institucional tipo oficio que luego puedes editar."
-                        className="text-[10px] font-bold uppercase tracking-wider px-2 py-1 rounded-md transition active:scale-95 disabled:opacity-50"
-                        style={{ background: '#EEF4EE', color: '#14532D', border: '1px solid #D9E2D9' }}
+                        className="tablero-interactivo inline-flex items-center gap-1.5 rounded-lg border px-2.5 py-1.5 text-[10px] font-bold uppercase tracking-wider transition-[transform,box-shadow,background-color] duration-150 hover:-translate-y-px hover:shadow-sm active:translate-y-0 disabled:opacity-50"
+                        style={{ background: 'var(--tema-fondo-f7f9fb)', color: 'var(--tema-texto-007049)', borderColor: 'var(--tema-borde-dce4ea)' }}
                       >
+                        <ClipboardPenLine size={14} strokeWidth={1.9} aria-hidden="true" />
                         Generar plantilla
                       </button>
                       <button
                         type="button"
                         onClick={() => setVistaPreviaActiva((v) => !v)}
                         disabled={guardando || respuesta.trim().length === 0}
-                        className="text-[10px] font-bold uppercase tracking-wider px-2 py-1 rounded-md transition active:scale-95 disabled:opacity-40"
+                        className="tablero-interactivo inline-flex items-center gap-1.5 rounded-lg border px-2.5 py-1.5 text-[10px] font-bold uppercase tracking-wider transition-[transform,box-shadow,background-color] duration-150 hover:-translate-y-px hover:shadow-sm active:translate-y-0 disabled:opacity-40"
                         style={vistaPreviaActiva
-                          ? { background: '#14532D', color: '#ffffff', border: '1px solid #14532D' }
-                          : { background: 'transparent', color: '#14532D', border: '1px solid #D9E2D9' }}
+                          ? { background: 'var(--tema-fondo-007049)', color: '#ffffff', border: '1px solid var(--tema-borde-007049)' }
+                          : { background: 'transparent', color: 'var(--tema-texto-007049)', border: '1px solid var(--tema-borde-dce4ea)' }}
                       >
+                        <Eye size={14} strokeWidth={1.9} aria-hidden="true" />
                         {vistaPreviaActiva ? 'Ocultar previa' : 'Vista previa'}
                       </button>
                     </div>
                   )}
                 </div>
                 <textarea value={respuesta} onChange={(e) => setRespuesta(e.target.value)}
-                  rows={modoAmplio ? (vistaPreviaActiva ? 14 : 10) : (vistaPreviaActiva ? 8 : 4)}
+                  rows={modoAmplio ? (vistaPreviaActiva ? 9 : 6) : (vistaPreviaActiva ? 6 : 4)}
+                  maxLength={5000}
                   placeholder="Describe la respuesta dada al ciudadano o usa “Generar plantilla” para un oficio institucional…"
-                  className={`input-internal ${modoAmplio ? 'resize-y' : 'resize-none'}`}
+                  className={`input-internal mt-1 ${modoAmplio ? 'resize-y' : 'resize-none'}`}
                   disabled={radicado.estadoActual === 'RESUELTO'}
                   style={{
                     fontFamily: '"DM Sans", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif',
-                    minHeight: modoAmplio ? 220 : undefined,
+                    minHeight: modoAmplio ? 180 : 150,
+                    borderColor: 'var(--tema-borde-b7c9be)',
                   }}
                 />
-                <p className="mt-1 text-[10px]" style={{ color: '#94A3B8' }}>
-                  Este texto se enviará por correo al ciudadano y quedará visible en la consulta pública con formato institucional.
-                </p>
+                <div className="mt-2 flex min-w-0 items-start justify-between gap-3 text-[10px]" style={{ color: 'var(--text-secondary)' }}>
+                  <p className="min-w-0 leading-relaxed">Este texto se enviará por correo al ciudadano y quedará visible en la consulta pública con formato institucional.</p>
+                  <span className="shrink-0 tabular-nums" aria-label={`${respuesta.length} de 5000 caracteres`}>{respuesta.length} / 5000</span>
+                </div>
               </div>
 
               {vistaPreviaActiva && respuesta.trim().length > 0 && (
                 <div
                   className="rounded-xl p-5"
-                  style={{ background: '#FFFFFF', border: '1px solid #14532D' }}
+                  style={{ background: 'var(--tema-fondo-ffffff)', border: '1px solid var(--tema-borde-007049)' }}
                 >
                   <p className="text-[10px] font-bold uppercase tracking-widest mb-3 pb-2"
-                     style={{ color: '#14532D', borderBottom: '1px dashed #D9E2D9' }}>
+                     style={{ color: 'var(--tema-texto-007049)', borderBottom: '1px dashed var(--tema-borde-dce4ea)' }}>
                     Vista previa institucional · cómo lo verá el ciudadano
                   </p>
                   <pre
                     className="text-[13px] leading-relaxed whitespace-pre-wrap break-words"
                     style={{
                       fontFamily: '"DM Sans", "Manrope", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif',
-                      color: '#1F2933',
+                      color: 'var(--tema-texto-172033)',
                     }}
                   >{respuesta}</pre>
                 </div>
               )}
 
               {radicado.estadoActual !== 'RESUELTO' && (
-                <div>
-                  <p className="text-[10px] font-bold uppercase tracking-widest mb-1.5" style={{ color: '#667085' }}>
-                    2 · Oficio firmado <span className="normal-case font-normal" style={{ color: '#94A3B8' }}>(PDF, opcional)</span>
+                <div className="mt-4 rounded-2xl bg-[var(--tema-fondo-ffffff)] p-4" style={{ border: '1px solid var(--tema-borde-e2e8e3)' }}>
+                  <p className="mb-2 text-[11px] font-bold uppercase tracking-[0.11em]" style={{ color: 'var(--tema-texto-475569)' }}>
+                    2 · Oficio firmado <span className="normal-case font-normal" style={{ color: 'var(--text-secondary)' }}>(PDF, opcional)</span>
                   </p>
                   {archivoPdf ? (
-                    <div className="flex items-center justify-between gap-2 px-3 py-2 rounded-lg"
-                         style={{ background: '#F0FDF4', border: '1px solid #BBF7D0' }}>
-                      <span className="text-xs text-green-700 truncate min-w-0">{archivoPdf.name}</span>
+                    <div className="flex min-w-0 items-center justify-between gap-2 rounded-xl px-3 py-3"
+                         style={{ background: 'var(--tema-fondo-f0fdf4)', border: '1px solid var(--tema-borde-bbf7d0)' }}>
+                      <span className="flex min-w-0 items-center gap-2 text-xs font-semibold text-green-700 oscuro:text-green-300"><Paperclip size={16} strokeWidth={1.9} className="shrink-0" aria-hidden="true" /><span className="truncate">{archivoPdf.name}</span></span>
                       <button type="button" onClick={() => setArchivoPdf(null)}
-                        className="shrink-0 text-[10px] transition-colors" style={{ color: '#94A3B8' }}
-                        onMouseEnter={(e) => { (e.currentTarget as HTMLElement).style.color = '#DC2626'; }}
-                        onMouseLeave={(e) => { (e.currentTarget as HTMLElement).style.color = '#94A3B8'; }}>
+                        className="shrink-0 rounded-md px-2 py-1 text-[10px] font-bold transition-colors" style={{ color: 'var(--text-secondary)' }}
+                        onMouseEnter={(e) => { (e.currentTarget as HTMLElement).style.color = 'var(--tema-texto-d81e1e)'; }}
+                        onMouseLeave={(e) => { (e.currentTarget as HTMLElement).style.color = 'var(--text-secondary)'; }}>
                         Quitar
                       </button>
                     </div>
                   ) : (
-                    <label className="flex items-center gap-2 px-3 py-2.5 rounded-lg border border-dashed cursor-pointer transition-colors"
-                           style={{ borderColor: '#D9E2D9' }}>
-                      <svg className="w-4 h-4 shrink-0" style={{ color: '#94A3B8' }} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
-                        <path strokeLinecap="round" strokeLinejoin="round" d="M18.375 12.739l-7.693 7.693a4.5 4.5 0 01-6.364-6.364l10.94-10.94A3 3 0 1119.5 7.372L8.552 18.32m.009-.01l-.01.01m5.699-9.941l-7.81 7.81a1.5 1.5 0 002.112 2.13" />
-                      </svg>
-                      <span className="text-xs" style={{ color: '#667085' }}>Adjuntar oficio firmado (PDF, máx. 10 MB)</span>
+                    <label className="group flex min-w-0 cursor-pointer items-center gap-3 rounded-xl border border-dashed px-3 py-3 transition-[background-color,border-color,box-shadow] duration-150 hover:bg-[var(--tema-fondo-f7f9fb)] hover:shadow-sm"
+                           style={{ borderColor: 'var(--tema-borde-b7c9be)' }}>
+                      <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-[var(--tema-fondo-f4f9f6)] text-[var(--tema-texto-007049)] transition-transform duration-150 group-hover:-translate-y-px"><UploadCloud size={18} strokeWidth={1.9} aria-hidden="true" /></span>
+                      <span className="min-w-0"><span className="block text-xs font-semibold" style={{ color: 'var(--tema-texto-334155)' }}>Adjuntar oficio firmado (PDF, máx. 10 MB)</span><span className="mt-0.5 block text-[10px]" style={{ color: 'var(--text-secondary)' }}>Haz clic para seleccionar el archivo</span></span>
                       <input type="file" accept="application/pdf" className="sr-only"
                         onChange={(e) => {
                           const f = e.target.files?.[0];
@@ -3165,33 +3325,28 @@ function PanelDerecho({
 
               {/* Panel claro — nadie tiene que adivinar qué hace el botón. */}
               {radicado.estadoActual !== 'RESUELTO' && !soloLectura && (
-                <div className="rounded-lg px-3 py-2.5" style={{ background: '#EAF3DE', border: '1px solid #C0DD97' }}>
-                  <p className="text-[10px] font-bold uppercase tracking-widest mb-1.5" style={{ color: '#27500A' }}>
+                <div className="mt-4 rounded-2xl px-4 py-3.5" style={{ background: 'var(--tema-fondo-f0fdf4)', border: '1px solid var(--tema-borde-bbf7d0)' }}>
+                  <div className="flex items-start gap-3">
+                    <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-[var(--tema-fondo-007049)] text-white"><Check size={20} strokeWidth={2.2} aria-hidden="true" /></span>
+                    <div className="min-w-0">
+                      <p className="text-[11px] font-bold uppercase tracking-[0.11em]" style={{ color: 'var(--tema-texto-006b45)' }}>
                     3 · Al marcar como resuelto
-                  </p>
-                  <div className="space-y-1 text-[11.5px]" style={{ color: '#3B6D11' }}>
-                    <p>✓ El ciudadano recibe la respuesta por correo automáticamente (si dejó uno)</p>
-                    <p>✓ Queda registrado si respondiste dentro del término</p>
-                    <p>✓ Se podrá registrar la salida 2-SAL del oficio despachado</p>
+                      </p>
+                      <div className="mt-2 space-y-1.5 text-[11.5px] leading-relaxed" style={{ color: 'var(--tema-texto-2f6b3a)' }}>
+                        <p>El ciudadano recibe la respuesta por correo automáticamente (si dejó uno).</p>
+                        <p>Queda registrado si respondiste dentro del término.</p>
+                        <p>Podrás registrar la salida 2-SAL del oficio despachado.</p>
+                      </div>
+                    </div>
                   </div>
                 </div>
               )}
-
-              <button type="button" onClick={responderCaso}
-                disabled={guardando || radicado.estadoActual === 'RESUELTO' || soloLectura}
-                title={soloLectura ? 'Tu rol no permite realizar acciones sobre radicados.' : undefined}
-                className="w-full py-2 rounded-lg text-white text-sm font-bold transition-all disabled:opacity-60 active:scale-[0.98]"
-                style={{ background: '#14532D' }}
-                onMouseEnter={(e) => { (e.currentTarget as HTMLElement).style.background = '#166534'; }}
-                onMouseLeave={(e) => { (e.currentTarget as HTMLElement).style.background = '#14532D'; }}>
-                {soloLectura ? 'Vista de solo lectura' : radicado.estadoActual === 'RESUELTO' ? 'Ya está resuelto' : 'Marcar como resuelto'}
-              </button>
-            </div>
+            </section>
 
             {guardando && (
-              <div className="flex items-center justify-center gap-2 text-xs" style={{ color: '#94A3B8' }}>
+              <div className="flex items-center justify-center gap-2 text-xs" style={{ color: 'var(--text-secondary)' }}>
                 <span className="w-3.5 h-3.5 border-2 rounded-full animate-spin"
-                      style={{ borderColor: '#D9E2D9', borderTopColor: '#14532D' }} />
+                      style={{ borderColor: 'var(--tema-borde-dce4ea)', borderTopColor: 'var(--tema-borde-007049)' }} />
                 Guardando en Firestore…
               </div>
             )}
@@ -3207,6 +3362,37 @@ function PanelDerecho({
           />
         )}
       </div>
+
+      {/* Barra de cierre fija: las acciones siguen disponibles mientras se revisa
+          el oficio largo. Resolver conserva exactamente el flujo existente. */}
+      {tab === 'responder' && (
+        <footer className="shrink-0 border-t bg-[var(--tema-fondo-ffffff)] px-4 py-3 sm:px-5" style={{ borderColor: 'var(--tema-borde-dce4ea)', boxShadow: '0 -4px 16px rgba(15,42,28,0.05)' }}>
+          <div className="flex min-w-0 flex-col-reverse gap-2 sm:flex-row sm:justify-end">
+            <button
+              type="button"
+              onClick={guardarBorradorRespuesta}
+              disabled={guardando || radicado.estadoActual === 'RESUELTO' || soloLectura || respuesta.trim().length === 0}
+              title={soloLectura ? 'Tu rol no permite realizar acciones sobre radicados.' : 'Guarda este texto temporalmente en el navegador'}
+              className="tablero-interactivo inline-flex min-h-10 items-center justify-center gap-2 rounded-xl border bg-[var(--tema-fondo-ffffff)] px-4 text-xs font-bold text-[var(--tema-texto-334155)] transition-[transform,box-shadow,background-color] duration-150 hover:-translate-y-px hover:bg-[var(--tema-fondo-f7f9fb)] hover:shadow-sm disabled:cursor-not-allowed disabled:opacity-50"
+              style={{ borderColor: 'var(--tema-borde-dce4ea)' }}
+            >
+              <Save size={16} strokeWidth={1.9} aria-hidden="true" />
+              Guardar borrador
+            </button>
+            <button
+              type="button"
+              onClick={responderCaso}
+              disabled={guardando || radicado.estadoActual === 'RESUELTO' || soloLectura}
+              title={soloLectura ? 'Tu rol no permite realizar acciones sobre radicados.' : undefined}
+              className="tablero-interactivo inline-flex min-h-10 items-center justify-center gap-2 rounded-xl px-4 text-xs font-bold text-white transition-[transform,box-shadow,background-color] duration-150 hover:-translate-y-px hover:shadow-md disabled:cursor-not-allowed disabled:opacity-60"
+              style={{ background: '#116530' }}
+            >
+              <Send size={16} strokeWidth={1.9} aria-hidden="true" />
+              {soloLectura ? 'Vista de solo lectura' : radicado.estadoActual === 'RESUELTO' ? 'Ya está resuelto' : 'Enviar respuesta y resolver'}
+            </button>
+          </div>
+        </footer>
+      )}
 
       {/* Sprint Radicación de salida — a nivel del panel (no de un tab)
           para poder abrirlo también desde el despacho al resolver. */}
@@ -3233,6 +3419,8 @@ function PanelDerecho({
 ══════════════════════════════════════════════════════════════ */
 
 interface DatosComprobante {
+  estadoAdjuntos?: EstadoAdjuntos;
+  mensajeAdjuntos?: string;
   solicitanteNombre: string;
   numeroDocumento:   string;
   tipoDocumento:     string;
@@ -3328,7 +3516,7 @@ function DrawerNuevoRadicado({
       // Camino ÚNICO por el servidor desde el cutover PT-1 (24-ago-2026):
       // POST /api/radicacion/interna. El kill-switch se retiró en el PR-C
       // — ver la cabecera de lib/recepcion/radicar-segun-flag.ts.
-      const { radicadoId } = await radicarSegunFlag(
+      const { radicadoId, estadoAdjuntos, mensajeAdjuntos, fechaRadicado, horaRadicado } = await radicarSegunFlag(
         payload,
         { uid: usuario.uid, nombre: usuario.nombre, tenantId: usuario.tenantId },
         (msg, pct) => { setProgreso(msg); setProgresoPct(pct); },
@@ -3342,11 +3530,13 @@ function DrawerNuevoRadicado({
         ? null
         : (payload.telefonoMovil?.trim() || payload.telefono?.trim() || null);
       setDatosComprobante({
+        estadoAdjuntos,
+        mensajeAdjuntos,
         solicitanteNombre: payload.nombreCompleto,
         numeroDocumento:   payload.numeroDocumento,
         tipoDocumento:     payload.tipoDocumento,
-        fechaRadicado:     ahora.toISOString(),
-        horaRadicado:      formatHoraColombia(ahora),
+        fechaRadicado:     fechaRadicado ?? ahora.toISOString(),
+        horaRadicado:      horaRadicado ?? formatHoraColombia(ahora),
         medioRecepcion:    payload.medioRecepcion,
         tipoTramite:       tipoConf.nombre,
         diasRespuesta:     tipoConf.diasRespuesta,
@@ -3388,9 +3578,9 @@ function DrawerNuevoRadicado({
 
       {/* Panel centrado */}
       <div
-        className="relative w-full bg-white flex flex-col shadow-2xl rounded-2xl overflow-hidden animate-modal-panel"
+        className="relative w-full bg-[var(--tema-fondo-ffffff)] flex flex-col shadow-2xl rounded-2xl overflow-hidden animate-modal-panel"
         style={{
-          border: '1px solid #D9E2D9',
+          border: '1px solid var(--tema-borde-dce4ea)',
           maxWidth: 'min(1120px, calc(100% - 24px))',
           maxHeight: 'calc(100dvh - 24px)',
         }}
@@ -3398,14 +3588,14 @@ function DrawerNuevoRadicado({
 
         {/* Header fijo */}
         <header
-          className="flex items-center justify-between gap-3 px-5 sm:px-6 py-4 shrink-0 bg-white"
-          style={{ borderBottom: '1px solid #D9E2D9' }}
+          className="flex items-center justify-between gap-3 px-5 sm:px-6 py-4 shrink-0 bg-[var(--tema-fondo-ffffff)]"
+          style={{ borderBottom: '1px solid var(--tema-borde-dce4ea)' }}
         >
           <div className="min-w-0">
-            <h2 id="rad-rapida-title" className="text-base sm:text-lg font-black truncate" style={{ color: '#1F2933' }}>
+            <h2 id="rad-rapida-title" className="text-base sm:text-lg font-black truncate" style={{ color: 'var(--tema-texto-172033)' }}>
               Radicación Rápida
             </h2>
-            <p id="rad-rapida-subtitle" className="text-xs mt-0.5 truncate" style={{ color: '#667085' }}>
+            <p id="rad-rapida-subtitle" className="text-xs mt-0.5 truncate" style={{ color: 'var(--text-secondary)' }}>
               Nuevo radicado institucional · Ventanilla Única
             </p>
           </div>
@@ -3414,9 +3604,9 @@ function DrawerNuevoRadicado({
             onClick={onCerrar}
             aria-label="Cerrar modal de radicación rápida"
             className="shrink-0 p-2 rounded-xl active:scale-90 transition-all duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-700/30"
-            style={{ color: '#94A3B8' }}
-            onMouseEnter={(e) => { (e.currentTarget as HTMLElement).style.color = '#1F2933'; (e.currentTarget as HTMLElement).style.background = '#EEF4EE'; }}
-            onMouseLeave={(e) => { (e.currentTarget as HTMLElement).style.color = '#94A3B8'; (e.currentTarget as HTMLElement).style.background = ''; }}
+            style={{ color: 'var(--text-secondary)' }}
+            onMouseEnter={(e) => { (e.currentTarget as HTMLElement).style.color = 'var(--tema-texto-172033)'; (e.currentTarget as HTMLElement).style.background = 'var(--tema-fondo-f4f9f6)'; }}
+            onMouseLeave={(e) => { (e.currentTarget as HTMLElement).style.color = 'var(--text-secondary)'; (e.currentTarget as HTMLElement).style.background = ''; }}
           >
             <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
               <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
@@ -3425,26 +3615,33 @@ function DrawerNuevoRadicado({
         </header>
 
         {/* Cuerpo con scroll interno */}
-        <div className="flex-1 min-h-0 overflow-y-auto px-4 sm:px-6 py-5" style={{ background: '#F8FAF7' }}>
+        <div className="flex-1 min-h-0 overflow-y-auto px-4 sm:px-6 py-5" style={{ background: 'var(--tema-fondo-f7f9fb)' }}>
 
           {/* ── Estado de éxito ── */}
           {radicadoGenerado && datosComprobante && (
             <div className="flex flex-col items-center gap-6 py-8">
               <div className="text-center">
                 <div className="inline-flex w-14 h-14 rounded-full items-center justify-center mb-3"
-                     style={{ background: '#F0FDF4', border: '1px solid #BBF7D0' }}>
-                  <svg className="w-7 h-7 text-green-600" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
+                     style={{ background: 'var(--tema-fondo-f0fdf4)', border: '1px solid var(--tema-borde-bbf7d0)' }}>
+                  <svg className="w-7 h-7 text-green-600 oscuro:text-green-300" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
                     <path strokeLinecap="round" strokeLinejoin="round" d="M4.5 12.75l6 6 9-13.5" />
                   </svg>
                 </div>
-                <p className="text-xs font-bold uppercase tracking-widest mb-1" style={{ color: '#16A34A' }}>Radicado registrado</p>
-                <p className="text-2xl font-black font-mono" style={{ color: '#14532D' }}>{radicadoGenerado}</p>
-                <p className="text-xs mt-1" style={{ color: '#94A3B8' }}>Informe este número al ciudadano para seguimiento.</p>
+                <p className="text-xs font-bold uppercase tracking-widest mb-1" style={{ color: 'var(--tema-texto-008f5a)' }}>Radicado registrado</p>
+                <p className="text-2xl font-black font-mono" style={{ color: 'var(--tema-texto-007049)' }}>{radicadoGenerado}</p>
+                <p className="text-xs mt-1" style={{ color: 'var(--text-secondary)' }}>Informe este número al ciudadano para seguimiento.</p>
               </div>
+              {datosComprobante.estadoAdjuntos === 'PENDIENTE_STORAGE' && (
+                <div role="status" className="max-w-xl rounded-lg border border-amber-300 bg-amber-50 p-4 text-sm text-amber-950">
+                  <p className="font-bold">Radicado creado con soportes pendientes de digitalización</p>
+                  <p className="mt-1">{datosComprobante.mensajeAdjuntos ?? 'Pendiente de adjunto / Storage no disponible. No se guardaron archivos digitales.'}</p>
+                  <p className="mt-1">Conserve los originales inventariados bajo la custodia registrada. El expediente digital aún no está completo.</p>
+                </div>
+              )}
 
               {/* Sprint Recepción fluida — elegir entre la constancia
                   completa y el sello sobre la copia física del ciudadano. */}
-              <div className="flex gap-1 p-1 rounded-full" style={{ background: '#EEF4EE' }} role="tablist" aria-label="Formato de impresión">
+              <div className="flex gap-1 p-1 rounded-full" style={{ background: 'var(--tema-fondo-f4f9f6)' }} role="tablist" aria-label="Formato de impresión">
                 {([
                   ['constancia', 'Constancia completa'],
                   ['sello',      'Sello de recibido'],
@@ -3457,8 +3654,8 @@ function DrawerNuevoRadicado({
                     onClick={() => setVistaExito(id)}
                     className="px-4 py-1.5 rounded-full text-xs font-bold transition-colors"
                     style={vistaExito === id
-                      ? { background: '#14532D', color: '#FFFFFF' }
-                      : { color: '#14532D' }}
+                      ? { background: 'var(--tema-fondo-007049)', color: '#FFFFFF' }
+                      : { color: 'var(--tema-texto-007049)' }}
                   >
                     {etiqueta}
                   </button>
@@ -3473,6 +3670,7 @@ function DrawerNuevoRadicado({
                   numeroFolios={datosComprobante.numeroFolios}
                   numeroAnexos={datosComprobante.numeroAnexos}
                   mediosAnexos={datosComprobante.mediosAnexos}
+                  estadoAdjuntos={datosComprobante.estadoAdjuntos}
                 />
               )}
 
@@ -3498,6 +3696,7 @@ function DrawerNuevoRadicado({
                 correoSolicitante={datosComprobante.correoSolicitante}
                 telefonoSolicitante={datosComprobante.telefonoSolicitante}
                 canalRespuesta={datosComprobante.canalRespuesta}
+                estadoAdjuntos={datosComprobante.estadoAdjuntos}
                 onEnviarCorreo={handleEnviarConstancia}
                 enviandoCorreo={estadoEnvioConstancia === 'enviando'}
                 estadoEnvio={estadoEnvioConstancia}
@@ -3516,8 +3715,8 @@ function DrawerNuevoRadicado({
 
               <button onClick={onCerrar}
                 className="px-5 py-2.5 rounded-xl text-sm transition-all duration-150 active:scale-95"
-                style={{ border: '1px solid #D9E2D9', color: '#667085' }}
-                onMouseEnter={(e) => { (e.currentTarget as HTMLElement).style.background = '#EEF4EE'; }}
+                style={{ border: '1px solid var(--tema-borde-dce4ea)', color: 'var(--text-secondary)' }}
+                onMouseEnter={(e) => { (e.currentTarget as HTMLElement).style.background = 'var(--tema-fondo-f4f9f6)'; }}
                 onMouseLeave={(e) => { (e.currentTarget as HTMLElement).style.background = ''; }}
               >Cerrar modal</button>
             </div>
@@ -3525,21 +3724,21 @@ function DrawerNuevoRadicado({
 
           {/* ── Barra de progreso ── */}
           {!radicadoGenerado && progreso && (
-            <div className="mb-5 p-4 rounded-xl bg-white" style={{ border: '1px solid #D9E2D9' }}>
+            <div className="mb-5 p-4 rounded-xl bg-[var(--tema-fondo-ffffff)]" style={{ border: '1px solid var(--tema-borde-dce4ea)' }}>
               <div className="flex items-center justify-between mb-2">
-                <span className="text-xs" style={{ color: '#667085' }}>{progreso}</span>
-                <span className="text-xs font-bold tabular-nums" style={{ color: '#14532D' }}>{progresoPct}%</span>
+                <span className="text-xs" style={{ color: 'var(--text-secondary)' }}>{progreso}</span>
+                <span className="text-xs font-bold tabular-nums" style={{ color: 'var(--tema-texto-007049)' }}>{progresoPct}%</span>
               </div>
-              <div className="h-1.5 rounded-full overflow-hidden" style={{ background: '#EEF4EE' }}>
+              <div className="h-1.5 rounded-full overflow-hidden" style={{ background: 'var(--tema-fondo-f4f9f6)' }}>
                 <div className="h-full rounded-full transition-all duration-500"
-                  style={{ width: `${progresoPct}%`, background: '#14532D' }} />
+                  style={{ width: `${progresoPct}%`, background: 'var(--tema-fondo-007049)' }} />
               </div>
             </div>
           )}
 
           {/* ── Error ── */}
           {errorGuardado && (
-            <div className="mb-4 p-3 rounded-xl text-xs" style={{ background: '#FEF2F2', border: '1px solid #FECACA', color: '#DC2626' }}>
+            <div className="mb-4 p-3 rounded-xl text-xs" style={{ background: 'var(--tema-fondo-fef2f2)', border: '1px solid var(--tema-borde-fecaca)', color: 'var(--tema-texto-d81e1e)' }}>
               {errorGuardado}
             </div>
           )}
@@ -3558,16 +3757,16 @@ function DrawerNuevoRadicado({
         {/* Footer fijo de acciones */}
         {!radicadoGenerado && (
           <footer
-            className="shrink-0 flex flex-col-reverse sm:flex-row items-stretch sm:items-center justify-end gap-2 px-4 sm:px-6 py-3 bg-white"
-            style={{ borderTop: '1px solid #D9E2D9' }}
+            className="shrink-0 flex flex-col-reverse sm:flex-row items-stretch sm:items-center justify-end gap-2 px-4 sm:px-6 py-3 bg-[var(--tema-fondo-ffffff)]"
+            style={{ borderTop: '1px solid var(--tema-borde-dce4ea)' }}
           >
             <button
               type="button"
               onClick={onCerrar}
               className="rounded-xl px-5 py-2.5 text-sm font-bold transition-all active:scale-[0.98] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-700/30"
-              style={{ background: 'white', color: '#475569', border: '1px solid #D9E2D9' }}
-              onMouseEnter={(e) => { (e.currentTarget as HTMLElement).style.background = '#EEF4EE'; }}
-              onMouseLeave={(e) => { (e.currentTarget as HTMLElement).style.background = 'white'; }}
+              style={{ background: 'var(--tema-fondo-ffffff)', color: 'var(--tema-texto-475569)', border: '1px solid var(--tema-borde-dce4ea)' }}
+              onMouseEnter={(e) => { (e.currentTarget as HTMLElement).style.background = 'var(--tema-fondo-f4f9f6)'; }}
+              onMouseLeave={(e) => { (e.currentTarget as HTMLElement).style.background = 'var(--tema-fondo-ffffff)'; }}
             >
               Cancelar
             </button>
@@ -3576,9 +3775,9 @@ function DrawerNuevoRadicado({
               form={FORM_ID}
               disabled={!!progreso && progresoPct > 0 && progresoPct < 100}
               className="rounded-xl px-6 py-2.5 text-sm font-bold text-white transition-all active:scale-[0.98] disabled:opacity-60 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-700/30"
-              style={{ background: '#14532D' }}
-              onMouseEnter={(e) => { (e.currentTarget as HTMLElement).style.background = '#166534'; }}
-              onMouseLeave={(e) => { (e.currentTarget as HTMLElement).style.background = '#14532D'; }}
+              style={{ background: 'var(--tema-fondo-007049)' }}
+              onMouseEnter={(e) => { (e.currentTarget as HTMLElement).style.background = '#006B45'; }}
+              onMouseLeave={(e) => { (e.currentTarget as HTMLElement).style.background = 'var(--tema-fondo-007049)'; }}
             >
               {progreso && progresoPct > 0 && progresoPct < 100 ? 'Radicando…' : 'Registrar radicado'}
             </button>
@@ -3590,717 +3789,19 @@ function DrawerNuevoRadicado({
 }
 
 /* ══════════════════════════════════════════════════════════════
-   VISTA: Reportes MIPG (placeholder)
-══════════════════════════════════════════════════════════════ */
-
-/* ── Helper: exportación CSV MIPG ──────────────────────────────
-   14 columnas que cubren los 8 requisitos MIPG de trazabilidad.
-   BOM UTF-8 (﻿) para que Excel colombiano abra tildes y ñ sin problemas.
-─────────────────────────────────────────────────────────────── */
-function exportarCSVMIPG(radicados: VentanillaRadicado[]): void {
-  const headers = [
-    'N° Radicado',                    // Req 1 (identificación)
-    'Fecha Radicación',               // Req 1
-    'Hora Radicación',                // Req 1
-    'Medio Recepción',                // Req 1
-    'Solicitante',                    // contexto ciudadano
-    'Documento',                      // identificación
-    'Tipo Solicitud',                 // clasificación MIPG
-    'Forma Presentación PQRSD',
-    'Solicitud Anónima',
-    'Identidad Reservada',
-    'Canal Respuesta',
-    'Dependencia Asignada',           // Req 2
-    // Req 3 — Responsable funcional (MIPG-2)
-    'Responsable UID',
-    'Responsable Nombre',
-    'Responsable Email',
-    'Responsable Rol',
-    'Responsable Cargo',
-    'Fecha Asignación Responsable',
-    'Estado Actual',                  // ciclo de vida
-    'Respuesta',                      // Req 4 (primeros 300 chars)
-    'Fecha Respuesta',                // Req 5
-    'Oficio Adjunto',                 // Req 6
-    'Fecha Vencimiento',              // Req 8 (término legal)
-    'Días Restantes',                 // MIPG-3: calculado en tiempo de exportación
-    'Estado Término',                 // MIPG-3: EN_TERMINO | POR_VENCER | VENCIDO | RESUELTO
-    'Días Vencido',                   // MIPG-3: solo cuando < 0
-    'Prórrogas Aplicadas',            // Req 8
-    'Cumplió Término MIPG',          // Req 8 — dato auditoriable
-    'Trazabilidad',                   // Req 7 — confirmación de subcollección
-  ];
-
-  const esc = (v: string) => `"${v.replace(/"/g, '""')}"`;
-
-  const rows = radicados.map((r) => { const sem = calcularSemaforo(r); return [
-    r.radicadoId,
-    r.control.fechaRadicado,
-    r.control.horaRadicado,
-    r.control.medioRecepcion,
-    nombreSolicitanteVisible(r, r.solicitante.nombreCompleto),
-    numeroDocumentoVisible(r, r.solicitante.numeroDocumento),
-    r.termino.tipoSolicitudNombre,
-    r.tipoPresentacion ?? (r.esAnonimo ? 'ANONIMA' : 'IDENTIFICADA'),
-    r.esAnonimo ? 'Sí' : 'No',
-    r.identidadReservada ? 'Sí' : 'No',
-    r.canalRespuesta ?? 'No registrado',
-    NOMBRES_TENANT[r.clasificacion.oficinaDestino] ?? r.clasificacion.oficinaDestino,
-    // Req 3 — MIPG-2: responsable funcional con backward compat
-    r.clasificacion.funcionarioResponsableUid    ?? '—',
-    r.clasificacion.funcionarioResponsableNombre ?? 'No registrado (ver trazabilidad)',
-    r.clasificacion.funcionarioResponsableEmail  ?? '—',
-    r.clasificacion.funcionarioResponsableRol    ?? '—',
-    r.clasificacion.funcionarioResponsableCargo  ?? '—',
-    r.clasificacion.fechaAsignacionResponsable   ?? '—',
-    r.estadoActual,
-    (r.respuestaOficial?.nota ?? '—').substring(0, 300),
-    r.respuestaOficial?.fecha ?? '—',
-    r.respuestaOficial?.archivoNombre ? `Sí — ${r.respuestaOficial.archivoNombre}` : 'No',
-    r.termino.fechaVencimiento,
-    String(sem.diasRestantes),
-    sem.estado,
-    sem.diasRestantes < 0 ? String(Math.abs(sem.diasRestantes)) : '0',
-    String(r.termino.prorrogasAplicadas ?? 0),
-    r.cumplioTermino === true  ? 'Sí — dentro del término' :
-    r.cumplioTermino === false ? 'No — fuera del término'  : 'Pendiente',
-    'Ver subcollección trazabilidad en Firebase',
-  ].map(esc).join(','); });
-
-  const csv = [headers.map(esc).join(','), ...rows].join('\r\n');
-  const blob = new Blob(['﻿' + csv], { type: 'text/csv;charset=utf-8;' });
-  const url  = URL.createObjectURL(blob);
-  const a    = document.createElement('a');
-  a.href     = url;
-  a.download = `MIPG_Radicados_${new Date().toISOString().slice(0, 10)}.csv`;
-  document.body.appendChild(a);
-  a.click();
-  document.body.removeChild(a);
-  URL.revokeObjectURL(url);
-}
-
-async function descargarExcelMipg(filtros?: Record<string, unknown>): Promise<{ ok: boolean; error?: string }> {
-  try {
-    const hayFiltros = filtros && Object.values(filtros).some((v) => v !== '' && v !== null && v !== undefined);
-    const res = await fetch('/api/reportes/mipg/excel', {
-      method: 'POST',
-      credentials: 'include',
-      ...(hayFiltros
-        ? { headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ filtros }) }
-        : {}),
-    });
-    if (!res.ok) {
-      // Lee como texto y trata de parsear JSON si aplica. Si el server
-      // devolvió HTML (p. ej. 500 sin handler) lo muestra recortado.
-      const raw = await res.text().catch(() => '');
-      let parsed: { error?: string; detalle?: string } | null = null;
-      try { parsed = JSON.parse(raw) as { error?: string; detalle?: string }; } catch { /* no-json */ }
-      const msg = parsed?.detalle
-        ? `${parsed.error ?? 'Error'} (${parsed.detalle})`
-        : parsed?.error ?? raw.slice(0, 200) ?? `HTTP ${res.status}`;
-      return { ok: false, error: msg };
-    }
-    // Verifica Content-Type antes de descargar para no entregar un HTML
-    // como si fuera xlsx.
-    const ct = res.headers.get('content-type') ?? '';
-    if (!ct.includes('spreadsheetml')) {
-      return { ok: false, error: `Respuesta inesperada del servidor (content-type: ${ct || 'desconocido'}). Revise logs del backend.` };
-    }
-    const blob = await res.blob();
-    if (blob.size === 0) {
-      return { ok: false, error: 'El servidor devolvió un archivo vacío. Revise logs del backend.' };
-    }
-    const cd = res.headers.get('content-disposition') ?? '';
-    const m  = cd.match(/filename="([^"]+)"/);
-    const filename = m?.[1] ?? `Reporte_MIPG_Simacota_${new Date().toISOString().slice(0, 10)}.xlsx`;
-    const url  = URL.createObjectURL(blob);
-    const a    = document.createElement('a');
-    a.href     = url;
-    a.download = filename;
-    document.body.appendChild(a);
-    a.click();
-    document.body.removeChild(a);
-    URL.revokeObjectURL(url);
-    return { ok: true };
-  } catch (err) {
-    return { ok: false, error: err instanceof Error ? err.message : String(err) };
-  }
-}
-
-/* Sprint 3C — impresión del reporte: solo el bloque #reporte-mipg-print
-   es visible al imprimir (mismo patrón de constancia y sello). */
-const PRINT_STYLES_REPORTE = `
-@media print {
-  body * { visibility: hidden !important; }
-  #reporte-mipg-print,
-  #reporte-mipg-print * { visibility: visible !important; }
-  #reporte-mipg-print {
-    position: fixed !important;
-    top: 0 !important;
-    left: 0 !important;
-    width: 100% !important;
-    height: auto !important;
-    overflow: visible !important;
-    background: white !important;
-    padding: 0 !important;
-    z-index: 99999 !important;
-  }
-  @page {
-    size: letter portrait;
-    margin: 14mm 12mm;
-  }
-}
-`;
-
-const MEDIO_SALIDA_LABEL: Record<string, string> = {
-  CORREO:     'Correo electrónico',
-  FISICO:     'Correo físico',
-  MENSAJERO:  'Mensajero',
-  PRESENCIAL: 'Entrega presencial',
-};
-
-function VistaReportes({
-  total,
-  radicados,
-  salidas,
-}: {
-  total:     number;
-  radicados: VentanillaRadicado[];
-  /** Fase B — libro de salidas; null = el rol no lee el libro completo. */
-  salidas:   SalidaOficial[] | null;
-}) {
-  const [descargandoExcel, setDescargandoExcel] = useState(false);
-  const [errorExcel, setErrorExcel] = useState<string | null>(null);
-  // Sprint 3C — preset de período y dependencia del reporte.
-  const [preset, setPreset] = useState<PresetReporte>('ESTE_MES');
-  const [depFiltro, setDepFiltro] = useState<TenantId | 'TODAS'>('TODAS');
-  async function onExportarExcel() {
-    setDescargandoExcel(true);
-    setErrorExcel(null);
-    const res = await descargarExcelMipg();
-    if (!res.ok) setErrorExcel(res.error ?? 'No se pudo generar el reporte Excel.');
-    setDescargandoExcel(false);
-  }
-
-  /* Sprint 3C — el reporte se calcula sobre el subconjunto del período
-     elegido, con los mismos cortes calendario de los KPIs operativos. */
-  const subconjunto = useMemo(
-    () => filtrarPorPreset(radicados, preset, depFiltro),
-    [radicados, preset, depFiltro],
-  );
-  const ind = useMemo(() => indicadoresDeReporte(subconjunto), [subconjunto]);
-  const filasDependencia = useMemo(() => resumenPorDependencia(subconjunto), [subconjunto]);
-  const pctCumplimiento = ind.pctCumplimiento;
-  /* Fase B — la serie 2-SAL del mismo período y dependencia. */
-  const resumenSal = useMemo(
-    () => (salidas ? resumenSalidas(filtrarSalidasPorPreset(salidas, preset, depFiltro)) : null),
-    [salidas, preset, depFiltro],
-  );
-
-  /* Sprint 3C — imprimir o "Guardar como PDF" del navegador. Se
-     desactiva la hoja de estilos del comprobante durante la impresión
-     para que no compita por la @page, y el tag propio se retira al
-     cerrar el diálogo (mismo manejo del sello de recibido). */
-  function handleImprimirReporte() {
-    const stylesComprobante =
-      document.getElementById('comprobante-print-styles') as HTMLStyleElement | null;
-    if (stylesComprobante) stylesComprobante.disabled = true;
-
-    const tag = document.createElement('style');
-    tag.id = 'reporte-mipg-print-styles';
-    tag.textContent = PRINT_STYLES_REPORTE;
-    document.head.appendChild(tag);
-
-    window.print();
-
-    tag.remove();
-    if (stylesComprobante) stylesComprobante.disabled = false;
-  }
-
-  const items = [
-    { label: 'Total radicados',           valor: ind.total,     color: '#12261A', desc: ETIQUETA_PRESET[preset] },
-    { label: 'Tasa resolución (%)',        valor: ind.total > 0 ? Math.round((ind.resueltos / ind.total) * 100) : 0, color: '#14532D', desc: 'Resueltos / Total' },
-    { label: 'Cumplimiento términos (%)',  valor: pctCumplimiento !== null ? pctCumplimiento : '—', color: pctCumplimiento !== null ? (pctCumplimiento >= 80 ? '#14532D' : pctCumplimiento >= 60 ? '#B45309' : '#DC2626') : '#94A3B8', desc: 'MIPG Req. 8 — Respondidos a tiempo' },
-    { label: 'Respondidos a tiempo',       valor: ind.aTiempo,   color: '#0F766E', desc: 'Con dato de cumplimiento' },
-    { label: 'Radicadas (pendientes)',     valor: ind.radicadas, color: '#475569', desc: '' },
-    { label: 'Prioridad MIPG activos',    valor: ind.prioridadMipg, color: '#DC2626', desc: 'Prioridad ROJO activa' },
-    { label: 'En trámite (asignadas)',     valor: ind.asignadas, color: '#1D4ED8', desc: '' },
-    { label: 'Por vencer (≤ 2 días)',      valor: ind.porVencer, color: '#D97706', desc: '' },
-    { label: 'Vencidas sin respuesta',     valor: ind.vencidas,  color: '#DC2626', desc: '' },
-    { label: 'Devueltas / Prórroga',       valor: ind.devueltasProrroga, color: '#B45309', desc: '' },
-  ];
-
-  return (
-    <div id="reporte-mipg-print" className="flex-1 overflow-y-auto px-4 sm:px-6 py-6 sm:py-8" style={{ background: '#F8FAF7' }}>
-      {/* Encabezado institucional — solo visible al imprimir. */}
-      <div className="hidden print:block mb-6" style={{ borderBottom: '2px solid #14532D', paddingBottom: 12 }}>
-        <div className="flex items-center gap-3">
-          <div className="shrink-0 overflow-hidden" style={{ width: 40, height: 40 }}>
-            {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img
-              src={INSTITUCION.logo}
-              alt=""
-              className="max-w-none"
-              style={{ height: 40, width: 'auto', objectPosition: 'left' }}
-            />
-          </div>
-          <div>
-            <p className="text-sm font-black uppercase" style={{ color: '#14532D' }}>{INSTITUCION.nombre}</p>
-            <p className="text-xs" style={{ color: '#667085' }}>
-              Reporte de indicadores MIPG · {ETIQUETA_PRESET[preset]}
-              {depFiltro !== 'TODAS' ? ` · ${NOMBRES_TENANT[depFiltro] ?? depFiltro}` : ' · Todas las dependencias'}
-            </p>
-            <p className="text-[10px]" style={{ color: '#94A3B8' }}>
-              Generado: {formatFechaHoraColombia(new Date())} · {subconjunto.length} radicado{subconjunto.length !== 1 ? 's' : ''} en el período
-            </p>
-          </div>
-        </div>
-      </div>
-
-      <div className="flex items-start justify-between gap-4 mb-6 print:hidden">
-        <div>
-          <p className="text-[10px] font-bold uppercase tracking-widest mb-1" style={{ color: '#667085' }}>MIPG · Rendición de Cuentas</p>
-          <h2 className="text-xl font-black" style={{ color: '#1F2933' }}>Indicadores de Eficiencia</h2>
-        </div>
-        <div className="shrink-0 flex items-center gap-2">
-          <button
-            type="button"
-            onClick={handleImprimirReporte}
-            className="flex items-center gap-2 px-4 py-2 rounded-lg text-xs font-bold transition-colors"
-            style={{ background: '#FFFFFF', color: '#14532D', border: '1px solid #14532D' }}
-            title="Imprimir el reporte del período o guardarlo como PDF desde el navegador"
-          >
-            <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-              <path strokeLinecap="round" strokeLinejoin="round"
-                d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z" />
-            </svg>
-            Imprimir / PDF
-          </button>
-          <button
-            type="button"
-            onClick={onExportarExcel}
-            disabled={descargandoExcel}
-            className="flex items-center gap-2 px-4 py-2 rounded-lg text-xs font-bold transition-colors disabled:opacity-60"
-            style={{ background: '#14532D', color: '#FFFFFF', border: '1px solid #14532D' }}
-            onMouseEnter={(e) => { if (!descargandoExcel) (e.currentTarget as HTMLElement).style.background = '#0F5F35'; }}
-            onMouseLeave={(e) => { (e.currentTarget as HTMLElement).style.background = '#14532D'; }}
-            title="Exportar Reporte MIPG en formato Excel institucional (8 hojas)"
-          >
-            <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-              <path strokeLinecap="round" strokeLinejoin="round" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-            </svg>
-            {descargandoExcel ? 'Generando…' : 'Exportar Excel MIPG'}
-          </button>
-          <button
-            type="button"
-            onClick={() => exportarCSVMIPG(subconjunto)}
-            className="flex items-center gap-2 px-3 py-2 rounded-lg text-xs font-bold transition-colors"
-            style={{ background: '#EEF4EE', border: '1px solid #D9E2D9', color: '#475569' }}
-            onMouseEnter={(e) => { (e.currentTarget as HTMLElement).style.background = '#D9E2D9'; }}
-            onMouseLeave={(e) => { (e.currentTarget as HTMLElement).style.background = '#EEF4EE'; }}
-            title="Exportar CSV técnico (respaldo plano para integraciones)"
-          >
-            CSV técnico
-          </button>
-        </div>
-      </div>
-      {errorExcel && (
-        <div className="mb-4 px-3 py-2 rounded-lg text-xs"
-             style={{ background: '#FEE2E2', border: '1px solid #FCA5A5', color: '#991B1B' }}>
-          <strong>Excel MIPG:</strong> {errorExcel}
-        </div>
-      )}
-
-      {/* Sprint 3C — presets de período + dependencia. */}
-      <div className="flex items-center gap-2 flex-wrap mb-5 print:hidden">
-        {(Object.entries(ETIQUETA_PRESET) as [PresetReporte, string][]).map(([id, etiqueta]) => (
-          <button
-            key={id}
-            type="button"
-            aria-pressed={preset === id}
-            onClick={() => setPreset(id)}
-            className="text-xs font-semibold px-3 py-1.5 rounded-full transition-colors"
-            style={preset === id
-              ? { background: '#14532D', color: '#FFFFFF', border: '1px solid #14532D' }
-              : { background: '#FFFFFF', color: '#475569', border: '1px solid #D9E2D9' }}
-          >
-            {etiqueta}
-          </button>
-        ))}
-        <select
-          value={depFiltro}
-          onChange={(e) => setDepFiltro(e.target.value as TenantId | 'TODAS')}
-          aria-label="Filtrar reporte por dependencia"
-          className="select-internal text-xs ml-auto"
-          style={{ maxWidth: 260 }}
-        >
-          <option value="TODAS">Todas las dependencias</option>
-          {(Object.entries(NOMBRES_TENANT) as [TenantId, string][]).map(([id, nombre]) => (
-            <option key={id} value={id}>{nombre}</option>
-          ))}
-        </select>
-      </div>
-
-      <div className="grid grid-cols-2 xl:grid-cols-5 gap-4 mb-6">
-        {items.map((item) => (
-          <div key={item.label} className="rounded-xl p-5 bg-white" style={{ border: '1px solid #D9E2D9', boxShadow: '0 1px 3px rgba(20,83,45,0.06)' }}>
-            <p className="text-3xl font-black tabular-nums" style={{ color: item.color }}>{item.valor}</p>
-            <p className="text-xs mt-2 leading-tight font-medium" style={{ color: '#667085' }}>{item.label}</p>
-            {item.desc && <p className="text-[10px] mt-0.5 leading-tight" style={{ color: '#94A3B8' }}>{item.desc}</p>}
-          </div>
-        ))}
-      </div>
-
-      {/* Sprint 3C — corte por dependencia del período. */}
-      {filasDependencia.length > 0 && (
-        <div className="rounded-xl bg-white p-4 mb-6" style={{ border: '1px solid #D9E2D9' }}>
-          <p className="text-[10px] font-bold uppercase tracking-widest mb-3" style={{ color: '#14532D' }}>
-            Por dependencia · {ETIQUETA_PRESET[preset]}
-          </p>
-          <div className="overflow-x-auto">
-            <table className="w-full text-xs">
-              <thead>
-                <tr className="text-left" style={{ color: '#667085' }}>
-                  <th className="py-1.5 pr-3 font-semibold">Dependencia</th>
-                  <th className="py-1.5 px-3 font-semibold text-right">Total</th>
-                  <th className="py-1.5 px-3 font-semibold text-right">Pendientes</th>
-                  <th className="py-1.5 px-3 font-semibold text-right">En trámite</th>
-                  <th className="py-1.5 px-3 font-semibold text-right">Resueltos</th>
-                  <th className="py-1.5 pl-3 font-semibold text-right">Vencidas</th>
-                </tr>
-              </thead>
-              <tbody>
-                {filasDependencia.map((f) => (
-                  <tr key={f.oficina} style={{ borderTop: '1px solid #EEF2EE', color: '#1F2933' }}>
-                    <td className="py-2 pr-3 font-medium">{NOMBRES_TENANT[f.oficina] ?? f.oficina}</td>
-                    <td className="py-2 px-3 text-right font-bold tabular-nums">{f.total}</td>
-                    <td className="py-2 px-3 text-right tabular-nums">{f.pendientes}</td>
-                    <td className="py-2 px-3 text-right tabular-nums">{f.enTramite}</td>
-                    <td className="py-2 px-3 text-right tabular-nums">{f.resueltos}</td>
-                    <td className="py-2 pl-3 text-right tabular-nums font-bold"
-                        style={{ color: f.vencidas > 0 ? '#DC2626' : '#94A3B8' }}>
-                      {f.vencidas}
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        </div>
-      )}
-
-      {/* Fase B — lo que la administración despachó en el mismo período. */}
-      {resumenSal && (
-        <div className="rounded-xl bg-white p-4 mb-6" style={{ border: '1px solid #D9E2D9' }}>
-          <p className="text-[10px] font-bold uppercase tracking-widest mb-3" style={{ color: '#8A6A12' }}>
-            Correspondencia de salida · {ETIQUETA_PRESET[preset]}
-          </p>
-          {resumenSal.total === 0 ? (
-            <p className="text-xs" style={{ color: '#7A8B7F' }}>
-              Sin salidas 2-SAL registradas en el período
-              {depFiltro !== 'TODAS' ? ' para esta dependencia' : ''}.
-            </p>
-          ) : (
-            <div className="flex items-center gap-6 flex-wrap">
-              <div>
-                <p className="text-3xl font-black tabular-nums" style={{ color: '#12261A' }}>{resumenSal.total}</p>
-                <p className="text-xs mt-1 font-medium" style={{ color: '#667085' }}>Salidas despachadas</p>
-              </div>
-              <div>
-                <p className="text-3xl font-black tabular-nums" style={{ color: '#185FA5' }}>{resumenSal.respuestas}</p>
-                <p className="text-xs mt-1 font-medium" style={{ color: '#667085' }}>Respuestas a radicados</p>
-              </div>
-              <div>
-                <p className="text-3xl font-black tabular-nums" style={{ color: '#3A4551' }}>{resumenSal.oficios}</p>
-                <p className="text-xs mt-1 font-medium" style={{ color: '#667085' }}>Oficios independientes</p>
-              </div>
-              {resumenSal.porMedio.length > 0 && (
-                <div className="flex items-center gap-1.5 flex-wrap ml-auto">
-                  {resumenSal.porMedio.map((m) => (
-                    <span
-                      key={m.medio}
-                      className="text-[10.5px] font-semibold px-2 py-0.5 rounded-full"
-                      style={{ background: '#EEF4EE', border: '1px solid #D9E2D9', color: '#475569' }}
-                    >
-                      {MEDIO_SALIDA_LABEL[m.medio] ?? m.medio}: {m.cantidad}
-                    </span>
-                  ))}
-                </div>
-              )}
-            </div>
-          )}
-        </div>
-      )}
-
-      {pctCumplimiento === null && (
-        <div className="rounded-lg px-4 py-3 mb-4" style={{ background: '#FFFBEB', border: '1px solid #FDE68A' }}>
-          <p className="text-xs leading-relaxed" style={{ color: '#92400E' }}>
-            <span className="font-bold">MIPG Req. 8 — Sin datos de cumplimiento aún.</span>{' '}
-            El campo <span className="font-mono">cumplioTermino</span> se registra automáticamente
-            la próxima vez que se resuelva un radicado. Los radicados históricos no tienen este dato.
-          </p>
-        </div>
-      )}
-
-      <p className="text-xs print:hidden" style={{ color: '#94A3B8' }}>
-        Datos en tiempo real · colección <span className="font-mono">ventanilla_radicados</span> ·
-        {' '}{subconjunto.length} de {total} documento{total !== 1 ? 's' : ''} en el período ·
-        el CSV exporta lo filtrado; el Excel MIPG, el histórico completo.
-      </p>
-    </div>
-  );
-}
-
-/* ══════════════════════════════════════════════════════════════
-   SUB-COMPONENTE: BandejaAsignacion
-══════════════════════════════════════════════════════════════ */
-
-function BandejaAsignacion({
-  radicados,
-  cargando,
-  error,
-  usuario,
-}: {
-  radicados: VentanillaRadicado[];
-  cargando: boolean;
-  error: string | null;
-  usuario: UsuarioAutenticado;
-}) {
-  const { state, dispatch } = useVentanilla();
-  const { seleccionMasiva, tenantMasivo } = state;
-
-  const [tenantPorFila,   setTenantPorFila]   = useState<Record<string, TenantId>>({});
-  const [asignandoFila,   setAsignandoFila]   = useState<Record<string, boolean>>({});
-  const [exitoFila,       setExitoFila]       = useState<Record<string, boolean>>({});
-  const [asignandoMasivo, setAsignandoMasivo] = useState(false);
-  const [resultadoMasivo, setResultadoMasivo] = useState<string | null>(null);
-
-  const todosIds = radicados.map((r) => r.radicadoId);
-  const todosSeleccionados =
-    todosIds.length > 0 && todosIds.every((id) => seleccionMasiva.has(id));
-
-  function getTenantFila(id: string): TenantId {
-    return tenantPorFila[id] ?? 'DESPACHO_ALCALDE';
-  }
-
-  async function asignarUno(r: VentanillaRadicado) {
-    const tenant = getTenantFila(r.radicadoId);
-    setAsignandoFila((p) => ({ ...p, [r.radicadoId]: true }));
-    try {
-      await asignarRadicado(r.radicadoId, tenant, { uid: usuario.uid, nombre: usuario.nombre });
-      setExitoFila((p) => ({ ...p, [r.radicadoId]: true }));
-      setTimeout(() => setExitoFila((p) => ({ ...p, [r.radicadoId]: false })), 3000);
-    } finally {
-      setAsignandoFila((p) => ({ ...p, [r.radicadoId]: false }));
-    }
-  }
-
-  async function asignarSeleccionados() {
-    if (!tenantMasivo || seleccionMasiva.size === 0) return;
-    setAsignandoMasivo(true);
-    setResultadoMasivo(null);
-    try {
-      const { asignados, fallidos } = await asignarMasivo(
-        Array.from(seleccionMasiva),
-        tenantMasivo as TenantId,
-        { uid: usuario.uid, nombre: usuario.nombre },
-      );
-      dispatch({ type: 'LIMPIAR_SELECCION' });
-      setResultadoMasivo(
-        `${asignados} asignado${asignados !== 1 ? 's' : ''}` +
-          (fallidos > 0 ? ` · ${fallidos} fallido${fallidos !== 1 ? 's' : ''}` : ''),
-      );
-    } finally {
-      setAsignandoMasivo(false);
-    }
-  }
-
-  return (
-    <div className="flex-1 flex flex-col overflow-hidden min-h-0">
-
-      {/* Encabezado */}
-      <div className="flex items-center justify-between gap-3 px-4 py-2.5 shrink-0 bg-white"
-           style={{ borderBottom: '1px solid #D9E2D9' }}>
-        <div className="flex items-center gap-2">
-          <h2 className="text-sm font-bold" style={{ color: '#1F2933' }}>Bandeja de Asignación</h2>
-          <span className="text-[10px] font-bold px-2 py-0.5 rounded-full border"
-                style={{ background: '#EEF4EE', color: '#14532D', borderColor: '#D9E2D9' }}>
-            {radicados.length} pendiente{radicados.length !== 1 ? 's' : ''}
-          </span>
-        </div>
-        {seleccionMasiva.size > 0 && (
-          <button onClick={() => dispatch({ type: 'LIMPIAR_SELECCION' })}
-            className="text-xs transition-colors" style={{ color: '#94A3B8' }}
-            onMouseEnter={(e) => { (e.currentTarget as HTMLElement).style.color = '#667085'; }}
-            onMouseLeave={(e) => { (e.currentTarget as HTMLElement).style.color = '#94A3B8'; }}>
-            Limpiar selección ({seleccionMasiva.size})
-          </button>
-        )}
-      </div>
-
-      {/* Barra de asignación masiva */}
-      {seleccionMasiva.size > 0 && (
-        <div className="flex items-center gap-3 px-4 py-2.5 shrink-0"
-             style={{ background: '#EEF4EE', borderBottom: '1px solid #D9E2D9' }}>
-          <span className="text-xs font-bold shrink-0" style={{ color: '#14532D' }}>
-            {seleccionMasiva.size} seleccionado{seleccionMasiva.size !== 1 ? 's' : ''}
-          </span>
-          <select value={tenantMasivo}
-            onChange={(e) => dispatch({ type: 'SET_TENANT_MASIVO', tenant: e.target.value as TenantId | '' })}
-            className="select-internal flex-1 text-xs">
-            <option value="">— Selecciona dependencia destino —</option>
-            {(Object.keys(DIRECTORIO_TENANTS) as TenantId[]).map((id) => (
-              <option key={id} value={id}>{NOMBRES_TENANT[id]}</option>
-            ))}
-          </select>
-          <button onClick={asignarSeleccionados} disabled={!tenantMasivo || asignandoMasivo}
-            className="shrink-0 flex items-center gap-1.5 px-4 py-1.5 rounded-lg text-white text-xs font-bold transition-all duration-150 disabled:opacity-50 active:scale-95"
-            style={{ background: '#14532D' }}
-            onMouseEnter={(e) => { (e.currentTarget as HTMLElement).style.background = '#166534'; }}
-            onMouseLeave={(e) => { (e.currentTarget as HTMLElement).style.background = '#14532D'; }}>
-            {asignandoMasivo && <span className="w-3 h-3 border-2 border-white/30 border-t-white rounded-full animate-spin" />}
-            Asignar {seleccionMasiva.size}
-          </button>
-        </div>
-      )}
-
-      {resultadoMasivo && (
-        <div className="mx-4 mt-2 px-3 py-2 rounded-lg text-xs shrink-0"
-             style={{ background: '#F0FDF4', border: '1px solid #BBF7D0', color: '#166534' }}>
-          {resultadoMasivo}
-        </div>
-      )}
-      {error && (
-        <div className="mx-4 mt-3 p-3 rounded-xl text-xs shrink-0"
-             style={{ background: '#FEF2F2', border: '1px solid #FECACA', color: '#DC2626' }}>
-          Error de conexión: {error}
-        </div>
-      )}
-
-      {/* Tabla */}
-      <div className="flex-1 overflow-y-auto overflow-x-auto bg-white">
-        <table className="w-full text-sm">
-          <thead className="sticky top-0 z-10" style={{ background: '#EEF4EE' }}>
-            <tr style={{ borderBottom: '1px solid #D9E2D9' }}>
-              <th className="px-4 py-2.5 w-10">
-                <input type="checkbox" checked={todosSeleccionados}
-                  onChange={() => dispatch({ type: 'SELECCIONAR_TODOS', radicadoIds: todosIds })}
-                  className="w-3.5 h-3.5 rounded cursor-pointer"
-                  style={{ accentColor: '#14532D' }} />
-              </th>
-              {['Radicado', 'Solicitante', 'Tipo', 'Días', 'Dependencia destino', 'Acción'].map((h) => (
-                <th key={h} className="px-4 py-2.5 text-left text-[10px] font-bold uppercase tracking-widest whitespace-nowrap"
-                    style={{ color: '#14532D' }}>
-                  {h}
-                </th>
-              ))}
-            </tr>
-          </thead>
-          <tbody>
-            {cargando && Array.from({ length: 5 }).map((_, i) => (
-              <tr key={i} className="animate-pulse" style={{ borderBottom: '1px solid #EEF4EE' }}>
-                {Array.from({ length: 7 }).map((_, j) => (
-                  <td key={j} className="px-4 py-3">
-                    <div className="h-3 rounded" style={{ width: `${40 + (j % 3) * 20}%`, background: '#EEF4EE' }} />
-                  </td>
-                ))}
-              </tr>
-            ))}
-
-            {!cargando && radicados.length === 0 && (
-              <tr>
-                <td colSpan={7} className="px-4 py-16 text-center">
-                  <p className="font-medium mb-1" style={{ color: '#667085' }}>Sin pendientes</p>
-                  <p className="text-xs" style={{ color: '#94A3B8' }}>No hay radicados esperando asignación.</p>
-                </td>
-              </tr>
-            )}
-
-            {!cargando && radicados.map((r) => {
-              const dias       = calcDiasRestantes(r);
-              const seleccionado = seleccionMasiva.has(r.radicadoId);
-              const esRojo     = r.prioridad === 'ROJO';
-              const ok         = exitoFila[r.radicadoId];
-
-              return (
-                <tr key={r.radicadoId} className="micro-row"
-                    style={{ borderBottom: '1px solid #EEF4EE', background: seleccionado ? '#EEF4EE' : undefined }}>
-                  <td className="px-4 py-3">
-                    <input type="checkbox" checked={seleccionado}
-                      onChange={() => dispatch({ type: 'TOGGLE_SELECCION', radicadoId: r.radicadoId })}
-                      className="w-3.5 h-3.5 rounded cursor-pointer"
-                      style={{ accentColor: '#14532D' }} />
-                  </td>
-
-                  <td className="px-4 py-3 whitespace-nowrap">
-                    <div className="flex items-center gap-1.5">
-                      {esRojo && <span className="w-1.5 h-1.5 rounded-full bg-red-500 animate-pulse shrink-0" />}
-                      <span className="font-mono text-xs font-bold" style={{ color: '#14532D' }}>{r.radicadoId}</span>
-                    </div>
-                    <p className="text-[10px] mt-0.5" style={{ color: '#94A3B8' }}>{fmtFecha(r.control.fechaRadicado)}</p>
-                  </td>
-
-                  <td className="px-4 py-3 max-w-[160px]">
-                    <p className="text-xs font-medium truncate" style={{ color: '#1F2933' }}>{nombreSolicitanteVisible(r, r.solicitante.nombreCompleto)}</p>
-                    <p className="text-[10px] font-mono" style={{ color: '#94A3B8' }}>
-                      {documentoSolicitanteVisible(r, r.solicitante.tipoDocumento, r.solicitante.numeroDocumento)}
-                    </p>
-                  </td>
-
-                  <td className="px-4 py-3 whitespace-nowrap">
-                    <p className="text-xs" style={{ color: '#667085' }}>{r.termino.tipoSolicitudNombre}</p>
-                    <p className="text-[10px]" style={{ color: '#94A3B8' }}>{r.termino.diasRespuesta}d</p>
-                  </td>
-
-                  <td className="px-4 py-3 whitespace-nowrap">
-                    <span className={`text-sm font-bold tabular-nums ${
-                      dias < 0 ? 'text-red-600' : dias <= 2 ? 'text-orange-600' : ''
-                    }`} style={dias > 2 ? { color: '#667085' } : {}}>
-                      {dias < 0 ? `${Math.abs(dias)}d venc.` : `${dias}d`}
-                    </span>
-                  </td>
-
-                  <td className="px-4 py-3">
-                    <select value={getTenantFila(r.radicadoId)}
-                      onChange={(e) => setTenantPorFila((p) => ({ ...p, [r.radicadoId]: e.target.value as TenantId }))}
-                      className="select-internal text-[11px] min-w-[150px]">
-                      {(Object.keys(DIRECTORIO_TENANTS) as TenantId[]).map((id) => (
-                        <option key={id} value={id}>{NOMBRES_TENANT[id]}</option>
-                      ))}
-                    </select>
-                  </td>
-
-                  <td className="px-4 py-3 whitespace-nowrap">
-                    {ok ? (
-                      <span className="text-xs font-bold text-green-700">✓ Asignado</span>
-                    ) : (
-                      <button onClick={() => asignarUno(r)} disabled={!!asignandoFila[r.radicadoId]}
-                        className="flex items-center gap-1 px-3 py-1.5 rounded-lg text-white text-xs font-bold transition-all active:scale-95 disabled:opacity-50"
-                        style={{ background: '#14532D' }}
-                        onMouseEnter={(e) => { (e.currentTarget as HTMLElement).style.background = '#166534'; }}
-                        onMouseLeave={(e) => { (e.currentTarget as HTMLElement).style.background = '#14532D'; }}>
-                        {asignandoFila[r.radicadoId]
-                          ? <span className="w-3 h-3 border-2 border-white/30 border-t-white rounded-full animate-spin" />
-                          : 'Asignar →'}
-                      </button>
-                    )}
-                  </td>
-                </tr>
-              );
-            })}
-          </tbody>
-        </table>
-      </div>
-    </div>
-  );
-}
-
-/* ══════════════════════════════════════════════════════════════
    COMPONENTE INTERNO PRINCIPAL (dentro del Provider)
 ══════════════════════════════════════════════════════════════ */
 
 type PanelDerechoModo = 'normal' | 'amplio';
+/** Ola 3 — secciones de Administración en pantallas de menos de 1280 px. */
+type SeccionAdministracion = 'USUARIOS' | 'GOBERNANZA';
+const SECCIONES_ADMINISTRACION = [
+  { id: 'USUARIOS' as const, etiqueta: 'Usuarios internos' },
+  { id: 'GOBERNANZA' as const, etiqueta: 'Gobernanza SIMI' },
+];
+
 const PANEL_MODO_KEY = 'panelDerechoModo';
+const SIDEBAR_FIJADO_KEY = 'sidebarFijado';
 
 function DashboardInterior({ usuario, cerrarSesion }: { usuario: UsuarioAutenticado; cerrarSesion: () => Promise<void> }) {
   const router = useRouter();
@@ -4372,6 +3873,10 @@ function DashboardInterior({ usuario, cerrarSesion }: { usuario: UsuarioAutentic
   // Preferencia persistente del usuario para el ancho del panel derecho en escritorio.
   // Móvil siempre ignora este valor (siempre full-screen como drawer).
   const [panelDerechoModo, setPanelDerechoModo] = useState<PanelDerechoModo>('normal');
+  const [sidebarFijado, setSidebarFijado] = useState(false);
+  const [sidebarTemporalAbierto, setSidebarTemporalAbierto] = useState(false);
+  const cierreSidebarRef = useRef<number | null>(null);
+  const contenidoSidebarRef = useRef<HTMLDivElement>(null);
   useEffect(() => {
     try {
       const v = window.localStorage.getItem(PANEL_MODO_KEY);
@@ -4396,13 +3901,131 @@ function DashboardInterior({ usuario, cerrarSesion }: { usuario: UsuarioAutentic
     vistaActual,
   } = state;
 
-  const esAdmin = usuario.rol === 'ADMIN' || usuario.rol === 'CONTROL_INTERNO';
+  /* EL AVISO DE «no se pudo abrir el radicado» SE DESCARTA SOLO.
+     Visto en producción el 29-sep-2026: el mensaje se quedaba pegado y viajaba
+     con la funcionaria de «Salidas» a «Ventanilla», tapando la cabecera de una
+     pantalla con la que no tenía nada que ver. Solo se limpiaba cuando una
+     apertura POSTERIOR salía bien — es decir, casi nunca.
+
+     Dos salidas, porque el banner es `fixed` y oculta contenido mientras siga:
+     1. al cambiar de vista — el error pertenecía a la pantalla anterior;
+     2. a los 10 s — tiempo de sobra para leerlo; después solo estorba. */
+  useEffect(() => {
+    setErrorAbrirRadicado(null);
+  }, [vistaActual]);
+
+  useEffect(() => {
+    if (!errorAbrirRadicado) return;
+    const temporizador = setTimeout(() => setErrorAbrirRadicado(null), 10_000);
+    return () => clearTimeout(temporizador);
+  }, [errorAbrirRadicado]);
+
+  const detalleRadicadoActivo = vistaActual === 'TABLERO'
+    && panelDerechoAbierto
+    && Boolean(radicadoSeleccionado);
+  const sidebarVisible = !detalleRadicadoActivo || sidebarFijado || sidebarTemporalAbierto;
+
+  useEffect(() => {
+    try {
+      setSidebarFijado(window.localStorage.getItem(SIDEBAR_FIJADO_KEY) === 'true');
+    } catch {
+      // La navegación sigue disponible aunque el navegador bloquee almacenamiento local.
+    }
+  }, []);
+
+  useEffect(() => () => {
+    if (cierreSidebarRef.current !== null) {
+      window.clearTimeout(cierreSidebarRef.current);
+    }
+  }, []);
+
+  useEffect(() => {
+    if (detalleRadicadoActivo && !sidebarFijado) {
+      setSidebarTemporalAbierto(false);
+    }
+  }, [detalleRadicadoActivo, sidebarFijado]);
+
+  function cancelarCierreSidebar() {
+    if (cierreSidebarRef.current !== null) {
+      window.clearTimeout(cierreSidebarRef.current);
+      cierreSidebarRef.current = null;
+    }
+  }
+
+  function abrirSidebarTemporal() {
+    cancelarCierreSidebar();
+    if (detalleRadicadoActivo && !sidebarFijado) {
+      setSidebarTemporalAbierto(true);
+    }
+  }
+
+  function cerrarSidebarTemporalConRetardo() {
+    if (!detalleRadicadoActivo || sidebarFijado) return;
+    cancelarCierreSidebar();
+    cierreSidebarRef.current = window.setTimeout(() => {
+      const focoPermaneceEnSidebar = contenidoSidebarRef.current?.contains(document.activeElement);
+      if (!focoPermaneceEnSidebar) {
+        setSidebarTemporalAbierto(false);
+      }
+      cierreSidebarRef.current = null;
+    }, 300);
+  }
+
+  function cerrarSidebarCuandoPierdeElFoco() {
+    window.setTimeout(() => {
+      const focoPermaneceEnSidebar = contenidoSidebarRef.current?.contains(document.activeElement);
+      if (!focoPermaneceEnSidebar) {
+        cerrarSidebarTemporalConRetardo();
+      }
+    }, 0);
+  }
+
+  function alternarSidebarTemporal() {
+    if (!detalleRadicadoActivo) return;
+    cancelarCierreSidebar();
+    setSidebarTemporalAbierto((abierto) => !abierto);
+  }
+
+  function alternarSidebarFijado() {
+    setSidebarFijado((fijado) => {
+      const siguiente = !fijado;
+      try {
+        window.localStorage.setItem(SIDEBAR_FIJADO_KEY, String(siguiente));
+      } catch {
+        // La preferencia es opcional; el control permanece funcional durante la sesión.
+      }
+      if (siguiente) {
+        cancelarCierreSidebar();
+        setSidebarTemporalAbierto(true);
+      }
+      return siguiente;
+    });
+  }
+
+  function cerrarSidebarConPestana() {
+    cancelarCierreSidebar();
+    if (sidebarFijado) {
+      setSidebarFijado(false);
+      try {
+        window.localStorage.setItem(SIDEBAR_FIJADO_KEY, 'false');
+      } catch {
+        // Sin persistencia, solo cambia el estado actual.
+      }
+    }
+    setSidebarTemporalAbierto(false);
+  }
+
+  /* Contexto único de interfaz (ADR-0046): qué ve y qué puede hacer este
+     usuario según rol + dependencia. Misma lógica de siempre, en un lugar. */
+  const contexto = useMemo(() => construirContextoInterno(usuario), [usuario]);
+  const [seccionAdministracion, setSeccionAdministracion] = useState<SeccionAdministracion>('USUARIOS');
+  const esAdmin = contexto.permisos.verIndicadoresGlobales;
   // Panel Op Nivel 1 — flag separado de esAdmin: gatea SOLO el selector
   // de dependencia. RECEPCIONISTA ve todos los tenants pero no hereda
   // los paneles administrativos (gobernanza SIMI, semáforo PQRSD).
-  const veTodosTenants = puedeVerTodosLosTenants(usuario.rol);
-  const tienePermisoRadicar = puedeRadicar(usuario);
-  const tienePermisoBandeja = puedeUsarBandejaAsignacion(usuario);
+  const veTodosTenants = contexto.permisos.filtrarPorDependencia;
+  const tienePermisoRadicar = contexto.permisos.radicar;
+  const tienePermisoBandeja = contexto.permisos.usarBandejaAsignacion;
   const [busquedaAvanzadaAbierta, setBusquedaAvanzadaAbierta] = useState(false);
   // Sprint Radicación de salida — modal (null = cerrado; entrada = amarre).
   const [salidaModal, setSalidaModal] = useState<{ entrada: EntradaAmarre | null } | null>(null);
@@ -4410,23 +4033,27 @@ function DashboardInterior({ usuario, cerrarSesion }: { usuario: UsuarioAutentic
   const [repartoAbierto, setRepartoAbierto] = useState(false);
   // Fase B — el libro completo lo leen los mismos roles de la vista
   // Salidas; el hook sin recorte por tenant solo se activa para ellos.
-  const puedeVerLibroSalidas = usuario.rol === 'ADMIN'
-    || usuario.rol === 'RECEPCIONISTA' || usuario.rol === 'CONTROL_INTERNO';
+  const puedeVerLibroSalidas = contexto.permisos.verLibroSalidas;
   const salidasLibro = useSalidas(
     vistaActual === 'SALIDAS'
     || (vistaActual === 'REPORTES' && puedeVerLibroSalidas),
   );
   // Sprint Registro exprés — modal para roles operativos.
   const [registroExpresAbierto, setRegistroExpresAbierto] = useState(false);
-  const puedeRegistroExpres = usuario.rol !== 'CONTROL_INTERNO';
-  const puedeRegistrarSalida = usuario.rol === 'ADMIN' || usuario.rol === 'RECEPCIONISTA';
+  const puedeRegistroExpres = contexto.permisos.registroExpres;
+  const puedeRegistrarSalida = contexto.permisos.registrarSalida;
   const {
     modo: indicadoresModo,
     toggle: toggleIndicadoresModo,
   } = useIndicadoresModo();
+  const { tema, alternarTema } = useTemaInterno();
+  const fechaDeHoy = useMemo(() => {
+    const texto = new Date().toLocaleDateString('es-CO', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' });
+    return texto.charAt(0).toUpperCase() + texto.slice(1);
+  }, []);
   const indicadoresCompactos = indicadoresModo === 'compacto';
   /** Roles de solo lectura: pueden ver pero no ejecutar acciones sobre radicados. */
-  const esVistaReadOnly = usuario.rol === 'JEFE_DEPENDENCIA' || usuario.rol === 'CONTROL_INTERNO';
+  const esVistaReadOnly = contexto.permisos.soloLectura;
 
   const { radicados: todosLosRadicados, cargando, error } =
     useVentanillaRadicados(usuario, tenantFiltro);
@@ -4508,6 +4135,49 @@ function DashboardInterior({ usuario, cerrarSesion }: { usuario: UsuarioAutentic
       dispatch({ type: 'SET_VISTA', vista: 'TABLERO' });
     }
   }, [dispatch, usuario, vistaActual]);
+
+  /* ── Licencias por dirección (ADR-0046 §7, armazón único) ──
+     `?vista=licencias[&expediente=…|&seccion=libro]` abre Licencias y su
+     pantalla: enlace directo, recarga y atrás/adelante funcionan. */
+  const destinoLicencias = leerDestinoLicencias(searchParams);
+  const licenciasEnUrl = destinoLicencias.activa;
+  const puedeVerLicencias = contexto.permisos.verLicencias;
+  const vistaActualRef = useRef(vistaActual);
+  useEffect(() => { vistaActualRef.current = vistaActual; }, [vistaActual]);
+
+  /** La dirección actual sin los parámetros de Licencias. */
+  const direccionSinLicencias = useCallback(() => {
+    const parametros = new URLSearchParams(searchParams.toString());
+    for (const p of PARAMETROS_LICENCIAS) parametros.delete(p);
+    const query = parametros.toString();
+    return query ? `/interno/dashboard?${query}` : '/interno/dashboard';
+  }, [searchParams]);
+
+  // Dirección → vista. Sin permiso, la dirección no abre Licencias ni un
+  // instante (no se montan ni piden sus datos): se limpia. Si la dirección
+  // deja Licencias (botón atrás) y la vista sigue ahí, se vuelve al Tablero.
+  useEffect(() => {
+    if (licenciasEnUrl) {
+      if (puedeVerLicencias) dispatch({ type: 'SET_VISTA', vista: 'LICENCIAS' });
+      else router.replace(direccionSinLicencias(), { scroll: false });
+    } else if (vistaActualRef.current === 'LICENCIAS') {
+      dispatch({ type: 'SET_VISTA', vista: 'TABLERO' });
+    }
+  }, [dispatch, licenciasEnUrl, puedeVerLicencias, router, direccionSinLicencias]);
+
+  // Vista → dirección, solo cuando la vista CAMBIA (entrar desde el menú o
+  // salir hacia otra vista); `replace` para no llenar el historial.
+  const vistaAnteriorRef = useRef(vistaActual);
+  useEffect(() => {
+    const anterior = vistaAnteriorRef.current;
+    vistaAnteriorRef.current = vistaActual;
+    if (anterior === vistaActual) return;
+    if (vistaActual === 'LICENCIAS' && !licenciasEnUrl) {
+      router.replace(urlLicencias(), { scroll: false });
+    } else if (anterior === 'LICENCIAS' && licenciasEnUrl) {
+      router.replace(direccionSinLicencias(), { scroll: false });
+    }
+  }, [vistaActual, licenciasEnUrl, router, direccionSinLicencias]);
 
   const metricas = useMemo(() => calcularMetricas(todosLosRadicados), [todosLosRadicados]);
 
@@ -4635,6 +4305,30 @@ function DashboardInterior({ usuario, cerrarSesion }: { usuario: UsuarioAutentic
     setMenuMovilAbierto(false);
   }
 
+  /* Hub de Ventanilla (decisión del propietario, 23-sep-2026). Cada cifra
+     sale del MISMO filtro que el Tablero aplica al llegar, sobre los mismos
+     datos (ya acotados por dependencia), así que la tarjeta y las filas
+     coinciden. «Por asignar» es la Bandeja de asignación. */
+  const resumenOperacionVentanilla = useMemo(() => {
+    const activosTablero = aplicarFiltroMIPG(todosLosRadicados, 'TODOS', '');
+    return {
+      porAsignar: radicadosPendientes.length,
+      datosIncompletos: filtrarSoloDatosIncompletos(activosTablero).length,
+      conErrores: aplicarFiltroMIPG(todosLosRadicados, 'CORREOS_FALLIDOS', '').length,
+      porVencer: aplicarFiltroMIPG(todosLosRadicados, 'POR_VENCER', '').length,
+    };
+  }, [todosLosRadicados, radicadosPendientes]);
+
+  /** Lleva al Tablero con SOLO el filtro existente de ese estado. */
+  function verEnTableroDesdeVentanilla(destino: DestinoTableroVentanilla) {
+    dispatch({ type: 'SET_BUSQUEDA', busqueda: '' });
+    setFiltroOperativo('NINGUNO');
+    setSoloMios(false);
+    setSoloDatosIncompletos(destino === 'DATOS_INCOMPLETOS');
+    dispatch({ type: 'SET_FILTRO_MIPG', filtro: destino === 'DATOS_INCOMPLETOS' ? 'TODOS' : destino });
+    dispatch({ type: 'SET_VISTA', vista: 'TABLERO' });
+  }
+
   function verCorreosFallidos() {
     dispatch({ type: 'SET_VISTA', vista: 'TABLERO' });
     dispatch({ type: 'SET_FILTRO_MIPG', filtro: 'CORREOS_FALLIDOS' });
@@ -4642,37 +4336,206 @@ function DashboardInterior({ usuario, cerrarSesion }: { usuario: UsuarioAutentic
     setMenuMovilAbierto(false);
   }
 
-  return (
-    <div className="flex h-[100dvh] overflow-hidden overflow-x-visible" style={{ background: '#F8FAF7' }}>
-      {/* ── COLUMNA 1: Sidebar de navegación ── */}
-      <SidebarNav
-        className="hidden md:flex"
-        vistaActual={vistaActual}
-        onVistaChange={cambiarVista}
-        onNuevoRadicado={() => {
-          if (tienePermisoRadicar) dispatch({ type: 'TOGGLE_DRAWER_NUEVO' });
-        }}
-        onRegistroExpres={puedeRegistroExpres ? () => setRegistroExpresAbierto(true) : undefined}
-        usuario={usuario}
-        onCerrarSesion={cerrarSesion}
-        pendientesBandeja={radicadosPendientes.length}
-        pendientesAlertas={pendientesAlertas}
-        miCarga={miCarga}
-        pendientesNotificacionFallida={pendientesNotificacionFallida}
-        onVerCorreosFallidos={verCorreosFallidos}
-        onAbrirResumen={reabrirResumen}
+  /* Mismos valores, filtros y handlers que alimentan chips y paneles. */
+  const indicadoresTablero: IndicadoresTableroProps = {
+    metricas,
+    filtroActivo: filtroMIPG,
+    onFiltroChange: (f) => dispatch({ type: 'SET_FILTRO_MIPG', filtro: f }),
+    kpisOperativos,
+    filtroOperativo,
+    onFiltroOperativoChange: setFiltroOperativo,
+    porVencerHoy,
+  };
+
+  /* Entre la barra de trabajo y la tabla: filtros rápidos, filtros activos
+     y la alerta de prioridad (solo si existe). */
+  const bandaFiltrosYAlerta = (
+    <>
+      <FiltrosRapidos
+        indicadores={indicadoresTablero}
+        filtroActivo={filtroMIPG}
+        onFiltroChange={(f) => dispatch({ type: 'SET_FILTRO_MIPG', filtro: f })}
+        misAsignados={misActivos}
+        soloMios={soloMios}
+        onToggleSoloMios={() => setSoloMios((v) => !v)}
+        soloDatosIncompletos={soloDatosIncompletos}
+        onToggleDatosIncompletos={() => setSoloDatosIncompletos((v) => !v)}
       />
+      {/* Panel Op Nivel 3A — barra de filtros activos (solo si hay). */}
+      <BarraFiltrosActivos
+        estado={estadoFiltros}
+        onQuitarDimension={quitarDimensionFiltro}
+        onLimpiarTodo={limpiarTodosLosFiltros}
+      />
+
+      {/* Resumen en tarjetas. «Minimizar paneles» y el detalle abierto lo
+          ocultan: la prioridad es el espacio de la tabla. */}
+      {!indicadoresCompactos && !panelDerechoAbierto && (
+        <ResumenTablero indicadores={indicadoresTablero} />
+      )}
+
+      {/* Banner de prioridad — reemplaza la bandeja operativa +
+          siguiente atención sugerida. Versión compacta que muestra
+          solo lo crítico: el caso más urgente que necesita acción. */}
+      {(() => {
+        const resumen = calcularResumenBandeja(todosLosRadicados);
+        const siguiente = resumen.siguiente;
+        const dias = siguiente ? calcDiasRestantes(siguiente) : null;
+        const requiereAtencion = Boolean(
+          siguiente && (dias !== null && dias <= 2
+            || siguiente.prioridad === 'ROJO'
+            || !siguiente.clasificacion.funcionarioResponsableUid),
+        );
+        if (!requiereAtencion) return null;
+        const nivelBanner = dias !== null && dias < 0
+          ? 'critico'
+          : dias !== null && dias <= 2
+            ? 'alerta'
+            : 'normal';
+        const descripcionBanner = dias !== null && dias < 0
+          ? `Trámite vencido hace ${Math.abs(dias)} día${Math.abs(dias) !== 1 ? 's' : ''}`
+          : dias !== null && dias === 0
+            ? 'Trámite vence hoy'
+            : dias !== null && dias <= 2
+              ? `Trámite vence en ${dias} día${dias !== 1 ? 's' : ''}`
+              : siguiente
+                ? 'Trámite requiere atención'
+                : '';
+        return (
+          <div className="px-3 pt-2 shrink-0 sm:px-4 lg:px-6">
+            <PriorityBanner
+              nivel={nivelBanner}
+              mensaje="Atención requerida"
+              descripcion={descripcionBanner}
+              accion={siguiente ? (
+                <button
+                  type="button"
+                  onClick={() => dispatch({ type: 'SELECCIONAR_RADICADO', radicado: siguiente })}
+                  className="tablero-interactivo group shrink-0 inline-flex items-center gap-1 rounded-lg px-3 py-1.5 text-xs font-bold transition-[transform,box-shadow,background-color] duration-200 ease-out hover:-translate-y-px hover:shadow-md active:translate-y-0 active:scale-95"
+                  style={{ background: '#E5A31A', color: '#3D2C00' }}
+                >
+                  Atender
+                  <ArrowRight className="tablero-icono-movil transition-transform duration-150 group-hover:translate-x-0.5" size={15} strokeWidth={2} aria-hidden="true" />
+                </button>
+              ) : undefined}
+            />
+          </div>
+        );
+      })()}
+    </>
+  );
+
+  return (
+    <div className="relative flex h-[100dvh] overflow-hidden overflow-x-visible" style={{ background: 'var(--tema-fondo-f7f9fb)' }}>
+      {/* ── COLUMNA 1: Sidebar de navegación ── */}
+      <div
+        id="navegacion-principal"
+        data-armazon="pantalla"
+        className={`relative z-50 hidden h-full shrink-0 transition-[width] duration-200 ease-out xl:block ${
+          detalleRadicadoActivo ? (sidebarVisible ? 'w-[224px]' : 'w-0') : 'w-[224px]'
+        }`}
+      >
+        <div
+          ref={contenidoSidebarRef}
+          className={`absolute inset-y-0 left-0 w-[224px] transition-transform duration-200 ease-out ${
+            sidebarVisible ? 'translate-x-0' : '-translate-x-full'
+          }`}
+          aria-hidden={!sidebarVisible || undefined}
+          inert={!sidebarVisible}
+          onMouseEnter={abrirSidebarTemporal}
+          onMouseLeave={cerrarSidebarTemporalConRetardo}
+          onFocusCapture={abrirSidebarTemporal}
+          onBlurCapture={cerrarSidebarCuandoPierdeElFoco}
+        >
+          <SidebarNav
+            className="flex"
+            vistaActual={vistaActual}
+            onVistaChange={cambiarVista}
+            onNuevoRadicado={() => {
+              if (tienePermisoRadicar) dispatch({ type: 'TOGGLE_DRAWER_NUEVO' });
+            }}
+            onRegistroExpres={puedeRegistroExpres ? () => setRegistroExpresAbierto(true) : undefined}
+            usuario={usuario}
+            onCerrarSesion={cerrarSesion}
+            pendientesBandeja={radicadosPendientes.length}
+            pendientesAlertas={pendientesAlertas}
+            miCarga={miCarga}
+            pendientesNotificacionFallida={pendientesNotificacionFallida}
+            onVerCorreosFallidos={verCorreosFallidos}
+            onAbrirResumen={reabrirResumen}
+            menuFijado={sidebarFijado}
+            onToggleMenuFijado={alternarSidebarFijado}
+            mostrarControlMenu={detalleRadicadoActivo}
+          />
+        </div>
+
+        {detalleRadicadoActivo && (
+          <button
+            type="button"
+            onMouseEnter={abrirSidebarTemporal}
+            onFocus={abrirSidebarTemporal}
+            onClick={sidebarVisible ? cerrarSidebarConPestana : alternarSidebarTemporal}
+            aria-controls="navegacion-principal"
+            aria-expanded={sidebarVisible}
+            aria-label={sidebarVisible ? 'Ocultar menú de navegación' : 'Abrir menú de navegación'}
+            title={sidebarVisible ? 'Ocultar menú' : 'Abrir menú'}
+            className={`absolute top-1/2 z-[60] hidden h-16 w-7 -translate-y-1/2 items-center justify-center border shadow-md transition-all duration-200 ease-out hover:w-8 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-700 xl:inline-flex ${
+              sidebarVisible
+                ? 'left-full rounded-r-xl border-l-0 bg-[var(--tema-fondo-ffffff)] text-[var(--tema-texto-007049)]'
+                : 'left-0 rounded-r-xl border-[var(--tema-borde-b9d1bf)] bg-[var(--tema-fondo-f4f9f6)] text-[var(--tema-texto-007049)]'
+            }`}
+          >
+            <PanelLeftOpen className={`h-4 w-4 transition-transform duration-200 ${sidebarVisible ? 'rotate-180' : ''}`} aria-hidden="true" />
+          </button>
+        )}
+      </div>
 
       {/* ── COLUMNA 2: Cuerpo central ──
             Sprint UI Bandeja: añadimos `min-h-0` para que los hijos con
             `flex-1` puedan ceder altura al scroll interno sin crecer
             indefinidamente y romper el layout. */}
-      <div className="flex-1 flex flex-col overflow-hidden overflow-x-visible min-w-0 min-h-0">
+      <div
+        className={`flex-1 flex flex-col min-w-0 min-h-0 overflow-x-visible bg-[var(--tema-fondo-f7f9fb)] ${panelDerechoAbierto ? 'overflow-y-scroll' : vistaActual === 'TABLERO' ? 'overflow-y-auto' : 'overflow-hidden'}`}
+        style={panelDerechoAbierto ? { scrollbarGutter: 'stable' } : undefined}
+      >
         <MobileTopBar
           usuario={usuario}
           vistaActual={vistaActual}
           onAbrirMenu={() => setMenuMovilAbierto(true)}
           onAbrirResumen={reabrirResumen}
+          tema={tema}
+          onAlternarTema={alternarTema}
+        />
+
+        {/* Encabezado común de escritorio. En el Tablero la dependencia es
+            siempre la del alcance ya autorizado por el store. */}
+        <EncabezadoPantalla
+          antetitulo={vistaActual === 'TABLERO' ? 'Sala de operaciones' : 'Ventanilla Única Digital'}
+          titulo={vistaActual === 'TABLERO'
+            ? `Bandeja de trámites · ${veTodosTenants
+              ? (tenantFiltro === 'TODOS' ? 'Vista municipal' : (NOMBRES_TENANT[tenantFiltro] ?? 'Vista municipal'))
+              : NOMBRES_TENANT[usuario.tenantId]}`
+            : etiquetaDeVista(vistaActual)}
+          complemento={vistaActual === 'TABLERO' ? (
+            /* Sprint tablero-jerarquia — mismo total y mismo filtro de
+               reinicio de siempre, como chip discreto junto al título. */
+            <button
+              type="button"
+              onClick={() => dispatch({ type: 'SET_FILTRO_MIPG', filtro: 'TODOS' })}
+              aria-pressed={filtroMIPG === 'TODOS'}
+              aria-label={`Ver todos los radicados activos del panorama MIPG (${totalKpisMipg})`}
+              className="shrink-0 inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-[11px] font-bold focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-700/30"
+              style={filtroMIPG === 'TODOS'
+                ? { background: 'var(--tema-fondo-f4f9f6)', color: 'var(--tema-texto-007049)', border: '1px solid var(--tema-borde-007049)' }
+                : { background: 'var(--tema-fondo-f7f9fb)', color: 'var(--tema-texto-007049)', border: '1px solid var(--tema-borde-dce4ea)' }}
+            >
+              <span className="tabular-nums">{totalKpisMipg}</span> activos
+            </button>
+          ) : undefined}
+          fecha={fechaDeHoy}
+          onBuscar={() => setBusquedaAvanzadaAbierta(true)}
+          onResumen={reabrirResumen}
+          botonTema={<BotonTema tema={tema} onAlternar={alternarTema} />}
         />
 
         {vistaActual === 'ANALYTICS' ? (
@@ -4684,8 +4547,10 @@ function DashboardInterior({ usuario, cerrarSesion }: { usuario: UsuarioAutentic
         ) : vistaActual === 'ALERTAS' ? (
           <VistaAlertas
             radicados={todosLosRadicados}
-            esAdmin={esAdmin}
+            /* Mismo alcance y mismo stream que el contador del menú. */
+            alcanceMunicipal={veTodosTenants}
             tenantIdUsuario={usuario.tenantId}
+            dependenciaFiltrada={veTodosTenants && tenantFiltro !== 'TODOS' ? tenantFiltro : undefined}
             onVerRadicado={(r) => abrirRadicadoPorId(r.radicadoId)}
           />
         ) : vistaActual === 'REPORTES' ? (
@@ -4693,6 +4558,8 @@ function DashboardInterior({ usuario, cerrarSesion }: { usuario: UsuarioAutentic
             total={todosLosRadicados.length}
             radicados={todosLosRadicados}
             salidas={puedeVerLibroSalidas ? salidasLibro.salidas : null}
+            /* Ola 3: con alcance de dependencia no hay selector que no aplique. */
+            dependenciaFija={contexto.permisos.filtrarPorDependencia ? undefined : usuario.tenantId}
           />
         ) : vistaActual === 'SALIDAS' ? (
           /* Sprint Radicación de salida — libro de correspondencia despachada. */
@@ -4701,9 +4568,8 @@ function DashboardInterior({ usuario, cerrarSesion }: { usuario: UsuarioAutentic
             cargando={salidasLibro.cargando}
             error={salidasLibro.error}
             onAbrirEntrada={(id) => abrirRadicadoPorId(id)}
-            onNuevaSalida={() => {
-              if (puedeRegistrarSalida) setSalidaModal({ entrada: null });
-            }}
+            /* Ola 3 (ADR-0046): sin permiso no hay botón (antes se veía y no hacía nada). */
+            onNuevaSalida={puedeRegistrarSalida ? () => setSalidaModal({ entrada: null }) : undefined}
           />
         ) : vistaActual === 'BANDEJA' && tienePermisoBandeja ? (
           <BandejaAsignacion
@@ -4723,26 +4589,32 @@ function DashboardInterior({ usuario, cerrarSesion }: { usuario: UsuarioAutentic
             onAbrirRadicado={(id) => abrirRadicadoPorId(id)}
           />
         ) : vistaActual === 'SUPERVISION_IA' ? (
-          <div className="flex-1 overflow-y-auto p-4 md:p-6 bg-[#0E0E10]/40">
+          /* Ola 3: fondo del Tablero (antes un velo oscuro del tema antiguo). */
+          <div className="flex-1 overflow-y-auto pb-6" style={{ background: 'var(--tema-fondo-f7f9fb)' }}>
             <VistaSupervisionIA />
           </div>
         ) : vistaActual === 'ANTICIPACION_OPERATIVA' ? (
-          <div className="flex-1 overflow-y-auto p-4 md:p-6 bg-[#0E0E10]/40">
+          <div className="flex-1 overflow-y-auto pb-6" style={{ background: 'var(--tema-fondo-f7f9fb)' }}>
             <VistaAnticipacionOperativa radicados={todosLosRadicados} />
           </div>
-        ) : vistaActual === 'LICENCIAS' ? (
-          /* Bloque B ("la ventanita") — Licencias como pestaña REAL del
-             panel interno, ya no página aparte. Módulo de pantalla
-             completa: gestiona su propia navegación interna (bandeja/libro
-             consecutivo/detalle) con estado local, no con `VistaActual`. */
+        ) : vistaActual === 'LICENCIAS' && puedeVerLicencias ? (
+          /* Licencias en el armazón único (ADR-0046 §7): la pantalla
+             (bandeja, libro consecutivo o detalle) sale de la dirección, y
+             navegar escribe en ella — enlaces directos, recarga y
+             atrás/adelante funcionan. */
           <div className="flex-1 overflow-y-auto" style={{ background: 'var(--bg-base)' }}>
-            <VistaLicencias />
+            <VistaLicencias
+              expedienteId={destinoLicencias.expedienteId}
+              seccion={destinoLicencias.seccion}
+              onNavegar={(destino) => router.push(urlLicencias(destino), { scroll: false })}
+            />
           </div>
         ) : vistaActual === 'CONTROL_INTERNO' ? (
-          <div className="flex-1 overflow-y-auto p-4 sm:p-6 space-y-6" style={{ background: '#F8FAF7' }}>
+          /* Ola 3: gutters y superficies del Tablero (el encabezado de sección trae su margen). */
+          <div className="flex-1 overflow-y-auto pb-6 space-y-3" style={{ background: 'var(--tema-fondo-f7f9fb)' }}>
             <CentroControlInterno />
-            <details className="rounded-xl bg-white p-4" style={{ border: '1px solid #D9E2D9' }}>
-              <summary className="cursor-pointer text-[10px] font-bold uppercase tracking-widest" style={{ color: '#667085' }}>
+            <details className="mx-3 rounded-xl bg-[var(--tema-fondo-ffffff)] p-3 sm:mx-4 lg:mx-6">
+              <summary className="cursor-pointer text-xs font-black" style={{ color: 'var(--tema-texto-172033)' }}>
                 Dashboard MIPG histórico (Sprint 5)
               </summary>
               <div className="mt-3">
@@ -4753,13 +4625,29 @@ function DashboardInterior({ usuario, cerrarSesion }: { usuario: UsuarioAutentic
         ) : vistaActual === 'APROBACIONES' ? (
           <JefeAprobacionesPanel usuarioRol={usuario.rol} />
         ) : vistaActual === 'ADMINISTRACION' ? (
-          <div className="flex-1 flex overflow-hidden min-h-0">
-            <div className="min-w-0 flex-1 overflow-hidden min-h-0"><VistaAdministracion /></div>
+          /* Ola 3 (ADR-0046): desde 1280 px, usuarios y gobernanza SIMI lado a
+             lado (como antes). Por debajo la gobernanza quedaba inalcanzable
+             (`hidden xl:flex`); ahora se elige con pestañas. */
+          <div className="flex-1 flex flex-col overflow-hidden min-h-0">
             {esAdmin && (
-              <div className="hidden xl:flex flex-col w-[420px] shrink-0 border-l" style={{ borderColor: '#D9E2D9' }}>
-                <SimiGobernanzaPanel usuario={usuario} />
+              <div className="xl:hidden shrink-0 px-3 pt-2 sm:px-4 lg:px-6">
+                <Pestanas
+                  idBase="administracion"
+                  etiquetaGrupo="Secciones de Administración"
+                  pestanas={SECCIONES_ADMINISTRACION}
+                  activa={seccionAdministracion}
+                  onCambiar={setSeccionAdministracion}
+                />
               </div>
             )}
+            <PanelPestana idBase="administracion" activa={seccionAdministracion} className="flex-1 flex overflow-hidden min-h-0">
+              <div className={`min-w-0 flex-1 overflow-hidden min-h-0 ${seccionAdministracion === 'GOBERNANZA' ? 'hidden xl:block' : ''}`}><VistaAdministracion /></div>
+              {esAdmin && (
+                <div className={`${seccionAdministracion === 'GOBERNANZA' ? 'flex' : 'hidden'} xl:flex flex-col w-full xl:w-[420px] shrink-0 xl:border-l`} style={{ borderColor: 'var(--tema-borde-dce4ea)' }}>
+                  <SimiGobernanzaPanel usuario={usuario} />
+                </div>
+              )}
+            </PanelPestana>
           </div>
         ) : vistaActual === 'VENTANILLA' ? (
           /* Ventanilla · módulo de mostrador — vista propia, ya NO hereda
@@ -4777,141 +4665,44 @@ function DashboardInterior({ usuario, cerrarSesion }: { usuario: UsuarioAutentic
             onAbrirReparto={puedeRegistrarSalida
               ? () => setRepartoAbierto(true)
               : undefined}
+            /* Hub: estado de la operación y accesos, cada uno con su permiso. */
+            resumenOperacion={resumenOperacionVentanilla}
+            onAbrirBandeja={tienePermisoBandeja ? () => cambiarVista('BANDEJA') : undefined}
+            onVerEnTablero={verEnTableroDesdeVentanilla}
+            onAbrirSalidas={puedeVerLibroSalidas ? () => cambiarVista('SALIDAS') : undefined}
           />
         ) : (
           <>
-            {/* Encabezado de la bandeja: la dependencia es siempre la del
-                alcance ya autorizado por el store, no un dato duplicado. */}
-            {vistaActual === 'TABLERO' && (
-              <div className="hidden md:flex min-w-0 items-center justify-between gap-3 bg-white px-4 pb-3 pt-4 lg:px-6 shrink-0">
-                <div className="flex min-w-0 items-center gap-2.5">
-                  <div className="min-w-0">
-                    <div className="flex items-center gap-2">
-                      <span className="text-[10px] font-bold uppercase tracking-[0.12em]" style={{ color: '#5F8A6E' }}>
-                        Sala de operaciones
-                      </span>
-                      <span className="w-1.5 h-1.5 rounded-full" style={{ background: '#3B9E5F' }} />
-                      <span className="text-[10px]" style={{ color: '#7A8B7F' }}>tiempo real</span>
-                    </div>
-                    <p className="mt-0.5 break-words text-xl font-black leading-tight" style={{ color: '#12261A' }}>
-                      Bandeja de trámites · {veTodosTenants
-                        ? (tenantFiltro === 'TODOS' ? 'Vista municipal' : (NOMBRES_TENANT[tenantFiltro] ?? 'Vista municipal'))
-                        : NOMBRES_TENANT[usuario.tenantId]}
-                    </p>
-                  </div>
-                  {/* Sprint tablero-jerarquia — reemplaza la card vertical
-                      "Todos" que antes competía visualmente con las 4
-                      tarjetas de severidad; mismo total, mismo filtro de
-                      reinicio, ahora como chip discreto junto al título. */}
-                  <button
-                    type="button"
-                    onClick={() => dispatch({ type: 'SET_FILTRO_MIPG', filtro: 'TODOS' })}
-                    aria-pressed={filtroMIPG === 'TODOS'}
-                    aria-label={`Ver todos los radicados activos del panorama MIPG (${totalKpisMipg})`}
-                    className="shrink-0 inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-[11px] font-bold focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-700/30"
-                    style={filtroMIPG === 'TODOS'
-                      ? { background: '#EEF4EE', color: '#14532D', border: '1px solid #14532D' }
-                      : { background: '#F8FAF7', color: '#14532D', border: '1px solid #D9E2D9' }}
-                  >
-                    <span className="tabular-nums">{totalKpisMipg}</span> activos
-                  </button>
-                </div>
-              </div>
-            )}
-
             {/* Dashboard PQRSD compacto — vencimientos y riesgo.
                 En modo "compacto" se oculta para dar más altura al listado. */}
             {esAdmin && (
-              <div className="px-4 py-2 bg-white shrink-0" style={{ borderBottom: '1px solid #D9E2D9' }}>
-                <p className="text-[9px] font-bold uppercase tracking-widest mb-1.5" style={{ color: '#14532D' }}>
-                  Semáforo PQRSD
-                </p>
+              <section className="mx-3 mt-2 rounded-xl bg-[var(--tema-fondo-ffffff)] px-3 py-2 shrink-0 sm:mx-4 lg:mx-6" aria-label="Semáforo PQRSD: indicadores globales">
+                <div className="mb-1.5 flex min-w-0 flex-wrap items-baseline justify-between gap-x-3 gap-y-0.5">
+                  <div className="flex min-w-0 flex-wrap items-baseline gap-x-2">
+                    <h2 className="text-[10px] font-black uppercase tracking-widest" style={{ color: 'var(--tema-texto-007049)' }}>
+                      Semáforo PQRSD
+                    </h2>
+                    {/* Métricas globales: no dependen de los filtros de la
+                        tabla (solo del alcance de dependencia autorizado). */}
+                    <p className="text-[10px]" style={{ color: 'var(--text-secondary)' }}>
+                      {tenantFiltro === 'TODOS'
+                        ? 'Estado general de todos los radicados del sistema'
+                        : `Estado general de todos los radicados de ${NOMBRES_TENANT[tenantFiltro] ?? 'la dependencia'}`}
+                    </p>
+                  </div>
+                  <span className="inline-flex cursor-help" style={{ color: 'var(--text-secondary)' }} title="Indicadores globales: no cambian con los filtros de la tabla.">
+                    <Info className="h-3.5 w-3.5" strokeWidth={2} aria-hidden="true" />
+                    <span className="sr-only">Indicadores globales: no cambian con los filtros de la tabla.</span>
+                  </span>
+                </div>
                 <PqrsdDeadlineDashboard
                   radicados={todosLosRadicados}
                   filtroTenant={tenantFiltro}
                   compact={true}
                 />
-              </div>
+              </section>
             )}
 
-            {/* Fila de métricas MIPG — 4 tarjetas grandes con jerarquía
-                por severidad. Los 4 KPIs restantes se fusionaron en la
-                banda "Estado operativo" de abajo (chipsExtra). */}
-            <TarjetasMIPG
-              metricas={metricas}
-              filtroActivo={filtroMIPG}
-              onFiltroChange={(f) => dispatch({ type: 'SET_FILTRO_MIPG', filtro: f })}
-              kpisOperativos={kpisOperativos}
-              filtroOperativo={filtroOperativo}
-              onFiltroOperativoChange={setFiltroOperativo}
-              porVencerHoy={porVencerHoy}
-              misAsignados={misActivos}
-              soloMios={soloMios}
-              onToggleSoloMios={() => setSoloMios((v) => !v)}
-              veTodosTenants={veTodosTenants}
-              tenantFiltro={tenantFiltro}
-              onTenantChange={(t) => dispatch({ type: 'SET_TENANT_FILTRO', tenant: t })}
-              modoCompacto={indicadoresCompactos}
-              onToggleCompacto={toggleIndicadoresModo}
-              soloDatosIncompletos={soloDatosIncompletos}
-              onToggleDatosIncompletos={() => setSoloDatosIncompletos((v) => !v)}
-            />
-
-            {/* Panel Op Nivel 3A — barra de filtros activos (solo si hay). */}
-            <BarraFiltrosActivos
-              estado={estadoFiltros}
-              onQuitarDimension={quitarDimensionFiltro}
-              onLimpiarTodo={limpiarTodosLosFiltros}
-            />
-
-            {/* Banner de prioridad — reemplaza la bandeja operativa +
-                siguiente atención sugerida. Versión compacta que muestra
-                solo lo crítico: el caso más urgente que necesita acción. */}
-            {(() => {
-              const resumen = calcularResumenBandeja(todosLosRadicados);
-              const siguiente = resumen.siguiente;
-              const dias = siguiente ? calcDiasRestantes(siguiente) : null;
-              const requiereAtencion = Boolean(
-                siguiente && (dias !== null && dias <= 2
-                  || siguiente.prioridad === 'ROJO'
-                  || !siguiente.clasificacion.funcionarioResponsableUid),
-              );
-              if (!requiereAtencion) return null;
-              const nivelBanner = dias !== null && dias < 0
-                ? 'critico'
-                : dias !== null && dias <= 2
-                  ? 'alerta'
-                  : 'normal';
-              const descripcionBanner = dias !== null && dias < 0
-                ? `Trámite vencido hace ${Math.abs(dias)} día${Math.abs(dias) !== 1 ? 's' : ''}`
-                : dias !== null && dias === 0
-                  ? 'Trámite vence hoy'
-                  : dias !== null && dias <= 2
-                    ? `Trámite vence en ${dias} día${dias !== 1 ? 's' : ''}`
-                    : siguiente
-                      ? 'Trámite requiere atención'
-                      : '';
-              return (
-                <div className="px-3 sm:px-4 py-2 shrink-0 bg-white" style={{ borderBottom: '1px solid #E5E7EB' }}>
-                  <PriorityBanner
-                    nivel={nivelBanner}
-                    mensaje="Atención requerida"
-                    descripcion={descripcionBanner}
-                    accion={siguiente ? (
-                      <button
-                        type="button"
-                        onClick={() => dispatch({ type: 'SELECCIONAR_RADICADO', radicado: siguiente })}
-                        className="tablero-interactivo group shrink-0 inline-flex items-center gap-1 rounded-lg px-3 py-1.5 text-xs font-bold transition-[transform,box-shadow,background-color] duration-200 ease-out hover:-translate-y-px hover:shadow-md active:translate-y-0 active:scale-95"
-                        style={{ background: '#D4A017', color: '#3D2C00' }}
-                      >
-                        Atender
-                        <ArrowRight className="tablero-icono-movil transition-transform duration-150 group-hover:translate-x-0.5" size={15} strokeWidth={2} aria-hidden="true" />
-                      </button>
-                    ) : undefined}
-                  />
-                </div>
-              );
-            })()}
 
             {/* Tabla maestra */}
             <TablaRadicados
@@ -4928,6 +4719,24 @@ function DashboardInterior({ usuario, cerrarSesion }: { usuario: UsuarioAutentic
               puedeRadicar={tienePermisoRadicar}
               onAbrirBusquedaAvanzada={() => setBusquedaAvanzadaAbierta(true)}
               forzarTarjetas={panelDerechoAbierto}
+              desplazamientoExterno={panelDerechoAbierto}
+              selectorDependencia={veTodosTenants ? (
+                <SelectorDependencia
+                  tenantFiltro={tenantFiltro}
+                  onTenantChange={(t) => dispatch({ type: 'SET_TENANT_FILTRO', tenant: t })}
+                />
+              ) : undefined}
+              entreBarraYTabla={bandaFiltrosYAlerta}
+            />
+
+            {/* Métricas de contexto bajo la tabla: Resumen de trámites y
+                Seguimiento de gestión, colapsables y completos. */}
+            <TarjetasMIPG
+              indicadores={indicadoresTablero}
+              filtroActivo={filtroMIPG}
+              modoCompacto={indicadoresCompactos}
+              onToggleCompacto={toggleIndicadoresModo}
+              enPanelDetalle={panelDerechoAbierto}
             />
           </>
         )}
@@ -4936,10 +4745,23 @@ function DashboardInterior({ usuario, cerrarSesion }: { usuario: UsuarioAutentic
       {errorAbrirRadicado && (
         <div
           role="alert"
-          className="fixed left-1/2 top-4 z-[70] w-[calc(100%-2rem)] max-w-md -translate-x-1/2 rounded-xl border px-4 py-3 text-sm font-semibold shadow-lg"
-          style={{ background: '#FEF2F2', borderColor: '#FECACA', color: '#991B1B' }}
+          className="fixed left-1/2 top-4 z-[70] flex w-[calc(100%-2rem)] max-w-md -translate-x-1/2 items-start gap-2 rounded-xl border px-4 py-3 text-sm font-semibold shadow-lg"
+          style={{ background: 'var(--tema-fondo-fef2f2)', borderColor: 'var(--tema-borde-fecaca)', color: 'var(--tema-texto-991b1b)' }}
         >
-          {errorAbrirRadicado}
+          <span className="min-w-0 flex-1">{errorAbrirRadicado}</span>
+          {/* Cerrar a mano: el aviso tapa la cabecera, y esperar los 10 s no
+              siempre es razonable cuando ya se leyó. */}
+          <button
+            type="button"
+            onClick={() => setErrorAbrirRadicado(null)}
+            aria-label="Cerrar aviso"
+            className="-mr-1 -mt-0.5 shrink-0 rounded p-1 leading-none transition-opacity hover:opacity-70 focus-visible:outline-none focus-visible:ring-2"
+            style={{ color: 'var(--tema-texto-991b1b)' }}
+          >
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" aria-hidden>
+              <path d="M6 6l12 12M18 6L6 18" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" />
+            </svg>
+          </button>
         </div>
       )}
 
@@ -4950,12 +4772,12 @@ function DashboardInterior({ usuario, cerrarSesion }: { usuario: UsuarioAutentic
        && vistaActual !== 'APROBACIONES'
        && vistaActual !== 'CONTROL_INTERNO' && vistaActual !== 'LICENCIAS' && (
         <div
-          className={`fixed inset-y-0 right-0 z-40 max-w-full transition-transform duration-300 ease-in-out md:relative md:z-auto md:shrink-0 md:overflow-hidden md:transition-all ${
+          className={`fixed inset-y-0 right-0 z-40 max-w-full transition-transform duration-300 ease-in-out xl:relative xl:z-auto xl:shrink-0 xl:overflow-hidden xl:transition-all ${
             panelDerechoAbierto
               ? panelDerechoModo === 'amplio'
-                ? 'w-full translate-x-0 md:w-[640px] xl:w-[720px]'
-                : 'w-full translate-x-0 md:w-[420px]'
-              : 'w-full translate-x-full md:w-0 md:translate-x-0'
+                ? 'w-full translate-x-0 xl:w-[720px]'
+                : 'w-full translate-x-0 xl:w-[420px]'
+              : 'w-full translate-x-full xl:w-0 xl:translate-x-0'
           }`}
         >
           {radicadoSeleccionado && (
@@ -5016,7 +4838,7 @@ function DashboardInterior({ usuario, cerrarSesion }: { usuario: UsuarioAutentic
       />
 
       {menuMovilAbierto && (
-        <div className="fixed inset-0 z-50 md:hidden">
+        <div className="fixed inset-0 z-50 xl:hidden">
           <button
             type="button"
             className="absolute inset-0 bg-black/70"
