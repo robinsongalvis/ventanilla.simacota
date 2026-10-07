@@ -42,7 +42,7 @@ subdivisión = 12 meses; el "6 meses" histórico era la norma derogada.
 ## Pendientes del registro
 
 1. Transcripción de la respuesta de silencio positivo (propietario) — parcialmente cubierta por el acta del 10-ago (activación y prueba de no configuración); persiste la dependencia del hueco ⚖️ 1 para el CÓMPUTO.
-2. Concepto escrito de Jurídica que resuelva suspensión vs. reinicio (única vía para ratificar RN-5) — **guía de preguntas en lenguaje sencillo entregada al propietario el 10-ago**.
+2. Concepto escrito de Jurídica que resuelva suspensión vs. reinicio (única vía para ratificar RN-5) — **guía de preguntas en lenguaje sencillo entregada al propietario el 10-ago**. **13-sep-2026: la consulta se ESTRECHA y se formula en concreto** en `CONSULTA_JURIDICA_REANUDACION_TERMINO.md` (cuatro preguntas). Lo que queda pendiente ya no es «suspensión vs. reinicio» a secas —el texto literal del art. 2.2.6.1.2.2.4 resolvió eso y el ADR-0038 lo implementó— sino el MOMENTO de la reanudación, la forma de la renuncia expresa, la acreditación de la comunicación del acta y la frontera del día exacto. El plazo del ciudadano y su prórroga de 15 días ya NO dependen de esta respuesta (PR #338).
 3. ~~Aclaración de los "6 meses"~~ — CERRADA (acta 10-ago: subdivisión 12 meses improrrogable; "6 meses" = norma derogada D.1469/2010).
 4. Referencia normativa exacta del formato del número de expediente (I1).
 5. NUEVA: precisión de firma — ¿el Ingeniero firma como Subsecretario/encargado, o el Secretario? (acta 10-ago vs registro del 6-ago).
