@@ -1,8 +1,9 @@
 # Retrospectiva técnica — preparación de radicación en contingencia
 
 Fecha: 2026-09-29. Alcance: implementación aislada sobre `54256f5`, ADR 0043.
-**Cierre parcial de ingeniería:** la prueba Stage y la autorización final siguen
-pendientes; este documento no declara la operación Production habilitada.
+**Contexto histórico:** al cerrar esta retrospectiva, Stage y la autorización
+final estaban pendientes. Actualización 2026-10-07: el código ya fue desplegado
+en Production; la serie continúa cerrada hasta la apertura operativa con `N`.
 
 ## Qué salió bien
 
@@ -12,8 +13,11 @@ pendientes; este documento no declara la operación Production habilitada.
   y evento de pendientes junto con el consecutivo y su reserva.
 - La revisión cruzada comprobó autenticación, rechazo temprano de archivos,
   aislamiento, preservación de históricos y recuperación idempotente.
-- La barrera de apertura y de mes evita emitir 1745 antes de la autorización o
-  con un período distinto del acordado. Ninguna prueba debe consumirlo en Production.
+- Nota 2026-10-07: la cifra usada en esta retrospectiva era evidencia histórica
+  y quedó superada; el inicio real será el `N` confirmado en el libro físico.
+- La barrera de apertura y de mes evita emitir el número entonces propuesto antes
+  de la autorización o con un período distinto. Ninguna prueba debe consumir `N`
+  en Production.
 
 ## Qué mejorar
 

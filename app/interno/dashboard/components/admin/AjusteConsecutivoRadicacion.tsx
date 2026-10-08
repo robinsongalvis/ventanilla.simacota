@@ -3,9 +3,9 @@
 /**
  * Apertura única de la serie real de radicación.
  *
- * La pantalla solo propone y confirma el primer consecutivo. La autorización,
- * las colisiones, la atomicidad y el bloqueo definitivo se validan siempre en
- * el servidor.
+ * La pantalla exige que el ADMIN transcriba el número confirmado en el libro
+ * físico. No propone ni precarga un número: la autorización, las colisiones,
+ * la atomicidad y el bloqueo definitivo se validan siempre en el servidor.
  */
 
 import { FormEvent, useCallback, useEffect, useState } from 'react';
@@ -24,7 +24,7 @@ interface EstadoSerie {
   ultimo: number;
   proximoRadicado: string;
   openingAlreadyExists: boolean;
-  primerNumeroSugerido: number;
+  primerNumeroMinimo: number;
   apertura?: AperturaSerie;
 }
 
@@ -35,11 +35,15 @@ type RespuestaApi = Partial<EstadoSerie> & {
 };
 
 function esEstadoSerie(data: RespuestaApi): data is RespuestaApi & EstadoSerie {
-  return Number.isInteger(data.anio)
+  return typeof data.anio === 'number'
+    && Number.isInteger(data.anio)
+    && typeof data.ultimo === 'number'
     && Number.isInteger(data.ultimo)
     && typeof data.proximoRadicado === 'string'
     && typeof data.openingAlreadyExists === 'boolean'
-    && Number.isInteger(data.primerNumeroSugerido);
+    && typeof data.primerNumeroMinimo === 'number'
+    && Number.isInteger(data.primerNumeroMinimo)
+    && data.primerNumeroMinimo === data.ultimo + 1;
 }
 
 function radicadoConConsecutivo(radicadoBase: string, consecutivo: number): string {
@@ -96,12 +100,8 @@ export function AjusteConsecutivoRadicacion() {
       }
 
       setEstado(data);
-      if (data.openingAlreadyExists) {
-        setValor('');
-        setConfirmado(false);
-      } else {
-        setValor(String(data.primerNumeroSugerido));
-      }
+      setValor('');
+      setConfirmado(false);
     } catch {
       setEstado(null);
       setError('No fue posible consultar el estado de la serie.');
@@ -209,9 +209,12 @@ export function AjusteConsecutivoRadicacion() {
                 </div>
                 <div>
                   <dt className="text-[11px] font-bold uppercase tracking-widest" style={{ color: 'var(--text-muted)' }}>
-                    Primer consecutivo real sugerido
+                    Mínimo técnicamente permitido
                   </dt>
-                  <dd className="mt-0.5 text-lg font-black" style={{ color: 'var(--text-primary)' }}>{estado.primerNumeroSugerido}</dd>
+                  <dd className="mt-0.5 text-lg font-black" style={{ color: 'var(--text-primary)' }}>{estado.primerNumeroMinimo}</dd>
+                  <dd className="mt-1 text-xs" style={{ color: 'var(--text-muted)' }}>
+                    No es una sugerencia. Ingrese el número exacto confirmado en el libro físico el día del arranque.
+                  </dd>
                 </div>
               </dl>
             )}
@@ -227,10 +230,11 @@ export function AjusteConsecutivoRadicacion() {
                   id="primer-consecutivo-real"
                   type="number"
                   inputMode="numeric"
-                  min={estado.ultimo + 1}
+                  min={estado.primerNumeroMinimo}
                   max={99_999_999}
                   step={1}
                   required
+                  placeholder="Número confirmado en el libro físico"
                   value={valor}
                   onChange={(event) => {
                     setValor(event.target.value);
@@ -243,7 +247,7 @@ export function AjusteConsecutivoRadicacion() {
                   style={{ background: 'var(--bg-surface)', border: '1px solid var(--color-border)', color: 'var(--text-primary)' }}
                 />
                 <span id="primer-consecutivo-ayuda" className="text-xs" style={{ color: 'var(--text-muted)' }}>
-                  Escriba únicamente el número inicial. Debe ser superior a {estado.ultimo}.
+                  Consulte el libro al momento del corte y escriba aquí ese número exacto. Debe ser igual o superior a {estado.primerNumeroMinimo}.
                 </span>
               </label>
 

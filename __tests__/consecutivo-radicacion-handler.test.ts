@@ -50,12 +50,14 @@ const usuario = {
   rol: 'ADMIN',
   tenantId: 'VENTANILLA_UNICA',
 };
+const NUMERO_LIBRO_SINTETICO = 1901;
+const OTRO_NUMERO_LIBRO_SINTETICO = 1911;
 let documentos: Map<string, Documento>;
 let secuenciaAuditoria: number;
 let revision: number;
 let fallarCreate: boolean;
 
-function solicitud(primerNumero: unknown = 1745): Request {
+function solicitud(primerNumero: unknown = NUMERO_LIBRO_SINTETICO): Request {
   return new Request('http://localhost/api/interno/consecutivo-radicacion', {
     method: 'POST',
     headers: { 'content-type': 'application/json' },
@@ -200,7 +202,7 @@ describe('apertura de radicados: autenticación antes de leer o escribir', () =>
 });
 
 describe('apertura única: integridad, bloqueo y auditoría atómica', () => {
-  it('GET no escribe y sugiere 1745 sobre el contador 27', async () => {
+  it('GET no escribe ni sugiere un número: solo informa el mínimo permitido', async () => {
     const respuesta = await GET();
     expect(respuesta.status).toBe(200);
     expect(await respuesta.json()).toEqual({
@@ -209,77 +211,83 @@ describe('apertura única: integridad, bloqueo y auditoría atómica', () => {
       ultimo: 27,
       proximoRadicado: '1-110-202609-00000028',
       openingAlreadyExists: false,
-      primerNumeroSugerido: 1745,
+      primerNumeroMinimo: 28,
     });
     expect(mocks.runTransaction).not.toHaveBeenCalled();
     expect(mocks.set).not.toHaveBeenCalled();
     expect(mocks.create).not.toHaveBeenCalled();
   });
 
-  it.each([1745, 1755])('abre en %s dejando N disponible, bloqueada y auditada', async (primerNumero) => {
-    const respuesta = await POST(solicitud(primerNumero));
-    expect(respuesta.status).toBe(200);
-    expect(await respuesta.json()).toMatchObject({
-      ok: true,
-      ultimo: primerNumero - 1,
-      primerNumeroSugerido: primerNumero,
-      proximoRadicado: `1-110-202609-${String(primerNumero).padStart(8, '0')}`,
-      openingAlreadyExists: true,
-      idempotente: false,
-      apertura: {
-        version: 1,
-        estado: 'BLOQUEADA',
-        primerNumero,
-        abiertoEn: primerNumero,
-        veniaDe: 27,
-        ultimoInicial: primerNumero - 1,
-        actorUid: usuario.uid,
-        actorRol: 'ADMIN',
-        tenantId: 'VENTANILLA_UNICA',
-        fecha: '2026-09-29T17:00:00.000Z',
-        fechaHoraBogota: '2026-09-29T12:00:00.000-05:00',
-      },
-    });
-    expect(documentos.get('counters/radicados-2026')).toMatchObject({
-      ultimo: primerNumero - 1,
-      historico: 'conservar',
-      apertura: { estado: 'BLOQUEADA', primerNumero },
-    });
-    expect([...documentos.keys()].filter((k) => k.startsWith('admin_auditoria/'))).toHaveLength(1);
-    expect([...documentos.keys()].some((k) => k.startsWith('ventanilla_radicados/'))).toBe(false);
-    expect([...documentos.keys()].some((k) => k.startsWith('unicidad_radicados/'))).toBe(false);
-    expect(mocks.queryGet.mock.calls.map(([consultaLeida]) => consultaLeida)).toEqual([
-      {
-        path: 'ventanilla_radicados',
-        campos: [
-          'consecutivo',
-          'control.consecutivo',
-          'control.fechaRadicado',
-          'control.radicadoId',
-        ],
-        limite: 1000,
-      },
-      {
-        path: 'unicidad_radicados',
-        campos: [
-          'consecutivo',
-          'control.consecutivo',
-          'control.fechaRadicado',
-          'control.radicadoId',
-        ],
-        limite: 1000,
-      },
-    ]);
-  });
+  it.each([NUMERO_LIBRO_SINTETICO, OTRO_NUMERO_LIBRO_SINTETICO])(
+    'abre en %s dejando N disponible, bloqueada y auditada',
+    async (primerNumero) => {
+      const respuesta = await POST(solicitud(primerNumero));
+      expect(respuesta.status).toBe(200);
+      expect(await respuesta.json()).toMatchObject({
+        ok: true,
+        ultimo: primerNumero - 1,
+        primerNumeroMinimo: primerNumero,
+        proximoRadicado: `1-110-202609-${String(primerNumero).padStart(8, '0')}`,
+        openingAlreadyExists: true,
+        idempotente: false,
+        apertura: {
+          version: 1,
+          estado: 'BLOQUEADA',
+          primerNumero,
+          abiertoEn: primerNumero,
+          veniaDe: 27,
+          ultimoInicial: primerNumero - 1,
+          actorUid: usuario.uid,
+          actorRol: 'ADMIN',
+          tenantId: 'VENTANILLA_UNICA',
+          fecha: '2026-09-29T17:00:00.000Z',
+          fechaHoraBogota: '2026-09-29T12:00:00.000-05:00',
+        },
+      });
+      expect(documentos.get('counters/radicados-2026')).toMatchObject({
+        ultimo: primerNumero - 1,
+        historico: 'conservar',
+        apertura: { estado: 'BLOQUEADA', primerNumero },
+      });
+      expect([...documentos.keys()].filter((k) => k.startsWith('admin_auditoria/'))).toHaveLength(1);
+      expect([...documentos.keys()].some((k) => k.startsWith('ventanilla_radicados/'))).toBe(false);
+      expect([...documentos.keys()].some((k) => k.startsWith('unicidad_radicados/'))).toBe(false);
+      expect(mocks.queryGet.mock.calls.map(([consultaLeida]) => consultaLeida)).toEqual([
+        {
+          path: 'ventanilla_radicados',
+          campos: [
+            'consecutivo',
+            'control.consecutivo',
+            'control.fechaRadicado',
+            'control.radicadoId',
+          ],
+          limite: 1000,
+        },
+        {
+          path: 'unicidad_radicados',
+          campos: [
+            'consecutivo',
+            'control.consecutivo',
+            'control.fechaRadicado',
+            'control.radicadoId',
+          ],
+          limite: 1000,
+        },
+      ]);
+    },
+  );
 
   it('repetir exactamente N es idempotente y no crea segunda escritura ni auditoría', async () => {
-    expect((await POST(solicitud(1745))).status).toBe(200);
+    expect((await POST(solicitud(NUMERO_LIBRO_SINTETICO))).status).toBe(200);
     const setDespuesPrimera = mocks.set.mock.calls.length;
     const createDespuesPrimera = mocks.create.mock.calls.length;
     const consultasDespuesPrimera = mocks.queryGet.mock.calls.length;
-    const segunda = await POST(solicitud(1745));
+    const segunda = await POST(solicitud(NUMERO_LIBRO_SINTETICO));
     expect(segunda.status).toBe(200);
-    expect(await segunda.json()).toMatchObject({ idempotente: true, ultimo: 1744 });
+    expect(await segunda.json()).toMatchObject({
+      idempotente: true,
+      ultimo: NUMERO_LIBRO_SINTETICO - 1,
+    });
     expect(mocks.set).toHaveBeenCalledTimes(setDespuesPrimera);
     expect(mocks.create).toHaveBeenCalledTimes(createDespuesPrimera);
     expect(mocks.queryGet).toHaveBeenCalledTimes(consultasDespuesPrimera);
@@ -287,19 +295,22 @@ describe('apertura única: integridad, bloqueo y auditoría atómica', () => {
   });
 
   it('bloquea cualquier N distinto después de confirmar la apertura', async () => {
-    expect((await POST(solicitud(1745))).status).toBe(200);
-    const respuesta = await POST(solicitud(1755));
+    expect((await POST(solicitud(NUMERO_LIBRO_SINTETICO))).status).toBe(200);
+    const respuesta = await POST(solicitud(OTRO_NUMERO_LIBRO_SINTETICO));
     expect(respuesta.status).toBe(409);
     expect(await respuesta.json()).toMatchObject({ error: expect.stringContaining('ya fue abierta') });
-    expect(documentos.get('counters/radicados-2026')?.ultimo).toBe(1744);
+    expect(documentos.get('counters/radicados-2026')?.ultimo).toBe(NUMERO_LIBRO_SINTETICO - 1);
     expect([...documentos.keys()].filter((k) => k.startsWith('admin_auditoria/'))).toHaveLength(1);
   });
 
-  it.each([0, -1, 1.5, Number.MAX_SAFE_INTEGER + 1])('rechaza primer número no seguro %s sin efectos', async (numero) => {
-    expect((await POST(solicitud(numero))).status).toBe(400);
-    expect(documentos.get('counters/radicados-2026')?.ultimo).toBe(27);
-    expect(mocks.set).not.toHaveBeenCalled();
-  });
+  it.each([0, -1, 1.5, 100_000_000, Number.MAX_SAFE_INTEGER + 1])(
+    'rechaza primer número fuera del rango institucional %s sin efectos',
+    async (numero) => {
+      expect((await POST(solicitud(numero))).status).toBe(400);
+      expect(documentos.get('counters/radicados-2026')?.ultimo).toBe(27);
+      expect(mocks.set).not.toHaveBeenCalled();
+    },
+  );
 
   it('rechaza N igual o inferior al contador vigente', async () => {
     expect((await POST(solicitud(27))).status).toBe(409);
@@ -316,7 +327,10 @@ describe('apertura única: integridad, bloqueo y auditoría atómica', () => {
   });
 
   it('falla cerrado ante apertura parcial/corrupta', async () => {
-    documentos.set('counters/radicados-2026', { ultimo: 1744, apertura: { abiertoEn: 1745 } });
+    documentos.set('counters/radicados-2026', {
+      ultimo: NUMERO_LIBRO_SINTETICO - 1,
+      apertura: { abiertoEn: NUMERO_LIBRO_SINTETICO },
+    });
     expect((await GET()).status).toBe(409);
     expect((await POST(solicitud())).status).toBe(409);
     expect(mocks.set).not.toHaveBeenCalled();
@@ -330,9 +344,28 @@ describe('apertura única: integridad, bloqueo y auditoría atómica', () => {
   });
 
   it.each([
-    ['ventanilla_radicados/1-110-202610-00001745', { control: { consecutivo: 1745, fechaRadicado: '2026-10-03T15:00:00.000Z' } }],
-    ['ventanilla_radicados/1-WEB-2026-00001760', { control: { consecutivo: 1760, fechaRadicado: '2026-02-03T15:00:00.000Z' } }],
-    ['unicidad_radicados/1-110-202611-00001746', { consecutivo: 1746 }],
+    [
+      `ventanilla_radicados/1-110-202610-${String(NUMERO_LIBRO_SINTETICO).padStart(8, '0')}`,
+      {
+        control: {
+          consecutivo: NUMERO_LIBRO_SINTETICO,
+          fechaRadicado: '2026-10-03T15:00:00.000Z',
+        },
+      },
+    ],
+    [
+      `ventanilla_radicados/1-WEB-2026-${String(NUMERO_LIBRO_SINTETICO + 20).padStart(8, '0')}`,
+      {
+        control: {
+          consecutivo: NUMERO_LIBRO_SINTETICO + 20,
+          fechaRadicado: '2026-02-03T15:00:00.000Z',
+        },
+      },
+    ],
+    [
+      `unicidad_radicados/1-110-202611-${String(NUMERO_LIBRO_SINTETICO + 1).padStart(8, '0')}`,
+      { consecutivo: NUMERO_LIBRO_SINTETICO + 1 },
+    ],
   ])('rechaza documento/reserva anual igual o posterior: %s', async (path, data) => {
     documentos.set(path, data);
     const respuesta = await POST(solicitud());
@@ -340,6 +373,27 @@ describe('apertura única: integridad, bloqueo y auditoría atómica', () => {
     expect(documentos.get('counters/radicados-2026')?.ultimo).toBe(27);
     expect(mocks.set).not.toHaveBeenCalled();
   });
+
+  it.each(['ventanilla_radicados', 'unicidad_radicados'])(
+    'falla cerrado si el año de un registro en %s no se puede determinar',
+    async (coleccion) => {
+      documentos.set(`${coleccion}/registro-legado-sin-anio`, {
+        consecutivo: NUMERO_LIBRO_SINTETICO,
+      });
+
+      const respuesta = await POST(solicitud());
+      expect(respuesta.status).toBe(409);
+      expect(await respuesta.json()).toMatchObject({
+        error: expect.stringContaining('año no se puede verificar'),
+      });
+      expect(documentos.get('counters/radicados-2026')).toEqual({
+        ultimo: 27,
+        historico: 'conservar',
+      });
+      expect(mocks.set).not.toHaveBeenCalled();
+      expect(mocks.create).not.toHaveBeenCalled();
+    },
+  );
 
   it.each(['ventanilla_radicados', 'unicidad_radicados'])(
     'falla cerrado sin escribir cuando %s alcanza exactamente el techo',
@@ -372,12 +426,18 @@ describe('apertura única: integridad, bloqueo y auditoría atómica', () => {
   );
 
   it('una ocupación de otro año no bloquea la serie anual actual', async () => {
-    documentos.set('unicidad_radicados/1-110-202509-00001760', { consecutivo: 1760 });
+    documentos.set(
+      `unicidad_radicados/1-110-202509-${String(NUMERO_LIBRO_SINTETICO + 20).padStart(8, '0')}`,
+      { consecutivo: NUMERO_LIBRO_SINTETICO + 20 },
+    );
     expect((await POST(solicitud())).status).toBe(200);
   });
 
   it('dos solicitudes concurrentes iguales producen una sola apertura y una sola auditoría', async () => {
-    const [a, b] = await Promise.all([POST(solicitud(1745)), POST(solicitud(1745))]);
+    const [a, b] = await Promise.all([
+      POST(solicitud(NUMERO_LIBRO_SINTETICO)),
+      POST(solicitud(NUMERO_LIBRO_SINTETICO)),
+    ]);
     expect([a.status, b.status]).toEqual([200, 200]);
     const cuerpos = await Promise.all([a.json(), b.json()]);
     expect(cuerpos.map((c) => c.idempotente).sort()).toEqual([false, true]);
@@ -385,7 +445,10 @@ describe('apertura única: integridad, bloqueo y auditoría atómica', () => {
   });
 
   it('dos solicitudes concurrentes diferentes: solo una gana y la otra recibe 409', async () => {
-    const respuestas = await Promise.all([POST(solicitud(1745)), POST(solicitud(1755))]);
+    const respuestas = await Promise.all([
+      POST(solicitud(NUMERO_LIBRO_SINTETICO)),
+      POST(solicitud(OTRO_NUMERO_LIBRO_SINTETICO)),
+    ]);
     expect(respuestas.map((r) => r.status).sort()).toEqual([200, 409]);
     expect([...documentos.keys()].filter((k) => k.startsWith('admin_auditoria/'))).toHaveLength(1);
   });
@@ -413,9 +476,9 @@ describe('apertura única: calendario America/Bogota', () => {
     expect(respuesta.status).toBe(200);
     expect(await respuesta.json()).toMatchObject({
       anio,
-      proximoRadicado: `1-110-${prefijo}-00001745`,
+      proximoRadicado: `1-110-${prefijo}-${String(NUMERO_LIBRO_SINTETICO).padStart(8, '0')}`,
       apertura: { anio },
     });
-    expect(documentos.get(`counters/radicados-${anio}`)?.ultimo).toBe(1744);
+    expect(documentos.get(`counters/radicados-${anio}`)?.ultimo).toBe(NUMERO_LIBRO_SINTETICO - 1);
   });
 });
