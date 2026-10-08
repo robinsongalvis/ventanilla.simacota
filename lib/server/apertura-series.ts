@@ -153,11 +153,11 @@ export function construirRegistroApertura(
    número es idempotente; intentar otro queda bloqueado.
 ══════════════════════════════════════════════════════════════ */
 
-export const PRIMER_NUMERO_CONTINGENCIA_SUGERIDO = 1745;
 export const AUTORIZADO_POR_APERTURA_CONTINGENCIA =
   'Secretaría de Gobierno de Simacota — instrucción de contingencia comunicada el 29-sep-2026';
 export const REFERENCIA_APERTURA_CONTINGENCIA =
   'docs/actas/ACTA_APERTURA_CONTINGENCIA_RADICADOS_2026-09-29.md';
+export const MAXIMO_CONSECUTIVO_RADICACION = 99_999_999;
 
 /**
  * Tope defensivo de la verificación histórica previa a la apertura.
@@ -232,7 +232,8 @@ export interface EstadoAperturaRadicados {
   ultimo: number;
   proximoRadicado: string;
   openingAlreadyExists: boolean;
-  primerNumeroSugerido: number;
+  /** Menor valor técnicamente admisible; no propone el número del libro físico. */
+  primerNumeroMinimo: number;
   apertura?: AperturaUnicaRadicados;
 }
 
@@ -370,6 +371,9 @@ function buscarColisionDesde(
 ): string | null {
   for (const doc of docs) {
     const anioDoc = anioDeDocumento(doc);
+    if (anioDoc === null) {
+      return `Existe ${etiqueta} cuyo año no se puede verificar (${doc.id}). La apertura permanece bloqueada.`;
+    }
     if (anioDoc !== anio) continue;
     const consecutivo = consecutivoDeDocumento(doc);
     if (consecutivo === null) {
@@ -394,8 +398,7 @@ function construirEstado(
     ultimo,
     proximoRadicado: formatearRadicadoInstitucional(ultimo + 1, fecha),
     openingAlreadyExists: Boolean(apertura),
-    primerNumeroSugerido: apertura?.primerNumero
-      ?? Math.max(PRIMER_NUMERO_CONTINGENCIA_SUGERIDO, ultimo + 1),
+    primerNumeroMinimo: ultimo + 1,
     ...(apertura ? { apertura } : {}),
   };
 }
@@ -471,8 +474,15 @@ export async function abrirSerieRadicadosUnaVez({
   actor,
   fecha = new Date(),
 }: SolicitudAperturaUnicaRadicados): Promise<ResultadoAperturaUnicaRadicados> {
-  if (!Number.isSafeInteger(primerNumero) || primerNumero <= 0) {
-    throw new AperturaSerieRadicadosError(400, 'El primer número debe ser un entero seguro mayor que cero.');
+  if (
+    !Number.isSafeInteger(primerNumero)
+    || primerNumero <= 0
+    || primerNumero > MAXIMO_CONSECUTIVO_RADICACION
+  ) {
+    throw new AperturaSerieRadicadosError(
+      400,
+      'El primer número debe ser un entero entre 1 y 99.999.999.',
+    );
   }
   if (actor.rol !== 'ADMIN') {
     throw new AperturaSerieRadicadosError(409, 'Solo un usuario ADMIN puede abrir la serie.');

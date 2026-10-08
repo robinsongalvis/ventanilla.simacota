@@ -3,11 +3,18 @@
 Fecha: 2026-09-29. Base inmutable: `54256f54cf1ad0cd1b3c61e59fc3c1424889e3f9`.
 Rama local: `contingency/radicacion-2026-09-29`.
 
+> **EVIDENCIA HISTÓRICA SUPERADA — NO OPERATIVA.** Las cifras 27/1745/1746
+> documentan lo observado el 29-sep-2026; no fijan ni sugieren el arranque.
+> Desde el 7-oct-2026 el preflight exige `--primer-numero N`, donde `N` se
+> coteja en el libro físico al momento del corte. Las pruebas 28 y 29 del
+> propietario quedaron consumidas/no reutilizables y no fueron un incidente.
+
 ## Alcance y estado
 
 Implementación local; sin push, deployment, apertura de serie ni escrituras de
 radicados en Production. Tampoco se realizó todavía la prueba sintética Stage.
-Los números 1745 y 1746 no se consumieron. Los históricos no se reescribieron.
+Las referencias 1745 y 1746 no se consumieron en esta entrega histórica. Los
+históricos no se reescribieron.
 
 Se mantienen sin cambios `.nvmrc`, `package.json`, lockfile, CI, Rules, índices,
 secretos, Billing, dominio, candidato original y PR #360. Las dependencias locales
@@ -21,8 +28,9 @@ La validación Node24 del candidato anterior no acredita por sí sola esta entre
   todo archivo antes de llamar Storage o reservar consecutivo.
 - Documento, contador, reserva única y auditoría de soportes en una transacción.
 - Emisores alternativos bloqueados, sin quitar autenticación ni permisos.
-- Apertura formal requerida en Production; primer 1745 exige septiembre de 2026
-  en America/Bogota. No se antedata para satisfacer el número esperado.
+- Apertura formal requerida en Production; el número real se ingresa desde el
+  libro al corte y usa el período vigente en America/Bogota. No se antedata para
+  satisfacer una referencia histórica.
 - Recuperación futura autenticada e idempotente: PDF consolidado de hasta 3 MB,
   escritura inmutable, lectura y SHA-256 verificados antes de persistir COMPLETO.
   Path compatible con el autorizador de descargas existente.
@@ -66,7 +74,7 @@ No confundir mocks ni emulador con una sesión legítima en Stage. Las pruebas
 históricas de modo normal desactivan la constante exclusivamente en sus harnesses
 de test; los casos de contingencia mantienen la constante real activa.
 
-## Dry-run oficial de Production — solo lectura
+## Dry-run histórico de Production — solo lectura, superado
 
 Ejecutado con el modo `--propuesta-contingencia-solo-lectura`. Credencial utilizada
 únicamente en memoria, sin imprimirla. Salida:
@@ -84,14 +92,20 @@ SERIES_DRY_RUN_OK=true
 ```
 
 Es una observación puntual, no una reserva. Debe repetirse antes de una futura
-apertura autorizada. La apertura futura requiere una transacción acotada y revisión;
+apertura autorizada con `--primer-numero N`; su salida debe usar el contador
+vigente y revisar cualquier documento o reserva del año con consecutivo igual o
+posterior a `N`. La apertura futura requiere una transacción acotada y revisión;
 no se autoriza usar el ejecutor legado secuencial como sustituto.
 Además, exige desplegar primero la entrega aprobada en estado cerrado, manteniendo
-el contador en 27, y demostrar el cierre de todos los demás emisores, incluidos
+el contador en su valor vigente, y demostrar el cierre de todos los demás emisores, incluidos
 deployments antiguos u otras URLs y procesos con acceso a la base. Si ese cierre
 no puede acreditarse, no se abre la serie. Después de esa verificación procede
 la apertura transaccional autorizada y la habilitación operativa de recepción.
 Esta secuencia es futura: no se ejecutó ningún despliegue ni apertura en esta fase.
+
+El `SERIES_DRY_RUN_OK=true` de este bloque acredita únicamente la lectura
+puntual del 29-sep-2026; no acredita el número ni el contador de una apertura
+posterior.
 
 ## Bloqueo de Stage y acceso
 

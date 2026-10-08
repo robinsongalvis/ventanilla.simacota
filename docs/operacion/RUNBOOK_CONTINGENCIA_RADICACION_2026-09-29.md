@@ -1,8 +1,14 @@
 # Runbook de radicación en contingencia
 
-Estado: entrega en validación; **Production no abierta ni desplegada**.
-Candidato integrado: SHA pendiente de fijar después de todos los gates.
-Rama aislada: `release/hardening-prod-2026-09-30`. Decisiones: ADR0043 y ADR0048.
+Estado: procedimiento actualizado el 7-oct-2026; **serie Production pendiente de apertura**.
+La evidencia de despliegue y del SHA activo se valida por separado antes de
+operar. Decisiones: ADR0043 y ADR0048.
+
+Adenda 7-oct-2026: los consecutivos 28 y 29 fueron pruebas del propietario cuyos
+documentos se borraron durante el diagnóstico. No fueron trámites ciudadanos ni
+un incidente. Sus reservas permanecen como evidencia de consumo y esos números
+no se reutilizan. El número inicial real no es 1745 ni otra cifra precargada:
+es `N`, tomado del libro físico y escrito por el ADMIN al momento del corte.
 
 ## Invariantes
 
@@ -23,6 +29,8 @@ Rama aislada: `release/hardening-prod-2026-09-30`. Decisiones: ADR0043 y ADR0048
 - Test históricos excluidos de operación; evidencia preservada para auditoría.
 - Solo ADMIN abre la serie y elige el primer número una vez. La apertura queda
   bloqueada; RECEPCIONISTA no puede abrirla ni modificarla.
+- La pantalla no precarga ni sugiere un número. El ADMIN coteja el libro físico,
+  escribe `N` y confirma que el libro quedó congelado antes de abrir.
 - Abrir deja el contador en `N-1`, sin crear radicado ni reserva. El primer
   número se consume únicamente con el primer trámite real en Production.
 
@@ -47,7 +55,7 @@ Rama aislada: `release/hardening-prod-2026-09-30`. Decisiones: ADR0043 y ADR0048
 7. Leer radicado, reserva, contador y eventos determinísticos: confirmar estado
    `PENDIENTE_STORAGE`, actor real de la sesión y auditoría atómica. Comprobar
    ausencia de duplicados. La concurrencia se ensaya en emulador, no creando un
-   segundo radicado Stage ni consumiendo 1745/1746 Production.
+   segundo radicado Stage ni consumiendo `N` o cualquier consecutivo Production.
 8. Ejecutar dry-run de Production abajo y detenerse con evidencia.
 
 ### Bloqueo actual de la validación Stage
@@ -70,18 +78,23 @@ la apertura ni el despliegue Production.
 ## Preflight oficial (sin escritura)
 
 Con credencial Production cargada únicamente en memoria mediante el mecanismo
-seguro del operador, sin imprimirla ni escribirla en archivos nuevos:
+seguro del operador, sin imprimirla ni escribirla en archivos nuevos, definir
+`N` con la cifra recién cotejada en el libro físico y ejecutar:
 
 ```sh
-Consultar la pantalla autenticada **Apertura de serie** sin confirmar ninguna
-acción y contrastar su lectura con Firestore por el procedimiento autorizado.
+node scripts/operacion/abrir-series.mjs \
+  --proyecto ventanilla-unica-f31b1 \
+  --propuesta-contingencia-solo-lectura \
+  --primer-numero N
 ```
 
-Debe mostrar el contador vigente, ausencia de apertura previa y sugerencia 1745.
-El ADMIN puede reemplazar la sugerencia por otro entero válido. Antes de
-confirmar se comprueban históricos y reservas; cualquier discrepancia detiene
-la apertura. El script anterior con propuesta fija queda solo como evidencia
-histórica y no debe usarse para abrir esta contingencia.
+También consultar la pantalla autenticada **Apertura de serie** sin confirmar
+ninguna acción. Debe mostrar el contador vigente, ausencia de apertura previa y
+el campo de inicio vacío. El preflight debe imprimir ese contador, `N-1`, `N`,
+cero colisiones documentales/reservas desde `N` y `PRODUCTION_WRITES=false`.
+Antes de confirmar se comprueban históricos y reservas; cualquier discrepancia
+detiene la apertura. Las salidas antiguas 27/1745 son evidencia histórica
+superada y no deben usarse como instrucción.
 
 ## Apertura futura — NO ejecutar en esta fase
 
@@ -89,8 +102,9 @@ Requiere Stage validado, revisión y autorización final. Mantener congelado el
 libro externo. **No abrir el contador antes de cerrar todos los emisores.**
 
 1. Tras autorización explícita, desplegar primero la entrega aprobada en estado
-   cerrado. El contador permanece en 27: la barrera del endpoint interno impide
-   emitir sin apertura formal y los emisores alternativos quedan bloqueados.
+   cerrado. El contador conserva su valor vigente (29 fue el último observado
+   tras las pruebas 28/29): la barrera del endpoint interno impide emitir sin
+   apertura formal y los emisores alternativos quedan bloqueados.
    Comprobar sesión, permisos y lecturas, sin radicación sintética Production.
 2. Demostrar que ningún otro emisor puede acceder a la serie para emitir. Incluir
    deployments antiguos y cualquier otra URL o proceso con acceso a la misma base:
@@ -98,11 +112,12 @@ libro externo. **No abrir el contador antes de cerrar todos los emisores.**
    ese aislamiento, **no abrir la serie**. Toda medida adicional sobre acceso,
    deployments, configuración o credenciales requiere su propia autorización;
    este runbook no autoriza revocaciones ni cambios automáticos.
-3. Repetir el preflight. El ADMIN escribe el **primer número** `N` y confirma
-   una sola vez. La transacción relee el contador 27, comprueba ausencia de una
-   apertura previa, históricos y reservas incompatibles, registra autoridad,
-   referencia, fecha, `veniaDe: 27` y `abiertoEn: N`, y deja el contador en
-   `N-1` sin alterar históricos ni otras series.
+3. En la ventana de corte, consultar el libro físico, congelarlo y repetir el
+   preflight con ese `N`. El ADMIN escribe el **primer número** `N` y confirma
+   una sola vez. La transacción relee el contador vigente `C`, comprueba ausencia
+   de apertura previa, históricos y reservas incompatibles, registra autoridad,
+   referencia, fecha, `veniaDe: C` y `abiertoEn: N`, y deja el contador en `N-1`
+   sin alterar históricos ni otras series.
 4. Verificar por lectura la apertura y la persistencia del cierre de los demás
    emisores. Habilitar operativamente recepción únicamente entonces. El primer
    trámite **real** consume `N`; el siguiente real, `N+1`. No probarlos.

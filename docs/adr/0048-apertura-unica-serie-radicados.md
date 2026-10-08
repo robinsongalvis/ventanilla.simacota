@@ -1,18 +1,24 @@
 # ADR 0048 — Apertura única y bloqueada de la serie de radicados
 
-Fecha: 2026-09-30. Estado: aceptado para validación Stage; Production pendiente de autorización final.
+Fecha: 2026-09-30. Estado: aceptado; código desplegado en Production y serie pendiente de apertura operativa.
+
+Actualización 2026-10-07: la referencia histórica a 1745 deja de ser una
+sugerencia operativa. El ADMIN debe escribir expresamente el número `N`
+confirmado en el libro físico en la ventana real de arranque. La interfaz y el
+preflight no precargan ni recomiendan una cifra.
 
 ## Contexto
 
-La entrega de contingencia exigía abrir la serie real en 1745. Antes de la
-salida, la Secretaría de Gobierno aclaró que un ADMIN debe poder escoger el
-primer consecutivo real una sola vez (por ejemplo 1745 o 1755), sin convertir
-el contador en una configuración editable durante la operación.
+La entrega de contingencia partió de una referencia temporal que, por entonces,
+era 1745. Antes de la salida se aclaró que el libro físico continúa avanzando:
+un ADMIN debe poder registrar el primer consecutivo real `N` una sola vez,
+usando exactamente la cifra cotejada en el libro al momento del corte, sin
+convertir el contador en una configuración editable durante la operación.
 
 El ajuste administrativo preexistente no satisface esa regla: permite avances
-sucesivos. La contingencia aislada tampoco: fijaba 1745 en código. Cualquiera de
-las dos opciones permitiría una discrepancia entre el acto de apertura y la
-serie que reciben los ciudadanos.
+sucesivos. La contingencia aislada inicial tampoco: fijaba por adelantado una
+cifra que podía quedar obsoleta. Cualquiera de las dos opciones permitiría una
+discrepancia entre el acto de apertura y la serie que reciben los ciudadanos.
 
 Este es un cambio estructural de nivel 3: modifica el contrato del endpoint,
 la historia persistida del contador y la barrera que habilita la emisión real.
@@ -36,8 +42,9 @@ la historia persistida del contador y la barrera que habilita la emisión real.
 - La radicación interna deja de exigir un número codificado. Exige una apertura
   bloqueada válida y toma el siguiente número del contador. Los emisores
   alternativos continúan cerrados durante la contingencia.
-- El valor sugerido en la interfaz es 1745, pero la decisión final pertenece al
-  ADMIN autorizado. El campo desaparece después de la apertura.
+- La interfaz no sugiere ni precarga un consecutivo. Exige al ADMIN autorizado
+  escribir la cifra cotejada en el libro físico y confirmar que ese libro quedó
+  congelado. El campo desaparece después de la apertura.
 
 ## Impacto sistémico
 
@@ -64,7 +71,7 @@ la historia persistida del contador y la barrera que habilita la emisión real.
 Antes de Production: auditoría de dependencias sin HIGH/CRITICAL; suite completa;
 TypeScript, lint y build; Rules y concurrencia en emulador; Linux/Node 24; y
 Stage aislado. Stage puede usar números sintéticos propios. Ninguna prueba debe
-abrir la serie Production ni consumir 1745, 1755 u otro número real.
+abrir la serie Production ni consumir `N` o cualquier otro número real.
 
 La salida se detiene aun con todos los gates verdes hasta recibir autorización
 explícita de despliegue Production.

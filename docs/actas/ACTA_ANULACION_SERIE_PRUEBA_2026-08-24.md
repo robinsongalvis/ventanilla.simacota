@@ -189,3 +189,20 @@ en 28 rompe la continuidad institucional que motivó adoptar el formato `1-110`.
 Esta decisión pertenece al paquete PT-7 del plan y **debe cerrarse antes de
 recibir la primera petición ciudadana**, porque después ya no se puede cambiar
 sin tocar números emitidos.
+
+## 10. Adenda del 7-oct-2026: pruebas 28 y 29
+
+El propietario confirmó que creó y borró directamente los radicados 28 y 29
+como pruebas de verificación durante el diagnóstico. No eran solicitudes de
+ciudadanos ni obedecieron a un proceso no autorizado; no constituyen un
+incidente de seguridad o integridad.
+
+La eliminación del documento no devuelve un consecutivo. Las reservas de 28 y
+29 permanecen, ambos números se consideran consumidos y **nunca se reutilizan**.
+Por tanto, la frase histórica de la sección anterior según la cual el primer
+radicado auténtico «nacería como 28» queda superada.
+
+El número inicial real será `N`: la cifra exacta cotejada en el libro físico e
+ingresada expresamente por el ADMIN al momento del corte. No se fija ni se
+sugiere un valor por anticipado. La apertura deja el contador en `N-1` y el
+primer trámite real consume `N`.

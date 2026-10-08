@@ -22,7 +22,10 @@
  *
  * Uso:
  *   FIREBASE_SERVICE_ACCOUNT="$(grep '^FIREBASE_SERVICE_ACCOUNT=' .env.local | cut -d= -f2-)" \
- *     node scripts/operacion/abrir-series.mjs --proyecto <id>            # DRY-RUN
+ *     node scripts/operacion/abrir-series.mjs --proyecto <id>            # DRY-RUN general
+ *   FIREBASE_SERVICE_ACCOUNT="..." node scripts/operacion/abrir-series.mjs \
+ *     --proyecto ventanilla-unica-f31b1 --propuesta-contingencia-solo-lectura \
+ *     --primer-numero <N>                                                # PREFLIGHT radicados
  *   CONFIRMO_APERTURA=SI ... node scripts/operacion/abrir-series.mjs --proyecto <id> \
  *     --esperado expedientes=26 --esperado actos-lsr=14
  *
@@ -37,51 +40,147 @@
 import { getFirestore } from 'firebase-admin/firestore';
 import { cert, getApps, initializeApp } from 'firebase-admin/app';
 
-export const PROPUESTA_CONTINGENCIA = Object.freeze({
-  desde: 1745,
-  autorizadoPor: 'Secretaría de Gobierno de Simacota — instrucción de contingencia comunicada el 29-sep-2026',
-  referencia: 'docs/actas/ACTA_APERTURA_CONTINGENCIA_RADICADOS_2026-09-29.md',
-});
+const AUTORIZADO_POR_CONTINGENCIA =
+  'Secretaría de Gobierno de Simacota — instrucción de contingencia comunicada el 29-sep-2026';
+const REFERENCIA_CONTINGENCIA =
+  'docs/actas/ACTA_APERTURA_CONTINGENCIA_RADICADOS_2026-09-29.md';
+export const MAXIMO_CONSECUTIVO_RADICACION = 99_999_999;
+export const TECHO_LECTURA_PREFLIGHT = 1000;
+
+/** La propuesta nace del número confirmado en el libro físico al momento del corte. */
+export function crearPropuestaContingencia(primerNumero) {
+  return Object.freeze({
+    desde: primerNumero,
+    autorizadoPor: AUTORIZADO_POR_CONTINGENCIA,
+    referencia: REFERENCIA_CONTINGENCIA,
+  });
+}
 
 /** Evaluación pura: ninguna propuesta se escribe para hacer un dry-run. */
-export function evaluarContingencia({ ultimo, periodo, ocupados, reservas }) {
-  const d = decidir('radicados', ultimo, PROPUESTA_CONTINGENCIA);
-  const problemas = verificarEsperados(d.accion === 'ABRIR' ? [{ serie: 'radicados', d }] : [], { radicados: 1745 });
-  if (ultimo !== 27) problemas.push('El contador ya no está en 27; requiere nueva revisión.');
-  if (periodo !== '202609') problemas.push('El período America/Bogota ya no es septiembre de 2026; no se permite antedatar.');
-  if (ocupados > 0) problemas.push('Existe un documento que utiliza 1745 o 1746; no se abre.');
-  if (reservas > 0) problemas.push('Existe una reserva de 1745 o 1746; no se abre.');
+export function evaluarContingencia({ ultimo, primerNumero, ocupados, reservas }) {
+  const d = decidir('radicados', ultimo, crearPropuestaContingencia(primerNumero));
+  const problemas = [];
+  if (!Number.isSafeInteger(primerNumero) || primerNumero <= 0 || primerNumero > MAXIMO_CONSECUTIVO_RADICACION) {
+    problemas.push('El primer número debe ser un entero entre 1 y 99.999.999.');
+  }
+  if (d.accion === 'ABRIR') {
+    problemas.push(...verificarEsperados([{ serie: 'radicados', d }], { radicados: primerNumero }));
+  } else {
+    problemas.push(d.motivo);
+  }
+  if (ocupados > 0) {
+    problemas.push(`Existen ${ocupados} documento(s) del año vigente con consecutivo igual o posterior a ${primerNumero}; no se abre.`);
+  }
+  if (reservas > 0) {
+    problemas.push(`Existen ${reservas} reserva(s) del año vigente con consecutivo igual o posterior a ${primerNumero}; no se abre.`);
+  }
   return { d, problemas, ok: problemas.length === 0 };
 }
 
+function anioDeIdentificador(valor) {
+  if (typeof valor !== 'string') return null;
+  const coincidencia = valor.match(/(?:^|-)(\d{4})(?:\d{2})?(?:-|$)/);
+  return coincidencia ? Number(coincidencia[1]) : null;
+}
+
+function consecutivoDeDocumento(doc) {
+  const datos = doc.data();
+  const control = datos.control && typeof datos.control === 'object' ? datos.control : {};
+  const declarado = control.consecutivo ?? datos.consecutivo;
+  if (Number.isSafeInteger(declarado) && declarado >= 0) return declarado;
+  const coincidencia = doc.id.match(/(?:^|-)0*(\d+)$/);
+  if (!coincidencia) return null;
+  const numero = Number(coincidencia[1]);
+  return Number.isSafeInteger(numero) ? numero : null;
+}
+
+function anioDeDocumento(doc) {
+  const datos = doc.data();
+  const control = datos.control && typeof datos.control === 'object' ? datos.control : {};
+  if (typeof control.fechaRadicado === 'string') {
+    const fecha = new Date(control.fechaRadicado);
+    if (Number.isFinite(fecha.getTime())) {
+      return Number(new Intl.DateTimeFormat('en-US', {
+        timeZone: 'America/Bogota', year: 'numeric',
+      }).format(fecha));
+    }
+  }
+  const radicadoId = typeof control.radicadoId === 'string'
+    ? control.radicadoId
+    : (typeof datos.radicadoId === 'string' ? datos.radicadoId : doc.id);
+  return anioDeIdentificador(radicadoId);
+}
+
+export function contarColisionesDesde(docs, anio, primerNumero) {
+  return docs.filter((doc) => {
+    const anioDoc = anioDeDocumento(doc);
+    // Sin año demostrable no es posible afirmar que el documento pertenece a
+    // otra vigencia. El preflight debe fallar cerrado antes de abrir la serie.
+    if (anioDoc === null) return true;
+    if (anioDoc !== Number(anio)) return false;
+    const consecutivo = consecutivoDeDocumento(doc);
+    // Un documento del año vigente cuyo número no se entiende también impide
+    // afirmar que el rango está libre. El preflight falla cerrado.
+    return consecutivo === null || consecutivo >= primerNumero;
+  }).length;
+}
+
 /** Solo lecturas, proyección sin PII. Nunca abre una transacción de escritura. */
-export async function dryRunContingencia(db, fecha = new Date()) {
+export async function dryRunContingencia(db, primerNumero, fecha = new Date()) {
+  if (
+    !Number.isSafeInteger(primerNumero)
+    || primerNumero <= 0
+    || primerNumero > MAXIMO_CONSECUTIVO_RADICACION
+  ) {
+    throw new Error('--primer-numero debe ser un entero entre 1 y 99.999.999.');
+  }
   const partes = new Intl.DateTimeFormat('en-US', {
     timeZone: 'America/Bogota', year: 'numeric', month: '2-digit',
   }).formatToParts(fecha);
   const anio = partes.find((p) => p.type === 'year').value;
-  const mes = partes.find((p) => p.type === 'month').value;
   const counterRef = db.doc(`counters/radicados-${anio}`);
   const antes = await counterRef.get();
   const [radicados, reservas] = await Promise.all([
-    db.collection('ventanilla_radicados').select('control.radicadoId', 'control.consecutivo', 'isTest', 'excludeFromMetrics').get(),
-    db.collection('unicidad_radicados').select('radicadoId', 'consecutivo').get(),
+    db.collection('ventanilla_radicados').select(
+      'consecutivo',
+      'control.radicadoId',
+      'control.consecutivo',
+      'control.fechaRadicado',
+      'isTest',
+      'excludeFromMetrics',
+    ).limit(TECHO_LECTURA_PREFLIGHT).get(),
+    db.collection('unicidad_radicados').select(
+      'radicadoId',
+      'consecutivo',
+      'control.radicadoId',
+      'control.consecutivo',
+      'control.fechaRadicado',
+    ).limit(TECHO_LECTURA_PREFLIGHT).get(),
   ]);
-  // Cubre la máscara actual, las máscaras históricas y reservas con datos
-  // incompletos. Ante un número ambiguo 1745/1746 se rechaza, no se adivina.
-  const objetivo = (valor) => typeof valor === 'string' && /(?:^|-)0*(1745|1746)$/.test(valor);
-  const esNumeroObjetivo = (valor) => [1745, 1746].includes(Number(valor));
-  const ocupados = radicados.docs.filter((doc) => objetivo(doc.id) || objetivo(doc.data().control?.radicadoId) || esNumeroObjetivo(doc.data().control?.consecutivo)).length;
-  const reservados = reservas.docs.filter((doc) => objetivo(doc.id) || objetivo(doc.data().radicadoId) || esNumeroObjetivo(doc.data().consecutivo)).length;
+  // Se revisa todo el rango [N, +∞) del año vigente. Comprobar únicamente N
+  // y N+1 permitiría abrir por debajo de un número posterior ya reservado.
+  const ocupados = contarColisionesDesde(radicados.docs, anio, primerNumero);
+  const reservados = contarColisionesDesde(reservas.docs, anio, primerNumero);
   const despues = await counterRef.get();
-  const evaluacion = evaluarContingencia({ ultimo: antes.data()?.ultimo, periodo: `${anio}${mes}`, ocupados, reservas: reservados });
+  const evaluacion = evaluarContingencia({
+    ultimo: antes.data()?.ultimo,
+    primerNumero,
+    ocupados,
+    reservas: reservados,
+  });
+  if (radicados.size === TECHO_LECTURA_PREFLIGHT || reservas.size === TECHO_LECTURA_PREFLIGHT) {
+    evaluacion.problemas.push(
+      'La verificación histórica alcanzó su techo de lectura y no puede demostrar que la serie esté libre.',
+    );
+    evaluacion.ok = false;
+  }
   if (!antes.updateTime?.isEqual(despues.updateTime)) {
     evaluacion.problemas.push('El contador cambió durante la lectura; repetir el dry-run.');
     evaluacion.ok = false;
   }
   console.log(`CURRENT_COUNTER=${antes.data()?.ultimo}`);
-  console.log('PROPOSED_COUNTER_VALUE=1744');
-  console.log('PROPOSED_FIRST_NUMBER=1745');
+  console.log(`PROPOSED_COUNTER_VALUE=${primerNumero - 1}`);
+  console.log(`PROPOSED_FIRST_NUMBER=${primerNumero}`);
   console.log(`EXPECTED_NUMBER_CHECK=${evaluacion.ok ? 'OK' : 'FAILED'}`);
   console.log(`TARGET_DOCUMENT_COLLISIONS=${ocupados}`);
   console.log(`TARGET_RESERVATION_COLLISIONS=${reservados}`);
@@ -195,13 +294,34 @@ export const MOTIVO_DEL_SALTO =
 if (process.argv[1]?.endsWith('abrir-series.mjs')) {
   const arg = (n) => { const i = process.argv.indexOf(n); return i === -1 ? undefined : process.argv[i + 1]; };
   const proyecto = arg('--proyecto');
+  const primerNumeroCrudo = arg('--primer-numero');
   const ejecutar = process.env.CONFIRMO_APERTURA === 'SI';
   const propuestaContingencia = process.argv.includes('--propuesta-contingencia-solo-lectura');
+  if (primerNumeroCrudo !== undefined && !propuestaContingencia) {
+    console.error('--primer-numero solo es válido con --propuesta-contingencia-solo-lectura. Nada se escribió.');
+    process.exit(1);
+  }
   if (propuestaContingencia && ejecutar) {
     console.error('La propuesta de contingencia solo admite lectura. Retire CONFIRMO_APERTURA. Nada se escribió.');
     process.exit(1);
   }
-  if (!proyecto) { console.error('Uso: --proyecto <project_id> [--esperado serie=N ...]'); process.exit(1); }
+  if (!proyecto) {
+    console.error('Uso: --proyecto <project_id> [--esperado serie=N ...]');
+    console.error('Preflight de contingencia: --propuesta-contingencia-solo-lectura --primer-numero <N>');
+    process.exit(1);
+  }
+  const primerNumero = primerNumeroCrudo === undefined ? undefined : Number(primerNumeroCrudo);
+  if (
+    propuestaContingencia
+    && (
+      !Number.isSafeInteger(primerNumero)
+      || primerNumero <= 0
+      || primerNumero > MAXIMO_CONSECUTIVO_RADICACION
+    )
+  ) {
+    console.error('El preflight exige --primer-numero <N>, confirmado contra el libro físico al momento del corte.');
+    process.exit(1);
+  }
 
   /* `--esperado serie=N`, repetible: los primeros números que dice el acta.
      Obligatorio para ejecutar — ver `verificarEsperados`. */
@@ -232,7 +352,7 @@ if (process.argv[1]?.endsWith('abrir-series.mjs')) {
       console.error('Esta propuesta corresponde exclusivamente al proyecto Production autorizado.');
       process.exit(3);
     }
-    const resultado = await dryRunContingencia(db);
+    const resultado = await dryRunContingencia(db, primerNumero);
     process.exit(resultado.ok ? 0 : 5);
   }
   const anio = new Date().getFullYear();

@@ -85,7 +85,7 @@ está marcada `dev=true` en el lockfile, se usa en lint/CI y no se empaqueta com
 runtime de Production. No procesa patrones aportados por ciudadanos; el riesgo
 residual identificado es agotamiento de recursos del runner de tooling.
 
-No se degradará Next.js `16.3.6`, no se introducirán overrides y no se
+No se degradará Next.js `16.3.8`, no se introducirán overrides y no se
 modificará la cadena solo para que `npm audit` muestre cero hallazgos.
 
 ## Controles compensatorios

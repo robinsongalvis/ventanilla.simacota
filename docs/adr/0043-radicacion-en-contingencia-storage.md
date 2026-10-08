@@ -1,10 +1,14 @@
 # ADR 0043 — Radicación interna con soportes en custodia
 
-Fecha: 2026-09-29. Estado: implementación autorizada; apertura y despliegue Production pendientes de revisión.
+Fecha: 2026-09-29. Estado: implementación desplegada; apertura operativa de la serie pendiente.
 
 Actualización 2026-09-30: el punto fijo 1745 descrito originalmente queda
 reemplazado por la apertura única configurable y bloqueada del ADR 0048. El
-valor 1745 continúa como sugerencia, no como constante de ejecución.
+valor 1745 quedó entonces solo como referencia temporal.
+
+Actualización 2026-10-07: tampoco se conserva como sugerencia. El número `N`
+se toma del libro físico en el momento del corte, se ingresa expresamente y no
+queda fijado ni precargado en código, interfaz o documentación operativa.
 
 ## Contexto e impacto (nivel 3)
 
@@ -39,8 +43,9 @@ Este ADR no sustituye un acto administrativo ni certifica obligaciones normativa
 - Se reutiliza `esDatoDePrueba` para excluir históricos de prueba de consultas
   ciudadanas, candidatos de licencias, reparto operativo, contexto IA y mutaciones.
   Su evidencia histórica permanece consultable por los lectores autorizados.
-- El dry-run oficial acepta una propuesta explícita solo en memoria, comprueba
-  contador y colisiones de 1745/1746 y no escribe configuración ni reservas.
+- El dry-run oficial exige `--primer-numero N`, acepta esa propuesta explícita
+  solo en memoria, comprueba el contador vigente y toda colisión del año igual
+  o posterior a `N`, y no escribe configuración ni reservas.
 
 ## Seguridad, rendimiento y operación
 
@@ -60,11 +65,12 @@ no resuelve Billing, backups, dominio, SMTP, Sentry ni capacidad.
 
 Pruebas locales completas y revisión cruzada, seguidas de validaciones
 sintéticas exclusivamente en Stage con sesión legítima. Nunca una prueba en
-Production. El contador Production debe permanecer en 27 hasta que un ADMIN
-confirme una sola vez el primer número real. El valor sugerido es 1745, pero el
-ADMIN puede escoger otro número válido; el contador queda en `N-1` sin consumir
-`N`. El libro externo está congelado por instrucción del propietario. Si cambia
-el período antes de abrir, el número conserva la fecha real de `America/Bogota`.
+Production. El contador Production conserva su valor vigente hasta que un ADMIN
+confirme una sola vez el primer número real `N`, cotejado en el libro físico al
+momento del corte. No existe valor sugerido: el contador queda en `N-1` sin
+consumir `N`. El libro externo debe quedar congelado antes de confirmar. Si
+cambia el período antes de abrir, el número conserva la fecha real de
+`America/Bogota`.
 
 No se abre ni se despliega Production en esta fase. Evidencia y autorización
 administrativa en el acta de apertura y el runbook de esta entrega.
