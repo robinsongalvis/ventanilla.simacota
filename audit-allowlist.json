@@ -40,7 +40,7 @@
     {
       "advisory": "GHSA-vfj7-8cjw-p6xm",
       "paquete": "braces",
-      "justificacion": "Hallazgo sin versión corregida compatible en la cadena eslint-config-next 16.3.3 → @next/eslint-plugin-next 16.3.3 → fast-glob 3.3.1 → micromatch 4.0.8 → braces 3.0.3. Degradar Next.js 16.3.6 o forzar overrides introduce mayor riesgo; se mantiene seguimiento pasivo temporal.",
+      "justificacion": "Hallazgo sin versión corregida compatible en la cadena eslint-config-next 16.3.3 → @next/eslint-plugin-next 16.3.3 → fast-glob 3.3.1 → micromatch 4.0.8 → braces 3.0.3. Degradar Next.js 16.3.8 o forzar overrides introduce mayor riesgo; se mantiene seguimiento pasivo temporal.",
       "alcanzabilidad": "La cadena completa está marcada dev=true en package-lock.json y se utiliza en lint/tooling de CI; no forma parte del runtime de Production ni procesa patrones aportados por ciudadanos. El riesgo residual es agotamiento de recursos del runner durante tooling.",
       "fechaAlta": "2026-10-05",
       "caducidad": "2026-10-26",
