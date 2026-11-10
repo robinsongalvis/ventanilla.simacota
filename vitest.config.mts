@@ -19,6 +19,10 @@ export default defineConfig({
       '**/dist/**',
       '**/.{idea,git,cache,output,temp}/**',
       'e2e/**',
+      // `.claude/` guarda memoria de agentes y árboles de trabajo viejos con
+      // copias completas de los tests: sin esta exclusión la suite los corre
+      // por duplicado (y con código desactualizado).
+      '**/.claude/**',
     ],
   },
 });
