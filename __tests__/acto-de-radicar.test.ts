@@ -1,4 +1,4 @@
-import { describe, it, expect } from 'vitest';
+import { afterEach, beforeEach, describe, it, expect, vi } from 'vitest';
 import {
   evaluarRadicacionEnDebidaForma,
   planRadicarEnDebidaForma,
@@ -22,6 +22,21 @@ import { DEFINICION_LICENCIA_CONSTRUCCION_PARCIAL } from '@/lib/motor-expediente
 
 const TENANT = 'SEC_PLANEACION';
 const AHORA = new Date('2026-08-26T17:00:00.000Z');
+
+/* El arnés pasa `ahora: AHORA`, pero la lectura del término
+   (motor-expedientes/lectura-del-termino.ts:107) toma `new Date()` por defecto
+   en el camino de la fecha DEDUCIDA: con el reloj real, pasado octubre de 2026
+   el término «nacería vencido» y estas pruebas caducaban solas. Se fija también
+   el reloj del proceso para que los dos relojes digan lo mismo — el patrón de
+   consecutivo-radicacion-handler. */
+beforeEach(() => {
+  vi.useFakeTimers();
+  vi.setSystemTime(AHORA);
+});
+
+afterEach(() => {
+  vi.useRealTimers();
+});
 
 /** Un expediente completo: todos los requisitos aplicables con documento. */
 function expedienteCompleto(over: Partial<ExpedienteLicenciaDoc> = {}): ExpedienteLicenciaDoc {

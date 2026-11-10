@@ -1,4 +1,4 @@
-import { afterEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { cleanup, render, screen, waitFor } from '@testing-library/react';
 import { EstadoTramiteLicencia } from '@/app/interno/dashboard/components/pqrs/EstadoTramiteLicencia';
 import { PLAZO_SIN_EMPEZAR } from '@/lib/server/proyeccion-ventanilla';
@@ -11,7 +11,18 @@ import { PLAZO_SIN_EMPEZAR } from '@/lib/server/proyeccion-ventanilla';
  * puede responder las cuatro preguntas SIN LEVANTARSE — y que no ve nada más.
  */
 
+/* Las fechas del arnés son absolutas (radicada el 20/08/2026, vence el
+   24/10/2026): pasado octubre, el reloj real empuja al componente a la rama de
+   «término vencido» y estas pruebas caducaban solas. Se fija el reloj DENTRO de
+   la ventana del término; `shouldAdvanceTime` deja correr los milisegundos que
+   `waitFor` necesita — el mismo patrón de bandeja-vence-alcanzable. */
+beforeEach(() => {
+  vi.useFakeTimers({ shouldAdvanceTime: true });
+  vi.setSystemTime(new Date('2026-09-15T17:00:00.000Z'));
+});
+
 afterEach(() => {
+  vi.useRealTimers();
   cleanup();
   vi.unstubAllGlobals();
 });
