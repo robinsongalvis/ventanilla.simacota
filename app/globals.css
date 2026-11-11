@@ -793,6 +793,27 @@ body {
 .svg-circle-draw { stroke-dasharray: 157; stroke-dashoffset: 157; animation: drawCircle 0.55s ease-out 0.15s both; }
 .svg-check-draw  { stroke-dasharray: 36;  stroke-dashoffset: 36;  animation: drawCheck  0.4s  ease-out 0.6s  both; }
 
+/* Confirmación de una actuación en el panel del radicado: entra desde
+   arriba, dibuja el chulo y una barra marca el tiempo que le queda. */
+@keyframes confirmacionIn {
+  from { opacity: 0; transform: translateY(-14px) scale(0.98); }
+  to   { opacity: 1; transform: translateY(0)     scale(1); }
+}
+@keyframes confirmacionBarra {
+  from { transform: scaleX(1); }
+  to   { transform: scaleX(0); }
+}
+.animate-confirmacion-in    { animation: confirmacionIn 320ms cubic-bezier(0.22, 1, 0.36, 1) both; }
+.animate-confirmacion-barra { transform-origin: left; animation: confirmacionBarra var(--confirmacion-ms, 6000ms) linear both; }
+
+@media (prefers-reduced-motion: reduce) {
+  .animate-confirmacion-in,
+  .animate-success-bounce { animation: none !important; opacity: 1; transform: none; }
+  .svg-circle-draw,
+  .svg-check-draw         { animation: none !important; stroke-dashoffset: 0; opacity: 1; }
+  .animate-confirmacion-barra { animation: none !important; transform: none; }
+}
+
 /* Entrada escalonada de campos */
 @keyframes fieldIn {
   from { opacity: 0; transform: translateY(14px); }

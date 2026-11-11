@@ -114,6 +114,7 @@ import { CentroControlInterno }              from '@/app/interno/dashboard/compo
 import { InstitucionalHeader }               from '@/app/components/institucional/InstitucionalHeader';
 import { SelloRadicado }                     from '@/app/components/institucional/SelloRadicado';
 import { ResumenEjecutivoRadicado }          from '@/app/interno/dashboard/components/ResumenEjecutivoRadicado';
+import { ConfirmacionAccion, type Confirmacion } from '@/app/interno/dashboard/components/ConfirmacionAccion';
 /* ADR-0034 — ventanilla ve el ESTADO del trámite de licencia. Vivía colgado de
    `PanelGestionRadicado`, el panel de detalle ANTERIOR, que el Sprint Panel
    claro dejó sin un solo llamador: la proyección se construyó, se probó y se
@@ -1895,6 +1896,11 @@ function PanelDerecho({
   const [respuesta,        setRespuesta]        = useState('');
   const [guardando,        setGuardando]        = useState(false);
   const [mensajeOk,        setMensajeOk]        = useState<string | null>(null);
+  // Confirmación grande (chulo animado) de la última actuación. Cada acción
+  // deja su texto en `exitoPendiente` antes de pasar por ejecutarAccion.
+  const [confirmacion,     setConfirmacion]     = useState<Confirmacion | null>(null);
+  const exitoPendiente = useRef<Confirmacion | null>(null);
+  const cerrarConfirmacion = useCallback(() => setConfirmacion(null), []);
   const [errorLocal,       setErrorLocal]       = useState<string | null>(null);
   const [trazabilidad,         setTrazabilidad]         = useState<TrazabilidadRadicado[]>([]);
   // Sprint Panel claro — la Historia humanizada y su filtro.
@@ -2054,17 +2060,23 @@ function PanelDerecho({
     try {
       await accionFn();
       setMensajeOk('Operación guardada correctamente.');
+      setConfirmacion(exitoPendiente.current ?? {
+        titulo:  'Guardado',
+        detalle: 'La actuación quedó registrada en la historia del radicado.',
+      });
       return true;
     } catch (err) {
       setErrorLocal(`Error: ${err instanceof Error ? err.message : String(err)}`);
       return false;
     } finally {
+      exitoPendiente.current = null;
       setGuardando(false);
     }
   }
 
   async function asignar() {
     if (!tenantDestino) return;
+    exitoPendiente.current = { titulo: 'Radicado asignado', detalle: `El ${radicado.radicadoId} ya tiene dependencia responsable y aparece en su bandeja.` };
 
     // Si la sugerencia difiere, enviamos feedback de corrección a la IA
     if (radicado.analisisIa && radicado.analisisIa.dependenciaSugerida !== tenantDestino) {
@@ -2115,6 +2127,7 @@ function PanelDerecho({
      es mío". Un clic y queda como responsable del caso de su propia
      dependencia (mismo endpoint y permiso que ya tiene por reglas). */
   async function tomarCaso() {
+    exitoPendiente.current = { titulo: 'Caso tomado', detalle: `El ${radicado.radicadoId} queda a tu cargo y ya cuenta en "Mi gestión".` };
     await ejecutarAccion(async () => {
       const response = await fetch(`/api/radicados/${encodeURIComponent(radicado.radicadoId)}/asignar`, {
         method: 'POST',
@@ -2138,6 +2151,7 @@ function PanelDerecho({
   }
 
   async function enviarFeedbackIA(puntuacion: 'POSITIVO' | 'NEGATIVO' | 'CORREGIDO', motivoCorreccion?: string) {
+    exitoPendiente.current = { titulo: 'Retroalimentación registrada', detalle: 'SIMI usará tu criterio para afinar las próximas sugerencias.' };
     if (!radicado.analisisIa) return;
     
     await ejecutarAccion(async () => {
@@ -2168,6 +2182,7 @@ function PanelDerecho({
   }
 
   async function devolver() {
+    exitoPendiente.current = { titulo: 'Radicado devuelto', detalle: `El ${radicado.radicadoId} vuelve a la ventanilla para reparto.` };
     if (motivo.trim().length < 10) { setErrorLocal('El motivo debe tener al menos 10 caracteres.'); return; }
     await ejecutarAccion(async () => {
       const response = await fetch(`/api/radicados/${encodeURIComponent(radicado.radicadoId)}/devolver`, {
@@ -2183,6 +2198,7 @@ function PanelDerecho({
   }
 
   async function aplicarProrroga() {
+    exitoPendiente.current = { titulo: 'Prórroga aplicada', detalle: `El término del ${radicado.radicadoId} se amplió y el ciudadano queda informado.` };
     if (motivo.trim().length < 5) { setErrorLocal('Ingresa el motivo de la prórroga.'); return; }
 
     await ejecutarAccion(async () => {
@@ -2219,6 +2235,10 @@ function PanelDerecho({
       const data = await response.json().catch(() => null) as { error?: string } | null;
       if (!response.ok) throw new Error(data?.error ?? 'No se pudo registrar la gestión.');
       setMensajeOk('Notificación marcada como gestionada por canal alternativo.');
+      setConfirmacion({
+        titulo:  'Notificación gestionada',
+        detalle: `Quedó registrado cómo se avisó al ciudadano del ${radicado.radicadoId}; el radicado sale de "Correos fallidos".`,
+      });
       setMotivoGestion('');
       setMostrarGestionNotif(false);
     } catch (err) {
@@ -2249,10 +2269,30 @@ function PanelDerecho({
         credentials: 'include',
         body: payload,
       });
-      const data = await response.json().catch(() => null) as { error?: string } | null;
+      const data = await response.json().catch(() => null) as
+        { error?: string; emailEnviado?: boolean; cumplioTermino?: boolean } | null;
       if (!response.ok) throw new Error(data?.error ?? 'Error al resolver el radicado.');
 
-      setMensajeOk('Operación guardada correctamente.');
+      // Decir QUÉ pasó, no solo que se guardó: si el correo al ciudadano no
+      // salió, el funcionario tiene que enterarse aquí mismo.
+      const sinCorreo    = radicado.esAnonimo || !radicado.solicitante?.email;
+      const correoSalio  = sinCorreo || data?.emailEnviado !== false;
+      const enTermino    = data?.cumplioTermino ? ' en término' : '';
+      setMensajeOk(correoSalio
+        ? 'Respuesta enviada y radicado resuelto.'
+        : 'Radicado resuelto. El correo al ciudadano no pudo enviarse.');
+      setConfirmacion(correoSalio
+        ? {
+            titulo:  sinCorreo ? 'Radicado resuelto' : 'Respuesta enviada',
+            detalle: sinCorreo
+              ? `El radicado ${radicado.radicadoId} quedó resuelto${enTermino} y la respuesta ya está en la consulta pública.`
+              : `El radicado ${radicado.radicadoId} quedó resuelto${enTermino}. El ciudadano recibe la respuesta por correo y la ve en la consulta pública.`,
+          }
+        : {
+            tono:    'aviso',
+            titulo:  'Resuelto, pero el correo no salió',
+            detalle: `El radicado ${radicado.radicadoId} quedó resuelto. Avísale al ciudadano por otro canal y marca la notificación como gestionada.`,
+          });
       setRespuesta('');
       setArchivoPdf(null);
       try { window.sessionStorage.removeItem(claveBorradorRespuesta); } catch { /* noop */ }
@@ -2270,7 +2310,14 @@ function PanelDerecho({
   const terminoVencido = semaforo.estado === 'VENCIDO';
 
   return (
-    <div className="h-full min-w-0 flex flex-col bg-[var(--tema-fondo-f7f9fb)]" style={{ borderLeft: '1px solid var(--tema-borde-dce4ea)' }}>
+    <div className="relative h-full min-w-0 flex flex-col bg-[var(--tema-fondo-f7f9fb)]" style={{ borderLeft: '1px solid var(--tema-borde-dce4ea)' }}>
+      {confirmacion && (
+        <ConfirmacionAccion
+          key={`${confirmacion.titulo}·${confirmacion.detalle ?? ''}`}
+          {...confirmacion}
+          onDismiss={cerrarConfirmacion}
+        />
+      )}
       {/* Encabezado del caso: identidad, estado y término en un solo vistazo. */}
       <div className={`shrink-0 bg-[var(--tema-fondo-ffffff)] px-4 py-3.5 sm:px-5 ${esRojo ? 'border-l-4 border-l-red-500' : ''}`}
            style={{ borderBottom: '1px solid var(--tema-borde-dce4ea)', boxShadow: '0 1px 2px rgba(15, 42, 28, 0.03)' }}>
