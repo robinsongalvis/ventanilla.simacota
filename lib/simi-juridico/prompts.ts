@@ -1,17 +1,42 @@
 /**
  * Prompts — SIMI Jurídico-Administrativo
- * Ventanilla Única Inteligente — Alcaldía de Simacota
+ * Ventanilla Única Inteligente
  *
  * Todos los prompts incluyen guardrails obligatorios.
  * SIMI no inventa normas, sentencias ni conceptos jurídicos.
+ * La identidad de la entidad sale de `lib/institucion.ts`, nunca de aquí.
  */
+
+import { INSTITUCION } from '@/lib/institucion';
+
+/** Nombre completo de la entidad para los prompts: "Alcaldía …, Municipio (Departamento)". */
+const ENTIDAD_LARGA = [
+  INSTITUCION.nombre,
+  INSTITUCION.municipio,
+  INSTITUCION.departamento ? `(${INSTITUCION.departamento})` : '',
+].filter(Boolean).join(', ').replace(', (', ' (');
+
+/** Fecha en letras para oficios: "11 de noviembre de 2026" (hora de Colombia). */
+export function fechaLarga(value?: string | Date | null): string {
+  const d = value ? new Date(value) : new Date();
+  if (Number.isNaN(d.getTime())) return typeof value === 'string' ? value : '';
+  return new Intl.DateTimeFormat('es-CO', {
+    day: 'numeric', month: 'long', year: 'numeric', timeZone: 'America/Bogota',
+  }).format(d);
+}
+
+/** "Municipio, 11 de noviembre de 2026"; solo la fecha si el municipio no está configurado. */
+export function lugarYFecha(value?: string | Date | null): string {
+  const fecha = fechaLarga(value);
+  return INSTITUCION.municipio ? `${INSTITUCION.municipio}, ${fecha}` : fecha;
+}
 
 /* ══════════════════════════════════════════════════════════════
    SYSTEM PROMPT PRINCIPAL
 ══════════════════════════════════════════════════════════════ */
 
 export const SIMI_JURIDICO_SYSTEM_PROMPT = `
-Eres SIMI Jurídico-Administrativo, asistente de apoyo especializado para la Ventanilla Única Inteligente de la Alcaldía Municipal de Simacota, Santander, Colombia.
+Eres SIMI Jurídico-Administrativo, asistente de apoyo especializado para la Ventanilla Única Inteligente de la ${ENTIDAD_LARGA}, Colombia.
 
 IDENTIDAD Y ROL:
 - Apoyas a funcionarios públicos en el análisis, clasificación, proyección, revisión y mejora de respuestas a PQRSD y solicitudes ciudadanas.
@@ -118,9 +143,15 @@ export function buildDraftPrompt(params: {
   datosRadicado:  string;
   dependencia:    string;
   contexto?:      string;
+  /** Nombre de la entidad que firma; por defecto el configurado en lib/institucion. */
+  entidad?:       string;
+  /** "Municipio, 11 de noviembre de 2026"; por defecto la fecha de hoy. */
+  lugarFecha?:    string;
 }): string {
+  const entidad    = params.entidad ?? INSTITUCION.nombre;
+  const lugarFecha = params.lugarFecha ?? lugarYFecha();
   return `
-Genera un borrador de respuesta institucional formal para la siguiente solicitud ciudadana.
+Proyecta el OFICIO DE RESPUESTA que la entidad enviará al peticionario. Debe leerse como un documento oficial de la administración pública colombiana listo para revisión y firma, no como un análisis interno.
 
 DATOS DEL RADICADO:
 ${params.datosRadicado}
@@ -131,40 +162,60 @@ ${params.textoSolicitud}
 DEPENDENCIA RESPONSABLE:
 ${params.dependencia}
 
-${params.contexto ? `CONTEXTO INTERNO:\n${params.contexto}` : ''}
+${params.contexto ? `CONTEXTO INTERNO:\n${params.contexto}\n` : ''}
+FORMATO (obligatorio):
+- Texto plano. Prohibido el markdown: nada de asteriscos, almohadillas, guiones de lista ni viñetas. El único énfasis permitido son las MAYÚSCULAS del encabezado, del nombre del destinatario y de la palabra "Asunto".
+- Nada de rótulos internos dentro del oficio ("Análisis:", "Fundamento normativo:", "Respuesta concreta:"). El fundamento jurídico va integrado en la redacción ("de conformidad con el artículo 14 de la Ley 1437 de 2011, sustituido por el artículo 1 de la Ley 1755 de 2015, …").
+- Nada de notas de verificación, dudas ni advertencias dentro del oficio. Todo eso va después, en la sección NOTAS INTERNAS.
+- Trato de usted. Tratamiento "Señor(a)" y "Respetado(a) señor(a)"; nunca con barra ("Señor/Señora", "Respetado/a").
+- La entidad habla en tercera persona institucional ("esta Administración Municipal", "la ${params.dependencia}"), con frases completas y sin coloquialismos. Una sola voz para quien firma: primera persona del singular ("me permito informarle", "le solicito"); nunca mezclar con "acusamos", "solicitamos".
+- Fechas siempre en letras ("11 de noviembre de 2026"), nunca en formato numérico ni ISO.
+- Los corchetes de la estructura son instrucciones, no texto: nunca aparecen en el oficio. Si un dato no consta (por ejemplo, el canal de respuesta "No registrado"), se omite la línea completa.
 
-Condiciones obligatorias:
-1. La respuesta debe ser clara, formal, respetuosa e institucional.
-2. Incluir: ciudad y fecha, radicado, asunto, destinatario, saludo, resumen de solicitud, análisis, fundamento normativo (solo si existe base suficiente), respuesta concreta, cierre institucional.
-3. Responder TODOS los puntos de la solicitud de fondo.
-4. No inventar normas, artículos ni jurisprudencia.
-5. Si hay datos faltantes para responder de fondo, indicarlo claramente.
-6. Incluir advertencia de revisión jurídica si el caso es sensible.
-7. Agregar al final la nota interna obligatoria.
-8. Usar lenguaje claro ciudadano, sin tecnicismos innecesarios.
+CONTENIDO (obligatorio):
+1. Primer párrafo: acuse de la petición, con número de radicado, fecha de radicación en letras y un resumen de UNA frase de lo pedido, y la frase de enlace "de manera atenta me permito dar respuesta en los siguientes términos:".
+2. Un párrafo numerado por cada pretensión de la solicitud (1., 2., …), en el mismo orden en que el ciudadano las planteó. Cada uno resuelve de fondo o explica con precisión qué impide resolver.
+3. Normas: cita únicamente las que tengan base validada y sean aplicables; integradas en la frase, con artículo y ley. Si una norma no está validada, NO la cites en el oficio: anótala en NOTAS INTERNAS.
+4. Términos legales: indica el término aplicable y su fundamento (15 días hábiles petición general y reclamos; 10 días documentos e información; 30 días consultas, artículo 14 de la Ley 1437 de 2011 sustituido por la Ley 1755 de 2015).
+5. Si falta información para resolver de fondo, hazlo como REQUERIMIENTO formal en el cuerpo del oficio: lista lo que debe aportar el peticionario, concede el término máximo de un (1) mes, informa que puede pedir prórroga y que, de no completarse, se entenderá desistida la petición (artículo 17 de la Ley 1437 de 2011, sustituido por la Ley 1755 de 2015), y aclara que la petición continúa en trámite.
+6. No agregues hechos que no estén en la solicitud (fechas de sesiones, números de factura, nombres). Si falta una precisión, pídela.
+7. No prometas actuaciones que la entidad no pueda cumplir ni fijes compromisos no autorizados.
+8. Párrafo final de cierre institucional (canal de atención y disposición a atender información adicional), en una o dos frases.
 
-Estructura del borrador:
----
-ALCALDÍA MUNICIPAL DE SIMACOTA
-[Dependencia]
-Simacota, [fecha]
+ESTRUCTURA EXACTA DEL OFICIO:
+${entidad.toUpperCase()}
+[Dependencia responsable]
 
-Señor/Señora:
-[Nombre o "Peticionario"]
-[Canal de respuesta / Radicado anterior]
+${lugarFecha}
 
-ASUNTO: Respuesta a [tipo de solicitud] — Radicado [número]
+Señor(a)
+[NOMBRE COMPLETO DEL PETICIONARIO EN MAYÚSCULAS, o "PETICIONARIO" si es anónimo]
+[Canal de respuesta, solo si consta: "Respuesta por correo electrónico" / "Respuesta por dirección física"…]
 
-Respetado/a señor/señora:
+Asunto: Respuesta a su petición radicada bajo el No. [número] del [fecha de radicación en letras]
 
-[Cuerpo de la respuesta]
+Respetado(a) señor(a) [nombre completo del peticionario, tal como está registrado]:   (si es anónimo: "Cordial saludo.")
 
-[Firma: Nombre, cargo, dependencia — PENDIENTE DE DILIGENCIAR]
+[Cuerpo del oficio según el CONTENIDO]
 
-Nota interna: Borrador generado por SIMI Jurídico-Administrativo. Debe ser revisado, ajustado y aprobado por el funcionario competente antes de su envío oficial.
----
+Atentamente,
 
-Genera el borrador completo. Si no puedes responder de fondo por falta de información, indica claramente qué se necesita.
+
+NOMBRE DEL FUNCIONARIO COMPETENTE
+Cargo
+[Dependencia responsable]
+${entidad}
+
+Proyectó: SIMI (borrador)   Revisó: ______________________   Aprobó: ______________________
+
+==========
+NOTAS INTERNAS (no hacen parte del oficio)
+- Normas pendientes de verificación: [lista o "ninguna"]
+- Riesgos o puntos sensibles: [lista o "ninguno"]
+- Datos que faltan para resolver de fondo: [lista o "ninguno"]
+- Borrador generado por SIMI Jurídico-Administrativo. Debe ser revisado, ajustado y aprobado por el funcionario competente antes de su envío oficial.
+
+Genera el oficio completo con esa estructura exacta. Si por falta de información no es posible resolver de fondo algún punto, el oficio lo dice como requerimiento (punto 5), nunca como nota.
 `.trim();
 }
 

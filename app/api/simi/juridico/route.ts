@@ -28,6 +28,7 @@ import {
   buildTransferPrompt,
   buildClarificationPrompt,
   buildPersonalDataPrompt,
+  fechaLarga,
 } from '@/lib/simi-juridico/prompts';
 import type {
   SimiJuridicoPayload,
@@ -39,6 +40,7 @@ import type {
   SimiLenguajeClaro,
 } from '@/src/types/simi-juridico';
 import { NOMBRES_TENANT }         from '@/src/types/reglas-negocio';
+import { labelCanalRespuesta }    from '@/lib/institucion';
 import type { VentanillaRadicado } from '@/src/types/ventanilla';
 
 export const runtime = 'nodejs';
@@ -178,9 +180,12 @@ function formatRadicadoContext(r: VentanillaRadicado): string {
     `Estado: ${r.estadoActual}`,
     `Tipo solicitud: ${r.termino.tipoSolicitudNombre}`,
     `Dependencia: ${NOMBRES_TENANT[r.clasificacion.oficinaDestino] ?? r.clasificacion.oficinaDestino}`,
-    `Fecha radicado: ${r.control.fechaRadicado}`,
-    `Fecha vencimiento: ${r.termino.fechaVencimiento}`,
+    // En letras: el modelo copia el formato que recibe y un oficio no lleva fechas ISO.
+    `Fecha radicado: ${fechaLarga(r.control.fechaRadicado)}`,
+    `Fecha vencimiento: ${fechaLarga(r.termino.fechaVencimiento)}`,
     `Solicitante: ${r.esAnonimo ? 'Anónimo' : r.solicitante.nombreCompleto}`,
+    // Solo la etiqueta del canal (correo, teléfono…), nunca la dirección ni el correo.
+    `Canal de respuesta: ${labelCanalRespuesta(r.canalRespuesta)}`,
     `Asunto: ${r.detalle.asunto}`,
   ].join('\n');
 }
