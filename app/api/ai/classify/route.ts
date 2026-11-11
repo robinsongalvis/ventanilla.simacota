@@ -3,6 +3,7 @@ import { CLASSIFIER_PROMPT, CLASSIFIER_SCHEMA } from '@/lib/ai/prompts/classifie
 import { registrarLogIA } from '@/lib/ai/telemetry';
 import { ejecutarConResiliencia } from '@/lib/ai/resilience';
 import { evaluarAccesoIA } from '@/lib/ai/guard-publico-ia';
+import { obtenerClavesGemini, esErrorDeCuota } from '@/lib/ai/gemini-keys';
 
 function ejecutarClasificacionLocal(asunto: string, descripcion: string, isFallbackError = false) {
   const text = `${asunto || ''} ${descripcion}`.toLowerCase();
@@ -51,7 +52,10 @@ function ejecutarClasificacionLocal(asunto: string, descripcion: string, isFallb
 
 export async function POST(request: Request) {
   const start = Date.now();
-  const apiKey = process.env.GEMINI_API_KEY;
+  // Principal + respaldo(s): si una agota su cuota (429), se rota a la siguiente,
+  // igual que en SIMI jurídico. Sin ninguna clave, clasificador local.
+  const claves = obtenerClavesGemini();
+  const apiKey = claves[0];
   let asunto = '';
   let descripcion = '';
 
@@ -100,8 +104,6 @@ export async function POST(request: Request) {
       return NextResponse.json(mockResponse);
     }
 
-    const geminiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${apiKey}`;
-
     const geminiRequestBody = {
       contents: [
         {
@@ -126,17 +128,21 @@ export async function POST(request: Request) {
       },
     };
 
-    // Consumir Gemini a través de la malla de resiliencia (Circuit Breaker + Retries)
-    const response = await ejecutarConResiliencia(
+    // Una llamada con una clave concreta, a través de la malla de resiliencia
+    // (Circuit Breaker + Retries).
+    const llamarConClave = (clave: string) => ejecutarConResiliencia(
       'GeminiClasificador',
       async () => {
-        const res = await fetch(geminiUrl, {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
+        const res = await fetch(
+          `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${clave}`,
+          {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify(geminiRequestBody),
           },
-          body: JSON.stringify(geminiRequestBody),
-        });
+        );
 
         if (!res.ok) {
           const errText = await res.text();
@@ -154,6 +160,24 @@ export async function POST(request: Request) {
         },
       }
     );
+
+    // Rotación: solo la cuota agotada se resuelve cambiando de clave; cualquier
+    // otro error sigue su curso (y abajo cae a la clasificación local).
+    let response: Response | undefined;
+    for (let i = 0; i < claves.length; i += 1) {
+      try {
+        response = await llamarConClave(claves[i]);
+        break;
+      } catch (error) {
+        const mensaje = error instanceof Error ? error.message : String(error);
+        if (esErrorDeCuota(mensaje) && i < claves.length - 1) {
+          console.warn(`[ai/classify] La clave ${i + 1} agotó su cuota; se rota a la ${i + 2}.`);
+          continue;
+        }
+        throw error;
+      }
+    }
+    if (!response) throw new Error('No fue posible conectar con Gemini.');
 
     const resData = await response.json();
     const responseText = resData.candidates?.[0]?.content?.parts?.[0]?.text;
