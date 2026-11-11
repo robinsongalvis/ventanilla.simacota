@@ -31,7 +31,11 @@ export async function callGeminiJuridico<T = string>(
     contents: [{ role: 'user', parts: [{ text: opts.userPrompt }] }],
     generationConfig: {
       temperature:     0.3,   // Más determinístico para análisis jurídico
-      maxOutputTokens: 4096,
+      // gemini-2.5-flash razona antes de responder y ese razonamiento consume
+      // maxOutputTokens: sin presupuesto de sobra el JSON llega truncado.
+      // Se apaga el razonamiento (tarea determinística) y se amplía el tope.
+      thinkingConfig:  { thinkingBudget: 0 },
+      maxOutputTokens: 8192,
       ...(opts.expectJson
         ? { responseMimeType: 'application/json' }
         : {}),
@@ -49,7 +53,7 @@ export async function callGeminiJuridico<T = string>(
     'gemini-juridico',
     async () => {
       const response = await fetch(
-        `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash-001:generateContent?key=${apiKey}`,
+        `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${apiKey}`,
         {
           method:  'POST',
           headers: { 'Content-Type': 'application/json' },
