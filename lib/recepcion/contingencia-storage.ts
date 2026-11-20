@@ -1,5 +1,5 @@
 /** ADR 0043: configuración versionada de esta entrega, no una variable secreta. */
-export const CONTINGENCIA_STORAGE_ACTIVA = true;
+export const CONTINGENCIA_STORAGE_ACTIVA = false;
 
 export const MENSAJE_SOPORTES_PENDIENTES =
   'Radicado creado con soportes pendientes de digitalización. Storage no disponible: conserve los originales en la custodia registrada.';
